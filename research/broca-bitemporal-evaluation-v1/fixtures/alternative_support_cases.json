@@ -1,0 +1,649 @@
+{
+  "schema_version": "broca-alternative-support-fixtures-v1",
+  "status": "proposed_gold_cases_not_yet_executed",
+  "time_semantics": "half-open [valid_from, valid_to); null valid_to means unbounded",
+  "cases": [
+    {
+      "id": "A01",
+      "name": "retract-one-of-two-independent-supports",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-ready",
+          "subject": "build-42",
+          "attribute": "ready",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J1",
+          "proposition_id": "P-ready",
+          "rule_id": "all-prereqs",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J2",
+          "proposition_id": "P-ready",
+          "rule_id": "manual-approval",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        },
+        {
+          "id": "J3",
+          "proposition_id": "P-release",
+          "rule_id": "ready-allows-release",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "proposition",
+              "id": "P-ready"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "retract_source",
+        "id": "E1"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-ready",
+          "P-release"
+        ],
+        "unsupported_propositions": [],
+        "active_justifications": [
+          "J2",
+          "J3"
+        ],
+        "invalidated_justifications": [
+          "J1"
+        ],
+        "conflicts": []
+      }
+    },
+    {
+      "id": "A02",
+      "name": "retract-last-valid-support",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-ready",
+          "subject": "build-42",
+          "attribute": "ready",
+          "value": "true"
+        },
+        {
+          "id": "P-release",
+          "subject": "build-42",
+          "attribute": "release_allowed",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J1",
+          "proposition_id": "P-ready",
+          "rule_id": "r",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J2",
+          "proposition_id": "P-ready",
+          "rule_id": "r",
+          "rule_version": "v2",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        },
+        {
+          "id": "J3",
+          "proposition_id": "P-release",
+          "rule_id": "r-release",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "proposition",
+              "id": "P-ready"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "retract_sources",
+        "ids": [
+          "E1",
+          "E2"
+        ]
+      },
+      "expected": {
+        "supported_propositions": [],
+        "unsupported_propositions": [
+          "P-ready",
+          "P-release"
+        ],
+        "active_justifications": [],
+        "invalidated_justifications": [
+          "J1",
+          "J2",
+          "J3"
+        ],
+        "conflicts": []
+      }
+    },
+    {
+      "id": "A03",
+      "name": "conjunctive-dependency-with-alternative-proof",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E3",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-build",
+          "subject": "build-42",
+          "attribute": "build_ready",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J1",
+          "proposition_id": "P-build",
+          "rule_id": "ci-plus-review",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            },
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        },
+        {
+          "id": "J2",
+          "proposition_id": "P-build",
+          "rule_id": "trusted-override",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E3"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "retract_source",
+        "id": "E1"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-build"
+        ],
+        "unsupported_propositions": [],
+        "active_justifications": [
+          "J2"
+        ],
+        "invalidated_justifications": [
+          "J1"
+        ],
+        "conflicts": []
+      }
+    },
+    {
+      "id": "A04",
+      "name": "rule-version-retirement-with-alternative",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-compliant",
+          "subject": "release-42",
+          "attribute": "compliant",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J-old",
+          "proposition_id": "P-compliant",
+          "rule_id": "compliance-policy",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J-current",
+          "proposition_id": "P-compliant",
+          "rule_id": "attested-compliance",
+          "rule_version": "v3",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "invalidate_rule_version",
+        "rule_id": "compliance-policy",
+        "rule_version": "v1"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-compliant"
+        ],
+        "unsupported_propositions": [],
+        "active_justifications": [
+          "J-current"
+        ],
+        "invalidated_justifications": [
+          "J-old"
+        ],
+        "conflicts": []
+      }
+    },
+    {
+      "id": "A05",
+      "name": "alternative-support-does-not-resolve-opposed-values",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-true",
+          "subject": "build-42",
+          "attribute": "ready",
+          "value": "true"
+        },
+        {
+          "id": "P-false",
+          "subject": "build-42",
+          "attribute": "ready",
+          "value": "false"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J-true",
+          "proposition_id": "P-true",
+          "rule_id": "r",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J-false",
+          "proposition_id": "P-false",
+          "rule_id": "r",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "query",
+        "subject": "build-42",
+        "attribute": "ready",
+        "valid_at": "2026-01-15",
+        "known_at": "2026-01-15"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-true",
+          "P-false"
+        ],
+        "unsupported_propositions": [],
+        "active_justifications": [
+          "J-false",
+          "J-true"
+        ],
+        "invalidated_justifications": [],
+        "conflicts": [
+          {
+            "subject": "build-42",
+            "attribute": "ready",
+            "proposition_ids": [
+              "P-false",
+              "P-true"
+            ],
+            "required_result": "conflict_no_value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A06",
+      "name": "late-evidence-does-not-leak-into-as-known-query",
+      "sources": [
+        {
+          "id": "E-old",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01",
+          "recorded_at": "2026-01-02T00:00:00Z"
+        },
+        {
+          "id": "E-late",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01",
+          "recorded_at": "2026-03-10T00:00:00Z"
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-owner-alice",
+          "subject": "asset-7",
+          "attribute": "owner",
+          "value": "alice",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01"
+        },
+        {
+          "id": "P-owner-bob",
+          "subject": "asset-7",
+          "attribute": "owner",
+          "value": "bob",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J-alice",
+          "proposition_id": "P-owner-alice",
+          "rule_id": "ownership",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E-old"
+            }
+          ]
+        },
+        {
+          "id": "J-bob",
+          "proposition_id": "P-owner-bob",
+          "rule_id": "ownership-correction",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E-late"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "query",
+        "subject": "asset-7",
+        "attribute": "owner",
+        "valid_at": "2026-01-15",
+        "known_at": "2026-02-01T00:00:00Z"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-owner-alice"
+        ],
+        "unsupported_propositions": [
+          "P-owner-bob"
+        ],
+        "active_justifications": [
+          "J-alice"
+        ],
+        "invalidated_justifications": [],
+        "conflicts": [],
+        "note": "E-late has an earlier valid time but arrives after known_at and is invisible to the as-known query"
+      }
+    },
+    {
+      "id": "A07",
+      "name": "support-intervals-form-a-normalized-union",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01"
+        },
+        {
+          "id": "E2",
+          "valid_from": "2026-02-01",
+          "valid_to": "2026-03-01"
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-available",
+          "subject": "service-x",
+          "attribute": "available",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J-jan",
+          "proposition_id": "P-available",
+          "rule_id": "uptime-a",
+          "rule_version": "v1",
+          "valid_from": "2026-01-01",
+          "valid_to": "2026-02-01",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J-feb",
+          "proposition_id": "P-available",
+          "rule_id": "uptime-b",
+          "rule_version": "v1",
+          "valid_from": "2026-02-01",
+          "valid_to": "2026-03-01",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E2"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "query_interval_union",
+        "proposition_id": "P-available"
+      },
+      "expected": {
+        "supported_propositions": [
+          "P-available"
+        ],
+        "unsupported_propositions": [],
+        "active_justifications": [
+          "J-feb",
+          "J-jan"
+        ],
+        "invalidated_justifications": [],
+        "conflicts": [],
+        "supported_intervals": [
+          {
+            "valid_from": "2026-01-01",
+            "valid_to": "2026-03-01"
+          }
+        ],
+        "note": "the boundary at 2026-02-01 is continuous under half-open interval semantics"
+      }
+    },
+    {
+      "id": "A08",
+      "name": "no-self-supporting-cycle-after-leaf-retraction",
+      "sources": [
+        {
+          "id": "E1",
+          "valid_from": "2026-01-01",
+          "valid_to": null
+        }
+      ],
+      "propositions": [
+        {
+          "id": "P-a",
+          "subject": "entity",
+          "attribute": "a",
+          "value": "true"
+        },
+        {
+          "id": "P-b",
+          "subject": "entity",
+          "attribute": "b",
+          "value": "true"
+        }
+      ],
+      "justifications": [
+        {
+          "id": "J-a-leaf",
+          "proposition_id": "P-a",
+          "rule_id": "root-rule",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "source",
+              "id": "E1"
+            }
+          ]
+        },
+        {
+          "id": "J-a-from-b",
+          "proposition_id": "P-a",
+          "rule_id": "cycle-rule",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "proposition",
+              "id": "P-b"
+            }
+          ]
+        },
+        {
+          "id": "J-b-from-a",
+          "proposition_id": "P-b",
+          "rule_id": "cycle-rule",
+          "rule_version": "v1",
+          "dependencies": [
+            {
+              "kind": "proposition",
+              "id": "P-a"
+            }
+          ]
+        }
+      ],
+      "mutation": {
+        "kind": "retract_source",
+        "id": "E1"
+      },
+      "expected": {
+        "supported_propositions": [],
+        "unsupported_propositions": [
+          "P-a",
+          "P-b"
+        ],
+        "active_justifications": [],
+        "invalidated_justifications": [
+          "J-a-leaf",
+          "J-a-from-b",
+          "J-b-from-a"
+        ],
+        "conflicts": [],
+        "note": "this proposed finite-DAG prototype rejects the cycle instead of allowing circular support"
+      }
+    }
+  ]
+}
