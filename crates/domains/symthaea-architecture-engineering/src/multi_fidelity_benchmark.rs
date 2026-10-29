@@ -57,6 +57,10 @@ pub struct MultiFidelityRun {
     pub random_simple_regret: f64,
     pub promotion_hit_global_optimum: bool,
     pub random_hit_global_optimum: bool,
+    /// Fraction of the oracle's top-10 candidates retained by promotion.
+    pub promotion_top_10_recall: f64,
+    /// Fraction of the oracle's top-10 candidates discovered by full-fidelity random search.
+    pub random_top_10_recall: f64,
     /// Spearman rank correlation between F0 scores and the known full-fidelity oracle.
     /// This is diagnostic-only and is available because this is a synthetic test.
     pub f0_quality_spearman: f64,
@@ -83,6 +87,8 @@ pub struct MultiFidelityAggregate {
     pub paired_regret_improvement_sample_sd: f64,
     pub promotion_global_optimum_hit_rate: f64,
     pub random_global_optimum_hit_rate: f64,
+    pub mean_promotion_top_10_recall: f64,
+    pub mean_random_top_10_recall: f64,
     pub mean_f0_quality_spearman: f64,
     pub mean_f0_nominal_95_coverage: f64,
     pub mean_f0_absolute_standardized_residual: f64,
@@ -306,6 +312,26 @@ pub fn run_multi_fidelity_trial(
     let promotion_best_quality = evaluate_candidate(promotion_best, quality_landscape).quality;
     let random_best_quality = evaluate_candidate(random_best, quality_landscape).quality;
     let global_quality = oracle.global_optimum_quality;
+    let oracle_top_10: HashSet<&str> = oracle.top_k_ids.iter().map(String::as_str).collect();
+    let top_10_denominator = oracle_top_10.len() as f64;
+    let promotion_top_10_recall = if top_10_denominator == 0.0 {
+        0.0
+    } else {
+        active
+            .iter()
+            .filter(|candidate| oracle_top_10.contains(candidate.id().as_str()))
+            .count() as f64
+            / top_10_denominator
+    };
+    let random_top_10_recall = if top_10_denominator == 0.0 {
+        0.0
+    } else {
+        random_candidates
+            .iter()
+            .filter(|candidate| oracle_top_10.contains(candidate.id().as_str()))
+            .count() as f64
+            / top_10_denominator
+    };
     let f0_trace: Vec<&MultiFidelityTraceEvent> = candidate_trace
         .iter()
         .filter(|event| {
@@ -353,6 +379,8 @@ pub fn run_multi_fidelity_trial(
         random_simple_regret: (global_quality - random_best_quality).max(0.0),
         promotion_hit_global_optimum: optimum_ids.contains(promotion_best.id().as_str()),
         random_hit_global_optimum: optimum_ids.contains(random_best.id().as_str()),
+        promotion_top_10_recall,
+        random_top_10_recall,
         f0_quality_spearman,
         f0_nominal_95_coverage,
         f0_mean_absolute_standardized_residual,
@@ -422,6 +450,12 @@ pub fn run_multi_fidelity_sweep(
             .filter(|run| run.random_hit_global_optimum)
             .count() as f64
             / runs.len() as f64,
+        mean_promotion_top_10_recall: mean(
+            &runs.iter().map(|run| run.promotion_top_10_recall).collect::<Vec<_>>(),
+        ),
+        mean_random_top_10_recall: mean(
+            &runs.iter().map(|run| run.random_top_10_recall).collect::<Vec<_>>(),
+        ),
         mean_f0_quality_spearman: mean(
             &runs
                 .iter()
@@ -672,6 +706,8 @@ mod tests {
         );
         assert_eq!(run.promoted_full_fidelity_count, 4);
         assert_eq!(run.random_full_fidelity_count, 13);
+        assert!((0.0..=1.0).contains(&run.promotion_top_10_recall));
+        assert!((0.0..=1.0).contains(&run.random_top_10_recall));
     }
 
     #[test]
