@@ -31,9 +31,9 @@ A candidate report must contain the following fields. The fixture hash must be c
       "cases": [
         {
           "case_id": "GCRB-A01",
-          "observed_disposition": "PRESERVE_OR_VERSION_METRIC",
-          "observed_severity": "medium",
-          "observed_required_behaviors": ["exact required behavior text from fixture"],
+          "observed_disposition": "BLOCK_SUCCESS_CLAIM_AND_PRESERVE_VERSIONS",
+          "observed_severity": "high",
+          "observed_required_behaviors": ["preserve_original_metric", "append_revision_with_reason_and_authority", "recompute_both_definitions"],
           "observed_forbidden_behaviors": [],
           "hard_gate_violations": []
         }
