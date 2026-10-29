@@ -272,3 +272,14 @@ A new Rust verifier and `search-exposure-receipt.schema.json` define a hash-chai
 The CLI `verify-search-receipt` distinguishes integrity failure (exit 10) from declared network-policy violation (exit 9); a receipt passing both gates still says that an external anchor is required. The focused workflow now has authored controls for intact receipts, allowed activity under an isolated policy, allowlist violations, mutated events, missing events, and reordered events. These are not yet passing evidence.
 
 A hash chain is not a trusted telemetry source. A party able to rewrite all events and recompute the run commitment can create a new internally consistent receipt. Scored runs therefore need the receipt commitment anchored in an independent append-only channel and network policy enforced by the runner, plus separate evaluator-side matching of retrieval artifacts against protected benchmark metadata, question context, and answer material. No receipt alone proves absence of unlogged network channels or pretraining contamination.
+
+
+## Follow-on: evaluator-side retrieval match adjudication (prototype; not yet CI-verified)
+
+The retrieval receipt is now paired with a separate evaluator-side match-report contract, tracked under [SCI-BENCH-SEARCH-EXPOSURE-001 / #8865](https://github.com/Luminous-Dynamics/symthaea/issues/8865). The match report binds to the exact receipt bytes and commitment, matcher revision, decision rules, and one ordered disposition for every logged event. It distinguishes benchmark-metadata leakage, question-context leakage, explicit-answer exposure, benign related material, no match, not-evaluable events, and ambiguous matches requiring review.
+
+The Rust verifier enforces full event coverage, protected-reference and evidence digests for positive match classifications, threshold/score constraints, and report commitment integrity. Exact-digest claims require equality between the protected-reference and evidence digests. Confirmed protected-content exposure blocks scoring; ambiguous cases pause for review. Every retrieval event remains represented rather than being filtered from the denominator.
+
+This is a **post-run report-contract verifier, not an implemented semantic matcher**. A separate evaluator process must compare stored retrieval artifacts against protected benchmark metadata, question context, and answers to produce the classifications. The evidence store and match report must remain inaccessible to the evaluated policy until the run is locked. The validator checks what the matcher claims; it does not establish that a lexical/semantic matcher is accurate, that all network activity was logged, or that the model's pretraining data are uncontaminated.
+
+The focused workflow now includes authored controls for a clean report, explicit answer exposure, ambiguous review, missing event records, and mutated classification/report bytes. No exact-head pass is claimed before CI finishes.
