@@ -535,3 +535,35 @@ A paired synthetic fixture holds identical service and storage configuration. On
 ### Claim ceiling
 
 This evaluator is a small synthetic benchmark harness. It does not imply calibrated scenario probabilities, real-world dispatch savings, causal operational impact, aircraft feasibility or SOTA outperformance. The next benchmark stage must reproduce a published charging/microgrid baseline on matched data/formulation and then compare paired held-out scenarios with identical inputs and compute budgets.
+
+
+## 18. P3 paired policy bake-off — coverage, recourse value and regret (2026-10-29)
+
+The paired benchmark module consumes one verified frozen baseline plan and a weighted panel of realized scenarios with forecast histories. It evaluates four policy families on the same panel:
+
+- **Static:** replay the same actions against each scenario, without changing the plan.
+- **Greedy:** run the renewable-first/grid-second/battery-last benchmark on each realized scenario.
+- **Rolling:** run the information-time-constrained policy with its supplied forecast history and state carryover.
+- **Perfect information:** exact solve on the complete realized scenario, reported only as an optimistic reference.
+
+### Required outputs
+
+For each policy, report feasible, infeasible and unresolved weight separately; mean cost and accounted lifecycle CO2e conditional on feasible weight; and worst feasible cost/emissions. Pairwise deltas only use the scenarios where both policies have independently verified feasible results.
+
+The evaluator reports:
+- rolling cost regret relative to the perfect-information minimum;
+- static-minus-rolling cost, where positive means rolling recourse was cheaper;
+- greedy-minus-rolling cost, where positive means rolling recourse was cheaper;
+- comparable weight for each paired delta, so the denominator is never implicit.
+
+An exact comparator dominance guard fails the evaluation if a feasible rolling plan is cheaper than the exact perfect-information minimum beyond numeric tolerance under the same scenario, objective and hard constraints. Such a result is a solver/accounting/comparator defect until independently resolved, not evidence of a breakthrough.
+
+### Reproducibility
+
+The paired benchmark digest binds the baseline scenario digest and actions, sorted weighted scenario IDs, scenario/forecast episode digests, per-policy statuses, verified actions/metrics, rolling timestamps and planning digests, and the search budget. The panel's integer weights must sum exactly to 1,000,000 ppm. These weights are scenario-design weights unless calibrated; they must not be reported as empirical probabilities by default.
+
+### Synthetic result interpretation
+
+The paired fixture contains a regular low-future-price scenario and a first-interval grid-capacity outage. One frozen schedule is feasible in the regular case but fails the outage; rolling recourse succeeds in both. The clairvoyant exact policy is the cost floor, and rolling regret reflects the information available when each action was committed. These figures are synthetic and are a falsifier demonstration, not an airport savings estimate.
+
+The evaluator does not prove SOTA. A credible superiority claim still requires protocol parity, identical input/data/compute budgets, chronological holdout, exact-oracle parity on tractable cases, and independent physical/lifecycle data where the claim requires them.
