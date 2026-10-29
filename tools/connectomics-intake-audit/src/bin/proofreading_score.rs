@@ -152,7 +152,7 @@ struct ClusterBootstrap {
     balanced_accuracy_95: Option<Interval>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct Interval {
     lower: f64,
     upper: f64,
