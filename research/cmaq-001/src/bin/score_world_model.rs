@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::process;
@@ -172,10 +172,6 @@ impl Report {
             self.hard_gate_pass
         )
     }
-}
-
-fn action_field(prefix: &str, action: usize) -> String {
-    format!("{prefix}_a{action}")
 }
 
 fn score(key: &Table, predictions: &Table) -> Result<Report, String> {
