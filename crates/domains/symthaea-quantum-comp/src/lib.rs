@@ -118,7 +118,8 @@ pub use photonic_architecture::{
     OpticalLink, OpticalRoute, OpticalRouteObjective, PhotonicEnvelopeError,
     PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope, PrimitiveEnvelopeEstimate,
     ProbabilityInterval, RobustPrimitiveEnvelopeEstimate, find_optical_route,
-    multiplexed_source_success_probability, transmission_probability,
+    loss_budget_db_for_minimum_transmission, multiplexed_source_success_probability,
+    route_fits_minimum_transmission, transmission_probability,
 };
 pub use preflight::{
     PreflightFinding, PreflightReport, PreflightSeverity, preflight_binding_config,
