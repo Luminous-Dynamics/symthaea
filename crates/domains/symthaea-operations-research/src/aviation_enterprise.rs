@@ -1013,7 +1013,7 @@ pub struct BranchAndBoundReport {
     pub stats: BranchAndBoundStats,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 struct RecoverySearchNode {
     source: PartSource,
     depth: usize,
@@ -1023,6 +1023,14 @@ struct RecoverySearchNode {
     lower_bound: u64,
     serial: u64,
 }
+
+impl PartialEq for RecoverySearchNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.lower_bound == other.lower_bound && self.serial == other.serial
+    }
+}
+
+impl Eq for RecoverySearchNode {}
 
 impl Ord for RecoverySearchNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
