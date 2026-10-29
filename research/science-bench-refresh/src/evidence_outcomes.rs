@@ -6,8 +6,7 @@
 //! scientific truth. Inference/calibration uncertainty is a separate analysis.
 
 use crate::counterfactual_evidence::{
-    EVIDENCE_INTERVENTION_PLAN_SCHEMA, EvidenceInterventionPlanV1,
-    verify_evidence_intervention_plan,
+    EvidenceInterventionPlanV1, verify_evidence_intervention_plan,
 };
 use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
@@ -291,6 +290,71 @@ struct OutcomeCommitmentPayloadV1<'a> {
     evaluator_revision_sha256: &'a str,
     decision_rules_sha256: &'a str,
     records: &'a [EvidenceOutcomeRecordV1],
+}
+
+fn require_keys(value: &serde_json::Value, keys: &[&str], label: &str) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{label} must be a JSON object"))?;
+    for key in keys {
+        if !object.contains_key(*key) {
+            return Err(format!("{label} is missing required field {key}"));
+        }
+    }
+    Ok(())
+}
+
+/// Serde intentionally maps omitted Option fields to None; the receipt contract
+/// distinguishes an explicit null from an omitted field, so enforce presence.
+fn validate_json_shape(bytes: &[u8], full_report: bool) -> Result<(), String> {
+    let value: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|error| format!("outcome JSON is malformed: {error}"))?;
+    let mut root_keys = vec![
+        "schema",
+        "plan_sha256",
+        "plan_commitment_sha256",
+        "evaluator_revision_sha256",
+        "decision_rules_sha256",
+        "records",
+    ];
+    if full_report {
+        root_keys.push("report_commitment_sha256");
+    }
+    require_keys(&value, &root_keys, "outcome report")?;
+    let records = value["records"]
+        .as_array()
+        .ok_or_else(|| "outcome report records must be a JSON array".to_owned())?;
+    const RECORD_KEYS: &[&str] = &[
+        "pair_id",
+        "trial_id",
+        "condition",
+        "terminal_status",
+        "response_status",
+        "runner_receipt_sha256",
+        "response_artifact_sha256",
+        "evaluator_record_sha256",
+        "task_correctness",
+        "evidence_use",
+        "claim_support",
+        "abstention_quality",
+        "confidence_millionths",
+        "confidence_source",
+        "resources",
+    ];
+    const RESOURCE_KEYS: &[&str] = &[
+        "wall_clock_ms",
+        "tool_calls",
+        "experiment_count",
+        "input_tokens",
+        "output_tokens",
+        "cost_micro_usd",
+    ];
+    for (index, record) in records.iter().enumerate() {
+        let label = format!("records[{index}]");
+        require_keys(record, RECORD_KEYS, &label)?;
+        require_keys(&record["resources"], RESOURCE_KEYS, &format!("{label}.resources"))?;
+    }
+    Ok(())
 }
 
 fn valid_digest(value: &str) -> bool {
@@ -694,6 +758,7 @@ pub fn compute_evidence_outcome_report_commitment(
     plan_bytes: &[u8],
     fields_bytes: &[u8],
 ) -> Result<String, String> {
+    validate_json_shape(fields_bytes, false)?;
     let fields: EvidenceOutcomeReportFieldsV1 = serde_json::from_slice(fields_bytes)
         .map_err(|error| format!("outcome fields do not match strict v1 shape: {error}"))?;
     let (_, issues) = validate_against_plan(plan_bytes, &fields)?;
@@ -709,6 +774,7 @@ pub fn verify_evidence_outcome_report(
     plan_bytes: &[u8],
     report_bytes: &[u8],
 ) -> Result<EvidenceOutcomeVerificationReportV1, String> {
+    validate_json_shape(report_bytes, true)?;
     let report: EvidenceOutcomeReportV1 = serde_json::from_slice(report_bytes)
         .map_err(|error| format!("outcome report does not match strict v1 shape: {error}"))?;
     let fields = fields_from_report(&report);
