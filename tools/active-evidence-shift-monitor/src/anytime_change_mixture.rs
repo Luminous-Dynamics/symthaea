@@ -96,7 +96,10 @@ impl AnytimeChangeMixture {
 
     /// Update the monitor with one Bernoulli event and return log portfolio e-value.
     pub fn observe(&mut self, event: bool) -> f64 {
-        self.steps += 1;
+        self.steps = self
+            .steps
+            .checked_add(1)
+            .expect("anytime-mixture step counter exhausted; fail closed rather than wrap");
         for component in &mut self.components {
             component.observe(self.steps, event);
         }
