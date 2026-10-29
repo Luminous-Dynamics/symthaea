@@ -129,6 +129,8 @@ class PairedComparisonTests(unittest.TestCase):
         candidate = result["arm_summaries"]["candidate"]
         self.assertAlmostEqual(candidate["cost_per_scheduled_trial_usd"], candidate["total_cost_usd"] / 16)
         self.assertEqual(candidate["duration_percentile_method"], "nearest_rank")
+        for arm in result["arm_summaries"].values():
+            self.assertIn("two_way_task_seed_bootstrap_sensitivity_95ci_pp", arm)
         self.assertTrue(result["pairwise_comparisons"])
         self.assertEqual(result["pairwise_comparisons"][0]["paired_task_cluster_count"], 8)
         self.assertEqual(result["pairwise_comparisons"][0]["seeds_per_task"], 2)
@@ -205,6 +207,8 @@ class PairedComparisonTests(unittest.TestCase):
         self.assertEqual(pair["task_win_sign_test"]["p_value_two_sided"], 0.25)
         self.assertEqual(pair["task_win_sign_test"]["holm_adjusted_p_value"], 0.25)
         self.assertTrue(pair["task_win_sign_test"]["estimable"])
+        self.assertIn("two_way_task_seed_bootstrap_sensitivity_95ci_pp", pair)
+        self.assertFalse(pair["intervals_are_simultaneous"])
 
     def test_deterministic_bootstrap_repeats_exactly(self) -> None:
         first = self.fixture.analyze()
@@ -212,6 +216,26 @@ class PairedComparisonTests(unittest.TestCase):
         self.assertEqual(first["arm_summaries"], second["arm_summaries"])
         self.assertEqual(first["pairwise_comparisons"], second["pairwise_comparisons"])
 
+    def test_crossed_bootstrap_exposes_seed_sensitivity_hidden_by_task_only_interval(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        for row in manifest["results"]:
+            if row["arm_id"] == "reference":
+                row["outcome"] = "fail"
+            else:
+                row["outcome"] = "pass" if row["seed"] == 101 else "fail"
+        result = self.fixture.analyze(manifest)
+        candidate = result["arm_summaries"]["candidate"]
+        task_ci = candidate["task_cluster_bootstrap_95ci_pp"]
+        crossed_ci = candidate["two_way_task_seed_bootstrap_sensitivity_95ci_pp"]
+        # Each task averages to 50% over both fixed seeds, so a task-only
+        # bootstrap is degenerate despite strong dependence on the chosen seeds.
+        self.assertEqual(task_ci, {"lower_pp": 50.0, "upper_pp": 50.0})
+        self.assertLess(crossed_ci["lower_pp"], 50.0)
+        self.assertGreater(crossed_ci["upper_pp"], 50.0)
+        pair = result["pairwise_comparisons"][0]
+        self.assertEqual(pair["paired_cluster_bootstrap_95ci_pp"], {"lower_pp": 50.0, "upper_pp": 50.0})
+        self.assertLess(pair["two_way_task_seed_bootstrap_sensitivity_95ci_pp"]["lower_pp"], 50.0)
+        self.assertGreater(pair["two_way_task_seed_bootstrap_sensitivity_95ci_pp"]["upper_pp"], 50.0)
 
     def test_exact_task_win_sign_test_is_directional_and_handles_ties(self) -> None:
         self.assertAlmostEqual(analyzer.exact_two_sided_sign_test_pvalue(5, 0), 0.0625)
