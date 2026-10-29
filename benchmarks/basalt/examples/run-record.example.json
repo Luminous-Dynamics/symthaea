@@ -7,7 +7,7 @@
     "repository": "Luminous-Dynamics/symthaea",
     "base_revision": "0123456789abcdef0123456789abcdef01234567",
     "candidate_revision": "89abcdef0123456789abcdef0123456789abcdef",
-    "manifest_digest": "sha256:49e42bf4ce773582a88d3e99ec3d2c6cf1fa565f793030ea4b2a66231b122d9d",
+    "manifest_digest": "sha256:432efff153a973a63b9b3916668a67f7efd1ad4a0b4cb1d02b07638c273a5c26",
     "orchestrator_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
     "verifier_bundle_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
   },
@@ -90,6 +90,13 @@
                 "blocking": true,
                 "status": "fail",
                 "evidence_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              {
+                "check_id": "scope",
+                "kind": "scope",
+                "blocking": true,
+                "status": "pass",
+                "evidence_digest": "sha256:abababababababababababababababababababababababababababababababab"
               }
             ]
           },
