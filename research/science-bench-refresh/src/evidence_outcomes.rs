@@ -241,6 +241,7 @@ pub struct ConditionOutcomeSummaryV1 {
     pub evidence_use_counts: BTreeMap<String, u64>,
     pub claim_support_counts: BTreeMap<String, u64>,
     pub abstention_quality_counts: BTreeMap<String, u64>,
+    pub confidence_source_counts: BTreeMap<String, u64>,
     pub confidence_recorded_trials: u64,
     pub confidence_missing_answered_trials: u64,
     pub wall_clock_ms: CounterSummaryV1,
@@ -648,6 +649,7 @@ fn scorecard(
         let mut evidence_use_counts = BTreeMap::new();
         let mut claim_support_counts = BTreeMap::new();
         let mut abstention_quality_counts = BTreeMap::new();
+        let mut confidence_source_counts = BTreeMap::new();
         let mut confidence_recorded_trials = 0u64;
         let mut confidence_missing_answered_trials = 0u64;
         for record in &selected {
@@ -657,6 +659,7 @@ fn scorecard(
             increment(&mut evidence_use_counts, record.evidence_use.as_str())?;
             increment(&mut claim_support_counts, record.claim_support.as_str())?;
             increment(&mut abstention_quality_counts, record.abstention_quality.as_str())?;
+            increment(&mut confidence_source_counts, record.confidence_source.as_str())?;
             if record.confidence_millionths.is_some() {
                 confidence_recorded_trials = confidence_recorded_trials
                     .checked_add(1)
@@ -681,6 +684,7 @@ fn scorecard(
             evidence_use_counts,
             claim_support_counts,
             abstention_quality_counts,
+            confidence_source_counts,
             confidence_recorded_trials,
             confidence_missing_answered_trials,
             wall_clock_ms: resource_summary(selected.iter().map(|r| r.resources.wall_clock_ms))?,
@@ -710,7 +714,7 @@ fn scorecard(
         external_anchor_required: true,
         runner_execution_proven: false,
         uncertainty_model: "not_estimated_by_structural_validator".to_owned(),
-        claim_boundary: "descriptive labels only; runner unauthenticated; no generalization/SOTA claim"
+        claim_boundary: "descriptive labels; runner unverified; no generalization/SOTA claim"
             .to_owned(),
     })
 }
