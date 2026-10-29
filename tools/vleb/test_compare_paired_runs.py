@@ -6,7 +6,9 @@ import copy
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -263,6 +265,59 @@ class PairedComparisonTests(unittest.TestCase):
         manifest["results"][0]["network_mode"] = ["none"]
         with self.assertRaises(ValueError):
             self.fixture.analyze(manifest)
+
+
+    def test_cli_accepts_exact_pins_and_writes_a_valid_analysis_only_report(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="vleb-paired-cli-") as temporary:
+            root = Path(temporary)
+            source = root / "manifest.json"
+            report = root / "report.json"
+            source.write_bytes(jbytes(self.fixture.manifest))
+            completed = subprocess.run(
+                [
+                    sys.executable, str(MODULE_PATH),
+                    "--input", str(source),
+                    "--expected-input-sha256", sha(source.read_bytes()),
+                    "--expected-protocol-sha256", self.fixture.PROTOCOL,
+                    "--expected-analyzer-sha256", sha(MODULE_PATH.read_bytes()),
+                    "--output", str(report),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            output = json.loads(completed.stdout)
+            saved = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(output, saved)
+            self.assertTrue(output["valid"])
+            self.assertTrue(output["analysis_only"])
+            self.assertFalse(output["score_eligible"])
+
+    def test_cli_rejects_wrong_external_manifest_pin_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="vleb-paired-cli-reject-") as temporary:
+            source = Path(temporary) / "manifest.json"
+            source.write_bytes(jbytes(self.fixture.manifest))
+            completed = subprocess.run(
+                [
+                    sys.executable, str(MODULE_PATH),
+                    "--input", str(source),
+                    "--expected-input-sha256", "f" * 64,
+                    "--expected-protocol-sha256", self.fixture.PROTOCOL,
+                    "--expected-analyzer-sha256", sha(MODULE_PATH.read_bytes()),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertEqual(completed.returncode, 1)
+            output = json.loads(completed.stdout)
+            self.assertFalse(output["valid"])
+            self.assertTrue(output["analysis_only"])
+            self.assertFalse(output["score_eligible"])
+            self.assertEqual(output["issues"][0]["code"], "paired_comparison_rejected")
 
 
 if __name__ == "__main__":
