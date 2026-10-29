@@ -319,6 +319,24 @@ pub fn verify_retiming_plan(
     }
 }
 
+/// Diagnostics from the deterministic greedy baseline.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RetimingGreedyStats {
+    pub processed_flights: u64,
+    pub candidate_actions_considered: u64,
+    pub feasible_candidate_actions_considered: u64,
+    pub assigned_flight_count: u64,
+    pub cancelled_flight_count: u64,
+    pub total_delay_minutes: u64,
+}
+
+/// A verified feasible plan and transparent greedy work counters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetimingGreedyReport {
+    pub plan: RetimingPlan,
+    pub stats: RetimingGreedyStats,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RetimingSearchOptions {
     pub max_expanded_nodes: u64,
@@ -621,6 +639,141 @@ pub fn solve_retiming_branch_and_bound(
     })
 }
 
+/// Deterministic, feasibility-preserving greedy baseline. Flights are considered
+/// by scheduled start and stable ID. For each flight, it chooses the lowest-cost
+/// currently feasible aircraft/delay action, preferring assignment over
+/// cancellation on exact cost ties. It never revisits earlier assignments, so
+/// it is a baseline for the anytime search, not a claim of global optimality.
+pub fn solve_retiming_greedy(
+    scenario: &RetimingScenario,
+) -> Result<RetimingGreedyReport, String> {
+    scenario.validate()?;
+    let mut order: Vec<usize> = (0..scenario.flights.len()).collect();
+    order.sort_by(|left, right| {
+        let a = &scenario.flights[*left];
+        let b = &scenario.flights[*right];
+        (a.scheduled_start_minutes, a.id.as_str())
+            .cmp(&(b.scheduled_start_minutes, b.id.as_str()))
+    });
+
+    let mut choices: Vec<Option<RetimingChoice>> = vec![None; scenario.flights.len()];
+    let mut stats = RetimingGreedyStats::default();
+
+    for flight_index in order {
+        let flight = &scenario.flights[flight_index];
+        // The tuple sorts by cost first; then assignment (0) wins over
+        // cancellation (1) on equal cost; delay and aircraft ID settle ties.
+        let mut best_key = (
+            flight.cancellation_cost,
+            1_u8,
+            0_u32,
+            String::new(),
+        );
+        let mut best_choice = RetimingChoice::Cancel;
+
+        for aircraft_index in 0..scenario.aircraft.len() {
+            let aircraft = &scenario.aircraft[aircraft_index];
+            for delay_minutes in 0..=flight.max_delay_minutes {
+                stats.candidate_actions_considered =
+                    stats.candidate_actions_considered.saturating_add(1);
+                let action_cost = flight
+                    .delay_cost_per_minute
+                    .checked_mul(u64::from(delay_minutes))
+                    .ok_or_else(|| format!("flight {} delay cost overflows", flight.id))?;
+                let key = (action_cost, 0_u8, delay_minutes, aircraft.id.clone());
+                choices[flight_index] = Some(RetimingChoice::Assign {
+                    aircraft_index,
+                    delay_minutes,
+                });
+                if partial_retiming_is_feasible(scenario, &choices, scenario.flights.len()) {
+                    stats.feasible_candidate_actions_considered =
+                        stats.feasible_candidate_actions_considered.saturating_add(1);
+                    if key < best_key {
+                        best_key = key;
+                        best_choice = RetimingChoice::Assign {
+                            aircraft_index,
+                            delay_minutes,
+                        };
+                    }
+                }
+                choices[flight_index] = None;
+            }
+        }
+
+        choices[flight_index] = Some(best_choice);
+        stats.processed_flights = stats.processed_flights.saturating_add(1);
+    }
+
+    let mut assignments = Vec::with_capacity(scenario.flights.len());
+    let mut total_delay_minutes = 0_u64;
+    let mut assigned_count = 0_u64;
+    let mut cancellation_count = 0_u64;
+    let mut total_cost = 0_u64;
+
+    for (index, choice) in choices.iter().enumerate() {
+        let flight = &scenario.flights[index];
+        let Some(choice) = choice else {
+            return Err(format!("greedy baseline left flight {} undecided", flight.id));
+        };
+        match choice {
+            RetimingChoice::Cancel => {
+                assignments.push(RetimingAssignment {
+                    flight_id: flight.id.clone(),
+                    aircraft_id: None,
+                    delay_minutes: 0,
+                });
+                cancellation_count = cancellation_count.saturating_add(1);
+                total_cost = total_cost
+                    .checked_add(flight.cancellation_cost)
+                    .ok_or_else(|| "greedy objective overflows u64".to_string())?;
+            }
+            RetimingChoice::Assign {
+                aircraft_index,
+                delay_minutes,
+            } => {
+                assignments.push(RetimingAssignment {
+                    flight_id: flight.id.clone(),
+                    aircraft_id: Some(scenario.aircraft[*aircraft_index].id.clone()),
+                    delay_minutes: *delay_minutes,
+                });
+                assigned_count = assigned_count.saturating_add(1);
+                total_delay_minutes = total_delay_minutes
+                    .checked_add(u64::from(*delay_minutes))
+                    .ok_or_else(|| "greedy delay total overflows u64".to_string())?;
+                let delay_cost = flight
+                    .delay_cost_per_minute
+                    .checked_mul(u64::from(*delay_minutes))
+                    .ok_or_else(|| "greedy delay cost overflows u64".to_string())?;
+                total_cost = total_cost
+                    .checked_add(delay_cost)
+                    .ok_or_else(|| "greedy objective overflows u64".to_string())?;
+            }
+        }
+    }
+
+    let plan = RetimingPlan {
+        scenario_id: scenario.id.clone(),
+        configuration_revision: scenario.configuration_revision.clone(),
+        input_digest: scenario.input_digest.clone(),
+        assignments,
+        total_cost,
+    };
+    let verification = verify_retiming_plan(scenario, &plan);
+    if verification.status != RetimingVerificationStatus::Verified
+        || verification.recomputed_cost != Some(total_cost)
+    {
+        return Err(format!(
+            "greedy baseline/verifier disagreement: {:?}",
+            verification.violations
+        ));
+    }
+
+    stats.total_delay_minutes = total_delay_minutes;
+    stats.assigned_flight_count = assigned_count;
+    stats.cancelled_flight_count = cancellation_count;
+    Ok(RetimingGreedyReport { plan, stats })
+}
+
 /// Validate only the already decided prefix, rejecting unavailable flights and
 /// any pair of committed intervals that violate an aircraft's turnaround.
 fn partial_retiming_is_feasible(
@@ -635,6 +788,7 @@ fn partial_retiming_is_feasible(
         vec![Vec::new(); scenario.aircraft.len()];
     for flight_index in 0..decided_count {
         match choices[flight_index] {
+            None => continue,
             Some(RetimingChoice::Cancel) => {}
             Some(RetimingChoice::Assign {
                 aircraft_index,
