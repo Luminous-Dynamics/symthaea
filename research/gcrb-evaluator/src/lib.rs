@@ -1383,7 +1383,11 @@ fn validate_cross_system_record(
                         "inferred record {evidence_id} has unresolved derivation input {input_id}"
                     ));
                 }
-                input_ids.insert(input_id.to_owned());
+                if !input_ids.insert(input_id.to_owned()) {
+                    return Err(format!(
+                        "inferred record {evidence_id} repeats derivation input {input_id}"
+                    ));
+                }
             }
             let dependency_ids = dependencies.iter().cloned().collect::<BTreeSet<_>>();
             if input_ids.is_empty() || input_ids != dependency_ids {
@@ -1936,4 +1940,16 @@ mod tests {
         assert!(result.unwrap_err().contains("must be 40 lowercase hex chars"));
     }
 
+
+
+    #[test]
+    fn rejects_duplicate_inferred_derivation_inputs() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][4]["derivation"]["input_evidence_ids"] = serde_json::json!([
+            "SYMTROPY-SIM-001", "SYMTROPY-SIM-001"
+        ]);
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("repeats derivation input"));
+    }
 }
