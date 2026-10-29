@@ -236,6 +236,9 @@ struct StrategyResult {
     mean_regret: f64,
     mean_net_regret: f64,
     net_lift_vs_direct: f64,
+    net_lift_standard_error: f64,
+    net_lift_ci95_low: f64,
+    net_lift_ci95_high: f64,
     model_query_cost_per_query: f64,
 }
 
@@ -249,14 +252,18 @@ fn nearest_model_mae(predictions: Option<[f64; 2]>, world: WorldFamily) -> Optio
     })
 }
 
-fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direct_net: f64, seed: u64, cost_per_query: f64) -> StrategyResult {
+fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, seed: u64, cost_per_query: f64) -> StrategyResult {
     let decision = decide(world, support, strategy, cost_per_query);
+    let direct_action = decide(world, support, Strategy::DirectTabular, cost_per_query).action;
+    let direct_probability = reward_probability(world, HELDOUT_CONTEXT, direct_action);
     let chosen_probability = reward_probability(world, HELDOUT_CONTEXT, decision.action);
     let oracle_probability = reward_probability(world, HELDOUT_CONTEXT, 0)
         .max(reward_probability(world, HELDOUT_CONTEXT, 1));
     let mut reward_total = 0_u64;
     let mut oracle_reward_total = 0_u64;
     let mut regret_total = 0_u64;
+    let mut paired_lift_sum = 0.0_f64;
+    let mut paired_lift_square_sum = 0.0_f64;
 
     for episode in 0..EVALUATION_EPISODES {
         let stream_seed = seed
@@ -266,6 +273,10 @@ fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direc
         let shared_draw = rng.unit_f64();
         let reward = if shared_draw < chosen_probability { 1_u64 } else { 0_u64 };
         let oracle_reward = if shared_draw < oracle_probability { 1_u64 } else { 0_u64 };
+        let direct_reward = if shared_draw < direct_probability { 1_u64 } else { 0_u64 };
+        let paired_lift = reward as f64 - decision.query_cost - direct_reward as f64;
+        paired_lift_sum += paired_lift;
+        paired_lift_square_sum += paired_lift * paired_lift;
         reward_total += reward;
         oracle_reward_total += oracle_reward;
         regret_total += oracle_reward.saturating_sub(reward);
@@ -276,6 +287,12 @@ fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direc
     let mean_net_utility = mean_reward - decision.query_cost;
     let mean_regret = regret_total as f64 / EVALUATION_EPISODES as f64;
     let mean_net_regret = oracle_mean_reward - mean_net_utility;
+    let net_lift_vs_direct = paired_lift_sum / EVALUATION_EPISODES as f64;
+    let variance_numerator = (paired_lift_square_sum
+        - paired_lift_sum * paired_lift_sum / EVALUATION_EPISODES as f64)
+        .max(0.0);
+    let sample_variance = variance_numerator / (EVALUATION_EPISODES - 1) as f64;
+    let net_lift_standard_error = (sample_variance / EVALUATION_EPISODES as f64).sqrt();
 
     StrategyResult {
         name: strategy.name(),
@@ -288,7 +305,10 @@ fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direc
         oracle_mean_reward,
         mean_regret,
         mean_net_regret,
-        net_lift_vs_direct: mean_net_utility - direct_net,
+        net_lift_vs_direct,
+        net_lift_standard_error,
+        net_lift_ci95_low: net_lift_vs_direct - 1.96 * net_lift_standard_error,
+        net_lift_ci95_high: net_lift_vs_direct + 1.96 * net_lift_standard_error,
         model_query_cost_per_query: cost_per_query,
     }
 }
@@ -297,23 +317,8 @@ fn evaluate_family(world: WorldFamily) -> Vec<StrategyResult> {
     let support = SupportMeans::fit(world, SEED);
     let mut rows = Vec::with_capacity(Strategy::ALL.len() * MODEL_QUERY_COST_LEVELS.len());
     for cost_per_query in MODEL_QUERY_COST_LEVELS {
-        let direct = evaluate(
-            world,
-            Strategy::DirectTabular,
-            support,
-            0.0,
-            SEED,
-            cost_per_query,
-        );
         rows.extend(Strategy::ALL.iter().copied().map(|strategy| {
-            evaluate(
-                world,
-                strategy,
-                support,
-                direct.mean_net_utility,
-                SEED,
-                cost_per_query,
-            )
+            evaluate(world, strategy, support, SEED, cost_per_query)
         }));
     }
     rows
@@ -354,9 +359,10 @@ fn emit_report() {
             );
             emit_optional_float(row.model_prediction_mae);
             print!(
-                ",\"mean_reward\":{:.6},\"mean_net_utility\":{:.6},\"oracle_mean_reward\":{:.6},\"mean_regret\":{:.6},\"mean_net_regret\":{:.6},\"net_lift_vs_direct\":{:.6}}}",
+                ",\"mean_reward\":{:.6},\"mean_net_utility\":{:.6},\"oracle_mean_reward\":{:.6},\"mean_regret\":{:.6},\"mean_net_regret\":{:.6},\"net_lift_vs_direct\":{:.6},\"net_lift_standard_error\":{:.6},\"net_lift_ci95_low\":{:.6},\"net_lift_ci95_high\":{:.6}}}",
                 row.mean_reward, row.mean_net_utility, row.oracle_mean_reward,
-                row.mean_regret, row.mean_net_regret, row.net_lift_vs_direct
+                row.mean_regret, row.mean_net_regret, row.net_lift_vs_direct,
+                row.net_lift_standard_error, row.net_lift_ci95_low, row.net_lift_ci95_high
             );
         }
         print!("]}}");
@@ -378,8 +384,7 @@ mod tests {
 
     fn result_for(world: WorldFamily, strategy: Strategy, cost_per_query: f64) -> StrategyResult {
         let support = SupportMeans::fit(world, SEED);
-        let direct = evaluate(world, Strategy::DirectTabular, support, 0.0, SEED, cost_per_query);
-        evaluate(world, strategy, support, direct.mean_net_utility, SEED, cost_per_query)
+        evaluate(world, strategy, support, SEED, cost_per_query)
     }
 
     #[test]
@@ -387,6 +392,7 @@ mod tests {
         let result = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(result.chosen_action, 1);
         assert!(result.net_lift_vs_direct > 0.10);
+        assert!(result.net_lift_ci95_low > 0.0);
         assert!(result.model_query_cost > 0.0);
         assert!(result.model_prediction_mae.unwrap() < 0.05);
     }
@@ -396,6 +402,7 @@ mod tests {
         let result = result_for(WorldFamily::InteractionOnly, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(result.chosen_action, 0);
         assert!(result.net_lift_vs_direct < -0.05);
+        assert!(result.net_lift_ci95_high < 0.0);
         assert!(result.model_prediction_mae.unwrap() > 0.20);
     }
 
@@ -429,7 +436,9 @@ mod tests {
         assert!(free.net_lift_vs_direct > normal_cost.net_lift_vs_direct);
         assert!(normal_cost.net_lift_vs_direct > expensive.net_lift_vs_direct);
         assert!(free.net_lift_vs_direct > 0.10);
+        assert!(normal_cost.net_lift_ci95_low > 0.0);
         assert!(expensive.net_lift_vs_direct < 0.0);
+        assert!(expensive.net_lift_ci95_high < 0.0);
         assert_eq!(expensive.model_query_count, 2);
         assert!((expensive.model_query_cost - 0.32).abs() < 1e-9);
     }
