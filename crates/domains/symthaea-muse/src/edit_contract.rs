@@ -651,7 +651,7 @@ mod tests {
             requirement: ObligationRequirement::PreserveWithin {
                 comparator_id: "rms-envelope-delta-v1".to_string(),
                 tolerance: QuantizedTolerance {
-                    value_microunits: 1_000_000,
+                    value_microunits: 500_000,
                     unit: "db".to_string(),
                 },
             },
@@ -748,10 +748,10 @@ mod tests {
         obligations.push(preservation_obligation(
             "edited-envelope",
             EditAttribute::RmsEnvelope,
-            ObligationScope::Event { event_id: "note-17".to_string() },
+            ObligationScope::Event { event_id: "score_event_index:1".to_string() },
             RMS_ENVELOPE_COMPARATOR_ID,
             "db",
-            1_000_000,
+            500_000,
         ));
         FrozenEditContract::new(
             "task-1".to_string(),
