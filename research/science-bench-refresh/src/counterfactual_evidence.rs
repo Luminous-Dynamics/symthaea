@@ -40,6 +40,10 @@ pub struct EvidenceInterventionPlanFieldsV1 {
     pub tool_manifest_sha256: String,
     pub budget_sha256: String,
     pub analysis_plan_sha256: String,
+    /// Evaluator implementation must be frozen before the first trial.
+    pub evaluator_revision_sha256: String,
+    /// Outcome labels and decision thresholds must be frozen before the first trial.
+    pub decision_rules_sha256: String,
     pub randomization_commitment_sha256: String,
     pub required_conditions: Vec<String>,
     pub pairs: Vec<EvidenceInterventionPairV1>,
@@ -153,6 +157,8 @@ fn fields_from_plan(plan: &EvidenceInterventionPlanV1) -> EvidenceInterventionPl
         tool_manifest_sha256: plan.tool_manifest_sha256.clone(),
         budget_sha256: plan.budget_sha256.clone(),
         analysis_plan_sha256: plan.analysis_plan_sha256.clone(),
+        evaluator_revision_sha256: plan.evaluator_revision_sha256.clone(),
+        decision_rules_sha256: plan.decision_rules_sha256.clone(),
         randomization_commitment_sha256: plan.randomization_commitment_sha256.clone(),
         required_conditions: plan.required_conditions.clone(),
         pairs: plan.pairs.clone(),
@@ -180,6 +186,8 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
         ("tool_manifest_sha256", fields.tool_manifest_sha256.as_str()),
         ("budget_sha256", fields.budget_sha256.as_str()),
         ("analysis_plan_sha256", fields.analysis_plan_sha256.as_str()),
+        ("evaluator_revision_sha256", fields.evaluator_revision_sha256.as_str()),
+        ("decision_rules_sha256", fields.decision_rules_sha256.as_str()),
         (
             "randomization_commitment_sha256",
             fields.randomization_commitment_sha256.as_str(),
@@ -425,7 +433,9 @@ mod tests {
             tool_manifest_sha256: digest('4'),
             budget_sha256: digest('5'),
             analysis_plan_sha256: digest('6'),
-            randomization_commitment_sha256: digest('7'),
+            evaluator_revision_sha256: digest('7'),
+            decision_rules_sha256: digest('9'),
+            randomization_commitment_sha256: digest('8'),
             required_conditions,
             pairs: vec![EvidenceInterventionPairV1 {
                 pair_id: "pair-1".to_owned(),
