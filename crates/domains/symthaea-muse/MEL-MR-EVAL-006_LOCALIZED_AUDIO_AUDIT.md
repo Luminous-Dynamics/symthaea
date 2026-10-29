@@ -18,10 +18,10 @@ This is a deliberately narrow, deterministic detector suite—not a claim of per
 - Frames intersecting the authorized mask expanded by a configured boundary guard are skipped. The guard is an explicit allowance, not a learned reverb-tail model.
 - Every other complete window is measured independently per channel.
 - The onset audit computes spectral-flux novelty per channel and matches detected onset events one-to-one within the configured timing tolerance. An event outside tolerance is conservatively recorded as a missing reference onset and an extra candidate onset.
-- Onset events inside the authorized mask expanded by the configured boundary guard are excluded. The onset audit abstains when there is too little protected duration or no calibration ID.
+- Onset events inside the authorized mask expanded by both the detector's STFT support (`frame_size / 2 + hop_size`) and the configured boundary/spillover guard are excluded. The effective guard is recorded in the receipt. The onset audit abstains when there is too little protected duration, no calibration ID, or no measurable protected reference onset.
 - Threshold exceedance in any protected channel-window blocks acceptance. Non-finite audio, malformed masks, and incompatible inputs are errors.
 - Passing additionally requires an externally maintained calibration ID and a minimum number of protected windows. An identifier is only recorded; the module cannot prove that calibration is real, appropriate, or frozen.
-- The report contains SHA-256 commitments over domain-separated sample bits and format metadata. They bind the receipt to supplied buffers but do not authenticate authorship, capture time, or renderer identity.
+- The report contains SHA-256 commitments over domain-separated sample bits and format metadata, plus sample rate, channel count, frame count, full detector configuration, and effective boundary guard. These bind the receipt to supplied buffers and documented metric settings but do not authenticate authorship, capture time, or renderer identity.
 
 ## Tests included
 
