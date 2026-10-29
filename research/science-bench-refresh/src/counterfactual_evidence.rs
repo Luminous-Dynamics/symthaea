@@ -113,6 +113,7 @@ pub struct EvidenceInterventionPlanReportV1 {
 
 fn valid_digest(value: &str) -> bool {
     value.len() == 64
+        && !value.bytes().all(|byte| byte == b'0')
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
@@ -244,6 +245,7 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
         }
 
         let mut conditions = BTreeSet::new();
+        let mut evidence_manifest_digests = BTreeSet::new();
         let mut orders = BTreeSet::new();
         for (trial_index, trial) in pair.trials.iter().enumerate() {
             let trial_prefix = format!("{pair_prefix}.trials[{trial_index}]");
@@ -268,7 +270,11 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
                 issues.push(format!("{trial_prefix}.policy_input_sha256 must be a lowercase SHA-256 digest"));
             }
             if !valid_digest(&trial.evidence_manifest_sha256) {
-                issues.push(format!("{trial_prefix}.evidence_manifest_sha256 must be a lowercase SHA-256 digest"));
+                issues.push(format!("{trial_prefix}.evidence_manifest_sha256 must be a nonzero lowercase SHA-256 digest"));
+            } else if !evidence_manifest_digests.insert(trial.evidence_manifest_sha256.as_str()) {
+                issues.push(format!(
+                    "{pair_prefix} reuses evidence_manifest_sha256 across conditions; condition-specific evidence/provenance manifests must have distinct commitments"
+                ));
             }
             if !valid_digest(&trial.seed_commitment_sha256) {
                 issues.push(format!("{trial_prefix}.seed_commitment_sha256 must be a lowercase SHA-256 digest"));
@@ -450,8 +456,16 @@ mod tests {
         let mut fields = fields();
         fields.required_conditions.swap(0, 1);
         fields.pairs[0].trials[0].policy_input_sha256 = "not-a-digest".to_owned();
+        fields.pairs[0].trials[1].evidence_manifest_sha256 =
+            fields.pairs[0].trials[0].evidence_manifest_sha256.clone();
         let issues = validate_fields(&fields);
         assert!(issues.iter().any(|issue| issue.contains("canonical order")));
         assert!(issues.iter().any(|issue| issue.contains("policy_input_sha256")));
+        assert!(issues.iter().any(|issue| issue.contains("reuses evidence_manifest_sha256")));
+    }
+
+    #[test]
+    fn rejects_all_zero_digest_placeholders() {
+        assert!(!valid_digest(&digest('0')));
     }
 }
