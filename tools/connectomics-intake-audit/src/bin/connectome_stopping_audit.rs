@@ -693,7 +693,7 @@ fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditRepor
         recommendation: "CONTINUE_REVIEW",
         status: if errors.is_empty() { "VALIDATED_NOT_STOPPED" } else { "FAIL" },
         errors,
-        scope_note: "Tail stability is a descriptive diagnostic, not a forecast or proof of biological correctness. The tool always recommends CONTINUE_REVIEW because this schema does not establish residual high-impact error risk or a valid stopping threshold. The caller-declared cluster/snapshot independence is not proven.",
+        scope_note: "Tail stability is descriptive and the optional asymptotic model is a one-step-ahead walk-forward diagnostic compared with persistence and linear-trend baselines. Evaluation conditions on the target snapshot cumulative edit count, which is only known retrospectively; it does not forecast elapsed time or edits required to meet a quality threshold, and does not yet provide calibrated prediction intervals. Neither stability nor forecast fit proves biological correctness. The tool always recommends CONTINUE_REVIEW because residual high-impact-error risk and a valid stopping threshold are not established.",
     }
 }
 
@@ -829,6 +829,8 @@ mod tests {
         }
         let before = walk_forward_forecasts(&snapshots, 4).0;
         let original = before.iter().find(|forecast| forecast.metric_id == "query:path_count" && forecast.target_sequence_index == 4).unwrap();
+        assert!(original.asymptotic_prediction.is_some());
+        assert!(original.linear_prediction.is_some());
         snapshots[4].query_evidence.metrics.get_mut("path_count").unwrap().value = 500.0;
         let after = walk_forward_forecasts(&snapshots, 4).0;
         let changed_target = after.iter().find(|forecast| forecast.metric_id == "query:path_count" && forecast.target_sequence_index == 4).unwrap();
