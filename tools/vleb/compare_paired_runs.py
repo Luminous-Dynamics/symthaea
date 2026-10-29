@@ -27,7 +27,7 @@ TOP_KEYS = {
     "task_contract_sha256_by_task", "seeds", "reference_arm", "arms",
     "bootstrap", "results",
 }
-ARM_KEYS = {"arm_id", "model_id", "model_version", "scaffold_sha256"}
+ARM_KEYS = {"arm_id", "model_id", "model_version", "scaffold_sha256", "execution_profile_sha256"}
 BOOTSTRAP_KEYS = {"replicates", "seed", "confidence_level"}
 RESULT_KEYS = {
     "task_id", "seed", "arm_id", "outcome", "run_id", "attempt_number",
@@ -125,6 +125,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         _require_nonempty(arm["model_id"], label + ".model_id")
         _require_nonempty(arm["model_version"], label + ".model_version")
         _require_digest(arm["scaffold_sha256"], label + ".scaffold_sha256")
+        _require_digest(arm["execution_profile_sha256"], label + ".execution_profile_sha256")
         arm_ids.append(arm["arm_id"])
     if len(arm_ids) != len(set(arm_ids)):
         raise ValueError("arm IDs must be unique")
