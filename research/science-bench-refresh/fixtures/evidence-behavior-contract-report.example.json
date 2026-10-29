@@ -1,0 +1,82 @@
+{
+  "schema": "symthaea.science_bench_refresh_evidence_behavior_contract_report.v1",
+  "purpose": "example_only",
+  "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "plan_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "evaluator_source_revision": "NOT_IMPLEMENTED_YET",
+  "decision_rules_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "adjudication_mode": "deterministic_synthetic_oracle",
+  "blind_to_system_identity": true,
+  "report_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "records": [
+    {
+      "case_id": "update-001",
+      "status": "pass",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [],
+      "not_evaluable_reason": null
+    },
+    {
+      "case_id": "conflict-001",
+      "status": "violation",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [
+        "silent_conflict"
+      ],
+      "not_evaluable_reason": null
+    },
+    {
+      "case_id": "decoy-001",
+      "status": "pass",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [],
+      "not_evaluable_reason": null
+    },
+    {
+      "case_id": "deletion-001",
+      "status": "not_evaluable",
+      "baseline_response_artifact_sha256": null,
+      "intervention_response_artifact_sha256": null,
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [],
+      "not_evaluable_reason": "Illustrative placeholder: evidence sufficiency not adjudicated."
+    },
+    {
+      "case_id": "permutation-001",
+      "status": "pass",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [],
+      "not_evaluable_reason": null
+    },
+    {
+      "case_id": "force-001",
+      "status": "violation",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [
+        "unsupported_force_increase"
+      ],
+      "not_evaluable_reason": null
+    },
+    {
+      "case_id": "completeness-001",
+      "status": "violation",
+      "baseline_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "intervention_response_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "adjudication_record_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "violation_codes": [
+        "unsupported_material_claim"
+      ],
+      "not_evaluable_reason": null
+    }
+  ]
+}
