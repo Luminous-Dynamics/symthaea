@@ -28,12 +28,13 @@ The code includes endpoint cases, zero rewards, non-finite / negative inputs, pr
 ## Frozen comparison
 
 - Three candidate policies with P(A=1) in {0.10, 0.50, 0.90}.
-- Reward means: E[R|A=0]=0.25, E[R|A=1]=0.75; analytical values are 0.30, 0.50 and 0.70.
-- Healthy fixed logger: P(A=1)=0.50.
-- Weak-overlap fixed logger: P(A=1)=0.99.
-- Structural zero-support logger: P(A=1)=1; target policies put positive mass on action zero, so results must be suppressed.
-- Same logged stream and seed schedule for all candidates and both comparison methods.
-- Horizons 64, 256 and 512; 1,024 deterministic paired replicates per identified scenario. This is a materially stronger simulation panel than the earlier 32-replicate smoke pilot, but it remains synthetic and cannot establish external validity.
+- Clear-margin controls: E[R|A=0]=0.25 and E[R|A=1]=0.75, giving exact values 0.30, 0.50 and 0.70.
+- Small-margin control: E[R|A=0]=0.49 and E[R|A=1]=0.51, giving exact values 0.492, 0.500 and 0.508. This distinguishes weak decision margin from weak support.
+- Policy-tie control: both action reward means are 0.50, so all three target policies have exact value 0.50. Top-1 accuracy treats all true-value maximizers as correct; a valid unique-winner certificate should not occur when policies are tied.
+- Healthy fixed logger P(A=1)=0.50; weak-overlap fixed logger P(A=1)=0.99.
+- Structural zero-support logger P(A=1)=1.00; target policies put positive mass on action zero, so all value, interval and paired-metric outputs must be suppressed.
+- The same logged stream and seed schedule are shared by every candidate and both methods within each scenario.
+- Horizons 64, 256 and 512; 1,024 deterministic paired replicates per identified scenario. This remains synthetic and cannot establish external validity.
 
 Methods:
 1. Fixed-grid pCRP-star-LCB witness with `delta_tail = 0.05 / (2M)` for each policy and each tail. The UCB follows Appendix B.6 of the paper: build the nonnegative complement score `w(a)(1-r)` with expectation `1 - V(pi)` and use `U(pi) = 1 - LCB(w(1-r))`. This is the pCRP-star variant of PUB-style pessimistic selection, with a conservative fixed-bet-grid approximation that may widen the bound.
