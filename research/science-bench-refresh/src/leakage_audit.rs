@@ -109,9 +109,9 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
             let mut canonical = Map::new();
             for key in keys {
                 canonical.insert(
-                key.clone(),
-                canonicalize(&fields[key], numeric_tolerant)?,
-            );
+                    key.clone(),
+                    canonicalize(&fields[key], numeric_tolerant)?,
+                );
             }
             Ok(Value::Object(canonical))
         }
@@ -320,18 +320,28 @@ fn build_near_groups(
         let left_candidates: Vec<&IndexedTask> = left_tasks
             .iter()
             .copied()
-            .filter(|task| right_exact_set.iter().any(|exact| *exact != task.exact_fingerprint.as_str()))
+            .filter(|task| {
+                right_exact_set
+                    .iter()
+                    .any(|exact| *exact != task.exact_fingerprint.as_str())
+            })
             .collect();
         let right_candidates: Vec<&IndexedTask> = right_tasks
             .iter()
             .copied()
-            .filter(|task| left_exact_set.iter().any(|exact| *exact != task.exact_fingerprint))
+            .filter(|task| {
+                left_exact_set
+                    .iter()
+                    .any(|exact| *exact != task.exact_fingerprint.as_str())
+            })
             .collect();
 
         groups.push(OverlapGroupV1 {
             fingerprint_sha256: digest.clone(),
-            left_task_count: u64::try_from(left_candidates.len()).map_err(|_| "left candidate count overflow")?,
-            right_task_count: u64::try_from(right_candidates.len()).map_err(|_| "right candidate count overflow")?,
+            left_task_count: u64::try_from(left_candidates.len())
+                .map_err(|_| "left candidate count overflow")?,
+            right_task_count: u64::try_from(right_candidates.len())
+                .map_err(|_| "right candidate count overflow")?,
             cross_set_pair_count: candidates,
             left_task_ids_sample: sample_ids(left_candidates.into_iter()),
             right_task_ids_sample: sample_ids(right_candidates.into_iter()),
@@ -385,7 +395,8 @@ pub fn audit_policy_input_overlap(
         left_task_set_sha256: sha256_hex(left_bytes),
         right_task_set_sha256: sha256_hex(right_bytes),
         left_task_count: u64::try_from(left_tasks.len()).map_err(|_| "left task count overflow")?,
-        right_task_count: u64::try_from(right_tasks.len()).map_err(|_| "right task count overflow")?,
+        right_task_count: u64::try_from(right_tasks.len())
+            .map_err(|_| "right task count overflow")?,
         exact_overlap_pair_count,
         near_duplicate_candidate_pair_count,
         exact_overlaps,
@@ -480,11 +491,16 @@ mod tests {
         let left = task_set("d", json!([task("a", input(1.0, 2.0))]));
         let right = task_set("r", json!([task("b", input(1.0001, 2.0001))]));
         let first = audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
-        let second = audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
+        let second =
+            audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         let first_bytes = serde_json::to_vec(&first).unwrap();
         let second_bytes = serde_json::to_vec(&second).unwrap();
         assert_eq!(first_bytes, second_bytes);
-        assert!(!String::from_utf8(first_bytes).unwrap().contains("not emitted by overlap auditor"));
+        assert!(
+            !String::from_utf8(first_bytes)
+                .unwrap()
+                .contains("not emitted by overlap auditor")
+        );
     }
 
     #[test]
