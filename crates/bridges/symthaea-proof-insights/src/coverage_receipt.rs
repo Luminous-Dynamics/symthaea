@@ -434,6 +434,119 @@ pub fn verify_receipt(
 }
 
 #[cfg(test)]
+pub mod test_support {
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    const TEST_SPLITS: &[u8] =
+        include_bytes!("../../../../data/benchmarks/proof-insight-transfer-v0/splits.json");
+    const TEST_METHODOLOGY: &[u8] =
+        include_bytes!("../../../../data/benchmarks/proof-insight-transfer-v0/coverage-review-methodology.md");
+
+    pub struct FullPartitionFixture {
+        pub split_bytes: Vec<u8>,
+        pub inventory_bytes: Vec<u8>,
+        pub receipt_bytes: Vec<u8>,
+        pub trust_store_bytes: Vec<u8>,
+        pub methodology_bytes: Vec<u8>,
+        pub partition_digest: String,
+        pub inventory_digest: String,
+        pub receipt_digest: String,
+        pub trust_store_digest: String,
+        pub methodology_digest: String,
+        pub families: BTreeMap<String, String>,
+    }
+
+    pub fn full_partition_fixture() -> Result<FullPartitionFixture> {
+        let split_bytes = TEST_SPLITS.to_vec();
+        let methodology_bytes = TEST_METHODOLOGY.to_vec();
+        let families = validate_frozen_partition(&split_bytes)?;
+        let edge_bytes = serde_json::to_vec(&Vec::<Edge>::new())?;
+        let edge_digest = sha256_hex(&edge_bytes);
+        let methodology_digest = sha256_hex(&methodology_bytes);
+
+        // These deterministic keys are test-only. They cannot stand in for the
+        // externally provisioned reviewer trust root used by a real experiment.
+        let keys = [
+            SigningKey::from_bytes(&[31_u8; 32]),
+            SigningKey::from_bytes(&[47_u8; 32]),
+        ];
+        let trust = TrustStore {
+            schema_version: TRUST_SCHEMA.to_owned(),
+            reviewers: vec![
+                TrustedReviewer {
+                    reviewer_id: "synthetic-auditor-a".to_owned(),
+                    key_id: "synthetic-key-a".to_owned(),
+                    organization_id: "synthetic-org-a".to_owned(),
+                    role: "coverage_auditor".to_owned(),
+                    public_key_hex: hex::encode(keys[0].verifying_key().as_bytes()),
+                },
+                TrustedReviewer {
+                    reviewer_id: "synthetic-auditor-b".to_owned(),
+                    key_id: "synthetic-key-b".to_owned(),
+                    organization_id: "synthetic-org-b".to_owned(),
+                    role: "coverage_auditor".to_owned(),
+                    public_key_hex: hex::encode(keys[1].verifying_key().as_bytes()),
+                },
+            ],
+        };
+        let trust_store_bytes = serde_json::to_vec_pretty(&trust)?;
+        let trust_store_digest = sha256_hex(&trust_store_bytes);
+        let partition = partition_digest(&families);
+        let message = signing_message(
+            UPSTREAM_COMMIT,
+            &partition,
+            &edge_digest,
+            &methodology_digest,
+            &trust_store_digest,
+        );
+        let receipt = Receipt {
+            schema_version: RECEIPT_SCHEMA.to_owned(),
+            upstream_commit: UPSTREAM_COMMIT.to_owned(),
+            source_partition_digest_sha256: partition.clone(),
+            relationship_inventory_edges_sha256: edge_digest,
+            review_methodology_sha256: methodology_digest.clone(),
+            trust_store_sha256: trust_store_digest.clone(),
+            attestation: "complete_relationship_inventory".to_owned(),
+            signatures: keys
+                .iter()
+                .enumerate()
+                .map(|(index, key)| ReviewerSignature {
+                    reviewer_id: format!("synthetic-auditor-{}", if index == 0 { "a" } else { "b" }),
+                    key_id: format!("synthetic-key-{}", if index == 0 { "a" } else { "b" }),
+                    signature_hex: hex::encode(key.sign(&message).to_bytes()),
+                })
+                .collect(),
+        };
+        let receipt_bytes = serde_json::to_vec_pretty(&receipt)?;
+        let receipt_digest = sha256_hex(&receipt_bytes);
+        let inventory = Inventory {
+            schema_version: "pitb.family-leakage-edges.v0".to_owned(),
+            source_partition_digest_sha256: partition.clone(),
+            coverage_status: "independently_reviewed_complete".to_owned(),
+            coverage_receipt_sha256: Some(receipt_digest.clone()),
+            edges: vec![],
+        };
+        let inventory_bytes = serde_json::to_vec_pretty(&inventory)?;
+        let inventory_digest = sha256_hex(&inventory_bytes);
+
+        Ok(FullPartitionFixture {
+            split_bytes,
+            inventory_bytes,
+            receipt_bytes,
+            trust_store_bytes,
+            methodology_bytes,
+            partition_digest: partition,
+            inventory_digest,
+            receipt_digest,
+            trust_store_digest,
+            methodology_digest,
+            families,
+        })
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
@@ -537,6 +650,32 @@ mod tests {
             test_partition_digest,
             families,
         )
+    }
+
+    #[test]
+    fn full_frozen_partition_fixture_verifies_without_granting_analyzer_qualification() {
+        let fixture = test_support::full_partition_fixture().unwrap();
+        assert_eq!(fixture.families.len(), 372);
+        let report = verify_receipt(
+            &fixture.inventory_bytes,
+            &fixture.receipt_bytes,
+            &fixture.trust_store_bytes,
+            &fixture.methodology_bytes,
+            &fixture.trust_store_digest,
+            &fixture.methodology_digest,
+            &fixture.partition_digest,
+            &fixture.families,
+        )
+        .unwrap();
+        assert!(report.cryptographically_verified);
+        assert_eq!(report.relationship_inventory_sha256, fixture.inventory_digest);
+        assert_eq!(report.coverage_receipt_sha256, fixture.receipt_digest);
+        assert_eq!(report.trust_store_sha256, fixture.trust_store_digest);
+        assert_eq!(report.review_methodology_sha256, fixture.methodology_digest);
+        assert_eq!(
+            report.resampling_qualification,
+            "requires_component_and_analyzer_validation"
+        );
     }
 
     #[test]
