@@ -75,6 +75,7 @@ class ShiftEvidenceFixture:
                 event = None if condition == "clean" else {
                     "event_id": event_id,
                     "event_kind": "requirement_update",
+                    "change_family": self.scenario["change_family"],
                     "sequence_number": 4,
                     "intervention_position": self.scenario["intervention_position"],
                     "applied": True,
@@ -255,6 +256,14 @@ class ShiftEventEvidenceTests(unittest.TestCase):
         row["post_shift_execution_profile_sha256"] = sha(b"drifted-post-profile")
         self.refresh_payload(row)
         with self.assertRaisesRegex(ValueError, "drifts in post-shift profile/network mode across seeds"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_event_change_family_must_match_locked_scenario(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+        shifted["runner_event"]["change_family"] = "source_update"
+        self.refresh_payload(shifted)
+        with self.assertRaisesRegex(ValueError, "change family differs"):
             auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
 
     def test_shift_position_must_match_locked_schedule(self) -> None:
