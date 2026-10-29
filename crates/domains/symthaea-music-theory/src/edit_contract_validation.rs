@@ -299,7 +299,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                 format!("region {} has an empty identifier or track set", region.region_id),
             );
         }
-        if region_by_id.insert(&region.region_id, region).is_some() {
+        if region_by_id.insert(region.region_id.as_str(), region).is_some() {
             push(
                 "DUPLICATE_REGION_ID",
                 format!("region ID {} is declared more than once", region.region_id),
