@@ -202,6 +202,52 @@ fn renewable_curtailment_is_not_counted_as_delivered_energy() {
 }
 
 #[test]
+fn initial_soc_is_bound_to_scenario_identity() {
+    let mut case = frontier_scenario();
+    let original_digest = case.input_digest.clone();
+    case.storage.initial_soc_quanta = 1;
+
+    assert_ne!(canonical_energy_hub_digest(&case).unwrap(), original_digest);
+    assert_eq!(
+        solve_exact_energy_hub_pareto(&case, 100_000).unwrap_err(),
+        EnergyHubError::ScenarioDigestMismatch
+    );
+}
+
+#[test]
+fn opening_storage_inventory_can_serve_demand_without_rebooking_upstream_impacts() {
+    let case = seal(TimeIndexedEnergyHubScenario {
+        scenario_id: "hub-opening-inventory-synthetic-v1".to_owned(),
+        input_digest: "pending".to_owned(),
+        currency_code: "USD".to_owned(),
+        quantum_kwh: 1.0,
+        service: TransportService {
+            period_id: "opening-inventory-period".to_owned(),
+            lifecycle_boundary_id: "source-to-load-v1".to_owned(),
+            completed_passenger_km: 100.0,
+            available_seat_km: 120.0,
+        },
+        storage: EnergyStorageSpec {
+            capacity_quanta: 1,
+            initial_soc_quanta: 1,
+            max_charge_input_quanta_per_interval: 1,
+            max_discharge_output_quanta_per_interval: 1,
+            charge_efficiency_ppm: 1_000_000,
+            discharge_efficiency_ppm: 1_000_000,
+            minimum_terminal_soc_quanta: 0,
+        },
+        intervals: vec![interval("t0", 1, 1, 0, 0, 0.0, 0.0, 0.0, 0.0)],
+    });
+    let result = solve_exact_energy_hub_pareto(&case, 10_000).unwrap();
+    let evaluated = verify_energy_hub_plan(&case, &result.frontier[0].plan).unwrap();
+
+    assert_eq!(evaluated.metrics.battery_discharge_output_quanta, 1);
+    assert_eq!(evaluated.metrics.source_ledger.total_delivered_energy_kwh, 1.0);
+    assert_eq!(evaluated.metrics.source_ledger.total_cost, 0.0);
+    assert_eq!(evaluated.metrics.source_ledger.accounted_lifecycle_co2e_kg, 0.0);
+}
+
+#[test]
 fn canonical_digest_is_stable_and_binds_ordered_interval_content() {
     let original = frontier_scenario();
     assert_eq!(
