@@ -142,5 +142,48 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "candidate_dataset_kind": {
+            "const": "synthetic_fixture"
+          }
+        },
+        "required": [
+          "candidate_dataset_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_kind": {
+            "const": "synthetic_fixture"
+          },
+          "structurally_feasible_for_power_planning": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "candidate_dataset_kind": {
+            "const": "candidate_only"
+          }
+        },
+        "required": [
+          "candidate_dataset_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_kind": {
+            "const": "reviewed_census"
+          }
+        }
+      }
+    }
+  ]
 }
