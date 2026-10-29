@@ -381,8 +381,8 @@ fn enumerate_block_directions_recursive(
     ] {
         directions.push(direction);
         enumerate_block_directions_recursive(
-            block_index + 1, candidate_system, blocks, directions, output, seen_cuts,
-            visited_combinations, max_combinations,
+            block_index + 1, candidate_system, blocks, block_by_local_unit, directions,
+            output, seen_cuts, visited_combinations, max_combinations,
         )?;
         directions.pop();
     }
