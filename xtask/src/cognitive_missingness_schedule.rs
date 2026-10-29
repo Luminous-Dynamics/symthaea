@@ -70,7 +70,7 @@ pub enum MissingnessDeclarationMode {
     Silent,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DelayPattern {
     Fixed { ticks: u64 },
@@ -93,11 +93,8 @@ pub enum OutcomeStateAtHorizon {
 pub struct PolicyFeed {
     pub schema_version: u32,
     pub generator_version: String,
-    pub run_id: String,
-    pub dataset_id: String,
-    pub scenario_id: String,
-    pub seed: u64,
-    /// No hidden schedule, mechanism ID, missingness probability, or future reveal time is exposed.
+    /// Deliberately contains no run ID, dataset/scenario label, seed, mechanism ID, selection
+    /// probability, hidden target, or future reveal time. Bind experiment identity outside policy.
     pub messages: Vec<PolicyVisibleMessage>,
 }
 
@@ -318,10 +315,6 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
     let policy_feed = PolicyFeed {
         schema_version: 1,
         generator_version: "cognitive-missingness-schedule-v1".to_string(),
-        run_id: input.run_id.clone(),
-        dataset_id: input.dataset_id.clone(),
-        scenario_id: input.scenario_id.clone(),
-        seed: input.seed,
         messages: policy_messages,
     };
     let evaluator_schedule = EvaluatorSchedule {
@@ -554,6 +547,10 @@ mod tests {
         assert!(!policy_json.contains("expected_reveal_tick"));
         assert!(!policy_json.contains("declaration_tick"));
         assert!(!policy_json.contains("mnar_high_loss"));
+        assert!(!policy_json.contains("scenario_id"));
+        assert!(!policy_json.contains("dataset_id"));
+        assert!(!policy_json.contains("run_id"));
+        assert!(!policy_json.contains("\"seed\""));
         assert!(policy_json.contains("observed_covariate"));
         assert!(policy_json.contains("outcome_loss"));
     }
