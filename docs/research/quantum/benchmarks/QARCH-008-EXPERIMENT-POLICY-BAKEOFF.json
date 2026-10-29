@@ -1,0 +1,184 @@
+{
+  "schema_version": "qarch-008-experiment-policy-bakeoff/1",
+  "fixture_id": "QARCH-008-MODEL-MISSPECIFICATION-DECISION-REGRET-001",
+  "evidence_class": "synthetic_analytic_fixture",
+  "prohibited_claims": [
+    "This fixture is not a quantum hardware benchmark.",
+    "The known truth is evaluator-only and must not be supplied to deployed policy selection.",
+    "Passing this fixture does not demonstrate quantum advantage or empirical superiority."
+  ],
+  "units": {
+    "utility": "utility_points",
+    "measurement_cost": "measurement_seconds"
+  },
+  "decision_problem": {
+    "hypotheses": [
+      "H0",
+      "H1"
+    ],
+    "prior": [
+      0.5,
+      0.5
+    ],
+    "actions": [
+      "choose-H0",
+      "choose-H1"
+    ],
+    "utilities_by_action_and_hypothesis": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "planning_scenarios": [
+    {
+      "id": "nominal",
+      "nominal": true,
+      "prior": [
+        0.5,
+        0.5
+      ],
+      "candidates": {
+        "A-nominal-perfect": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "B-moderate": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ]
+      }
+    },
+    {
+      "id": "plausible-alternative",
+      "nominal": false,
+      "prior": [
+        0.5,
+        0.5
+      ],
+      "candidates": {
+        "A-nominal-perfect": [
+          [
+            0.5,
+            0.5
+          ],
+          [
+            0.5,
+            0.5
+          ]
+        ],
+        "B-moderate": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ]
+      }
+    }
+  ],
+  "held_out_truth": {
+    "id": "held-out-alternative",
+    "evaluator_only": true,
+    "prior": [
+      0.5,
+      0.5
+    ],
+    "candidates": {
+      "A-nominal-perfect": [
+        [
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ],
+      "B-moderate": [
+        [
+          0.8,
+          0.2
+        ],
+        [
+          0.2,
+          0.8
+        ]
+      ]
+    }
+  },
+  "candidate_costs": {
+    "A-nominal-perfect": 1,
+    "B-moderate": 1
+  },
+  "expected": {
+    "no_measurement_expected_utility": 0.5,
+    "oracle_expected_utility": 0.8,
+    "oracle_experiment_id": "B-moderate",
+    "per_candidate": {
+      "A-nominal-perfect": {
+        "expected_decision_utility": 0.5,
+        "ground_truth_posterior_utility": 0.5,
+        "unsupported_outcome_probability": 0
+      },
+      "B-moderate": {
+        "expected_decision_utility": 0.8,
+        "ground_truth_posterior_utility": 0.8,
+        "unsupported_outcome_probability": 0
+      }
+    },
+    "policies": {
+      "nominal_evsi_per_cost": {
+        "selected_experiment_id": "A-nominal-perfect",
+        "expected_decision_utility": 0.5,
+        "decision_regret": 0.3,
+        "expected_measurement_cost": 1
+      },
+      "nominal_information_gain_per_cost": {
+        "selected_experiment_id": "A-nominal-perfect",
+        "expected_decision_utility": 0.5,
+        "decision_regret": 0.3,
+        "expected_information_gain_bits": 1
+      },
+      "robust_worst_case_evsi_per_cost": {
+        "selected_experiment_id": "B-moderate",
+        "expected_decision_utility": 0.8,
+        "decision_regret": 0,
+        "expected_measurement_cost": 1
+      },
+      "fixed_first": {
+        "selected_experiment_id": "A-nominal-perfect",
+        "expected_decision_utility": 0.5,
+        "decision_regret": 0.3,
+        "expected_measurement_cost": 1
+      },
+      "uniform_random": {
+        "selected_experiment_id": null,
+        "expected_decision_utility": 0.65,
+        "decision_regret": 0.15,
+        "expected_measurement_cost": 1
+      }
+    },
+    "notes": "The evaluator computes expected utility exactly from the known held-out truth. Uniform random is the exact arithmetic mean over candidate choices, not a Monte Carlo estimate."
+  }
+}
