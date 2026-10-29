@@ -330,6 +330,7 @@ def _paired_effect(
         return {
             "n_paired_units": 0, "mean_delta": None, "median_delta": None,
             "wins": 0, "ties": 0, "losses": 0, "win_rate_excluding_ties": None,
+            "bootstrap_95pct_ci_win_rate": None,
             "bootstrap_95pct_ci_mean_delta": None, "bootstrap_95pct_ci_median_delta": None,
         }
     wins = sum(value > tie_tolerance for value in differences)
@@ -348,7 +349,6 @@ def _paired_effect(
         estimates.sort()
         return [_quantile(estimates, 0.025), _quantile(estimates, 0.975)] if estimates else None
 
-    ordered = sorted(differences)
     return {
         "n_paired_units": len(differences),
         "mean_delta": statistics.mean(differences),
