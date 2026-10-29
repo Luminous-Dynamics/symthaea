@@ -614,12 +614,72 @@ mod tests {
     }
 
     fn add_balanced_program_holdout(fixture: &mut Fixture) {
-        fixture.add_row("s-train-attack", "a", "program-a", "run-a", "family-a", "board-a", "program_holdout", "train", "attack");
-        fixture.add_row("s-train-benign", "b", "program-b", "run-b", "NA", "board-a", "program_holdout", "train", "benign");
-        fixture.add_row("s-val-attack", "c", "program-c", "run-c", "family-c", "board-a", "program_holdout", "validation", "attack");
-        fixture.add_row("s-val-benign", "d", "program-d", "run-d", "NA", "board-a", "program_holdout", "validation", "benign");
-        fixture.add_row("s-test-attack", "e", "program-e", "run-e", "family-e", "board-a", "program_holdout", "test", "attack");
-        fixture.add_row("s-test-benign", "f", "program-f", "run-f", "NA", "board-a", "program_holdout", "test", "benign");
+        fixture.add_row(
+            "s-train-attack",
+            "a",
+            "program-a",
+            "run-a",
+            "family-a",
+            "board-a",
+            "program_holdout",
+            "train",
+            "attack",
+        );
+        fixture.add_row(
+            "s-train-benign",
+            "b",
+            "program-b",
+            "run-b",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "train",
+            "benign",
+        );
+        fixture.add_row(
+            "s-val-attack",
+            "c",
+            "program-c",
+            "run-c",
+            "family-c",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "attack",
+        );
+        fixture.add_row(
+            "s-val-benign",
+            "d",
+            "program-d",
+            "run-d",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "validation",
+            "benign",
+        );
+        fixture.add_row(
+            "s-test-attack",
+            "e",
+            "program-e",
+            "run-e",
+            "family-e",
+            "board-a",
+            "program_holdout",
+            "test",
+            "attack",
+        );
+        fixture.add_row(
+            "s-test-benign",
+            "f",
+            "program-f",
+            "run-f",
+            "NA",
+            "board-a",
+            "program_holdout",
+            "test",
+            "benign",
+        );
     }
 
     impl Drop for Fixture {
