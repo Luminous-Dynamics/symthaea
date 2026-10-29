@@ -1,6 +1,6 @@
 # CMAQ-007: Planner-Induced World-Model Exploitability
 
-**Status:** protocol v0.2 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.3 + executable synthetic smoke harness; draft  
 **Tracking issue:** [#9035](https://github.com/Luminous-Dynamics/symthaea/issues/9035)  
 **Claim ceiling:** deterministic finite synthetic benchmark only; no SOTA, physical safety, trained-model, or production Symthaea claim
 
@@ -81,17 +81,25 @@ The follow-up control passed at current source commit `22ce169ab360be31bc19f1cda
 
 At size 8, the random score happens to have lower regret because it abstains more often; this is a useful reminder that one seed panel and one threshold do not prove superiority. From sizes 32 to 512, the informative score outperforms the shuffled score on both regret and unsupported-selection rate. But it still leaves substantial unsupported selection at 512 candidates, so support scoring is evidence—not a safety certificate. The workflow now encodes the large-search contrast as a regression assertion rather than a narrative-only observation.
 
-## Calibration-selected risk control (v0.2)
+## Joint risk- and utility-controlled planning (v0.3)
 
-CMAQ-007 v0.2 adds a *risk-controlled selector* to make the support-gate threshold an output of a preregistered calibration procedure, not an after-the-fact tuning choice.
+CMAQ-007 v0.3 replaces hand-picked thresholds with a calibration-selected abstention rule. The design treats world-model authority as conditional: a model action is used only if the calibration evidence meets three separately declared requirements.
 
-For each search size (8, 32, 128 and 512), the procedure uses **256 calibration episodes** from a deterministic seed stream distinct from both the descriptive benchmark panel and **256 held-out qualification episodes**. It examines a fixed six-threshold grid: 0.40, 0.55, 0.75, 0.90, 0.97 and 1.01. The last threshold forces direct fallback because generated support scores are below 1.01. Calibration episodes provide evaluator-observed supported/unsupported labels retrospectively; the candidate selector still receives only the declared candidate-facing score. This is an offline synthetic-calibration assumption, not a claim that live Symthaea can know support labels before execution.
+For each search size (8, 32, 128 and 512), the procedure uses **2,048 calibration episodes** and **2,048 held-out qualification episodes** from distinct deterministic seed streams. Those streams are separate from the 256-episode descriptive panel. It examines a fixed six-threshold grid: 0.40, 0.55, 0.75, 0.90, 0.97 and 1.01. The last threshold forces direct fallback because support scores are below 1.01. Calibration episodes provide evaluator-observed supported/unsupported labels retrospectively; the candidate selector itself receives only the declared candidate-facing support score and predicted utility. This is an offline synthetic-calibration assumption, not a claim that live Symthaea knows support labels before execution.
 
-For each threshold, it computes a **one-sided Clopper–Pearson upper confidence bound** on the episode-level unsupported-selection rate. It applies Bonferroni correction across all six preregistered thresholds (α = 0.05/6) and sets the target bound at **5% unsupported selections**. Among thresholds whose adjusted upper bound is at or below 5%, it selects the one with the greatest calibration coverage; exact coverage ties prefer the stricter threshold. The forced-fallback threshold guarantees a feasible choice, even if the data cannot support any nonzero-coverage model gate.
+For every threshold, the calibrator evaluates three quantities:
 
-The report separately records selected threshold, calibration event count/rate/upper bound/coverage, and qualification event rate/coverage/regret; it also includes direct-fallback regret on the same qualification seeds. The qualification metrics are descriptive held-out checks, not part of threshold selection. A calibration bound under 5% does not automatically guarantee the observed qualification rate is under 5%, especially with finite and synthetic samples; such a mismatch is a result to report.
+1. **Unsupported-selection risk:** the one-sided Clopper–Pearson upper confidence bound on the fraction of episodes in which the chosen model action is evaluator-labelled unsupported must be at most 5%.
+2. **Fallback-downside risk:** the one-sided Clopper–Pearson upper confidence bound on the fraction of episodes in which the selected model action delivers utility no better than the direct fallback must be at most 5%. Episodes where the controller falls back are not counted as a downside event.
+3. **Positive utility lift:** a one-sided Hoeffding lower bound on mean per-episode utility lift versus direct fallback must be strictly above zero. Candidate lift is bounded in this synthetic construction to a width of 0.50 utility units; fallback episodes contribute zero lift.
 
-This is a more defensible pattern than picking 0.97 because it looked good on a single panel, but it is not yet a distribution-free deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution and labels correctly identify the chosen action's support status. It does not cover arbitrary shift after calibration, adaptive adversaries, misspecified support labels, or dependence among episodes. The next experiments must include calibration/qualification family shifts, delayed/noisy labels, score corruption, more independent scenarios, and explicit abstention-cost analysis. If the risk bound forces fallback at larger search sizes, the correct interpretation is that this support estimator has not earned higher-coverage authority—not that the bound should be weakened.
+The six candidate thresholds × three criteria produce 18 bounds, so the procedure uses Bonferroni-adjusted α = 0.05/18 for each bound. Among thresholds satisfying **all three** constraints, it selects the one with the greatest calibration coverage; exact coverage ties prefer the stricter threshold. If no model threshold satisfies every criterion, it selects 1.01, explicitly authorizing fallback and zero model coverage. The model-gate flag distinguishes a genuinely certified threshold from this fallback sentinel.
+
+The report records selected threshold, whether the gate was certified, calibration event counts/rates/upper bounds, the utility-lift estimate and lower bound, held-out event rates/coverage/utility lift/regret, and direct-fallback regret on the same qualification episodes. Qualification outcomes are not used to choose the threshold. The workflow checks the schema, distinct seed roots, sample counts, risk bounds, and positive utility bound for any certified model gate; it does not require a model to be used when none qualifies.
+
+This rule is intentionally conservative, but it is still a synthetic experiment rather than a deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution, support/downside labels are correct, and the candidate utility-lift range is valid. It does not cover arbitrary shift after calibration, adaptive adversaries, mislabelled or delayed support evidence, or dependence among episodes. If the controller abstains at larger search sizes, that shows the current estimator has not earned higher-coverage authority under these requirements. Do not weaken the bound after inspecting qualification outcomes; improve the support estimator, collect better calibration evidence, or improve the model's decision-value margin.
+
+**Status:** v0.3 source and report-contract checks have been added; the exact-head run for this revision is pending. No performance result for the new three-constraint gate should be cited until its focused Rust workflow completes.
 
 ## Falsifiable research questions
 
@@ -111,4 +119,4 @@ A negative answer is still useful. The benchmark must report where no method dom
 - No process isolation, cryptographic provenance, real-world robot interface, or hardware latency/energy measurement.
 - The search-pressure panel is a falsification smoke test, not an industry ranking and not a claim that the current construction beats any SOTA method.
 
-Next steps: add correlated and horizon-amplified model error; adversarial policy-search intensity; distribution shift after policy selection; support-score corruption controls; multiple seeds/families at qualification scale; and then compare Symthaea's model-based policy with direct and robust baselines on a matched task and compute budget.
+Next steps: add correlated and horizon-amplified model error; adversarial policy-search intensity; distribution shift after policy selection; support-score corruption and delayed/noisy-label controls; expand held-out mechanism families; and then compare Symthaea's model-based policy with direct and robust baselines on a matched task and compute budget.
