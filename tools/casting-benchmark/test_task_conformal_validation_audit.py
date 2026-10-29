@@ -150,6 +150,7 @@ def make_case(counts=None, *, false_a=0, false_b=0, no_recommendations=False,
         "critical_strata": strata,
         "frozen_before_outcomes": True,
     }
+    contract_bytes = encode(contract)
     validation = {
         "schema_version": "1.0.0",
         "validation_id": "validation-outcomes-v1",
@@ -161,12 +162,16 @@ def make_case(counts=None, *, false_a=0, false_b=0, no_recommendations=False,
         "outcomes_unsealed_after_decisions": True,
         "independence_unit": "task_id",
         "independence_note": "Each task is a separately generated validation unit.",
+        "audit_contract_sha256": hashlib.sha256(contract_bytes).hexdigest(),
         "decision_receipt_sha256": decision_hash,
         "target_prediction_manifest_sha256": target_hash,
         "tasks": validation_tasks,
     }
     result = audit_evaluate(
         contract, decision, target_manifest, validation,
+        contract_manifest_sha256=hashlib.sha256(contract_bytes).hexdigest(),
+        contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
         decision_receipt_sha256=decision_hash,
         target_prediction_manifest_sha256=target_hash,
     )
@@ -176,7 +181,7 @@ def make_case(counts=None, *, false_a=0, false_b=0, no_recommendations=False,
         "result": result, "bytes": {
             "config": config_bytes, "calibration": calibration_bytes,
             "target": target_bytes, "decision": decision_bytes,
-            "validation": encode(validation), "contract": encode(contract),
+            "validation": encode(validation), "contract": contract_bytes,
         },
     }
 
@@ -241,12 +246,16 @@ class TaskConformalValidationAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match audit contract"):
             audit_evaluate(
                 case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
                 decision_receipt_sha256="f" * 64,
                 target_prediction_manifest_sha256=hashlib.sha256(case["bytes"]["target"]).hexdigest(),
             )
         with self.assertRaisesRegex(ValueError, "target prediction raw-byte digest"):
             audit_evaluate(
                 case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
                 decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
                 target_prediction_manifest_sha256="f" * 64,
             )
@@ -257,6 +266,8 @@ class TaskConformalValidationAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "candidate roster mismatch"):
             audit_evaluate(
                 case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
                 decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
                 target_prediction_manifest_sha256=case["contract"]["target_prediction_manifest_sha256"],
             )
@@ -267,6 +278,8 @@ class TaskConformalValidationAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "undeclared critical stratum"):
             audit_evaluate(
                 case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
                 decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
                 target_prediction_manifest_sha256=case["contract"]["target_prediction_manifest_sha256"],
             )
@@ -274,9 +287,12 @@ class TaskConformalValidationAuditTests(unittest.TestCase):
     def test_contract_requires_the_zero_failure_sample_floor(self):
         case = make_case()
         case["contract"]["minimum_recommended_tasks_per_critical_stratum"] = 58
+        case["validation"]["audit_contract_sha256"] = hashlib.sha256(encode(case["contract"])).hexdigest()
         with self.assertRaisesRegex(ValueError, "planning floor 59"):
             audit_evaluate(
                 case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
+
                 decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
                 target_prediction_manifest_sha256=case["contract"]["target_prediction_manifest_sha256"],
             )
