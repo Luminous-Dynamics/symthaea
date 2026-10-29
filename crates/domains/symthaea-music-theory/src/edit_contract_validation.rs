@@ -292,7 +292,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
 
     for region in &contract.authorization_mask {
         if region.region_id.trim().is_empty()
-            || region.region_id.trim() != region.region_id
+            || region.region_id.trim() != region.region_id.as_str()
             || region.track_ids.is_empty()
             || region.track_ids.iter().any(|id| id.trim().is_empty() || id.trim() != id.as_str())
         {
@@ -905,7 +905,7 @@ mod tests {
             }
             cases += 1;
         }
-        assert_eq!(cases, 25, "the published v0.1 corpus must be complete");
+        assert_eq!(cases, 27, "the published v0.1 corpus must be complete");
     }
 
     #[test]
