@@ -1,0 +1,71 @@
+# CMAQ-007: Planner-Induced World-Model Exploitability
+
+**Status:** protocol v0.1 + executable synthetic smoke harness; draft  
+**Tracking issue:** [#9035](https://github.com/Luminous-Dynamics/symthaea/issues/9035)  
+**Claim ceiling:** deterministic finite synthetic benchmark only; no SOTA, physical safety, trained-model, or production Symthaea claim
+
+## Why this benchmark
+
+A predictor may have low average error and still be unsafe or decision-poor after a planner searches many candidates. Optimization changes the distribution of selected predictions: it preferentially picks favorable errors. Average open-loop loss can therefore conceal selected-action optimism, regret and unsupported-action exploitation.
+
+This slice isolates that effect using a deterministic 256-seed panel and nested candidate catalog sizes of 8, 32, 128 and 512. Each episode uses the same catalog prefix for all policies at a given size; methods are paired on identical hidden truths. Unsupported candidates are rare, have deliberately optimistic model predictions, and have overconfident uncertainty estimates. This makes the world model's errors policy-inducing rather than just uniformly noisy.
+
+The synthetic support-confidence score is imperfect and overlaps between supported and unsupported actions. Support gates therefore expose a **risk–coverage frontier** rather than receiving an oracle support label.
+
+Current literature supports this evaluation direction, not a claim that this harness is novel or state of the art. The 2026 [decision-making-centric world-model evaluation position](https://arxiv.org/abs/2606.15032) explicitly recommends testing policy ranking, optimization lift, exploitability and uncertainty calibration. The [2026 world-model benchmark survey](https://world-model-benchmarks.github.io/) distinguishes prediction-level evaluation from downstream decision utility; its survey snapshot reports 102 representative benchmarks, while its taxonomy includes 13 closed-loop interaction and 14 downstream-outcome-metric entries (categories overlap). A separate 2026 [embodied-world-model benchmark survey](https://arxiv.org/abs/2609.29669) argues that explicit world-model versus direct-policy comparisons and prediction-to-action tests remain scarce. These findings motivate the research question but do not establish a novelty claim for CMAQ-007.
+
+## Run
+
+From this directory:
+
+```sh
+cargo test --locked
+cargo run --quiet --locked
+```
+
+The program prints one machine-readable JSON report. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, and a search-pressure / risk-coverage relation. A passing smoke test establishes only that the code and declared synthetic invariants work.
+
+## Candidate and evaluator boundary
+
+For this synthetic harness, the candidate selector receives predicted utility, a predicted uncertainty value, and a support-confidence score. The evaluator holds the true utility and support flag. In a later process-isolated qualification harness, candidate-facing records must omit evaluator truth, support flags and hidden structural-family identity. In this first slice, source code necessarily specifies the generator; this is not a sealed test set.
+
+## Strategies
+
+- **Direct fallback:** selects a fixed reference action with utility 0.35.
+- **Predicted greedy:** selects the candidate with highest predicted utility.
+- **Uncertainty penalty:** selects predicted utility minus twice its stated uncertainty. The unsupported family intentionally under-reports uncertainty, testing whether a generic penalty can correct structural blind spots.
+- **Support gates:** filter candidate actions by score thresholds 0.40, 0.55, 0.75, 0.90 and 0.97, then select by predicted utility. No learned threshold is tuned on a qualification set.
+- **Oracle upper bound:** evaluator-only selector chooses the best true-utility action or direct fallback. This is not an eligible competitor.
+
+All candidates and methods are evaluated at the same search sizes and episode seeds. Increasing search size uses a prefix of the same 512-candidate catalog for that episode, making the search-pressure contrast paired.
+
+## Reported metrics
+
+- **Prediction MAE:** mean absolute prediction error across the candidate catalog.
+- **Selected-action optimism gap:** predicted utility minus true utility of the action that is selected.
+- **Realized utility and regret:** selected true utility and regret against the evaluator-only best action available in that catalog (including the fallback).
+- **Unsupported-selection rate:** fraction of episodes in which a selector chooses an unsupported candidate.
+- **Coverage:** fraction of episodes in which a selector chooses a model candidate instead of the direct fallback.
+- **Paired regret reduction versus predicted-greedy:** greedy regret minus the strategy's regret, with a normal-approximation 95% interval over the 256 paired episode differences.
+
+The interval is an exploratory normal approximation, not a guarantee of calibration for arbitrary dependence. The independent sampling unit is the seeded episode. Report raw policy-level metrics and the complete risk–coverage frontier; do not choose one threshold after looking at qualification results.
+
+## Falsifiable research questions
+
+1. Does search breadth increase the unsupported-action selection rate or selected-action optimism gap while mean prediction MAE remains comparatively stable?
+2. Does the uncertainty penalty fail when the estimator is structurally overconfident outside support?
+3. Can imperfect support gating reduce regret, and what coverage does it sacrifice?
+4. Do the risk–coverage trade-offs survive support-score corruption, correlated errors, multiple rollout horizons and held-out reward families?
+5. Does a calibrated, evidence-backed support gate beat direct fallback at matched compute and data cost on real task suites?
+
+A negative answer is still useful. The benchmark must report where no method dominates, not tune away a difficult regime.
+
+## Known limitations / next work
+
+- No transition dynamics or long-horizon rollout in v0.1; utility is one-step and scalar.
+- No learned world model; errors are generated by a fixed synthetic mechanism.
+- Support score and model uncertainty are synthetic observables, not calibrated outputs from Symthaea.
+- No process isolation, cryptographic provenance, real-world robot interface, or hardware latency/energy measurement.
+- The search-pressure panel is a falsification smoke test, not an industry ranking and not a claim that the current construction beats any SOTA method.
+
+Next steps: add correlated and horizon-amplified model error; adversarial policy-search intensity; distribution shift after policy selection; support-score corruption controls; multiple seeds/families at qualification scale; and then compare Symthaea's model-based policy with direct and robust baselines on a matched task and compute budget.
