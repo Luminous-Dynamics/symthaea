@@ -5,6 +5,7 @@
 **Prerequisite audit:** [#8308 — Liquid Broca learning signal and benchmark validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308)  
 **Related experiment:** [#8362 — context-local adaptation vs extra thought tokens](https://github.com/Luminous-Dynamics/symthaea/issues/8362)
 **Next-stage qualification protocol:** [Held-out architecture-search landscape suite v0.1](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md) ([#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959); design only).
+**Multi-fidelity follow-up:** [Cost-aware promotion and evaluation contract v0.1](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md) ([#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994)); scheduling code authored, not compiled or qualified.
 
 ## 1. Research question
 
@@ -270,7 +271,7 @@ The next acceptance step is to run these commands on the exact branch head and i
 
 ### Known limitation and next stage
 
-The two fixed surfaces in this v0.1 harness are implementation controls, not evidence that a search policy generalizes across optimization landscapes. The proposed follow-up is the [held-out landscape suite](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md), tracked by [#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959). It remains a design proposal; it has not been implemented or run.
+The two fixed surfaces in this v0.1 harness are implementation controls, not evidence that a search policy generalizes across optimization landscapes. The proposed follow-up is the [held-out landscape suite](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md), tracked by [#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959). It remains a design proposal; it has not been implemented or run. A separate [multi-fidelity evaluation contract](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md), tracked by [#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994), now has a scheduling primitive authored to make cost accounting and uncertainty-aware promotions explicit; it remains uncompiled and unqualified.
 
 ## 10. Non-goals and claim ceiling
 
