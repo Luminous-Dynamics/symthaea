@@ -629,6 +629,36 @@ mod tests {
     }
 
     #[test]
+    fn metadata_context_and_answer_exposures_have_distinct_blocking_labels() {
+        let receipt = sealed_receipt(true);
+        let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
+        let digest = sha256_hex(b"same-exact-matched-artifact");
+        for (classification, expected_admission) in [
+            ("benchmark_metadata", "blocked_benchmark_metadata_exposure"),
+            ("question_context", "blocked_question_context_exposure"),
+            ("explicit_answer", "blocked_explicit_answer_exposure"),
+        ] {
+            let report = match_report(
+                &receipt_bytes,
+                classification,
+                "exact_digest",
+                MAX_SCORE_MICROS,
+                MAX_SCORE_MICROS,
+                Some(digest.clone()),
+                Some(digest.clone()),
+            );
+            let verified = verify_search_exposure_match_report(
+                &receipt_bytes,
+                &serde_json::to_vec(&report).unwrap(),
+            )
+            .unwrap();
+            assert!(verified.integrity_valid);
+            assert_eq!(verified.contaminated_event_count, 1);
+            assert_eq!(verified.admission, expected_admission);
+        }
+    }
+
+    #[test]
     fn missing_records_and_mutated_match_report_fail_closed() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
