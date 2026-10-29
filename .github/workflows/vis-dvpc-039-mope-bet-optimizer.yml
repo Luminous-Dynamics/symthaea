@@ -1,0 +1,64 @@
+name: VIS-DVPC-039 MOPE constrained-bet optimizer kernel
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-039-mope-bet-optimizer.rs"
+      - "docs/research/VIS_DVPC_039_MOPE_OPTIMIZER_KERNEL_V1.md"
+      - ".github/workflows/vis-dvpc-039-mope-bet-optimizer.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-039-mope-bet-optimizer.rs"
+      - "docs/research/VIS_DVPC_039_MOPE_OPTIMIZER_KERNEL_V1.md"
+      - ".github/workflows/vis-dvpc-039-mope-bet-optimizer.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Run optimizer unit tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-039-mope-bet-optimizer.rs -o /tmp/vis-dvpc-039-tests
+          /tmp/vis-dvpc-039-tests
+      - name: Sweep constrained optimizer fixtures
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-039-mope-bet-optimizer.rs -o /tmp/vis-dvpc-039
+          /tmp/vis-dvpc-039 --sweep > /tmp/vis-dvpc-039-results.tsv
+          test "$(grep -c '^CASE' /tmp/vis-dvpc-039-results.tsv)" = "8"
+          test "$(grep -c '^METRIC' /tmp/vis-dvpc-039-results.tsv)" = "128"
+          grep -Fq $'CASE\tinterior_optimum\tstatus\tOK' /tmp/vis-dvpc-039-results.tsv
+          grep -Fq $'METRIC\tinterior_optimum\tlambda1\t0.100000000000' /tmp/vis-dvpc-039-results.tsv
+          grep -Fq $'METRIC\tinterior_optimum\tlambda2\t0.100000000000' /tmp/vis-dvpc-039-results.tsv
+          grep -Fq $'CASE\tweighted_edge_interior\tstatus\tOK' /tmp/vis-dvpc-039-results.tsv
+          grep -Fq $'CASE\tsum_edge_interior\tstatus\tOK' /tmp/vis-dvpc-039-results.tsv
+          grep -Fq $'CASE\tunit_weight_degeneracy\tstatus\tOK' /tmp/vis-dvpc-039-results.tsv
+          awk -F '\t' '$1=="METRIC" && ($3=="slack_lambda2" || $3=="slack_sum" || $3=="slack_weighted") { if ($4 < -0.000000001) exit 1; n++ } END { if (n != 24) exit 1 }' /tmp/vis-dvpc-039-results.tsv
+          grep '^CASE' /tmp/vis-dvpc-039-results.tsv > /tmp/vis-dvpc-039-summaries.tsv
+      - name: Create exact source and output receipt
+        run: |
+          {
+            printf 'VIS_DVPC_039_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-039-mope-bet-optimizer.rs /tmp/vis-dvpc-039-results.tsv /tmp/vis-dvpc-039-summaries.tsv
+          } > /tmp/vis-dvpc-039-receipt.tsv
+          cat /tmp/vis-dvpc-039-receipt.tsv
+      - name: Publish optimizer results and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-039-mope-optimizer-kernel
+          path: |
+            /tmp/vis-dvpc-039-results.tsv
+            /tmp/vis-dvpc-039-summaries.tsv
+            /tmp/vis-dvpc-039-receipt.tsv
+          retention-days: 90
