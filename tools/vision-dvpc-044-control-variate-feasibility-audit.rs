@@ -166,6 +166,15 @@ fn support_aware_minimum_factor(bet:Bet,audit:&Audit)->f64 {
         1.0+bet.x*(a.w-1.0)+bet.y*(a.residual_min-1.0)
     }).fold(f64::INFINITY,f64::min)
 }
+fn support_aware_corners_hold(bet:Bet,audit:&Audit)->bool{
+    audit.actions.iter().all(|action|{
+        [0.0,1.0].iter().all(|reward|{
+            [0.0,1.0].iter().all(|candidate|{
+                actual_factor(*action,*reward,*candidate,bet)>=WEALTH_FLOOR-TOL
+            })
+        })
+    })
+}
 
 fn upstream_counterexample() -> Result<(Audit,Bet,f64),String> {
     let dgp=Dgp{
@@ -234,7 +243,8 @@ fn run()->Result<String,String>{
             let bet=Bet{x,y};
             if support_aware_feasible(bet,&a){
                 checked+=1;
-                if support_aware_minimum_factor(bet,&a)<WEALTH_FLOOR-TOL{
+                if support_aware_minimum_factor(bet,&a)<WEALTH_FLOOR-TOL
+                    || !support_aware_corners_hold(bet,&a) {
                     return Err("support-aware feasible-set grid found a factor-floor violation".into());
                 }
             }
@@ -290,6 +300,7 @@ mod tests{
                 let candidate=Bet{x:x_i as f64/200.0,y:y_i as f64/200.0};
                 if support_aware_feasible(candidate,&a){
                     assert!(support_aware_minimum_factor(candidate,&a)>=WEALTH_FLOOR-TOL);
+                    assert!(support_aware_corners_hold(candidate,&a));
                 }
             }
         }
