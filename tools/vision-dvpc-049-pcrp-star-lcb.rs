@@ -374,6 +374,22 @@ struct Aggregate {
     plausible_winner_set_size: RunningMean,
 }
 
+fn certified_winner(lower_bounds: &[f64], upper_bounds: &[f64]) -> Option<usize> {
+    if lower_bounds.is_empty() || lower_bounds.len() != upper_bounds.len() {
+        return None;
+    }
+    for i in 0..lower_bounds.len() {
+        // Do not certify a candidate whose own interval is numerically reversed.
+        if lower_bounds[i] <= upper_bounds[i] + EPS
+            && (0..upper_bounds.len()).filter(|&j| j != i)
+                .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
+        {
+            return Some(i);
+        }
+    }
+    None
+}
+
 fn rate_se(successes: usize, n: usize) -> f64 {
     if n == 0 {
         return 0.0;
@@ -497,17 +513,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                         .all(|((lower, upper), truth)| {
                             *lower <= *truth + EPS && *upper >= *truth - EPS && *lower <= *upper + EPS
                         });
-                    let mut certified_winner = None;
-                    for i in 0..lower_bounds.len() {
-                        // Suppress a certificate if its own interval is numerically reversed.
-                        if lower_bounds[i] <= upper_bounds[i] + EPS
-                            && (0..upper_bounds.len()).filter(|&j| j != i)
-                                .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
-                        {
-                            certified_winner = Some(i);
-                            break;
-                        }
-                    }
+                    let certified_winner = certified_winner(&lower_bounds, &upper_bounds);
                     let max_lower = lower_bounds.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                     let plausible_winner_set_size = upper_bounds
                         .iter()
@@ -750,6 +756,14 @@ mod tests {
                 close(expectation, true_value(target), 1.0e-12);
             }
         }
+    }
+
+    #[test]
+    fn winner_certificate_requires_nonreversed_candidate_interval() {
+        assert_eq!(certified_winner(&[0.8, 0.2, 0.3], &[0.9, 0.4, 0.5]), Some(0));
+        assert_eq!(certified_winner(&[0.9, 0.2], &[0.8, 0.3]), None);
+        assert_eq!(certified_winner(&[0.7, 0.6], &[0.8, 0.65]), None);
+        assert_eq!(certified_winner(&[0.8], &[]), None);
     }
 
     #[test]
