@@ -99,7 +99,22 @@ The report records selected threshold, whether the gate was certified, calibrati
 
 This rule is intentionally conservative, but it is still a synthetic experiment rather than a deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution, support/downside labels are correct, and the candidate utility-lift range is valid. It does not cover arbitrary shift after calibration, adaptive adversaries, mislabelled or delayed support evidence, or dependence among episodes. If the controller abstains at larger search sizes, that shows the current estimator has not earned higher-coverage authority under these requirements. Do not weaken the bound after inspecting qualification outcomes; improve the support estimator, collect better calibration evidence, or improve the model's decision-value margin.
 
-**Status:** v0.3 source and report-contract checks have been added; the exact-head run for this revision is pending. No performance result for the new three-constraint gate should be cited until its focused Rust workflow completes.
+### Exact-head Rust result (v0.3)
+
+The focused Rust workflow passed on code/config head `008934e24839b5e9845c72ef446fbc56850b0f7d`: **10 tests passed**, including exact-bound edge cases and the calibration/qualification contract. The 44-row planner report, 4-row risk report, report assertions and full runner all passed ([workflow run 40953822832](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40953822832)). The table below is the actual report output from Rust, not an independent mirror.
+
+| Search size | Selected threshold | Gate certified? | Calibration coverage | Unsupported-risk upper bound | Fallback-downside upper bound | Utility-lift lower bound | Held-out coverage | Held-out unsupported rate | Held-out downside rate | Held-out mean utility lift | Gate regret / direct-fallback regret |
+|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.97 | Yes | 22.12% | 1.68% | 3.02% | +0.00208 | 20.75% | 1.03% | 2.10% | +0.01777 | 0.12996 / 0.14773 |
+| 32 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 / 0.18539 |
+| 128 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 / 0.19635 |
+| 512 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00000 | 0.19910 / 0.19910 |
+
+At search size 8, the gate met all three calibration requirements on a separate 2,048-episode panel; on the 2,048-episode qualification panel it retained 20.75% coverage, with unsupported selections in 1.03% of episodes and fallback-downside events in 2.10%. Mean utility lift was +0.01777 and mean regret was lower than direct fallback in this held-out synthetic panel. That is promising for this one small finite construction, not a general guarantee.
+
+At sizes 32, 128 and 512, no nonzero-coverage threshold met the complete calibration contract, including the positive utility-lift lower bound. The controller selected the 1.01 sentinel and fell back in all qualification episodes. This is an intentional **no-authority** outcome, not missing data and not a reason to weaken the thresholds. It also demonstrates the distinction between epistemic support and decision value: a low unsupported-selection bound alone did not justify model use.
+
+The exact-head pass is limited to this deterministic synthetic setup. The calibration and qualification panels are separate seed streams, but they share the same generator and are not independent real environments. Further qualification must vary the reward family, support-score mechanism, horizon, and post-calibration distribution before broad claims.
 
 ## Falsifiable research questions
 
