@@ -337,3 +337,47 @@ Delay quantiles are conditional on detections. Especially for p1=.55, the low de
 The implementation and independent Python reference also test predictable null schedules fully within [0.48, 0.52]: deterministic alternation between endpoints, and a feedback schedule whose next conditional rate depends only on the current score before the next observation. The mathematical bound is via monotone coupling of each direction to its constant boundary-rate process; the exact-DP schedule tests are regression controls for implementation errors, not a substitute for held-out real-stream validation.
 
 **Claim ceiling:** all these values are independent local exact-DP calculations, not results from the stacked Rust PR's artifact or CI. This is a constant-edge synthetic comparison under a matched conservative family-wise false-alarm ceiling, not evidence of superiority on general distribution shift. Exact-head Rust/reference parity, formatting checks, external version-pinned baselines, and source-held-out real streams remain pending. Do not call this state of the art or general superiority.
+
+
+## 28. Source-derived semisynthetic evaluation and dataset-held-out qualification
+
+### Why this tier is required
+
+The exact finite-state Bernoulli process is an excellent mathematical reference, but does not represent feature geometry, autocorrelation, class structure, delayed labels, or a real selection policy. The 2026 KDD paper *A Framework for Evaluating and Benchmarking Concept Drift Detection Methods* injects known abrupt/gradual changes into seven real-world streams, compares 14 detectors, and recommends leave-one-dataset-out configuration selection ([Cerqueira et al., DOI 10.1145/3770855.3819070](https://doi.org/10.1145/3770855.3819070)). The fully unsupervised real-stream survey evaluates seven faithful implementations on eleven streams and shows that preferred detectors depend on the target metric ([Lukats et al., 2025](https://doi.org/10.1007/s41060-024-00620-y)). Our addition should not claim their core contribution as novel; the distinction here is the explicit treatment of selection mechanisms, randomized label audit, target-population harm, and exact error-control receipts.
+
+### Source-stream register
+
+First candidates to audit are Electricity, Covtype, Posture, Rialto, GasSensorArray, NOAA, and Asfault, listed by the KDD benchmark repository. For each dataset, pin the authoritative source, exact release/version, license, row ordering semantics, feature and target columns, preprocessing, source-group/time split, and source SHA-256. Do not vendor external payloads into this repository until its license and redistribution terms are verified. A missing or ambiguous source licence is a hard blocker, not an assumption.
+
+### Required causal scenario classes
+
+Each semisynthetic run must declare a target class and an independently generated run manifest:
+
+1. **Target-distribution drift:** a seeded source-derived intervention changes (P(X)), (P(Y)), or (P(Y mid X)), with explicit distinction among the three.
+2. **Selection-only drift:** query/label-selection probabilities change while the target population and target risk remain fixed. The selected stream may change; this is not a target-environment detection positive.
+3. **Joint target and selection drift:** both change and both are independently parameterized; report selected-stream detection and target-population outcomes separately.
+4. **Null-preserving conditional schedule:** predictable observation probabilities or source-conditioned schedules remain inside the accepted null. Alarms count against the null budget, never as successful target detections.
+5. **Feature-only / unlabeled drift:** evaluate only methods eligible for the observed information. Label-using baselines are disallowed or assigned to a separate track.
+6. **Delayed or missing outcomes:** randomized sentinel audits are the only representative label stream. Audit rate, cost, and delay are part of the operating point.
+
+Every intervention includes a zero-shift sham, and the chosen source/time block and shift location are sealed from tuning. Feature permutation, filtering, label swaps, and prior shifts are useful controlled interventions, but any intervention that destroys temporal order or data support must be labelled as an artificial stress test, not a realistic production scenario.
+
+### Split and operating-point rules
+
+- Tune hyperparameters and thresholds on calibration sources only. Hold out an entire source dataset for evaluation and rotate the held-out dataset (leave-one-dataset-out). No thresholds, transformations, source identity, or shift location may be tuned against the held-out evaluation data.
+- Freeze both the detector and the acquisition policy before unsealing held-out labels. Randomized audit outcomes cannot flow into the stream selector before their authorized reveal time.
+- Separate formal anytime-valid guarantees, exact finite-horizon calibration, and empirical calibration of heuristic detectors. Match the *family-wise* false-alarm rate or an explicitly equivalent ARL0 target; never equate a one-sided component threshold with a two-sided detector's family error rate.
+- Pair detectors on identical source rows and seed manifests. Bootstrap or otherwise resample at the source/run level, not at the observation level when rows are dependent.
+- Keep detection, adaptation, and harm separate: a detector may identify covariate shift with no risk increase, miss label/conditional shift, or alert on selected-stream changes that do not generalize to the target population.
+
+### Mandatory report
+
+Per source and aggregated with uncertainty: false alarms per 1,000/10,000 observations; family-wise FPR and ARL0; detection probability and missed-detection rate; conditional median/P90 delay plus the full run-level latency distribution; target-population loss/regret and worst-group harm; calibration and bias of selected vs randomized-audit samples; label/audit cost; wall time, throughput, peak memory, and cold-start cost. Report results by transformation family and severity, source holdout, transition width, label delay/missingness, and target/selection combination—not only a single mean score.
+
+### Manifest and fail-closed gates
+
+The first code milestone is a Rust-first manifest validator that operates without carrying dataset payloads. Each run binds: source URL/version/license and digest; row ordering and feature/target semantics; transformation family, severity, seed, and time interval; train/calibration/held-out source identities; detector build/version/config; policy version; label/audit reveal schedule; and output digest. Canonicalized manifests must be deterministic. Validation rejects absent licence/hash/target semantics, a calibration/evaluation source overlap, tuning parameters selected using held-out source data, unauthorized label reveal, and a sham without an explicitly zero intervention. Negative controls must mutate each protected field and prove rejection.
+
+**Proposed acceptance gates:** at least three license-cleared source-distinct datasets; abrupt and gradual variants plus zero-shift controls; leave-one-dataset-out tuning enforced in code; matched family-wise false-alarm operating points; deterministic paired replay from pinned manifests; target-versus-selection outcomes separately scored; and no SOTA claim until an independent replay reproduces source digests, manifests, and result receipts. These are proposed gates, not completed results.
+
+Implementation issue: [#8829](https://github.com/Luminous-Dynamics/symthaea/issues/8829).
