@@ -25,6 +25,7 @@
 pub mod api_inventory;
 pub mod active_experiment;
 pub mod robust_experiment;
+pub mod predictive_adequacy;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -179,4 +180,10 @@ pub use active_experiment::{
 pub use robust_experiment::{
     rank_robust_experiments, RobustExperimentError, RobustExperimentRanking,
     RobustExperimentScore, RobustModelScenario, ScenarioValue,
+};
+
+pub use predictive_adequacy::{
+    assess_predictive_adequacy, ObservationSource, PredictiveAdequacyError,
+    PredictiveAdequacyPolicy, PredictiveAdequacyReport, PredictiveAdequacyStatus,
+    PredictiveLogLoss, PredictiveObservationSet, SamplingAssumption,
 };
