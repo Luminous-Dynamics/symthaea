@@ -726,6 +726,15 @@ fn validate_trial(
             error(report, "E_VERIFIER_BLOCKING_CHECK_FAILED", format!("{check_path}.status"), "verifier cannot pass while a blocking check is not pass");
         }
     }
+    if trial.verifier.status == VerifierStatus::NotRun && trial.verifier.checks.iter().any(|check| check.status != CheckStatus::NotRun) {
+        error(report, "E_NOT_RUN_CHECK_CONTRADICTION", format!("{verifier_path}.checks"), "not_run verifier cannot contain checks reported as pass/fail/unresolved");
+    }
+    if trial.verifier.status == VerifierStatus::Fail
+        && !trial.verifier.checks.iter().any(|check| check.blocking && check.status == CheckStatus::Fail)
+    {
+        error(report, "E_VERIFIER_FAIL_UNSUPPORTED", format!("{verifier_path}.checks"), "failed verifier requires at least one failed blocking check");
+    }
+
     if trial.verifier.status == VerifierStatus::Pass {
         if !trial.verifier.isolated_from_agent || !trial.verifier.independent_of_generator {
             error(report, "E_VERIFIER_NOT_INDEPENDENT", &verifier_path, "a passing verifier must be isolated from the agent and independent of the generator");
@@ -941,6 +950,20 @@ mod tests {
         validate_bytes(&bytes, MANIFEST.as_bytes())
     }
 
+    fn validate_value_and_manifest(
+        mutator: impl FnOnce(&mut Value, &mut Value),
+    ) -> ValidationReport {
+        let mut value: Value = serde_json::from_str(EXAMPLE).expect("synthetic fixture parses");
+        let mut manifest: Value = serde_json::from_str(MANIFEST).expect("synthetic manifest parses");
+        mutator(&mut value, &mut manifest);
+        let mut manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest serializes");
+        manifest_bytes.push(b'\n');
+        value["source"]["manifest_digest"] =
+            Value::String(format!("sha256:{}", sha256_hex(&manifest_bytes)));
+        let bytes = serde_json::to_vec_pretty(&value).expect("record serializes");
+        validate_bytes(&bytes, &manifest_bytes)
+    }
+
     fn has_code(report: &ValidationReport, code: &str) -> bool {
         report.errors.iter().any(|error| error.code == code)
     }
@@ -1108,15 +1131,27 @@ mod tests {
     }
 
     #[test]
-    fn quarantined_task_is_retained_but_not_marked_accepted() {
-        let report = validate_value(|v| {
-            v["task_records"][0]["quality_audit"]["status"] = Value::String("quarantined".into());
+    fn predeclared_quarantined_task_is_retained_but_not_marked_accepted() {
+        let report = validate_value_and_manifest(|run, manifest| {
+            run["task_records"][0]["quality_audit"]["status"] = Value::String("quarantined".into());
+            manifest["tasks"][0]["quality_audit"]["status"] = Value::String("quarantined".into());
+            run["task_records"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "a".repeat(64)));
+            manifest["tasks"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "a".repeat(64)));
         });
         assert!(report.valid, "{:?}", report.errors);
         assert_eq!(report.counts.tasks_total, 1);
         assert_eq!(report.counts.tasks_accepted, 0);
         assert_eq!(report.counts.tasks_quarantined, 1);
         assert_eq!(report.counts.trials_accounted, 2);
+    }
+
+    #[test]
+    fn posthoc_task_reclassification_is_rejected_by_frozen_manifest() {
+        let report = validate_value(|run| {
+            run["task_records"][0]["quality_audit"]["status"] = Value::String("quarantined".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_TASK_MANIFEST_MISMATCH"));
     }
 
     #[test]
@@ -1147,17 +1182,38 @@ mod tests {
     }
 
     #[test]
-    fn invalid_task_trials_remain_accounted_without_becoming_successes() {
-        let report = validate_value(|v| {
-            v["task_records"][0]["quality_audit"]["status"] = Value::String("invalid".into());
-            for trial in v["task_records"][0]["trials"].as_array_mut().unwrap() {
+    fn predeclared_invalid_task_trials_remain_accounted_without_becoming_successes() {
+        let report = validate_value_and_manifest(|run, manifest| {
+            for value in [
+                &mut run["task_records"][0]["quality_audit"]["status"],
+                &mut manifest["tasks"][0]["quality_audit"]["status"],
+            ] {
+                *value = Value::String("invalid".into());
+            }
+            run["task_records"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "b".repeat(64)));
+            manifest["tasks"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "b".repeat(64)));
+            for trial in run["task_records"][0]["trials"].as_array_mut().unwrap() {
                 trial["outcome"] = Value::String("invalid_task".into());
                 trial["verifier"]["status"] = Value::String("not_run".into());
+                for check in trial["verifier"]["checks"].as_array_mut().unwrap() {
+                    check["status"] = Value::String("not_run".into());
+                }
             }
         });
         assert!(report.valid, "{:?}", report.errors);
         assert_eq!(report.counts.tasks_invalid, 1);
         assert_eq!(report.counts.trials_accounted, 2);
+    }
+
+    #[test]
+    fn altered_manifest_bytes_are_rejected_without_pinned_digest_update() {
+        let mut manifest: Value = serde_json::from_str(MANIFEST).unwrap();
+        manifest["tasks"][0]["family"] = Value::String("different_family".into());
+        let mut bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        bytes.push(b'\n');
+        let report = validate_bytes(EXAMPLE.as_bytes(), &bytes);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_MANIFEST_DIGEST_MISMATCH"));
     }
 
 }
