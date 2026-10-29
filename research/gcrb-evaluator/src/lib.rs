@@ -688,6 +688,13 @@ pub fn generate_parameterized_controls(
     let base = parse_fixture(fixture_bytes)?;
     let mut document: serde_json::Value = serde_json::from_slice(fixture_bytes)
         .map_err(|error| format!("fixture JSON is invalid: {error}"))?;
+    if document.get("generator").is_some() {
+        return Err(
+            "source fixture must be hand-authored public development data, not a previous generated stress fixture"
+                .to_owned(),
+        );
+    }
+    let source_fixture_sha256 = sha256_hex(fixture_bytes);
     let base_cases = document["cases"]
         .as_array()
         .ok_or_else(|| "fixture cases must be an array".to_owned())?;
@@ -751,6 +758,7 @@ pub fn generate_parameterized_controls(
         "version": GENERATOR_VERSION,
         "master_seed": master_seed,
         "parameterized_control_count": control_count,
+        "source_fixture_sha256": source_fixture_sha256,
         "algorithm": "splitmix64-v1",
         "known_answers_public": true
     });
@@ -972,6 +980,7 @@ mod tests {
         assert_eq!(summary.negative_control_count, 1_000);
         assert_eq!(value["generator"]["algorithm"], "splitmix64-v1");
         assert_eq!(value["generator"]["known_answers_public"], true);
+        assert_eq!(value["generator"]["source_fixture_sha256"], sha256_hex(fixture));
         let ids = value["cases"].as_array().unwrap().iter()
             .map(|case| case["case_id"].as_str().unwrap())
             .collect::<BTreeSet<_>>();
@@ -990,4 +999,13 @@ mod tests {
         assert!(generate_parameterized_controls(fixture, 100_001, 1).unwrap_err().contains("between 1"));
         assert!(generate_parameterized_controls(fixture, 2, u64::MAX).unwrap_err().contains("overflows"));
     }
+
+    #[test]
+    fn generator_rejects_a_generated_fixture_as_its_own_source() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let generated = generate_parameterized_controls(fixture, 8, 41).unwrap();
+        let result = generate_parameterized_controls(&generated, 8, 42);
+        assert!(result.unwrap_err().contains("not a previous generated stress fixture"));
+    }
+
 }
