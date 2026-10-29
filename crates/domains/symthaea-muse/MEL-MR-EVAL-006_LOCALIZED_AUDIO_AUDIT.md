@@ -45,20 +45,23 @@ Run the fixture-only conformance suite with:
 cargo run --locked -p symthaea-muse --example mel_mr_eval_006_conformance
 ```
 
-The runner emits JSON for eight predeclared cases and exits non-zero if any expected verdict is not reproduced:
+The runner emits JSON for eleven predeclared cases and exits non-zero if any expected verdict is not reproduced:
 
 - identical protected audio → pass;
 - localized mutation outside the edit mask → fail;
+- localized gain drop → fail;
+- local 440 Hz to 880 Hz substitution → fail;
 - mutation only inside the authorized mask → pass;
 - identical transient timing → pass;
 - 512-frame transient delay in protected content → fail;
+- additional transient in protected content → fail;
 - edit mask plus analysis guard hides all onset evidence → abstain;
 - silence contains no measurable onset evidence → abstain;
 - removal of a protected reference burst → fail.
 
 The runner labels its threshold ID as synthetic-only. It is a quick regression/conformance suite, not a production calibration, a human preference study, or a leaderboard result. The JSON reports detector configuration, input digests, per-case measurements, counts, and any unexpected verdicts. It should be run on every code revision before collecting a larger calibration set.
 
-An independent NumPy/FFT reference simulation was executed for the same eight scenarios in the development environment and reproduced all eight predeclared verdicts. This is independent reference evidence—not execution of the Rust runner, whose compile and test status remains unknown until a Rust toolchain is available.
+An independent NumPy/FFT reference simulation was executed for the same eleven scenarios in the development environment and reproduced all eleven predeclared verdicts, including the gain-drop, frequency-swap, and extra-transient mutations. This is independent reference evidence—not execution of the Rust runner, whose compile and test status remains unknown until a Rust toolchain is available.
 
 ## Positioning against public benchmarks
 
