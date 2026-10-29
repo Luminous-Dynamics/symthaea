@@ -32,6 +32,12 @@ pub use self::anytime_quality::{
     compare_verified_anytime_quality, compare_verified_anytime_quality_from_bundle,
 };
 
+#[path = "clique_partition.rs"]
+mod clique_partition;
+pub use self::clique_partition::{
+    CliquePartitionError, VerifiedCliquePartition, verify_clique_partition_certificate,
+};
+
 /// Opaque evidence minted by the MIS verifier and scoped to one experiment trial.
 /// A generic unscoped verifier result cannot satisfy the matched evaluator.
 pub type VerifierReceiptEvidence = VerifiedMisCandidate;
