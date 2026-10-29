@@ -1,8 +1,8 @@
 //! Deterministic, evaluator-separated generation of delayed and informatively missing outcomes.
 //!
-//! The policy feed contains only decision-time context, revealed outcomes, and missingness
-//! declarations that have occurred by the registered horizon. Hidden targets, selection
-//! probabilities, future reveal times, and the missingness mechanism remain evaluator-only.
+//! The controller receives a single-tick input, never the full future delivery queue. The
+//! queue remains inside the trusted driver; hidden targets, selection probabilities, future
+//! reveal times, and the missingness mechanism remain in the separate evaluator artifact.
 
 use anyhow::{ensure, Context};
 use serde::{Deserialize, Serialize};
@@ -588,7 +588,12 @@ mod tests {
         assert!(!policy_json.contains("run_id"));
         assert!(!policy_json.contains("\"seed\""));
         assert!(policy_json.contains("observed_covariate"));
-        assert!(policy_json.contains("outcome_loss"));
+        // Tick 7 has no outcome reveal in this deterministic fixture. A later tick is
+        // delivered separately and contains the outcome only once its reveal tick arrives.
+        assert!(!policy_json.contains("outcome_loss"));
+        let reveal_tick = generated.policy_tick_input(19);
+        assert!(reveal_tick.messages.iter().all(|message| policy_message_tick(message) == 19));
+        assert!(serde_json::to_string(&reveal_tick).unwrap().contains("outcome_loss"));
     }
 
     #[test]
