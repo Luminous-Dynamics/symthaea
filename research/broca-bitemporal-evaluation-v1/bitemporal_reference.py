@@ -143,7 +143,7 @@ def validate_queries(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
         query["_valid_at"] = parse_day(query["valid_at"], f"{context} valid_at")
         query["_known_at"] = parse_timestamp(query["known_at"], f"{context} known_at")
         expected_state = query["expected_state"]
-        if expected_state not in STATES:
+        if not isinstance(expected_state, str) or expected_state not in STATES:
             raise ValueError(f"{context}: expected_state must be one of {sorted(STATES)}")
         expected_value = query["expected_value"]
         if expected_state == "resolved":
@@ -183,6 +183,7 @@ def resolve_query(events: list[dict[str, Any]], query: dict[str, Any]) -> dict[s
             "state": "unknown",
             "value": None,
             "selected_event_ids": [],
+            "selected_evidence": [],
             "shadowed_event_ids": [],
             "conflicting_values": [],
             "resolution_rule": "no claim both known by cutoff and valid at requested time",
@@ -203,12 +204,25 @@ def resolve_query(events: list[dict[str, Any]], query: dict[str, Any]) -> dict[s
         if event["event_id"] not in {item["event_id"] for item in selected}
     )
     selected_ids = sorted(event["event_id"] for event in selected)
+    selected_evidence = [
+        {
+            "event_id": event["event_id"],
+            "source": event["source"],
+            "value": event["value"],
+            "valid_from": event["valid_from"],
+            "valid_to": event["valid_to"],
+            "recorded_at": event["recorded_at"],
+            "authority_rank": event["authority_rank"],
+        }
+        for event in sorted(selected, key=lambda item: item["event_id"])
+    ]
     if len(values) > 1:
         return {
             **base,
             "state": "conflict",
             "value": None,
             "selected_event_ids": selected_ids,
+            "selected_evidence": selected_evidence,
             "shadowed_event_ids": shadowed,
             "conflicting_values": values,
             "selected_valid_from": latest_effective_start.isoformat(),
@@ -220,6 +234,7 @@ def resolve_query(events: list[dict[str, Any]], query: dict[str, Any]) -> dict[s
         "state": "resolved",
         "value": values[0],
         "selected_event_ids": selected_ids,
+        "selected_evidence": selected_evidence,
         "shadowed_event_ids": shadowed,
         "conflicting_values": [],
         "selected_valid_from": latest_effective_start.isoformat(),
