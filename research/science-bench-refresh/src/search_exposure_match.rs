@@ -251,8 +251,7 @@ fn validate_record_contract(
                 || !has_protected_evidence(record)
             {
                 issues.push(format!(
-                    "records[{index}] {0} requires a method and protected/evidence digests",
-                    record.classification
+                    "records[{index}] has invalid related/review evidence contract"
                 ));
                 valid = false;
             }
