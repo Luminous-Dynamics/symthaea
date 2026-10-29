@@ -38,6 +38,12 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         all_ids = [task["task_id"] for task in (*SOURCE_TASKS, *TARGET_TASKS)]
         self.assertEqual(len(all_ids), len(set(all_ids)))
         self.assertEqual(len(TASK_SUITE_SHA256), 64)
+        self.assertEqual(len(TARGET_TASKS), 32)
+        self.assertEqual(len(target_families), 8)
+        self.assertEqual(
+            {family: sum(task["family"] == family for task in TARGET_TASKS) for family in target_families},
+            {family: 4 for family in target_families},
+        )
 
     def test_frozen_task_suite_digest_rejects_runtime_mutation(self):
         task = SOURCE_TASKS[0]
@@ -82,7 +88,9 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         self.assertEqual(receipt["receipt_label"], "HISTORICAL_TRANSFER_SYNTHETIC_PREDICTION_AUDIT_NOT_OPTIMIZER_SOTA_EVIDENCE")
         self.assertFalse(receipt["target_high_fidelity_used_by_predictor"])
         self.assertEqual(receipt["source_task_count"], 8)
-        self.assertEqual(receipt["target_task_count"], 4)
+        self.assertEqual(receipt["target_task_count"], 32)
+        self.assertEqual(receipt["target_family_count"], 8)
+        self.assertTrue(all(count == 4 for count in receipt["task_variants_per_target_family"].values()))
         self.assertEqual(receipt["history_pair_count"], 24)
         costs = receipt["cost_accounting"]
         self.assertEqual(costs["archive_build_cost_units"], 24 * (LOW_COST_UNITS + HIGH_COST_UNITS))
@@ -91,19 +99,36 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         self.assertEqual(costs["target_high_only_evaluation_cost_per_task_units"], 12 * HIGH_COST_UNITS)
         self.assertEqual(set(receipt["aggregate_metrics_macro_averaged_over_target_tasks"]), set(POLICY_IDS))
         self.assertEqual(set(receipt["comparisons_vs_low_fidelity_only"]), set(POLICY_IDS) - {"low_fidelity_only"})
-        self.assertIn("too few", receipt["claim_ceiling"])
+        self.assertEqual(
+            set(receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"]),
+            set(POLICY_IDS) - {"low_fidelity_only"},
+        )
+        for policy in POLICY_IDS:
+            self.assertEqual(
+                receipt["aggregate_metrics_macro_averaged_over_target_families"][policy]["family_count"], 8
+            )
+        self.assertIn("eight synthetic families", receipt["claim_ceiling"])
 
-    def test_target_points_are_nested_within_only_four_independent_units(self):
+    def test_task_variants_and_candidate_points_are_not_mislabeled_as_family_units(self):
         receipt = run_benchmark(history_points=2, test_points=20, nearest_k=4, reuse_count=10)
-        self.assertEqual(receipt["target_task_count"], 4)
+        self.assertEqual(receipt["target_task_count"], 32)
+        self.assertEqual(receipt["target_family_count"], 8)
         for policy in POLICY_IDS:
             aggregation = receipt["aggregate_metrics_macro_averaged_over_target_tasks"][policy]
-            self.assertEqual(aggregation["target_task_units"], 4)
+            self.assertEqual(aggregation["target_task_units"], 32)
             self.assertTrue(aggregation["target_points_nested_within_tasks"])
+            family_aggregation = receipt["aggregate_metrics_macro_averaged_over_target_families"][policy]
+            self.assertEqual(family_aggregation["family_count"], 8)
+            self.assertEqual(
+                family_aggregation["independent_generalization_unit"], "held_out_task_family; task variants are nested"
+            )
             self.assertEqual(
                 sum(row["policy_metrics"][policy]["audit_sample_count"] for row in receipt["target_task_results"]),
-                4 * 20,
+                32 * 20,
             )
+        for policy, comparison in receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"].items():
+            self.assertEqual(comparison["held_out_family_units"], 8)
+            self.assertEqual(len(comparison["by_family"]), 8)
 
     def test_source_archive_cannot_contain_target_task_ids(self):
         receipt = run_benchmark(history_points=2, test_points=8, nearest_k=3, reuse_count=1)
