@@ -490,11 +490,79 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             }
         }
 
+        match invariant.scope {
+            InvariantScope::Everywhere if invariant.region_ids.is_some() => add_issue!(
+                "AMBIGUOUS_INVARIANT_SCOPE",
+                "an everywhere invariant may be filtered by track_ids, not region_ids".to_owned(),
+            ),
+            InvariantScope::OutsideMask if invariant.region_ids.is_some() => add_issue!(
+                "AMBIGUOUS_INVARIANT_SCOPE",
+                "outside_mask is defined as the complement of all authorized regions; region_ids is not allowed".to_owned(),
+            ),
+            _ => {}
+        }
+
+        if invariant.scope == InvariantScope::InsideMask {
+            let selected_regions: Vec<&RegionMask> = invariant
+                .region_ids
+                .as_ref()
+                .map(|ids| ids.iter().filter_map(|id| region_by_id.get(id).copied()).collect())
+                .unwrap_or_else(|| contract.authorization_mask.iter().collect());
+            let selected_tracks: BTreeSet<&str> = selected_regions
+                .iter()
+                .flat_map(|region| region.track_ids.iter().map(String::as_str))
+                .collect();
+            if invariant
+                .track_ids
+                .as_ref()
+                .is_some_and(|ids| ids.iter().any(|track| !selected_tracks.contains(track.as_str())))
+            {
+                add_issue!(
+                    "TRACK_SCOPE_VIOLATION",
+                    "inside_mask invariant selects a track outside its selected region mask".to_owned(),
+                );
+            }
+        }
+
         for change in &contract.requested_changes {
             if change.axis != invariant.axis {
                 continue;
             }
-            let scope_overlaps = match invariant.scope {
+            let changed_tracks: BTreeSet<&str> = change
+                .region_ids
+                .iter()
+                .filter_map(|id| region_by_id.get(id))
+                .flat_map(|region| region.track_ids.iter().map(String::as_str))
+                .collect();
+            let protected_tracks: BTreeSet<&str> = invariant
+                .track_ids
+                .as_ref()
+                .map(|tracks| tracks.iter().map(String::as_str).collect())
+                .unwrap_or_else(|| match invariant.scope {
+                    InvariantScope::InsideMask => invariant
+                        .region_ids
+                        .as_ref()
+                        .map(|ids| {
+                            ids.iter()
+                                .filter_map(|id| region_by_id.get(id))
+                                .flat_map(|region| region.track_ids.iter().map(String::as_str))
+                                .collect()
+                        })
+                        .unwrap_or_else(|| {
+                            contract
+                                .authorization_mask
+                                .iter()
+                                .flat_map(|region| region.track_ids.iter().map(String::as_str))
+                                .collect()
+                        }),
+                    InvariantScope::Everywhere | InvariantScope::OutsideMask => {
+                        source_tracks.iter().map(String::as_str).collect()
+                    }
+                });
+            let track_overlap = changed_tracks
+                .iter()
+                .any(|track| protected_tracks.contains(track));
+            let region_overlap = match invariant.scope {
                 InvariantScope::Everywhere => true,
                 InvariantScope::OutsideMask => false,
                 InvariantScope::InsideMask => invariant
@@ -502,11 +570,11 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                     .as_ref()
                     .is_none_or(|ids| ids.iter().any(|id| change.region_ids.contains(id))),
             };
-            if scope_overlaps {
+            if region_overlap && track_overlap {
                 add_issue!(
                     "REQUEST_PROTECTED_SCOPE_CONFLICT",
                     format!(
-                        "requested {:?} change conflicts with a {:?} invariant",
+                        "requested {:?} change overlaps a {:?} invariant on a shared track and region",
                         change.axis, invariant.scope
                     ),
                 );
