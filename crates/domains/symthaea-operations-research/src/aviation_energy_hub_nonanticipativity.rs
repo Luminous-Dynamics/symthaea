@@ -76,6 +76,10 @@ pub enum NonanticipativityError {
         stage_index: usize,
         information_set_id: String,
     },
+    InvalidHistoryDigest {
+        scenario_id: String,
+        stage_index: usize,
+    },
     InformationSetHistoryMismatch {
         stage_index: usize,
         information_set_id: String,
@@ -120,6 +124,10 @@ impl fmt::Display for NonanticipativityError {
             } => write!(
                 f,
                 "information set {information_set_id} at stage {stage_index} has an inconsistent prior history for {scenario_id}"
+            ),
+            Self::InvalidHistoryDigest { scenario_id, stage_index } => write!(
+                f,
+                "invalid observed-history SHA-256 digest for {scenario_id} at stage {stage_index}"
             ),
             Self::InformationSetHistoryMismatch { stage_index, information_set_id } => write!(
                 f,
@@ -247,9 +255,10 @@ pub fn verify_nonanticipative_policy(
             }
             let history_digest = &policy.observed_history_digest_by_stage[stage_index];
             if !is_valid_sha256(history_digest) {
-                return Err(NonanticipativityError::MissingIdentifier(
-                    "valid observed-history digest",
-                ));
+                return Err(NonanticipativityError::InvalidHistoryDigest {
+                    scenario_id: policy.scenario_id.clone(),
+                    stage_index,
+                });
             }
         }
     }
