@@ -24,7 +24,8 @@
         0
       ],
       "expected": 0.0396,
-      "absolute_tolerance": 0.001
+      "absolute_tolerance": 0.001,
+      "quantity_id": "iit4_system_phi_s"
     },
     {
       "id": "system-phi-s-AB",
@@ -34,7 +35,8 @@
         1
       ],
       "expected": 0.1719,
-      "absolute_tolerance": 0.001
+      "absolute_tolerance": 0.001,
+      "quantity_id": "iit4_system_phi_s"
     },
     {
       "id": "AB-cause-phi",
@@ -44,7 +46,8 @@
         1
       ],
       "expected": 0.2446,
-      "absolute_tolerance": 0.002
+      "absolute_tolerance": 0.002,
+      "quantity_id": "iit4_cause_phi_c"
     },
     {
       "id": "AB-effect-phi",
@@ -54,7 +57,8 @@
         1
       ],
       "expected": 0.1719,
-      "absolute_tolerance": 0.001
+      "absolute_tolerance": 0.001,
+      "quantity_id": "iit4_effect_phi_e"
     },
     {
       "id": "AB-structure-Phi",
@@ -64,7 +68,8 @@
         1
       ],
       "expected": 1.5627,
-      "absolute_tolerance": 0.005
+      "absolute_tolerance": 0.005,
+      "quantity_id": "iit4_structure_big_phi"
     },
     {
       "id": "system-phi-s-ABC",
@@ -75,7 +80,8 @@
         2
       ],
       "expected": 0.1339,
-      "absolute_tolerance": 0.001
+      "absolute_tolerance": 0.001,
+      "quantity_id": "iit4_system_phi_s"
     }
   ],
   "interpretation_ceiling": [
