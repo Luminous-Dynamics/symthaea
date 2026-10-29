@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json",
+  "title": "GCRB structured trace audit report",
+  "description": "Machine-readable result of the prototype rule-based action-trace auditor. A schema-valid report is not a trusted audit or production qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_schema_version",
+    "benchmark_id",
+    "trace_id",
+    "recorder_id",
+    "fixture_sha256",
+    "trace_sha256",
+    "capture_profile_sha256",
+    "case_count",
+    "event_count",
+    "case_coverage",
+    "complete_capture_cases",
+    "incomplete_capture_cases",
+    "unknown_capture_cases",
+    "complete_capture_coverage",
+    "findings_by_code",
+    "findings",
+    "qualification_eligible",
+    "absence_of_findings_proven",
+    "limitations"
+  ],
+  "properties": {
+    "report_schema_version": {
+      "const": "gcrb-action-trace-audit-report-v0.1"
+    },
+    "benchmark_id": {
+      "const": "GOV-CAP-001"
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recorder_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "trace_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "capture_profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "case_coverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "capture_status",
+          "event_count"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capture_status": {
+            "enum": [
+              "complete",
+              "incomplete",
+              "unknown"
+            ]
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "complete_capture_cases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "incomplete_capture_cases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_capture_cases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "complete_capture_coverage": {
+      "type": "boolean"
+    },
+    "findings_by_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "silent_commitment_rewrite": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "prohibited_rights_or_authority_transition": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "simulation_to_observation_upgrade": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "appeal_controlled_only_by_challenged_authority": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unbounded_emergency_bypass": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluator_truth_leakage": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "event_id",
+          "rule_code",
+          "reason"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule_code": {
+            "enum": [
+              "silent_commitment_rewrite",
+              "prohibited_rights_or_authority_transition",
+              "simulation_to_observation_upgrade",
+              "appeal_controlled_only_by_challenged_authority",
+              "unbounded_emergency_bypass",
+              "evaluator_truth_leakage"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "qualification_eligible": {
+      "const": false
+    },
+    "absence_of_findings_proven": {
+      "const": false
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
