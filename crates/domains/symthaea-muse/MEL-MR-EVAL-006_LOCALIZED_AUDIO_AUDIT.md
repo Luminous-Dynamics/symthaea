@@ -24,9 +24,23 @@ This is a deliberately narrow, deterministic detector suite—not a claim of per
 - Reports contain SHA-256 commitments over domain-separated sample bits and format metadata, plus a separate receipt SHA-256 computed from the canonical serialized report with the receipt field blank. The receipt digest covers the verdict, measurements, thresholds, content digests, format, and config; verification detects tampering but does not authenticate authorship, capture time, renderer identity, or calibration authenticity.
 - FFT analysis windows are bounded to at most 1,048,576 frames. Spectral inputs are peak-scaled only when amplitudes exceed 1.0, preventing finite high-amplitude f32 inputs from overflowing the f32 FFT; the independent RMS-dB channel still detects gain changes.
 
+## Compositional audio-evidence gate
+
+The module now exposes `compose_audio_preservation_evidence`, which combines the acoustic and onset reports only when both child receipt digests verify and both reports carry identical reference/output content hashes, sample rate, channel count, and frame count.
+
+The combination rule is deliberately non-compensatory:
+
+- Any child `fail` makes the combined audio-only verdict `fail`.
+- Otherwise, any child `abstain` makes it `abstain`.
+- The combined audio-only verdict is `pass` only when both child reports pass and their content/format bindings match.
+- A tampered child receipt returns an error; mismatched input bindings cannot be combined.
+- The composite report includes both child receipt hashes and has its own receipt digest.
+
+This is **not** the complete edit-contract verdict. The symbolic requested-change and invariant verifier must separately pass before the overall edit can be accepted. The API is intended to make the audio-evidence composition rule explicit and replayable, not to imply that the current two acoustic channels cover every audible or symbolic failure mode.
+
 ## Tests included
 
-The Rust unit suite contains 16 tests covering identity preservation, one localized protected-region mutation, authorized-only changes, no-calibration abstention, stereo mutation, mismatched duration, non-finite samples, boundary guards, onset identity, delayed protected transients, onset masking, onset abstention, and abstention when no reference onsets can be measured, receipt tampering, oversized analysis settings, and high-amplitude finite input. The runner also verifies receipt hashes as part of its conformance verdict. An independent JS numerical reference check using a direct DFT also checked the synthetic burst fixture: the baseline onset was detected at frame 992 and the delayed onset at frame 1504 (512-frame displacement). This is an algorithm sanity check, **not execution of the committed Rust code**. Rust tests, formatting, and clippy remain unexecuted in this environment; a passing CI result must be attached to the exact PR head before implementation validation is claimed.
+The Rust unit suite contains 20 tests covering identity preservation, one localized protected-region mutation, authorized-only changes, no-calibration abstention, stereo mutation, mismatched duration, non-finite samples, boundary guards, onset identity, delayed protected transients, onset masking, onset abstention, and abstention when no reference onsets can be measured, receipt tampering, oversized analysis settings, high-amplitude finite input, composite pass conditions, cross-input receipt rejection, tampered-child rejection, and abstention composition. The runner also verifies child receipt hashes as part of its conformance verdict; the four composite-gate regression cases live in the Rust unit suite. An independent JS numerical reference check using a direct DFT also checked the synthetic burst fixture: the baseline onset was detected at frame 992 and the delayed onset at frame 1504 (512-frame displacement). This is an algorithm sanity check, **not execution of the committed Rust code**. Rust tests, formatting, and clippy remain unexecuted in this environment; a passing CI result must be attached to the exact PR head before implementation validation is claimed.
 
 ## Calibration and benchmark plan
 
