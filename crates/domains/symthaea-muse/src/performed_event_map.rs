@@ -231,9 +231,32 @@ impl PerformedEventMap {
         Ok(())
     }
 
-    /// Require the primary MIDI note for each target-score event to match the
-    /// expected MIDI pitches. Additional descendants do not change this check.
-    pub fn verify_primary_pitches(
+    /// Verify the complete receipt/context gate and exact primary MIDI pitches.
+    ///
+    /// This is the public convenience entry point for acceptance paths; it
+    /// prevents callers from treating pitch agreement alone as a verified map.
+    pub fn verify_for_score_and_pitches(
+        &self,
+        expected_target_score_sha256: &str,
+        expected_performed_midi_sha256: &str,
+        expected_sample_rate_hz: u32,
+        expected_total_frames: u64,
+        expected_target_event_count: usize,
+        expected_midi_by_score_index: &[u8],
+    ) -> Result<(), PerformedEventMapError> {
+        self.verify_for_score(
+            expected_target_score_sha256,
+            expected_performed_midi_sha256,
+            expected_sample_rate_hz,
+            expected_total_frames,
+            expected_target_event_count,
+        )?;
+        self.verify_primary_pitches(expected_midi_by_score_index)
+    }
+
+    /// Check the primary MIDI note for each target-score event. This is
+    /// private so external callers cannot bypass receipt/context validation.
+    fn verify_primary_pitches(
         &self,
         expected_midi_by_score_index: &[u8],
     ) -> Result<(), PerformedEventMapError> {
@@ -405,9 +428,10 @@ mod tests {
     #[test]
     fn sealed_map_binds_exact_score_midi_and_primary_pitch_context() {
         let map = fixture();
-        map.verify_for_score(&digest('a'), &digest('b'), 48_000, 48_000, 2)
-            .unwrap();
-        map.verify_primary_pitches(&[60, 64]).unwrap();
+        map.verify_for_score_and_pitches(
+            &digest('a'), &digest('b'), 48_000, 48_000, 2, &[60, 64],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -477,7 +501,9 @@ mod tests {
         );
         map.seal().unwrap();
         assert_eq!(
-            map.verify_primary_pitches(&[60, 64]),
+            map.verify_for_score_and_pitches(
+                &digest('a'), &digest('b'), 48_000, 48_000, 2, &[60, 64],
+            ),
             Err(PerformedEventMapError::ContextMismatch("primary performed MIDI pitch"))
         );
     }
