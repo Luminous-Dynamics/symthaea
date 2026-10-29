@@ -37,11 +37,11 @@ A percentile bootstrap is a descriptive empirical uncertainty procedure, not a u
 
 ## 3. Promotion contract
 
-The CLI consumes three strict UTF-8 JSON files:
+The CLI consumes four strict UTF-8 JSON files: the paired receipt, its original run manifest, the promotion contract and the independent validation manifest.
 
 ```sh
 python3 tools/casting-benchmark/paired_benchmark_promotion_gate.py \
-  paired-receipt.json promotion-contract.json independent-validation.json \
+  paired-receipt.json paired-run-manifest.json promotion-contract.json independent-validation.json \
   --output promotion-readiness.json
 ```
 
@@ -55,6 +55,8 @@ The contract freezes:
 - minimum cost-to-target reduction on jointly reaching pairs;
 - maximum false-feasible rate and one-sided confidence level;
 - whether incomplete or over-budget runs disqualify promotion.
+
+The gate re-runs `paired_benchmark_audit.analyze_manifest` on the supplied original run manifest and compares the full recomputed receipt against the supplied paired receipt, including the exact raw-manifest digest and paired-evaluator source digest. A manually edited score cannot pass merely by keeping a syntactically valid JSON hash field. The run manifest must be retained alongside the receipt.
 
 The contract is strict-schema. Unknown keys, malformed values, duplicated critical-family names and invalid digests fail rather than being ignored.
 
