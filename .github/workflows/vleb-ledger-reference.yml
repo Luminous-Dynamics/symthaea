@@ -89,6 +89,18 @@ jobs:
         run: python tools/vleb/test_analyze_shifted_runs.py
       - name: Test shift-event evidence consistency auditor
         run: python tools/vleb/test_audit_shift_event_evidence.py
+      - name: Test shift-event auditor mutation campaign
+        run: python tools/vleb/test_shift_event_mutation_campaign.py
+      - name: Mutation-test shift-event evidence guardrails
+        run: python tools/vleb/run_shift_event_mutation_campaign.py --output "$RUNNER_TEMP/vleb-shift-event-mutation-report.json"
+      - name: Upload shift-event mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vleb-shift-event-mutation-report-${{ github.sha }}
+          path: ${{ runner.temp }}/vleb-shift-event-mutation-report.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Test reproducible two-sided oracle-control replay
         run: python tools/vleb/test_verify_oracle_controls.py
       - name: Test oracle-control verifier mutation campaign
