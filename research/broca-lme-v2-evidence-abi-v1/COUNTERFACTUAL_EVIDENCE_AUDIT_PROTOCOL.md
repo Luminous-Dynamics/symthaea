@@ -16,18 +16,18 @@ This protocol introduces a **paired counterfactual unit**: two cases share the s
 
 Record the following as distinct fields; never collapse them into one Boolean:
 
-1. **Integrity:** source, payload and span digests validate.
+1. **Integrity:** the committed source digest remains bound to the evidence record; the current payload digest and selected payload-span digest are independently recomputed and validated.
 2. **Eligibility:** scope, lifecycle, authorization, and temporal validity permit the record to contribute.
 3. **Role coverage:** supplied requirement-role labels are covered by supplied candidate-role annotations.
 4. **Semantic support:** the selected evidence entails or otherwise justifies the specific answer claim in context, including polarity, time, entity, and relevant relations.
 5. **Decision:** answer, abstain/escalate, or bounded refinement.
 6. **Answer correctness:** downstream answer judged against the frozen reference/evaluation protocol.
 
-The selector's `complete=true` is layer 3 only. A span digest establishes byte identity, not entailment, source authority, truth, independence, or freshness. An integrity error must not be relabeled as low coverage or an ordinary abstention.
+The selector's `complete=true` is layer 3 only. A payload-span digest establishes byte identity within the selected evidence payload, not raw-source offset mapping, entailment, source authority, truth, independence, or freshness. An integrity error must not be relabeled as low coverage or an ordinary abstention.
 
 ## 3. Versioned fixture format
 
-Store fixtures as deterministic UTF-8 JSONL. One row is one pair; a pair contains two independently executed cases. Use a fixed schema version and reject unknown fields in the generator/validator. The generator emits only the data needed for the memory write/query path. Keep gold labels in a separate evaluator-only file inaccessible to the system under test.
+Store fixtures as deterministic UTF-8 JSONL. One row is one pair; a pair contains two independently executed cases. Use a fixed schema version and reject unknown fields in the generator/validator. The generator emits only the data needed for the memory write/query path. Any byte-range witnesses in this protocol are defined against the exact text payload supplied to the selector, not automatically against the original trajectory JSON or raw source bytes. Keep gold labels in a separate evaluator-only file inaccessible to the system under test.
 
 Proposed pair record:
 
@@ -144,7 +144,9 @@ Run the official reader and baseline configurations, including the packaged stro
 Always disaggregate by mutation family and report the denominator:
 
 - Integrity-gate pass/fail and forbidden-evidence emission count.
-- Span-verification accuracy / exact byte-traceability.
+- Payload-span verification accuracy / exact byte integrity.
+- Source-record binding (payload receipt carries the expected committed source digest).
+- Raw-source traceability (payload span is mapped to and independently verified against original source bytes); report as unavailable until an explicit mapping/locator is implemented.
 - Semantic role precision/recall and false-role rate.
 - **False-coverage rate:** cases declared covered/complete for which at least one essential answer requirement lacks genuine support.
 - **Unsupported-answer rate:** answered cases whose material answer claims lack support.
@@ -198,4 +200,4 @@ These works motivate the protocol but use different datasets, memory interfaces,
 
 ## 10. Current claim boundary
 
-This document provides a versioned evaluation contract. It does not implement semantic entailment, contradiction detection, role extraction, query planning, answer calibration, official worker wiring, or a benchmark result. PR #8876's role coverage and PR #8894's source-span verification remain useful component-level guarantees; neither is a semantic-sufficiency certificate. No performance or SOTA claim follows until the exact integrated commit is compiled, tested, and evaluated on the frozen held-out protocol.
+This document provides a versioned evaluation contract. It does not implement semantic entailment, contradiction detection, role extraction, query planning, answer calibration, official worker wiring, or a benchmark result. PR #8876's role coverage and PR #8894's payload-span verification/source-digest association remain useful component-level guarantees; neither is a semantic-sufficiency certificate, and the latter does not yet prove raw-source byte-range mapping. No performance or SOTA claim follows until the exact integrated commit is compiled, tested, and evaluated on the frozen held-out protocol.
