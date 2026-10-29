@@ -807,6 +807,66 @@ mod tests {
         assert!(LoRaFragment::from_bytes(&[]).is_none());
     }
 
+    #[test]
+    fn parser_rejects_fec_flag_on_nonfinal_index_with_valid_checksum() {
+        let data = vec![0x5a; PAYLOAD_SIZE * 2 + 7];
+        let mut malformed = fragment(7, &data)[0].clone();
+        malformed.flags |= FLAG_FEC;
+        malformed.checksum = malformed.compute_checksum();
+
+        let mut wire = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_final_fragment_without_fec_with_valid_checksum() {
+        let data = vec![0x6b; PAYLOAD_SIZE * 2 + 7];
+        let mut malformed = fragment(8, &data).pop().unwrap();
+        malformed.flags &= !FLAG_FEC;
+        malformed.checksum = malformed.compute_checksum();
+
+        let mut wire = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len]).is_none());
+    }
+
+    #[test]
+    fn assembler_rejects_mismatched_count_without_advancing_state() {
+        let data = vec![0x7c; 2048];
+        let frags = fragment(9, &data);
+        let mut assembler = FragmentAssembler::new(9, frags.len() as u8, data.len());
+        let mut malformed = frags[0].clone();
+        malformed.total_fragments -= 1;
+        malformed.checksum = malformed.compute_checksum();
+
+        assert!(!assembler.feed(&malformed));
+        assert!(!assembler.has_fragment(malformed.fragment_index));
+        assert_eq!(assembler.received_data_count(), 0);
+
+        for frag in &frags {
+            assembler.feed(frag);
+        }
+        assert_eq!(assembler.assemble().as_deref(), Some(data.as_slice()));
+    }
+
+    #[test]
+    fn assembler_invalid_expected_layout_fails_closed_without_panicking() {
+        let data = vec![0x8d; 2048];
+        let frags = fragment(10, &data);
+
+        let mut wrong_size = FragmentAssembler::new(10, frags.len() as u8, 100);
+        for frag in &frags {
+            assert!(!wrong_size.feed(frag));
+        }
+        assert!(!wrong_size.is_complete());
+        assert!(wrong_size.assemble().is_none());
+
+        let zero_data_count = FragmentAssembler::new(10, 1, 2048);
+        assert!(!zero_data_count.is_complete());
+        assert!(zero_data_count.assemble().is_none());
+    }
+
     // -- Wrong thought_id rejected --
 
     #[test]
