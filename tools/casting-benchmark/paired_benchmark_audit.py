@@ -141,7 +141,7 @@ def validate_manifest(document: Any) -> dict[str, Any]:
         raise ValueError("runs must be a non-empty array")
 
     by_unit: dict[str, dict[str, dict[str, Any]]] = {}
-    policies: set[str] | None = None
+    all_policies: set[str] = set()
     shared_meta: dict[str, tuple[Any, ...]] = {}
     for index, raw in enumerate(runs):
         run = _strict_object(raw, RUN_FIELDS, f"runs[{index}]")
@@ -224,12 +224,9 @@ def validate_manifest(document: Any) -> dict[str, Any]:
             "curve": normalized_curve,
             "shift_map": shift_map,
         }
-        this_policies = set(by_unit[unit_id])
-        if policies is None:
-            policies = this_policies
-        # Verify global policy identity consistency after the loop.
+        all_policies.add(policy_id)
 
-    assert policies is not None
+    policies = all_policies
     if doc["baseline_policy"] not in policies:
         raise ValueError("baseline_policy is absent from run manifest")
     expected_shift_set: set[str] | None = None
@@ -312,6 +309,18 @@ def _paired_effect(
     losses = sum(value < -tie_tolerance for value in differences)
     ties = len(differences) - wins - losses
     n_not_tied = wins + losses
+    def bootstrap_win_rate() -> list[float] | None:
+        estimates: list[float] = []
+        count = len(differences)
+        for _ in range(replicates):
+            sample = [differences[rng.randrange(count)] for _ in range(count)]
+            sample_wins = sum(value > tie_tolerance for value in sample)
+            sample_losses = sum(value < -tie_tolerance for value in sample)
+            if sample_wins + sample_losses:
+                estimates.append(sample_wins / (sample_wins + sample_losses))
+        estimates.sort()
+        return [_quantile(estimates, 0.025), _quantile(estimates, 0.975)] if estimates else None
+
     ordered = sorted(differences)
     return {
         "n_paired_units": len(differences),
@@ -319,6 +328,7 @@ def _paired_effect(
         "median_delta": statistics.median(differences),
         "wins": wins, "ties": ties, "losses": losses,
         "win_rate_excluding_ties": wins / n_not_tied if n_not_tied else None,
+        "bootstrap_95pct_ci_win_rate": bootstrap_win_rate() if n_not_tied else None,
         "bootstrap_95pct_ci_mean_delta": _bootstrap_interval(
             differences, replicates=replicates, rng=rng, statistic="mean"
         ),
