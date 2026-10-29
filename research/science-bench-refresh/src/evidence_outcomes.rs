@@ -571,7 +571,7 @@ fn increment(map: &mut BTreeMap<String, u64>, key: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn resource_summary<'a>(
+fn resource_summary(
     values: impl Iterator<Item = Option<u64>>,
 ) -> Result<CounterSummaryV1, String> {
     let mut summary = CounterSummaryV1 {
