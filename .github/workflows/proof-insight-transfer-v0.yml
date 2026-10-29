@@ -3606,9 +3606,24 @@ jobs:
         run: |
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
+          root="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0"
+          python - "$root/fixtures/component-first-split-candidate.synthetic.json" "$root/fixtures/family-component-manifest.feasibility.synthetic.json" "$RUNNER_TEMP/component-first-split-candidate.synthetic.json" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+
+          candidate_path, component_path, output_path = map(Path, sys.argv[1:])
+          candidate = json.loads(candidate_path.read_text())
+          component_bytes = component_path.read_bytes()
+          component = json.loads(component_bytes)
+          if component.get("dataset_kind") != "synthetic_fixture":
+              raise SystemExit("source component fixture must be explicitly synthetic")
+          candidate["source_component_manifest_sha256"] = hashlib.sha256(component_bytes).hexdigest()
+          output_path.write_text(json.dumps(candidate, indent=2) + "\\n")
+          PY
           cargo run --locked --bin audit_component_split_feasibility -- \
-            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/component-first-split-candidate.synthetic.json" \
-            "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/pre-split-target-eligibility-census.synthetic.json" \
+            "$RUNNER_TEMP/component-first-split-candidate.synthetic.json" \
+            "$root/fixtures/pre-split-target-eligibility-census.synthetic.json" \
+            "$root/fixtures/family-component-manifest.feasibility.synthetic.json" \
             "$RUNNER_TEMP/component-split-feasibility.synthetic.json"
           "$RUNNER_TEMP/jsonschema-venv/bin/python" - \
             "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/pre-split-target-eligibility-census-v0.schema.json" \
