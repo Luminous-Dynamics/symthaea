@@ -46,6 +46,8 @@ jobs:
           test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-047-results.tsv)" = "5"
           awk -F '\t' '$1=="FIXTURE" && $2=="zero_personalization_headroom" && $11=="personalization_headroom" { if ($12 < -0.00000001 || $12 > 0.00000001) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
           awk -F '\t' '$1=="FIXTURE" && $2=="misaligned_dense_personalization" && $15=="pairwise_alignment_accuracy" { if ($16 > 0.01) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $2=="aligned_dense_personalization" && $3==128 && $4=="matured_outcome_fraction" { if ($5 < 0.90) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $2=="aligned_sparse_delayed_outcome" && $3==128 && $4=="matured_outcome_fraction" { if ($5 > 0.80) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($4=="proxy_policy_identification_rate" || $4=="north_star_policy_identification_rate" || $4=="matured_outcome_fraction" || $4=="batch_ips_pointwise_wald_coverage" || $4=="batch_ips_matured_sample_fraction") { if ($5 < -0.000001 || $5 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($4=="online_north_star_regret_per_decision" || $4=="online_proxy_regret_per_decision" || $4=="batch_ips_absolute_error_for_learned_greedy_policy" || $4=="batch_ips_wald_interval_width") { if ($5 < -0.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-047-results.tsv
           grep '^CONFIG' /tmp/vis-dvpc-047-results.tsv > /tmp/vis-dvpc-047-config.tsv
