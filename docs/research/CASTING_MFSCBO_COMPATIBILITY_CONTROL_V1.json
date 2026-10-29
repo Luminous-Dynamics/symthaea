@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "CASTING-MFSCBO-INVARIANT-CONSTRAINT-CONTROL-001",
+  "suite_type": "public_analytic_mfscbo_compatible_control",
+  "evidence_class": "public_analytic",
+  "objective_directions": ["minimize", "minimize"],
+  "domain": {
+    "dimension": 2,
+    "lower_bound": 0.0,
+    "upper_bound": 1.0,
+    "coordinates": ["x0", "x1"]
+  },
+  "fidelities": ["low", "medium", "high"],
+  "objective_contract": {
+    "high": [
+      "f0_high = 0.1 + (x0 - 0.2)^2 + 0.25*x1",
+      "f1_high = 0.1 + (x0 - 0.8)^2 + 0.25*(1 - x1)"
+    ],
+    "low": [
+      "f0_low = f0_high + 0.12*x0 + 0.04*sin(2*pi*(x0 + x1))",
+      "f1_low = f1_high - 0.09*x1 + 0.03*cos(2*pi*x0)"
+    ],
+    "medium": [
+      "f0_medium = f0_high + 0.38*(0.12*x0 + 0.04*sin(2*pi*(x0 + x1)))",
+      "f1_medium = f1_high + 0.38*(-0.09*x1 + 0.03*cos(2*pi*x0))"
+    ],
+    "truth_use": "Budgeted fidelity-specific objective observations may be queried by the optimizer; complete-pool high-fidelity truth is reserved for post-run scoring."
+  },
+  "constraint_contract": {
+    "constraint_id": "normalized_geometry_envelope_v1",
+    "definition": "margin(x) = 1.4 - x0 - x1; feasible iff margin >= 0",
+    "fidelity_invariant": true,
+    "margin_sign": "positive_means_feasible"
+  },
+  "fidelity_cost_units": {
+    "low": 1,
+    "medium": 5,
+    "high": 25
+  },
+  "mfscbo_compatibility": {
+    "constraint_fidelity_invariant": true,
+    "objective_api": "one scalarized objective per fidelity",
+    "claim_limit": "analytic API-compatibility control only; not a casting physics model"
+  },
+  "claim_ceiling": "This manifest defines an analytic compatibility control for evaluating comparator wiring and cost accounting. It is not a measured casting process, physical feasibility model, optimizer result, or SOTA evidence."
+}
