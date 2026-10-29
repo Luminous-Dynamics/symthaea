@@ -290,14 +290,13 @@ def run_mutation_campaign(
                 "anchor_counts": [],
             }
             try:
-                mutated_text = original
+                mutated_text = replace_reviewed_anchors(original, mutation)
                 for replacement in mutation["replacements"]:
                     anchor = replacement["anchor"]
-                    count = mutated_text.count(anchor)
-                    result["anchor_counts"].append({"anchor_sha256": digest(anchor.encode("utf-8")), "count": count})
-                    if count != 1:
-                        raise ValueError(f"reviewed mutation anchor count is {count}, expected exactly one")
-                    mutated_text = mutated_text.replace(anchor, replacement["replacement"], 1)
+                    result["anchor_counts"].append({
+                        "anchor_sha256": digest(anchor.encode("utf-8")),
+                        "count": original.count(anchor),
+                    })
             except (KeyError, TypeError, ValueError) as exc:
                 result["reason"] = str(exc)
                 results.append(result)
