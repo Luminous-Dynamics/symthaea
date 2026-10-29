@@ -11,6 +11,7 @@ use symthaea_operations_research::aviation_energy_hub_robustness::{
 fn storage() -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: 2,
+        initial_soc_quanta: 0,
         max_charge_input_quanta_per_interval: 2,
         max_discharge_output_quanta_per_interval: 2,
         charge_efficiency_ppm: 1_000_000,
