@@ -301,6 +301,7 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
         let mut moments=OpeMoments::default();
         let mut seq_covered=[true;4];
         let mut promotion_time:[Option<usize>;4]=[None;4];
+        let mut previous_intervals=[Interval{lower:0.0,upper:1.0};4];
         let mut look_index=0usize;
 
         for t in 1..=max_horizon {
@@ -315,7 +316,16 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
             moments.update(w*reward);
             let mut intervals=[Interval{lower:0.0,upper:1.0};4];
             intervals[0]=mope_interval;
-            for method in 1..4 { intervals[method]=baseline_interval(method,moments,scenario.max_weight); }
+            // Reused Wald remains pointwise by design. Time-uniform methods use
+            // the running intersection, matching the endpoint semantics of MOPE.
+            intervals[1]=baseline_interval(1,moments,scenario.max_weight);
+            for method in 2..4 {
+                let raw=baseline_interval(method,moments,scenario.max_weight);
+                intervals[method]=Interval {
+                    lower: previous_intervals[method].lower.max(raw.lower),
+                    upper: previous_intervals[method].upper.min(raw.upper),
+                };
+            }
 
             for method in 0..4 {
                 let interval=intervals[method];
@@ -334,6 +344,7 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                 }
                 look_index+=1;
             }
+            previous_intervals=intervals;
             samples_processed+=1;
         }
     }
