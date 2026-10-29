@@ -825,18 +825,15 @@ mod tests {
     #[test]
     fn midi_parser_rejects_an_orphaned_lineage_marker() {
         let mut midi = minimal_marked_midi();
-        // In this fixture, the marker starts after the 7-byte track name and
-        // 7-byte tempo events. Replace the NoteOn with a second metadata event.
-        let marker_payload = encode_midi_lineage_marker_payload(0, 0);
-        let marker = [0xFF, 0x7F, marker_payload.len() as u8];
+        // Replace the four-byte NoteOn with a four-byte empty text meta event,
+        // keeping the SMF track length unchanged while leaving the marker orphaned.
         let needle = [0x00, 0x90, 60, 100];
         let position = midi
             .windows(needle.len())
             .position(|window| window == needle)
             .unwrap();
-        let mut replacement = vec![0, 0xFF, 0x01, 1, b'x'];
-        midi.splice(position..position + needle.len(), replacement.drain(..));
-        let _ = marker;
+        let replacement = [0x00, 0xFF, 0x01, 0x00];
+        midi[position..position + needle.len()].copy_from_slice(&replacement);
         assert_eq!(
             PerformedEventMap::from_midi_bytes(&midi, &digest('a'), 48_000, 48_000),
             Err(PerformedEventMapError::OrphanLineageMarker)
