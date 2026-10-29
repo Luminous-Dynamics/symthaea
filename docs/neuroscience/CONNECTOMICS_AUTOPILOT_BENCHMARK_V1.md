@@ -120,6 +120,26 @@ The delta is a consequence of the proposed edit, not evidence that the edit is c
 
 After reconstruction quality gates pass, connect anatomical data to activity, cell identity, perturbations, or behavior where valid aligned datasets exist. Ask whether a proposed circuit explanation predicts held-out observations better than competing explanations. A connectome by itself is not a complete functional model and cannot establish the causal role of every edge.
 
+### 7. From a single-model leaderboard to a risk-budgeted cascade
+
+The October 2026 VLM study argues that specialist models can be cheaper per image for one fixed task and known dataset, while adapted VLMs can transfer better to unfamiliar species in some error classes. Symthaea should test a **cascade**, not assume one model should handle every case:
+
+1. A compact specialist handles in-domain, well-calibrated, low-impact cases.
+2. A second model or adapted VLM is invoked when calibrated uncertainty, detected distribution shift, or model disagreement justifies the extra cost.
+3. High-impact unresolved cases are sent to expert review; insufficient evidence results in abstention.
+4. The system records the route, features that triggered escalation, actual outcome, latency, GPU/memory cost, and reviewer time prospectively.
+
+The routing decision must be task-specific. The cited VLM preprint's strongest unseen-species result is on merge-error identification; it did not show the same improvement on split-error transfer. Do not infer one universal species/OOD policy from the win on a single task.
+
+Benchmark the risk–coverage–cost frontier, not just accuracy:
+- accepted-case error at 50/70/80/90/95% automatic coverage, wherever sample size supports the estimate;
+- end-to-end cost per 1,000 accepted decisions, including model inference, escalations, reviewer minutes, and failed/retried calls;
+- p50/p95 latency, peak device memory, and throughput under the same hardware and batching;
+- quality and calibration by task × species × modality, including abstention and escalation rates;
+- the counterfactual cost and error of the same system if every item were sent to the VLM, specialist, or human reviewer.
+
+Do not multiply uncalibrated confidence scores, and do not allow the router to hide hard cases by abstaining on an entire disadvantaged subgroup without reporting its coverage.
+
 ## System boundary
 
 The V1 system proposes, ranks, records, and evaluates. It does not autonomously mutate authoritative public connectome annotations.
@@ -181,16 +201,17 @@ Splits must be grouped by source volume, spatial block, neuron/cell identity, an
 
 1. **Published ConnectomeBench2 ViT baseline**, reproducing the pinned `v2` dataset, modality, and split protocol where possible.
 2. **Specialist task models and morphology rules**, including NEURD where source data and operation semantics are compatible.
-3. **VLM comparison arms:** zero-shot, few-shot, and LoRA-adapted configurations from the September 2026 VLM study where model/code/artifact access and license permit a faithful reproduction.
-4. Existing segmentation/tracing output with no additional triage.
-5. Random review at the same expert-review budget.
-6. Simple uncertainty-only and calibrated-uncertainty-only ranking.
-7. Model-disagreement ranking, with shared ancestry tracked where known.
-8. Active-learning baseline matching the same annotation budget; report the labels needed to reach a fixed target quality.
-9. An error/impact ranker using only directly observable, available features.
-10. Symthaea orchestration with correction memory and budgeted selection.
-11. Ablations: no HDC retrieval; no correction memory; no active selection; no graph-impact term; no calibration/abstention policy.
-12. Expert review as a reference ceiling only where expert labels and reviewer effort are actually measured. Never present the ceiling as an automated baseline.
+3. **VLM comparison arms:** zero-shot, few-shot, and LoRA-adapted configurations from the September/October 2026 VLM study where model/code/artifact access and license permit faithful reproduction.
+4. **Risk-budgeted cascade:** specialist → uncertainty/OOD gate → adapted VLM → expert review/abstention, compared against always-run specialist, always-run VLM, and simple threshold routing at matched quality/coverage targets.
+5. Existing segmentation/tracing output with no additional triage.
+6. Random review at the same expert-review budget.
+7. Simple uncertainty-only and calibrated-uncertainty-only ranking.
+8. Model-disagreement ranking, with shared ancestry tracked where known.
+9. Active-learning baseline matching the same annotation budget; report the labels needed to reach a fixed target quality.
+10. An error/impact ranker using only directly observable, available features.
+11. Symthaea orchestration with correction memory and budgeted selection.
+12. Ablations: no HDC retrieval; no correction memory; no active selection; no graph-impact term; no calibration/abstention policy.
+13. Expert review as a reference ceiling only where expert labels and reviewer effort are actually measured. Never present the ceiling as an automated baseline.
 
 Keep model version, prompts, preprocessing, compute, reviewer instructions, candidate pool, and stopping rules fixed across paired comparisons. Give every baseline the same input access and review budget.
 
@@ -202,6 +223,9 @@ Keep model version, prompts, preprocessing, compute, reviewer instructions, cand
 - impact-weighted true-error yield at fixed review budgets;
 - reviewer disagreement and escalation time;
 - all-in latency/compute used to produce and rank the queue.
+- all-in model + reviewer cost per 1,000 accepted decisions, with per-model inference cost, escalation rate, and reviewer minutes separated;
+- p50/p95 end-to-end latency, peak memory, throughput, and fail/retry rate under matched hardware and batch assumptions;
+- risk–coverage–cost Pareto frontier for specialist-only, VLM-only, human-only, and cascaded policies;
 
 **Error quality**
 - precision, recall, and PR-AUC by merge, split, branch discontinuity, orphan fragment, and synapse-assignment error when ground truth supports each class;
@@ -238,6 +262,7 @@ After reproducing the pinned ConnectomeBench2 V2 baseline, validating the split/
 - **Label-efficiency target:** reduce expert labels/review decisions needed to reach a prespecified quality target by at least 20% relative to the strongest eligible active-learning baseline, under equal reviewer/compute budgets and with no critical error-class regression.
 - **Shift-safety target:** on held-out region/species/source groups, report risk-coverage and calibration-vs-coverage; abstention must lower accepted-case error as coverage is reduced. If a subgroup lacks enough labels for a calibration claim, mark it not estimable and default to human review.
 - Report two Pareto frontiers, not one leaderboard: (accuracy / accepted-case risk) vs expert-label budget, and (accepted-case risk) vs coverage, with all-in latency and compute reported alongside.
+- **Cascade efficiency target:** at fixed accepted-case risk and automatic coverage, reduce all-in inference plus reviewer cost by at least 20% versus the strongest eligible always-run or simple-routing baseline. Cost accounting must be defined before lockbox evaluation; if expert time cannot be measured prospectively, mark the real-world cost target not estimable.
 
 These targets are intentionally about efficient, safe proofreading, not unsupported claims of beating every segmenter or achieving whole-brain autonomy.
 
