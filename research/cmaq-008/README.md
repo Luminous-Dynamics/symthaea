@@ -1,6 +1,6 @@
 # CMAQ-008: Sequential Support-Drift Detection and Model-Use Revocation
 
-**Status:** protocol v0.1 + executable Rust smoke harness; draft  
+**Status:** protocol v0.2 + executable Rust smoke harness; draft  
 **Tracking issue:** [#9058](https://github.com/Luminous-Dynamics/symthaea/issues/9058)  
 **Claim ceiling:** synthetic sequential-monitor benchmark only; no production, safety certification or SOTA claim
 
@@ -14,11 +14,13 @@ This v0.1 smoke harness models the outcome feedback itself rather than a learned
 
 ## Executable panel
 
-The dependency-free Rust CLI runs **512 paired deterministic episodes per scenario**, each 128 decisions long. Every policy sees the same exogenous random tape for a given episode, allowing paired utility comparisons. A candidate action under the model gate has utility +0.03 when supported and −0.20 when unsupported; direct fallback utility is 0. The unsupported-outcome probability is:
+The dependency-free Rust CLI runs **512 paired deterministic episodes per scenario**, each 128 decisions long, across five lanes. Every policy sees the same exogenous random tape for a given episode, allowing paired utility comparisons. A candidate action under the model gate has utility +0.03 when supported and −0.20 when unsupported; direct fallback utility is 0. The unsupported-outcome probability is:
 
 - **Stationary null:** 1% through all 128 decisions.
 - **Abrupt support shift:** 1% through step 63, then 25% from step 64.
 - **Gradual support shift:** 1% through step 31, rises linearly from step 32 through step 95, and reaches 25% at step 96.
+- **Delayed abrupt shift:** same underlying shift as the abrupt lane, but support feedback arrives 8 additional decision steps late.
+- **Noisy stationary feedback:** the true unsupported outcome remains at 1%, but the primary feedback channel independently flips 10% of labels. This is an observation-channel failure, not a causal/support shift.
 
 These rates and payoffs define a synthetic falsification mechanism. They are not learned or measured estimates from Symthaea, and numbers must not be transferred to a real environment.
 
@@ -38,7 +40,7 @@ Every scenario/policy row reports:
 - mean cumulative utility and paired utility delta versus fixed gate, with a normal-approximation 95% interval over episode-level paired differences;
 - model-action coverage;
 - unsupported outcomes per model action and per 1,000 total decisions;
-- episode revocation rate and false-revocation rate (pre-shift alarms on changing scenarios, all monitor revocations in stationary scenarios);
+- episode revocation rate and false-revocation rate (pre-shift alarms on changing scenarios, all monitor revocations in no-change scenarios); feedback mismatch rate and feedback-record overhead;
 - shift-detection coverage and conditional p90 detection delay (−1 means no detections);
 - descriptive mean regret, CVaR95 regret (average of the worst ceil(5% of episodes)) and maximum regret versus the oracle policy on paired exogenous tapes.
 
@@ -63,7 +65,7 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The focused workflow validates strict report schema, row uniqueness, fixed/fallback behavior, stationary false-alarm budget, abrupt detection and delay, paired utility lift, gradual-lane output and risk/coverage accounting. Rust must compile and the exact-head workflow must pass before reporting benchmark outputs as Rust evidence.
+The focused workflow validates strict report schema, row uniqueness, fixed/fallback behavior, stationary false-alarm budget, abrupt and delayed detection/delay, paired utility lift, gradual-lane output, observation-channel corruption, witness overhead and risk/coverage accounting. Rust must compile and the exact-head workflow must pass before reporting benchmark outputs as Rust evidence.
 
 ## Limitations and next work
 
@@ -73,4 +75,4 @@ The focused workflow validates strict report schema, row uniqueness, fixed/fallb
 - Three synthetic lanes do not cover recurrent regimes, covariate drift, correlated feedback, adversarial support-score changes or hidden mechanism families.
 - The harness establishes no production guarantee and has not yet integrated with CMAQ-003/006 or the live Symthaea planner.
 
-Next stage: add feedback delay/drop/corruption, threshold-independent anytime-valid evidence monitoring, recurrent-shift/recovery lanes, and a trusted event-envelope boundary. Then compare to a sequential Bayesian changepoint or Page–Hinkley baseline on held-out environment families, with identical action, compute and observation budgets.
+Next stage: add missing/duplicated/replayed feedback, threshold-independent anytime-valid evidence monitoring, recurrent-shift/recovery lanes, and a cryptographically bound event-envelope boundary. Then compare to a sequential Bayesian changepoint or Page–Hinkley baseline on held-out environment families, with identical action, compute and observation budgets.
