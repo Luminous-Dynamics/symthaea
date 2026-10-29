@@ -236,7 +236,7 @@ where
             next_index += 1;
         }
 
-        let (best, lower_bound, gap) = summarize_bounds(&ordered, &evaluations);
+        let (best, _, gap) = summarize_bounds(&ordered, &evaluations);
         if best.is_some() && gap.is_some_and(|value| value <= options.max_absolute_optimality_gap)
         {
             break;
@@ -278,10 +278,10 @@ where
 
     let indeterminate_remains = remaining_candidates
         .iter()
-        .any(|candidate| matches!(candidate.reason, RemainingCandidateReason::Indeterminate { .. }));
+        .any(|candidate| matches!(&candidate.reason, RemainingCandidateReason::Indeterminate { .. }));
     let unevaluated_remains = remaining_candidates
         .iter()
-        .any(|candidate| matches!(candidate.reason, RemainingCandidateReason::NotEvaluated));
+        .any(|candidate| matches!(&candidate.reason, RemainingCandidateReason::NotEvaluated));
 
     let status = match (best.as_ref(), gap) {
         (Some(_), Some(value)) if value <= options.max_absolute_optimality_gap => {
@@ -359,7 +359,7 @@ fn summarize_bounds(
     match best.as_ref() {
         Some((_, best_cost)) => {
             let lower_bound = unresolved_lower_bound.map_or(*best_cost, |bound| bound.min(*best_cost));
-            (best, Some(lower_bound), Some(best_cost - lower_bound))
+            (best, Some(lower_bound), Some(*best_cost - lower_bound))
         }
         None => (best, unresolved_lower_bound, None),
     }
