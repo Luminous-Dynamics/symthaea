@@ -26,6 +26,7 @@ pub mod api_inventory;
 pub mod active_experiment;
 pub mod robust_experiment;
 pub mod predictive_adequacy;
+pub mod experiment_policy_benchmark;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -186,4 +187,10 @@ pub use predictive_adequacy::{
     assess_predictive_adequacy, ObservationSource, PredictiveAdequacyError,
     PredictiveAdequacyPolicy, PredictiveAdequacyReport, PredictiveAdequacyStatus,
     PredictiveLogLoss, PredictiveObservationSet, SamplingAssumption,
+};
+
+pub use experiment_policy_benchmark::{
+    run_experiment_policy_bakeoff, ExperimentPolicyBakeoffReport,
+    ExperimentPolicyBenchmarkError, ExperimentPolicyEvaluation,
+    ExperimentSelectionPolicy, ExperimentTruthEvaluation,
 };
