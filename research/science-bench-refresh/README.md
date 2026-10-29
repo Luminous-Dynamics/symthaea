@@ -5,6 +5,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 ## Current contents
 
 - docs/research/SCI-EVIDENCE-CONTRACTS-001.md: evaluator-side evidence behavior contract ontology, metrics, and qualification plan (proposal; fixtures are non-scoring).
+- src/evidence_behavior_contracts.rs: typed plan/report commitments, fail-closed case accounting, and per-family scorecards; CLI commands commit/verify both plan and report.
 - schema/evidence-behavior-contract-plan.schema.json and schema/evidence-behavior-contract-report.schema.json: strict draft schemas for pre-run obligations and terminal adjudications.
 - fixtures/evidence-behavior-contract-plan.example.json and fixtures/evidence-behavior-contract-report.example.json: seven-family illustrative fixtures with placeholder digests; not eligible for scoring.
 
