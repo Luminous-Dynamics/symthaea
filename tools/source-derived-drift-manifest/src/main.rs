@@ -163,7 +163,7 @@ fn canonical_unit_float(value: &str, field: &str) -> Result<f64, String> {
     Ok(parsed)
 }
 
-fn comma_list(value: &str, field: &str) -> Result<Vec<&str>, String> {
+fn comma_list<'a>(value: &'a str, field: &str) -> Result<Vec<&'a str>, String> {
     let items: Vec<&str> = value.split(',').collect();
     if items.is_empty() || items.iter().any(|item| !is_token(item)) {
         return Err(fail(format!("{field} must be a comma-separated list of canonical tokens")));
