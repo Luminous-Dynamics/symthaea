@@ -12,6 +12,7 @@ enum Family {
     Additive,
     Interaction,
     Threshold,
+    Parity,
 }
 
 impl Family {
@@ -24,6 +25,7 @@ impl Family {
             Self::Additive => 0,
             Self::Interaction => 1,
             Self::Threshold => 2,
+            Self::Parity => 3,
         }
     }
 
@@ -32,6 +34,7 @@ impl Family {
             Self::Additive => "additive",
             Self::Interaction => "interaction",
             Self::Threshold => "threshold",
+            Self::Parity => "parity-heldout",
         }
     }
 }
@@ -113,6 +116,15 @@ impl Mechanism {
                 };
                 additive + gain
             }
+            // Evaluator-only held-out family: categorical context/action parity,
+            // intentionally excluded from Family::all() and the candidate library.
+            Family::Parity => {
+                if (query.context + 2 * action + self.variant) % 4 < 2 {
+                    11
+                } else {
+                    -4
+                }
+            }
         };
 
         Outcome {
@@ -144,6 +156,12 @@ fn mechanisms() -> Vec<Mechanism> {
     Family::all()
         .into_iter()
         .flat_map(|family| (0..ACTIONS).map(move |variant| Mechanism::new(family, variant)))
+        .collect()
+}
+
+fn heldout_mechanisms() -> Vec<Mechanism> {
+    (0..ACTIONS)
+        .map(|variant| Mechanism::new(Family::Parity, variant))
         .collect()
 }
 
@@ -659,6 +677,34 @@ mod tests {
         )
         .expect_err("incompatible outcome must not silently empty posterior");
         assert!(error.contains("possible regime shift"));
+    }
+
+    #[test]
+    fn heldout_mechanism_family_triggers_model_misspecification_signal() {
+        let candidates = mechanisms();
+        for hidden_world in heldout_mechanisms() {
+            let mut posterior: Vec<usize> = (0..candidates.len()).collect();
+            let mut detected = false;
+            for query in all_queries() {
+                match update_posterior(
+                    &candidates,
+                    &posterior,
+                    query,
+                    hidden_world.sense(query),
+                ) {
+                    Ok(next) => posterior = next,
+                    Err(error) => {
+                        assert!(error.contains("model misspecification"));
+                        detected = true;
+                        break;
+                    }
+                }
+            }
+            assert!(
+                detected,
+                "held-out family must not be silently represented as an in-class mechanism"
+            );
+        }
     }
 
     #[test]
