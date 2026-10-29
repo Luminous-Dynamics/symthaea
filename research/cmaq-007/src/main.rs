@@ -196,7 +196,7 @@ fn evaluate_episode(actions: &[CandidateAction], strategy: Strategy) -> EpisodeM
             (
                 action.true_utility,
                 action.predicted_utility - action.true_utility,
-                f64::from(!action.supported),
+                if action.supported { 0.0 } else { 1.0 },
                 1.0,
             )
         } else {
