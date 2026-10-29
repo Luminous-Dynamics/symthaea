@@ -1,0 +1,9 @@
+{"event_id":"E001","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"db-primary-a.internal","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T09:00:00Z","source":"operations"}
+{"event_id":"E002","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"db-primary-b.internal","valid_from":"2026-02-10","valid_to":null,"recorded_at":"2026-02-10T10:00:00Z","source":"operations"}
+{"event_id":"E003","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"db-primary-c.internal","valid_from":"2026-01-15","valid_to":null,"recorded_at":"2026-03-01T08:00:00Z","source":"operations"}
+{"event_id":"E004","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"db-primary-d.internal","valid_from":"2026-01-15","valid_to":null,"recorded_at":"2026-03-02T08:00:00Z","source":"incident-review"}
+{"event_id":"R005","kind":"retract","target_event_id":"E004","recorded_at":"2026-04-01T00:00:00Z","source":"operations"}
+{"event_id":"R006","kind":"retract","target_event_id":"E003","recorded_at":"2026-03-20T08:00:00Z","source":"user-notes"}
+{"event_id":"E006","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"forged-endpoint.invalid","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-10T10:00:00Z","source":"user-notes"}
+{"event_id":"E007","kind":"assert","subject":"db-prod","attribute":"endpoint","value":"unknown-source.invalid","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-11T10:00:00Z","source":"mystery-source"}
+{"event_id":"E008","kind":"assert","subject":"memory-policy","attribute":"notes","value":"budget-review","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-02T09:00:00Z","source":"user-notes"}
