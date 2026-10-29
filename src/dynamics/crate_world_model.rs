@@ -138,10 +138,23 @@ impl HierarchicalCfCWorldModel {
         Array2::from_shape_fn((rows, cols), |_| rng.gen_range(-scale..scale))
     }
 
-    /// Create a new World Model with given configuration
+    /// Create a new World Model with given configuration.
+    ///
+    /// The initialization seed is sampled from the thread RNG. Use
+    /// [`Self::new_with_seed`] when experiments need deterministic initialization.
     pub fn new(config: WorldModelConfig) -> Result<Self> {
         let mut rng = rand::thread_rng();
-        let base_seed: u64 = rng.r#gen();
+        Self::new_with_seed(config, rng.r#gen())
+    }
+
+    /// Create a World Model from an explicit initialization seed.
+    ///
+    /// All randomly initialized weights and time constants are derived from
+    /// `seed`. The constructor is intended to make experiments and benchmark
+    /// replays reproducible; it does not make training data or GPU kernels
+    /// deterministic by itself.
+    pub fn new_with_seed(config: WorldModelConfig, seed: u64) -> Result<Self> {
+        let base_seed = seed;
 
         // Input projection: [hidden_dim, 2 * hdc_dim]
         // Uses sparse random projection (Johnson-Lindenstrauss style)
@@ -593,6 +606,32 @@ impl ExperienceBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seeded_initialization_replays_weights_and_predictions() {
+        let config = WorldModelConfig {
+            hdc_dim: 16,
+            hidden_dim: 8,
+            ..Default::default()
+        };
+        let first = HierarchicalCfCWorldModel::new_with_seed(config.clone(), 0x5EED_C0DE).unwrap();
+        let second = HierarchicalCfCWorldModel::new_with_seed(config.clone(), 0x5EED_C0DE).unwrap();
+        let different = HierarchicalCfCWorldModel::new_with_seed(config, 0x5EED_C0DF).unwrap();
+
+        assert_eq!(first.w_input, second.w_input);
+        assert_eq!(first.cfc_tau, second.cfc_tau);
+        assert_eq!(first.w_backbone, second.w_backbone);
+        assert_eq!(first.w_target, second.w_target);
+        assert_eq!(first.w_output, second.w_output);
+        assert_ne!(first.w_input, different.w_input);
+
+        let state = vec![0.25; 16];
+        let action = vec![0.75; 16];
+        assert_eq!(
+            first.predict(&state, &action, 1.0).unwrap(),
+            second.predict(&state, &action, 1.0).unwrap()
+        );
+    }
 
     #[test]
     fn test_world_model_predict() {
