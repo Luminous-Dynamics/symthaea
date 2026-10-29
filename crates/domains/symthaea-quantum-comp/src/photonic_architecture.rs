@@ -685,6 +685,8 @@ pub enum PhotonicEnvelopeError {
     InvalidProbabilityInterval,
     /// Invalid or negative optical loss, in dB.
     InvalidOpticalLoss(f64),
+    /// Minimum photon transmission must lie in (0, 1].
+    InvalidMinimumTransmissionProbability(f64),
     /// Optical routing requires at least one node.
     InvalidNodeCount,
     /// Optical link endpoint is outside the declared topology.
