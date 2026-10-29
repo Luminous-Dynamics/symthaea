@@ -51,7 +51,9 @@ jobs:
           test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-045-results.tsv)" = "12"
           awk -F '\t' '$1=="ROOT_METRIC" { n++; if ($7=="failures" && $8 != 0) bad=1 } END { if (n != 72 || bad) exit 1 }' /tmp/vis-dvpc-045-results.tsv
           awk -F '\t' '$1=="ROOT_METRIC" && $5=="checks" { total += $6; n++ } END { if (n != 72 || total < 1) exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="ROOT_METRIC" && $4=="MOPE_predictor_safe" && $5=="checks" { total += $6; n++ } END { if (n != 36 || total < 1) exit 1 }' /tmp/vis-dvpc-045-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $5=="sequence_coverage" && $8 < 0.90 { exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $5=="false_promotion_probability" && $9 > 0.10 { exit 1 }' /tmp/vis-dvpc-045-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="pointwise_coverage" || $5=="sequence_coverage" || $5=="sequence_false_exclusion_probability" || $5=="false_promotion_probability" || $5=="promotion_power" || $5=="reversed_interval_probability") { exit 1 }' /tmp/vis-dvpc-045-results.tsv
           grep '^SEED_SCHEDULE' /tmp/vis-dvpc-045-results.tsv > /tmp/vis-dvpc-045-seeds.tsv
           grep '^DGP\|^RESULT_METRIC\|^ROOT_METRIC\|^SYSTEM\|^BENCHMARK_CONFIG' /tmp/vis-dvpc-045-results.tsv > /tmp/vis-dvpc-045-summary.tsv
