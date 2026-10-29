@@ -44,12 +44,14 @@ struct Action {
     stated_uncertainty: f64,
     support_score: f64,
     supported: bool,
+    ensemble_noise: [f64; 5],
 }
 
 #[derive(Clone, Debug, PartialEq)]
 struct Candidate {
     true_utility: f64,
     predicted_utility: f64,
+    ensemble_min_utility: f64,
     stated_uncertainty: f64,
     support_score: f64,
     supported: bool,
@@ -82,12 +84,19 @@ fn make_catalog(seed: u64) -> Vec<Action> {
             } else {
                 0.15 + 0.85 * rng.unit()
             };
+            // Five synthetic model heads share the structural error above but have
+            // independent small residuals. Their minimum is a robustness comparator,
+            // not a trained ensemble and not a substitute for support evidence.
+            let head_noise_scale = if supported { 0.035 } else { 0.012 };
+            let ensemble_noise: [f64; 5] =
+                std::array::from_fn(|_| (rng.unit() - 0.5) * 2.0 * head_noise_scale);
             Action {
                 true_utility,
                 persistent_error,
                 stated_uncertainty,
                 support_score,
                 supported,
+                ensemble_noise,
             }
         })
         .collect()
@@ -109,12 +118,22 @@ fn project(actions: &[Action], horizon: usize, rollout_growth: f64) -> Vec<Candi
     let amplification = amplification_ratio(horizon, rollout_growth);
     actions
         .iter()
-        .map(|action| Candidate {
-            true_utility: action.true_utility,
-            predicted_utility: action.true_utility + action.persistent_error * amplification,
-            stated_uncertainty: action.stated_uncertainty,
-            support_score: action.support_score,
-            supported: action.supported,
+        .map(|action| {
+            let ensemble_min_utility = action.ensemble_noise
+                .iter()
+                .map(|noise| {
+                    action.true_utility
+                        + (action.persistent_error + noise) * amplification
+                })
+                .fold(f64::INFINITY, f64::min);
+            Candidate {
+                true_utility: action.true_utility,
+                predicted_utility: action.true_utility + action.persistent_error * amplification,
+                ensemble_min_utility,
+                stated_uncertainty: action.stated_uncertainty,
+                support_score: action.support_score,
+                supported: action.supported,
+            }
         })
         .collect()
 }
@@ -124,16 +143,18 @@ enum Strategy {
     DirectFallback,
     PredictedGreedy,
     UncertaintyPenalty,
+    EnsembleMin,
     SupportGate060,
     SupportGate090,
     OracleUpperBound,
 }
 
 impl Strategy {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::DirectFallback,
         Self::PredictedGreedy,
         Self::UncertaintyPenalty,
+        Self::EnsembleMin,
         Self::SupportGate060,
         Self::SupportGate090,
         Self::OracleUpperBound,
@@ -144,6 +165,7 @@ impl Strategy {
             Self::DirectFallback => "direct_fallback",
             Self::PredictedGreedy => "predicted_greedy",
             Self::UncertaintyPenalty => "uncertainty_penalty",
+            Self::EnsembleMin => "ensemble_min",
             Self::SupportGate060 => "support_gate_060",
             Self::SupportGate090 => "support_gate_090",
             Self::OracleUpperBound => "oracle_upper_bound",
@@ -164,6 +186,7 @@ struct EpisodeMetrics {
     prediction_mae: f64,
     realized_utility: f64,
     selected_optimism_gap: f64,
+    selected_decision_score_gap: f64,
     regret: f64,
     unsupported_selected: f64,
     coverage: f64,
@@ -195,6 +218,7 @@ fn evaluate_episode(actions: &[Candidate], strategy: Strategy) -> EpisodeMetrics
                 Strategy::UncertaintyPenalty => {
                     action.predicted_utility - UNCERTAINTY_PENALTY * action.stated_uncertainty
                 }
+                Strategy::EnsembleMin => action.ensemble_min_utility,
                 Strategy::OracleUpperBound => action.true_utility,
                 Strategy::DirectFallback => FALLBACK_UTILITY,
             };
@@ -205,17 +229,18 @@ fn evaluate_episode(actions: &[Candidate], strategy: Strategy) -> EpisodeMetrics
         }
     }
 
-    let (realized, optimism_gap, unsupported, coverage) = match best_index {
+    let (realized, optimism_gap, decision_score_gap, unsupported, coverage) = match best_index {
         Some(index) => {
             let action = &actions[index];
             (
                 action.true_utility,
                 action.predicted_utility - action.true_utility,
+                best_policy_score - action.true_utility,
                 (!action.supported) as u8 as f64,
                 1.0,
             )
         }
-        None => (FALLBACK_UTILITY, 0.0, 0.0, 0.0),
+        None => (FALLBACK_UTILITY, 0.0, 0.0, 0.0, 0.0),
     };
 
     let oracle_utility = actions
@@ -227,6 +252,7 @@ fn evaluate_episode(actions: &[Candidate], strategy: Strategy) -> EpisodeMetrics
         prediction_mae: prediction_mae(actions),
         realized_utility: realized,
         selected_optimism_gap: optimism_gap,
+        selected_decision_score_gap: decision_score_gap,
         regret: (oracle_utility - realized).max(0.0),
         unsupported_selected: unsupported,
         coverage,
@@ -264,6 +290,7 @@ struct Summary {
     mean_prediction_mae: f64,
     mean_realized_utility: f64,
     mean_selected_optimism_gap: f64,
+    mean_selected_decision_score_gap: f64,
     mean_regret: f64,
     unsupported_selection_rate: f64,
     unsupported_rate_given_model_action: f64,
@@ -308,6 +335,7 @@ fn summarize(
         mean_prediction_mae: mean(&samples.iter().map(|row| row.prediction_mae).collect::<Vec<_>>()),
         mean_realized_utility: mean(&samples.iter().map(|row| row.realized_utility).collect::<Vec<_>>()),
         mean_selected_optimism_gap: mean(&optimism_values),
+        mean_selected_decision_score_gap: mean(&samples.iter().map(|row| row.selected_decision_score_gap).collect::<Vec<_>>()),
         mean_regret: mean(&regret_values),
         unsupported_selection_rate: mean(&unsupported_values),
         unsupported_rate_given_model_action: if covered_count == 0.0 {
@@ -392,6 +420,7 @@ fn render_report(rows: &[Summary]) -> String {
                 "\"mean_prediction_mae\": {:.8}, ",
                 "\"mean_realized_utility\": {:.8}, ",
                 "\"mean_selected_optimism_gap\": {:.8}, ",
+                "\"mean_selected_decision_score_gap\": {:.8}, ",
                 "\"mean_regret\": {:.8}, ",
                 "\"unsupported_selection_rate\": {:.8}, ",
                 "\"unsupported_rate_given_model_action\": {:.8}, ",
@@ -408,6 +437,7 @@ fn render_report(rows: &[Summary]) -> String {
             row.mean_prediction_mae,
             row.mean_realized_utility,
             row.mean_selected_optimism_gap,
+            row.mean_selected_decision_score_gap,
             row.mean_regret,
             row.unsupported_selection_rate,
             row.unsupported_rate_given_model_action,
@@ -531,6 +561,7 @@ mod tests {
             assert!(row.mean_prediction_mae.is_finite() && row.mean_prediction_mae >= 0.0);
             assert!(row.mean_realized_utility.is_finite());
             assert!(row.mean_selected_optimism_gap.is_finite());
+            assert!(row.mean_selected_decision_score_gap.is_finite());
             assert!(row.mean_regret.is_finite() && row.mean_regret >= 0.0);
             assert!((0.0..=1.0).contains(&row.unsupported_selection_rate));
             assert!((0.0..=1.0).contains(&row.unsupported_rate_given_model_action));
