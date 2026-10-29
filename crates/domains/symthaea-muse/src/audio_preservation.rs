@@ -23,6 +23,9 @@ use sha2::{Digest, Sha256};
 /// Receipt/version string. Bump when metric or verdict semantics change.
 pub const AUDIO_PRESERVATION_VERIFIER_VERSION: &str = "mel-mr-eval-006-audio-preservation-v0.1";
 
+/// Bound FFT allocation and work even if a caller supplies untrusted settings.
+const MAX_ANALYSIS_FRAME_SIZE: usize = 1_048_576;
+
 /// Interleaved PCM-like samples. The evaluator does not decode, resample,
 /// loudness-normalize, or align audio; those steps would change the evidence.
 #[derive(Debug, Clone, Copy)]
@@ -113,6 +116,9 @@ pub struct AudioPreservationReport {
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
+    /// SHA-256 over the canonical serialized report with this field blank.
+    /// Covers the verdict, thresholds, configuration, measurements, and digests.
+    pub receipt_sha256: String,
     /// Count of unique time windows, not channel-window measurements.
     pub protected_windows: usize,
     pub audited_channel_windows: usize,
@@ -135,6 +141,7 @@ pub enum AudioAuditInputError {
     FormatMismatch,
     LengthMismatch,
     InvalidEditInterval,
+    SerializationFailure,
     InvalidConfig(&'static str),
 }
 
@@ -151,6 +158,7 @@ impl std::fmt::Display for AudioAuditInputError {
             Self::FormatMismatch => write!(f, "reference and candidate formats differ"),
             Self::LengthMismatch => write!(f, "reference and candidate frame counts differ"),
             Self::InvalidEditInterval => write!(f, "edit interval is empty or outside the audio"),
+            Self::SerializationFailure => write!(f, "could not serialize preservation receipt"),
             Self::InvalidConfig(reason) => write!(f, "invalid preservation config: {reason}"),
         }
     }
@@ -279,7 +287,7 @@ pub fn audit_protected_audio(
         PreservationVerdict::Pass
     };
 
-    Ok(AudioPreservationReport {
+    let mut report = AudioPreservationReport {
         verifier_version: AUDIO_PRESERVATION_VERIFIER_VERSION.to_owned(),
         calibration_id: config.calibration_id.clone(),
         sample_rate_hz: reference.sample_rate_hz,
@@ -289,6 +297,7 @@ pub fn audit_protected_audio(
         effective_boundary_guard_frames: config.boundary_guard_frames,
         reference_audio_sha256,
         candidate_audio_sha256,
+        receipt_sha256: String::new(),
         protected_windows: protected_starts.len(),
         audited_channel_windows: measurements.len(),
         violating_channel_windows,
@@ -297,7 +306,49 @@ pub fn audit_protected_audio(
         verdict,
         reasons,
         measurements,
-    })
+    };
+    report.receipt_sha256 = receipt_sha256(&report)?;
+    Ok(report)
+}
+
+
+/// Hash a fully serialized report with its receipt field cleared. Struct field
+/// order is explicit in the derived Serialize shape; the domain tag prevents
+/// reuse as an audio-buffer digest. JSON serialization fails closed on NaN/Inf.
+fn receipt_sha256<T: Serialize>(report_with_blank_digest: &T) -> Result<String, AudioAuditInputError> {
+    let bytes = serde_json::to_vec(report_with_blank_digest)
+        .map_err(|_| AudioAuditInputError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-mel-mr-eval-006-receipt-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Verify that a report's verdict, metrics, thresholds, and content digests
+/// still match its receipt. This is integrity checking, not signer identity.
+pub fn verify_audio_preservation_receipt(
+    report: &AudioPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    let expected = report.receipt_sha256.clone();
+    if expected.is_empty() {
+        return Ok(false);
+    }
+    let mut unsealed = report.clone();
+    unsealed.receipt_sha256.clear();
+    Ok(receipt_sha256(&unsealed)? == expected)
+}
+
+/// Onset-report counterpart to the audio-preservation receipt verifier.
+pub fn verify_onset_preservation_receipt(
+    report: &OnsetPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    let expected = report.receipt_sha256.clone();
+    if expected.is_empty() {
+        return Ok(false);
+    }
+    let mut unsealed = report.clone();
+    unsealed.receipt_sha256.clear();
+    Ok(receipt_sha256(&unsealed)? == expected)
 }
 
 fn validate_view(view: AudioView<'_>) -> Result<(), AudioAuditInputError> {
@@ -323,6 +374,11 @@ fn validate_config(config: &PreservationConfig) -> Result<(), AudioAuditInputErr
     if config.frame_size < 16 {
         return Err(AudioAuditInputError::InvalidConfig(
             "frame_size must be at least 16",
+        ));
+    }
+    if config.frame_size > MAX_ANALYSIS_FRAME_SIZE {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "frame_size exceeds the maximum supported analysis allocation",
         ));
     }
     if config.hop_size == 0 || config.hop_size > config.frame_size {
@@ -528,6 +584,8 @@ pub struct OnsetPreservationReport {
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
+    /// SHA-256 over the canonical serialized report with this field blank.
+    pub receipt_sha256: String,
     pub protected_duration_frames: usize,
     pub onset_time_tolerance_frames: usize,
     pub matched_events: usize,
@@ -691,7 +749,7 @@ pub fn audit_onset_preservation(
         PreservationVerdict::Pass
     };
 
-    Ok(OnsetPreservationReport {
+    let mut report = OnsetPreservationReport {
         verifier_version: format!("{AUDIO_PRESERVATION_VERIFIER_VERSION}+spectral-flux-onset-v0.1"),
         calibration_id: config.calibration_id.clone(),
         sample_rate_hz: reference.sample_rate_hz,
@@ -701,6 +759,7 @@ pub fn audit_onset_preservation(
         effective_boundary_guard_frames,
         reference_audio_sha256: audio_digest(reference),
         candidate_audio_sha256: audio_digest(candidate),
+        receipt_sha256: String::new(),
         protected_duration_frames,
         onset_time_tolerance_frames: tolerance_frames,
         matched_events,
@@ -711,13 +770,20 @@ pub fn audit_onset_preservation(
         reasons,
         reference_onsets,
         candidate_onsets,
-    })
+    };
+    report.receipt_sha256 = receipt_sha256(&report)?;
+    Ok(report)
 }
 
 fn validate_onset_config(config: &OnsetPreservationConfig) -> Result<(), AudioAuditInputError> {
     if config.frame_size < 16 {
         return Err(AudioAuditInputError::InvalidConfig(
             "onset frame_size must be at least 16",
+        ));
+    }
+    if config.frame_size > MAX_ANALYSIS_FRAME_SIZE {
+        return Err(AudioAuditInputError::InvalidConfig(
+            "onset frame_size exceeds the maximum supported analysis allocation",
         ));
     }
     if config.hop_size == 0 || config.hop_size > config.frame_size {
@@ -890,6 +956,13 @@ mod tests {
         assert_eq!(report.reference_audio_sha256, report.candidate_audio_sha256);
         assert_eq!(report.worst_rms_delta_db, 0.0);
         assert_eq!(report.worst_spectral_distance, 0.0);
+        assert!(verify_audio_preservation_receipt(&report).expect("receipt serializes"));
+        let mut tampered = report.clone();
+        tampered.verdict = PreservationVerdict::Fail;
+        assert!(!verify_audio_preservation_receipt(&tampered).expect("tampered receipt serializes"));
+        tampered = report.clone();
+        tampered.config.rms_delta_db_tolerance += 0.1;
+        assert!(!verify_audio_preservation_receipt(&tampered).expect("config tampering serializes"));
     }
 
     #[test]
@@ -1093,6 +1166,10 @@ mod tests {
         assert_eq!(report.reference_audio_sha256, report.candidate_audio_sha256);
         assert_eq!(report.missing_reference_events.len(), 0);
         assert_eq!(report.extra_candidate_events.len(), 0);
+        assert!(verify_onset_preservation_receipt(&report).expect("receipt serializes"));
+        let mut tampered = report.clone();
+        tampered.reference_onsets.clear();
+        assert!(!verify_onset_preservation_receipt(&tampered).expect("tampered onset receipt serializes"));
     }
 
     #[test]
@@ -1158,6 +1235,42 @@ mod tests {
         .expect("valid silent buffers");
         assert_eq!(report.verdict, PreservationVerdict::Abstain);
         assert!(report.reasons.iter().any(|reason| reason.contains("no protected reference onsets")));
+    }
+
+    #[test]
+    fn oversized_analysis_window_is_rejected_before_fft_allocation() {
+        let samples = sine(4096, 16_000, 440.0);
+        let mut config = calibrated_config();
+        config.frame_size = MAX_ANALYSIS_FRAME_SIZE + 1;
+        assert_eq!(
+            audit_protected_audio(
+                view(&samples),
+                view(&samples),
+                &[],
+                &config,
+            ).expect_err("oversized frame must be rejected"),
+            AudioAuditInputError::InvalidConfig(
+                "frame_size exceeds the maximum supported analysis allocation"
+            )
+        );
+    }
+
+    #[test]
+    fn oversized_onset_window_is_rejected_before_fft_allocation() {
+        let samples = sine(4096, 16_000, 440.0);
+        let mut config = onset_config();
+        config.frame_size = MAX_ANALYSIS_FRAME_SIZE + 1;
+        assert_eq!(
+            audit_onset_preservation(
+                view(&samples),
+                view(&samples),
+                &[],
+                &config,
+            ).expect_err("oversized onset frame must be rejected"),
+            AudioAuditInputError::InvalidConfig(
+                "onset frame_size exceeds the maximum supported analysis allocation"
+            )
+        );
     }
 
 }
