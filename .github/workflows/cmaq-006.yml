@@ -1,0 +1,56 @@
+name: CMAQ-006 evidence-gated world-model use
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-006/**"
+      - ".github/workflows/cmaq-006.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-006/**"
+      - ".github/workflows/cmaq-006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-006
+        run: cargo test --locked
+      - name: Decision ledger known-answer fixture
+        working-directory: research/cmaq-006
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked -- --input fixtures/cases.tsv > /tmp/cmaq-006-ledger.tsv
+          diff -u expected.tsv /tmp/cmaq-006-ledger.tsv
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+
+          with Path("/tmp/cmaq-006-ledger.tsv").open(newline="") as file:
+              rows = list(csv.DictReader(file, delimiter="\t"))
+          assert len(rows) == 10
+          by_case = {row["case_id"]: row for row in rows}
+          assert by_case["eligible_model"]["decision"] == "USE_MODEL"
+          assert all(
+              by_case[key]["decision"] == "DIRECT_FALLBACK"
+              for key in [
+                  "shift_alarm", "stale_epoch", "unknown_adequacy", "low_lift_bound",
+                  "mismatched_adequacy_digest", "mismatched_utility_digest",
+                  "model_action_unauthorized", "invalid_model_digest"
+              ]
+          )
+          assert by_case["no_action_authorized"]["decision"] == "BLOCK"
+          assert all(row["schema_version"] == "cmaq-006-decision-gate-v0.1" for row in rows)
+          print("CMAQ-006 known-answer ledger and fail-closed gate contract validated")
+          print({key: value["decision"] + ":" + value["reason"] for key, value in by_case.items()})
+          PY
