@@ -133,6 +133,10 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     run_benchmark(**kwargs)
 
+    def test_rejects_unreasonably_large_distance_sweep(self):
+        with self.assertRaisesRegex(ValueError, "must be <= 25000000"):
+            run_benchmark(history_points=1000, test_points=1000, nearest_k=16, reuse_count=10)
+
     def test_cli_writes_auditable_receipt(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "receipt.json"
