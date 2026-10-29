@@ -6,7 +6,7 @@
 
 Can an agent choose safe experiments that improve subsequent decisions enough to justify their cost? CMAQ-001 evaluates one-step decisions, CMAQ-002 measures closed-loop model exploitation, and CMAQ-003 tests uncertainty-aware selective trust. CMAQ-004 adds active information gathering under an explicit intervention budget.
 
-The benchmark holds the initial observation fixed within an information group while hiding which causal variant is active. The candidate can choose probes, observe the environment's actual signal, and then choose a final action. The evaluator scores net utility after probe costs and compares it with the best safe static action for each information group.
+The benchmark holds the initial observation fixed within an evaluator-only information group while hiding which causal variant is active. Observable context may change between groups (for example, a high-stakes versus low-stakes decision), but the case ID and group ID do not reveal the hidden variant. The candidate can choose probes, observe the environment's actual signal, and then choose a final action. The evaluator scores net utility after probe costs and compares it with the best safe static action for each information group.
 
 ## Run
 
@@ -18,7 +18,7 @@ Use Rust 1.96.0 from this directory:
 
 ## Input contract and evaluator boundary
 
-- cases.tsv: opaque case ID, information-group ID, common initial observation, maximum probe count and total probe-cost budget.
+- cases.tsv: opaque case ID, evaluator-only information-group ID, agent-visible initial observation, maximum probe count and total probe-cost budget. The group ID must never be exposed to the candidate.
 - action-key.tsv: evaluator-only action rewards and safety by hidden case.
 - probe-key.tsv: evaluator-only probe observation, cost and safety by hidden case.
 - probe-trace.tsv: candidate-reported probe order and observations.

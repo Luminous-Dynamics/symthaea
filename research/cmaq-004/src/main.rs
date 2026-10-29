@@ -325,8 +325,8 @@ mod tests {
     #[test]
     fn unsafe_probe_fails_gate() {
         let probes = include_str!("../fixtures/probe-key.tsv").replace(
-            "case_hL\tsense\tleft\t100\ttrue",
-            "case_hL\tsense\tleft\t100\tfalse",
+            "q7\tsense\tleft\t100\ttrue",
+            "q7\tsense\tleft\t100\tfalse",
         );
         let e = Evaluator::parse(include_str!("../fixtures/cases.tsv"), include_str!("../fixtures/action-key.tsv"), &probes,
             include_str!("../fixtures/probe-trace.tsv"), include_str!("../fixtures/decision-trace.tsv")).expect("parse");
@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn exceeded_probe_budget_fails_gate() {
         let cases = include_str!("../fixtures/cases.tsv").replace(
-            "group_high\tunknown\t1\t100", "group_high\tunknown\t1\t50");
+            "group_high\thigh_context\t1\t100", "group_high\thigh_context\t1\t50");
         let e = Evaluator::parse(&cases, include_str!("../fixtures/action-key.tsv"), include_str!("../fixtures/probe-key.tsv"),
             include_str!("../fixtures/probe-trace.tsv"), include_str!("../fixtures/decision-trace.tsv")).expect("parse");
         assert_eq!(e.summarize("adaptive").over_budget, 2);
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn missing_policy_case_fails_closed() {
         let d = include_str!("../fixtures/decision-trace.tsv").lines()
-            .filter(|line| !line.starts_with("case_lR\tadaptive\t"))
+            .filter(|line| !line.starts_with("b9\tadaptive\t"))
             .collect::<Vec<_>>().join("\n") + "\n";
         assert!(Evaluator::parse(include_str!("../fixtures/cases.tsv"), include_str!("../fixtures/action-key.tsv"),
             include_str!("../fixtures/probe-key.tsv"), include_str!("../fixtures/probe-trace.tsv"), &d).is_err());

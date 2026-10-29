@@ -1,5 +1,5 @@
 case_id	group_id	initial_observation	max_probes	probe_budget_milli
-case_hL	group_high	unknown	1	100
-case_hR	group_high	unknown	1	100
-case_lL	group_low	unknown	1	100
-case_lR	group_low	unknown	1	100
+q7	group_high	unknown	1	100
+n2	group_high	unknown	1	100
+w5	group_low	unknown	1	100
+b9	group_low	unknown	1	100

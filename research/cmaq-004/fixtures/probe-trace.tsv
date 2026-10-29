@@ -1,8 +1,8 @@
 case_id	policy_id	step	probe_id	observed_observation_id
-case_hL	adaptive	1	sense	left
-case_hR	adaptive	1	sense	right
-case_hL	probe_all	1	sense	left
-case_hR	probe_all	1	sense	right
-case_lL	probe_all	1	sense	left
-case_lR	probe_all	1	sense	right
-case_hL	forged	1	sense	right
+q7	adaptive	1	sense	left
+n2	adaptive	1	sense	right
+q7	probe_all	1	sense	left
+n2	probe_all	1	sense	right
+w5	probe_all	1	sense	left
+b9	probe_all	1	sense	right
+q7	forged	1	sense	right
