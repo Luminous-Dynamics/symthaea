@@ -19507,6 +19507,9 @@ dependencies = [
 [[package]]
 name = "symthaea-operations-research"
 version = "0.1.0"
+dependencies = [
+ "sha2",
+]
 
 [[package]]
 name = "symthaea-optics"
