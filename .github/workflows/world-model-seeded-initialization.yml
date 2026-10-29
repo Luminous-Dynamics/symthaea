@@ -39,5 +39,5 @@ jobs:
 
       - name: Run exact seeded-initialization regression test
         run: >-
-          cargo test --locked --lib
+          cargo test --lib
           dynamics::crate_world_model::tests::seeded_initialization_replays_weights_and_predictions
