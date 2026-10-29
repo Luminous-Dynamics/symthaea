@@ -96,7 +96,7 @@ Focused tests: **4/4 passed**. Full 200-repeat sweep: 27.289 seconds. Exact sour
 - Source SHA-256 41fee55be24bb536b3ef3e2521030cbefd0ccd5712718d36e3728d0b6ab4c8f2; Git blob 9be0972f6f8746987ba6c732fed2442fcb90e270.
 - Test SHA-256 c22df0c3ac469ddc19f04df7458585a48bce043679853e1d3072b3a915c4f54d; Git blob a4f9e8520751e22822b5b3bd6fa9c1d77b4d1c60.
 - Raw JSON SHA-256 e647cf4345a507230481890386bf709e7b68356ad65298ee1e893b04446ba3a3.
-- Test log SHA-256 9db92ca374868ece9aa96f4f2d937b26f9221679973f3fb6ec564d2acd798e2f.
+- Test log SHA-256 961489bf6d5f2e841e14df81c8f8e60f54896e76f64a68bbe2ad11479c347ec8.
 
 ## Limitations
 
