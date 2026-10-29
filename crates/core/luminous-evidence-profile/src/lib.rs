@@ -589,7 +589,7 @@ mod tests {
     }
 
     #[test]
-    fn unrun_verification_cannot_have_verifier_or_checks() {
+    fn consistent_unrun_verification_is_accepted() {
         let mut statement = minimal_statement();
         statement["predicate"]["execution"]["status"] = json!("not_run");
         statement["predicate"]["execution"]["result"] = json!("not_run");
@@ -599,8 +599,31 @@ mod tests {
         statement["predicate"]["verification"]["checkedTarget"] = Value::Null;
         statement["predicate"]["verification"]["checks"] = json!([]);
         let report = verify_statement(&statement);
+        assert!(report.valid, "{:?}", report.violations);
+    }
+
+    #[test]
+    fn unrun_verification_cannot_claim_a_verifier_or_checks() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["execution"]["status"] = json!("not_run");
+        statement["predicate"]["execution"]["result"] = json!("not_run");
+        statement["predicate"]["execution"]["runId"] = Value::Null;
+        statement["predicate"]["verification"]["outcome"] = json!("not_run");
+        let report = verify_statement(&statement);
         assert!(!report.valid);
-        assert!(has_code(&report, "MISSING_RUN_ID") == false);
+        assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_VERIFIER"));
+        assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_TARGET"));
+        assert!(has_code(&report, "UNRUN_VERIFICATION_HAS_CHECKS"));
+    }
+
+    #[test]
+    fn repository_stale_target_fixture_is_rejected() {
+        let statement: Value = serde_json::from_str(include_str!(
+            "../../../../docs/research/fixtures/luminous-evidence-v0.1/semantic-stale-target.json"
+        )).expect("stale-target fixture must be valid JSON");
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "LEP_TARGET_MISMATCH"), "{:?}", report.violations);
     }
 
     #[test]
