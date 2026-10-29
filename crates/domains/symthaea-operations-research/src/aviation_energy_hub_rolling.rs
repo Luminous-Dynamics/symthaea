@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use crate::aviation_energy_hub::{
     canonical_energy_hub_digest, seal_energy_hub_scenario, solve_exact_energy_hub_pareto,
     verify_energy_hub_plan, EnergyHubError, EnergyHubMetrics, EnergyHubPlan, EnergyHubStepAction,
-    EnergyStorageSpec, EvaluatedEnergyHubPlan, TimeIndexedEnergyHubScenario, EnergyHubInterval,
+    EvaluatedEnergyHubPlan, TimeIndexedEnergyHubScenario, EnergyHubInterval,
 };
 
 const MAX_NODES_PER_STAGE: u64 = 250_000;
