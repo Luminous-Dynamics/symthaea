@@ -22,6 +22,9 @@ The ABA case matters: if an office address changes A → B → A, an old A recor
 - `run_probe.py`: accepts optional fixture paths while preserving the original defaults.
 - `score_probe.py`: scores required-support recall, ordinary complete-chain rate, **stale-aware complete-chain rate**, forbidden/stale hits, and distractor retrieval at the same fixed top-k budget.
 - `fixtures/mutations/eligibility-ledger.jsonl`: explicit status policy for every string source pointer (current, historical, revoked, tentative, not-applied, causal, or contextual).
+- `fixtures/mutations/dependency_snapshots.jsonl`: four explicit dependency-chain snapshots from initial state through upstream mutation, partial refresh, and complete refresh.
+- `dependency_cascade.py`: reference truth-maintenance evaluator. A derived claim is current only if it points at the latest revision of every dependency and each dependency is itself current. Missing dependencies are marked unknown; cycles and duplicate revisions fail closed.
+- `test_dependency_cascade.py`: tests direct/transitive invalidation, absence of stale derived claims from the current view, partial refresh, full-chain refresh, historical auditability, and malformed graph rejection.
 - `eligibility_filter.py`: provenance-bound eligibility-first ablation, with `--intent-source annotated` (oracle upper bound) and `--intent-source heuristic` (transparent keyword baseline). Both filter a BM25 candidate pool before final top-k selection; unknown policy pointers fail closed and unknown heuristic intent produces an empty context.
 
 From the repository root, after compiling the Rust worker:
@@ -117,6 +120,28 @@ Do not collapse these into a single accuracy number. A method that raises ordina
 The ordinary complete-chain metric can reward a retrieval set that contains every required item **and** a superseded item. The stale-aware metric deliberately makes that case fail, while preserving the separate forbidden-hit rates so severity and frequency remain visible. Keep both metrics: the gap between them quantifies cases where recall alone hides a currentness defect.
 
 This distinction mirrors a wider finding in recent memory evaluation: temporal update and forgetting are separate capabilities, not just retrieval recall. Memora/FAMA evaluates reuse of obsolete or invalidated memories; MRAgent evaluates active reconstruction from associative evidence; Mem2ActBench checks whether memory translates into correct tool selection and argument grounding. Use them as distinct comparison lanes rather than combining their scores.
+
+## Dependency cascade and absence probe
+
+Recent [MEME: Multi-entity & Evolving Memory Evaluation](https://arxiv.org/abs/2605.12477) isolates two tasks that ordinary fact recall misses: **Cascade** (upstream changes must invalidate/update dependent facts) and **Absence** (the system must not assert a value when its evidence has become invalid). In its reported default configurations over 100 controlled episodes, the benchmark authors report average accuracy of 3% on Cascade and 1% on Absence, despite stronger static retrieval. These are benchmark-specific findings, not universal system scores.
+
+This repository now includes a small synthetic reference probe with four snapshots:
+
+1. An endpoint, service connection string, worker connection string, and an unrelated alert threshold are current.
+2. The endpoint changes. Both the service DSN and transitively dependent worker DSN should cease to be current immediately.
+3. The service DSN is refreshed against the new endpoint, but the worker DSN still depends on the old service revision and must remain stale.
+4. The worker DSN is refreshed against the new service revision; the full chain becomes current again.
+
+Run the research reference evaluator with:
+
+```sh
+python3 research/broca-causal-episode-probe-v1/dependency_cascade.py \
+  --input research/broca-causal-episode-probe-v1/fixtures/mutations/dependency_snapshots.jsonl \
+  --output /tmp/broca-dependency-cascade-report.json
+python3 research/broca-causal-episode-probe-v1/test_dependency_cascade.py
+```
+
+The report lists every claim revision and gives each a state (`current`, `historical`, `stale_dependency`, or `unknown_dependency`). The `current_claims` view contains only latest, dependency-valid revisions. Missing dependency references do not pass through as current, and cyclic graphs are rejected. The implementation is a deterministic research evaluator, **not a production truth-maintenance engine or a worker integration**. Its next role is to define falsifiable expected semantics for a Rust implementation, including how update transactions, rollback, partial recomputation and persisted event replay affect downstream eligibility.
 
 ## External benchmark context
 
