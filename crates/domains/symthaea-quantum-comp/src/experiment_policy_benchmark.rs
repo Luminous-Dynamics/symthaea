@@ -184,11 +184,10 @@ pub fn run_experiment_policy_bakeoff(
     let reference = nominal.problem();
     validate_ground_truth_contract(reference, ground_truth)?;
 
-    let baseline_weights = averaged_prior(planning_scenarios);
-    let baseline_action = best_action(reference, &baseline_weights)?;
+    let no_measurement_action = best_action(ground_truth, ground_truth.prior())?;
     let no_measurement_expected_utility = expected_action_utility(
         ground_truth,
-        baseline_action,
+        no_measurement_action,
         ground_truth.prior(),
     )?;
 
@@ -702,12 +701,12 @@ mod tests {
         let report = run_experiment_policy_bakeoff("truth-with-unseen-outcome", &truth, &[nominal, alternative]).unwrap();
         let candidate = report.candidate_results.iter()
             .find(|result| result.experiment_id == "A-nominal-perfect").unwrap();
-        assert!((candidate.unsupported_outcome_probability - 1.0).abs() < 1e-12);
+        assert!((candidate.unsupported_outcome_probability - 0.5).abs() < 1e-12);
     }
 
     #[test]
     fn ground_truth_candidate_mismatch_is_rejected() {
-        let (models, mut truth) = fixture_models();
+        let (models, truth) = fixture_models();
         truth = ActiveExperimentProblem::new(
             vec!["H0".into(), "H1".into()],
             vec![0.5, 0.5],
