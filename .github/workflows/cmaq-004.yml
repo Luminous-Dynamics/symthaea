@@ -74,12 +74,15 @@ jobs:
           additive_base = rows_at_cost("additive_positive", 0.04)["learned_additive_model"]
           additive_expensive = rows_at_cost("additive_positive", 0.16)["learned_additive_model"]
           assert additive_base["net_lift_vs_direct"] > 0.10
+          assert additive_base["net_lift_ci95_low"] > 0
           assert additive_base["model_prediction_mae"] < 0.05
           assert additive_free["net_lift_vs_direct"] > additive_base["net_lift_vs_direct"]
           assert additive_expensive["net_lift_vs_direct"] < 0.0
+          assert additive_expensive["net_lift_ci95_high"] < 0
 
           interaction = rows_at_cost("interaction_only", 0.04)["learned_additive_model"]
           assert interaction["net_lift_vs_direct"] < -0.05
+          assert interaction["net_lift_ci95_high"] < 0
           assert interaction["model_prediction_mae"] > 0.20
 
           reversed_world = rows_at_cost("additive_reversed", 0.04)
@@ -94,6 +97,7 @@ jobs:
                           "action": row["chosen_action"],
                           "net_utility": row["mean_net_utility"],
                           "net_lift": row["net_lift_vs_direct"],
+                          "net_lift_ci95": [row["net_lift_ci95_low"], row["net_lift_ci95_high"]],
                           "prediction_mae": row["model_prediction_mae"],
                       }
                       for row in rows_at_cost(family_name, cost).values()
