@@ -151,20 +151,20 @@ A negative answer is still useful. The benchmark must report where no method dom
 - No process isolation, cryptographic provenance, real-world robot interface, or hardware latency/energy measurement.
 - The search-pressure panel is a falsification smoke test, not an industry ranking and not a claim that the current construction beats any SOTA method.
 
-The new v0.5 companion begins the next step: a separate deterministic Rust panel crosses search sizes 8/32/128/512 with rollout depths 1/4/16 and two persistent-error growth settings. It reports prediction MAE, selected-action optimism, regret, unsupported-action selection, coverage, and paired regret-reduction intervals for fallback, greedy, uncertainty-penalized, support-gated and oracle policies.
+The new v0.5 companion begins the next step: a separate deterministic Rust panel crosses search sizes 8/32/128/512 with rollout depths 1/4/16 and two persistent-error growth settings. It reports prediction MAE, selected-action optimism, regret, unsupported-action selection, coverage, and paired regret-reduction intervals for fallback, greedy, uncertainty-penalized, conservative ensemble-min, support-gated and oracle policies.
 
 ## Rollout-depth stress panel (v0.5 companion)
 
 Run from this directory:
 
-\`\`\`sh
+```sh
 cargo test --locked
 cargo run --quiet --locked --bin horizon_stress
-\`\`\`
+```
 
-The companion emits JSON with schema \`cmaq-007-horizon-stress-v0.1\` and 144 policy/search/depth/error-growth rows. It uses 128 paired episode seeds. The candidate catalog and evaluator truths remain identical across policies for each seed; search sizes are nested prefixes of a fixed 512-action catalog. The output includes raw prediction MAE and decision-facing metrics separately, plus paired 95% normal-approximation intervals for regret reduction against predicted-greedy.
+The companion emits JSON with schema `cmaq-007-horizon-stress-v0.1` and 168 policy/search/depth/error-growth rows. It uses 128 paired episode seeds. The candidate catalog and evaluator truths remain identical across policies for each seed; search sizes are nested prefixes of a fixed 512-action catalog. The output includes raw prediction MAE, nominal mean-model optimism and decision-score gap separately, plus paired 95% normal-approximation intervals for regret reduction against predicted-greedy.
 
-**New falsification axis:** action-specific model error persists across the rollout and is geometrically amplified by the declared \`rollout_growth\` factor. At zero growth, per-step error remains fixed with depth. At growth 0.20, the error is deliberately compounded across the horizon. This is a stress parameter for a hypothesized failure mode—not an estimate fitted to Symthaea, robotics, or a physical plant.
+**New falsification axis:** action-specific model error persists across the rollout and is geometrically amplified by the declared `rollout_growth` factor. At zero growth, per-step error remains fixed with depth. At growth 0.20, the error is deliberately compounded across the horizon. This is a stress parameter for a hypothesized failure mode—not an estimate fitted to Symthaea, robotics, or a physical plant. This version also includes a five-head synthetic ensemble-min baseline, motivated by but not a reproduction of the MRSQ result reported by Chang et al. (ICML 2026, https://proceedings.mlr.press/v306/chang26a.html). Each head shares the same structural action error but receives a small independent residual. The minimum can suppress independent overestimation, but it is deliberately unable to erase a common-mode unsupported-action bias; the experiment therefore tests both the benefit and boundary of ensemble pessimism. The report separates the selected action's nominal mean-model optimism from the selected decision estimator's gap, so a pessimistic selector is not conflated with the model's raw prediction.
 
 The focused workflow tests three distinct claims rather than collapsing them into one score: (1) increasing search breadth can increase unsupported selection; (2) deeper rollouts under persistent error can increase selected optimism; and (3) the growth condition increases prediction MAE relative to the zero-growth control. It also checks oracle regret, fallback coverage, threshold coverage ordering, finite metrics and stable output schema.
 
