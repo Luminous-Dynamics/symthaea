@@ -79,9 +79,9 @@
     }
   },
   "identifiability_frontier": {
-    "equation": "0.02 + rho/(1-rho) <= 0.05",
-    "rho_max": 0.029126213592233004,
-    "interpretation": "about 2.91% contamination before sampling uncertainty for the stated safe model if R is arbitrary"
+    "equation": "max(0.02, abs(rho/(1-rho)-0.02)) <= 0.05; rho/(1-rho) <= 0.07",
+    "rho_max": 0.06542056074766356,
+    "interpretation": "about 6.54% contamination before sampling uncertainty for the stated safe model if R=0; the 5% robust refusals here are due to finite-sample confidence-sequence width under the current cap"
   },
   "preflight_negative_controls": {
     "missing_support_fails_closed": true,
