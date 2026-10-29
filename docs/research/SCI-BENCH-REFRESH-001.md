@@ -327,7 +327,7 @@ The companion [SCI-RETRIEVAL-OUTCOMES-001 / #8950](https://github.com/Luminous-D
 
 ### New measurement boundary
 
-The report keeps terminal status separate from response status and evaluator axes. Task correctness, evidence use, claim support, abstention quality, confidence provenance/coverage, and resource usage are separate dimensions. Contaminated or failed trials cannot carry performance labels but remain in the denominator. Null resource/confidence values are reported as unavailable, not silently converted to zero. The validator emits no composite trust/evidence score and performs no calibration or generalization inference.
+The report keeps terminal status separate from response status and evaluator axes. Task correctness, evidence use, claim support, abstention quality, confidence provenance/coverage, and resource usage are separate dimensions. Contaminated, budget-violating or failed trials cannot carry performance labels but remain in the denominator. Null resource/confidence values are reported as unavailable, not silently converted to zero. The validator emits no composite trust/evidence score and performs no calibration or generalization inference.
 
 This composes with the existing generic paired-trial auditor [PR #8738](https://github.com/Luminous-Dynamics/symthaea/pull/8738) rather than replacing it: the outcome receipt carries evidence-use-specific judgments while generic trial infrastructure provides patterns for paired accounting and resource provenance. The Benchmark Evidence Graph issue [#6283](https://github.com/Luminous-Dynamics/symthaea/issues/6283) remains the right place for uncertainty, dependence, sampling-frame, transfer, applicability and claim-ceiling semantics.
 
