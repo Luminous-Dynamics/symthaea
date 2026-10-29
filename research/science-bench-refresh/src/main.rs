@@ -1,28 +1,27 @@
-use science_bench_refresh_validator::{
-    compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
-    validate_manifest_bytes, verify_regeneration, verify_reveal,
-};
 use science_bench_refresh_validator::counterfactual_evidence::{
     compute_evidence_intervention_plan_commitment, verify_evidence_intervention_plan,
+};
+use science_bench_refresh_validator::evidence_behavior_contracts::{
+    compute_evidence_behavior_contract_plan_commitment,
+    compute_evidence_behavior_contract_report_commitment, verify_evidence_behavior_contract_plan,
+    verify_evidence_behavior_contract_report,
 };
 use science_bench_refresh_validator::evidence_outcomes::{
     compute_evidence_outcome_report_commitment, verify_evidence_outcome_report,
 };
 use science_bench_refresh_validator::exact_protected_matcher::{
-    compute_protected_index_commitment, match_search_exposure_exact,
-    verify_search_exposure_exact_match_report, ProtectedSearchArtifactIndexCommitmentInput,
-};
-use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
-use science_bench_refresh_validator::evidence_behavior_contracts::{
-    compute_evidence_behavior_contract_plan_commitment,
-    compute_evidence_behavior_contract_report_commitment,
-    verify_evidence_behavior_contract_plan,
-    verify_evidence_behavior_contract_report,
+    ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
+    match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
+use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
 use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
+use science_bench_refresh_validator::{
+    compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
+    validate_manifest_bytes, verify_regeneration, verify_reveal,
+};
 use serde_json::json;
 use std::env;
 use std::fs;
@@ -174,7 +173,8 @@ fn run(args: &[String]) -> ExitCode {
                 Ok(bytes) => bytes,
                 Err(code) => return code,
             };
-            let report = match verify_evidence_behavior_contract_report(&plan_bytes, &report_bytes) {
+            let report = match verify_evidence_behavior_contract_report(&plan_bytes, &report_bytes)
+            {
                 Ok(report) => report,
                 Err(error) => {
                     eprintln!("{error}");
@@ -394,10 +394,7 @@ fn run(args: &[String]) -> ExitCode {
                 Ok(bytes) => bytes,
                 Err(code) => return code,
             };
-            let report = match match_search_exposure_exact(
-                &receipt_bytes,
-                &protected_index_bytes,
-            ) {
+            let report = match match_search_exposure_exact(&receipt_bytes, &protected_index_bytes) {
                 Ok(report) => report,
                 Err(error) => {
                     eprintln!("{error}");
@@ -582,8 +579,7 @@ fn run(args: &[String]) -> ExitCode {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report)
-                    .expect("lineage audit report serializes")
+                serde_json::to_string_pretty(&report).expect("lineage audit report serializes")
             );
             if report.shared_lineage_root_count > 0
                 || report.left_exposed_refresh_task_count > 0
@@ -607,22 +603,17 @@ fn run(args: &[String]) -> ExitCode {
                 Ok(bytes) => bytes,
                 Err(code) => return code,
             };
-            let report = match audit_policy_input_overlap(
-                &args[1],
-                &left_bytes,
-                &args[3],
-                &right_bytes,
-            ) {
-                Ok(report) => report,
-                Err(error) => {
-                    eprintln!("{error}");
-                    return ExitCode::from(2);
-                }
-            };
+            let report =
+                match audit_policy_input_overlap(&args[1], &left_bytes, &args[3], &right_bytes) {
+                    Ok(report) => report,
+                    Err(error) => {
+                        eprintln!("{error}");
+                        return ExitCode::from(2);
+                    }
+                };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report)
-                    .expect("overlap audit report serializes")
+                serde_json::to_string_pretty(&report).expect("overlap audit report serializes")
             );
             if report.shared_task_id_count > 0 || report.exact_overlap_pair_count > 0 {
                 ExitCode::from(6)
@@ -779,8 +770,7 @@ fn run(args: &[String]) -> ExitCode {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report)
-                    .expect("regeneration report serializes")
+                serde_json::to_string_pretty(&report).expect("regeneration report serializes")
             );
             if report.verified {
                 ExitCode::SUCCESS
