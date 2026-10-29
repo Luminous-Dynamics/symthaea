@@ -3,6 +3,9 @@ use std::fs;
 use std::process::ExitCode;
 
 use serde::Deserialize;
+use symthaea_architecture_engineering::multi_fidelity_benchmark::{
+    run_multi_fidelity_sweep, MultiFidelityLandscape,
+};
 use symthaea_architecture_engineering::paired_evaluation::{
     evaluate_paired_cohort, EvaluationPlan, TrialObservation,
 };
@@ -20,7 +23,7 @@ struct PairedEvaluationInput {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "usage:\n  symthaea-architecture-engineering validate-matrix <matrix.json>\n  symthaea-architecture-engineering evaluate-paired <evaluation.json>\n  symthaea-architecture-engineering synthetic-sweep <smooth_tradeoff|deceptive> <seed-count>"
+        "usage:\n  symthaea-architecture-engineering validate-matrix <matrix.json>\n  symthaea-architecture-engineering evaluate-paired <evaluation.json>\n  symthaea-architecture-engineering synthetic-sweep <smooth_tradeoff|deceptive> <seed-count>\n  symthaea-architecture-engineering multi-fidelity-sweep <rank_preserving|rank_reversal|late_emerging_quality> <seed-count>"
     );
     ExitCode::from(2)
 }
@@ -37,6 +40,62 @@ fn parse_landscape(value: &str) -> Option<SyntheticLandscape> {
         "smooth_tradeoff" => Some(SyntheticLandscape::SmoothTradeoff),
         "deceptive" => Some(SyntheticLandscape::Deceptive),
         _ => None,
+    }
+}
+
+fn parse_multi_fidelity_landscape(value: &str) -> Option<MultiFidelityLandscape> {
+    match value {
+        "rank_preserving" => Some(MultiFidelityLandscape::RankPreserving),
+        "rank_reversal" => Some(MultiFidelityLandscape::RankReversal),
+        "late_emerging_quality" => Some(MultiFidelityLandscape::LateEmergingQuality),
+        _ => None,
+    }
+}
+
+fn run_multi_fidelity_sweep_command(args: Vec<String>) -> ExitCode {
+    if args.len() != 2 {
+        return usage();
+    }
+    let Some(landscape) = parse_multi_fidelity_landscape(&args[0]) else {
+        eprintln!(
+            "INVALID: landscape must be rank_preserving, rank_reversal, or late_emerging_quality"
+        );
+        return ExitCode::from(2);
+    };
+    let seed_count = match args[1].parse::<usize>() {
+        Ok(value) if value >= 2 && value <= 10_000 => value,
+        _ => {
+            eprintln!("INVALID: seed-count must be in 2..=10000");
+            return ExitCode::from(2);
+        }
+    };
+
+    let (runs, aggregate) = match run_multi_fidelity_sweep(landscape, seed_count) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("INVALID: multi-fidelity benchmark rejected input: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let output = serde_json::json!({
+        "schema": "symthaea.multi-fidelity-search-benchmark",
+        "version": "0.1.0",
+        "qualification_state": "SYNTHETIC_ONLY_NOT_MODEL_EVIDENCE",
+        "landscape": landscape,
+        "seed_count": seed_count,
+        "runs": runs,
+        "aggregate": aggregate,
+        "claim_ceiling": "Synthetic multi-fidelity scheduling validation only; no neural-model or SOTA result."
+    });
+    match serde_json::to_string_pretty(&output) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("error: failed to serialize multi-fidelity report: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -129,6 +188,9 @@ fn main() -> ExitCode {
 
     if command == "synthetic-sweep" {
         return run_synthetic_sweep(args.collect());
+    }
+    if command == "multi-fidelity-sweep" {
+        return run_multi_fidelity_sweep_command(args.collect());
     }
 
     let Some(path) = args.next() else {
