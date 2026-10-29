@@ -430,9 +430,9 @@ mod tests {
     #[test]
     fn oracle_upper_bound_dominates_net_utility() {
         for world in WorldFamily::ALL {
-            let oracle = result_for(world, Strategy::Oracle);
+            let oracle = result_for(world, Strategy::Oracle, 0.04);
             for strategy in Strategy::ALL {
-                let result = result_for(world, strategy);
+                let result = result_for(world, strategy, 0.04);
                 assert!(
                     result.mean_net_utility <= oracle.oracle_mean_reward + 1e-12,
                     "{} exceeds evaluator-only oracle in {}",
