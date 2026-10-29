@@ -400,10 +400,6 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
     {
         return Err(fail("selection_label_bias requires binary or categorical labels"));
     }
-    if selection_transform == "selection_feature_bias" && target == "NA" && features.is_empty() {
-        return Err(fail("selection_feature_bias requires feature columns"));
-    }
-
     canonical_u64(required(fields, "seed")?, "seed")?;
     let calibration_sources = comma_list(required(fields, "calibration_sources")?, "calibration_sources")?;
     let heldout_source = required(fields, "heldout_source")?;
@@ -715,7 +711,7 @@ mod tests {
         set(&mut fields, "change_end", "NA");
         validate_manifest(&fields).unwrap();
         set(&mut fields, "transform_severity", "0.100000");
-        assert!(validate_manifest(&fields).unwrap_err().contains("zero-shift sham"));
+        assert!(validate_manifest(&fields).unwrap_err().contains("zero_shift_control"));
     }
 
     #[test]
