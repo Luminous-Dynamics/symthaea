@@ -261,6 +261,13 @@ fn scenario_rejects_nonfinite_energy_or_emission_inputs() {
         solve_exact_pareto(&case, 100_000).unwrap_err(),
         EnergyDispatchError::InvalidNumericValue("upstream CO2e factor")
     );
+
+    let mut case = scenario();
+    case.offers[0].upstream_co2e_kg_per_quantum = -1.0;
+    assert_eq!(
+        solve_exact_pareto(&case, 100_000).unwrap_err(),
+        EnergyDispatchError::NegativeValue("upstream CO2e factor")
+    );
 }
 
 #[test]
