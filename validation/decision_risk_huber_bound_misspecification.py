@@ -28,13 +28,13 @@ def run(repeats: int = REPEATS, actual_rhos=ACTUAL_RHOS, claimed_rhos=CLAIMED_RH
     if repeats < 100:
         raise ValueError("use at least 100 repeats")
     model = np.array([0.15, 0.30, 0.60, 0.80], dtype=float)
-    clean = np.array([0.15, 0.37, 0.60, 0.80], dtype=float)
+    clean = np.array([0.15, 0.37, 0.60, 0.80], dtype=float)  # true max error 0.07 > 0.05 tolerance
     true_error = float(np.max(np.abs(model - clean)))
     rng = np.random.default_rng(SEED)
     results: dict[str, dict] = {}
     for actual_rho in actual_rhos:
         observed = clean.copy()
-        observed[1] = (1 - actual_rho) * clean[1]
+        observed[1] = (1 - actual_rho) * clean[1]  # R=0 only for the attacked cell
         accum = {f"{claim:.3f}": [] for claim in claimed_rhos}
         for _ in range(repeats):
             streams = np.vstack([rng.binomial(1, q, size=huber.MAX_PER_CELL) for q in observed]).astype(np.int8)
@@ -66,6 +66,7 @@ def run(repeats: int = REPEATS, actual_rhos=ACTUAL_RHOS, claimed_rhos=CLAIMED_RH
             "true_clean_max_model_error_for_scoring_only": true_error,
             "claimed_bound_grid": by_claim,
         }
+    # Missing/unknown bound must not silently default to zero.
     unknown = huber.run_certifier(np.zeros((4, huber.MAX_PER_CELL), dtype=np.int8), model,
                                   mode="huber_robust", rho_upper=None)
     return {
@@ -96,14 +97,13 @@ def run(repeats: int = REPEATS, actual_rhos=ACTUAL_RHOS, claimed_rhos=CLAIMED_RH
         "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }
 
-
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--repeats", type=int, default=REPEATS)
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--actual-rhos", default=",".join(str(x) for x in ACTUAL_RHOS))
-    p.add_argument("--claimed-rhos", default=",".join(str(x) for x in CLAIMED_RHOS))
+    p.add_argument("--actual-rhos", default=",".join(str(x) for x in ACTUAL_RHOS), help="comma-separated actual contamination rates")
+    p.add_argument("--claimed-rhos", default=",".join(str(x) for x in CLAIMED_RHOS), help="comma-separated claimed upper bounds")
     a = p.parse_args()
     actual_rhos = tuple(float(x) for x in a.actual_rhos.split(","))
     claimed_rhos = tuple(float(x) for x in a.claimed_rhos.split(","))
