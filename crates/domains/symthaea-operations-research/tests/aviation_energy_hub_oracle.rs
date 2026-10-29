@@ -207,6 +207,7 @@ fn initial_soc_is_bound_to_scenario_identity() {
     let mut case = frontier_scenario();
     let original_digest = case.input_digest.clone();
     case.storage.initial_soc_quanta = 1;
+    case.storage.initial_soc_ledger_ref = "synthetic:external-opening-inventory-ledger-v1".to_owned();
 
     assert_ne!(canonical_energy_hub_digest(&case).unwrap(), original_digest);
     assert_eq!(
