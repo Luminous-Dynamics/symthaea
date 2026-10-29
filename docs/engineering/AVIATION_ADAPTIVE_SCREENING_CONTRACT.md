@@ -57,9 +57,9 @@ Every method must receive the same frozen scenario, full candidate universe, har
 | E | Adaptive expansion with verified outcomes and admissible bounds | Proposed method |
 | F | Best-first branch-and-bound on the complete synthetic assignment tree | Lower-bound and partial-feasibility pruning |
 | G | Independent exhaustive raw-input oracle | Correctness reference on tiny scenarios |
-| F | Recovery-aware features (swap savings and disruption proximity) | Feature-engineering contribution |
-| G | ML-ranked candidates with the same verifier and bound protocol | Ranker contribution, not a separate safety guarantee |
-| H | Hindsight/perfect-information plan | Upper/lower-bound context only; not deployable |
+| H | Recovery-aware features (swap savings and disruption proximity) | Feature-engineering contribution |
+| I | ML-ranked candidates with the same verifier and bound protocol | Ranker contribution, not a separate safety guarantee |
+| J | Hindsight/perfect-information plan | Upper/lower-bound context only; not deployable |
 
 For larger instances, compare only solvers that use the same mathematical model, feasible action set, objective scaling, hardware class, thread budget, and timeout. A commercial or open MILP/CP-SAT result is not comparable when its formulation or constraints differ.
 
