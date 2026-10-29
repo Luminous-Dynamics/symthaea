@@ -21,21 +21,22 @@ The branch adds crates/domains/symthaea-broca/src/memory_attestation.rs, exporte
 - **Source signature:** binds a domain-separated, normalized event payload to signer_key_id and verifies that the key is registered for the event's claimed source and event-signing role.
 - **Trusted-ingress receipt:** a separately provisioned ingestion key signs the event ID, source signer ID, digest of the source signature, and accepted_at. The receipt signer must have the separate ingestion-receipt role.
 
-The verified event's transaction time is overwritten with the signed accepted_at value before it enters PolicyPinnedLedger. The source-provided timestamp is therefore not used as the query cutoff time. The policy/event receipt digests cover the normalized signed envelopes, including source signatures and ingress-receipt signatures, in stable ID/version order. The source key must also be valid at the trusted acceptance time, not merely at the timestamp the source claims.
+A verified event's transaction time is overwritten with the trusted-ingress receipt's accepted_at before it enters PolicyPinnedLedger. Policy envelopes also require a distinct trusted-ingress receipt. The policy signer's claimed recorded_at is authenticated as part of the signed source payload, but is not trusted as the policy's timeline timestamp: verification replaces it with accepted_at. Both event and policy signing keys are checked for validity at trusted acceptance time, preventing backdating a newly signed policy into a retired key's old validity window. The policy/event digests cover normalized signed envelopes, including source signatures and ingress receipts, in stable ID/version order.
 
-SignedAuthorityPolicy separately verifies policy changes under an explicitly provisioned policy-signing key. Policy records are normalized and sorted for signing so a harmless reorder of policy sources does not change the signature payload.
+SignedAuthorityPolicy separately verifies policy changes under an explicitly provisioned policy-signing key and requires an independently provisioned ingress-receipt key. The trust store rejects configurations where a key has more than one role or where the same public key is aliased under separate IDs, so a policy/event signer cannot mint its own receipt. Policy records are normalized and sorted for signing so a harmless reorder of policy sources does not change the signature payload.
 
 EvidenceTrustStore::verify_batch verifies the policy envelopes and event envelopes. The resulting VerifiedLedgerBatch has private input fields, exposes policy/event digests, and can be converted to PolicyPinnedLedger only after verification.
 
 ### Authored Rust tests
 
-The module includes 19 authored unit tests covering:
+The module includes 26 authored unit tests covering:
 - valid source, policy and ingress signatures;
 - source-payload and receipt-time tampering;
 - source/key identity mismatch and unknown key rejection;
-- role separation among policy, source-event and ingestion-receipt keys;
-- source key validity checked at actual receipt time;
-- source-claimed time cannot override trusted ingress time in a query;
+- role separation among policy, source-event and ingestion-receipt keys, including rejection of multi-role keys and aliases that reuse public-key material;
+- event and policy key validity checked at actual receipt time, including a backdated policy from an expired key;
+- source-claimed event time cannot override trusted ingress time in a query;
+- policy timestamps are replaced with trusted ingress time;
 - canonical policy source ordering;
 - strict schema rejection;
 - verified batch to ledger constructor flow;
@@ -57,8 +58,8 @@ This design is safer than trusting self-asserted source names/ranks, but it is n
 
 - **A signer can lie about the world.** A valid signature attributes a statement to a key; it does not make the statement true.
 - **The trust store is a root of trust.** Public-key configuration must come from an authenticated deployment mechanism, not from the same event feed it validates.
-- **The ingress key is privileged.** A compromised ingress key can sign false acceptance times. Production should anchor append-only receipts in a durable, monotonic log with rollback detection; key rotation/revocation needs an authenticated policy.
-- **Policy time needs anchoring too.** The policy signer controls the signed policy's recorded timestamp. Production policy distribution should provide its own trusted receipt/effective-time rule and reject rollback.
+- **The ingress key is privileged.** A compromised ingress key can sign false acceptance times for both policies and events. Production must anchor append-only receipts in a durable, monotonic log or external timestamp/checkpoint protocol with rollback detection; key rotation/revocation needs an authenticated policy.
+- **No trusted clock by signature alone.** The receipt's accepted_at is only as trustworthy as the ingress service and its clock. The signature makes the claim attributable and tamper-evident, not objectively true.
 - **Replay and exactly-once effects.** Event IDs are unique within a ledger, but distributed deduplication, monotonic sequence numbers, checkpointing and crash-safe log persistence are not implemented here.
 - **Deletion and reinstatement.** Retractions preserve audit history. Real deletion/privacy obligations and retraction reversal require explicit, separately reviewed semantics.
 - **No live worker integration.** The JSONL worker continues using its existing behavior until a separately reviewed integration change wires in a verified ledger and authenticated trust-store provisioning.
