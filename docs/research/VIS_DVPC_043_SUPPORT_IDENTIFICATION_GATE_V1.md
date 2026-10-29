@@ -24,7 +24,7 @@ Unsupported target mass:
 
 m_unsupported = sum_a pi(a) * 1[h(a)=0].
 
-If this is greater than 1e-12, status is NOT_IDENTIFIED. The module suppresses maximum ratio, second moment, population ESS, and downstream value/interval disclosure. It never divides by zero or fabricates an importance weight for an unsupported target action.
+If any action has h(a)=0 and pi(a)>0, status is NOT_IDENTIFIED. This is a strict support check: even tiny positive target mass on an unlogged action must not be silently rounded into identification. The module suppresses maximum ratio, second moment, population ESS, and downstream value/interval disclosure. It never divides by zero or fabricates an importance weight for an unsupported target action.
 
 When support is complete, compute:
 
