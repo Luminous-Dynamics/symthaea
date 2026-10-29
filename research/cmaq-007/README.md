@@ -1,0 +1,183 @@
+# CMAQ-007: Planner-Induced World-Model Exploitability
+
+**Status:** protocol v0.4 + executable synthetic smoke harness; draft  
+**Tracking issue:** [#9035](https://github.com/Luminous-Dynamics/symthaea/issues/9035)  
+**Claim ceiling:** deterministic finite synthetic benchmark only; no SOTA, physical safety, trained-model, or production Symthaea claim
+
+## Why this benchmark
+
+A predictor may have low average error and still be unsafe or decision-poor after a planner searches many candidates. Optimization changes the distribution of selected predictions: it preferentially picks favorable errors. Average open-loop loss can therefore conceal selected-action optimism, regret and unsupported-action exploitation.
+
+This slice isolates that effect using a deterministic 256-seed panel and nested candidate catalog sizes of 8, 32, 128 and 512. Each episode uses the same catalog prefix for all policies at a given size; methods are paired on identical hidden truths. Unsupported candidates are rare, have deliberately optimistic model predictions, and have overconfident uncertainty estimates. This makes the world model's errors policy-inducing rather than just uniformly noisy.
+
+The synthetic support-confidence score is imperfect and overlaps between supported and unsupported actions. Support gates therefore expose a **risk–coverage frontier** rather than receiving an oracle support label.
+
+Current literature supports this evaluation direction, not a claim that this harness is novel or state of the art. The 2026 [decision-making-centric world-model evaluation position](https://arxiv.org/abs/2606.15032) explicitly recommends testing policy ranking, optimization lift, exploitability and uncertainty calibration. The [2026 world-model benchmark survey](https://world-model-benchmarks.github.io/) distinguishes prediction-level evaluation from downstream decision utility; its survey snapshot reports 102 representative benchmarks, while its taxonomy includes 13 closed-loop interaction and 14 downstream-outcome-metric entries (categories overlap). A separate 2026 [embodied-world-model benchmark survey](https://arxiv.org/abs/2609.29669) argues that explicit world-model versus direct-policy comparisons and prediction-to-action tests remain scarce. These findings motivate the research question but do not establish a novelty claim for CMAQ-007.
+
+## Run
+
+From this directory:
+
+```sh
+cargo test --locked
+cargo run --quiet --locked
+```
+
+The program prints one machine-readable JSON report with 44 planner-policy rows and four risk-control rows. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, the shuffled-score negative control, the calibrated risk-control contract, and a post-calibration support-score shift panel. A passing smoke test establishes only that the code and declared synthetic invariants work.
+
+## Candidate and evaluator boundary
+
+For this synthetic harness, the candidate selector receives predicted utility, a predicted uncertainty value, and a support-confidence score. The evaluator holds the true utility and support flag. In a later process-isolated qualification harness, candidate-facing records must omit evaluator truth, support flags and hidden structural-family identity. In this first slice, source code necessarily specifies the generator; this is not a sealed test set.
+
+## Strategies
+
+- **Direct fallback:** selects a fixed reference action with utility 0.35.
+- **Predicted greedy:** selects the candidate with highest predicted utility.
+- **Uncertainty penalty:** selects predicted utility minus twice its stated uncertainty. The unsupported family intentionally under-reports uncertainty, testing whether a generic penalty can correct structural blind spots.
+- **Support gates:** filter candidate actions by score thresholds 0.40, 0.55, 0.75, 0.90 and 0.97, then select by predicted utility. No learned threshold is tuned on a qualification set.
+- **Shuffled-support negative controls:** apply the same 0.55 and 0.97 gates to a separate seeded random score stream independent of the truth labels. This checks whether the apparent gate benefit requires informative support evidence instead of chance filtering. The shuffled score is generated with an independent RNG, preserving the main candidate/utility tape and the earlier reported outputs.
+- **Oracle upper bound:** evaluator-only selector chooses the best true-utility action or direct fallback. This is not an eligible competitor.
+
+All candidates and methods are evaluated at the same search sizes and episode seeds. Increasing search size uses a prefix of the same 512-candidate catalog for that episode, making the search-pressure contrast paired.
+
+## Reported metrics
+
+- **Prediction MAE:** mean absolute prediction error across the candidate catalog.
+- **Selected-action optimism gap:** predicted utility minus true utility of the action that is selected.
+- **Realized utility and regret:** selected true utility and regret against the evaluator-only best action available in that catalog (including the fallback).
+- **Unsupported-selection rate:** fraction of episodes in which a selector chooses an unsupported candidate.
+- **Coverage:** fraction of episodes in which a selector chooses a model candidate instead of the direct fallback.
+- **Paired regret reduction versus predicted-greedy:** greedy regret minus the strategy's regret, with a normal-approximation 95% interval over the 256 paired episode differences.
+
+The interval is an exploratory normal approximation, not a guarantee of calibration for arbitrary dependence. The independent sampling unit is the seeded episode. Report raw policy-level metrics and the complete risk–coverage frontier; do not choose one threshold after looking at qualification results.
+
+## First exact-head smoke result (Rust)
+
+The initial focused workflow passed on source commit `c1cf6921ee68f02492ebf8e68d98c246a3ddccbd`: **7 Rust tests passed**, and the JSON report/schema and fixed-panel invariants passed ([workflow run 40952051883](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952051883)). These numbers are the actual Rust workflow output for this commit, not the earlier kind of independent mirror result; this remains a synthetic smoke panel, not external qualification.
+
+| Search candidates | Mean prediction MAE | Greedy regret | Greedy unsupported selections | Uncertainty-penalty regret | Uncertainty-penalty unsupported selections | Strict support gate (0.97) regret | Strict gate unsupported selections / coverage |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.0391 | 0.0422 | 14.5% | 0.0666 | 21.1% | 0.1616 | 1.2% / 43.8% |
+| 32 | 0.0409 | 0.0911 | 29.7% | 0.1511 | 48.0% | 0.1439 | 2.0% / 91.0% |
+| 128 | 0.0411 | 0.1569 | 55.9% | 0.2462 | 85.2% | 0.0731 | 8.2% / 100% |
+| 512 | 0.0414 | 0.2414 | 89.5% | 0.2739 | 100% | 0.0646 | 15.2% / 100% |
+
+The strict 0.97 gate table entry is reported as *unsupported selections / coverage*. For comparison, the direct fallback's regret rises only from 0.1475 at size 8 to 0.1991 at size 512, with zero unsupported selections and zero model-candidate coverage. The 0.55 support gate at size 512 still selects an unsupported candidate in 69.9% of episodes and has regret 0.1924.
+
+**Interpretation:** in this chosen synthetic construction, mean prediction MAE changes only from roughly 0.039 to 0.041, while the greedy planner's unsupported-action selection rises from 14.5% to 89.5% as search size increases. A generic uncertainty penalty is worse here because the structural blind spots are overconfident; at 512 candidates it selects unsupported actions in every episode. A very strict support gate reduces that risk but cannot eliminate it under the deliberately overlapping support scores, and broad search eventually finds high-scored unsupported actions more often. The gate can also perform worse than fallback at low search size because it takes low-coverage risks.
+
+This demonstrates the intended falsification signal for this synthetic setup; it does **not** show that all real planners behave this way, that a support gate universally fixes it, or that Symthaea outperforms an industry baseline. The same result must be challenged with corrupted support signals, correlated/horizon-amplified errors and independently held-out environments before any generalization claim.
+
+## Shuffled-support negative control (Rust exact-head run)
+
+The follow-up control passed at current source commit `22ce169ab360be31bc19f1cdaa69b15fa1ef8446`: **8 Rust tests passed**, and the 44-row report schema, oracle/fallback/risk–coverage invariants, and the preregistered informative-versus-shuffled strict-gate comparisons at candidate-set sizes 32, 128 and 512 passed ([exact-head workflow run 40952937400](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952937400)).
+
+| Search candidates | Informative support gate .97: regret | Unsupported rate | Shuffled support gate .97: regret | Unsupported rate | Informative gate coverage | Shuffled gate coverage |
+|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.1616 | 1.2% | 0.1524 | 0.4% | 43.8% | 26.2% |
+| 32 | 0.1439 | 2.0% | 0.1944 | 3.1% | 91.0% | 63.7% |
+| 128 | 0.0731 | 8.2% | 0.1241 | 8.6% | 100% | 98.4% |
+| 512 | 0.0646 | 15.2% | 0.0919 | 20.3% | 100% | 100% |
+
+At size 8, the random score happens to have lower regret because it abstains more often; this is a useful reminder that one seed panel and one threshold do not prove superiority. From sizes 32 to 512, the informative score outperforms the shuffled score on both regret and unsupported-selection rate. But it still leaves substantial unsupported selection at 512 candidates, so support scoring is evidence—not a safety certificate. The workflow now encodes the large-search contrast as a regression assertion rather than a narrative-only observation.
+
+## Joint risk- and utility-controlled planning (v0.4)
+
+CMAQ-007 v0.3 replaces hand-picked thresholds with a calibration-selected abstention rule. The design treats world-model authority as conditional: a model action is used only if the calibration evidence meets three separately declared requirements.
+
+For each search size (8, 32, 128 and 512), the procedure uses **2,048 calibration episodes** and **2,048 held-out qualification episodes** from distinct deterministic seed streams. Those streams are separate from the 256-episode descriptive panel. It examines a fixed six-threshold grid: 0.40, 0.55, 0.75, 0.90, 0.97 and 1.01. The last threshold forces direct fallback because support scores are below 1.01. Calibration episodes provide evaluator-observed supported/unsupported labels retrospectively; the candidate selector itself receives only the declared candidate-facing support score and predicted utility. This is an offline synthetic-calibration assumption, not a claim that live Symthaea knows support labels before execution.
+
+For every threshold, the calibrator evaluates three quantities:
+
+1. **Unsupported-selection risk:** the one-sided Clopper–Pearson upper confidence bound on the fraction of episodes in which the chosen model action is evaluator-labelled unsupported must be at most 5%.
+2. **Fallback-downside risk:** the one-sided Clopper–Pearson upper confidence bound on the fraction of episodes in which the selected model action delivers utility no better than the direct fallback must be at most 5%. Episodes where the controller falls back are not counted as a downside event.
+3. **Positive utility lift:** a one-sided Hoeffding lower bound on mean per-episode utility lift versus direct fallback must be strictly above zero. Candidate lift is bounded in this synthetic construction to a width of 0.50 utility units; fallback episodes contribute zero lift.
+
+The six candidate thresholds × three criteria produce 18 bounds, so the procedure uses Bonferroni-adjusted α = 0.05/18 for each bound. Among thresholds satisfying **all three** constraints, it selects the one with the greatest calibration coverage; exact coverage ties prefer the stricter threshold. If no model threshold satisfies every criterion, it selects 1.01, explicitly authorizing fallback and zero model coverage. The model-gate flag distinguishes a genuinely certified threshold from this fallback sentinel.
+
+The report records selected threshold, whether the gate was certified, calibration event counts/rates/upper bounds, the utility-lift estimate and lower bound, held-out event rates/coverage/utility lift/regret, and direct-fallback regret on the same qualification episodes. Qualification outcomes are not used to choose the threshold. The workflow checks the schema, distinct seed roots, sample counts, risk bounds, and positive utility bound for any certified model gate; it does not require a model to be used when none qualifies.
+
+This rule is intentionally conservative, but it is still a synthetic experiment rather than a deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution, support/downside labels are correct, and the candidate utility-lift range is valid. It does not cover arbitrary shift after calibration, adaptive adversaries, mislabelled or delayed support evidence, or dependence among episodes. If the controller abstains at larger search sizes, that shows the current estimator has not earned higher-coverage authority under these requirements. Do not weaken the bound after inspecting qualification outcomes; improve the support estimator, collect better calibration evidence, or improve the model's decision-value margin.
+
+## Post-calibration support-score shift
+
+The v0.4 stress panel keeps the calibrated threshold fixed but changes the score-generating process in qualification. For the paired shifted panel, the utility truths, predicted utilities, stated uncertainty and unsupported labels are held constant for each same seed; only the **unsupported action's support score** is shifted upward from Uniform[0.15, 1.00) to Uniform[0.90, 1.00). Supported scores and the independent shuffled-score stream are unchanged. This simulates a support estimator whose confidence becomes over-optimistic for out-of-support actions after calibration.
+
+The controller does not recalibrate on the shifted panel. The report separately records shift-panel unsupported selection, fallback-downside, coverage, utility lift and regret, plus direct-fallback regret. These metrics are never inputs to threshold selection. If the shifted panel breaches the nominal 5% risk target, the correct conclusion is that offline calibration alone does not survive this support-score drift; a separate shift detector/currentness gate or robust support estimator is required.
+
+The support-score shift is synthetic and deliberately adverse. It does not represent a measured Symthaea score distribution or a claimed real-world attack rate.
+
+The initial v0.4 exact-head Rust/report run passed at code/config head `bbe50982b7cdeae9ad5cb0ac385fd79fbe3362e8`: **11 tests passed** and the report/schema checks passed ([workflow run 40954248667](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40954248667)). The latest workflow additionally locks the intended size-8 support-risk breach as a deterministic regression assertion; that stronger assertion is pending its exact-head rerun. The table below is actual output from the passing v0.4 Rust report, not an independent mirror.
+
+| Search size | Gate threshold | Baseline coverage | Baseline unsupported rate | Baseline downside rate | Baseline utility lift | Baseline regret | Shifted coverage | Shifted unsupported rate | Shifted downside rate | Shifted utility lift | Shifted regret |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.97 | 20.75% | 1.03% | 2.10% | +0.01777 | 0.12996 | 26.71% | 7.52% | 8.54% | +0.00693 | 0.14081 |
+| 32 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 |
+| 128 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 |
+| 512 | 1.01 (fallback) | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19910 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19910 |
+
+At size 8, keeping the calibrated 0.97 threshold after support-score drift raises coverage from 20.75% to 26.71%, but unsupported selection rises from 1.03% to 7.52% and fallback-downside from 2.10% to 8.54%—both above the nominal 5% calibration targets. Mean utility lift falls from +0.01777 to +0.00693. This is the desired falsification result: the baseline risk controller does **not** remain calibrated under this deliberately shifted confidence signal, so a production design would need a freshness/shift detector, a conservative fallback, or robust support evidence.
+
+At sizes 32, 128 and 512, no model gate was certified under the original calibration criteria. The fixed 1.01 fallback sentinel therefore stays in force even in the shifted panel. Direct-fallback regret is unchanged under the paired score-only shift, as true utility and predictions were held constant.
+
+| Search size | Selected threshold | Gate certified? | Calibration coverage | Unsupported-risk upper bound | Fallback-downside upper bound | Utility-lift lower bound | Held-out coverage | Held-out unsupported rate | Held-out downside rate | Held-out mean utility lift | Gate regret / direct-fallback regret |
+|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.97 | Yes | 22.12% | 1.68% | 3.02% | +0.00208 | 20.75% | 1.03% | 2.10% | +0.01777 | 0.12996 / 0.14773 |
+| 32 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.18539 / 0.18539 |
+| 128 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00% | 0.00000 | 0.19635 / 0.19635 |
+| 512 | 1.01 | No | 0.00% | 0.29% | 0.29% | −0.01895 | 0.00% | 0.00% | 0.00000 | 0.19910 / 0.19910 |
+
+At search size 8, the gate met all three calibration requirements on a separate 2,048-episode panel; on the 2,048-episode qualification panel it retained 20.75% coverage, with unsupported selections in 1.03% of episodes and fallback-downside events in 2.10%. Mean utility lift was +0.01777 and mean regret was lower than direct fallback in this held-out synthetic panel. That is promising for this one small finite construction, not a general guarantee.
+
+At sizes 32, 128 and 512, no nonzero-coverage threshold met the complete calibration contract, including the positive utility-lift lower bound. The controller selected the 1.01 sentinel and fell back in all qualification episodes. This is an intentional **no-authority** outcome, not missing data and not a reason to weaken the thresholds. It also demonstrates the distinction between epistemic support and decision value: a low unsupported-selection bound alone did not justify model use.
+
+The exact-head pass is limited to this deterministic synthetic setup. The calibration and qualification panels are separate seed streams, but they share the same generator and are not independent real environments. Further qualification must vary the reward family, support-score mechanism, horizon, and post-calibration distribution before broad claims.
+
+## Falsifiable research questions
+
+1. Does search breadth increase the unsupported-action selection rate or selected-action optimism gap while mean prediction MAE remains comparatively stable?
+2. Does the uncertainty penalty fail when the estimator is structurally overconfident outside support?
+3. Can imperfect support gating reduce regret, and what coverage does it sacrifice?
+4. Do the risk–coverage trade-offs survive support-score corruption, correlated errors, multiple rollout horizons and held-out reward families?
+5. Does a calibrated, evidence-backed support gate beat direct fallback at matched compute and data cost on real task suites?
+
+A negative answer is still useful. The benchmark must report where no method dominates, not tune away a difficult regime.
+
+## Known limitations / next work
+
+- No transition dynamics or long-horizon rollout in v0.1; utility is one-step and scalar.
+- No learned world model; errors are generated by a fixed synthetic mechanism.
+- Support score and model uncertainty are synthetic observables, not calibrated outputs from Symthaea.
+- No process isolation, cryptographic provenance, real-world robot interface, or hardware latency/energy measurement.
+- The search-pressure panel is a falsification smoke test, not an industry ranking and not a claim that the current construction beats any SOTA method.
+
+The new v0.5 companion begins the next step: a separate deterministic Rust panel crosses search sizes 8/32/128/512 with rollout depths 1/4/16 and two persistent-error growth settings. It reports prediction MAE, selected-action optimism, regret, unsupported-action selection, coverage, and paired regret-reduction intervals for fallback, greedy, uncertainty-penalized, conservative ensemble-min, support-gated and oracle policies.
+
+## Rollout-depth stress panel (v0.5 companion)
+
+Run from this directory:
+
+```sh
+cargo test --locked
+cargo run --quiet --locked --bin horizon_stress
+```
+
+The companion emits JSON with schema `cmaq-007-horizon-stress-v0.1` and 168 policy/search/depth/error-growth rows. It uses 256 paired episode seeds. The candidate catalog and evaluator truths remain identical across policies for each seed; search sizes are nested prefixes of a fixed 512-action catalog. The output includes raw prediction MAE, nominal mean-model optimism and decision-score gap separately, mean regret, empirical CVaR95 regret, maximum regret, and paired 95% normal-approximation intervals for regret reduction against predicted-greedy.
+
+**New falsification axis:** action-specific model error persists across the rollout and is geometrically amplified by the declared `rollout_growth` factor. At zero growth, per-step error remains fixed with depth. At growth 0.20, the error is deliberately compounded across the horizon. This is a stress parameter for a hypothesized failure mode—not an estimate fitted to Symthaea, robotics, or a physical plant. CVaR95 is the average regret among the worst ceil(5% of episodes) for each policy/condition; at 256 paired seeds, that is the worst 13 episodes. Maximum regret is also reported so a mean score cannot conceal a single severe synthetic failure. These are descriptive finite-panel tail metrics, not population confidence guarantees. This version also includes a five-head synthetic ensemble-min baseline, motivated by but not a reproduction of the MRSQ result reported by Chang et al. (ICML 2026, https://proceedings.mlr.press/v306/chang26a.html). Each head shares the same structural action error but receives a small independent residual. The minimum can suppress independent overestimation, but it is deliberately unable to erase a common-mode unsupported-action bias; the experiment therefore tests both the benefit and boundary of ensemble pessimism. The report separates the selected action's nominal mean-model optimism from the selected decision estimator's gap, so a pessimistic selector is not conflated with the model's raw prediction.
+
+### Exact-head v0.5 stress outputs
+
+Rust workflow run [40959040088](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40959040088) passed the unit tests, v0.4 report validator, and v0.5 report/falsification validator at the v0.5 code head. The validator emitted the following synthetic diagnostic values for predicted-greedy:
+
+| Constructed stress contrast | Metric | Result |
+|---|---|---:|
+| Search size 8 → 512, horizon 16, growth 0.20 | Unsupported-selection rate | 46.48% → 100.00% |
+| Horizon 1 → 16, search size 512, growth 0.20 | Selected nominal-model optimism gap | 0.0342 → 0.7047 |
+| Growth 0.00 → 0.20, search size 512, horizon 16 | Mean prediction MAE | 0.0304 → 0.1663 |
+
+These values are emitted by the synthetic harness and are not measured Symthaea outputs. They demonstrate the three preregistered effects are visible in this constructed model: broader search exposes more unsupported actions, persistent error compounds with rollout depth, and geometric error growth increases prediction error. They do **not** establish the same numerical behavior for real world models or any industry ranking.
+
+The focused workflow tests three distinct claims rather than collapsing them into one score: (1) increasing search breadth can increase unsupported selection; (2) deeper rollouts under persistent error can increase selected optimism; and (3) the growth condition increases prediction MAE relative to the zero-growth control. It also checks oracle regret, fallback coverage, threshold coverage ordering, finite metrics and stable output schema.
+
+This panel still does **not** implement transition-state simulation, train a model, or establish a real-world horizon law. Because the synthetic generator intentionally chooses the error structure, passing establishes that this mechanism is observable and reproducibly scored—not that every world model exhibits it or that one baseline is universally superior. The next evidence step is to evaluate the same metrics on frozen, action-coupled environments with separately held dynamics and at least one independently implemented comparator. The support gate must retain the full coverage/risk frontier, including regimes where it abstains completely or does worse than fallback.

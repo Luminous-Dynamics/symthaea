@@ -1,0 +1,214 @@
+name: CMAQ-007 planner exploitability smoke benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-007/**"
+      - ".github/workflows/cmaq-007.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-007/**"
+      - ".github/workflows/cmaq-007.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exploitability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-007
+        run: cargo test --locked
+      - name: Generate report and validate invariants
+        working-directory: research/cmaq-007
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked --bin cmaq-007-planner-exploitability > /tmp/cmaq-007-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-007-report.json").read_text())
+          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.4"
+          assert report["seed_count"] == 256
+          assert report["calibration_seed_root"] != report["qualification_seed_root"]
+          assert report["support_score_shift"].startswith("unsupported scores moved to [0.90, 1.00)")
+          assert report["search_sizes"] == [8, 32, 128, 512]
+          rows = report["summary"]
+          assert len(rows) == 44
+          by_key = {(row["search_size"], row["strategy"]): row for row in rows}
+          assert len(by_key) == len(rows)
+          for size in report["search_sizes"]:
+              assert by_key[(size, "oracle_upper_bound")]["mean_regret"] <= 1e-9
+              assert by_key[(size, "direct_fallback")]["unsupported_selection_rate"] == 0.0
+              assert by_key[(size, "predicted_greedy")]["mean_prediction_mae"] < 0.10
+              assert by_key[(size, "support_gate_097")]["coverage_rate"] <= by_key[(size, "support_gate_055")]["coverage_rate"]
+          assert by_key[(size, "shuffled_support_gate_055")]["coverage_rate"] >= 0.0
+          assert 0.0 <= by_key[(size, "shuffled_support_gate_055")]["unsupported_selection_rate"] <= 1.0
+          assert 0.0 <= by_key[(size, "shuffled_support_gate_097")]["unsupported_selection_rate"] <= 1.0
+          assert by_key[(512, "predicted_greedy")]["unsupported_selection_rate"] > by_key[(8, "predicted_greedy")]["unsupported_selection_rate"]
+          # The support signal must earn its value over a deterministic shuffled-score control.
+          for size in [32, 128, 512]:
+              assert by_key[(size, "support_gate_097")]["mean_regret"] < by_key[(size, "shuffled_support_gate_097")]["mean_regret"]
+              assert by_key[(size, "support_gate_097")]["unsupported_selection_rate"] < by_key[(size, "shuffled_support_gate_097")]["unsupported_selection_rate"]
+          risk_rows = report["risk_control"]
+          assert len(risk_rows) == 4
+          risk_by_size = {row["search_size"]: row for row in risk_rows}
+          assert set(risk_by_size) == set(report["search_sizes"])
+          expected_thresholds = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01]
+          assert risk_by_size[8]["model_gate_certified"]
+          assert risk_by_size[8]["shifted_qualification_unsupported_rate"] > risk_by_size[8]["qualification_unsupported_rate"]
+          assert risk_by_size[8]["shifted_qualification_unsupported_rate"] > risk_by_size[8]["target_unsupported_risk"]
+          assert risk_by_size[8]["shifted_qualification_downside_rate"] > risk_by_size[8]["target_fallback_downside_risk"]
+          for size, row in risk_by_size.items():
+              assert row["target_unsupported_risk"] == 0.05
+              assert row["target_fallback_downside_risk"] == 0.05
+              assert row["target_utility_lift_lower_bound"] == 0.0
+              assert row["familywise_alpha"] == 0.05
+              assert row["threshold_count"] == 6
+              assert row["bound_count"] == 18
+              assert abs(row["alpha_per_bound"] - (0.05 / 18)) < 1e-8
+              assert row["selected_threshold"] in expected_thresholds
+              assert row["calibration_episode_count"] == 2048
+              assert row["qualification_episode_count"] == 2048
+              assert row["shifted_qualification_episode_count"] == 2048
+              assert row["calibration_unsupported_upper_bound"] <= row["target_unsupported_risk"]
+              assert row["calibration_downside_upper_bound"] <= row["target_fallback_downside_risk"]
+              assert row["model_gate_certified"] == (row["selected_threshold"] < 1.0)
+              if row["model_gate_certified"]:
+                  assert row["calibration_utility_lift_lower_bound"] > row["target_utility_lift_lower_bound"]
+              else:
+                  assert row["selected_threshold"] == 1.01
+                  assert row["qualification_coverage_rate"] == 0.0
+              assert 0.0 <= row["calibration_coverage_rate"] <= 1.0
+              assert 0.0 <= row["qualification_unsupported_rate"] <= 1.0
+              assert 0.0 <= row["qualification_downside_rate"] <= 1.0
+              assert 0.0 <= row["qualification_coverage_rate"] <= 1.0
+          print("CMAQ-007 v0.4 schema, planner-exploitability panel, shuffled-score control, joint risk/value gate, and shifted-support stress validated")
+          print(json.dumps({
+              "planner_exploitability": {
+                  size: {
+                      strategy: {
+                          "prediction_mae": by_key[(size, strategy)]["mean_prediction_mae"],
+                          "regret": by_key[(size, strategy)]["mean_regret"],
+                          "unsupported_rate": by_key[(size, strategy)]["unsupported_selection_rate"],
+                          "coverage": by_key[(size, strategy)]["coverage_rate"],
+                      }
+                      for strategy in ["direct_fallback", "predicted_greedy", "uncertainty_penalty", "support_gate_055", "support_gate_097", "shuffled_support_gate_055", "shuffled_support_gate_097", "oracle_upper_bound"]
+                  }
+                  for size in report["search_sizes"]
+              },
+              "risk_control": {
+                  size: {
+                      "selected_threshold": row["selected_threshold"],
+                      "model_gate_certified": row["model_gate_certified"],
+                      "selected_threshold": row["selected_threshold"],
+                      "calibration_unsupported_upper": row["calibration_unsupported_upper_bound"],
+                      "calibration_downside_upper": row["calibration_downside_upper_bound"],
+                      "calibration_utility_lift_lower": row["calibration_utility_lift_lower_bound"],
+                      "calibration_coverage": row["calibration_coverage_rate"],
+                      "qualification_unsupported_rate": row["qualification_unsupported_rate"],
+                      "qualification_downside_rate": row["qualification_downside_rate"],
+                      "qualification_utility_lift": row["qualification_mean_utility_lift_vs_fallback"],
+                      "qualification_coverage": row["qualification_coverage_rate"],
+                      "qualification_regret": row["qualification_mean_regret"],
+                      "fallback_regret": row["direct_fallback_mean_regret"],
+                      "shifted_qualification_unsupported_rate": row["shifted_qualification_unsupported_rate"],
+                      "shifted_qualification_downside_rate": row["shifted_qualification_downside_rate"],
+                      "shifted_qualification_coverage": row["shifted_qualification_coverage_rate"],
+                      "shifted_qualification_utility_lift": row["shifted_qualification_mean_utility_lift_vs_fallback"],
+                      "shifted_qualification_regret": row["shifted_qualification_mean_regret"],
+                      "shifted_fallback_regret": row["shifted_direct_fallback_mean_regret"],
+                  }
+                  for size, row in risk_by_size.items()
+              }
+          }, sort_keys=True))
+          PY
+      - name: Run horizon-amplified error stress panel
+        working-directory: research/cmaq-007
+        run: cargo run --quiet --locked --bin horizon_stress > /tmp/cmaq-007-horizon-stress.json
+      - name: Validate horizon stress schema and falsification controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-007-horizon-stress.json").read_text())
+          assert report["schema_version"] == "cmaq-007-horizon-stress-v0.1"
+          assert report["seed_count"] == 256
+          assert report["search_sizes"] == [8, 32, 128, 512]
+          assert report["horizons"] == [1, 4, 16]
+          assert report["rollout_growth_values"] == [0.0, 0.2]
+          rows = report["summary"]
+          assert len(rows) == 168
+          by_key = {
+              (r["search_size"], r["horizon"], round(r["rollout_growth"], 2), r["strategy"]): r
+              for r in rows
+          }
+          assert len(by_key) == len(rows)
+          strategies = {
+              "direct_fallback", "predicted_greedy", "uncertainty_penalty",
+              "support_gate_060", "support_gate_090", "ensemble_min", "oracle_upper_bound",
+          }
+          assert {r["strategy"] for r in rows} == strategies
+          for size in report["search_sizes"]:
+              for horizon in report["horizons"]:
+                  for growth in report["rollout_growth_values"]:
+                      oracle = by_key[(size, horizon, round(growth, 2), "oracle_upper_bound")]
+                      fallback = by_key[(size, horizon, round(growth, 2), "direct_fallback")]
+                      assert oracle["mean_regret"] <= 1e-8
+                      assert fallback["model_action_coverage"] == 0.0
+                      assert fallback["unsupported_selection_rate"] == 0.0
+                      for row in (by_key[(size, horizon, round(growth, 2), s)] for s in strategies):
+                          for key in (
+                              "mean_prediction_mae", "mean_realized_utility",
+                              "mean_selected_optimism_gap", "mean_selected_decision_score_gap", "mean_regret", "cvar95_regret", "max_regret",
+                              "unsupported_selection_rate", "unsupported_rate_given_model_action",
+                              "model_action_coverage", "paired_regret_reduction_vs_greedy",
+                              "paired_regret_reduction_ci95_low", "paired_regret_reduction_ci95_high",
+                          ):
+                              assert math.isfinite(row[key]), (key, row)
+                          assert row["mean_prediction_mae"] >= 0
+                          assert row["mean_regret"] >= -1e-9
+                          assert row["cvar95_regret"] >= row["mean_regret"] - 1e-8
+                          assert row["max_regret"] >= row["cvar95_regret"] - 1e-8
+                          for key in ("unsupported_selection_rate", "unsupported_rate_given_model_action", "model_action_coverage"):
+                              assert 0.0 <= row[key] <= 1.0
+                          assert row["paired_regret_reduction_ci95_low"] <= row["paired_regret_reduction_ci95_high"]
+                      assert by_key[(size, horizon, round(growth, 2), "support_gate_090")]["model_action_coverage"] <= by_key[(size, horizon, round(growth, 2), "support_gate_060")]["model_action_coverage"]
+          # Preregistered falsification checks: search pressure, rollout depth, and
+          # geometric error propagation must be visible rather than inferred from MAE alone.
+          greedy_8 = by_key[(8, 16, 0.2, "predicted_greedy")]
+          greedy_512 = by_key[(512, 16, 0.2, "predicted_greedy")]
+          assert greedy_512["unsupported_selection_rate"] > greedy_8["unsupported_selection_rate"]
+          shallow = by_key[(512, 1, 0.2, "predicted_greedy")]
+          deep = by_key[(512, 16, 0.2, "predicted_greedy")]
+          assert deep["mean_selected_optimism_gap"] > shallow["mean_selected_optimism_gap"]
+          no_growth = by_key[(512, 16, 0.0, "predicted_greedy")]
+          assert deep["mean_prediction_mae"] > no_growth["mean_prediction_mae"]
+          print("CMAQ-007 v0.5 horizon stress schema, paired policies, empirical tail-risk metrics, oracle/fallback controls, and search/depth falsification checks validated")
+          print(json.dumps({
+              "search_pressure": {
+                  "size_8_unsupported_rate": greedy_8["unsupported_selection_rate"],
+                  "size_512_unsupported_rate": greedy_512["unsupported_selection_rate"],
+              },
+              "rollout_depth": {
+                  "horizon_1_optimism_gap": shallow["mean_selected_optimism_gap"],
+                  "horizon_16_optimism_gap": deep["mean_selected_optimism_gap"],
+              },
+              "error_growth": {
+                  "no_growth_prediction_mae": no_growth["mean_prediction_mae"],
+                  "growth_0_20_prediction_mae": deep["mean_prediction_mae"],
+              },
+          }, sort_keys=True))
+          PY

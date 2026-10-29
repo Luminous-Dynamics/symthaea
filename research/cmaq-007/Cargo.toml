@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-007-planner-exploitability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic smoke benchmark for planner-induced world-model exploitation"
+
+[dependencies]
+
+[workspace]
