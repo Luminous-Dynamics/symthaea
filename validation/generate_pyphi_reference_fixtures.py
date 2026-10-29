@@ -43,9 +43,9 @@ def _float_matrix(value: Any) -> list[list[float]]:
     return [[float(cell) for cell in row] for row in value]
 
 
-MODEL_MAGIC = b"SYMTHAEA-IIT-BINARY-TPM\\0v0.1\\0"
-EVALUATION_MAGIC = b"SYMTHAEA-IIT-EVALUATION\\0v0.1\\0"
-ANALYSIS_REQUEST_MAGIC = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\\0v0.1\\0"
+MODEL_MAGIC = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0"
+EVALUATION_MAGIC = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0"
+ANALYSIS_REQUEST_MAGIC = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0"
 
 
 def _canonical_model_bytes(tpm: list[list[float]], connectivity: list[list[int]]) -> bytes:
@@ -98,9 +98,9 @@ def _analysis_request_digest(
     encoded.extend(struct.pack("<I", len(subset)))
     for unit in subset:
         encoded.extend(struct.pack("<I", int(unit)))
-    encoded.extend(b"\\0")
+    encoded.extend(b"\0")
     encoded.extend(formalism.encode("utf-8"))
-    encoded.extend(b"\\0")
+    encoded.extend(b"\0")
     encoded.extend(quantity_id.encode("utf-8"))
     return hashlib.sha256(encoded).hexdigest()
 
