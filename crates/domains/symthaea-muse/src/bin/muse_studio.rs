@@ -1015,6 +1015,7 @@ async fn main() {
         .route("/api/notes/{id}", get(notes))
         .route("/api/harmony/{id}", get(harmony_summary))
         .route("/api/piece/{id}/listen-bundle", get(listen_bundle))
+        .route("/api/piece/{id}/render-receipt", get(render_execution_receipt))
         .route("/api/motifs/{id}", get(motifs_summary))
         .route(
             "/api/piece/{id}/performance-bundle",
@@ -4388,6 +4389,18 @@ mod piece_bundle_tests {
         assert_eq!(notes[1].id, "score-melody-1");
         assert_eq!(notes[0].midi, 60);
     }
+}
+
+async fn render_execution_receipt(
+    State(studio): State<Arc<Studio>>,
+    AxPath(id): AxPath<u64>,
+) -> Result<Json<symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt>, StatusCode> {
+    let receipt = {
+        let store = studio.candidates.lock().unwrap();
+        let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
+        candidate.render_receipt.clone().ok_or(StatusCode::NOT_FOUND)?
+    };
+    Ok(Json(receipt))
 }
 
 async fn listen_bundle(
