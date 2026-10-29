@@ -163,6 +163,44 @@ fn insufficient_grid_and_no_storage_is_infeasible() {
 }
 
 #[test]
+fn canonical_digest_matches_independent_known_answer_vector() {
+    assert_eq!(
+        canonical_energy_hub_digest(&frontier_scenario()).unwrap(),
+        "sha256:21048e86350e423468d5fcac5a137c6cfea74922df14894ad5331c05b70ac2e7"
+    );
+}
+
+#[test]
+fn renewable_curtailment_is_not_counted_as_delivered_energy() {
+    let case = seal(TimeIndexedEnergyHubScenario {
+        scenario_id: "hub-curtailment-synthetic-v1".to_owned(),
+        input_digest: "pending".to_owned(),
+        currency_code: "USD".to_owned(),
+        quantum_kwh: 1.0,
+        service: TransportService {
+            period_id: "synthetic-period-curtailment".to_owned(),
+            lifecycle_boundary_id: "source-to-airport-bus-v1".to_owned(),
+            completed_passenger_km: 100.0,
+            available_seat_km: 120.0,
+        },
+        storage: storage(1, 1, 1, 1),
+        intervals: vec![interval("t0", 1, 1, 4, 0, 1.0, 2.0, 1.0, 10.0)],
+    });
+    let result = solve_exact_energy_hub_pareto(&case, 10_000).unwrap();
+    let plan = result.frontier.iter().find(|candidate| {
+        candidate.plan.actions[0].renewable_direct_quanta == 1
+            && candidate.plan.actions[0].renewable_charge_input_quanta == 1
+            && candidate.plan.actions[0].renewable_curtailed_quanta == 2
+    }).expect("renewable surplus should serve demand, charge storage, and curtail remainder");
+
+    assert_eq!(plan.metrics.source_ledger.total_source_energy_kwh, 4.0);
+    assert_eq!(plan.metrics.source_ledger.total_delivered_energy_kwh, 2.0);
+    assert_eq!(plan.metrics.renewable_generation_quanta, 4);
+    assert_eq!(plan.metrics.renewable_curtailed_quanta, 2);
+    assert_eq!(plan.metrics.final_soc_quanta, 1);
+}
+
+#[test]
 fn canonical_digest_is_stable_and_binds_ordered_interval_content() {
     let original = frontier_scenario();
     assert_eq!(
