@@ -736,7 +736,7 @@ mod tests {
         let worlds = mechanisms();
         let query = all_queries()
             .into_iter()
-            .find(|query| worlds[0].observe(*query) != worlds[1].observe(*query))
+            .find(|query| worlds[0].sense(*query) != worlds[1].sense(*query))
             .expect("two mechanisms differ on at least one query");
         let error = update_posterior(
             &worlds,
