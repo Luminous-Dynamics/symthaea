@@ -1,0 +1,27 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [{ "name": "negative-fixture.json", "digest": { "sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4" } }],
+  "predicateType": "https://luminousdynamics.io/attestations/evidence/v0.1",
+  "predicate": {
+    "schemaVersion": "0.1.0",
+    "claim": { "id": "NEG-001", "kind": "test_result", "statement": "Queued work cannot be reported as passed.", "scope": ["status-consistency"] },
+    "target": {
+      "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeef1234567" },
+      "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+      "inputs": []
+    },
+    "execution": { "status": "queued", "result": "passed", "runId": "not-executed" },
+    "verification": {
+      "outcome": "passed",
+      "verifier": { "id": "must-not-pass", "version": "0.1.0" },
+      "checkedTarget": {
+        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeef1234567" },
+        "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+        "inputs": []
+      },
+      "checks": []
+    },
+    "evidence": [],
+    "limitations": []
+  }
+}
