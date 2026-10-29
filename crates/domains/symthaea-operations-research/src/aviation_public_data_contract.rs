@@ -289,6 +289,11 @@ pub fn validate_manifest(manifest: &PublicDataManifest) -> Result<(), DataContra
                 return Err(DataContractError::InvalidTimestamp("dataset download time"));
             }
         }
+        if source.acquisition_status == AcquisitionStatus::Retrieved
+            && source.dataset_downloaded_at_epoch.is_none()
+        {
+            return Err(DataContractError::InvalidTimestamp("retrieved dataset time"));
+        }
         if sources_by_id.insert(source.source_id.as_str(), source).is_some() {
             return Err(DataContractError::DuplicateIdentifier("source ID"));
         }
