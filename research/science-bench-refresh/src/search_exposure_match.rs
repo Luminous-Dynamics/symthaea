@@ -239,8 +239,7 @@ fn validate_record_contract(
                 || record.evidence_artifact_sha256.is_some()
             {
                 issues.push(format!(
-                    "records[{index}] not_evaluable requires method none, score zero, and no",
-                    "protected evidence"
+                    "records[{index}] has invalid not_evaluable contract"
                 ));
                 valid = false;
             }
@@ -279,8 +278,7 @@ fn validate_record_contract(
                 || !has_protected_evidence(record)
             {
                 issues.push(format!(
-                    "records[{index}] confirmed exposure classification requires a method",
-                    "and protected/evidence digests"
+                    "records[{index}] confirmed exposure lacks required match/evidence digests"
                 ));
                 valid = false;
             }
