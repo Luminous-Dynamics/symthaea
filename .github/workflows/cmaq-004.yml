@@ -46,7 +46,7 @@ jobs:
           for family in families.values():
               rows = {row["strategy"]: row for row in family["results"]}
               assert set(rows) == {
-                  "direct_tabular_fallback", "learned_additive_model", "shuffled_model_control",
+                  "direct_nearest_context", "learned_additive_model", "shuffled_model_control",
                   "stale_model_control", "oracle_evaluator_only"
               }
               assert rows["oracle_evaluator_only"]["mean_net_utility"] >= max(
