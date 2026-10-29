@@ -22,8 +22,9 @@ use symthaea_music_theory::edit_locality::{
 use symthaea_music_theory::Score;
 
 use crate::audio_preservation::{
-    AudioAuditInputError, AudioPreservationReport, AudioView, OnsetPreservationReport,
-    PreservationVerdict, audio_content_sha256, compose_audio_preservation_evidence,
+    AudioAuditInputError, AudioPreservationReport, AudioView, FrameInterval,
+    OnsetPreservationReport, PreservationVerdict, audio_content_sha256,
+    compose_audio_preservation_evidence,
     verify_audio_preservation_against_buffers, verify_onset_preservation_against_buffers,
 };
 
@@ -430,6 +431,99 @@ fn require_only_locality_dimensions_changed(
     Ok(())
 }
 
+
+/// Convert a beat value to a conservative audio-frame boundary without
+/// clipping. The source/target score must fit fully inside the rendered buffer.
+fn beat_to_frame(
+    beat: f64,
+    tempo_bpm: f64,
+    sample_rate_hz: u32,
+    total_frames: usize,
+    round_up: bool,
+) -> Result<usize, SymbolicAudioBindingError> {
+    if !beat.is_finite() || beat < 0.0 || !tempo_bpm.is_finite() || tempo_bpm <= 0.0 {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "non-finite or negative beat position cannot map to audio frames",
+        ));
+    }
+    let frame = beat * 60.0 * sample_rate_hz as f64 / tempo_bpm;
+    if !frame.is_finite() || frame > total_frames as f64 + 1.0e-6 {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "score timing extends beyond the rendered audio buffer",
+        ));
+    }
+    let rounded = if round_up { frame.ceil() } else { frame.floor() };
+    Ok((rounded as usize).min(total_frames))
+}
+
+/// Derive the only authorized temporal mask implied by a supported symbolic
+/// operation. This prevents a caller from widening the audio exemption mask
+/// independently of the recorded edit request.
+fn derive_authorized_audio_mask(
+    source: &[LocalityEvent],
+    target: &[LocalityEvent],
+    request: symthaea_music_theory::edit_locality::EditRequest,
+    tempo_bpm: f64,
+    sample_rate_hz: u32,
+    total_frames: usize,
+) -> Result<Vec<FrameInterval>, SymbolicAudioBindingError> {
+    if source.is_empty() || source.len() != target.len() {
+        return Err(SymbolicAudioBindingError::UnsupportedScore(
+            "source/target symbolic events must be non-empty and index-aligned",
+        ));
+    }
+    let indices: Vec<usize> = match request.operation {
+        symthaea_music_theory::edit_locality::EditOperation::Transpose { .. }
+        | symthaea_music_theory::edit_locality::EditOperation::ScaleDurations { .. }
+        | symthaea_music_theory::edit_locality::EditOperation::ScaleOnsets { .. } =>
+            (0..source.len()).collect(),
+        symthaea_music_theory::edit_locality::EditOperation::PitchAt { index, .. }
+        | symthaea_music_theory::edit_locality::EditOperation::DurationAt { index, .. } => {
+            if index >= source.len() {
+                return Err(SymbolicAudioBindingError::UnsupportedScore(
+                    "requested edit index is outside the symbolic event sequence",
+                ));
+            }
+            vec![index]
+        }
+    };
+
+    let mut intervals = Vec::with_capacity(indices.len());
+    for index in indices {
+        let source_event = source[index];
+        let target_event = target[index];
+        let start_beat = source_event.onset_beats.min(target_event.onset_beats);
+        let source_end = source_event.onset_beats + source_event.duration_beats;
+        let target_end = target_event.onset_beats + target_event.duration_beats;
+        let end_beat = source_end.max(target_end);
+        let start_frame = beat_to_frame(
+            start_beat, tempo_bpm, sample_rate_hz, total_frames, false,
+        )?;
+        let end_frame = beat_to_frame(
+            end_beat, tempo_bpm, sample_rate_hz, total_frames, true,
+        )?;
+        if start_frame >= end_frame {
+            return Err(SymbolicAudioBindingError::UnsupportedScore(
+                "authorized event does not map to a non-empty audio interval",
+            ));
+        }
+        intervals.push(FrameInterval { start_frame, end_frame });
+    }
+
+    intervals.sort_by_key(|interval| interval.start_frame);
+    let mut merged: Vec<FrameInterval> = Vec::with_capacity(intervals.len());
+    for interval in intervals {
+        if let Some(previous) = merged.last_mut() {
+            if interval.start_frame <= previous.end_frame {
+                previous.end_frame = previous.end_frame.max(interval.end_frame);
+                continue;
+            }
+        }
+        merged.push(interval);
+    }
+    Ok(merged)
+}
+
 fn full_score_binding_receipt_sha256(
     binding: &FullScoreRenderBinding,
 ) -> Result<String, SymbolicAudioBindingError> {
@@ -462,6 +556,30 @@ pub fn create_full_score_render_binding(
     require_only_locality_dimensions_changed(source_score, target_score)?;
     let source_events = validate_score_projection(source_score)?;
     let target_events = validate_score_projection(target_score)?;
+    if !verify_edit_locality_evidence(&source_events, &target_events, symbolic_evidence)? {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "symbolic receipt does not replay against the supplied full Score projection",
+        ));
+    }
+    // Validate buffers before using their dimensions in the score-to-audio map.
+    audio_content_sha256(source_audio)?;
+    audio_content_sha256(target_audio)?;
+    let total_frames = source_audio.interleaved_samples.len() / source_audio.channels;
+    let expected_mask = derive_authorized_audio_mask(
+        &source_events,
+        &target_events,
+        symbolic_evidence.request,
+        source_score.tempo_bpm,
+        source_audio.sample_rate_hz,
+        total_frames,
+    )?;
+    if acoustic_evidence.authorized_edits != expected_mask
+        || onset_evidence.authorized_edits != expected_mask
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "audio authorization mask does not match the requested symbolic edit and score timing",
+        ));
+    }
     let projected_binding = create_symbolic_audio_render_binding(
         &source_events,
         &target_events,
