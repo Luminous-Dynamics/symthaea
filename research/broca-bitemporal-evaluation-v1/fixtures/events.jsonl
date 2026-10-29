@@ -1,0 +1,11 @@
+{"event_id":"E001","subject":"db-prod","attribute":"endpoint","value":"db-primary-a.internal","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T09:00:00Z","source":"operations","authority_rank":1}
+{"event_id":"E002","subject":"db-prod","attribute":"endpoint","value":"db-primary-b.internal","valid_from":"2026-02-10","valid_to":null,"recorded_at":"2026-02-10T10:00:00Z","source":"operations","authority_rank":1}
+{"event_id":"E003","subject":"db-prod","attribute":"endpoint","value":"db-primary-c.internal","valid_from":"2026-01-15","valid_to":"2026-02-10","recorded_at":"2026-03-01T08:00:00Z","source":"post-incident-correction","authority_rank":1}
+{"event_id":"E004","subject":"door","attribute":"policy","value":"open","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T10:00:00Z","source":"facilities","authority_rank":1}
+{"event_id":"E005","subject":"door","attribute":"policy","value":"closed","valid_from":"2026-03-01","valid_to":null,"recorded_at":"2026-03-01T08:00:00Z","source":"security","authority_rank":3}
+{"event_id":"E006","subject":"door","attribute":"policy","value":"open","valid_from":"2026-03-01","valid_to":null,"recorded_at":"2026-03-01T08:05:00Z","source":"facilities","authority_rank":1}
+{"event_id":"E007","subject":"retention","attribute":"days","value":"30","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T09:00:00Z","source":"storage-admin","authority_rank":1}
+{"event_id":"E008","subject":"retention","attribute":"days","value":"90","valid_from":"2026-01-05","valid_to":null,"recorded_at":"2026-01-05T09:00:00Z","source":"storage-admin-a","authority_rank":1}
+{"event_id":"E009","subject":"retention","attribute":"days","value":"120","valid_from":"2026-01-05","valid_to":null,"recorded_at":"2026-01-06T09:00:00Z","source":"storage-admin-b","authority_rank":1}
+{"event_id":"E010","subject":"replication","attribute":"enabled","value":"true","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T09:00:00Z","source":"service-owner","authority_rank":1}
+{"event_id":"E011","subject":"replication","attribute":"enabled","value":"true","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-02T09:00:00Z","source":"audit-agent","authority_rank":1}

@@ -1,0 +1,11 @@
+{"query_id":"Q001","subject":"db-prod","attribute":"endpoint","valid_at":"2026-02-20","known_at":"2026-02-05T00:00:00Z","expected_state":"resolved","expected_value":"db-primary-a.internal"}
+{"query_id":"Q002","subject":"db-prod","attribute":"endpoint","valid_at":"2026-02-20","known_at":"2026-02-20T00:00:00Z","expected_state":"resolved","expected_value":"db-primary-b.internal"}
+{"query_id":"Q003","subject":"db-prod","attribute":"endpoint","valid_at":"2026-01-20","known_at":"2026-03-05T00:00:00Z","expected_state":"resolved","expected_value":"db-primary-c.internal"}
+{"query_id":"Q004","subject":"db-prod","attribute":"endpoint","valid_at":"2026-01-20","known_at":"2026-02-28T00:00:00Z","expected_state":"resolved","expected_value":"db-primary-a.internal"}
+{"query_id":"Q005","subject":"db-prod","attribute":"endpoint","valid_at":"2026-02-10","known_at":"2026-03-05T00:00:00Z","expected_state":"resolved","expected_value":"db-primary-b.internal"}
+{"query_id":"Q006","subject":"door","attribute":"policy","valid_at":"2026-03-15","known_at":"2026-03-15T00:00:00Z","expected_state":"resolved","expected_value":"closed"}
+{"query_id":"Q007","subject":"door","attribute":"policy","valid_at":"2026-03-15","known_at":"2026-02-28T23:59:59Z","expected_state":"resolved","expected_value":"open"}
+{"query_id":"Q008","subject":"retention","attribute":"days","valid_at":"2026-01-06","known_at":"2026-01-07T00:00:00Z","expected_state":"conflict","expected_value":null}
+{"query_id":"Q009","subject":"unknown-system","attribute":"endpoint","valid_at":"2026-03-15","known_at":"2026-03-15T00:00:00Z","expected_state":"unknown","expected_value":null}
+{"query_id":"Q010","subject":"replication","attribute":"enabled","valid_at":"2026-01-08","known_at":"2026-01-08T00:00:00Z","expected_state":"resolved","expected_value":"true"}
+{"query_id":"Q011","subject":"db-prod","attribute":"endpoint","valid_at":"2026-02-20","known_at":"2026-02-10T09:59:00Z","expected_state":"resolved","expected_value":"db-primary-a.internal"}
