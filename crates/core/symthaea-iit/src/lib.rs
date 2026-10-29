@@ -66,6 +66,12 @@ pub enum ModelError {
     #[error("quantity {quantity} is not supported by formalism {formalism}")]
     IncompatibleQuantity { quantity: &'static str, formalism: &'static str },
 
+    #[error("candidate system must contain at least one unit")]
+    EmptyCandidateSystem,
+
+    #[error("candidate system repeats unit {unit}")]
+    DuplicateCandidateUnit { unit: usize },
+
     #[error("connectivity omits causal influence {source_unit}->{target_unit} between states {state_without_source} and {state_with_source}")]
     MissingCausalEdge {
         source_unit: usize,
@@ -463,7 +469,6 @@ impl FormalismProfile {
 pub enum AnalysisQuantity {
     Iit3SystemPhi,
     Iit4SystemPhiS,
-    Iit4MechanismSmallPhi,
     Iit4CauseEffectStructure,
     Iit4StructureBigPhi,
 }
@@ -474,7 +479,6 @@ impl AnalysisQuantity {
         match self {
             Self::Iit3SystemPhi => "iit3_system_phi",
             Self::Iit4SystemPhiS => "iit4_system_phi_s",
-            Self::Iit4MechanismSmallPhi => "iit4_mechanism_small_phi",
             Self::Iit4CauseEffectStructure => "iit4_cause_effect_structure",
             Self::Iit4StructureBigPhi => "iit4_structure_big_phi",
         }
@@ -485,7 +489,6 @@ impl AnalysisQuantity {
             (Self::Iit3SystemPhi, FormalismProfile::Iit3_0) => true,
             (
                 Self::Iit4SystemPhiS
-                | Self::Iit4MechanismSmallPhi
                 | Self::Iit4CauseEffectStructure
                 | Self::Iit4StructureBigPhi,
                 FormalismProfile::Iit4_0_2023 | FormalismProfile::Iit4_0_2026,
@@ -500,6 +503,7 @@ impl AnalysisQuantity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalysisRequest {
     state: Vec<bool>,
+    candidate_system: Vec<usize>,
     formalism: FormalismProfile,
     quantity: AnalysisQuantity,
 }
@@ -509,21 +513,37 @@ impl AnalysisRequest {
     pub fn new(
         model: &BinaryCausalModel,
         state: Vec<bool>,
+        candidate_system: Vec<usize>,
         formalism: FormalismProfile,
         quantity: AnalysisQuantity,
     ) -> Result<Self, ModelError> {
         model.check_state(&state)?;
+        if candidate_system.is_empty() {
+            return Err(ModelError::EmptyCandidateSystem);
+        }
+        let mut seen = vec![false; model.n_units];
+        for unit in candidate_system.iter().copied() {
+            model.check_unit(unit)?;
+            if seen[unit] {
+                return Err(ModelError::DuplicateCandidateUnit { unit });
+            }
+            seen[unit] = true;
+        }
         if !quantity.compatible_with(formalism) {
             return Err(ModelError::IncompatibleQuantity {
                 quantity: quantity.id(),
                 formalism: formalism.id(),
             });
         }
-        Ok(Self { state, formalism, quantity })
+        Ok(Self { state, candidate_system, formalism, quantity })
     }
 
     pub fn state(&self) -> &[bool] {
         &self.state
+    }
+
+    pub fn candidate_system(&self) -> &[usize] {
+        &self.candidate_system
     }
 
     pub fn formalism(&self) -> FormalismProfile {
@@ -543,6 +563,8 @@ impl AnalysisRequest {
             ANALYSIS_REQUEST_MAGIC.len()
                 + model.canonical_bytes().len()
                 + self.state.len()
+                + 4
+                + self.candidate_system.len() * 4
                 + self.formalism.id().len()
                 + self.quantity.id().len()
                 + 2,
@@ -550,6 +572,10 @@ impl AnalysisRequest {
         bytes.extend_from_slice(ANALYSIS_REQUEST_MAGIC);
         bytes.extend_from_slice(&model.canonical_bytes());
         bytes.extend(self.state.iter().map(|on| u8::from(*on)));
+        bytes.extend_from_slice(&(self.candidate_system.len() as u32).to_le_bytes());
+        for unit in &self.candidate_system {
+            bytes.extend_from_slice(&(*unit as u32).to_le_bytes());
+        }
         bytes.push(0);
         bytes.extend_from_slice(self.formalism.id().as_bytes());
         bytes.push(0);
@@ -699,6 +725,7 @@ mod tests {
         assert!(AnalysisRequest::new(
             &model,
             vec![true, false],
+            vec![0, 1],
             FormalismProfile::Iit4_0_2023,
             AnalysisQuantity::Iit4SystemPhiS
         ).is_ok());
@@ -706,6 +733,7 @@ mod tests {
             AnalysisRequest::new(
                 &model,
                 vec![true, false],
+                vec![0, 1],
                 FormalismProfile::Iit3_0,
                 AnalysisQuantity::Iit4StructureBigPhi
             ),
@@ -715,6 +743,7 @@ mod tests {
             AnalysisRequest::new(
                 &model,
                 vec![true],
+                vec![0],
                 FormalismProfile::Iit4_0_2026,
                 AnalysisQuantity::Iit4SystemPhiS
             ),
@@ -726,6 +755,26 @@ mod tests {
             AnalysisQuantity::Iit4SystemPhiS.id(),
             AnalysisQuantity::Iit4StructureBigPhi.id()
         );
+        assert!(matches!(
+            AnalysisRequest::new(
+                &model,
+                vec![true, false],
+                vec![],
+                FormalismProfile::Iit4_0_2023,
+                AnalysisQuantity::Iit4SystemPhiS
+            ),
+            Err(ModelError::EmptyCandidateSystem)
+        ));
+        assert!(matches!(
+            AnalysisRequest::new(
+                &model,
+                vec![true, false],
+                vec![0, 0],
+                FormalismProfile::Iit4_0_2023,
+                AnalysisQuantity::Iit4SystemPhiS
+            ),
+            Err(ModelError::DuplicateCandidateUnit { unit: 0 })
+        ));
     }
 
     #[test]
@@ -734,23 +783,34 @@ mod tests {
         let req_2023 = AnalysisRequest::new(
             &model,
             vec![true, false],
+            vec![0, 1],
             FormalismProfile::Iit4_0_2023,
             AnalysisQuantity::Iit4SystemPhiS,
         ).unwrap();
         let req_2026 = AnalysisRequest::new(
             &model,
             vec![true, false],
+            vec![0, 1],
             FormalismProfile::Iit4_0_2026,
             AnalysisQuantity::Iit4SystemPhiS,
         ).unwrap();
         let req_structure = AnalysisRequest::new(
             &model,
             vec![true, false],
+            vec![0, 1],
             FormalismProfile::Iit4_0_2023,
             AnalysisQuantity::Iit4StructureBigPhi,
         ).unwrap();
         assert_ne!(req_2023.request_sha256(&model), req_2026.request_sha256(&model));
         assert_ne!(req_2023.request_sha256(&model), req_structure.request_sha256(&model));
+        let req_subset_a = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            vec![0],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        assert_ne!(req_2023.request_sha256(&model), req_subset_a.request_sha256(&model));
     }
 
     #[test]
