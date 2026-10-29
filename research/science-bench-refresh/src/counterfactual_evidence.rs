@@ -421,9 +421,9 @@ mod tests {
                 trial_id: format!("trial-{index}"),
                 condition: (*condition).to_owned(),
                 policy_input_sha256: digest(char::from(b'a' + index as u8)),
-                evidence_manifest_sha256: digest(char::from(b'g' + index as u8)),
+                evidence_manifest_sha256: digest(char::from(b'1' + index as u8)),
                 randomization_order: index as u32,
-                seed_commitment_sha256: digest(char::from(b'm' + index as u8)),
+                seed_commitment_sha256: digest(['7', '8', '9', 'a', 'b', 'c'][index]),
             })
             .collect();
         EvidenceInterventionPlanFieldsV1 {
