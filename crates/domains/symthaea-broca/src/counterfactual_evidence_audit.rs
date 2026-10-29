@@ -130,6 +130,7 @@ pub fn validate_counterfactual_fixture_jsonl(
 ) -> Result<Vec<CounterfactualPairFixture>, String> {
     let mut pairs = Vec::new();
     let mut pair_ids = BTreeSet::new();
+    let mut case_ids = BTreeSet::new();
 
     for (line_index, line) in input.lines().enumerate() {
         let line_number = line_index + 1;
@@ -146,6 +147,11 @@ pub fn validate_counterfactual_fixture_jsonl(
             .map_err(|error| format!("fixture line {line_number} rejected: {error}"))?;
         if !pair_ids.insert(pair.pair_id.clone()) {
             return Err(format!("duplicate pair_id {:?}", pair.pair_id));
+        }
+        for case in &pair.cases {
+            if !case_ids.insert(case.case_id.clone()) {
+                return Err(format!("duplicate case_id across corpus {:?}", case.case_id));
+            }
         }
         pairs.push(pair);
     }
@@ -819,6 +825,15 @@ mod tests {
         assert!(pairs.len() >= 8, "retain a nontrivial adversarial fixture suite");
         let families: BTreeSet<_> = pairs.iter().map(|pair| pair.family.as_str()).collect();
         assert_eq!(families.len(), 10, "cover every pinned counterfactual failure family");
+    }
+
+    #[test]
+    fn fixture_validator_rejects_case_ids_reused_across_pairs() {
+        let pairs = validate_counterfactual_fixture_jsonl(FIXTURES).unwrap();
+        let mut duplicate = serde_json::to_value(&pairs[0]).unwrap();
+        duplicate["pair_id"] = Value::String("distinct-pair-with-reused-case-ids".into());
+        let input = format!("{}\n{}\n", serde_json::to_value(&pairs[0]).unwrap(), duplicate);
+        assert!(validate_counterfactual_fixture_jsonl(&input).is_err());
     }
 
     #[test]
