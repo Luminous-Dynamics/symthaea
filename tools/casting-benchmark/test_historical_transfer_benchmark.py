@@ -19,6 +19,7 @@ from historical_transfer_benchmark import (
     TARGET_TASKS,
     TASK_SUITE_SHA256,
     _descriptor,
+    _validate_task_registry,
     _f1,
     _metrics,
     design_point,
@@ -37,6 +38,17 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         all_ids = [task["task_id"] for task in (*SOURCE_TASKS, *TARGET_TASKS)]
         self.assertEqual(len(all_ids), len(set(all_ids)))
         self.assertEqual(len(TASK_SUITE_SHA256), 64)
+
+    def test_frozen_task_suite_digest_rejects_runtime_mutation(self):
+        task = SOURCE_TASKS[0]
+        original = list(task["descriptor"])
+        try:
+            task["descriptor"][0] = 0.99
+            with self.assertRaisesRegex(ValueError, "task suite changed"):
+                _validate_task_registry()
+        finally:
+            task["descriptor"][:] = original
+        _validate_task_registry()
 
     def test_design_points_are_deterministic_and_in_unit_box(self):
         points = [design_point(i) for i in range(1, 500)]
