@@ -285,7 +285,7 @@ Next: run formatting/compilation/tests at an environment with the toolchain, fix
 
 ### GCRB-3 — Trace-derived hard-gate audit (prototype authored; not executed)
 
-An initial structured trace auditor is committed at `research/gcrb-evaluator/src/trace_audit.rs`, with its input schema at `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json` and a synthetic demo at `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`.
+An initial structured trace auditor is committed at `research/gcrb-evaluator/src/trace_audit.rs`, with its input schema at `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json`, report schema at `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json`, and a synthetic demo at `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`.
 
 The CLI accepts:
 
