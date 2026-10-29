@@ -21,10 +21,12 @@
 //!
 //! This codec only frames bytes. The AEAD-size profile is accounting only and does not encrypt.
 //! CRC is not authentication. The caller MUST allocate non-repeating session generations through
-//! the reviewed clone-safe key/session lifecycle, must not reuse message_sequence in one generation,
+//! the reviewed clone-safe key/session lifecycle, must not reuse message_sequence in one
+//! generation,
 //! and must authenticate the complete identity/header as associated data (or an equivalent reviewed
 //! authenticated context) before trusting payload bytes. Reassembly is also scoped to a 32-byte
-//! authenticated peer context supplied by the caller; never pass an unauthenticated source-ID field.
+//! authenticated peer context supplied by the caller; never pass an unauthenticated
+//! source-ID field.
 //! A generation field alone cannot make a rolled-back sender safe. This module is experimental and
 //! is not wired into production paths.
 
@@ -585,12 +587,29 @@ mod tests {
 
     #[test]
     fn v3_exact_length_and_single_erasure_recovery_for_boundary_profiles() {
-        for len in [1usize, V3_AEAD_PAYLOAD_SIZE, V3_AEAD_PAYLOAD_SIZE + 1, 1800, 2048, 2105, V3_MAX_AEAD_ENCODED_LEN] {
+        for len in [
+            1usize,
+            V3_AEAD_PAYLOAD_SIZE,
+            V3_AEAD_PAYLOAD_SIZE + 1,
+            1800,
+            2048,
+            2105,
+            V3_MAX_AEAD_ENCODED_LEN,
+        ] {
             let original = sample(len, len as u64 + 0x9e37);
-            let frames = fragment_v3_with_aead_overhead(0xAABB_CCDD_EEFF_0011, 7, &original).unwrap();
+            let frames = fragment_v3_with_aead_overhead(
+                0xAABB_CCDD_EEFF_0011,
+                7,
+                &original,
+            )
+            .unwrap();
             assert!(frames.iter().all(|frame| frame.to_bytes().len() + V3_AEAD_OVERHEAD <= V3_MTU));
             for lost in 0..frames.len() - 1 {
-                let first = frames.iter().enumerate().find_map(|(i, f)| (i != lost).then_some(f)).unwrap();
+                let first = frames
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, frame)| (i != lost).then_some(frame))
+                    .unwrap();
                 let peer_context = [0x11; 32];
                 let mut assembler = FragmentAssemblerV3::new(peer_context, first).unwrap();
                 for (index, frame) in frames.iter().enumerate() {
@@ -600,7 +619,11 @@ mod tests {
                     }
                 }
                 assert!(assembler.is_complete(), "len={len}, lost={lost}");
-                assert_eq!(assembler.assemble().as_deref(), Some(original.as_slice()), "len={len}, lost={lost}");
+                assert_eq!(
+                    assembler.assemble().as_deref(),
+                    Some(original.as_slice()),
+                    "len={len}, lost={lost}"
+                );
             }
         }
     }
@@ -731,7 +754,10 @@ mod tests {
             for bit_index in 0..8 {
                 let mut corrupted = frame.clone();
                 corrupted[byte_index] ^= 1u8 << bit_index;
-                assert!(LoRaFragmentV3::from_bytes(&corrupted).is_none(), "byte={byte_index}, bit={bit_index}");
+                assert!(
+                    LoRaFragmentV3::from_bytes(&corrupted).is_none(),
+                    "byte={byte_index}, bit={bit_index}"
+                );
             }
         }
     }
