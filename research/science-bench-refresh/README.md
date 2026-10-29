@@ -305,3 +305,20 @@ Keep these axes separate: terminal/execution disposition; answer/abstention stat
 Scored labels are disallowed on contaminated, budget-violating, failed, invalid, timed-out and not-started trials. They remain visible in the outcome report and in the planned denominator. `runner_execution_proven` remains false and `external_anchor_required` remains true: the report hash binds content only, not the authenticity of the collector or evaluator.
 
 The validator deliberately does not compute calibration error or infer causal effects. Use the row-level pair/condition data in a separate preregistered analysis; distinguish fixed-benchmark accuracy from generalized accuracy and account for task/world dependence (for example, a well-specified GLMM when justified). Exact-head CI and independent runner evidence remain required.
+
+## Preregistered paired evidence outcome analysis
+
+The Rust module `src/paired_outcome_analysis.rs` consumes a validated intervention plan, a validated outcome report, and the exact analysis-plan artifact whose digest was frozen in the intervention plan. The CLI is:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json
+```
+
+The analysis plan schema is `schema/paired-outcome-analysis-plan.schema.json`. It freezes the analyzer's full source revision, each treatment-vs-reference contrast, endpoint, directional hypothesis, multiplicity policy, and—when using the expected-response endpoint—one evaluator-side intended response per planned pair/condition. The artifact must not be exposed to the evaluated policy. The analyzer rejects altered analysis-plan bytes or a different analyzer source revision.
+
+Binary endpoints are strict correctness (correct=1, incorrect=0; partial/abstained outcomes remain endpoint-ineligible), fully supported claims, relevant evidence use, and expected-response adherence. Resource endpoints preserve paired differences for wall clock, tool calls, experiments, tokens, and measured cost. They do not receive p-values by default. Every contrast retains the complete assigned pair denominator, eligible pair count, incomplete count and reasons, plus per-pair values/differences. Failed, contaminated, budget-violating and not-started trials are never silently treated as incorrect answers or zero-cost trials.
+
+For binary matched endpoints, the analyzer reports wins/losses/ties, paired risk difference, the exact two-sided McNemar conditional p-value, and a Wilson 95% interval for the win proportion among discordant pairs. That interval is **not** a confidence interval for the risk difference. Holm adjustment is applied across binary contrasts when declared; unadjusted p-values are available only under the explicitly exploratory multiplicity policy. Empty eligible-pair sets have no p-value. The report is deterministic and content-committed.
+
+This estimates performance only on the fixed predeclared set. It does not estimate generalized accuracy, certify causality, authenticate evaluator labels or prove that the runner executed the declared intervention. NIST AI 800-3 motivates separating fixed-benchmark results from generalized performance and making uncertainty assumptions explicit. A GLMM/generalization model belongs in a separate analysis with a declared target population, item/task-family structure, assumptions and diagnostics—not as an implied property of a paired p-value.
