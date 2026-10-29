@@ -29,7 +29,7 @@ The focused workflow at `.github/workflows/cmaq-003.yml` checks the JSON schema 
 A separate Python mirror of the same fixed-seed equations produced the following values over 128 episodes per lane. These are useful to test whether the report and tests express the intended trade-off; they are **not a Rust run, statistical qualification, or external benchmark score**. The observation-only lane also exposes how often the naive policy treats sensor-channel drift as a causal-regime change.
 
 | CUSUM threshold | Stationary false-alarm episodes | Abrupt-shift detection rate | p90 delay among detected episodes | Observation-drift false causal diagnoses | Mean abrupt-shift regret / episode |
-|---:|---:|---:|---:|---:|
+|---:|---:|---:|---:|---:|---:|
 | 1.5 | 109 / 128 | 34.4% | 7 steps | 128 / 128 | 29.98 |
 | 2.0 | 44 / 128 | 78.9% | 10 steps | 123 / 128 | 11.16 |
 | 2.5 | 14 / 128 | 93.0% | 13 steps | 103 / 128 | 7.06 |
