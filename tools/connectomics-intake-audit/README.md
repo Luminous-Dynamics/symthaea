@@ -30,6 +30,16 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml -- \
 
 Every `input_files[].path` is relative to `--root`. Absolute paths, parent-directory traversal, symlink escapes, missing files, byte-count mismatches, and SHA-256 mismatches fail closed. Keep dataset license/source metadata with the manifest.
 
+## Manifest contract
+
+- Dataset ID is `jeffbbrown2/ConnectomeBench2`; dataset revision must be `v2` (not `main`). Record the exact dataset-revision commit SHA in the manifest.
+- The upstream code commit is pinned to `5679b39aa2641d8d0afeed88b441e696f87a66df`. This pin was reviewed against `src/neurips_training/data.py::route_row` and `scripts/data_generation/neurips/postprocess_giga_parquet.py::derive_task_routing`. Change the pin only after auditing the replacement source commit and updating the code/schema contracts together.
+- `false_split_correction` uses `false_split_correction_label = same_neuron` and dual-segment `geometry` for merge correction.
+- `false_merge_identification` uses `false_merge_identification_label = !same_neuron` and single-segment `geometry_single` for split correction.
+- Allowed model inputs are `geometry`, `geometry_single`, `em_xy`, `em_xz`, and `em_yz`. `em_best`, labels, IDs, routing, and metadata are not accepted as model inputs.
+- Single-segment geometry declares `geometry_preprocessing_profile=single_segment_zero_mask_channels` to mirror the reference loader's defensive mask-zeroing step. Dual geometry declares `dual_segment_native`.
+- If EM slices are inputs, the preprocessing profile must declare A/B fusion and zeroing B for single-segment input, or native dual masks for dual-segment input.
+
 ## Exit codes
 
 - `0`: all declared checks pass.
