@@ -1,64 +1,72 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! IIT 4.0 Measures
+//! IIT-4.0-inspired HDC estimators (formal compliance not established by this module).
 //!
-//! Reference: Albantakis et al. (2023) "Integrated Information Theory (IIT) 4.0"
+//! Reference theory: Albantakis et al. (2023), "Integrated Information Theory (IIT) 4.0".
+//! This implementation uses HDC histogram and mutual-information proxies; the API
+//! shown here does not provide a complete explicit causal transition model and the
+//! formal cause/effect repertoire calculations needed to claim a full IIT 4.0 result.
+//! See `docs/research/PHI_QUALIFICATION_V0_1.md` for the qualification contract.
 
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 use super::{ContinuousEntropyEstimator, TruePhiCalculator};
 
-/// IIT 4.0 result containing intrinsic difference measures
+/// Legacy-compatible aggregate of IIT-inspired HDC proxy measurements.
+///
+/// The type name and serialized field names are retained for compatibility; these
+/// fields are not a qualification claim that the full IIT 4.0 formalism is computed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IIT4Result {
-    /// Intrinsic difference (id) - fundamental measure
+    /// Average histogram JSD-style distribution-difference proxy; not formal IIT id without qualification.
     pub intrinsic_difference: f64,
-    /// Small phi (φ) - irreducibility of a mechanism
+    /// HDC proxy for a mechanism-level irreducibility-like quantity; not formal φ without qualification.
     pub small_phi: f64,
-    /// Big Phi (Φ) - integrated information of the system
+    /// Legacy system-score field populated by `TruePhiCalculator`.
+    /// Do not interpret as PyPhi `Analysis.big_phi` (structure integrated information)
+    /// or formal IIT system φ_s without a separate qualified mapping.
     pub big_phi: f64,
-    /// Intrinsic information (ii) - how much the state specifies itself
+    /// Entropy-derived intrinsic-information proxy, not a formal IIT ii value unless qualified.
     pub intrinsic_information: f64,
-    /// Number of concepts (mechanisms with φ > 0)
+    /// Count of components whose proxy score exceeds `phi_threshold`; not a formal concept count.
     pub concept_count: usize,
-    /// Concept structure: irreducible cause-effect mechanisms.
+    /// Optional component-level proxy summaries; not formal cause/effect mechanisms.
     /// Only populated when `iit4` feature is enabled.
     #[cfg(feature = "iit4")]
     pub concepts: Vec<ConceptStructure>,
 }
 
-/// A concept in IIT 4.0: an irreducible cause-effect mechanism.
+/// A proxy record for one HDC component.
 ///
-/// Each mechanism in the system has a cause repertoire (constraints on past)
-/// and an effect repertoire (constraints on future). The mechanism's phi (φ)
-/// is the irreducibility of this cause-effect structure under all partitions.
-///
-/// Science: Albantakis et al. (2023) — concepts are the "atoms of experience".
-/// A concept with φ > 0 specifies an irreducible cause-effect distinction.
+/// The current fields use estimated statistics as cause/effect-like features; they
+/// are not guaranteed to be formal IIT 4.0 repertoires, distinctions, or atoms of
+/// experience. Keep their use scoped to the estimator profile until reference tests
+/// validate stronger correspondence.
 #[cfg(feature = "iit4")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConceptStructure {
     /// Index of the mechanism component
     pub mechanism_index: usize,
-    /// Small phi (irreducibility) of this concept
+    /// HDC component proxy score; not formally calculated IIT small φ.
     pub phi: f64,
-    /// Cause information: how much this mechanism constrains its past
+    /// Mutual-information proxy between this HDC component and bundled context; not a causal repertoire.
     pub cause_info: f64,
-    /// Effect information: how much this mechanism constrains its future
+    /// Entropy-derived proxy used as an effect-like feature; not a future causal repertoire.
     pub effect_info: f64,
-    /// Combined cause-effect power: min(cause_info, effect_info)
-    /// IIT 4.0 uses the minimum to ensure both directions are specified.
+    /// Minimum of two proxy features, retained for compatibility; not formal IIT cause-effect power.
     pub cause_effect_power: f64,
 }
 
-/// IIT 4.0 Calculator
+/// IIT-4.0-inspired HDC proxy calculator (historical type name retained).
 ///
-/// Implements the updated IIT 4.0 formalism with:
-/// - Intrinsic difference as the fundamental measure
-/// - Improved irreducibility computation
-/// - Intrinsic information quantification
+/// Computes IIT-inspired statistics over continuous HDC representations.
+///
+/// The implementation uses histogram-based Jensen–Shannon-style distribution
+/// differences, mutual-information-like partition proxies, and an entropy-derived
+/// intrinsic-information proxy. These operations do not by themselves establish the
+/// complete IIT 4.0 formalism. The module name is retained for API compatibility.
 ///
 /// ## Entropy estimation
 ///
@@ -90,7 +98,7 @@ impl Default for IIT4Calculator {
 }
 
 impl IIT4Calculator {
-    /// Create a new IIT 4.0 calculator with default 16 bins
+    /// Create the HDC proxy calculator with default 16-bin histogram estimation.
     pub fn new() -> Self {
         Self {
             estimator: ContinuousEntropyEstimator::fast(),
@@ -108,10 +116,10 @@ impl IIT4Calculator {
         }
     }
 
-    /// Compute intrinsic difference between two distributions
+    /// Compute a histogram-based Jensen–Shannon-style difference proxy between vectors.
     ///
-    /// id(p, q) = D_KL(p || m) + D_KL(q || m)
-    /// where m = (p + q) / 2 (Jensen-Shannon style)
+    /// This is an estimator over binned vector coordinates; it is not automatically
+    /// the formal IIT intrinsic-difference quantity over cause/effect repertoires.
     pub fn intrinsic_difference(&self, p: &ContinuousHV, q: &ContinuousHV) -> f64 {
         let n = p.values.len().min(q.values.len());
         if n == 0 {
@@ -151,10 +159,10 @@ impl IIT4Calculator {
         id / 2.0 // Normalize to [0, 1] range for identical distributions
     }
 
-    /// Compute small phi (φ) - irreducibility of a mechanism
+    /// Compute the legacy HDC partition proxy for one component against context.
     ///
-    /// φ measures how much a mechanism's cause-effect is reduced
-    /// when the system is partitioned.
+    /// This computes a difference between mutual-information-like estimates over
+    /// hypervector bundles. It does not evaluate formal IIT cause/effect repertoires.
     pub fn small_phi(&self, mechanism: &ContinuousHV, context: &[ContinuousHV]) -> f64 {
         if context.is_empty() {
             return 0.0;
@@ -200,10 +208,10 @@ impl IIT4Calculator {
         (whole_mi - min_mi).max(0.0)
     }
 
-    /// Compute intrinsic information
+    /// Compute an entropy-derived proxy feature.
     ///
-    /// How much the current state specifies about itself
-    /// (self-information under the mechanism)
+    /// This function does not calculate formal IIT intrinsic information from an
+    /// explicit causal model; it maps the HDC vector's estimated entropy to a score.
     pub fn intrinsic_information(&self, state: &ContinuousHV) -> f64 {
         // Use entropy as a proxy for self-information
         // Lower entropy = more specific state = higher intrinsic info
@@ -212,7 +220,7 @@ impl IIT4Calculator {
         (max_h - h).max(0.0)
     }
 
-    /// Compute full IIT 4.0 analysis
+    /// Compute this module's aggregate HDC proxy summary (not full IIT 4.0 analysis).
     pub fn analyze(&self, components: &[ContinuousHV]) -> IIT4Result {
         let n = components.len();
         if n < 2 {
@@ -265,7 +273,8 @@ impl IIT4Calculator {
             #[cfg(feature = "iit4")]
             {
                 // Compute cause and effect info for this mechanism
-                // Cause info: MI between mechanism and context (past → present)
+                // Cause-like feature: MI between the HDC vector and bundled context;
+                // no past/future transition model is supplied in this calculation.
                 let refs: Vec<&ContinuousHV> = context.iter().collect();
                 let bundle = ContinuousHV::bundle(&refs);
                 let cause_info = self
@@ -275,7 +284,7 @@ impl IIT4Calculator {
                 // Effect info: use intrinsic information as proxy for future constraint
                 let effect_info = self.intrinsic_information(&components[i]);
 
-                // IIT 4.0: cause-effect power = min(cause, effect)
+                // Legacy combination of two proxy features; not formal IIT cause-effect power.
                 let cause_effect_power = cause_info.min(effect_info);
 
                 if phi_i > self.phi_threshold {

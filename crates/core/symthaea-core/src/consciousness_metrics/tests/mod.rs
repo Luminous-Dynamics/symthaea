@@ -27,7 +27,7 @@ mod invariant_tests;
 mod optimized_tests;
 #[cfg(feature = "parallel")]
 mod parallel_tests;
-mod pyphi_tests;
+mod proxy_semantics_tests;
 mod quantum_tests;
 mod simd_tests;
 mod spectral_mip_tests;

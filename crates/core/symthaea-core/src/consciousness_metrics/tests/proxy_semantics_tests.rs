@@ -1,50 +1,52 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! PyPhi comparison tests.
+//! HDC proxy semantics tests.
 //!
-//! Validate our Φ implementation against known IIT results from literature.
-//! Reference: Oizumi et al. (2014), Tononi et al. (2016)
+//! These tests exercise the behavior of `TruePhiCalculator` on synthetic
+//! hypervector representations. They do not invoke PyPhi, consume an external
+//! oracle, construct an explicit state-indexed transition probability model,
+//! or validate IIT 3.0 / IIT 4.0. The legacy `phi` field is treated here only
+//! as the output of Symthaea's pairwise-information partition proxy.
 
 use super::*;
 
-/// PyPhi Test Case 1: Completely independent system
+/// Unrelated random representations should have a small pairwise-information proxy.
 ///
-/// Two independent elements have Φ = 0 because there's no integration.
-/// This is a fundamental axiom of IIT.
+/// This tests representation-level behavior only; random seeds do not define
+/// a causal-independence model and the assertion is not an IIT oracle check.
 #[test]
-fn test_pyphi_independent_elements_zero_phi() {
+fn unrelated_random_representations_have_near_zero_pairwise_mi_proxy() {
     let calc = TruePhiCalculator::new();
 
-    // Create completely independent vectors (different random seeds, no correlation)
+    // Create unrelated random representations. This is not a causal model.
     let a = ContinuousHV::random(HDC_DIMENSION, 1);
     let b = ContinuousHV::random(HDC_DIMENSION, 1000000); // Very different seed
 
     let result = calc.compute_true_phi(&[a, b]);
 
-    // For truly independent elements, Φ should be very close to 0
-    // We allow small positive values due to random correlations
+    // For unrelated random representations, the binned pairwise-MI proxy should be small.
     assert!(
         result.phi < 0.05,
-        "Independent elements should have near-zero \u{03a6}: {:.6}",
+        "Unrelated random representations should have near-zero \u{03a6}: {:.6}",
         result.phi
     );
 
     println!(
-        "PyPhi comparison - Independent 2-node: \u{03a6} = {:.6} (expected \u{2248} 0)",
+        "HDC proxy - unrelated 2-vector case: \u{03a6} = {:.6} (expected \u{2248} 0)",
         result.phi
     );
 }
 
-/// PyPhi Test Case 2: Maximally correlated system
+/// Shared-base representations should have positive pairwise-information proxy.
 ///
-/// Two elements derived from the same base should have high MI but
-/// the Φ depends on how the partition affects information.
+/// The assertion is about the estimator's output on correlated representations,
+/// not about integrated information in an explicit causal system.
 #[test]
-fn test_pyphi_correlated_elements_positive_phi() {
+fn shared_base_representations_have_positive_pairwise_mi_proxy() {
     let calc = TruePhiCalculator::new();
 
-    // Create maximally correlated vectors
+    // Create strongly correlated vector representations from a shared base.
     let base = ContinuousHV::random(HDC_DIMENSION, 42);
     let a = ContinuousHV::weighted_bundle(
         &[&base, &ContinuousHV::random(HDC_DIMENSION, 100)],
@@ -57,7 +59,7 @@ fn test_pyphi_correlated_elements_positive_phi() {
 
     let result = calc.compute_true_phi(&[a, b]);
 
-    // Correlated elements should have positive Φ
+    // Shared-base representations should have positive Φ
     assert!(
         result.phi > 0.0,
         "Correlated elements should have positive \u{03a6}: {:.6}",
@@ -72,20 +74,20 @@ fn test_pyphi_correlated_elements_positive_phi() {
     );
 
     println!(
-        "PyPhi comparison - Correlated 2-node: \u{03a6} = {:.6}, EI = {:.6}",
+        "HDC proxy - shared-base 2-vector case: \u{03a6} = {:.6}, EI = {:.6}",
         result.phi, result.system_ei
     );
 }
 
-/// PyPhi Test Case 3: XOR-like structure
+/// HDC binding should remain a valid finite input to the proxy.
 ///
-/// An XOR gate creates integration because the output depends on
-/// both inputs in a non-decomposable way.
+/// `bind` is an HDC representation operation here, not an XOR causal mechanism
+/// or a substitute for a binary transition probability matrix.
 #[test]
-fn test_pyphi_xor_like_structure() {
+fn hdc_binding_operation_produces_valid_proxy_outputs() {
     let calc = TruePhiCalculator::new();
 
-    // Create XOR-like structure: c = f(a, b) where c requires both a and b
+    // Create an HDC binding representation; no causal mechanism is defined.
     let a = ContinuousHV::random(HDC_DIMENSION, 1);
     let b = ContinuousHV::random(HDC_DIMENSION, 2);
     let c = a.bind(&b); // XOR-like: c encodes relationship between a and b
@@ -96,29 +98,27 @@ fn test_pyphi_xor_like_structure() {
     // System with a, b, and their bound output
     let phi_abc = calc.compute_true_phi(&[a, b, c]);
 
-    println!("PyPhi comparison - XOR structure:");
+    println!("HDC proxy smoke test - binding representation:");
     println!("  \u{03a6}(a,b) = {:.6}", phi_ab.phi);
     println!("  \u{03a6}(a,b,c) = {:.6}", phi_abc.phi);
 
-    // The bound structure should affect the integration
-    // (we don't assert specific relationship, but both should be valid)
+    // This is a smoke test only: no IIT interpretation or expected ranking.
     assert!(phi_ab.phi >= 0.0 && phi_abc.phi >= 0.0);
 }
 
-/// PyPhi Test Case 4: Copy mechanism
+/// Copy-like and binding representations produce finite nonnegative proxy values.
 ///
-/// A simple copy (identity) relationship should have lower Φ than XOR
-/// because it doesn't require integration of multiple inputs.
+/// This does not assert a causal ordering between copy and XOR mechanisms.
 #[test]
-fn test_pyphi_copy_vs_xor() {
+fn binding_and_copy_like_representations_have_finite_nonnegative_proxy() {
     let calc = TruePhiCalculator::new();
 
-    // XOR-like (requires both inputs)
+    // HDC binding representation (not a modeled XOR gate).
     let a = ContinuousHV::random(HDC_DIMENSION, 1);
     let b = ContinuousHV::random(HDC_DIMENSION, 2);
     let xor = a.bind(&b);
 
-    // Copy-like (just a with noise)
+    // Copy-like noisy representation (not an explicit identity transition).
     let copy = ContinuousHV::weighted_bundle(
         &[&a, &ContinuousHV::random(HDC_DIMENSION, 3)],
         &[0.99, 0.01],
@@ -127,7 +127,7 @@ fn test_pyphi_copy_vs_xor() {
     let phi_xor = calc.compute_true_phi(&[a.clone(), b, xor]);
     let phi_copy = calc.compute_true_phi(&[a, copy]);
 
-    println!("PyPhi comparison - Copy vs XOR:");
+    println!("HDC proxy smoke test - binding vs copy-like representations:");
     println!("  \u{03a6}(XOR) = {:.6}", phi_xor.phi);
     println!("  \u{03a6}(Copy) = {:.6}", phi_copy.phi);
 
@@ -135,12 +135,11 @@ fn test_pyphi_copy_vs_xor() {
     assert!(phi_xor.phi >= 0.0 && phi_copy.phi >= 0.0);
 }
 
-/// PyPhi Test Case 5: Scaling with system size
+/// The summed pairwise-MI estimator grows on a shared-base ensemble.
 ///
-/// For integrated systems, Φ should generally increase with size
-/// (more components = more potential integration).
+/// This is an estimator/size diagnostic, not a universal claim about IIT Phi.
 #[test]
-fn test_pyphi_phi_scales_with_size() {
+fn shared_base_pairwise_information_grows_with_ensemble_size() {
     let calc = TruePhiCalculator::new();
     let base = ContinuousHV::random(HDC_DIMENSION, 42);
 
@@ -159,7 +158,7 @@ fn test_pyphi_phi_scales_with_size() {
     let phi_3 = calc.compute_true_phi(&create_correlated(3));
     let phi_4 = calc.compute_true_phi(&create_correlated(4));
 
-    println!("PyPhi comparison - Size scaling:");
+    println!("HDC pairwise-information proxy - ensemble-size diagnostic:");
     println!(
         "  \u{03a6}(n=2) = {:.6}, EI = {:.6}",
         phi_2.phi, phi_2.system_ei
@@ -173,7 +172,7 @@ fn test_pyphi_phi_scales_with_size() {
         phi_4.phi, phi_4.system_ei
     );
 
-    // System EI should increase with size (more pairwise connections)
+    // This estimator sums pairwise MI, so the shared-base ensemble should grow here.
     assert!(
         phi_4.system_ei > phi_2.system_ei,
         "Larger systems should have more total information"

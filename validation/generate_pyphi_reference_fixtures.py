@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Run a pinned upstream PyPhi literature-reference smoke test.
+
+This test verifies the external oracle/API against published example outputs.
+It does not measure Symthaea's HDC estimator and cannot qualify consciousness.
+The result artifact binds the canonical TPM, declared connectivity, state,
+formalism, package version, Python version, and all computed values.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.metadata
+import json
+import math
+import platform
+import sys
+from pathlib import Path
+from typing import Any
+
+
+
+PINNED_PYPHI_VERSION = "2.0.0rc4"
+EXPECTED_EXAMPLE = "pyphi.examples.iit4_2023_fig1a_substrate()"
+EXPECTED_FORMALISM = "IIT_4_0_2023"
+EXPECTED_STATE = (0, 1, 1)
+EXPECTED_QUANTITY_IDS = {
+    "system-phi-s-A": "iit4_system_phi_s",
+    "system-phi-s-AB": "iit4_system_phi_s",
+    "AB-cause-phi": "iit4_cause_phi_c",
+    "AB-effect-phi": "iit4_effect_phi_e",
+    "AB-structure-Phi": "iit4_structure_big_phi",
+    "system-phi-s-ABC": "iit4_system_phi_s",
+}
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "pyphi-iit4-2023-fig1a-reference-v0.1.json"
+
+
+def _canonical_json(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _float_matrix(value: Any) -> list[list[float]]:
+    return [[float(cell) for cell in row] for row in value]
+
+
+try:
+    from .iit_digest_contract import (
+        analysis_request_digest,
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+    )
+except ImportError:  # Direct execution: python validation/generate_pyphi_reference_fixtures.py
+    from iit_digest_contract import (
+        analysis_request_digest,
+        canonical_model_bytes,
+        evaluation_digest,
+        model_digest,
+    )
+
+
+def _model_digest(
+    substrate: Any, state: tuple[int, ...], formalism: str
+) -> tuple[str, str, str, dict[str, Any], bytes]:
+    # PyPhi documents state-by-node TPMs, little-endian rows, and source-to-target
+    # connectivity. Reuse the shared binary encoder covered by dependency-free tests.
+    tpm_frame = substrate.tpm.to_pandas()
+    tpm = _float_matrix(tpm_frame.values.tolist())
+    connectivity = [[int(cell) for cell in row] for row in substrate.cm.tolist()]
+    row_states = [
+        list(map(int, row if isinstance(row, tuple) else (row,)))
+        for row in tpm_frame.index.tolist()
+    ]
+    n_units = len(tpm[0]) if tpm else 0
+    expected_row_states = [
+        [(state_index >> unit) & 1 for unit in range(n_units)]
+        for state_index in range(1 << n_units)
+    ]
+    if len(state) != n_units or any(bit not in (0, 1) for bit in state):
+        raise RuntimeError("evaluation state does not match the binary TPM unit count")
+    if row_states != expected_row_states:
+        raise RuntimeError(
+            "PyPhi TPM row order does not match symthaea-iit's declared little-endian state order"
+        )
+    model = {
+        "formalism": formalism,
+        "node_labels": [str(label) for label in substrate.node_labels],
+        "state": list(state),
+        "state_order": row_states,
+        "tpm_state_by_node": tpm,
+        "connectivity_matrix": connectivity,
+        "time_grain": "one PyPhi discrete update",
+    }
+    model_bytes = canonical_model_bytes(tpm, connectivity)
+    model_sha256 = model_digest(model_bytes)
+    evaluation_sha256 = evaluation_digest(model_bytes, state)
+    reference_manifest_sha256 = hashlib.sha256(_canonical_json(model)).hexdigest()
+    return model_sha256, evaluation_sha256, reference_manifest_sha256, model, model_bytes
+
+def _extract_measurements(
+    pyphi_module: Any, substrate: Any, state: tuple[int, ...], formalism: str
+) -> dict[str, float]:
+    analyses = {
+        "system-phi-s-A": pyphi_module.analyze(substrate, state=state, subset=(0,), formalism=formalism),
+        "system-phi-s-AB": pyphi_module.analyze(substrate, state=state, subset=(0, 1), formalism=formalism),
+        "system-phi-s-ABC": pyphi_module.analyze(substrate, state=state, subset=(0, 1, 2), formalism=formalism),
+    }
+    ab = analyses["system-phi-s-AB"]
+    values = {
+        "system-phi-s-A": float(analyses["system-phi-s-A"].phi),
+        "system-phi-s-AB": float(ab.phi),
+        "AB-cause-phi": float(ab.sia.cause.phi),
+        "AB-effect-phi": float(ab.sia.effect.phi),
+        "AB-structure-Phi": float(ab.ces.big_phi),
+        "system-phi-s-ABC": float(analyses["system-phi-s-ABC"].phi),
+    }
+    if not all(math.isfinite(value) for value in values.values()):
+        raise RuntimeError("oracle produced a non-finite quantity; refusing to write a passing artifact")
+    return values
+
+
+def run(output_path: Path) -> dict[str, Any]:
+    try:
+        installed_version = importlib.metadata.version("pyphi")
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise RuntimeError("PyPhi distribution metadata unavailable; install the pinned pyphi==2.0.0rc4 artifact") from exc
+
+    if installed_version != PINNED_PYPHI_VERSION:
+        raise RuntimeError(
+            f"wrong PyPhi version: expected {PINNED_PYPHI_VERSION}, found {installed_version}; refusing an unpinned comparison"
+        )
+
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    reference = fixture.get("reference", {})
+    if reference.get("exact_version") != PINNED_PYPHI_VERSION:
+        raise RuntimeError("fixture and runner version pins disagree")
+    if reference.get("api_example") != EXPECTED_EXAMPLE:
+        raise RuntimeError("fixture points to an unrecognized PyPhi reference example")
+    if reference.get("formalism") != EXPECTED_FORMALISM:
+        raise RuntimeError("fixture formalism differs from the runner's reviewed reference profile")
+    state = tuple(reference.get("state", ()))
+    if state != EXPECTED_STATE:
+        raise RuntimeError("fixture evaluation state differs from the reviewed Fig. 1A state")
+
+    quantities = fixture.get("quantities")
+    if not isinstance(quantities, list) or len(quantities) != len(EXPECTED_QUANTITY_IDS):
+        raise RuntimeError("fixture must contain exactly the six reviewed reference quantities")
+    ids = [item.get("id") for item in quantities if isinstance(item, dict)]
+    if len(ids) != len(quantities) or len(set(ids)) != len(ids):
+        raise RuntimeError("fixture quantity IDs are missing, malformed, or duplicated")
+    if set(ids) != set(EXPECTED_QUANTITY_IDS):
+        raise RuntimeError("fixture quantity set differs from the six reviewed reference quantities")
+    for item in quantities:
+        if item.get("quantity_id") != EXPECTED_QUANTITY_IDS[item["id"]]:
+            raise RuntimeError(f"quantity id mismatch for {item['id']}")
+        tolerance = item.get("absolute_tolerance")
+        expected = item.get("expected")
+        if not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise RuntimeError(f"invalid absolute tolerance for {item['id']}")
+        if not isinstance(expected, (int, float)) or not math.isfinite(expected):
+            raise RuntimeError(f"invalid expected anchor for {item['id']}")
+
+    try:
+        import pyphi
+    except ImportError as exc:
+        raise RuntimeError("PyPhi is unavailable; install the pinned pyphi==2.0.0rc4 artifact") from exc
+    formalism = EXPECTED_FORMALISM
+    pyphi.config.progress_bars = False
+    substrate = pyphi.examples.iit4_2023_fig1a_substrate()
+    model_sha256, evaluation_sha256, reference_manifest_sha256, canonical_model, model_bytes = _model_digest(
+        substrate, state, formalism
+    )
+    measured = _extract_measurements(pyphi, substrate, state, formalism)
+
+    comparisons = []
+    for expected in fixture["quantities"]:
+        actual = measured[expected["id"]]
+        error = abs(actual - float(expected["expected"]))
+        tolerance = float(expected["absolute_tolerance"])
+        comparisons.append({
+            "id": expected["id"],
+            "quantity": expected["kind"],
+            "quantity_id": expected["quantity_id"],
+            "analysis_request_sha256": analysis_request_digest(
+                model_bytes, state, expected["subset"], formalism, expected["quantity_id"]
+            ),
+            "subset": expected["subset"],
+            "expected_anchor": expected["expected"],
+            "actual": actual,
+            "absolute_error_to_documented_anchor": error,
+            "absolute_tolerance": tolerance,
+            "matches_anchor": error <= tolerance,
+        })
+
+    passed = all(item["matches_anchor"] for item in comparisons)
+    artifact = {
+        "schema_version": "pyphi-reference-run-v0.1",
+        "status": "PASS" if passed else "MISMATCH",
+        "qualification_scope": "upstream_reference_smoke_test_only",
+        "consciousness_inference_permitted": False,
+        "provenance": {
+            "distribution": "pyphi",
+            "version": installed_version,
+            "python_version": platform.python_version(),
+            "formalism": formalism,
+            "upstream_example": reference["api_example"],
+            "state": list(state),
+            "model_sha256": model_sha256,
+            "model_digest_semantics": "SHA-256 of SYMTHAEA-IIT-BINARY-TPM v0.1 bytes: n_units u32 LE, state-by-unit f64 LE TPM, then source-major connectivity bytes; negative zero normalized",
+            "evaluation_sha256": evaluation_sha256,
+            "reference_manifest_sha256": reference_manifest_sha256,
+            "analysis_request_digest_semantics": "SHA-256 of SYMTHAEA-IIT-ANALYSIS-REQUEST v0.1 bytes: canonical model, state bits, candidate subset length/indices u32 LE, NUL, formalism id, NUL, quantity id",
+            "source_fixture": str(FIXTURE_PATH.name),
+            "source_url": reference["source_url"],
+        },
+        "canonical_model": canonical_model,
+        "comparisons": comparisons,
+        "summary": {
+            "expected_quantity_count": len(fixture["quantities"]),
+            "computed_quantity_count": len(measured),
+            "passed_anchor_count": sum(1 for item in comparisons if item["matches_anchor"]),
+            "failed_anchor_count": sum(1 for item in comparisons if not item["matches_anchor"]),
+        },
+        "notes": [
+            "This run checks only that pinned PyPhi reproduces its documented IIT 4.0 (2023) example anchors.",
+            "It is not a Symthaea/HDC comparison, and does not validate consciousness.",
+            "Any anchor mismatch remains visible and produces a nonzero exit code.",
+            "The TPM digest is necessary provenance, not a proof of formal correctness.",
+        ],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(artifact, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
+    return artifact
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=Path("PYPHI_IIT4_2023_REFERENCE_RUN.json"))
+    args = parser.parse_args()
+    try:
+        artifact = run(args.output)
+    except Exception as exc:
+        print(f"NOT QUALIFIED: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"status={artifact['status']}")
+    print(f"model_sha256={artifact['provenance']['model_sha256']}")
+    print(f"anchors={artifact['summary']['passed_anchor_count']}/{artifact['summary']['expected_quantity_count']}")
+    print(f"artifact={args.output}")
+    return 0 if artifact["status"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
