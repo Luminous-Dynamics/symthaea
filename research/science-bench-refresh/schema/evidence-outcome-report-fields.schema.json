@@ -23,10 +23,10 @@
       "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
     },
     "evaluator_revision_sha256": {
-      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+      "$ref": "evidence-outcome-report.schema.json#/$defs/nonzero_digest"
     },
     "decision_rules_sha256": {
-      "$ref": "evidence-outcome-report.schema.json#/$defs/digest"
+      "$ref": "evidence-outcome-report.schema.json#/$defs/nonzero_digest"
     },
     "records": {
       "type": "array",
