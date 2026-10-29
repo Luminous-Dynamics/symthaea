@@ -253,6 +253,20 @@ fn semantic_checks(manifest: &Manifest) -> Vec<Check> {
         .filter(|column| !ALLOWED_INPUT_COLUMNS.contains(&column.as_str()))
         .cloned()
         .collect();
+    let mut unique_input_columns = BTreeSet::new();
+    let duplicate_input_columns: Vec<_> = manifest.model_input_columns
+        .iter()
+        .filter(|column| !unique_input_columns.insert((*column).clone()))
+        .cloned()
+        .collect();
+    if !duplicate_input_columns.is_empty() {
+        checks.push(Check::fail(
+            "unique_model_input_columns",
+            format!("duplicate model input column(s): {}", duplicate_input_columns.join(", ")),
+        ));
+    } else {
+        checks.push(Check::pass("unique_model_input_columns", "model input columns are unique"));
+    }
     if manifest.model_input_columns.is_empty() {
         checks.push(Check::fail("model_input_allowlist", "at least one model input column must be declared"));
     } else if invalid_inputs.is_empty() {
@@ -559,7 +573,7 @@ mod tests {
             task_route_value: "false_merge_identification".into(),
             label_column: "false_merge_identification_label".into(),
             label_true_semantics: "different_neuron".into(),
-            label_mapping_reference: "src/training/training.py#reviewed-task-map".into(),
+            label_mapping_reference: "https://github.com/timfarkas/ConnectomeBench2/blob/5679b39aa2641d8d0afeed88b441e696f87a66df/src/neurips_training/data.py#L201-L227".into(),
             split: "train".into(),
             input_mode: "single_segment".into(),
             model_input_columns: vec!["geometry_single".into(), "em_xy".into()],
@@ -589,6 +603,29 @@ mod tests {
         manifest.label_column = "false_split_correction_label".into();
         let checks = semantic_checks(&manifest);
         assert!(checks.iter().any(|check| !check.passed && check.code == "task_contract_label_column"));
+    }
+
+    #[test]
+    fn dual_segment_task_contract_passes() {
+        let mut manifest = base_manifest();
+        manifest.task = "merge_correction_false_split".into();
+        manifest.task_route_value = "false_split_correction".into();
+        manifest.label_column = "false_split_correction_label".into();
+        manifest.label_true_semantics = "same_neuron".into();
+        manifest.input_mode = "dual_segment".into();
+        manifest.model_input_columns = vec!["geometry".into(), "em_xy".into()];
+        manifest.geometry_preprocessing_profile = Some("dual_segment_native".into());
+        manifest.em_preprocessing_profile = Some("dual_segment_native".into());
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().all(|check| check.passed), "{checks:#?}");
+    }
+
+    #[test]
+    fn duplicate_model_input_columns_are_rejected() {
+        let mut manifest = base_manifest();
+        manifest.model_input_columns.push("geometry_single".into());
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().any(|check| !check.passed && check.code == "unique_model_input_columns"));
     }
 
     #[test]
