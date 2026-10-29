@@ -79,6 +79,10 @@ Choose architecture and route using calibration intervals and uncertainty, not a
 
 **Falsifier:** the selected design changes under small, plausible perturbations or its apparent benefit disappears once calibration uncertainty is propagated.
 
+### Machine-readable loss-budget reference
+
+The example threshold and component values are also recorded in [PHOTONIC-LOSS-BUDGET-REFERENCE-001.json](benchmarks/PHOTONIC-LOSS-BUDGET-REFERENCE-001.json). It is explicitly marked as a literature-derived scenario fixture, with the paper-derived threshold kept separate from the cited component-loss values. In particular, do not sum the listed dB and dB/cm or dB/m values into a system path until a concrete route and path length are declared.
+
 ## Work plan
 
 1. **Component envelope (initial prototype):** implemented in the dependency-free Rust module photonic_architecture. It provides dB-to-transmission, separate source/path/detector/gate yield factors, idealized probabilistic-source multiplexing, expected restart cost, and deterministic parameter-interval propagation. These calculations assume independent events and are not a fault-tolerance simulator.
