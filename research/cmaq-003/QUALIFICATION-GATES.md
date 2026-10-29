@@ -62,7 +62,7 @@ Minimum *before* discussing a general performance advantage:
 - [ ] Paired 95% interval for the primary dynamic-regret contrast.
 - [ ] Improvement of at least 10% relative to the strongest eligible non-oracle baseline is the initial target; it is not mandatory evidence until measured.
 - [ ] On stationary lanes: no more than 1 false reset per 1,000 steps is the proposed initial target.
-- [ ] On the proposed 256-step abrupt-shift lane: 90th-percentile detection delay ≤8 steps, with detection and recovery-regret distributions reported.
+- [ ] On the proposed 256-step abrupt-shift lane: detection coverage ≥95% and 90th-percentile detection delay ≤8 steps, with detection and recovery-regret distributions reported.
 - [ ] On observation-only drift: causal-mechanism false diagnosis ≤5% of episodes is the proposed initial target, with a confidence interval.
 - [ ] Zero observed envelope violations is accompanied by the number of independent exposures and a suitable one-sided upper confidence bound; roughly 3,000 independent zero-violation exposures are needed for a 95% upper bound near 0.1%. Correlated timesteps must not be counted as independent events.
 - [ ] Negative controls behave as preregistered; tampering or irrelevant history cannot preserve the expected benefit.
