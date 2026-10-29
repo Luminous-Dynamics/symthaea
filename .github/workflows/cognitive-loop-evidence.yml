@@ -14,6 +14,7 @@ on:
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_missingness.rs"
+      - "xtask/src/cognitive_missingness_schedule.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -37,6 +38,7 @@ on:
       - "xtask/src/cognitive_replay_receipt.rs"
       - "xtask/src/cognitive_replay_driver.rs"
       - "xtask/src/cognitive_missingness.rs"
+      - "xtask/src/cognitive_missingness_schedule.rs"
       - "xtask/src/cognitive_adaptation_utility.rs"
       - "xtask/src/cognitive_adaptation_panel.rs"
       - "xtask/src/cognitive_adaptation_audit.rs"
@@ -106,6 +108,8 @@ jobs:
         run: cargo test --locked -p xtask cognitive_adaptation_utility
       - name: Test informative-missingness bounds and sensitivity
         run: cargo test --locked -p xtask cognitive_missingness
+      - name: Test missingness schedule determinism and policy isolation
+        run: cargo test --locked -p xtask cognitive_missingness_schedule
 
       - name: Test adaptation panel coverage and aggregation
         run: cargo test --locked -p xtask cognitive_adaptation_panel
@@ -428,3 +432,34 @@ jobs:
             (.result_sha256 | length) == 64 and
             (.interpretation_guard | contains("not a confidence interval"))
           ' "$RUNNER_TEMP/informative-missingness-score.json"
+      - name: Generate separated policy and evaluator missingness artifacts
+        run: |
+          cargo run --locked -p xtask -- generate-cognitive-missingness-schedule --input benchmarks/cognitive-loop-evidence/synthetic-missingness-schedule-input.json --policy-out "$RUNNER_TEMP/missingness-policy-feed.json" --evaluator-out "$RUNNER_TEMP/missingness-evaluator-schedule.json" > "$RUNNER_TEMP/missingness-generation-summary.json"
+          jq -e '
+            .generator_version == "cognitive-missingness-schedule-v1" and
+            .eligible_event_count == 64 and
+            (.observed_count + .delayed_pending_count + .right_censored_count + .declared_missing_count + .unknown_unnotified_count) == 64 and
+            (.source_input_sha256 | length) == 64 and
+            (.policy_feed_sha256 | length) == 64 and
+            (.evaluator_schedule_sha256 | length) == 64 and
+            (.interpretation_guard | contains("must remain outside the policy process"))
+          ' "$RUNNER_TEMP/missingness-generation-summary.json"
+          jq -e '
+            (.messages | length) >= 64 and
+            (has("seed") | not) and
+            (has("scenario_id") | not) and
+            (has("dataset_id") | not) and
+            (has("run_id") | not) and
+            ([.messages[] | select(
+              has("hidden_loss") or has("prediction_error_signal") or
+              has("missingness_probability") or has("was_selected_missing") or
+              has("expected_reveal_tick") or has("declaration_tick") or
+              has("scenario_id") or has("seed")
+            )] | length) == 0
+          ' "$RUNNER_TEMP/missingness-policy-feed.json"
+          jq -e '
+            (.events | length) == 64 and
+            ([.events[] | select(.state_at_horizon == "observed")] | length) > 0 and
+            ([.events[] | select(.state_at_horizon == "declared_missing")] | length) > 0 and
+            ([.events[] | select(.state_at_horizon == "observed" and (.expected_reveal_tick > .evaluation_horizon_tick))] | length) == 0
+          ' "$RUNNER_TEMP/missingness-evaluator-schedule.json"
