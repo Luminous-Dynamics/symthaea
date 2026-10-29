@@ -283,6 +283,8 @@ A first draft predicate schema lives at \`docs/research/schemas/luminous-evidenc
 
 The schema enforces required target identity, version and enumerated states, digest shape for common algorithms, and the rule that a verification cannot be marked passed unless execution is completed and passed. A queued or not-run record cannot claim a passed execution. The fixtures include a valid illustrative statement and negative cases for a queued-but-passed result and a missing target.
 
+A Rust semantic checker now exists in `crates/core/luminous-evidence-profile` with an offline CLI and fixture-backed unit tests. It adds exact structured target/checked-target equality, immutable source-revision enforcement, supported digest-shape checks, execution/result consistency, and check outcome/id consistency. It deliberately does not authenticate in-toto/DSSE signatures, resolve artifact URIs, recompute artifact bytes, or prove that a declared run occurred.
+
 **Scope and limitations:** these are structural constraints only. The example digests are placeholders; this fixture is not a production run receipt. JSON Schema cannot prove that artifacts exist, that the checked target matches the declared target, that a signature is valid, or that a test genuinely ran. A separate semantic verifier must compare the declared \`target\` with \`verification.checkedTarget\`, resolve and hash evidence artifacts, check signer authority where applicable, and test whether the named checks justify the claim. Local structural validation is not yet CI or cross-implementation conformance.
 
 ### C. Physical-model interoperability before a proprietary equation language
