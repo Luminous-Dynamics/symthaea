@@ -506,7 +506,9 @@ impl PolicyPinnedLedger {
             if record.recorded_at > known_at {
                 continue;
             }
-            let target_index = self.event_index[target_event_id];
+            let target_index = self.event_index.get(target_event_id).copied().ok_or_else(|| {
+                format!("retraction {}: validated target disappeared", record.event.event_id())
+            })?;
             let target = &self.events[target_index];
             let LedgerEvent::Assert {
                 subject, attribute, ..
@@ -583,7 +585,9 @@ impl PolicyPinnedLedger {
             if retracted_ids.contains(record.event.event_id()) {
                 continue;
             }
-            let from = record.valid_from.expect("validated assertion valid_from");
+            let from = record.valid_from.ok_or_else(|| {
+                format!("assertion {} lost its validated valid_from", record.event.event_id())
+            })?;
             if from > valid_at {
                 continue;
             }
@@ -628,14 +632,14 @@ impl PolicyPinnedLedger {
             .iter()
             .filter_map(|index| self.events[*index].valid_from)
             .max()
-            .expect("non-empty eligible assertion set");
+            .ok_or_else(|| "eligible assertions lack valid_from".to_string())?;
         let rank_at_start = eligible_indices
             .iter()
             .filter(|index| self.events[**index].valid_from == Some(latest_start))
             .filter_map(|index| policy.sources.get(self.events[*index].event.source()))
             .map(|source| source.authority_rank)
             .max()
-            .expect("eligible source must exist under current policy");
+            .ok_or_else(|| "eligible assertion lacks an authority policy".to_string())?;
         let selected_indices: Vec<usize> = eligible_indices
             .iter()
             .copied()
@@ -675,7 +679,7 @@ impl PolicyPinnedLedger {
                 authority_rank: rank_at_start,
                 record_policy_version: self.admission[*index]
                     .record_policy_version
-                    .unwrap_or_default(),
+                    .ok_or_else(|| format!("admitted event {event_id} lacks record policy version"))?,
             });
         }
         selected_evidence.sort_by(|left, right| left.event_id.cmp(&right.event_id));
