@@ -295,3 +295,13 @@ The shared contract separates:
 Golden vectors cover a two-unit TPM, one evaluation state, and an IIT 4.0 (2023) system-φ_s request. The vectors exist in both Rust unit tests and Python's dependency-free tests. The encoder rejects connectivity that omits an influence present in the TPM, matching the Rust input-validation policy.
 
 This is a byte-identity contract only; it does not establish that the scientific model is causally correct, that the repertoire algorithm is formally equivalent to PyPhi, or that any Phi quantity is correctly calculated. The Python tests and Rust tests have not been executed in this environment; static readback alone is not qualification evidence.
+
+
+The dependency-free contract suite also freezes a second shared digest vector using
+the two-unit state-by-node TPM printed in PyPhi's conventions documentation. The
+runner validates that the upstream TPM rows actually match the same little-endian
+state order before computing any hash. It refuses truncated anchor lists, unknown
+quantity IDs, incorrect formalism/state pins, malformed probabilities, invalid
+connectivity, and non-canonical raw model bytes before producing an artifact.
+This protects the reference path against accidentally “passing” a partial or
+semantically misidentified comparison.
