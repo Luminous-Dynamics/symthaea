@@ -428,6 +428,13 @@ mod tests {
     }
 
     #[test]
+    fn shuffled_support_scores_are_not_identical_to_true_support() {
+        let catalog = candidate_catalog(BASE_SEED);
+        assert!(catalog.iter().any(|action| !action.supported && action.shuffled_support_score >= 0.55));
+        assert!(catalog.iter().any(|action| action.supported && action.shuffled_support_score < 0.55));
+    }
+
+    #[test]
     fn regret_and_optimism_are_finite_for_all_baselines() {
         let catalog = candidate_catalog(BASE_SEED);
         for strategy in Strategy::all() {
