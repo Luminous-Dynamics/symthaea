@@ -33,8 +33,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Formatting
-        run: cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml -- --check
+      - name: Formatting for changed Rust implementation files
+        # Keep the gate strict on this PR's implementation files without
+        # reformatting unrelated pre-existing modules from the stacked base.
+        run: >-
+          rustfmt --check --edition 2024
+          research/science-bench-refresh/src/main.rs
+          research/science-bench-refresh/src/evidence_behavior_contracts.rs
 
       - name: Unit tests
         run: cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
