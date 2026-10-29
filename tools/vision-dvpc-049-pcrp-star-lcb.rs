@@ -460,11 +460,16 @@ fn certified_winner(lower_bounds: &[f64], upper_bounds: &[f64]) -> Option<usize>
     if lower_bounds.is_empty() || lower_bounds.len() != upper_bounds.len() {
         return None;
     }
+    // A malformed interval anywhere invalidates the portfolio certificate, not just
+    // the candidate under consideration. Failing closed keeps the contract simple.
+    if lower_bounds.iter().zip(upper_bounds.iter())
+        .any(|(lower, upper)| *lower > *upper + EPS)
+    {
+        return None;
+    }
     for i in 0..lower_bounds.len() {
-        // Do not certify a candidate whose own interval is numerically reversed.
-        if lower_bounds[i] <= upper_bounds[i] + EPS
-            && (0..upper_bounds.len()).filter(|&j| j != i)
-                .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
+        if (0..upper_bounds.len()).filter(|&j| j != i)
+            .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
         {
             return Some(i);
         }
@@ -945,6 +950,8 @@ mod tests {
         assert_eq!(certified_winner(&[0.8, 0.2, 0.3], &[0.9, 0.4, 0.5]), Some(0));
         assert_eq!(certified_winner(&[0.9, 0.2], &[0.8, 0.3]), None);
         assert_eq!(certified_winner(&[0.7, 0.68], &[0.8, 0.75]), None);
+        // Even a clearly separated candidate is not certified if any competitor interval is reversed.
+        assert_eq!(certified_winner(&[0.8, 0.7, 0.3], &[0.9, 0.6, 0.5]), None);
         assert_eq!(certified_winner(&[0.8], &[]), None);
     }
 
