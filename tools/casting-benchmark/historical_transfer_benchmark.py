@@ -483,6 +483,9 @@ def run_benchmark(
             policy_metrics["mean_pareto_front_size_predicted"] = len(predicted_front)
             policy_metrics["mean_pareto_front_size_truth"] = len(true_front)
             if policy == ABSTENTION_POLICY_ID:
+                policy_metrics["prediction_coverage_semantics"] = (
+                    "underlying KNN scores are diagnostic-only on all points; use selective_prediction for accepted-set metrics"
+                )
                 covered_indices = [i for i, abstain in enumerate(distance_abstained) if not abstain]
                 covered_truth = [truth[i] for i in covered_indices]
                 covered_predictions = [predictions[policy][i] for i in covered_indices]
@@ -561,7 +564,7 @@ def run_benchmark(
     baseline = aggregation["low_fidelity_only"]
     comparison: dict[str, Any] = {}
     for policy in POLICY_IDS:
-        if policy == "low_fidelity_only":
+        if policy in ("low_fidelity_only", ABSTENTION_POLICY_ID):
             continue
         paired_task_rows = []
         for row in target_results:
@@ -653,7 +656,7 @@ def run_benchmark(
             "independent_generalization_unit": "held_out_task_family; task variants are nested",
         }
 
-        if policy == "low_fidelity_only":
+        if policy in ("low_fidelity_only", ABSTENTION_POLICY_ID):
             continue
         by_family = {}
         for family, family_rows in rows_by_family.items():
