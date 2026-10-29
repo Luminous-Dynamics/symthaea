@@ -838,9 +838,19 @@ pub fn verify_evidence_outcome_report(
         && fields.plan_commitment_sha256 == plan.plan_commitment_sha256
         && verify_evidence_intervention_plan(plan_bytes)?.valid;
     let valid = issues.is_empty() && commitment_matches && plan_binding_valid;
-    let expected_count = plan.pairs.iter().map(|pair| pair.trials.len()).sum::<usize>();
+    let expected_trial_ids = plan
+        .pairs
+        .iter()
+        .flat_map(|pair| pair.trials.iter().map(|trial| trial.trial_id.as_str()))
+        .collect::<BTreeSet<_>>();
+    let observed_trial_ids = report
+        .records
+        .iter()
+        .map(|record| record.trial_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let expected_count = expected_trial_ids.len();
     let observed_count = report.records.len();
-    let missing_count = expected_count.saturating_sub(observed_count);
+    let missing_count = expected_trial_ids.difference(&observed_trial_ids).count();
     let scorecard = if valid {
         Some(scorecard(plan_bytes, &plan, report_bytes, &report)?)
     } else {
@@ -1072,6 +1082,11 @@ mod tests {
             &serde_json::to_vec(&duplicate).unwrap()
         )
         .is_err());
+        let duplicate_report = full_report(duplicate);
+        let duplicate_verification =
+            verify_evidence_outcome_report(&plan, &duplicate_report).unwrap();
+        assert!(!duplicate_verification.valid);
+        assert_eq!(duplicate_verification.missing_trial_count, 1);
 
         let mut wrong_condition = fields(&plan);
         wrong_condition.records[0].condition = "source_contradiction".to_owned();
