@@ -335,14 +335,22 @@ fn summarize_outcomes(
     if accounted_weight_ppm != PPM {
         return Err(EnergyHubRobustnessError::ArithmeticOverflow);
     }
-    let denominator = feasible_weight_ppm as f64;
+    let (mean_cost_given_feasible, mean_accounted_co2e_kg_given_feasible) =
+        if feasible_weight_ppm > 0 {
+            let denominator = feasible_weight_ppm as f64;
+            (
+                Some(weighted_cost / denominator),
+                Some(weighted_co2e / denominator),
+            )
+        } else {
+            (None, None)
+        };
     Ok(ConditionalMetricSummary {
         feasible_weight_ppm,
         infeasible_weight_ppm,
         unresolved_weight_ppm,
-        mean_cost_given_feasible: (feasible_weight_ppm > 0).then_some(weighted_cost / denominator),
-        mean_accounted_co2e_kg_given_feasible:
-            (feasible_weight_ppm > 0).then_some(weighted_co2e / denominator),
+        mean_cost_given_feasible,
+        mean_accounted_co2e_kg_given_feasible,
         worst_cost_among_feasible_cases: worst_cost,
         worst_accounted_co2e_kg_among_feasible_cases: worst_co2e,
         worst_final_soc_quanta: worst_soc,
