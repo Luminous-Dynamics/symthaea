@@ -39,7 +39,7 @@ Methods:
 1. Fixed-grid pCRP-star-LCB witness with delta_policy = 0.05 / M (variance-adaptive and conservative under the paper's assumptions; potentially wider than the continuous-supremum bound).
 2. A bounded-reward Hoeffding LCB with the same per-policy alpha allocation and a known importance-score range (fixed-horizon comparator, not advertised as anytime-valid).
 
-Metrics include familywise lower-bound coverage, top-1 policy selection accuracy, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Monte Carlo standard errors, and elapsed calculation time. Timing rows are excluded from deterministic replay comparisons.
+Metrics include familywise two-sided interval coverage, top-1 policy selection accuracy, winner-certificate rate, unconditional and conditional false-certificate probability, reversed-interval candidate rate, mean interval width, plausible-winner set size, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Monte Carlo standard errors, and elapsed calculation time. Timing rows are excluded from deterministic replay comparisons.
 
 ## Acceptance and limits
 
