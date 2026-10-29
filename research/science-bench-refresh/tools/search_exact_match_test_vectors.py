@@ -155,6 +155,14 @@ def main() -> int:
         index = make_index(generation, protected)
         write_json(output / f"{name}-receipt.json", receipt)
         write_json(output / f"{name}-index.json", index)
+        if name == "answer":
+            fields = {
+                "generation_id": index["generation_id"],
+                "matcher_revision_sha256": index["matcher_revision_sha256"],
+                "decision_rules_sha256": index["decision_rules_sha256"],
+                "artifacts": index["artifacts"],
+            }
+            write_json(output / "answer-index-fields.json", fields)
 
     blocked = make_receipt(generation, None)
     blocked_index = make_index(generation, [])
