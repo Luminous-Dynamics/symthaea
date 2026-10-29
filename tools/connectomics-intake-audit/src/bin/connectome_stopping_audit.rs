@@ -799,18 +799,22 @@ mod tests {
     #[test]
     fn walk_forward_forecast_does_not_leak_the_target_value() {
         let values = [10.0, 8.2, 7.0, 6.1, 5.7, 5.3];
-        let mut snapshots: Vec<Snapshot> = values.iter().enumerate().map(|(index, value)| {
-            snapshot(
+        let mut snapshots: Vec<Snapshot> = Vec::new();
+        for (index, value) in values.iter().enumerate() {
+            let graph_digest = format!("{:064x}", index + 1);
+            let previous_digest = if index == 0 { None } else { Some(format!("{:064x}", index)) };
+            let mut item = snapshot(
                 index as u64,
                 (index as u64) * 10,
-                &format!("{:064x}", index + 1),
-                if index == 0 { None } else { Some(Box::leak(format!("{:064x}", index).into_boxed_str()) as &str) },
+                &graph_digest,
+                previous_digest.as_deref(),
                 0.5 + index as f64 * 0.0001,
                 *value,
-            )
-        }).collect();
-        for index in 1..snapshots.len() {
-            snapshots[index].edits.edits_since_previous_snapshot = Some(10);
+            );
+            if index > 0 {
+                item.edits.edits_since_previous_snapshot = Some(10);
+            }
+            snapshots.push(item);
         }
         let before = walk_forward_forecasts(&snapshots, 4).0;
         let original = before.iter().find(|forecast| forecast.metric_id == "query:path_count" && forecast.target_sequence_index == 4).unwrap();
