@@ -39,7 +39,7 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Snapshot {
     schema_version: u32,
@@ -51,7 +51,7 @@ struct Snapshot {
     provenance: Provenance,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct DatasetIdentity {
     dataset_id: String,
@@ -62,7 +62,7 @@ struct DatasetIdentity {
     region: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SnapshotIdentity {
     snapshot_id: String,
@@ -72,7 +72,7 @@ struct SnapshotIdentity {
     previous_graph_sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct EditCounts {
     cumulative_committed: u64,
@@ -80,7 +80,7 @@ struct EditCounts {
     edits_since_previous_snapshot: Option<u64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct GraphSummary {
     directed: bool,
@@ -89,7 +89,7 @@ struct GraphSummary {
     invariants: BTreeMap<String, f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct QueryEvidence {
     query_id: String,
@@ -97,7 +97,7 @@ struct QueryEvidence {
     metrics: BTreeMap<String, QueryMetric>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct QueryMetric {
     value: f64,
@@ -106,7 +106,7 @@ struct QueryMetric {
     upper: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Provenance {
     graph_computation_profile_sha256: String,
@@ -564,7 +564,7 @@ mod tests {
         let a = snapshot(0, 0, &"1".repeat(64), None, 1.0, 4.0);
         let mut b = snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 4.0);
         b.query_evidence.query_id = "different-query".into();
-        let report = build_report(&jsonl(&[a, b.clone()]), &[a.clone(), b.clone()], &args(2));
+        let report = build_report(&jsonl(&[a.clone(), b.clone()]), &[a, b], &args(2));
         assert!(report.errors.iter().any(|error| error.contains("query definition changed")));
     }
 
