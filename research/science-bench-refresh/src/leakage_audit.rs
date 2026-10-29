@@ -35,6 +35,8 @@ pub struct OverlapAuditReportV1 {
     pub right_task_set_sha256: String,
     pub left_task_count: u64,
     pub right_task_count: u64,
+    pub shared_task_id_count: u64,
+    pub shared_task_ids_sample: Vec<String>,
     pub exact_overlap_pair_count: u64,
     pub near_duplicate_candidate_pair_count: u64,
     pub exact_overlaps: Vec<OverlapGroupV1>,
@@ -378,6 +380,29 @@ pub fn audit_policy_input_overlap(
 
     let left_set = load_task_set(left_bytes, "left")?;
     let right_set = load_task_set(right_bytes, "right")?;
+    let left_task_ids: BTreeSet<&str> = left_set
+        .tasks
+        .iter()
+        .map(|task| task.task_id.as_str())
+        .collect();
+    let right_task_ids: BTreeSet<&str> = right_set
+        .tasks
+        .iter()
+        .map(|task| task.task_id.as_str())
+        .collect();
+    let mut shared_task_ids: Vec<String> = left_task_ids
+        .intersection(&right_task_ids)
+        .map(|task_id| (*task_id).to_owned())
+        .collect();
+    shared_task_ids.sort();
+    let shared_task_id_count =
+        u64::try_from(shared_task_ids.len()).map_err(|_| "shared task ID count overflow")?;
+    let shared_task_ids_sample = shared_task_ids
+        .iter()
+        .take(MAX_IDS_PER_GROUP)
+        .cloned()
+        .collect();
+
     let left_tasks = index_tasks(&left_set)?;
     let right_tasks = index_tasks(&right_set)?;
     let (exact_overlap_pair_count, exact_overlaps) =
@@ -385,8 +410,8 @@ pub fn audit_policy_input_overlap(
     let (near_duplicate_candidate_pair_count, near_duplicate_candidates) =
         build_near_groups(&left_tasks, &right_tasks)?;
 
-    let admission = if exact_overlap_pair_count > 0 {
-        "blocked_exact_policy_input_overlap"
+    let admission = if shared_task_id_count > 0 || exact_overlap_pair_count > 0 {
+        "blocked_shared_task_id_or_exact_policy_input_overlap"
     } else if near_duplicate_candidate_pair_count > 0 {
         "manual_review_required_for_numeric_near_duplicates"
     } else {
@@ -405,6 +430,8 @@ pub fn audit_policy_input_overlap(
         left_task_count: u64::try_from(left_tasks.len()).map_err(|_| "left task count overflow")?,
         right_task_count: u64::try_from(right_tasks.len())
             .map_err(|_| "right task count overflow")?,
+        shared_task_id_count,
+        shared_task_ids_sample,
         exact_overlap_pair_count,
         near_duplicate_candidate_pair_count,
         exact_overlaps,
@@ -482,6 +509,20 @@ mod tests {
         }"#;
         let report = audit_policy_input_overlap("development", left, "refresh:g2", right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 1);
+    }
+
+    #[test]
+    fn shared_task_ids_block_even_when_policy_inputs_differ() {
+        let left = task_set("development-1", json!([task("reused-id", input(1.0, 2.0))]));
+        let right = task_set("refresh-2", json!([task("reused-id", input(9.0, 18.0))]));
+        let report =
+            audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
+        assert_eq!(report.shared_task_id_count, 1);
+        assert_eq!(report.exact_overlap_pair_count, 0);
+        assert_eq!(
+            report.admission,
+            "blocked_shared_task_id_or_exact_policy_input_overlap"
+        );
     }
 
     #[test]
