@@ -47,7 +47,11 @@ def _run(unit, policy, curve, *, completed=True, spent=10, shifts=None, decision
         "decision": decision,
         "curve": _curve(curve),
         "shift_results": shifts,
-        "run_receipt_sha256": SHA_A if policy == "baseline" else SHA_B,
+        "run_receipt_sha256": "e" * 64 if policy == "baseline" else "f" * 64,
+        "policy_source_sha256": SHA_A if policy == "baseline" else SHA_B,
+        "policy_config_sha256": "d" * 64 if policy == "baseline" else "e" * 64,
+        "environment_sha256": "1" * 64,
+        "suite_manifest_sha256": "2" * 64,
     }
 
 
@@ -98,7 +102,7 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         self.assertEqual(effect["ties"], 0)
         self.assertEqual(effect["losses"], 0)
         self.assertAlmostEqual(effect["median_delta"], 0.15)
-        self.assertAlmostEqual(effect["mean_delta"], (0.15 + 0.125 + 0.165) / 3)
+        self.assertAlmostEqual(effect["mean_delta"], (0.15 + 0.15 + 0.165) / 3)
         self.assertEqual(effect["bootstrap_95pct_ci_mean_delta"], [effect["mean_delta"], effect["mean_delta"]])
         self.assertEqual(effect["bootstrap_95pct_ci_win_rate"], [1.0, 1.0])
 
