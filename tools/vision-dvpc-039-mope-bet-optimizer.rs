@@ -125,7 +125,7 @@ fn edge_maximum(a: Sym2, b: Vec2, start: Vec2, end: Vec2) -> Vec2 {
     // f(start + t*d) = constant + linear*t + quadratic*t^2.
     let quadratic = PSI * a.quad(direction);
     let linear = 2.0 * PSI * a.bilinear(start, direction) + b.dot(direction);
-    let t = if quadratic < -EPS {
+    let t = if quadratic < 0.0 {
         (-linear / (2.0 * quadratic)).clamp(0.0, 1.0)
     } else if linear > 0.0 {
         // The edge objective is linear (or numerically flat); select its increasing endpoint.
@@ -165,17 +165,24 @@ fn optimize(a: Sym2, b: Vec2, max_weight: f64) -> Result<Optimum, String> {
         candidates.extend([v0, v1, v2]);
 
         // Unconstrained stationary point lambda = -(2*psi*A)^(-1) b, when A is invertible.
-        let det_a = a.determinant();
-        let determinant_scale = 1.0_f64.max(a.a00.abs() * a.a11.abs()).max(a.a01 * a.a01);
-        if det_a > PSD_TOL * determinant_scale {
-            let factor = -1.0 / (2.0 * PSI * det_a);
-            let stationary = Vec2::new(
-                factor * (a.a11 * b.x - a.a01 * b.y),
-                factor * (-a.a01 * b.x + a.a00 * b.y),
-            );
-            if stationary.finite() && feasible(stationary, max_weight, FEAS_TOL) {
-                candidates.push(stationary);
-                stationary_point_considered = true;
+        // Use a scale-relative determinant check. An absolute determinant floor
+        // incorrectly classifies small but well-conditioned PSD matrices as singular.
+        let a_scale = a.a00.abs().max(a.a01.abs()).max(a.a11.abs());
+        if a_scale > 0.0 {
+            let a00 = a.a00 / a_scale;
+            let a01 = a.a01 / a_scale;
+            let a11 = a.a11 / a_scale;
+            let det_normalized = a00 * a11 - a01 * a01;
+            if det_normalized > PSD_TOL {
+                let denominator = 2.0 * PSI * a_scale * det_normalized;
+                let stationary = Vec2::new(
+                    -(a11 * b.x - a01 * b.y) / denominator,
+                    -(-a01 * b.x + a00 * b.y) / denominator,
+                );
+                if stationary.finite() && feasible(stationary, max_weight, FEAS_TOL) {
+                    candidates.push(stationary);
+                    stationary_point_considered = true;
+                }
             }
         }
 
@@ -406,6 +413,17 @@ mod tests {
         assert!(fixture.a.determinant().abs() <= EPS);
         let result = optimize(fixture.a, fixture.b, fixture.w).unwrap();
         assert!(result.objective.is_finite());
+    }
+
+    #[test]
+    fn small_scale_but_well_conditioned_psd_matrix_keeps_its_interior_optimum() {
+        let scale = 1e-8;
+        let a = Sym2 { a00: scale, a01: 0.0, a11: scale };
+        let b = Vec2::new(-2.0 * PSI * scale * 0.1, -2.0 * PSI * scale * 0.1);
+        let result = optimize(a, b, 50.0).unwrap();
+        close(result.lambda.x, 0.1, 1e-8);
+        close(result.lambda.y, 0.1, 1e-8);
+        assert!(result.stationary_point_considered);
     }
 
     #[test]
