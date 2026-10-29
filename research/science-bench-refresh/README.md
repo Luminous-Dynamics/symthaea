@@ -109,7 +109,7 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 Split labels must use a known role: `development`, `anchor`, or `refresh`; an optional colon suffix distinguishes versions/generations. The labels are caller-supplied metadata, not proof of runner isolation.
 
 The report separates:
-- **Exact overlap:** deterministic canonical policy-input equality (ignores object-key order, JSON whitespace, task IDs, evaluator-only fields, and equivalent integral spellings such as 1 and 1.0). Any exact collision exits with code 6 and blocks admission.
+- **Shared task ID / exact overlap:** reused task IDs across the compared sets or deterministic canonical policy-input equality (ignores object-key order, JSON whitespace, task IDs, evaluator-only fields, and equivalent integral spellings such as 1 and 1.0). Either condition exits with code 6 and blocks admission.
 - **Numeric near-duplicate candidates:** a conservative fingerprint that rounds numbers to three significant digits while preserving the remaining input structure/text. These are triage candidates, not proof of leakage; they exit with code 7 so a qualification pipeline pauses for review.
 - **No detected overlap:** exits 0 when neither tier finds candidates.
 - **Invalid inputs:** exits 2 for invalid labels, duplicate IDs, malformed task sets, or unsupported schema.
