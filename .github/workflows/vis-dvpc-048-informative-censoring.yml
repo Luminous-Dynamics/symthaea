@@ -1,0 +1,80 @@
+name: VIS-DVPC-048 IPCW and informative feedback censoring
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-048-informative-censoring.rs"
+      - "docs/research/VIS_DVPC_048_INFORMATIVE_CENSORING_V1.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-048-informative-censoring.rs"
+      - "docs/research/VIS_DVPC_048_INFORMATIVE_CENSORING_V1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact censoring benchmark
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run Rust proof controls
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-048-informative-censoring.rs -o /tmp/vis-dvpc-048-tests
+          /tmp/vis-dvpc-048-tests
+      - name: Verify deterministic replay and fail-closed statuses
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-048-informative-censoring.rs -o /tmp/vis-dvpc-048
+          /tmp/vis-dvpc-048 --smoke > /tmp/vis-dvpc-048-smoke-a.tsv
+          /tmp/vis-dvpc-048 --smoke > /tmp/vis-dvpc-048-smoke-b.tsv
+          grep -v '^SYSTEM' /tmp/vis-dvpc-048-smoke-a.tsv > /tmp/vis-dvpc-048-smoke-a-stable.tsv
+          grep -v '^SYSTEM' /tmp/vis-dvpc-048-smoke-b.tsv > /tmp/vis-dvpc-048-smoke-b-stable.tsv
+          cmp /tmp/vis-dvpc-048-smoke-a-stable.tsv /tmp/vis-dvpc-048-smoke-b-stable.tsv
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-smoke-a-stable.tsv)" = "184"
+          grep -Fq $'FIXTURE\ttarget_cell_never_matures\tqualification\tNOT_IDENTIFIED_POSITIVITY' /tmp/vis-dvpc-048-smoke-a-stable.tsv
+          grep -Fq $'FIXTURE\treward_dependent_mnar_censoring\tqualification\tNOT_IDENTIFIED_MNAR' /tmp/vis-dvpc-048-smoke-a-stable.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($2=="target_cell_never_matures" || $2=="reward_dependent_mnar_censoring") && $4 ~ /^ipcw_/ { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-smoke-a-stable.tsv
+      - name: Run 1,024 paired censoring trajectories
+        run: |
+          /tmp/vis-dvpc-048 --benchmark > /tmp/vis-dvpc-048-results.tsv
+          test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-048-results.tsv)" = "5"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-results.tsv)" = "276"
+          test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-048-results.tsv)" = "5"
+          grep -Fq $'FIXTURE\tno_censoring\tqualification\tIDENTIFIED_MAR' /tmp/vis-dvpc-048-results.tsv
+          grep -Fq $'FIXTURE\tcontext_action_dependent_censoring\tqualification\tIDENTIFIED_MAR' /tmp/vis-dvpc-048-results.tsv
+          grep -Fq $'FIXTURE\ttarget_cell_never_matures\tqualification\tNOT_IDENTIFIED_POSITIVITY' /tmp/vis-dvpc-048-results.tsv
+          grep -Fq $'FIXTURE\treward_dependent_mnar_censoring\tqualification\tNOT_IDENTIFIED_MNAR' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="matured_fraction" || $4=="target_action_matured_fraction" || $4=="available_case_wald_coverage" || $4=="ipcw_pointwise_hoeffding_coverage" || $4=="ipcw_cs_sequence_coverage") { if ($5 < -0.000001 || $5 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="available_case_ips_absolute_error" || $4=="available_case_ips_squared_error" || $4=="zero_filled_ips_absolute_error" || $4=="zero_filled_ips_squared_error" || $4=="available_case_wald_width" || $4=="ipcw_absolute_error" || $4=="ipcw_squared_error" || $4=="ipcw_cs_width" || $4=="ipcw_effective_sample_size" || $4=="ipcw_score_bound") { if ($5 < -0.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $4=="ipcw_pointwise_hoeffding_coverage" { n++; if ($5 < 0.90) bad=1 } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $4=="ipcw_cs_sequence_coverage" { n++; if ($5 < 0.90) bad=1 } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($2=="target_cell_never_matures" || $2=="reward_dependent_mnar_censoring") && $4 ~ /^ipcw_/ { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          grep '^CONFIG' /tmp/vis-dvpc-048-results.tsv > /tmp/vis-dvpc-048-config.tsv
+          grep '^FIXTURE\|^RESULT_METRIC\|^SYSTEM' /tmp/vis-dvpc-048-results.tsv > /tmp/vis-dvpc-048-summary.tsv
+      - name: Create exact source/output SHA-256 receipt
+        run: |
+          {
+            printf 'VIS_DVPC_048_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-048-informative-censoring.rs /tmp/vis-dvpc-048-results.tsv /tmp/vis-dvpc-048-summary.tsv /tmp/vis-dvpc-048-config.tsv
+          } > /tmp/vis-dvpc-048-receipt.tsv
+          cat /tmp/vis-dvpc-048-receipt.tsv
+      - name: Publish censoring report and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-048-informative-censoring
+          path: |
+            /tmp/vis-dvpc-048-results.tsv
+            /tmp/vis-dvpc-048-summary.tsv
+            /tmp/vis-dvpc-048-config.tsv
+            /tmp/vis-dvpc-048-smoke-a-stable.tsv
+            /tmp/vis-dvpc-048-receipt.tsv
+          retention-days: 90
