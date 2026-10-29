@@ -64,6 +64,12 @@ These arithmetic checks independently evaluate the **published formula only**. T
 4. Does the theory make additional predictions not used to choose the link/readout and not equivalent to fitting the alpha result? What observation could falsify each?
 5. Which empirical comparisons are independent, and which share theoretical inputs or experimental systematics?
 
+## Ancillary artifacts named by the paper
+
+The paper identifies three ancillary artifacts in Supplement S7/S11: `records.csv`, `enumerate records.py`, and `mutations.py`. It states that the script rebuilds the 169 two-slot product records plus the three commutator records, and that mutation tests perturb definitions and cause the relevant Lean theorem to fail when a changed value is introduced.
+
+These artifacts should be acquired from the author's publication bundle and pinned by byte-level digest before auditing. Use them as the **author-provided reference implementation and test suite**, not as inputs to the independent Rust reconstruction. The independent implementation should derive records from the stated definitions; then cross-check its outputs against the author artifacts. If any ancillary artifact is inaccessible, record that as a reproducibility blocker rather than guessing a URL or marking the work complete.
+
 ## Work plan
 
 ### WP1 — Independent reconstruction
