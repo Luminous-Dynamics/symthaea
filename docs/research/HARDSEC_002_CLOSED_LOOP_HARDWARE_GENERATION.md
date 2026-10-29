@@ -25,6 +25,16 @@ The upstream repository documents Icarus Verilog and GCC as relevant toolchain d
 
 **License caveat:** the upstream repository has a license file, but Phase A must inspect the actual data archive, task artifacts, embedded reference code, tests, and any third-party source separately. A repository-level license must not be assumed to cover every embedded artifact or all derived redistribution.
 
+### Published baseline details to reproduce, not merely cite
+
+The IJCAI paper reports that the authors began with **1,170 candidate samples**, filtered out 246 that did not meet efficacy gates, and retained **924 tasks / 4,425 test cases** across 599 Verilog tasks and 325 C tasks. The paper reports 92.5% average coverage; its inclusion threshold was 80%, with C coverage measured via gcov and RTL coverage estimated by static mapping of harness signals to executable lines. The authors applied five mutation operators and generated five mutants per task, retained tasks at mutation score ≥50%, reported a 70.2% mean mutation score, and manually audited 100 randomly selected tasks. These are published results, not values independently reproduced by Luminous Dynamics. Phase A must reconcile the actual archive with these figures rather than assume they match.
+
+The paper also separates the **security specification from the generation prompt**: the target sees functional requirements but not the security-requirement set used to evaluate it. Golden implementation and test-harness construction follow separate information paths. Preserve that separation in the replicated baseline or the benchmark has changed. The paper’s single-attempt setting permits up to three compiler-error-only repair rounds before scoring; its iterative setting returns functional feedback, not security-test feedback, and runs security evaluation on the final candidate. The upstream repository exposes security hint levels none/general/CWE-specific, iteration and attempt limits, and Pass@5; record exact settings per run instead of treating README defaults as universal paper settings.
+
+For an externally anchored score comparison, the paper’s own table gives an example of how much results depend on the evaluation setting: GPT-5.1-medium is reported at 40.02% security pass for single-attempt, 45.76% for iterative Pass@1, and 53.88% for Pass@5 (with different functional pass rates in those same settings). Its cross-domain analysis reports 38.31% security pass for firmware C and 44.93% for RTL Verilog. These are paper-specific reference points, not portable scores for a current model/provider or direct estimates for this project; we must replicate the same task split, hints, evaluator and sampling rules before making a numerical comparison.
+
+One important metric distinction: the paper’s Pass@k averages requirement-level pass results. It is not necessarily the probability that one generated artifact passes *every* required functional and security condition. We will report upstream-compatible requirement-level metrics **and** the additional task-level joint-acceptance rate to expose that difference.
+
 ## 3. Principle: investigate, do not self-certify
 
 The proposed loop is:
@@ -65,11 +75,11 @@ Within each task, all arms receive the same functional specification and the sam
 | B. Generic security hint | Separates prompting effect from added architecture |
 | C. CWE-specific hint | Matches the upstream benchmark's documented hint axis |
 | D. Iterative repair with functional feedback only | Measures whether functional feedback alone leaves security defects |
-| E. Iterative repair with independently generated security feedback | Tests value of security-specific verification |
+| E. Security-feedback repair (extension arm; not upstream-parity baseline) | Tests whether exposing independently verified security-test failures improves repair, at a separately recorded budget |
 | F. Symthaea-directed requirement and test selection | Measures whether the investigation policy adds value beyond prompting |
 | G. Symthaea + bounded Symtropy scenario bookkeeping (later phase only) | Tests whether explicit scenario/state organization improves coverage or repair efficiency |
 
-The official evaluator should remain the result authority for benchmark-compatible measures until any alternative implementation has passed parity testing. Our Rust-first code should manage manifests, orchestration, evidence binding, and aggregation; do not silently rewrite the upstream evaluator or change its oracle semantics.
+The official evaluator should remain the result authority for benchmark-compatible measures until any alternative implementation has passed parity testing. Our Rust-first code should manage manifests, orchestration, evidence binding, and aggregation; do not silently rewrite the upstream evaluator or change its oracle semantics. Arms A–D reproduce or extend published conditions. Arm E is a new intervention and must be reported as a separate extension: it must not be called a HardSecBench replication or compared directly with upstream scores unless its information budget and feedback timing are explicitly matched. During baseline-generation turns, keep the task's security-requirement set and security-test outputs hidden from the generator except for the defined security-hint conditions.
 
 Do not force HDC/CfC to be the code generator. The hypothesis is that Symthaea may be a better investigation / experiment-selection layer when paired with a separate code-generation provider. Any claim about Symthaea itself generating code must be evaluated as a distinct arm.
 
@@ -79,7 +89,8 @@ Report all outcomes separately by language and CWE:
 
 - functional requirement pass rate;
 - security requirement pass rate;
-- **joint functional + security pass rate** (primary endpoint);
+- **joint functional + security pass rate** (primary endpoint; task-level acceptance, distinct from requirement-level mean Pass@k);
+- upstream-compatible requirement-level pass rates and Pass@k;
 - compilation and simulation success;
 - formal/property-check pass, fail, unsupported, or not available;
 - mutation-detection rate and oracle-inadequate task count;
