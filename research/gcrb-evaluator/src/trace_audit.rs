@@ -314,7 +314,6 @@ fn validate_event(event: &TraceEvent, case_id: &str) -> Result<Vec<TraceFinding>
         }
     }
 
-    drop(push_finding);
     Ok(findings)
 }
 
