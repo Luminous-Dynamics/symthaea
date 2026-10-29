@@ -171,6 +171,34 @@ class ShiftedRunsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "do not share the same pinned starting identity"):
             self.fixture.analyze(manifest)
 
+    def test_model_configuration_must_not_drift_across_seeds(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        for row in manifest["runs"]:
+            if row["scenario_id"] == "scenario-01" and row["seed"] == 22:
+                row["initial_execution_profile_sha256"] = sha(b"drifted-profile")
+        with self.assertRaisesRegex(ValueError, "drifts in model/scaffold/initial profile across seeds"):
+            self.fixture.analyze(manifest)
+
+    def test_post_shift_configuration_must_not_drift_across_seeds(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        for row in manifest["runs"]:
+            if row["scenario_id"] == "scenario-01" and row["condition"] == "shifted" and row["seed"] == 22:
+                row["post_shift_execution_profile_sha256"] = sha(b"other-post-profile")
+        with self.assertRaisesRegex(ValueError, "drifts in post-shift profile/network mode across seeds"):
+            self.fixture.analyze(manifest)
+
+    def test_malformed_network_mode_fails_closed(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        row = next(item for item in manifest["runs"] if item["condition"] == "clean")
+        row["initial_network_mode"] = ["none"]
+        with self.assertRaisesRegex(ValueError, "initial_network_mode must be a valid network-mode string"):
+            self.fixture.analyze(manifest)
+        manifest = copy.deepcopy(self.fixture.manifest)
+        row = next(item for item in manifest["runs"] if item["condition"] == "shifted")
+        row["post_shift_network_mode"] = ["none"]
+        with self.assertRaisesRegex(ValueError, "post_shift_network_mode must be a valid network-mode string"):
+            self.fixture.analyze(manifest)
+
     def test_clean_condition_cannot_claim_post_shift_configuration(self) -> None:
         manifest = copy.deepcopy(self.fixture.manifest)
         clean = next(row for row in manifest["runs"] if row["condition"] == "clean")
