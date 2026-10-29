@@ -19,9 +19,7 @@ An absent target row is not permitted: the script rejects it. An `unknown` outco
 
 Let the treatment and control outcomes for target i be Y_Ti and Y_Ci in the frozen finite cohort of N targets. The quantity of interest is:
 
-$
-\Delta_N = \frac{1}{N}\sum_{i=1}^{N}(Y_{Ti}-Y_{Ci})
-$
+`Delta_N = (1/N) * sum_i(Y_Ti - Y_Ci)`
 
 For targets with both outcomes observed, the contribution is exact. If only control is observed, the missing treatment outcome is bounded in `[0,1]`; if only treatment is observed, the control outcome is bounded in `[0,1]`; if both are unknown, the difference is in `[-1,1]`. Summing these per-target minima and maxima and dividing by the *full frozen target count* gives the sharp finite-cohort identification interval under only binary outcome bounds. Every possible completion of unknown outcomes must lie inside this interval.
 
@@ -52,7 +50,7 @@ The local self-test suite has seven tests: complete-data interval collapse, exha
 
 ## Why this is methodologically useful
 
-Partial-identification methods make the role of assumptions visible instead of selecting one missing-data model and treating its imputation as observed fact. Recent literature presents tipping-point sensitivity as a systematic exploration of assumptions that can overturn a conclusion rather than a few convenient alternatives ([tipping-point method, 2025](https://pubmed.ncbi.nlm.nih.gov/40140629/)). A 2026 paper on incomplete outcomes in cluster-randomized studies similarly derives doubly robust methods under specified missing-at-random conditions and adds a sensitivity framework for violations of those assumptions ([open article](https://pmc.ncbi.nlm.nih.gov/articles/PMC13108325/)). Research on informative cluster size emphasizes that individual-weighted and cluster-weighted estimands may differ and should not be swapped silently ([Statistics in Medicine, first published 9 October 2026](https://onlinelibrary.wiley.com/doi/10.1002/sim.70762)).
+Partial-identification methods make the role of assumptions visible instead of selecting one missing-data model and treating its imputation as observed fact. Manski's overview of partial identification with missing data describes this identified-set approach ([overview](https://www.sciencedirect.com/science/article/pii/S0888613X04001124)). Recent literature presents tipping-point sensitivity as a systematic exploration of assumptions that can overturn a conclusion rather than a few convenient alternatives ([tipping-point method, 2025](https://pubmed.ncbi.nlm.nih.gov/40140629/)). A 2026 paper on incomplete outcomes in cluster-randomized studies similarly derives doubly robust methods under specified missing-at-random conditions and adds a sensitivity framework for violations of those assumptions ([open article](https://pmc.ncbi.nlm.nih.gov/articles/PMC13108325/)). Research on informative cluster size emphasizes that individual-weighted and cluster-weighted estimands may differ and should not be swapped silently ([Statistics in Medicine, first published 9 October 2026](https://onlinelibrary.wiley.com/doi/10.1002/sim.70762)).
 
 PITB is not a randomized clinical trial, and its proof-method comparison does not inherit trial randomization assumptions. These sources inform the general discipline: define the estimand, state the assumptions, show how conclusions depend on missing outcomes, and keep the diagnostic distinct from confirmatory proof evaluation.
 
