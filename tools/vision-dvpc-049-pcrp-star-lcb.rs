@@ -456,6 +456,14 @@ struct PairedAggregate {
     plausible_set_size_difference: RunningMean,
 }
 
+fn is_best_value(value: f64, oracle_value: f64) -> bool {
+    (value - oracle_value).abs() <= EPS
+}
+
+fn is_false_certificate(value: f64, oracle_value: f64) -> bool {
+    value + EPS < oracle_value
+}
+
 fn certified_winner(lower_bounds: &[f64], upper_bounds: &[f64]) -> Option<usize> {
     if lower_bounds.is_empty() || lower_bounds.len() != upper_bounds.len() {
         return None;
@@ -650,12 +658,12 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     if familywise_covered {
                         ag.familywise_covered += 1;
                     }
-                    if (true_values[chosen] - oracle_value).abs() <= EPS {
+                    if is_best_value(true_values[chosen], oracle_value) {
                         ag.top1 += 1;
                     }
                     if let Some(winner) = certified_winner {
                         ag.winner_certificates += 1;
-                        if true_values[winner] + EPS < oracle_value {
+                        if is_false_certificate(true_values[winner], oracle_value) {
                             ag.false_certificates += 1;
                         }
                     }
@@ -672,10 +680,10 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     ag.selected_lcb_gap.push(true_values[chosen] - lower_bounds[chosen]);
                     let is_winner_certificate = certified_winner.is_some();
                     let is_false_certificate = certified_winner
-                        .map(|winner| true_values[winner] + EPS < oracle_value)
+                        .map(|winner| is_false_certificate(true_values[winner], oracle_value))
                         .unwrap_or(false);
                     replicate_method_metrics[method_index] = Some(TrialSummary {
-                        top1: if (true_values[chosen] - oracle_value).abs() <= EPS { 1.0 } else { 0.0 },
+                        top1: if is_best_value(true_values[chosen], oracle_value) { 1.0 } else { 0.0 },
                         regret,
                         winner_certificate: if is_winner_certificate { 1.0 } else { 0.0 },
                         false_certificate: if is_false_certificate { 1.0 } else { 0.0 },
@@ -943,6 +951,15 @@ mod tests {
                 close(expectation, true_value(target, MU0, MU1), 1.0e-12);
             }
         }
+    }
+
+    #[test]
+    fn tied_policies_are_all_counted_as_optimal() {
+        let tied_values = [0.5_f64, 0.5, 0.5];
+        let oracle = tied_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        assert!(tied_values.iter().all(|&value| is_best_value(value, oracle)));
+        assert!(!is_false_certificate(0.5, oracle));
+        assert!(is_false_certificate(0.49, oracle));
     }
 
     #[test]
