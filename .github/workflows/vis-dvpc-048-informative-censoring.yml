@@ -37,7 +37,7 @@ jobs:
           grep -v '^SYSTEM' /tmp/vis-dvpc-048-smoke-a.tsv > /tmp/vis-dvpc-048-smoke-a-stable.tsv
           grep -v '^SYSTEM' /tmp/vis-dvpc-048-smoke-b.tsv > /tmp/vis-dvpc-048-smoke-b-stable.tsv
           cmp /tmp/vis-dvpc-048-smoke-a-stable.tsv /tmp/vis-dvpc-048-smoke-b-stable.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-smoke-a-stable.tsv)" = "148"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-smoke-a-stable.tsv)" = "184"
           grep -Fq $'FIXTURE\ttarget_cell_never_matures\tqualification\tNOT_IDENTIFIED_POSITIVITY' /tmp/vis-dvpc-048-smoke-a-stable.tsv
           grep -Fq $'FIXTURE\treward_dependent_mnar_censoring\tqualification\tNOT_IDENTIFIED_MNAR' /tmp/vis-dvpc-048-smoke-a-stable.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($2=="target_cell_never_matures" || $2=="reward_dependent_mnar_censoring") && $4 ~ /^ipcw_/ { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-smoke-a-stable.tsv
@@ -45,14 +45,14 @@ jobs:
         run: |
           /tmp/vis-dvpc-048 --benchmark > /tmp/vis-dvpc-048-results.tsv
           test "$(grep -c '^FIXTURE' /tmp/vis-dvpc-048-results.tsv)" = "5"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-results.tsv)" = "222"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-048-results.tsv)" = "276"
           test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-048-results.tsv)" = "5"
           grep -Fq $'FIXTURE\tno_censoring\tqualification\tIDENTIFIED_MAR' /tmp/vis-dvpc-048-results.tsv
           grep -Fq $'FIXTURE\tcontext_action_dependent_censoring\tqualification\tIDENTIFIED_MAR' /tmp/vis-dvpc-048-results.tsv
           grep -Fq $'FIXTURE\ttarget_cell_never_matures\tqualification\tNOT_IDENTIFIED_POSITIVITY' /tmp/vis-dvpc-048-results.tsv
           grep -Fq $'FIXTURE\treward_dependent_mnar_censoring\tqualification\tNOT_IDENTIFIED_MNAR' /tmp/vis-dvpc-048-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($4=="matured_fraction" || $4=="target_action_matured_fraction" || $4=="available_case_wald_coverage" || $4=="ipcw_pointwise_hoeffding_coverage" || $4=="ipcw_cs_sequence_coverage") { if ($5 < -0.000001 || $5 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
-          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="available_case_ips_absolute_error" || $4=="available_case_wald_width" || $4=="ipcw_absolute_error" || $4=="ipcw_cs_width" || $4=="ipcw_effective_sample_size" || $4=="ipcw_score_bound") { if ($5 < -0.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($4=="available_case_ips_absolute_error" || $4=="available_case_ips_squared_error" || $4=="zero_filled_ips_absolute_error" || $4=="zero_filled_ips_squared_error" || $4=="available_case_wald_width" || $4=="ipcw_absolute_error" || $4=="ipcw_squared_error" || $4=="ipcw_cs_width" || $4=="ipcw_effective_sample_size" || $4=="ipcw_score_bound") { if ($5 < -0.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $4=="ipcw_pointwise_hoeffding_coverage" { n++; if ($5 < 0.90) bad=1 } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $4=="ipcw_cs_sequence_coverage" { n++; if ($5 < 0.90) bad=1 } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($2=="target_cell_never_matures" || $2=="reward_dependent_mnar_censoring") && $4 ~ /^ipcw_/ { bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-048-results.tsv
