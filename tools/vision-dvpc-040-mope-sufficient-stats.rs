@@ -350,16 +350,16 @@ fn sweep() -> Result<String, String> {
                 ("T",report.polynomial.t),
                 ("U",report.polynomial.u),
             ] {
-                let _=writeln!(output,"POLYNOMIAL\\t{sequence_id}\\t{}\\t-\\t{name}\\t{value:.12}\\t-",index+1);
+                let _=writeln!(output,"POLYNOMIAL\t{sequence_id}\t{}\t-\t{name}\t{value:.12}\t-",index+1);
             }
             for (root_index,root) in report.level_roots.iter().enumerate() {
                 if !close(report.polynomial.value(*root),level,IDENTITY_TOL) {
                     return Err(format!("{sequence_id} prefix {}: root residual too large",index+1));
                 }
-                let _=writeln!(output,"ROOT_DIAGNOSTIC\\t{sequence_id}\\t{}\\t{root_index}\\troot\\t{root:.12}\\t-",index+1);
+                let _=writeln!(output,"ROOT_DIAGNOSTIC\t{sequence_id}\t{}\t{root_index}\troot\t{root:.12}\t-",index+1);
             }
             if let Some(root) = report.selected_safe_root {
-                let _=writeln!(output,"ROOT_FRONTIER\\t{sequence_id}\\t{}\\t-\\tlargest_in_range_root\\t{root:.12}\\t-",index+1);
+                let _=writeln!(output,"ROOT_FRONTIER\t{sequence_id}\t{}\t-\tlargest_in_range_root\t{root:.12}\t-",index+1);
             }
             for &value in &TEST_VALUES {
                 let (a,b)=direct_observed(&direct_samples,value);
@@ -380,8 +380,8 @@ fn sweep() -> Result<String, String> {
                 if actual_log_wealth + IDENTITY_TOL * (1.0 + actual_log_wealth.abs()) < stored_bound {
                     return Err(format!("{sequence_id} prefix {}: quadratic lower bound exceeds actual log wealth at value {value}",index+1));
                 }
-                let _=writeln!(output,"IDENTITY\\t{sequence_id}\\t{}\\t{value:.2}\\tpolynomial_lower_bound\\t{stored_bound:.12}\\t{direct_bound:.12}",index+1);
-                let _=writeln!(output,"WEALTH_BOUND\\t{sequence_id}\\t{}\\t{value:.2}\\tlog_wealth_ge_lower_bound\\t{actual_log_wealth:.12}\\t{stored_bound:.12}",index+1);
+                let _=writeln!(output,"IDENTITY\t{sequence_id}\t{}\t{value:.2}\tpolynomial_lower_bound\t{stored_bound:.12}\t{direct_bound:.12}",index+1);
+                let _=writeln!(output,"WEALTH_BOUND\t{sequence_id}\t{}\t{value:.2}\tlog_wealth_ge_lower_bound\t{actual_log_wealth:.12}\t{stored_bound:.12}",index+1);
             }
             let candidate_value=if index % 3 == 0 {0.25} else if index % 3 == 1 {0.5} else {0.75};
             let next=stream.choose_next_bet(candidate_value)?;
