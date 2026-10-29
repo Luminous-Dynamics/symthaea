@@ -75,7 +75,7 @@ jobs:
             printf 'VIS_DVPC_049_RECEIPT\tformat\tv1\n'
             printf 'commit_sha\t%s\n' "$GITHUB_SHA"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-049-pcrp-star-lcb.rs /tmp/vis-dvpc-049-results.tsv /tmp/vis-dvpc-049-summary.tsv /tmp/vis-dvpc-049-config.tsv
+            sha256sum tools/vision-dvpc-049-pcrp-star-lcb.rs docs/research/VIS_DVPC_049_PCRP_STAR_LCB_V1.md .github/workflows/vis-dvpc-049-pcrp-star-lcb.yml /tmp/vis-dvpc-049-results.tsv /tmp/vis-dvpc-049-summary.tsv /tmp/vis-dvpc-049-config.tsv
           } > /tmp/vis-dvpc-049-receipt.tsv
           cat /tmp/vis-dvpc-049-receipt.tsv
       - name: Publish benchmark and receipt
