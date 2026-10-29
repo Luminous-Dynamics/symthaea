@@ -77,6 +77,7 @@ struct ArtifactBinding {
     attack_family_id: String,
     split: String,
     label: String,
+    security_outcome: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -382,6 +383,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             attack_family_id: sample.attack_family_id.clone(),
             split: sample.split.clone(),
             label: sample.label.clone(),
+            security_outcome: sample.security_outcome.clone(),
         };
         if let Some(previous) = artifact_bindings.get(&sample.artifact_id) {
             if previous != &binding {
