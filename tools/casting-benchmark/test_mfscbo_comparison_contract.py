@@ -19,6 +19,9 @@ from mfscbo_comparison_contract import (
 
 UPSTREAM_SHA = "ca42fd6c5ec8c841e3f1ff9642509e12d104b581"
 HASH = "a" * 64
+ROOT = Path(__file__).resolve().parents[2]
+TASK_SUITE_PATH = "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+TASK_SUITE_SHA256 = hashlib.sha256((ROOT / TASK_SUITE_PATH).read_bytes()).hexdigest()
 
 
 def valid_contract():
@@ -27,7 +30,8 @@ def valid_contract():
         "contract_id": "casting-mfscbo-control-v1",
         "upstream_repository": "Nemo-Virtual-Lab/MF-SCBO",
         "upstream_commit_sha": UPSTREAM_SHA,
-        "task_suite_sha256": "b" * 64,
+        "task_suite_path": TASK_SUITE_PATH,
+        "task_suite_sha256": TASK_SUITE_SHA256,
         "evidence_class": "public_analytic",
         "objective_directions": ["minimize", "minimize"],
         "normalization_offset": [0.1, 0.2],
@@ -116,6 +120,16 @@ class MfScboComparisonContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unique"):
             validate_contract(value)
 
+    def test_rejects_changed_suite_digest_and_unsafe_suite_paths(self):
+        value = valid_contract()
+        value["task_suite_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "does not match the referenced suite file"):
+            validate_contract(value)
+        value = valid_contract()
+        value["task_suite_path"] = "../../outside.json"
+        with self.assertRaisesRegex(ValueError, "without parent traversal"):
+            validate_contract(value)
+
     def test_rejects_budget_that_does_not_cover_initialization(self):
         value = valid_contract()
         value["cost_budget_units"] = 77
@@ -160,6 +174,9 @@ class MfScboComparisonContractTests(unittest.TestCase):
             self.assertEqual(len(receipt["source_artifacts"]["mf_scbo_lock_sha256"]), 64)
             self.assertEqual(len(receipt["source_artifacts"]["preflight_evaluator_sha256"]), 64)
             self.assertIn("not an MF-SCBO execution", receipt["claim_ceiling"])
+        self.assertEqual(receipt["task_suite_path"], TASK_SUITE_PATH)
+        self.assertEqual(receipt["task_suite_sha256"], TASK_SUITE_SHA256)
+        self.assertIn("cannot prove independence", receipt["holdout_truth_limit"])
 
     def test_cli_rejects_duplicate_json_keys_and_output_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
