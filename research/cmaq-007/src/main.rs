@@ -92,7 +92,7 @@ enum Strategy {
 }
 
 impl Strategy {
-    fn all() -> [Self; 9] {
+    fn all() -> [Self; 11] {
         [
             Self::DirectFallback,
             Self::PredictedGreedy,
