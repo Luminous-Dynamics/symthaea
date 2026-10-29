@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, and audited evidence-floor resolver are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, an opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, and query-specific evidence-set selector are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -169,6 +169,29 @@ Compare at least: (1) resolver without audit/floor, (2) audit only, (3) configur
 **Hard gates:** a rejected, invalid, stale, or cross-scope candidate must never be emitted; an eligible but corrupt payload must produce an explicit integrity error; failed floor must be visible to the caller; no empty-result fallback may disguise integrity failure. The downstream policy must not proceed on a failed floor unless the application explicitly chooses and audits a separate escalation path.
 
 **Decision rule:** treat floor compliance and decision quality as separate axes. First achieve zero policy bypasses in adversarial fixtures; then require held-out paired improvement in act/abstain accuracy without unacceptable loss of solveable-task coverage. The operational floor's threshold is tuned only on development data. No semantic sufficiency or SOTA claim is implied by this resolver.
+
+### Query-specific evidence sets and refinement (new opt-in selector)
+
+Recent work makes the relevance–sufficiency gap explicit: a record can be individually relevant while the answer still lacks a required fact, relation, time constraint or supporting source. QEMem formulates memory utilization as constructing a query-specific evidence set and combines query-guided discovery, source-grounded ViewCards and sufficiency-guided refinement ([arXiv:2610.22668](https://arxiv.org/abs/2610.22668)). Its authors report a 91.43% headline LLM-judge accuracy on LoCoMo with Claude Opus 4.5; its detailed ablation also reports 89.6% for full QEMem on a 1,540-question setup. Treat these as the paper's configuration-specific results, not as LongMemEval-V2 results or direct evidence that a Rust selector outperforms QEMem.
+
+The new Rust experiment implements only a small selection primitive, not the QEMem framework. The caller supplies (a) query-required information-role labels and (b) an explicit role set for each candidate. The selector greedily chooses eligible text candidates that cover the most still-uncovered roles per declared token cost; retrieval score is a tie-break, not an estimate of evidence strength. It reports covered and missing roles. It does not extract roles, prove a role annotation, detect entailment/contradiction, or decide that the answer is semantically supported. Role extraction and query planning must remain separately source-grounded, versioned, and measured.
+
+Compare under identical histories, reader, prompt, and actual final serialized-token budget:
+
+1. **Score-prefix baseline:** standard top-ranked records, budget bounded.
+2. **Role-coverage selector:** maximize uncovered required roles per declared token cost.
+3. **Coverage + trajectory diversity:** add a per-trajectory constraint as a separate ablation; do not assume independence from distinct trajectories.
+4. **Coverage + adjacent-state expansion:** include ordered neighbors only as an explicit additional arm.
+5. **Iterative gap refinement:** after the first set, obtain a structured list of uncovered requirements and issue a second bounded retrieval pass. The missing-requirement generator must not see gold answers or evaluator metadata.
+6. **Oracle role coverage:** diagnostic upper bound only; oracle annotations are prohibited from inference-time selector inputs.
+
+Construct held-out tasks where answers require complementary pieces from different records, intermediate relations, time constraints, or a source excerpt. Include near-twins with one critical role removed, contradictory candidate roles, wrong-time evidence, duplicate records from one source family, and source-mapping errors. A high coverage percentage cannot override source-integrity or lifecycle failures.
+
+Report requirement-role recall/precision, source-span visibility/traceability, complete-evidence-set rate, answer/task accuracy conditional on coverage, unsupported-answer rate, false-coverage rate from incorrect role annotations, number of refinement rounds, additional retrieval cost, actual context tokens, and paired 95% confidence intervals. Separate the role selector's conditional algorithmic behavior from the role extractor's semantic accuracy. Use mutation tests to falsify coverage claims by deleting one required role, swapping source maps, duplicating one source across multiple projections, or reordering candidate inputs.
+
+**Hard gates:** every candidate must have an explicit role annotation (an empty set means explicitly annotated as covering no required roles, not missing metadata); unknown/missing annotations fail closed; inactive and cross-scope evidence never contribute; eligible corrupt text is an error; uncovered required roles remain explicit; final serialized context must satisfy the actual token budget. The complete result means only that the supplied role labels cover the supplied required-role labels. It is not a truth or entailment certificate.
+
+**Decision rule:** keep the selector experimental until a matched, held-out comparison improves evidence coverage and downstream accuracy without increasing unsupported-answer rate or violating cost budgets. If the role extraction/planning stage is not calibrated, role coverage results are only a software contract test and must not be presented as cognitive sufficiency.
 
 ## Required baseline arms
 
