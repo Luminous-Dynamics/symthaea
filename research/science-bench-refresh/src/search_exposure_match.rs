@@ -699,7 +699,7 @@ mod tests {
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
         let report = match_report(
             &receipt_bytes,
-            "not_evaluable",
+            "no_match",
             "none",
             0,
             0,
