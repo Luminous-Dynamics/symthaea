@@ -255,6 +255,10 @@ impl MopeGridPair {
 /// Fair precision comparator: evaluates the same quadratic lower-bound
 /// polynomial used by the analytic-root method on GRID_SIZE candidates.
 /// This isolates root finding versus grid discretization from actual wealth.
+fn last_superlevel_index(values:&[f64],level:f64)->Option<usize>{
+    values.iter().rposition(|value|value.is_finite() && *value>=level)
+}
+
 struct MopeBoundGridPair {
     lower_stream: stream::StreamState,
     complement_stream: stream::StreamState,
@@ -297,18 +301,23 @@ impl MopeBoundGridPair {
             self.complement_bound[i]+=contribution_c;
         }
         let level=(2.0/ALPHA).ln();
-        let lower_index=self.lower_bound.iter().position(|p|*p<level).unwrap_or(0);
-        let complement_index=self.complement_bound.iter().position(|p|*p<level).unwrap_or(0);
-        let proposed_lower=self.lower_endpoint.max(self.values[lower_index]);
-        let lower_cap=1.0-self.complement_endpoint;
-        let updated_lower=proposed_lower.min(lower_cap);
-        if updated_lower>self.lower_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
-        self.lower_endpoint=updated_lower;
-        let proposed_complement=self.complement_endpoint.max(self.values[complement_index]);
-        let complement_cap=1.0-self.lower_endpoint;
-        let updated_complement=proposed_complement.min(complement_cap);
-        if updated_complement>self.complement_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
-        self.complement_endpoint=updated_complement;
+        // P(v) is concave, so the superlevel set may be an interior interval.
+        // Select the largest grid value with P(v) >= level; first-below fails
+        // whenever P(0) is below level but P becomes large at interior values.
+        if let Some(index)=last_superlevel_index(&self.lower_bound,level){
+            let proposed_lower=self.lower_endpoint.max(self.values[index]);
+            let lower_cap=1.0-self.complement_endpoint;
+            let updated_lower=proposed_lower.min(lower_cap);
+            if updated_lower>self.lower_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
+            self.lower_endpoint=updated_lower;
+        }
+        if let Some(index)=last_superlevel_index(&self.complement_bound,level){
+            let proposed_complement=self.complement_endpoint.max(self.values[index]);
+            let complement_cap=1.0-self.lower_endpoint;
+            let updated_complement=proposed_complement.min(complement_cap);
+            if updated_complement>self.complement_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
+            self.complement_endpoint=updated_complement;
+        }
         self.lower_stream.choose_next_bet(self.lower_endpoint)?;
         self.complement_stream.choose_next_bet(self.complement_endpoint)?;
         Ok(Interval{lower:self.lower_endpoint,upper:1.0-self.complement_endpoint})
@@ -665,6 +674,14 @@ mod tests {
         assert!(close(got.lower,0.2,1e-12));
         assert!(close(got.upper,0.7,1e-12));
         assert!(got.width()<=previous.width()+1e-12);
+    }
+
+    #[test]
+    fn bound_grid_selects_last_superlevel_not_first_below(){
+        let level=1.0;
+        assert_eq!(last_superlevel_index(&[-1.0,0.0,1.1,2.0,1.2,-1.0],level),Some(4));
+        assert_eq!(last_superlevel_index(&[-1.0,0.0,0.5],level),None);
+        assert_eq!(last_superlevel_index(&[1.1,1.2,1.3],level),Some(2));
     }
 
     #[test]
