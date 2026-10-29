@@ -240,6 +240,15 @@ fn component_quotas(component_count: usize) -> [usize; 3] {
     ]
 }
 
+fn minimum_total_components_for_heldout_floor(minimum: usize) -> usize {
+    (4..)
+        .find(|total| {
+            let quotas = component_quotas(*total);
+            quotas[1] >= minimum && quotas[2] >= minimum
+        })
+        .expect("a finite total can satisfy both held-out component quotas")
+}
+
 fn family_balance_loss(family_counts: &[usize; 3], total_families: usize) -> f64 {
     let total = total_families as f64;
     TARGET_SHARES
@@ -459,11 +468,12 @@ fn execute() -> Result<()> {
     let heldout_component_floor_met =
         target_component_counts[1] >= MIN_HELDOUT_COMPONENTS
             && target_component_counts[2] >= MIN_HELDOUT_COMPONENTS;
-    // With the registered floor-based 70/15/15 quotas, 134 components is
-    // the smallest total that yields at least 20 components in both held-out
-    // strata. It does not guarantee adequate power or receipt qualification.
+    // Derive this from the exact floor-based quota function rather than
+    // using ceil(20 / 0.15), which can be conservative by a few units because
+    // validation is the difference of two floored cumulative cut points.
+    // This is not a power guarantee or receipt qualification.
     let minimum_total_components_for_heldout_floor =
-        (MIN_HELDOUT_COMPONENTS * 100).div_ceil(15);
+        minimum_total_components_for_heldout_floor(MIN_HELDOUT_COMPONENTS);
     let max_absolute_family_share_error = SPLITS
         .iter()
         .enumerate()
@@ -667,14 +677,15 @@ mod tests {
     }
 
     #[test]
-    fn twenty_components_in_each_heldout_split_requires_134_total_components() {
-        let qualifies_133 = component_quotas(133);
-        let qualifies_134 = component_quotas(134);
-        assert_eq!(qualifies_133, [93, 20, 20]);
-        assert!(qualifies_133[1] < MIN_HELDOUT_COMPONENTS || qualifies_133[2] < MIN_HELDOUT_COMPONENTS);
-        assert_eq!(qualifies_134, [93, 20, 21]);
-        assert!(qualifies_134[1] >= MIN_HELDOUT_COMPONENTS);
-        assert!(qualifies_134[2] >= MIN_HELDOUT_COMPONENTS);
+    fn twenty_components_in_each_heldout_split_requires_131_total_components() {
+        let below = component_quotas(130);
+        let minimum = component_quotas(131);
+        assert_eq!(below, [91, 19, 20]);
+        assert!(below[1] < MIN_HELDOUT_COMPONENTS || below[2] < MIN_HELDOUT_COMPONENTS);
+        assert_eq!(minimum, [91, 20, 20]);
+        assert!(minimum[1] >= MIN_HELDOUT_COMPONENTS);
+        assert!(minimum[2] >= MIN_HELDOUT_COMPONENTS);
+        assert_eq!(minimum_total_components_for_heldout_floor(MIN_HELDOUT_COMPONENTS), 131);
     }
 
     #[test]
