@@ -46,7 +46,12 @@ def write_json_bytes(path: Path, value: dict[str, Any]) -> bytes:
     return data
 
 
-def make_analysis(plan_fields: dict[str, Any], revision: str) -> dict[str, Any]:
+def make_analysis(
+    plan_fields: dict[str, Any],
+    revision: str,
+    *,
+    dependence_unknown: bool = False,
+) -> dict[str, Any]:
     pair_ids = [pair["pair_id"] for pair in plan_fields["pairs"]]
     conditions = plan_fields["required_conditions"]
     contrasts = [
@@ -106,10 +111,20 @@ def make_analysis(plan_fields: dict[str, Any], revision: str) -> dict[str, Any]:
     return {
         "schema": ANALYSIS_SCHEMA,
         "analysis_implementation_revision": revision,
-        "multiplicity_policy": "holm_across_binary_contrasts",
-        "pair_dependence_policy": "exact_conditional_independent_pairs",
+        "multiplicity_policy": (
+            "descriptive_no_p_values"
+            if dependence_unknown
+            else "holm_across_binary_contrasts"
+        ),
+        "pair_dependence_policy": (
+            "descriptive_only_dependence_unknown"
+            if dependence_unknown
+            else "exact_conditional_independent_pairs"
+        ),
         "dependence_justification_sha256": sha256(
-            b"synthetic fixture: one unique task/world pair per independent block"
+            b"synthetic fixture: pair dependence explicitly unknown"
+            if dependence_unknown
+            else b"synthetic fixture: one unique task/world pair per independent block"
         ),
         "contrasts": contrasts,
         "expected_responses": expected_responses,
@@ -148,10 +163,27 @@ def main() -> int:
     bad_revision["analysis_implementation_revision"] = "f" * 40
     write_json_bytes(output / "wrong-revision-analysis-plan.json", bad_revision)
 
+    # A separate precommitted plan exercises the conservative path when the
+    # evaluator cannot justify independent pair blocks.
+    unknown_analysis = make_analysis(source_fields, revision, dependence_unknown=True)
+    unknown_analysis_bytes = write_json_bytes(
+        output / "unknown-dependence-analysis-plan.json", unknown_analysis
+    )
+    unknown_fields = copy.deepcopy(source_fields)
+    unknown_fields["analysis_plan_sha256"] = sha256(unknown_analysis_bytes)
+    unknown_commitment = framed_hash(b"plan.v1", encode(unknown_fields))
+    unknown_plan = {
+        **unknown_fields,
+        "plan_commitment_sha256": unknown_commitment,
+    }
+    write_json_bytes(output / "unknown-dependence-plan-fields.json", unknown_fields)
+    write_json_bytes(output / "unknown-dependence-plan.json", unknown_plan)
+
     summary = {
         "schema": "symthaea.paired_outcome_analysis_test_vectors.v1",
         "analysis_plan_sha256": sha256(analysis_bytes),
         "expected_plan_commitment_sha256": commitment,
+        "unknown_dependence_plan_commitment_sha256": unknown_commitment,
         "analysis_implementation_revision": revision,
         "expected_pair_count": len(fields["pairs"]),
         "expected_contrast_count": len(analysis["contrasts"]),
