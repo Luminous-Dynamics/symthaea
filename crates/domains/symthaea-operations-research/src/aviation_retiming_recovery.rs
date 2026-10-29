@@ -361,6 +361,8 @@ pub struct RetimingSearchStats {
     pub verified_complete_assignments: u64,
     pub partial_feasibility_prunes: u64,
     pub objective_bound_prunes: u64,
+    pub lower_bound_evaluations: u64,
+    pub availability_relaxation_checks: u64,
     pub peak_frontier_nodes: usize,
 }
 
@@ -443,7 +445,8 @@ pub fn solve_retiming_branch_and_bound(
     }
 
     let mut frontier = std::collections::BinaryHeap::<RetimingSearchNode>::new();
-    let root_lower_bound = retiming_optimistic_lower_bound(scenario, 0, 0)
+    let mut stats = RetimingSearchStats::default();
+    let root_lower_bound = retiming_optimistic_lower_bound(scenario, 0, 0, &mut stats)
         .ok_or_else(|| "root recovery lower bound overflows u64".to_string())?;
     frontier.push(RetimingSearchNode {
         depth: 0,
@@ -453,11 +456,8 @@ pub fn solve_retiming_branch_and_bound(
         serial: 0,
     });
     let mut serial = 1_u64;
-    let mut stats = RetimingSearchStats {
-        generated_nodes: 1,
-        peak_frontier_nodes: 1,
-        ..RetimingSearchStats::default()
-    };
+    stats.generated_nodes = 1;
+    stats.peak_frontier_nodes = 1;
     let mut best_plan: Option<RetimingPlan> = None;
     let mut stopped_by_generation_budget = false;
 
@@ -560,6 +560,7 @@ pub fn solve_retiming_branch_and_bound(
                     scenario,
                     flight_index + 1,
                     committed_cost,
+                    &mut stats,
                 )
                 .ok_or_else(|| "partial recovery lower bound overflows u64".to_string())?;
                 children.push(RetimingSearchNode {
@@ -582,6 +583,7 @@ pub fn solve_retiming_branch_and_bound(
             scenario,
             flight_index + 1,
             cancellation_cost,
+            &mut stats,
         )
         .ok_or_else(|| "partial cancellation lower bound overflows u64".to_string())?;
         children.push(RetimingSearchNode {
@@ -671,14 +673,18 @@ fn retiming_optimistic_lower_bound(
     scenario: &RetimingScenario,
     first_unresolved_flight: usize,
     committed_cost: u64,
+    stats: &mut RetimingSearchStats,
 ) -> Option<u64> {
     if first_unresolved_flight > scenario.flights.len() {
         return None;
     }
+    stats.lower_bound_evaluations = stats.lower_bound_evaluations.saturating_add(1);
     let mut lower_bound = committed_cost;
     for flight in &scenario.flights[first_unresolved_flight..] {
         let mut minimum_action_cost = flight.cancellation_cost;
         for aircraft in &scenario.aircraft {
+            stats.availability_relaxation_checks =
+                stats.availability_relaxation_checks.saturating_add(1);
             let minimum_delay = aircraft
                 .available_at_minutes
                 .saturating_sub(flight.scheduled_start_minutes);
