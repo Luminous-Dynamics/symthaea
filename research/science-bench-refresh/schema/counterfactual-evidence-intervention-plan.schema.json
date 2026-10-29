@@ -54,11 +54,11 @@
       "$ref": "#/$defs/digest"
     },
     "evaluator_revision_sha256": {
-      "$ref": "#/$defs/digest",
+      "$ref": "#/$defs/nonzero_digest",
       "description": "Digest of the exact evaluator implementation frozen before any trial outcome is observed."
     },
     "decision_rules_sha256": {
-      "$ref": "#/$defs/digest",
+      "$ref": "#/$defs/nonzero_digest",
       "description": "Digest of the outcome-label rubric, severity rules and thresholds frozen before any trial outcome is observed."
     },
     "randomization_commitment_sha256": {
@@ -100,6 +100,12 @@
     "digest": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonzero_digest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "pattern": "^0{64}$" } }
+      ]
     },
     "pair": {
       "type": "object",
