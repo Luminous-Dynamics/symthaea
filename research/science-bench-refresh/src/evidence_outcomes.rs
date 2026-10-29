@@ -710,7 +710,7 @@ fn scorecard(
         external_anchor_required: true,
         runner_execution_proven: false,
         uncertainty_model: "not_estimated_by_structural_validator".to_owned(),
-        claim_boundary: "descriptive_evaluator_labels_only; runner execution unauthenticated;             no generalized-performance or SOTA claim"
+        claim_boundary: "descriptive labels only; runner unauthenticated; no generalization/SOTA claim"
             .to_owned(),
     })
 }
@@ -772,7 +772,7 @@ fn validate_against_plan(
                 || record.condition != condition
             {
                 issues.push(format!(
-                    "records[{index}] must match planned pair/trial/condition {pair_id}/{trial_id}/{condition}"
+                    "records[{index}] does not match the planned pair, trial, and condition"
                 ));
             }
         } else {
@@ -906,9 +906,10 @@ mod tests {
             }],
         };
         let fields_bytes = serde_json::to_vec(&fields).unwrap();
-        let commitment = crate::counterfactual_evidence::compute_evidence_intervention_plan_commitment(
-            &fields_bytes,
-        )
+        let commitment =
+            crate::counterfactual_evidence::compute_evidence_intervention_plan_commitment(
+                &fields_bytes,
+            )
         .unwrap();
         let mut full = serde_json::to_value(fields).unwrap();
         full["plan_commitment_sha256"] = json!(commitment);
