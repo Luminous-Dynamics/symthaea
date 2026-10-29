@@ -48,6 +48,7 @@ pub struct SearchExposureMatchReportV1 {
     pub generation_id: String,
     pub receipt_sha256: String,
     pub receipt_commitment_sha256: String,
+    pub protected_index_sha256: String,
     pub matcher_revision_sha256: String,
     pub decision_rules_sha256: String,
     pub expected_event_count: u64,
@@ -74,6 +75,7 @@ struct MatchCommitmentPayloadV1<'a> {
     generation_id: &'a str,
     receipt_sha256: &'a str,
     receipt_commitment_sha256: &'a str,
+    protected_index_sha256: &'a str,
     matcher_revision_sha256: &'a str,
     decision_rules_sha256: &'a str,
     expected_event_count: u64,
@@ -135,13 +137,14 @@ fn valid_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn match_commitment(report: &SearchExposureMatchReportV1) -> Result<String, String> {
+pub(crate) fn match_commitment(report: &SearchExposureMatchReportV1) -> Result<String, String> {
     let payload = MatchCommitmentPayloadV1 {
         schema: &report.schema,
         run_id: &report.run_id,
         generation_id: &report.generation_id,
         receipt_sha256: &report.receipt_sha256,
         receipt_commitment_sha256: &report.receipt_commitment_sha256,
+        protected_index_sha256: &report.protected_index_sha256,
         matcher_revision_sha256: &report.matcher_revision_sha256,
         decision_rules_sha256: &report.decision_rules_sha256,
         expected_event_count: report.expected_event_count,
@@ -262,12 +265,6 @@ fn validate_record_contract(
                     ));
                     valid = false;
                 }
-                if record.protected_reference_sha256 != record.evidence_artifact_sha256 {
-                    issues.push(format!(
-                        "records[{index}] exact_digest evidence and reference digests differ"
-                    ));
-                    valid = false;
-                }
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
@@ -333,6 +330,7 @@ pub fn verify_search_exposure_match_report(
     for (label, digest) in [
         ("receipt_sha256", report.receipt_sha256.as_str()),
         ("receipt_commitment_sha256", report.receipt_commitment_sha256.as_str()),
+        ("protected_index_sha256", report.protected_index_sha256.as_str()),
         ("matcher_revision_sha256", report.matcher_revision_sha256.as_str()),
         ("decision_rules_sha256", report.decision_rules_sha256.as_str()),
         ("report_commitment_sha256", report.report_commitment_sha256.as_str()),
@@ -607,15 +605,14 @@ mod tests {
     fn explicit_answer_match_blocks_and_records_evidence_digests() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let exact_match_digest = sha256_hex(b"exact-matched-answer-snippet");
         let report = match_report(
             &receipt_bytes,
             "explicit_answer",
             "exact_digest",
             MAX_SCORE_MICROS,
             MAX_SCORE_MICROS,
-            Some(exact_match_digest.clone()),
-            Some(exact_match_digest),
+            Some(sha256_hex(b"opaque-protected-reference-id")),
+            Some(sha256_hex(b"exact-matched-answer-snippet")),
         );
         let verified = verify_search_exposure_match_report(
             &receipt_bytes,
@@ -631,7 +628,6 @@ mod tests {
     fn metadata_context_and_answer_exposures_have_distinct_blocking_labels() {
         let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
-        let digest = sha256_hex(b"same-exact-matched-artifact");
         for (classification, expected_admission) in [
             ("benchmark_metadata", "blocked_benchmark_metadata_exposure"),
             ("question_context", "blocked_question_context_exposure"),
@@ -643,8 +639,8 @@ mod tests {
                 "exact_digest",
                 MAX_SCORE_MICROS,
                 MAX_SCORE_MICROS,
-                Some(digest.clone()),
-                Some(digest.clone()),
+                Some(sha256_hex(format!("opaque-reference:{classification}").as_bytes())),
+                Some(sha256_hex(b"same-exact-matched-artifact")),
             );
             let verified = verify_search_exposure_match_report(
                 &receipt_bytes,

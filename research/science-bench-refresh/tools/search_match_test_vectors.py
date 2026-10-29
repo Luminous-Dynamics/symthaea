@@ -61,6 +61,7 @@ def make_match_report(
         "generation_id": receipt["generation_id"],
         "receipt_sha256": sha256(receipt_bytes),
         "receipt_commitment_sha256": receipt["receipt_commitment_sha256"],
+        "protected_index_sha256": sha256(b"protected-index-test-vector"),
         "matcher_revision_sha256": sha256(b"frozen-matcher-revision"),
         "decision_rules_sha256": sha256(b"frozen-search-match-thresholds"),
         "expected_event_count": len(receipt["events"]),
@@ -111,7 +112,7 @@ def main() -> int:
         "exact_digest",
         1_000_000,
         1_000_000,
-        sha256(b"exact-matched-answer-snippet"),
+        sha256(b"opaque-reference-id"),
         sha256(b"exact-matched-answer-snippet"),
     )
     write_json(output / "explicit-answer-report.json", explicit_answer)

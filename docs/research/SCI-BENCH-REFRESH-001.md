@@ -283,3 +283,16 @@ The Rust verifier enforces full event coverage, protected-reference and evidence
 This is a **post-run report-contract verifier, not an implemented semantic matcher**. A separate evaluator process must compare stored retrieval artifacts against protected benchmark metadata, question context, and answers to produce the classifications. The evidence store and match report must remain inaccessible to the evaluated policy until the run is locked. The validator checks what the matcher claims; it does not establish that a lexical/semantic matcher is accurate, that all network activity was logged, or that the model's pretraining data are uncontaminated.
 
 The focused workflow now includes authored controls for a clean report, explicit answer exposure, ambiguous review, missing event records, and mutated classification/report bytes. No exact-head pass is claimed before CI finishes.
+
+
+## Follow-on: deterministic exact protected retrieval matcher (prototype; not yet CI-verified)
+
+The new [SCI-BENCH-SEARCH-EXPOSURE-001 / #8865](https://github.com/Luminous-Dynamics/symthaea/issues/8865) work now includes a first executable protected-artifact matcher, rather than only a verifier for evaluator-authored labels. A versioned evaluator-only index stores opaque reference-ID digests, a contamination severity, and the digest of each protected artifact. The Rust `match-search-exact` command verifies the event receipt, checks the index's typed commitment and generation binding, and matches event response digests against the protected index. A companion `verify-search-exact-matches` command deterministically regenerates the classifications and rejects altered or rebound reports.
+
+For the same content digest in multiple classes, the matcher chooses the highest severity: explicit-answer exposure, then question-context exposure, then benchmark-metadata exposure. Every event receives a disposition; blocked events remain `not_evaluable`, and unrelated response bodies are `no_match`. The report emits an opaque protected-reference handle and a domain-separated evidence-binding digest instead of the protected-content hash.
+
+The protected index and protected artifact store must remain evaluator-only. Its commitment must be anchored before scoring via the frozen analysis plan/protocol or an independent append-only channel. An index whose commitment is recomputed after a run is not proof that the index was frozen beforehand.
+
+This is a high-precision exact-digest baseline only. It does not detect partial-page substring hits, altered snippets, paraphrases, semantic matches, or unlogged retrieval. The next iteration should add span/canonicalized and semantic candidate tiers and measure their precision/recall against blinded adjudication sets; those tiers must remain separate and must not convert ambiguous similarity into an automatic contamination finding.
+
+Authored tests cover the three severities, severity precedence, a benign negative, blocked/not-evaluable events, malformed or altered indexes, mismatched generations, and report relabeling. The focused validator has not yet provided exact-head passing evidence, so no compile/test/format/Clippy pass is claimed.

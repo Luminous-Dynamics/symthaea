@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/search-protected-artifact-index.schema.json",
+  "title": "Symthaea Protected Retrieval Artifact Index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "matcher_revision_sha256",
+    "decision_rules_sha256",
+    "artifacts",
+    "index_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_protected_search_artifact_index.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "matcher_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_rules_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 250000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference_id_sha256",
+          "classification",
+          "content_sha256"
+        ],
+        "properties": {
+          "reference_id_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Hash of an opaque protected reference identifier. Do not put target names or target text in this index."
+          },
+          "classification": {
+            "enum": [
+              "benchmark_metadata",
+              "question_context",
+              "explicit_answer"
+            ]
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "SHA-256 of the exact protected content artifact bytes used for exact matching."
+          }
+        }
+      }
+    },
+    "index_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "description": "Evaluator-only exact-digest index. Each content digest corresponds to a protected metadata, task-context, or answer artifact. Artifacts must be sorted by (content_sha256, classification, reference_id_sha256). The index's domain-separated commitment must be anchored independently before scoring; otherwise an attacker could remove matching entries and recompute it."
+}

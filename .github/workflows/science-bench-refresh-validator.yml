@@ -626,3 +626,94 @@ jobs:
           # Evaluator-side protected references and raw response content are not emitted.
           ! grep -Eq 'protected-answer-item|retrieved response body|candidate-evidence-snippet' \
             /tmp/sbr-match-answer-report.json
+
+
+      - name: Exact protected retrieval matching controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          python3 research/science-bench-refresh/tools/search_exact_match_test_vectors.py /tmp/sbr-exact-matcher
+
+          # Independently computed Python fixture commitment must match the Rust implementation.
+          rust_index_commitment="$(cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            commit-protected-index /tmp/sbr-exact-matcher/answer-index-fields.json | jq -r '.index_commitment_sha256')"
+          fixture_index_commitment="$(jq -r '.index_commitment_sha256' /tmp/sbr-exact-matcher/answer-index.json)"
+          test "$rust_index_commitment" = "$fixture_index_commitment"
+
+          # Exact answer match wins over lower-severity references for the same bytes.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            match-search-exact /tmp/sbr-exact-matcher/answer-receipt.json \
+            /tmp/sbr-exact-matcher/answer-index.json > /tmp/sbr-exact-answer-report.json
+          answer_exit=$?
+          set -e
+          test "$answer_exit" -eq 12
+          grep -q '"classification": "explicit_answer"' /tmp/sbr-exact-answer-report.json
+          grep -q '"match_method": "exact_digest"' /tmp/sbr-exact-answer-report.json
+          ! grep -Eq 'exact protected answer bytes|answer-ref|protected answer text' /tmp/sbr-exact-answer-report.json
+
+          # The emitted report must be reproducible from the exact receipt and protected-index bytes.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-exact-matches /tmp/sbr-exact-matcher/answer-receipt.json \
+            /tmp/sbr-exact-matcher/answer-index.json \
+            /tmp/sbr-exact-answer-report.json > /tmp/sbr-exact-answer-verified.json
+          verified_answer_exit=$?
+          set -e
+          test "$verified_answer_exit" -eq 12
+          grep -q 'blocked_explicit_answer_exposure' /tmp/sbr-exact-answer-verified.json
+
+          # Metadata and question-context exposure are kept as separate severities.
+          for case in metadata context; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              match-search-exact "/tmp/sbr-exact-matcher/$case-receipt.json" \
+              "/tmp/sbr-exact-matcher/$case-index.json" \
+              > "/tmp/sbr-exact-$case-report.json"
+            match_exit=$?
+            set -e
+            test "$match_exit" -eq 12
+          done
+          grep -q '"classification": "benchmark_metadata"' /tmp/sbr-exact-metadata-report.json
+          grep -q '"classification": "question_context"' /tmp/sbr-exact-context-report.json
+
+          # A response with no exact protected digest match remains no_match.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            match-search-exact /tmp/sbr-exact-matcher/no-match-receipt.json \
+            /tmp/sbr-exact-matcher/no-match-index.json > /tmp/sbr-exact-no-match-report.json
+          grep -q '"classification": "no_match"' /tmp/sbr-exact-no-match-report.json
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-exact-matches /tmp/sbr-exact-matcher/no-match-receipt.json \
+            /tmp/sbr-exact-matcher/no-match-index.json \
+            /tmp/sbr-exact-no-match-report.json > /tmp/sbr-exact-no-match-verified.json
+          grep -q 'no_detected_retrieval_contamination_under_declared_matcher' /tmp/sbr-exact-no-match-verified.json
+
+          # A blocked request is not evaluable for content matching, not a negative answer match.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            match-search-exact /tmp/sbr-exact-matcher/blocked-receipt.json \
+            /tmp/sbr-exact-matcher/blocked-index.json > /tmp/sbr-exact-blocked-report.json
+          grep -q '"classification": "not_evaluable"' /tmp/sbr-exact-blocked-report.json
+
+          # Tampered commitments or generation mismatches fail before classifying a response.
+          for index in mutated-index wrong-generation-index; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              match-search-exact /tmp/sbr-exact-matcher/answer-receipt.json \
+              "/tmp/sbr-exact-matcher/$index.json" > "/tmp/sbr-exact-$index-report.json" 2> "/tmp/sbr-exact-$index.stderr"
+            index_exit=$?
+            set -e
+            test "$index_exit" -eq 2
+          done
+
+          # A report cannot be relabeled clean without being detected by deterministic recomputation.
+          jq '.records[0].classification = "no_match"' \
+            /tmp/sbr-exact-answer-report.json > /tmp/sbr-exact-answer-mutated-report.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-exact-matches /tmp/sbr-exact-matcher/answer-receipt.json \
+            /tmp/sbr-exact-matcher/answer-index.json \
+            /tmp/sbr-exact-answer-mutated-report.json > /tmp/sbr-exact-answer-mutated-verified.json 2> /tmp/sbr-exact-answer-mutated.stderr
+          mutated_report_exit=$?
+          set -e
+          test "$mutated_report_exit" -eq 11
