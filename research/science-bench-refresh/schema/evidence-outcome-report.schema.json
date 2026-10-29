@@ -19,8 +19,8 @@
     },
     "plan_sha256": { "$ref": "#/$defs/digest" },
     "plan_commitment_sha256": { "$ref": "#/$defs/digest" },
-    "evaluator_revision_sha256": { "$ref": "#/$defs/digest" },
-    "decision_rules_sha256": { "$ref": "#/$defs/digest" },
+    "evaluator_revision_sha256": { "$ref": "#/$defs/nonzero_digest" },
+    "decision_rules_sha256": { "$ref": "#/$defs/nonzero_digest" },
     "records": {
       "type": "array",
       "items": { "$ref": "#/$defs/record" },
@@ -33,6 +33,12 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
       "not": { "pattern": "^0{64}$" }
+    },
+    "nonzero_digest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "pattern": "^0{64}$" } }
+      ]
     },
     "digest_or_null": {
       "oneOf": [
