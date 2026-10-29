@@ -187,6 +187,10 @@ pub struct EvidenceBundleReport {
     pub receipt_count: usize,
     pub decision_time_epoch_seconds: i64,
     pub verification_time_epoch_seconds: i64,
+    pub expected_source_commit_sha: String,
+    pub expected_source_tree_sha256: String,
+    pub trust_store_sha256: String,
+    pub verification_policy_sha256: String,
     pub max_manifest_age_seconds: u64,
     pub max_decision_age_seconds: u64,
 }
@@ -238,6 +242,55 @@ pub fn canonical_receipt_signing_bytes(receipt: &VerifierReceipt) -> Vec<u8> {
     out
 }
 
+/// Canonical representation of the externally provisioned trust store.
+/// Entries are sorted by all fields so input order cannot change its digest.
+/// Duplicate entries are preserved so duplication remains visible in the digest.
+pub fn canonical_trust_store_bytes(anchors: &[TrustAnchor]) -> Vec<u8> {
+    let mut ordered: Vec<&TrustAnchor> = anchors.iter().collect();
+    ordered.sort_by(|a, b| {
+        a.key_id.cmp(&b.key_id)
+            .then_with(|| a.role.cmp(&b.role))
+            .then_with(|| a.verifier_id.cmp(&b.verifier_id))
+            .then_with(|| a.verifier_binary_sha256.cmp(&b.verifier_binary_sha256))
+            .then_with(|| a.public_key_hex.cmp(&b.public_key_hex))
+            .then_with(|| a.active_from_epoch_seconds.cmp(&b.active_from_epoch_seconds))
+            .then_with(|| a.active_until_epoch_seconds.cmp(&b.active_until_epoch_seconds))
+            .then_with(|| a.max_receipt_lifetime_seconds.cmp(&b.max_receipt_lifetime_seconds))
+            .then_with(|| a.revoked.cmp(&b.revoked))
+    });
+    let mut out = Vec::new();
+    field(&mut out, "domain", "luminous-dynamics.aviation-trust-store.v1");
+    field(&mut out, "anchor_count", &ordered.len().to_string());
+    for (index, anchor) in ordered.iter().enumerate() {
+        indexed_field(&mut out, index, "key_id", &anchor.key_id);
+        indexed_field(&mut out, index, "role", &anchor.role);
+        indexed_field(&mut out, index, "verifier_id", &anchor.verifier_id);
+        indexed_field(&mut out, index, "verifier_binary_sha256", &anchor.verifier_binary_sha256);
+        indexed_field(&mut out, index, "public_key_hex", &anchor.public_key_hex);
+        indexed_field(&mut out, index, "active_from_epoch_seconds", &anchor.active_from_epoch_seconds.to_string());
+        indexed_field(&mut out, index, "active_until_epoch_seconds", &anchor.active_until_epoch_seconds.to_string());
+        indexed_field(&mut out, index, "max_receipt_lifetime_seconds", &anchor.max_receipt_lifetime_seconds.to_string());
+        indexed_field(&mut out, index, "revoked", if anchor.revoked { "true" } else { "false" });
+    }
+    out
+}
+
+/// Canonical representation of caller-supplied freshness policy. The returned
+/// digest makes the exact policy auditable; trust policy still must be provisioned
+/// and selected independently of the untrusted evidence bundle.
+pub fn canonical_verification_policy_bytes(policy: &EvidenceVerificationPolicy) -> Vec<u8> {
+    let mut out = Vec::new();
+    field(&mut out, "domain", "luminous-dynamics.aviation-verification-policy.v1");
+    field(&mut out, "max_manifest_age_seconds", &policy.max_manifest_age_seconds.to_string());
+    field(&mut out, "max_decision_age_seconds", &policy.max_decision_age_seconds.to_string());
+    out
+}
+
+fn indexed_field(out: &mut Vec<u8>, index: usize, name: &str, value: &str) {
+    let key = format!("anchor.{index}.{name}");
+    field(out, &key, value);
+}
+
 pub fn subject_digest_for_role(manifest: &EvidenceManifest, role: EvidenceRole) -> &str {
     match role {
         EvidenceRole::Calibration => &manifest.calibration_artifact_sha256,
@@ -259,6 +312,8 @@ pub fn verify_evidence_bundle(
     verification_time_epoch_seconds: i64,
 ) -> EvidenceBundleReport {
     let manifest_digest = sha256_hex(&canonical_manifest_bytes(manifest));
+    let trust_store_digest = sha256_hex(&canonical_trust_store_bytes(trust_anchors));
+    let verification_policy_digest = sha256_hex(&canonical_verification_policy_bytes(freshness_policy));
     let mut blockers = validate_manifest(
         manifest,
         freshness_policy,
@@ -377,6 +432,10 @@ pub fn verify_evidence_bundle(
         receipt_count: receipts.len(),
         decision_time_epoch_seconds: manifest.decision_time_epoch_seconds,
         verification_time_epoch_seconds,
+        expected_source_commit_sha: expected_source.commit_sha.into(),
+        expected_source_tree_sha256: expected_source.tree_sha256.into(),
+        trust_store_sha256: trust_store_digest,
+        verification_policy_sha256: verification_policy_digest,
         max_manifest_age_seconds: freshness_policy.max_manifest_age_seconds,
         max_decision_age_seconds: freshness_policy.max_decision_age_seconds,
     }
@@ -782,6 +841,10 @@ mod tests {
         assert!(report.blockers.is_empty());
         assert_eq!(report.verified_roles, EvidenceRole::REQUIRED.to_vec());
         assert_eq!(report.receipt_count, EvidenceRole::REQUIRED.len());
+        assert_eq!(report.expected_source_commit_sha, manifest.source_commit_sha);
+        assert_eq!(report.expected_source_tree_sha256, manifest.source_tree_sha256);
+        assert_eq!(report.trust_store_sha256, sha256_hex(&canonical_trust_store_bytes(&anchors)));
+        assert_eq!(report.verification_policy_sha256, sha256_hex(&canonical_verification_policy_bytes(&default_policy())));
     }
 
     #[test]
@@ -789,6 +852,26 @@ mod tests {
         let manifest = manifest();
         assert_eq!(canonical_manifest_bytes(&manifest), canonical_manifest_bytes(&manifest));
         assert_eq!(sha256_hex(&canonical_manifest_bytes(&manifest)).len(), 64);
+    }
+
+    #[test]
+    fn trust_store_digest_is_independent_of_anchor_order() {
+        let manifest = manifest();
+        let (receipts, anchors) = signed_receipts(&manifest);
+        let mut reversed = anchors.clone();
+        reversed.reverse();
+        assert_eq!(
+            canonical_trust_store_bytes(&anchors),
+            canonical_trust_store_bytes(&reversed)
+        );
+        let policy = default_policy();
+        assert_eq!(
+            canonical_verification_policy_bytes(&policy),
+            canonical_verification_policy_bytes(&policy)
+        );
+        let first = verify_fixture(&manifest, &receipts, &anchors, NOW);
+        let second = verify_fixture(&manifest, &receipts, &reversed, NOW);
+        assert_eq!(first, second);
     }
 
     #[test]

@@ -8,7 +8,8 @@
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use symthaea_operations_research::aviation_evidence_bundle::{
-    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, EvidenceVerificationPolicy, ExpectedSourceIdentity, TrustAnchor,
+    canonical_trust_store_bytes, canonical_verification_policy_bytes, verify_evidence_bundle,
+    EvidenceBundleStatus, EvidenceManifest, EvidenceVerificationPolicy, ExpectedSourceIdentity, TrustAnchor,
     VerifierReceipt, EVIDENCE_MANIFEST_SCHEMA_VERSION, VERIFIER_RECEIPT_SCHEMA_VERSION,
 };
 
@@ -48,6 +49,49 @@ fn verify_fixture(
     };
     let policy = default_policy();
     verify_evidence_bundle(manifest, &expected, &policy, receipts, anchors, now)
+}
+
+fn independent_indexed_field(out: &mut Vec<u8>, index: usize, name: &str, value: &str) {
+    let key = format!("anchor.{index}.{name}");
+    independent_field(out, &key, value);
+}
+
+fn independent_trust_store_bytes(anchors: &[TrustAnchor]) -> Vec<u8> {
+    let mut ordered: Vec<&TrustAnchor> = anchors.iter().collect();
+    ordered.sort_by(|a, b| {
+        a.key_id.cmp(&b.key_id)
+            .then_with(|| a.role.cmp(&b.role))
+            .then_with(|| a.verifier_id.cmp(&b.verifier_id))
+            .then_with(|| a.verifier_binary_sha256.cmp(&b.verifier_binary_sha256))
+            .then_with(|| a.public_key_hex.cmp(&b.public_key_hex))
+            .then_with(|| a.active_from_epoch_seconds.cmp(&b.active_from_epoch_seconds))
+            .then_with(|| a.active_until_epoch_seconds.cmp(&b.active_until_epoch_seconds))
+            .then_with(|| a.max_receipt_lifetime_seconds.cmp(&b.max_receipt_lifetime_seconds))
+            .then_with(|| a.revoked.cmp(&b.revoked))
+    });
+    let mut out = Vec::new();
+    independent_field(&mut out, "domain", "luminous-dynamics.aviation-trust-store.v1");
+    independent_field(&mut out, "anchor_count", &ordered.len().to_string());
+    for (index, anchor) in ordered.iter().enumerate() {
+        independent_indexed_field(&mut out, index, "key_id", &anchor.key_id);
+        independent_indexed_field(&mut out, index, "role", &anchor.role);
+        independent_indexed_field(&mut out, index, "verifier_id", &anchor.verifier_id);
+        independent_indexed_field(&mut out, index, "verifier_binary_sha256", &anchor.verifier_binary_sha256);
+        independent_indexed_field(&mut out, index, "public_key_hex", &anchor.public_key_hex);
+        independent_indexed_field(&mut out, index, "active_from_epoch_seconds", &anchor.active_from_epoch_seconds.to_string());
+        independent_indexed_field(&mut out, index, "active_until_epoch_seconds", &anchor.active_until_epoch_seconds.to_string());
+        independent_indexed_field(&mut out, index, "max_receipt_lifetime_seconds", &anchor.max_receipt_lifetime_seconds.to_string());
+        independent_indexed_field(&mut out, index, "revoked", if anchor.revoked { "true" } else { "false" });
+    }
+    out
+}
+
+fn independent_verification_policy_bytes(policy: &EvidenceVerificationPolicy) -> Vec<u8> {
+    let mut out = Vec::new();
+    independent_field(&mut out, "domain", "luminous-dynamics.aviation-verification-policy.v1");
+    independent_field(&mut out, "max_manifest_age_seconds", &policy.max_manifest_age_seconds.to_string());
+    independent_field(&mut out, "max_decision_age_seconds", &policy.max_decision_age_seconds.to_string());
+    out
 }
 
 fn independent_sha256(bytes: &[u8]) -> String {
@@ -224,6 +268,27 @@ fn independent_byte_contract_matches_canonical_api_and_accepts_signed_bundle() {
     let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
     assert_eq!(report.status, EvidenceBundleStatus::Verified);
     assert!(report.blockers.is_empty());
+
+    let policy = default_policy();
+    assert_eq!(
+        independent_trust_store_bytes(&anchors),
+        canonical_trust_store_bytes(&anchors),
+    );
+    assert_eq!(
+        independent_verification_policy_bytes(&policy),
+        canonical_verification_policy_bytes(&policy),
+    );
+    assert_eq!(
+        report.trust_store_sha256,
+        independent_sha256(&independent_trust_store_bytes(&anchors)),
+    );
+    assert_eq!(
+        report.verification_policy_sha256,
+        independent_sha256(&independent_verification_policy_bytes(&policy)),
+    );
+    assert_eq!(report.expected_source_commit_sha, manifest.source_commit_sha);
+    assert_eq!(report.max_manifest_age_seconds, policy.max_manifest_age_seconds);
+    assert_eq!(report.max_decision_age_seconds, policy.max_decision_age_seconds);
 }
 
 #[test]
@@ -235,6 +300,10 @@ fn independent_oracle_detects_mutated_snapshot_and_permutation_is_irrelevant() {
     reversed.reverse();
     let second = verify_fixture(&manifest, &reversed, &anchors, NOW);
     assert_eq!(first, second);
+    let mut reversed_anchors = anchors.clone();
+    reversed_anchors.reverse();
+    let third = verify_fixture(&manifest, &receipts, &reversed_anchors, NOW);
+    assert_eq!(first, third);
 
     let mut mutated = manifest;
     mutated.data_snapshot_sha256 = digest_label("mutated-data");
