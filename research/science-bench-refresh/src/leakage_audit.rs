@@ -449,7 +449,19 @@ mod tests {
 
     #[test]
     fn json_object_key_order_and_whitespace_do_not_change_exact_identity() {
-        let left = br#"{"schema":"symthaea.science_bench_refresh_task_set.v1","generation_id":"d","tasks":[{"task_id":"1","family_id":"f","policy_input":{"instruction":"Recover","observations":[{"x":1,"y":2}]},"evaluator_only":{}}]}"#;
+        let left = br#"{
+          "schema": "symthaea.science_bench_refresh_task_set.v1",
+          "generation_id": "d",
+          "tasks": [{
+            "task_id": "1",
+            "family_id": "f",
+            "policy_input": {
+              "instruction": "Recover",
+              "observations": [{"x": 1, "y": 2}]
+            },
+            "evaluator_only": {}
+          }]
+        }"#;
         let right = br#"{
           "schema": "symthaea.science_bench_refresh_task_set.v1",
           "generation_id": "r",
