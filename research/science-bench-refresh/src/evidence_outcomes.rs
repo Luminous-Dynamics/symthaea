@@ -1069,6 +1069,61 @@ mod tests {
     }
 
     #[test]
+    fn preserves_partial_timeout_artifact_without_scoring_it() {
+        let plan = intervention_plan();
+        let mut fields = fields(&plan);
+        let record = &mut fields.records[1];
+        record.terminal_status = OutcomeTerminalStatusV1::Timeout;
+        record.response_status = OutcomeResponseStatusV1::NoResponse;
+        record.response_artifact_sha256 = Some(digest('e'));
+        record.evaluator_record_sha256 = None;
+        record.task_correctness = TaskCorrectnessV1::NotEvaluated;
+        record.evidence_use = EvidenceUseV1::NotEvaluated;
+        record.claim_support = ClaimSupportV1::NotEvaluated;
+        record.abstention_quality = AbstentionQualityV1::NotEvaluated;
+        record.confidence_millionths = None;
+        record.confidence_source = ConfidenceSourceV1::None;
+
+        let report = full_report(fields);
+        let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
+        assert!(verification.valid, "{:?}", verification.issues);
+        let scorecard = verification.scorecard.unwrap();
+        assert_eq!(scorecard.planned_trial_count, 3);
+        assert_eq!(scorecard.terminal_status_counts.get("timeout"), Some(&1));
+        // The raw receipt retains the partial output digest while the failed
+        // trial contributes no correctness/evidence-use score.
+        let outcome: EvidenceOutcomeReportV1 = serde_json::from_slice(&report).unwrap();
+        assert_eq!(
+            outcome.records[1].response_artifact_sha256.as_deref(),
+            Some(digest('e').as_str())
+        );
+        assert_eq!(
+            outcome.records[1].task_correctness,
+            TaskCorrectnessV1::NotEvaluated
+        );
+    }
+
+    #[test]
+    fn abstention_can_be_supported_by_relevant_but_conflicting_evidence() {
+        let plan = intervention_plan();
+        let mut fields = fields(&plan);
+        let record = &mut fields.records[2];
+        record.response_status = OutcomeResponseStatusV1::Abstained;
+        record.task_correctness = TaskCorrectnessV1::NotEvaluated;
+        record.evidence_use = EvidenceUseV1::UsedRelevant;
+        record.claim_support = ClaimSupportV1::NotEvaluated;
+        record.abstention_quality = AbstentionQualityV1::Appropriate;
+        record.confidence_millionths = None;
+        record.confidence_source = ConfidenceSourceV1::None;
+
+        let report = full_report(fields);
+        let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
+        assert!(verification.valid, "{:?}", verification.issues);
+        let scorecard = verification.scorecard.unwrap();
+        assert_eq!(scorecard.planned_trial_count, 3);
+    }
+
+    #[test]
     fn rejects_missing_duplicate_and_wrong_condition_records() {
         let plan = intervention_plan();
 
