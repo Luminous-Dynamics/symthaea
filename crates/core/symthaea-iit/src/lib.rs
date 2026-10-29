@@ -40,11 +40,12 @@ pub const MAX_DENSE_UNITS: usize = 16;
 
 const MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0";
 const EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0";
+const ANALYSIS_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0";
 
 /// Errors caused by invalid model inputs or invalid state requests.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum ModelError {
-    #[error("unit count must be in 1..={MAX_DENSE_UNITS}; got {units}")]
+    #[error("unit count must be in 1..=16; got {units}")]
     InvalidUnitCount { units: usize },
 
     #[error("TPM length mismatch: expected {expected} state-by-unit values, got {actual}")]
@@ -61,6 +62,9 @@ pub enum ModelError {
 
     #[error("unit index {index} is outside 0..{unit_count}")]
     UnitIndexOutOfRange { index: usize, unit_count: usize },
+
+    #[error("quantity {quantity} is not supported by formalism {formalism}")]
+    IncompatibleQuantity { quantity: &'static str, formalism: &'static str },
 }
 
 /// Dense, binary, factored transition-probability model.
@@ -243,6 +247,131 @@ impl BinaryCausalModel {
     }
 }
 
+
+/// Explicit IIT formalism profile. Profiles are not interchangeable defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FormalismProfile {
+    /// Original IIT 3.0 formalism (PyPhi preset: IIT_3_0).
+    Iit3_0,
+    /// IIT 4.0 as published in 2023, without the later intrinsic-information
+    /// requirement in the system-level phi_s measure.
+    Iit4_0_2023,
+    /// IIT 4.0 with the intrinsic-information requirement described in 2026.
+    Iit4_0_2026,
+}
+
+impl FormalismProfile {
+    /// Stable external identifier intended for manifests and request digests.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Iit3_0 => "IIT_3_0",
+            Self::Iit4_0_2023 => "IIT_4_0_2023",
+            Self::Iit4_0_2026 => "IIT_4_0_2026",
+        }
+    }
+}
+
+/// Requested result identity. Distinct variants prevent conflating IIT 3.0 Phi,
+/// IIT 4.0 system phi_s, mechanism small phi, and structure-level big Phi.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AnalysisQuantity {
+    Iit3SystemPhi,
+    Iit4SystemPhiS,
+    Iit4MechanismSmallPhi,
+    Iit4CauseEffectStructure,
+    Iit4StructureBigPhi,
+}
+
+impl AnalysisQuantity {
+    /// Stable external identifier intended for manifests and request digests.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Iit3SystemPhi => "iit3_system_phi",
+            Self::Iit4SystemPhiS => "iit4_system_phi_s",
+            Self::Iit4MechanismSmallPhi => "iit4_mechanism_small_phi",
+            Self::Iit4CauseEffectStructure => "iit4_cause_effect_structure",
+            Self::Iit4StructureBigPhi => "iit4_structure_big_phi",
+        }
+    }
+
+    fn compatible_with(self, formalism: FormalismProfile) -> bool {
+        match (self, formalism) {
+            (Self::Iit3SystemPhi, FormalismProfile::Iit3_0) => true,
+            (
+                Self::Iit4SystemPhiS
+                | Self::Iit4MechanismSmallPhi
+                | Self::Iit4CauseEffectStructure
+                | Self::Iit4StructureBigPhi,
+                FormalismProfile::Iit4_0_2023 | FormalismProfile::Iit4_0_2026,
+            ) => true,
+            _ => false,
+        }
+    }
+}
+
+/// Complete identity of one requested calculation; no calculation algorithm is
+/// implied by creating or hashing this record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisRequest {
+    state: Vec<bool>,
+    formalism: FormalismProfile,
+    quantity: AnalysisQuantity,
+}
+
+impl AnalysisRequest {
+    /// Create a request only when state shape and quantity/formalism are compatible.
+    pub fn new(
+        model: &BinaryCausalModel,
+        state: Vec<bool>,
+        formalism: FormalismProfile,
+        quantity: AnalysisQuantity,
+    ) -> Result<Self, ModelError> {
+        model.check_state(&state)?;
+        if !quantity.compatible_with(formalism) {
+            return Err(ModelError::IncompatibleQuantity {
+                quantity: quantity.id(),
+                formalism: formalism.id(),
+            });
+        }
+        Ok(Self { state, formalism, quantity })
+    }
+
+    pub fn state(&self) -> &[bool] {
+        &self.state
+    }
+
+    pub fn formalism(&self) -> FormalismProfile {
+        self.formalism
+    }
+
+    pub fn quantity(&self) -> AnalysisQuantity {
+        self.quantity
+    }
+
+    /// SHA-256 binding model bytes, evaluation state, formalism, and quantity.
+    ///
+    /// A qualified result receipt should also bind build identity, algorithm
+    /// version, numerical policy, and partition-search configuration.
+    pub fn request_sha256(&self, model: &BinaryCausalModel) -> String {
+        let mut bytes = Vec::with_capacity(
+            ANALYSIS_REQUEST_MAGIC.len()
+                + model.canonical_bytes().len()
+                + self.state.len()
+                + self.formalism.id().len()
+                + self.quantity.id().len()
+                + 2,
+        );
+        bytes.extend_from_slice(ANALYSIS_REQUEST_MAGIC);
+        bytes.extend_from_slice(&model.canonical_bytes());
+        bytes.extend(self.state.iter().map(|on| u8::from(*on)));
+        bytes.push(0);
+        bytes.extend_from_slice(self.formalism.id().as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.quantity.id().as_bytes());
+        hex_digest(&bytes)
+    }
+}
+
 fn hex_digest(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(digest.len() * 2);
@@ -259,7 +388,8 @@ mod tests {
     use super::*;
 
     fn two_unit_model() -> BinaryCausalModel {
-        // States are [00, 01, 10, 11], with unit 0 as the least-significant bit.
+        // State indices 0..3 map to [false,false], [true,false],
+        // [false,true], [true,true]; unit 0 is the least-significant bit.
         // Each row contains P(A_next=1), P(B_next=1).
         BinaryCausalModel::new(
             2,
@@ -377,4 +507,64 @@ mod tests {
             Err(ModelError::StateLength { expected: 2, actual: 1 })
         ));
     }
+    #[test]
+    fn formalism_and_quantity_are_typed_and_compatible() {
+        let model = two_unit_model();
+        assert!(AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS
+        ).is_ok());
+        assert!(matches!(
+            AnalysisRequest::new(
+                &model,
+                vec![true, false],
+                FormalismProfile::Iit3_0,
+                AnalysisQuantity::Iit4StructureBigPhi
+            ),
+            Err(ModelError::IncompatibleQuantity { .. })
+        ));
+        assert!(matches!(
+            AnalysisRequest::new(
+                &model,
+                vec![true],
+                FormalismProfile::Iit4_0_2026,
+                AnalysisQuantity::Iit4SystemPhiS
+            ),
+            Err(ModelError::StateLength { .. })
+        ));
+        assert_eq!(FormalismProfile::Iit4_0_2023.id(), "IIT_4_0_2023");
+        assert_eq!(FormalismProfile::Iit4_0_2026.id(), "IIT_4_0_2026");
+        assert_ne!(
+            AnalysisQuantity::Iit4SystemPhiS.id(),
+            AnalysisQuantity::Iit4StructureBigPhi.id()
+        );
+    }
+
+    #[test]
+    fn analysis_request_digest_binds_formalism_and_quantity() {
+        let model = two_unit_model();
+        let req_2023 = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        let req_2026 = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            FormalismProfile::Iit4_0_2026,
+            AnalysisQuantity::Iit4SystemPhiS,
+        ).unwrap();
+        let req_structure = AnalysisRequest::new(
+            &model,
+            vec![true, false],
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4StructureBigPhi,
+        ).unwrap();
+        assert_ne!(req_2023.request_sha256(&model), req_2026.request_sha256(&model));
+        assert_ne!(req_2023.request_sha256(&model), req_structure.request_sha256(&model));
+    }
+
 }
