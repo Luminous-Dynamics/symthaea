@@ -26,7 +26,7 @@ class ArrayLike:
 class FakeFrame:
     def __init__(self, rows, index):
         self.values = ArrayLike(rows)
-        self.index = index
+        self.index = ArrayLike(index)
 
 
 class FakeTpm:
