@@ -58,6 +58,8 @@ struct Manifest {
     model_input_columns: Vec<String>,
     input_files: Vec<InputFile>,
     #[serde(default)]
+    geometry_preprocessing_profile: Option<String>,
+    #[serde(default)]
     em_preprocessing_profile: Option<String>,
     #[serde(default)]
     reviewed_by: Option<String>,
@@ -272,6 +274,36 @@ fn semantic_checks(manifest: &Manifest) -> Vec<Check> {
         checks.push(Check::fail("geometry_mode", "input_mode must be single_segment or dual_segment"));
     } else {
         checks.push(Check::pass("geometry_mode", "geometry input matches the declared segment mode"));
+    }
+
+    let has_geometry_render = has_geometry || has_geometry_single;
+    let geometry_profile = manifest.geometry_preprocessing_profile.as_deref().unwrap_or("");
+    let expected_geometry_profile = if has_geometry_single {
+        "single_segment_zero_mask_channels"
+    } else if has_geometry {
+        "dual_segment_native"
+    } else {
+        "not_applicable"
+    };
+    if (expected_geometry_profile == "not_applicable"
+        && (geometry_profile.is_empty() || geometry_profile == expected_geometry_profile))
+        || geometry_profile == expected_geometry_profile
+    {
+        checks.push(Check::pass(
+            "geometry_preprocessing_profile",
+            format!("geometry preprocessing profile is {expected_geometry_profile}"),
+        ));
+    } else {
+        checks.push(Check::fail(
+            "geometry_preprocessing_profile",
+            format!("expected {expected_geometry_profile:?} for selected geometry columns; got {geometry_profile:?}"),
+        ));
+    }
+    if !has_geometry_render && manifest.geometry_preprocessing_profile.as_deref().is_some_and(|v| v != "not_applicable") {
+        checks.push(Check::fail(
+            "geometry_preprocessing_profile",
+            "geometry preprocessing profile must be not_applicable when no geometry column is a model input",
+        ));
     }
 
     let has_em = manifest.model_input_columns.iter().any(|v| EM_INPUT_COLUMNS.contains(&v.as_str()));
@@ -537,6 +569,7 @@ mod tests {
                 bytes: 123,
                 split: "train".into(),
             }],
+            geometry_preprocessing_profile: Some("single_segment_zero_mask_channels".into()),
             em_preprocessing_profile: Some("single_segment_fuse_ab_zero_b".into()),
             reviewed_by: Some("connectomics-reviewer".into()),
             notes: None,
@@ -572,6 +605,24 @@ mod tests {
         manifest.model_input_columns.push("em_best".into());
         let checks = semantic_checks(&manifest);
         assert!(checks.iter().any(|check| !check.passed && check.code == "model_input_allowlist"));
+    }
+
+    #[test]
+    fn single_segment_geometry_requires_zeroed_mask_channels() {
+        let mut manifest = base_manifest();
+        manifest.geometry_preprocessing_profile = Some("dual_segment_native".into());
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().any(|check| !check.passed && check.code == "geometry_preprocessing_profile"));
+    }
+
+    #[test]
+    fn geometry_profile_is_not_applicable_when_using_only_em() {
+        let mut manifest = base_manifest();
+        manifest.model_input_columns = vec!["em_xy".into()];
+        manifest.geometry_preprocessing_profile = None;
+        manifest.em_preprocessing_profile = Some("single_segment_fuse_ab_zero_b".into());
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().all(|check| check.passed), "{checks:#?}");
     }
 
     #[test]
