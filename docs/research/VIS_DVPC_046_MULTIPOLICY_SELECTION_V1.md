@@ -54,13 +54,15 @@ The portfolio certificate is conservative by design: even if one policy looks pr
 
 ## Fixed-horizon COLT and LS baselines
 
-At the three preregistered looks, the benchmark also evaluates the following methods on the same logged prefix:
+At the three preregistered looks, the benchmark also evaluates three fixed-horizon methods on the same logged prefix:
 
 - **pCRP-star fixed-grid LCB.** This is based on the penalized best constant-rebalanced-portfolio LCB in Ryu et al., *Improved Offline Contextual Bandits with Second-Order Bounds: Betting and Freezing* (COLT 2025). It uses a fixed set of 33 feasible bets and monotone root bisection. A finite grid's maximum wealth is no larger than the continuous-bet supremum, so the induced LCB is conservative relative to the exact pCRP-star bound, potentially at a cost in width. This is *not* an exact reproduction of the paper's continuous optimization or its separate freezing-based learning algorithm. Reference: https://proceedings.mlr.press/v291/ryu25a.html
 
 - **Logarithmic Smoothing (LS) fixed-horizon LCB.** This is based on Sakhi et al., *Logarithmic Smoothing for Pessimistic Off-Policy Evaluation, Selection and Learning* (NeurIPS 2024), Corollary 5 / equations (12)–(14). With nonnegative reward scores `Y=wR` and their complement `Yc=w(1-R)`, it computes `L(Y)` and `U(V)=1-L(Yc)`. The registered, scale-aware parameter is `lambda = sqrt(2 ln(1/delta_tail)/(n W_j^2))`; it is fixed by n, the error allocation and the known policy-specific weight ceiling, never tuned on test outcomes. The 2024 bound applies for fixed-horizon inputs; this implementation does not call it a confidence sequence. Reference: https://proceedings.neurips.cc/paper_files/paper/2024/hash/9379ea6ba7a61a402c7750833848b99f-Abstract-Conference.html
 
-Each one-sided bound uses `delta_tail = 0.05/(2M)` for that registered horizon. At each horizon this allocates the full 0.05 risk budget across the lower/upper tails and M policy candidates. Because there are multiple registered horizons, this is a per-look fixed-horizon claim—not a simultaneous guarantee across all three horizons and not an optional-stopping guarantee. A future sequential LS implementation must use the theorem and protocol of the separate 2026 sequential LS + online PAC-Bayes work: https://proceedings.mlr.press/v300/haddouche26a.html.
+- **Safe lambda-grid LS.** This is a familywise-safe parameter-selection variant of the 2024 LS lower bound. It evaluates the preregistered scales `s ∈ {0.5, 1, 2}` with `lambda_s = s * sqrt(2 ln(1/delta_tail_lambda)/(n W_j^2))` and `delta_tail_lambda = 0.05/(2 M K)`, where `K=3`. It selects the maximum of the K reward LCBs and, separately, the maximum of the K reward-complement LCBs for the reflected upper bound. Since each of the K bounds receives `delta_tail/K`, a union bound preserves the tail error budget while allowing the smoothing parameter to be selected from the same logged sample. The multiplier grid is frozen in source and is not tuned from observed test outcomes. This is still a fixed-horizon method.
+
+The single-lambda pCRP-star and LS bounds use `delta_tail = 0.05/(2M)` for that registered horizon. For safe lambda-grid LS, the tail budget is divided by K=3 in addition to dividing across the M policies. At each horizon the total allocation is 0.05 across lower/upper tails and the finite policy set. Because there are multiple registered horizons, this is a per-look fixed-horizon claim—not a simultaneous guarantee across all three horizons and not an optional-stopping guarantee. A future sequential LS implementation must use the theorem and protocol of the separate 2026 sequential LS + online PAC-Bayes work: https://proceedings.mlr.press/v300/haddouche26a.html.
 
 To keep the new methods computationally tractable for 1,024 replicates through n=4,096, the Rust harness compresses exactly repeated nonnegative IPS scores into (score, multiplicity) bins as data arrive. This leaves the logged stream and mathematical objective unchanged. Tests compare the compressed log wealth against an observation-level calculation, check the analytical pCRP constant-stream root, verify LS's constant-stream formula, and verify the identity `E[w(1-R)] = 1 - V(pi)` under both registered loggers.
 
@@ -84,7 +86,7 @@ A false certificate means some certified candidate is suboptimal relative to the
 ## Hard gates
 
 The exact-head workflow checks:
-- expected output row counts (1,224 full metric rows; 816 smoke metric rows), 36/24 fixed-horizon guarantee-status rows and deterministic replay (wall-time rows excluded), including 88 explicit policy definitions;
+- expected output row counts (1,332 full metric rows; 888 smoke metric rows), 54/36 fixed-horizon guarantee-status rows and deterministic replay (wall-time rows excluded), including 88 explicit policy definitions;
 - every importance ratio stays below its computed policy-specific W_j;
 - the familywise CS has a sequence-coverage Wilson lower bound above 0.90 for every portfolio;
 - its false-certificate probability has a Wilson upper bound below 0.10;
