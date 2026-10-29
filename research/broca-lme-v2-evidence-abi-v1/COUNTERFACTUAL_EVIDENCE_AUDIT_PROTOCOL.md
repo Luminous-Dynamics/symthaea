@@ -42,8 +42,8 @@ Proposed pair record:
       "case_id": "negation-0001-a",
       "evidence": [
         {
-          "evidence_id": "event-a",
-          "source_id": "source-a",
+          "evidence_id": "event-1",
+          "source_id": "source-1",
           "scope": "prod-east",
           "observed_at": "2026-01-02T10:00:00Z",
           "valid_until": null,
@@ -55,8 +55,8 @@ Proposed pair record:
       "case_id": "negation-0001-b",
       "evidence": [
         {
-          "evidence_id": "event-b",
-          "source_id": "source-b",
+          "evidence_id": "event-1",
+          "source_id": "source-1",
           "scope": "prod-east",
           "observed_at": "2026-01-02T10:00:00Z",
           "valid_until": null,
