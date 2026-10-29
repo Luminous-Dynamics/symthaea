@@ -1,0 +1,56 @@
+{
+  "schema": "symthaea-joint-graph-actuator-receipt-v1",
+  "date": "2026-10-22",
+  "status": "EXACT_SOURCE_LOCAL_TESTS_PASSED_NOT_EXTERNAL_QUALIFICATION",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "research/entropy-causal-cut-benchmark-v1",
+  "source": {
+    "path": "validation/joint_graph_actuator_inference.py",
+    "git_blob": "80939b1e17dbd5bd1384824586ea12e9d0cfe08b",
+    "bytes": 14455,
+    "sha256": "ed49dd785ca5894dc452caf42dddffc2ce85c81695960f1a4387468b4ea6f4bb"
+  },
+  "tests": {
+    "path": "validation/test_joint_graph_actuator_inference.py",
+    "git_blob": "6c464e13deffc18974a930131599eb41da7a5a1f",
+    "bytes": 2496,
+    "sha256": "37a2eef94a69c9f2e7b6487b1901da4098cdd05fa42806527b1d45b5c520e2be",
+    "count": 6,
+    "result": "6/6_PASS_LOCAL"
+  },
+  "dependency": {
+    "path": "validation/intervention_reliability_audit.py",
+    "git_blob": "f0f0a684891707171c886737a536ef1d96174052",
+    "role": "SCM, Action, entropy, outcome likelihood and weighted AUC reference functions"
+  },
+  "artifact": {
+    "path": "joint_graph_actuator_results.json",
+    "repository_summary_path": "validation/joint_graph_actuator_summary_2026-10-22.json",
+    "repository_summary_git_blob": "b7744975c1f1fc4349b0d7756eac297c58eee4bd",
+    "bytes": 27572,
+    "rows": 60,
+    "sha256": "153e8d61e2928ccc459308273d7c502e8c7b42843d080d9eb6206d34e02509eb",
+    "source_git_blob_bound": "80939b1e17dbd5bd1384824586ea12e9d0cfe08b"
+  },
+  "report": {
+    "path": "docs/research/JOINT_GRAPH_ACTUATOR_INFERENCE_2026-10-22.md",
+    "git_blob": "9cc847e230b313468f79e65e7a79443cde565926",
+    "bytes": 8797
+  },
+  "protocol": {
+    "candidate_graphs": ["candidate_chain", "candidate_fork"],
+    "compliance_grid": [0.5, 0.75, 1.0],
+    "out_of_class_worlds": ["heldout_collider_xor", "heldout_reverse_chain"],
+    "noise_grid": [0.1, 0.25],
+    "adaptive_budget": 2,
+    "policies": 5
+  },
+  "validation": {
+    "embedded_self_test": "PASS_LOCAL",
+    "unit_tests": "6/6_PASS_LOCAL",
+    "exact_execution_source_matches_git_blob": true,
+    "exact_test_source_matches_git_blob": true,
+    "remote_ci": "not claimed as passing; exact final head has not returned workflow/status evidence"
+  },
+  "conclusion": "Joint graph/compliance inference has zero in-class zero-support mass for the declared q grid, unlike naive q=1 under partial compliance. The compliance-information term modestly improves OOD-surprise AUC in this exact toy grid. The JSD addition contributes little separate gain. No external benchmark or SOTA claim is established."
+}

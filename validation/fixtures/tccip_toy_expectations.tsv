@@ -1,0 +1,10 @@
+# schema=tccip-toy-expectations-v3
+# Each row is an executable fixture plus analytical expectations; weights are integer counts over input states in LSB-first bit order, not a Rust run receipt.
+# interventions: semicolon-separated id:source_node:target_node:positive_cost. Cross-cut vs internal is derived from partition labels.
+# columns: fixture<TAB>node_count<TAB>input_count<TAB>output_node<TAB>task_target<TAB>input_state_weights<TAB>canonical_rules<TAB>components_A_B<TAB>interventions<TAB>partition_mask<TAB>intact_utility<TAB>cross_mean_loss<TAB>control_mean_loss<TAB>tccip<TAB>partitions_total<TAB>partitions_usable<TAB>partitions_skipped<TAB>partition_min<TAB>partition_max
+useful_xor_coordination	8	2	4	xor-inputs:0:1	1,1,1,1	input:0,input:1,copy:0,copy:1,xor:2:3,copy:0,copy:1,xor:5:6	AAAABBBB	cross_left_into_task_xor:2:4:1;cross_right_into_task_xor:3:4:1;matched_cut_control_left:5:7:1;matched_cut_control_right:6:7:1	240	1.0	0.5	0.0	0.5	127	112	15	-0.5	0.5
+irrelevant_cross_component_connectivity	5	2	2	copy-input:0	1,1,1,1	input:0,input:1,copy:0,copy:2,copy:3	AAABB	cross_cut_irrelevant_branch:2:3:1;matched_internal_side_branch:3:4:1	24	1.0	0.0	0.0	0.0	15	8	7	0.0	0.0
+harmful_cross_component_coupling	10	2	6	xor-inputs:0:1	1,1,1,1	input:0,input:1,copy:0,copy:1,xor:2:3,constant:1,xor:4:5,copy:0,copy:1,xor:7:8	AAAAAABBBB	cross_cut_correct_parity_path:4:6:1;cross_cut_harmful_bias_path:5:6:1;matched_control_left:7:9:1;matched_control_right:8:9:1	960	0.0	-0.5	0.0	-0.5	511	448	63	-0.5	0.5
+task_relevant_high_x1_prior	5	2	4	and-inputs:0:1	4,1,16,4	input:0,input:1,copy:0,copy:1,and:2:3	ABABB	cross_cut_input0:2:4:1;matched_internal_input1:3:4:1	26	1.0	0.4	0.1	0.3	15	8	7	-0.3	0.3
+task_relevant_high_x0_prior	5	2	4	and-inputs:0:1	4,16,1,4	input:0,input:1,copy:0,copy:1,and:2:3	ABABB	cross_cut_input0:2:4:1;matched_internal_input1:3:4:1	26	1.0	0.1	0.4	-0.3	15	8	7	-0.3	0.3
+role_matched_xor_synergy_uniform_prior	5	2	4	xor-inputs:0:1	1,1,1,1	input:0,input:1,copy:0,copy:1,xor:2:3	ABABB	cross_cut_xor_left:2:4:1;matched_internal_xor_right:3:4:1	26	1.0	0.5	0.5	0.0	15	8	7	0.0	0.0
