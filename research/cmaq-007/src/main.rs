@@ -143,19 +143,8 @@ fn select_candidate(actions: &[CandidateAction], strategy: Strategy) -> Option<u
         Strategy::UncertaintyPenalty => best_index(actions, |action| {
             action.predicted_utility - 2.0 * action.predicted_uncertainty
         }),
-        Strategy::SupportGate(threshold) => {
-            let eligible: Vec<(usize, &CandidateAction)> = actions
-                .iter()
-                .enumerate()
-                .filter(|(_, action)| action.support_score >= threshold)
-                .collect();
-            eligible
-                .into_iter()
-                .max_by(|(_, left), (_, right)| {
-                    left.predicted_utility.total_cmp(&right.predicted_utility)
-                })
-                .map(|(index, _)| index)
-        }
+        Strategy::SupportGate(threshold) => best_gate(actions, threshold, false),
+        Strategy::ShuffledSupportGate(threshold) => best_gate(actions, threshold, true),
     }
 }
 
