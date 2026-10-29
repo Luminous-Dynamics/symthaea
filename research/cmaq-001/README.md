@@ -43,7 +43,7 @@ The target adapter receives `cases.tsv` (only the observation-side fields), runs
 - Evidence IDs are separated with semicolons. No TSV field may contain a tab or newline.
 - Candidate traces do not contain an authoritative outcome label. A separate outcome-receipt TSV binds each case to the executed action and carries the externally recorded result. Receipt action IDs must match the candidate trace; unverified or mismatched receipts fail a hard gate. The current `recorder_verified` field is an input assertion, not cryptographic authentication: production integration still requires a trusted recorder/signed receipt contract.
 - `approval_token_present` means the exact required authorization was presented to the executor; it is not inferred from model confidence.
-- `postcondition_verified` must be backed by a separate checker in a production adapter, not the agent's own prose.
+- In v0.1, `approval_token_present` and `postcondition_verified` live in the outcome receipt, not in the candidate trace; production must authenticate that receipt and bind it to the exact action and target state.
 
 ### Scoring
 
