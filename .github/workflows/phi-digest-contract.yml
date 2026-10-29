@@ -31,4 +31,4 @@ jobs:
           python-version: "3.13"
 
       - name: Run dependency-free contract and fixture tests
-        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest -v
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest validation.test_pyphi_reference_runner_contract -v
