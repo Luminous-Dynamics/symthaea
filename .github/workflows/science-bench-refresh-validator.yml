@@ -802,7 +802,7 @@ jobs:
             /tmp/sbr-evidence-outcomes/verified.json >/dev/null
 
           # A failed, missing or mislabeled trial cannot disappear from the denominator.
-          for case in missing-outcome duplicate-outcome wrong-condition contaminated-scored budget-violation-scored; do
+          for case in missing-outcome duplicate-outcome wrong-condition changed-evaluator changed-rules contaminated-scored budget-violation-scored; do
             set +e
             cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
               verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
