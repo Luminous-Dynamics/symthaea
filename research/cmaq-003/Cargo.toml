@@ -7,3 +7,5 @@ license = "AGPL-3.0-or-later"
 description = "Deterministic synthetic smoke harness for sequential causal regime-shift detection"
 
 [dependencies]
+
+[workspace]
