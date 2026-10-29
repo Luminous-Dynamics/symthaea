@@ -439,7 +439,12 @@ mod tests {
 
     #[test]
     fn matching_prediction_has_expected_metrics() {
-        let input = data(&[0.5, 0.5], &[50, 50], SamplingAssumption::IidCategorical, ObservationSource::AnalyticReference);
+        let input = data(
+            &[0.5, 0.5],
+            &[50, 50],
+            SamplingAssumption::IidCategorical,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 0.25, 0.6, Some(1.0))).unwrap();
         assert_eq!(report.observed_total_variation, Some(0.0));
         assert!((report.brier_score.unwrap() - 0.5).abs() < 1e-12);
@@ -449,7 +454,12 @@ mod tests {
 
     #[test]
     fn systematic_prediction_bias_is_rejected() {
-        let input = data(&[0.9, 0.1], &[10, 90], SamplingAssumption::IidCategorical, ObservationSource::MeasuredPhysical);
+        let input = data(
+            &[0.9, 0.1],
+            &[10, 90],
+            SamplingAssumption::IidCategorical,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 0.25, 0.6, Some(1.0))).unwrap();
         assert!((report.observed_total_variation.unwrap() - 0.8).abs() < 1e-12);
         assert_eq!(report.status, PredictiveAdequacyStatus::Reject);
@@ -457,7 +467,12 @@ mod tests {
 
     #[test]
     fn observed_zero_probability_event_is_explicit_and_rejected() {
-        let input = data(&[1.0, 0.0], &[99, 1], SamplingAssumption::IidCategorical, ObservationSource::MeasuredPhysical);
+        let input = data(
+            &[1.0, 0.0],
+            &[99, 1],
+            SamplingAssumption::IidCategorical,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 1.0, 2.0, None)).unwrap();
         assert_eq!(report.mean_log_loss, Some(PredictiveLogLoss::InfiniteDueToZeroProbability));
         assert!(report.observed_zero_probability_event);
@@ -466,14 +481,24 @@ mod tests {
 
     #[test]
     fn too_few_observations_mean_insufficient_not_pass() {
-        let input = data(&[0.5, 0.5], &[4, 6], SamplingAssumption::IidCategorical, ObservationSource::SyntheticFixture);
+        let input = data(
+            &[0.5, 0.5],
+            &[4, 6],
+            SamplingAssumption::IidCategorical,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 1.0, 2.0, None)).unwrap();
         assert_eq!(report.status, PredictiveAdequacyStatus::InsufficientEvidence);
     }
 
     #[test]
     fn non_iid_sampling_has_no_iid_confidence_radius() {
-        let input = data(&[0.5, 0.5], &[50, 50], SamplingAssumption::UnknownOrNonIid, ObservationSource::MeasuredPhysical);
+        let input = data(
+            &[0.5, 0.5],
+            &[50, 50],
+            SamplingAssumption::UnknownOrNonIid,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 1.0, 2.0, None)).unwrap();
         assert_eq!(report.total_variation_sampling_radius, None);
         assert_eq!(report.status, PredictiveAdequacyStatus::InsufficientEvidence);
@@ -503,7 +528,12 @@ mod tests {
 
     #[test]
     fn one_category_has_zero_tv_and_exact_model_agreement() {
-        let input = data(&[1.0], &[100], SamplingAssumption::IidCategorical, ObservationSource::AnalyticReference);
+        let input = data(
+            &[1.0],
+            &[100],
+            SamplingAssumption::IidCategorical,
+            ObservationSource::SyntheticFixture,
+        );
         let report = assess_predictive_adequacy(&input, policy(100, 0.0, 0.0, Some(0.0))).unwrap();
         assert_eq!(report.observed_total_variation, Some(0.0));
         assert_eq!(report.total_variation_sampling_radius, Some(0.0));
