@@ -313,3 +313,73 @@ jobs:
           set -e
           test "$task_regen_exit" -eq 5
           grep -q '"byte_exact_match": false' /tmp/sbr-task-regeneration-report.json
+
+
+      - name: Cross-set overlap audit positive and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          cat > /tmp/sbr-overlap-left.json <<'JSON'
+          {
+            "schema": "symthaea.science_bench_refresh_task_set.v1",
+            "generation_id": "development-fixture",
+            "tasks": [{
+              "task_id": "dev-1",
+              "family_id": "semantic_invariance",
+              "policy_input": {
+                "instruction": "Recover the relationship.",
+                "observations": [{"x": 1.0, "y": 2.0}, {"x": 2.0, "y": 4.0}]
+              },
+              "evaluator_only": {"expected_law": "secret-fixture-label"}
+            }]
+          }
+          JSON
+
+          # Exact policy inputs block, even when task IDs/targets differ.
+          jq '.generation_id = "refresh-exact" |
+              .tasks[0].task_id = "refresh-1" |
+              .tasks[0].evaluator_only.expected_law = "different-secret"' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-exact.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:exact /tmp/sbr-overlap-exact.json > /tmp/sbr-overlap-exact-report.json
+          exact_exit=$?
+          set -e
+          test "$exact_exit" -eq 6
+          grep -q '"exact_overlap_pair_count": 1' /tmp/sbr-overlap-exact-report.json
+          ! grep -Eq 'secret-fixture-label|different-secret' /tmp/sbr-overlap-exact-report.json
+
+          # A coarse numerical match pauses for review; it is not classified as a leak.
+          jq '.generation_id = "refresh-near" |
+              .tasks[0].task_id = "near-1" |
+              .tasks[0].policy_input.observations[0].x = 1.0001 |
+              .tasks[0].policy_input.observations[0].y = 2.0001 |
+              .tasks[0].policy_input.observations[1].x = 2.0001 |
+              .tasks[0].policy_input.observations[1].y = 4.0001' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-near.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:near /tmp/sbr-overlap-near.json > /tmp/sbr-overlap-near-report.json
+          near_exit=$?
+          set -e
+          test "$near_exit" -eq 7
+          grep -q '"near_duplicate_candidate_pair_count": 1' /tmp/sbr-overlap-near-report.json
+          grep -q 'manual_review_required_for_numeric_near_duplicates' /tmp/sbr-overlap-near-report.json
+
+          # Same structure but numerically distant observations are a negative control.
+          jq '.generation_id = "refresh-distant" |
+              .tasks[0].task_id = "distant-1" |
+              .tasks[0].policy_input.observations[0].x = 100.0 |
+              .tasks[0].policy_input.observations[0].y = 200.0 |
+              .tasks[0].policy_input.observations[1].x = 101.0 |
+              .tasks[0].policy_input.observations[1].y = 400.0' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-distant.json
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:distant /tmp/sbr-overlap-distant.json > /tmp/sbr-overlap-distant-report.json
+          grep -q '"exact_overlap_pair_count": 0' /tmp/sbr-overlap-distant-report.json
+          grep -q '"near_duplicate_candidate_pair_count": 0' /tmp/sbr-overlap-distant-report.json
+          grep -q 'no_detected_exact_or_numeric_tolerant_overlap' /tmp/sbr-overlap-distant-report.json
