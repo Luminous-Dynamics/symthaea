@@ -1,8 +1,9 @@
 //! Fail-closed validator for source-derived semisynthetic drift benchmark manifests.
 //!
 //! The manifest describes provenance and experimental design. Dataset payloads are deliberately
-//! not embedded in this tool. Output bytes and the canonical manifest are hashed with the host's
-//! standard `sha256sum` utility when a receipt is validated.
+//! not embedded in this tool. The intervention plan is a separately hashed canonical file whose
+//! bytes and declared fields are checked against the manifest. Manifest, intervention, and output
+//! bytes are hashed with the host's standard `sha256sum` utility when validated.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
