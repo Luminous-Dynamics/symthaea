@@ -123,22 +123,26 @@ fn ipcw_hoeffding_cs(sum:f64,n:usize,bound:f64,previous:Interval)->Interval{
 fn seed_for(rep:usize)->u64{
     0x8b8b_8b8b_0480_0048 ^ (rep as u64).wrapping_mul(0xA076_1D64_78BD_642F)
 }
-const COMMON_NAMES:[&str;10]=[
+const COMMON_NAMES:[&str;13]=[
     "available_case_ips_estimate",
     "available_case_ips_bias",
     "available_case_ips_absolute_error",
+    "available_case_ips_squared_error",
     "available_case_wald_coverage",
     "available_case_wald_width",
     "zero_filled_ips_estimate",
     "zero_filled_ips_bias",
+    "zero_filled_ips_absolute_error",
+    "zero_filled_ips_squared_error",
     "matured_fraction",
     "target_action_matured_fraction",
     "matured_sample_count",
 ];
-const IPCW_NAMES:[&str;8]=[
+const IPCW_NAMES:[&str;9]=[
     "ipcw_estimate",
     "ipcw_bias",
     "ipcw_absolute_error",
+    "ipcw_squared_error",
     "ipcw_pointwise_hoeffding_coverage",
     "ipcw_cs_sequence_coverage",
     "ipcw_cs_width",
@@ -209,14 +213,20 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
             if look_i<looks.len()&&n==looks[look_i]{
                 let estimate=if mature_count==0{0.0}else{available_sum/mature_count as f64};
                 let (lo,hi,width,wald_estimate)=available_case_wald(available_sum,available_sq,mature_count);
+                let available_error=estimate-true_value();
+                let zero_estimate=zero_fill_sum/n as f64;
+                let zero_error=zero_estimate-true_value();
                 let common_values=[
                     estimate,
-                    estimate-true_value(),
-                    (estimate-true_value()).abs(),
+                    available_error,
+                    available_error.abs(),
+                    available_error*available_error,
                     (lo<=true_value()+EPS&&hi>=true_value()-EPS) as u8 as f64,
                     width,
-                    zero_fill_sum/n as f64,
-                    zero_fill_sum/n as f64-true_value(),
+                    zero_estimate,
+                    zero_error,
+                    zero_error.abs(),
+                    zero_error*zero_error,
                     mature_count as f64/n as f64,
                     if target_seen==0{0.0}else{target_matured as f64/target_seen as f64},
                     mature_count as f64,
@@ -226,10 +236,12 @@ fn simulate(f:Fixture,reps:usize,looks:&[usize])->Result<ResultFixture,String>{
                 if is_identified{
                     let ipcw_est=ipcw_sum/n as f64;
                     let ess=if ipcw_weight_sq_sum<=0.0{0.0}else{ipcw_weight_sum*ipcw_weight_sum/ipcw_weight_sq_sum};
+                    let ipcw_error=ipcw_est-true_value();
                     let values=[
                         ipcw_est,
-                        ipcw_est-true_value(),
-                        (ipcw_est-true_value()).abs(),
+                        ipcw_error,
+                        ipcw_error.abs(),
+                        ipcw_error*ipcw_error,
                         current_raw_cs.covers(true_value()) as u8 as f64,
                         cs_sequence_coverage as u8 as f64,
                         cs.width(),
