@@ -140,7 +140,7 @@ pub fn plan_promotions(
 ) -> Result<PromotionDecision, FidelityError> {
     validate_fidelity_ladder(levels)?;
 
-    if current_fidelity_index + 1 >= levels.len() {
+    if current_fidelity_index >= levels.len() - 1 {
         return Err(FidelityError::new(
             "current_fidelity_index",
             "must identify a level with a subsequent fidelity",
@@ -382,15 +382,12 @@ mod tests {
         assert_eq!(first.promoted_candidate_ids.len(), 4);
         assert_eq!(first.exploitation_count, 3);
         assert_eq!(first.exploration_count, 1);
-        assert!(first.promoted_candidate_ids[..3].iter().all(|id| id.starts_with("candidate-")));
-        assert!(!first.promoted_candidate_ids[..3].contains(&first.promoted_candidate_ids[3]));
-        let exploitation_ids: HashSet<&str> = inputs.iter()
-            .collect::<Vec<_>>()
-            .iter()
-            .map(|observation| observation.candidate_id.as_str())
-            .collect();
-        assert_eq!(exploitation_ids.len(), 8);
-        assert!(!first.promoted_candidate_ids[..3].contains(&"candidate-0".to_owned()));
+        let exploitation_ids = ["candidate-7", "candidate-6", "candidate-5"];
+        assert_eq!(
+            &first.promoted_candidate_ids[..3],
+            &exploitation_ids.map(str::to_owned),
+        );
+        assert!(!exploitation_ids.contains(&first.promoted_candidate_ids[3].as_str()));
     }
 
     #[test]
