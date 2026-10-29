@@ -275,6 +275,9 @@ fn generation_budget_preserves_the_unexpanded_subtree_and_makes_no_claim() {
     assert_eq!(report.stats.generated_nodes, 1);
     assert_eq!(report.stats.expanded_nodes, 0);
     assert_eq!(report.global_lower_bound_cost, Some(0));
+    assert!(report.stats.candidate_actions_considered > 0);
+    assert!(report.stats.partial_feasibility_checks > 0);
+    assert!(report.stats.lower_bound_evaluations > 1);
 }
 
 #[test]
