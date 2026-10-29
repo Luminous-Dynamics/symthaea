@@ -19152,6 +19152,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-iit"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-information-theory"
 version = "0.1.0"
 
