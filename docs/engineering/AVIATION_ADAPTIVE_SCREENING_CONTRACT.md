@@ -101,6 +101,7 @@ Evidence from an earlier tier does not imply evidence for a later one.
 Every report must bind:
 
 - Scenario/input snapshot digest and stable scenario ID.
+- Complete candidate-universe digest over canonical candidate IDs, rank scores, and admissible lower bounds.
 - Candidate universe and stable IDs.
 - Screening policy digest and ranking artifact digest.
 - Source commit IDs for screening and independent feasibility verification.
@@ -109,7 +110,7 @@ Every report must bind:
 - Best feasible cost, global lower bound, absolute gap, declared tolerance, and honest terminal status.
 - Evaluation budget and any timeout, expansion, fallback, or indeterminate reason.
 
-The current module validates digest encoding and echoes caller-supplied identities. The runner must calculate these digests from canonical frozen artifacts, and evidence-signing work must bind them to trusted receipts before any promotion gate consumes the report.
+The current module validates digest encoding and echoes caller-supplied scenario, candidate-universe, policy, ranking-artifact, and source identities. The runner must calculate these digests from canonical frozen artifacts, and evidence-signing work must bind them to trusted receipts before any promotion gate consumes the report.
 
 ## Current scope and next integration steps
 
