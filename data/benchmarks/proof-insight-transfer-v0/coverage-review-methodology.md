@@ -26,7 +26,7 @@ The review log must list each family, source artifacts examined, search procedur
 
 ## Edge contract
 
-Every inventory edge uses a registered relation and a status. Evidence is content-addressed. A resolved assessment requires at least two reviewer IDs. The receipt verifier independently checks schema-level semantics, family membership, relationship-pair uniqueness, and the normalized edge digest.
+Every inventory edge uses a registered relation and a status. Evidence is content-addressed. A resolved assessment requires at least two reviewer IDs. Every edge-level reviewer ID must resolve to the pinned trust store and must be included in the receipt's verified signer set; resolved-edge reviewers must span at least two registered organizations. This prevents an inventory from attributing a reviewed edge to an untrusted, unsigned, or single-organization reviewer while relying on unrelated top-level signatures. The receipt verifier independently checks these identities plus schema-level semantics, family membership, relationship-pair uniqueness, and the normalized edge digest.
 
 Relationship kinds `exact_duplicate`, `shared_source_artifact`, `formal_dependency`, `reused_lemma`, and `equivalent_statement` are hard links. `conceptual_similarity` and `citation_only` are not hard links by themselves. Unresolved hard links conservatively join components. Dismissed hard links do not join components, but their evidence and reviewer decision remain in the inventory.
 
