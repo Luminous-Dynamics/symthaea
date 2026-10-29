@@ -245,7 +245,11 @@ fn validate_record_contract(
             }
         }
         "benign_related" | "review_required" => {
-            if record.match_method == "none" || !has_protected_evidence(record) {
+            if record.match_method == "none"
+                || record.match_score_micros == 0
+                || record.decision_threshold_micros == 0
+                || !has_protected_evidence(record)
+            {
                 issues.push(format!(
                     "records[{index}] {0} requires a method and protected/evidence digests",
                     record.classification
@@ -262,7 +266,11 @@ fn validate_record_contract(
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
-            if record.match_method == "none" || !has_protected_evidence(record) {
+            if record.match_method == "none"
+                || record.match_score_micros == 0
+                || record.decision_threshold_micros == 0
+                || !has_protected_evidence(record)
+            {
                 issues.push(format!(
                     "records[{index}] confirmed exposure classification requires a method and protected/evidence digests"
                 ));
