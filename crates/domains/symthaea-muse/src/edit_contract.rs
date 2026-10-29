@@ -793,7 +793,7 @@ mod tests {
             ObligationScope::ScoreWide,
             RMS_ENVELOPE_COMPARATOR_ID,
             "db",
-            1_000_000,
+            500_000,
         ));
         FrozenEditContract::new(
             "task-1".to_string(),
