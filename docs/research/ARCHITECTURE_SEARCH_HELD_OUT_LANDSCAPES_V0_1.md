@@ -4,6 +4,7 @@
 **Tracking issue:** [#8959 — qualify architecture search on held-out landscape families](https://github.com/Luminous-Dynamics/symthaea/issues/8959)  
 **Parent program:** [#8888](https://github.com/Luminous-Dynamics/symthaea/issues/8888)  
 **Current implementation under review:** [PR #8890](https://github.com/Luminous-Dynamics/symthaea/pull/8890)
+**Related cost-aware follow-up:** [Multi-fidelity architecture search v0.1](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md) ([#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994)); authored as a scheduling primitive, not yet compiled or qualified.
 
 ## 1. Why this is the next paradigm shift
 
