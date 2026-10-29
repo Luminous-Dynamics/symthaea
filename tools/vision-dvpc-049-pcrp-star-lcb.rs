@@ -431,6 +431,27 @@ struct Aggregate {
     plausible_winner_set_size: RunningMean,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct TrialSummary {
+    top1: f64,
+    regret: f64,
+    winner_certificate: f64,
+    false_certificate: f64,
+    interval_width: f64,
+    plausible_winner_set_size: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PairedAggregate {
+    n: usize,
+    top1_difference: RunningMean,
+    regret_difference: RunningMean,
+    certificate_rate_difference: RunningMean,
+    false_certificate_difference: RunningMean,
+    interval_width_difference: RunningMean,
+    plausible_set_size_difference: RunningMean,
+}
+
 fn certified_winner(lower_bounds: &[f64], upper_bounds: &[f64]) -> Option<usize> {
     if lower_bounds.is_empty() || lower_bounds.len() != upper_bounds.len() {
         return None;
@@ -453,6 +474,39 @@ fn rate_se(successes: usize, n: usize) -> f64 {
     }
     let p = successes as f64 / n as f64;
     (p * (1.0 - p) / n as f64).sqrt()
+}
+
+fn wilson95(successes: usize, n: usize) -> (f64, f64) {
+    if n == 0 {
+        return (0.0, 1.0);
+    }
+    let n_f = n as f64;
+    let p = successes as f64 / n_f;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n_f;
+    let center = (p + z2 / (2.0 * n_f)) / denominator;
+    let half = z * ((p * (1.0 - p) / n_f) + z2 / (4.0 * n_f * n_f)).sqrt() / denominator;
+    ((center - half).clamp(0.0, 1.0), (center + half).clamp(0.0, 1.0))
+}
+
+fn metric_ci_line(
+    out: &mut String,
+    scenario: &str,
+    horizon: usize,
+    method: &str,
+    metric: &str,
+    successes: usize,
+    n: usize,
+) {
+    if n == 0 {
+        return;
+    }
+    let (lower, upper) = wilson95(successes, n);
+    let _ = writeln!(
+        out,
+        "RESULT_CI\t{scenario}\t{horizon}\t{method}\t{metric}\t{lower:.12}\t{upper:.12}\t{n}"
+    );
 }
 
 fn metric_line(
@@ -511,6 +565,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
 
         let mut aggregates = vec![vec![Aggregate::default(); METHODS.len()]; horizons.len()];
         let mut elapsed_seconds = vec![vec![0.0_f64; METHODS.len()]; horizons.len()];
+        let mut paired = vec![PairedAggregate::default(); horizons.len()];
         // Two tails across M policies: total familywise error budget is at most ALPHA.
         let delta_per_tail = ALPHA / (2.0 * POLICY_P1.len() as f64);
         let true_values: Vec<f64> = POLICY_P1.iter().map(|&p| true_value(p)).collect();
@@ -533,6 +588,7 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                 .collect::<Result<Vec<_>, _>>()?;
 
             for (horizon_index, &horizon) in horizons.iter().enumerate() {
+                let mut replicate_method_metrics = vec![None; METHODS.len()];
                 for (method_index, method) in METHODS.iter().enumerate() {
                     let started = Instant::now();
                     let mut lower_bounds = Vec::with_capacity(POLICY_P1.len());
@@ -598,16 +654,41 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     }
                     ag.reversed_intervals += reversed_count;
                     ag.interval_candidates += lower_bounds.len();
-                    ag.interval_width.push(
-                        lower_bounds.iter().zip(upper_bounds.iter())
-                            .map(|(lower, upper)| (upper - lower).max(0.0))
-                            .sum::<f64>() / lower_bounds.len() as f64
-                    );
+                    let mean_interval_width = lower_bounds.iter().zip(upper_bounds.iter())
+                        .map(|(lower, upper)| (upper - lower).max(0.0))
+                        .sum::<f64>() / lower_bounds.len() as f64;
+                    ag.interval_width.push(mean_interval_width);
                     ag.plausible_winner_set_size.push(plausible_winner_set_size);
                     let regret = oracle_value - true_values[chosen];
                     ag.regret.push(regret);
                     ag.selected_lcb.push(lower_bounds[chosen]);
                     ag.selected_lcb_gap.push(true_values[chosen] - lower_bounds[chosen]);
+                    let is_winner_certificate = certified_winner.is_some();
+                    let is_false_certificate = certified_winner
+                        .map(|winner| winner != oracle_index)
+                        .unwrap_or(false);
+                    replicate_method_metrics[method_index] = Some(TrialSummary {
+                        top1: if chosen == oracle_index { 1.0 } else { 0.0 },
+                        regret,
+                        winner_certificate: if is_winner_certificate { 1.0 } else { 0.0 },
+                        false_certificate: if is_false_certificate { 1.0 } else { 0.0 },
+                        interval_width: mean_interval_width,
+                        plausible_winner_set_size,
+                    });
+                }
+                if METHODS.len() == 2 {
+                    let pcrp = replicate_method_metrics[0]
+                        .ok_or_else(|| "missing pCRP trial summary".to_owned())?;
+                    let hoeffding = replicate_method_metrics[1]
+                        .ok_or_else(|| "missing Hoeffding trial summary".to_owned())?;
+                    let pair = &mut paired[horizon_index];
+                    pair.n += 1;
+                    pair.top1_difference.push(pcrp.top1 - hoeffding.top1);
+                    pair.regret_difference.push(pcrp.regret - hoeffding.regret);
+                    pair.certificate_rate_difference.push(pcrp.winner_certificate - hoeffding.winner_certificate);
+                    pair.false_certificate_difference.push(pcrp.false_certificate - hoeffding.false_certificate);
+                    pair.interval_width_difference.push(pcrp.interval_width - hoeffding.interval_width);
+                    pair.plausible_set_size_difference.push(pcrp.plausible_winner_set_size - hoeffding.plausible_winner_set_size);
                 }
             }
         }
@@ -673,11 +754,35 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     &mut out, scenario.name, horizon, method, "mean_selected_truth_minus_lcb",
                     ag.selected_lcb_gap.mean, ag.selected_lcb_gap.standard_error(),
                 );
+                metric_ci_line(&mut out, scenario.name, horizon, method, "familywise_interval_coverage", ag.familywise_covered, ag.n);
+                metric_ci_line(&mut out, scenario.name, horizon, method, "top1_policy_selection_accuracy", ag.top1, ag.n);
+                metric_ci_line(&mut out, scenario.name, horizon, method, "winner_certificate_rate", ag.winner_certificates, ag.n);
+                metric_ci_line(&mut out, scenario.name, horizon, method, "false_certificate_probability", ag.false_certificates, ag.n);
+                metric_ci_line(&mut out, scenario.name, horizon, method, "reversed_interval_candidate_rate", ag.reversed_intervals, ag.interval_candidates);
+                metric_ci_line(&mut out, scenario.name, horizon, method, "false_certificate_given_certificate", ag.false_certificates, ag.winner_certificates);
                 let _ = writeln!(
                     out,
                     "SYSTEM\t{}\t{}\t{}\telapsed_seconds\t{:.6}\t-",
                     scenario.name, horizon, method, elapsed_seconds[horizon_index][method_index]
                 );
+            }
+            let pair = paired[horizon_index];
+            if pair.n > 0 {
+                let comparisons = [
+                    ("delta_top1_accuracy_pcrp_minus_hoeffding", pair.top1_difference),
+                    ("delta_simple_regret_pcrp_minus_hoeffding", pair.regret_difference),
+                    ("delta_winner_certificate_rate_pcrp_minus_hoeffding", pair.certificate_rate_difference),
+                    ("delta_false_certificate_rate_pcrp_minus_hoeffding", pair.false_certificate_difference),
+                    ("delta_interval_width_pcrp_minus_hoeffding", pair.interval_width_difference),
+                    ("delta_plausible_winner_set_size_pcrp_minus_hoeffding", pair.plausible_set_size_difference),
+                ];
+                for (metric, stats) in comparisons {
+                    let _ = writeln!(
+                        out,
+                        "PAIR_METRIC\t{}\t{}\tpCRP_star_minus_Hoeffding_fixed_horizon\t{}\t{:.12}\t{:.12}\t{}",
+                        scenario.name, horizon, metric, stats.mean, stats.standard_error(), pair.n
+                    );
+                }
             }
         }
     }
@@ -688,7 +793,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let result = match args.get(1).map(String::as_str) {
         Some("--smoke") => run(4, &[8, 16]),
-        Some("--benchmark") => run(32, &[64, 256, 512]),
+        Some("--benchmark") => run(1024, &[64, 256, 512]),
         _ => Err("usage: vision-dvpc-049-pcrp-star-lcb --smoke|--benchmark".into()),
     };
     match result {
