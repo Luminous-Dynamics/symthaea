@@ -1499,4 +1499,21 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn four_and_five_unit_partition_counts_pin_combinatorial_growth() {
+        // Raw assignments are sum_k S(n,k) * (3^k), excluding the one-block
+        // partition: n=4 gives 306, n=5 gives 1,863. Deduplication reduces
+        // these to 150 and 1,061 distinct directed cut matrices respectively.
+        let four = enumerate_iit4_system_partitions(&[0, 1, 2, 3], 4, false, 306).unwrap();
+        assert_eq!(four.len(), 150);
+
+        let five = enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_863).unwrap();
+        assert_eq!(five.len(), 1_061);
+
+        assert!(matches!(
+            enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_862),
+            Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1_862 })
+        ));
+    }
+
 }
