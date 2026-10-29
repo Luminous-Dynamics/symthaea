@@ -41,6 +41,31 @@ class IitDigestContractTests(unittest.TestCase):
             "728eb74b44c4aec7896db360919b6efcb0f06e4b7eb487b2974c486c42a80b62",
         )
 
+    def test_published_pyphi_conventions_tpm_matches_rust_golden_vectors(self):
+        # Two-unit state-by-node TPM from PyPhi's conventions documentation.
+        tpm = [
+            [0.1, 0.2],
+            [0.3, 0.4],
+            [0.5, 0.6],
+            [0.7, 0.8],
+        ]
+        model_bytes = canonical_model_bytes(tpm, [[1, 1], [1, 1]])
+        self.assertEqual(
+            model_digest(model_bytes),
+            "8e8000cfacf6631f5d229449662b260e07419d76b566d6a78214fe1f4b408894",
+        )
+        self.assertEqual(
+            evaluation_digest(model_bytes, [1, 0]),
+            "143ea0c7ae2676acb89adbd02f93d40a71ee3e6098bade2421a4a2105176eab8",
+        )
+        self.assertEqual(
+            analysis_request_digest(
+                model_bytes, [1, 0], [0, 1],
+                "IIT_4_0_2023", "iit4_system_phi_s",
+            ),
+            "1b1d3a2f76139abfd2e5bf89da48376b6fac11420382844be813e6e7ac87f2fd",
+        )
+
     def test_evaluation_digest_matches_rust_golden_vector(self):
         self.assertEqual(
             evaluation_digest(self.model_bytes, [1, 0]),
