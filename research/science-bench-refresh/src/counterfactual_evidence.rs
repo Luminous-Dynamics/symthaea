@@ -445,9 +445,11 @@ mod tests {
     fn rejects_missing_condition_even_when_other_fields_are_valid() {
         let mut fields = fields();
         fields.pairs[0].trials.pop();
-        assert!(validate_fields(&fields)
-            .iter()
-            .any(|issue| issue.contains("exactly") || issue.contains("each required condition")));
+        assert!(
+            validate_fields(&fields)
+                .iter()
+                .any(|issue| issue.contains("exactly") || issue.contains("each required condition"))
+        );
     }
 
     #[test]
