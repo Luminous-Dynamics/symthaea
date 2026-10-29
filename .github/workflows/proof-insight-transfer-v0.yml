@@ -882,6 +882,7 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$PITB_MANIFEST")"
           cargo test --locked --bin analyze_pitb_results
+          cargo test --locked --bin verify_component_coverage_receipt
 
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
