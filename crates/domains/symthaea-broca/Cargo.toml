@@ -96,6 +96,10 @@ name = "broca-counterfactual-audit"
 path = "src/bin/broca_counterfactual_audit.rs"
 
 [[bin]]
+name = "broca-memory-influence-score"
+path = "src/bin/broca_memory_influence_score.rs"
+
+[[bin]]
 name = "broca-mamba-verify"
 path = "src/bin/broca_mamba_verify.rs"
 required-features = ["mamba-cpu"]
