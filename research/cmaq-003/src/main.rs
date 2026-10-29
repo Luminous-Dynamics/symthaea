@@ -82,7 +82,7 @@ struct ScoreRow {
     unsupported_actions: usize,
     unsupported_rate_ppm: u64,
     executed_reward_mae_milli: f64,
-    executed_safety_brier_micro: f64,
+    all_action_safety_brier_micro: f64,
     transition_mismatches: usize,
     reward_interval_coverage_ppm: u64,
     mean_interval_width_milli: f64,
@@ -472,7 +472,7 @@ impl Evaluator {
             unsupported_actions,
             unsupported_rate_ppm,
             executed_reward_mae_milli: if executed == 0 { 0.0 } else { reward_abs_error / executed as f64 },
-            executed_safety_brier_micro: brier,
+            all_action_safety_brier_micro: brier,
             transition_mismatches,
             reward_interval_coverage_ppm: coverage,
             mean_interval_width_milli: width,
@@ -500,7 +500,7 @@ impl ScoreRow {
             self.unsupported_actions,
             self.unsupported_rate_ppm,
             self.executed_reward_mae_milli.round(),
-            self.executed_safety_brier_micro.round(),
+            self.all_action_safety_brier_micro.round(),
             self.transition_mismatches,
             self.reward_interval_coverage_ppm,
             self.mean_interval_width_milli.round(),
@@ -544,7 +544,7 @@ fn run() -> Result<(), String> {
     let evaluator = Evaluator::load(&args["--truth"], &args["--predictions"], &args["--support"], &args["--starts"])?;
     let mut tasks: Vec<&String> = evaluator.configs.keys().collect();
     tasks.sort();
-    println!("task_id\tpolicy\tactual_return_milli\tconstrained_return_milli\toracle_safe_return_milli\tregret_milli\trisk_adjusted_plan_value_milli\tmodel_to_rollout_gap_milli\texecuted_actions\tunsafe_actions\tunsupported_actions\tunsupported_rate_ppm\texecuted_reward_mae_milli\texecuted_safety_brier_micro\ttransition_mismatches\treward_interval_coverage_ppm\tmean_interval_width_milli\tfalse_safe_predictions\tabstained\thard_gate_pass");
+    println!("task_id\tpolicy\tactual_return_milli\tconstrained_return_milli\toracle_safe_return_milli\tregret_milli\trisk_adjusted_plan_value_milli\tmodel_to_rollout_gap_milli\texecuted_actions\tunsafe_actions\tunsupported_actions\tunsupported_rate_ppm\texecuted_reward_mae_milli\tall_action_safety_brier_micro\ttransition_mismatches\treward_interval_coverage_ppm\tmean_interval_width_milli\tfalse_safe_predictions\tabstained\thard_gate_pass");
     for task in tasks {
         println!("{}", evaluator.score_task(task, Policy::Point).tsv());
         println!("{}", evaluator.score_task(task, Policy::TrustRegion).tsv());
