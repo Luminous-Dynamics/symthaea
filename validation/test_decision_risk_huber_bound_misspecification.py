@@ -25,6 +25,8 @@ class HuberBoundMisspecificationTests(unittest.TestCase):
         self.assertTrue(0.12 + 1e-12 >= 0.12)
 
     def test_understated_bound_can_admit_unsafe_clean_target(self):
+        # Same deterministic stream can be admitted if rho is falsely declared zero,
+        # but becomes unresolved when the actual 18% mixture contamination is bounded.
         model=np.array([.15,.30,.60,.80])
         q=np.array([.15,.82*.37,.60,.80])
         rng=np.random.default_rng(20261030)
