@@ -32,6 +32,8 @@ The oracle is an upper bound, never a deployable baseline. The report scores all
 
 The candidate retains all hypotheses consistent with the observation history. A probe reveals only a binary positive/non-positive reward signal plus the safety bit for one selected context/action; exact reward magnitude remains evaluator-side and is used only for scoring. This deliberately makes information incomplete: multiple mechanisms can yield the same observed signal while having different utility. If a new signal matches no remaining hypothesis, the update fails closed with an explicit mechanism-change/contradiction signal; it does not silently create an empty belief.
 
+Probe queries are simulated interventions inside the benchmark sandbox; they do not actuate a physical system. The safety bit describes whether the same context/action is safe in the represented world, and the candidate uses only posterior predictions when selecting a deployed action. The current prototype therefore tests decision-time safety filtering, not the safety of real-world experiment execution; physical experimentation would require an independent, pre-authorized safe-probe envelope outside the learned model.
+
 For each test context, the candidate may choose an action only if that action is safe in every remaining hypothesis. It then selects the action with the highest posterior mean reward, abstaining when no robustly safe action has positive expected reward. This is intentionally conservative and makes the safety assumptions explicit.
 
 - **Decision value:** mean utility over the four evaluation contexts.
