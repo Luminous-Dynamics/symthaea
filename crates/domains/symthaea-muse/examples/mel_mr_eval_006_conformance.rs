@@ -179,6 +179,17 @@ fn main() -> ExitCode {
     let mut local_damage = reference_sine.clone();
     local_damage[1_024..1_280].fill(0.0);
 
+    let mut gain_drop = reference_sine.clone();
+    for sample in &mut gain_drop[1_024..1_280] {
+        *sample *= 0.25;
+    }
+
+    let mut frequency_swap = reference_sine.clone();
+    for (offset, sample) in frequency_swap[1_024..1_280].iter_mut().enumerate() {
+        let frame = 1_024 + offset;
+        *sample = (std::f32::consts::TAU * 880.0 * frame as f32 / SAMPLE_RATE_HZ as f32).sin();
+    }
+
     let mut authorized_damage = reference_sine.clone();
     authorized_damage[4_096..5_120].fill(0.0);
     let authorized_mask = [FrameInterval {
@@ -188,6 +199,10 @@ fn main() -> ExitCode {
 
     let reference_burst = burst(TOTAL_FRAMES, 1_024, 3_072);
     let delayed_burst = burst(TOTAL_FRAMES, 1_536, 3_584);
+    let mut burst_with_extra_transient = reference_burst.clone();
+    let extra_transient = burst(TOTAL_FRAMES, 5_120, 6_144);
+    burst_with_extra_transient[5_120..6_144]
+        .copy_from_slice(&extra_transient[5_120..6_144]);
     let silent = vec![0.0; TOTAL_FRAMES];
     let onset_mask_hiding_all_events = [FrameInterval {
         start_frame: 512,
@@ -212,6 +227,22 @@ fn main() -> ExitCode {
             PreservationVerdict::Fail,
         ),
         acoustic_case(
+            "AP-GAIN-DROP-001",
+            "A protected local window has a 12 dB-class gain drop",
+            &reference_sine,
+            &gain_drop,
+            &authorized_mask,
+            PreservationVerdict::Fail,
+        ),
+        acoustic_case(
+            "AP-FREQUENCY-SWAP-001",
+            "A protected local window is changed from 440 Hz to 880 Hz",
+            &reference_sine,
+            &frequency_swap,
+            &authorized_mask,
+            PreservationVerdict::Fail,
+        ),
+        acoustic_case(
             "AP-AUTHORIZED-ONLY-001",
             "A changed window fully contained by the authorized mask",
             &reference_sine,
@@ -232,6 +263,14 @@ fn main() -> ExitCode {
             "Protected transient is delayed by 512 frames",
             &reference_burst,
             &delayed_burst,
+            &[],
+            PreservationVerdict::Fail,
+        ),
+        onset_case(
+            "ONSET-EXTRA-001",
+            "Candidate adds a transient in otherwise protected content",
+            &reference_burst,
+            &burst_with_extra_transient,
             &[],
             PreservationVerdict::Fail,
         ),
