@@ -116,6 +116,14 @@ jobs:
             exit 1
           fi
 
+          semantic_mismatch_manifest="$config_mutation_dir/semantic-mismatch.manifest"
+          changed_config_sha256="$(sha256sum -- "$config_mutation_dir/zero-shift-intervention.conf" | cut -d' ' -f1)"
+          sed "s/^intervention_config_sha256=.*/intervention_config_sha256=$changed_config_sha256/" "$manifest" > "$semantic_mismatch_manifest"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$semantic_mismatch_manifest"; then
+            echo "validator accepted intervention config whose digest matches but semantics disagree with manifest" >&2
+            exit 1
+          fi
+
           bad_intervention_digest="$temp_dir/bad-intervention-digest.manifest"
           sed 's/^intervention_config_sha256=.*/intervention_config_sha256=short/' "$target_manifest" > "$bad_intervention_digest"
           if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$bad_intervention_digest"; then
