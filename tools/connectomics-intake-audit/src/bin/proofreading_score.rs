@@ -1047,15 +1047,14 @@ mod tests {
     #[test]
     fn paired_bootstrap_reports_positive_policy_delta_against_uncertainty() {
         let mut rows = Vec::new();
+        // Every cluster contains both classes, so a valid cluster resample cannot erase one class.
         for i in 0..4 {
-            let mut r = row(&format!("err-{i}"), true, 0.9, 0.9, 1.0, 2.0, "mouse:merge");
-            r.cluster_id = format!("cluster-err-{i}");
-            rows.push(r);
-        }
-        for i in 0..4 {
-            let mut r = row(&format!("ok-{i}"), false, 0.49, 0.1, 1.0, 0.0, "mouse:merge");
-            r.cluster_id = format!("cluster-ok-{i}");
-            rows.push(r);
+            let mut error = row(&format!("err-{i}"), true, 0.9, 0.9, 1.0, 2.0, "mouse:merge");
+            error.cluster_id = format!("cluster-{i}");
+            let mut control = row(&format!("ok-{i}"), false, 0.49, 0.1, 1.0, 0.0, "mouse:merge");
+            control.cluster_id = format!("cluster-{i}");
+            rows.push(error);
+            rows.push(control);
         }
         let refs: Vec<&Prediction> = rows.iter().collect();
         let delta = paired_delta_bootstrap(
