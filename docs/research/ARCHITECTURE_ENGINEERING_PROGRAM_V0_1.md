@@ -4,6 +4,7 @@
 **Tracking issue:** [#8888](https://github.com/Luminous-Dynamics/symthaea/issues/8888)  
 **Prerequisite audit:** [#8308 — Liquid Broca learning signal and benchmark validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308)  
 **Related experiment:** [#8362 — context-local adaptation vs extra thought tokens](https://github.com/Luminous-Dynamics/symthaea/issues/8362)
+**Next-stage qualification protocol:** [Held-out architecture-search landscape suite v0.1](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md) ([#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959); design only).
 
 ## 1. Research question
 
@@ -266,6 +267,10 @@ The next acceptance step is to run these commands on the exact branch head and i
 - [ZAPS (September 2026)](https://arxiv.org/abs/2609.14184) reports that zero-cost proxies can be strongly correlated and that naive proxy aggregation may compound shared errors. Its reported 52.3%/65.8% top-100 recovery at 200 evaluations belongs to its NAS-Bench-201 experiments, not Symthaea. This motivates explicit shuffled/anti-correlated proxy controls and measuring top-K recall under limited evaluation budgets.
 - [LUMINA (March 2026)](https://www.microsoft.com/en-us/research/publication/lumina-llm-guided-gpu-architecture-exploration-via-bottleneck-analysis/) investigates LLM-guided GPU design-space exploration and reports Pareto-front gains on its own hardware-design problem. Symthaea should compare search efficiency and frontier quality in a small known-optimum environment before investing in an expensive real architecture search.
 - [MLPerf Endpoints v1.0](https://mlcommons.org/2026/10/open-submissions-endpoints-v1-0/) opened rolling submissions on October 13, 2026. The official reporting site now exposes reports with October 16–17 run data (for example, [a live report](https://endpoints.mlcommons.org/report?source=phase2&submission=03381a91-8b69-4aa2-bf75-0b6dd7730ad8)); check each report's publication/review state before treating it as an approved industry result. Endpoints measures an operating frontier across concurrency, per-user interactivity, aggregate throughput, and P90 time-to-first-token; provisioned-power reporting is required in the Standardized division. Its rules/docs are an evolving v1.0 protocol, so pin the rule/checker revisions used for any comparison. For architecture claims, keep workload, model quality, software stack, and hardware controlled; for serving claims, publish the full quality-gated workload frontier and memory plus measured-versus-estimated energy.
+
+### Known limitation and next stage
+
+The two fixed surfaces in this v0.1 harness are implementation controls, not evidence that a search policy generalizes across optimization landscapes. The proposed follow-up is the [held-out landscape suite](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md), tracked by [#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959). It remains a design proposal; it has not been implemented or run.
 
 ## 10. Non-goals and claim ceiling
 
