@@ -349,6 +349,21 @@ The exact finite-state Bernoulli process is an excellent mathematical reference,
 
 First candidates to audit are Electricity, Covtype, Posture, Rialto, GasSensorArray, NOAA, and Asfault, listed by the KDD benchmark repository. For each dataset, pin the authoritative source, exact release/version, license, row ordering semantics, feature and target columns, preprocessing, source-group/time split, and source SHA-256. Do not vendor external payloads into this repository until its license and redistribution terms are verified. A missing or ambiguous source licence is a hard blocker, not an assumption.
 
+### Initial source-license audit findings (29 Oct 2026)
+
+These are candidate decisions, not a blanket clearance of the seven-stream suite. Dataset versions and payload digests must still be pinned on acquisition.
+
+| Stream / source | Evidence checked | Initial use classification | Action |
+|---|---|---|---|
+| Covtype / [UCI Covertype](https://archive.ics.uci.edu/dataset/31/covertype) | UCI lists CC BY 4.0 and a dataset DOI | Commercial-compatible candidate, subject to attribution and version/hash pinning | Include as one candidate after manifest records exact release, license-evidence URL, and payload SHA-256 |
+| GasSensorArray / [UCI Gas Sensor Array Drift](https://archive.ics.uci.edu/dataset/224/gas%2Bsensor%2Barray%2Bdrift%2Bdataset) | UCI states research-only use and explicitly excludes commercial use | Research-only; blocked from any commercial-compatible manifest without separate permission | Keep isolated as a research-only track or obtain permission before commercial use |
+| Electricity / [CapyMOA Electricity documentation](https://capymoa.org/api/modules/capymoa.datasets.Electricity.html) points to a SourceForge ARFF archive | The documentation establishes the stream, size, and upstream download location, but the page does not establish the dataset's reuse license | Pending / not cleared for commercial-compatible use | Find the authoritative license for the exact archive/version before approval |
+| Gas sensor array low-concentration / [UCI dataset 1081](https://archive.ics.uci.edu/dataset/1081/gas%2Bsensor%2Barray%2Blow-concentration) | UCI lists CC BY 4.0; the dataset has only 90 examples with long sensor traces | Supplemental sensor stress set, not a substitute for the distinct 13,910-measurement Gas Sensor Array Drift dataset | Consider only if row definition and evaluation goal are appropriate; clearly separate the two sources |
+
+The manifest schema now includes both a license-evidence URL and an explicit intended-use profile (`research_only` or `commercial_compatible`). The validator conservatively rejects obvious non-commercial identifiers such as CC BY-NC under a commercial-compatible profile, plus unreviewed LicenseRef identifiers. This is a guardrail, **not** a legal interpreter or SPDX-registry validator; the evidence URL and full terms still require human review.
+
+The distinction is important for Luminous Dynamics: a source that is suitable for a publicly reproducible research-only experiment is not automatically suitable for a commercial product, fundable deliverable, or dataset redistribution. Do not silently promote a research-only result into a commercial-compatible dataset manifest.
+
 ### Required causal scenario classes
 
 Each semisynthetic run must declare a target class and an independently generated run manifest:
