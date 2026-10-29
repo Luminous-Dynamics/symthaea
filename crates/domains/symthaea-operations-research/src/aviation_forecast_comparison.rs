@@ -184,7 +184,11 @@ pub fn compare_forecasts_cluster_bootstrap(
     let mut paired_rows = Vec::with_capacity(baseline.len());
     let mut clusters = BTreeSet::<String>::new();
     for (record_id, base) in &baseline_by_id {
-        let cand = candidate_by_id[record_id];
+        let cand = candidate_by_id.get(*record_id).copied().ok_or_else(|| {
+            ForecastComparisonError::RecordMissingFromCandidate {
+                record_id: (*record_id).into(),
+            }
+        })?;
         for (field, left, right) in [
             ("decision_time_epoch_seconds", base.decision_time_epoch_seconds, cand.decision_time_epoch_seconds),
             ("target_window_start_epoch_seconds", base.target_window_start_epoch_seconds, cand.target_window_start_epoch_seconds),
