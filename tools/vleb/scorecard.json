@@ -251,6 +251,7 @@
       "definition": "Share of scored tasks with an evaluator-pinned replay from the frozen source revision where the empty baseline demonstrates a test-level failure and the reference patch passes every preregistered test command.",
       "requirements": [
         "source revision, test bundle, reference patch, command manifest and verifier are pinned out of band",
+        "each command has an explicit environment map; the report binds its digest and does not inherit ambient runner variables",
         "both arms start from the same clean source revision and use identical independent test bytes",
         "baseline failures require actual test-start and fail-summary markers; startup failures and timeouts are unresolved",
         "reference passes every command and the baseline has at least one test-level failure",
@@ -494,6 +495,7 @@
       "formula": "scored tasks with a valid pinned empty-baseline/reference-patch replay / all scored tasks assigned to the locked cohort",
       "pass_requirements": [
         "the control manifest, source revision, independent test bundle, reference patch and verifier match evaluator-supplied pins",
+        "each command uses the exact declared environment and records its digest without leaking values",
         "empty baseline has at least one actual test-level failure and every reference command passes",
         "test bundle bytes are identical across both source worktrees and cannot overwrite source files",
         "raw combined output is retained and hashed for each command",
