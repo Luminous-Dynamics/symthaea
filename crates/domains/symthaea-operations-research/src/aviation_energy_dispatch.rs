@@ -208,7 +208,7 @@ pub fn canonical_scenario_digest(
     let digest = Sha256::digest(&bytes);
     let mut hex = String::with_capacity(7 + digest.len() * 2);
     hex.push_str("sha256:");
-    for byte in digest {
+    for byte in digest.iter() {
         use std::fmt::Write as _;
         write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
     }
