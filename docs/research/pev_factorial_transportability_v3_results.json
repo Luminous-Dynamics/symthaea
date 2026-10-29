@@ -22,7 +22,7 @@
     "scope": "Calibration for this planted random-intercept process only."
   },
   "gates": {
-    "all_mutations_detected": true,
+    "all_guard_tests_passed": true,
     "cluster_aware_coverage_93_97": true,
     "iid_interval_exposes_cluster_undercoverage": true,
     "pooled_equivalence_with_subgroup_sign_recovery": true,
@@ -35,7 +35,7 @@
     "No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.",
     "Passing establishes only these reference-method properties, not task utility or SOTA superiority."
   ],
-  "mutation_tests": {
+  "guard_tests": {
     "fixed_order_drift_flagged": true,
     "missing_joint_arm_abstains": true,
     "opposing_subgroups_preserved": true
