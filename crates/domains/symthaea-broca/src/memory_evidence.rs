@@ -100,6 +100,17 @@ pub struct ResolvedMemoryContextItem {
     pub item: MemoryContextItem,
 }
 
+/// A seed or an adjacent state selected for temporal/workflow context.
+///
+/// Seed candidates retain their retrieval identity. An adjacent candidate records
+/// which seed caused its inclusion; no relevance score is fabricated for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AdjacentStateCandidate {
+    pub(crate) hdc_id: u64,
+    /// None for ranked retrieval seeds; Some(seed HDC ID) for an expanded neighbor.
+    pub(crate) anchor_hdc_id: Option<u64>,
+}
+
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
     pub fn validate(&self) -> Result<(), String> {
@@ -485,6 +496,9 @@ struct LexicalPosting {
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
+    /// Derived adjacency index includes tombstones; query-time eligibility is
+    /// always rechecked against the canonical record before a neighbor is emitted.
+    trajectory_state_ids: BTreeMap<(String, u64), BTreeSet<u64>>,
 }
 
 impl LexicalIndex {
@@ -624,6 +638,15 @@ impl LexicalIndex {
 }
 
 impl EvidenceIndex {
+    fn index_trajectory_state(&mut self, record: &EvidenceRecord) {
+        if let Some(step_index) = record.source.step_index {
+            self.trajectory_state_ids
+                .entry((record.source.trajectory_id.clone(), step_index))
+                .or_default()
+                .insert(record.hdc_id);
+        }
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -723,6 +746,7 @@ impl EvidenceIndex {
             if index.evidence_ids.contains_key(&record.evidence_id) {
                 return Err("snapshot contains duplicate evidence_id".into());
             }
+            index.index_trajectory_state(&record);
             index.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
             index.records.insert(record.hdc_id, record);
         }
@@ -765,6 +789,7 @@ impl EvidenceIndex {
         if self.evidence_ids.contains_key(&record.evidence_id) {
             return Err("duplicate evidence_id".into());
         }
+        self.index_trajectory_state(&record);
         self.evidence_ids.insert(record.evidence_id.clone(), record.hdc_id);
         self.records.insert(record.hdc_id, record);
         Ok(())
@@ -1093,6 +1118,147 @@ impl EvidenceIndex {
             selected.push((hdc_id, score));
             if selected.len() == max_candidates {
                 break;
+            }
+        }
+        Ok(selected)
+    }
+
+    /// Expand ranked seeds with immediate same-trajectory predecessor/successor states.
+    ///
+    /// Seeds remain first and retain their rank order. Adjacent records are appended
+    /// in seed order, predecessor before successor, and carry the seed ID that caused
+    /// their inclusion. The method never invents an adjacent record's relevance score.
+    ///
+    /// Only an eligible text record at the exact neighboring state index may expand.
+    /// Missing states are not bridged, cross-trajectory and cross-scope records are
+    /// excluded, and multiple eligible records at one trajectory/state coordinate
+    /// cause a fail-closed ambiguity error. Tombstones remain in the index but are
+    /// filtered at selection time. The caller must apply the final token-budget guard.
+    ///
+    /// This is an opt-in policy for temporal-dynamics and workflow questions; static
+    /// state recall may regress if unnecessary neighbors are included. Measure by
+    /// ability and equal serialized-token budget before enabling by default.
+    pub(crate) fn expand_text_candidates_with_adjacent_states(
+        &self,
+        ranked_seeds: &[(u64, f32)],
+        scope_id: &str,
+        now_ms: u64,
+        max_candidates: usize,
+        max_neighbors_per_seed: usize,
+    ) -> Result<Vec<AdjacentStateCandidate>, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if ranked_seeds.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+
+        let mut ordered = ranked_seeds.to_vec();
+        ordered.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+
+        // Validate every unique seed ID before truncation; malformed lower-ranked
+        // candidates must not be hidden by max_candidates.
+        let mut seen_seeds = BTreeSet::new();
+        for (hdc_id, _) in &ordered {
+            if !seen_seeds.insert(*hdc_id) {
+                continue;
+            }
+            if !self.records.contains_key(hdc_id) {
+                return Err(format!("ranked memory seed references unknown HDC ID {hdc_id}"));
+            }
+        }
+        if max_candidates == 0 || ordered.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut selected = Vec::with_capacity(max_candidates.min(ordered.len()));
+        let mut selected_ids = BTreeSet::new();
+
+        // Preserve the strongest eligible seeds before spending any slots on
+        // expansion. An ineligible seed is skipped and cannot authorize neighbors.
+        for (hdc_id, _) in &ordered {
+            if !selected_ids.insert(*hdc_id) {
+                continue;
+            }
+            let record = self.records.get(hdc_id)
+                .ok_or_else(|| format!("ranked memory seed references unknown HDC ID {hdc_id}"))?;
+            if !record.is_eligible_for(scope_id, now_ms)
+                || !matches!(&record.payload, EvidencePayload::Text { .. })
+            {
+                selected_ids.remove(hdc_id);
+                continue;
+            }
+            selected.push(AdjacentStateCandidate {
+                hdc_id: *hdc_id,
+                anchor_hdc_id: None,
+            });
+            if selected.len() == max_candidates {
+                return Ok(selected);
+            }
+        }
+
+        if max_neighbors_per_seed == 0 || selected.len() == max_candidates {
+            return Ok(selected);
+        }
+
+        // Neighbors are appended only after all retrieval seeds, so expansion
+        // cannot displace a higher-ranked seed. The ordered state index is derived
+        // on insert/restore; lifecycle is still checked below at query time.
+        let seed_ids: Vec<u64> = selected.iter().map(|candidate| candidate.hdc_id).collect();
+        for seed_id in seed_ids {
+            if selected.len() == max_candidates {
+                break;
+            }
+            let seed = self.records.get(&seed_id)
+                .ok_or_else(|| format!("selected seed disappeared: {seed_id}"))?;
+            let Some(step_index) = seed.source.step_index else {
+                continue;
+            };
+            let trajectory_id = seed.source.trajectory_id.clone();
+            let mut neighbor_steps = Vec::with_capacity(2);
+            if let Some(previous) = step_index.checked_sub(1) {
+                neighbor_steps.push(previous);
+            }
+            if let Some(next) = step_index.checked_add(1) {
+                neighbor_steps.push(next);
+            }
+
+            let mut added_for_seed = 0usize;
+            for neighbor_step in neighbor_steps {
+                if selected.len() == max_candidates || added_for_seed == max_neighbors_per_seed {
+                    break;
+                }
+                let key = (trajectory_id.clone(), neighbor_step);
+                let Some(ids) = self.trajectory_state_ids.get(&key) else {
+                    continue;
+                };
+
+                let mut eligible_text_ids = ids.iter().copied().filter(|candidate_id| {
+                    self.records.get(candidate_id).is_some_and(|record| {
+                        record.is_eligible_for(scope_id, now_ms)
+                            && matches!(&record.payload, EvidencePayload::Text { .. })
+                    })
+                });
+                let Some(neighbor_id) = eligible_text_ids.next() else {
+                    continue;
+                };
+                if eligible_text_ids.next().is_some() {
+                    return Err(format!(
+                        "ambiguous eligible adjacent states at trajectory {:?}, state index {}",
+                        trajectory_id, neighbor_step
+                    ));
+                }
+                if !selected_ids.insert(neighbor_id) {
+                    continue;
+                }
+
+                selected.push(AdjacentStateCandidate {
+                    hdc_id: neighbor_id,
+                    anchor_hdc_id: Some(seed_id),
+                });
+                added_for_seed += 1;
             }
         }
         Ok(selected)
@@ -1576,6 +1742,95 @@ mod tests {
         ).is_err());
         assert!(evidence.pack_text_candidates_under_token_budget(
             &[(7, 0.5)], &costs, "web", 150, 5, 2, Some(0),
+        ).is_err());
+    }
+
+    #[test]
+    fn adjacent_state_expansion_keeps_seeds_and_adds_contiguous_neighbors() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id, step, scope, text) in [
+            (1, "a-state-4", "trajectory-a", 4, "web", "previous state"),
+            (2, "a-state-5", "trajectory-a", 5, "web", "retrieved target state"),
+            (3, "a-state-6", "trajectory-a", 6, "web", "following state"),
+            (4, "b-state-4", "trajectory-b", 4, "web", "other trajectory"),
+            (5, "private-state-6", "trajectory-a", 6, "enterprise", "private neighbor"),
+            (6, "a-state-8", "trajectory-a", 8, "web", "not contiguous"),
+        ] {
+            let (mut record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, scope, trajectory_id, text,
+            );
+            record.source.step_index = Some(step);
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+
+        let expanded = evidence.expand_text_candidates_with_adjacent_states(
+            &[(2, 0.99)], "web", 150, 3, 2,
+        ).unwrap();
+        assert_eq!(expanded, vec![
+            AdjacentStateCandidate { hdc_id: 2, anchor_hdc_id: None },
+            AdjacentStateCandidate { hdc_id: 1, anchor_hdc_id: Some(2) },
+            AdjacentStateCandidate { hdc_id: 3, anchor_hdc_id: Some(2) },
+        ]);
+    }
+
+    #[test]
+    fn adjacent_state_expansion_filters_lifecycle_and_preserves_seed_priority() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, step, text) in [
+            (1, "previous", 4, "previous active state"),
+            (2, "seed", 5, "retrieval seed"),
+            (3, "next-revoked", 6, "revoked next state"),
+            (4, "other-seed", 9, "second ranked seed"),
+            (5, "other-next", 10, "neighbor of second seed"),
+        ] {
+            let (mut record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", "trajectory-a", text,
+            );
+            record.source.step_index = Some(step);
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        evidence.revoke(3).unwrap();
+
+        let expanded = evidence.expand_text_candidates_with_adjacent_states(
+            &[(2, 0.99), (4, 0.90)], "web", 150, 3, 1,
+        ).unwrap();
+        assert_eq!(expanded, vec![
+            AdjacentStateCandidate { hdc_id: 2, anchor_hdc_id: None },
+            AdjacentStateCandidate { hdc_id: 4, anchor_hdc_id: None },
+            AdjacentStateCandidate { hdc_id: 1, anchor_hdc_id: Some(2) },
+        ]);
+    }
+
+    #[test]
+    fn adjacent_state_expansion_fails_closed_on_ambiguous_active_neighbors() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, step, text) in [
+            (1, "seed", 5, "retrieval seed"),
+            (2, "neighbor-a", 6, "first possible neighbor"),
+            (3, "neighbor-b", 6, "ambiguous possible neighbor"),
+        ] {
+            let (mut record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", "trajectory-a", text,
+            );
+            record.source.step_index = Some(step);
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+        assert!(evidence.expand_text_candidates_with_adjacent_states(
+            &[(1, 0.99)], "web", 150, 3, 2,
+        ).is_err());
+    }
+
+    #[test]
+    fn adjacent_state_expansion_rejects_unknown_seed_and_malformed_score() {
+        let evidence = EvidenceIndex::new();
+        assert!(evidence.expand_text_candidates_with_adjacent_states(
+            &[(404, 0.99)], "web", 150, 3, 2,
+        ).is_err());
+        assert!(evidence.expand_text_candidates_with_adjacent_states(
+            &[(404, f32::INFINITY)], "web", 150, 3, 2,
+        ).is_err());
+        assert!(evidence.expand_text_candidates_with_adjacent_states(
+            &[], "", 150, 3, 2,
         ).is_err());
     }
 
