@@ -138,6 +138,7 @@ def _check_receipt_bindings(
     decision_receipt_sha256: str,
     target_prediction_manifest_sha256: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    contract_manifest_sha256 = _sha256(contract_manifest_sha256, "contract_manifest_sha256")
     if not isinstance(decision, dict) or decision.get("receipt_label") != SCREEN_LABEL:
         raise ValueError("decision receipt label is not the task-conformal feasibility screen")
     if decision.get("evidence_class") != contract["evidence_class"]:
