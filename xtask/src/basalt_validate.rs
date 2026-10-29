@@ -257,13 +257,12 @@ where
 
 #[derive(Debug)]
 struct OptionalNonNull<T> {
-    present: bool,
     value: Option<T>,
 }
 
 impl<T> Default for OptionalNonNull<T> {
     fn default() -> Self {
-        Self { present: false, value: None }
+        Self { value: None }
     }
 }
 
@@ -275,7 +274,7 @@ where
     where
         D: Deserializer<'de>,
     {
-        T::deserialize(deserializer).map(|value| Self { present: true, value: Some(value) })
+        T::deserialize(deserializer).map(|value| Self { value: Some(value) })
     }
 }
 
