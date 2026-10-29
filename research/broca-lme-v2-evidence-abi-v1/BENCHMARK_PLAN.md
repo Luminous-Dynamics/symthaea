@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, query-specific evidence-set selector, and source-span-witness verifier are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, query-specific evidence-set selector, source-span-witness verifier, counterfactual fixture validator, and input/runtime projection test seam are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -16,6 +16,9 @@ This makes memory quality a multi-objective systems problem:
 - **Recoverability:** crashes expose either a valid committed state or an explicit integrity error—never a hybrid index/payload state.
 
 ## Public comparison points
+
+Budgeted Flat Reconstruction (BFR) is a direct method-level comparator: it decomposes questions into requirements, selects a complementary evidence set, then iteratively retrieves missing evidence via text or entity/session views. It reports 82.2% judged accuracy and 91.4% Turn Hit on LongMemEval-S using its own evaluator and setup. These are **not LongMemEval-V2 results**. Treat BFR as an algorithmic arm only if a compatible reproduction can be run on the original dataset or a carefully matched memory store; otherwise cite it only as related work, never as a measured Symthaea baseline.
+
 
 The official [LongMemEval-V2 repository](https://github.com/xiaowu0162/LongMemEval-V2/) reports 451 curated questions, five memory abilities, web and enterprise domains, histories up to 500 trajectories / 115M tokens, and small/medium leaderboard tiers. Its published baseline page ([results](https://xiaowu0162.github.io/longmemeval-v2/)) currently lists:
 
@@ -232,11 +235,12 @@ Freeze and compare these as separate arms. Do not conflate them into one adverti
 
 1. **No-memory control:** same reader/model without retrieved history.
 2. **Official simple RAG controls:** official query-to-slice and query-to-slice-plus-notes implementations.
-3. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
-4. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
-5. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
-6. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
-7. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
+3. **Direct evidence-reconstruction comparator:** Budgeted Flat Reconstruction (BFR), which decomposes queries into requirements, selects complementary evidence, then iteratively discovers additional records through text or multi-view access. Its paper reports 82.2% judged accuracy / 91.4% Turn Hit on LongMemEval-S under that paper's protocol, not LongMemEval-V2; reproduce on its original setup separately. See [arXiv:2610.09348](https://arxiv.org/abs/2610.09348).
+4. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
+5. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
+6. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
+7. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
+8. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
 
 All arms must receive the same allowed history and query. No benchmark question ID, gold answer, question type, evaluator metadata or future trajectory information may enter the memory write path, ranking features, or prompt. Pin dataset revisions, model/tokenizer hashes, code commits, prompt templates, context budget, seeds and evaluator versions.
 
@@ -269,6 +273,25 @@ Separate three claims: logical ineligibility, visible-file pruning, and physical
 Track answer/task quality against end-to-end latency, memory footprint, context tokens and inference cost. Use adaptive retrieval depth only behind deterministic safety filters, and compare its decisions to exact HDC results. Cache only with a versioned key that includes generation, scope, time policy and encoder identity; invalidate it on every relevant state transition.
 
 **Research question:** can the system return better-supported answers and actions at lower latency/cost by spending retrieval effort only where additional evidence changes the decision?
+
+## Counterfactual fixture validator (new executable structural seam)
+Recent adjacent work changes the experimental target in a useful way. [MemCalib (arXiv:2609.24259)](https://arxiv.org/abs/2609.24259) labels each memory atom's target influence as Ignore, Bound or Control and measures over-use separately from under-use; its authors report that optimization can improve one direction while worsening the other. [DynamicMem (arXiv:2606.22877)](https://arxiv.org/abs/2606.22877) adds multi-timescale profile changes, causally grounded cross-application behavior and quarterly checkpoints; it reports that more than 93% of its observed failures traced to memory retrieval rather than answer generation. These are published claims for their own evaluation settings, not results for Symthaea.
+
+The next memory-use experiment should pair evidence sufficiency with an atom-ablation audit: for each labeled atom, compare the same frozen query/prompt with and without that atom. Test whether Ignore atoms have no material answer-specific footprint, Bound atoms contribute only locally, and Control atoms actually affect required claims/constraints. Report over-use, under-use, answerability/coverage and retrieval failures separately. This is a new evaluation arm, not a current model capability or a performance claim.
+
+
+The Rust module `crates/domains/symthaea-broca/src/counterfactual_evidence_audit.rs` and CLI `broca-counterfactual-audit` define a deterministic input-fixture validator. The current synthetic corpus contains 10 pairs / 20 cases across polarity, temporal validity, entity binding, scope, source dependence, missing requirements, ordered transitions, correction updates, qualifier context, and memory influence (Ignore/Bound/Control target levels). The evaluator-only labels are stored separately under `tests/fixtures/evaluator-only/`.
+
+The validator checks the pinned schema, unique IDs, explicit scopes/entities/source families, RFC3339 timestamps, allowed mutation families/relations, family-specific mutation kinds/paths, forbidden evaluator-only keys, and exact agreement between declared and observed evidence diffs. The memory-influence pair supplies a positive atom-level Ignore/Control label fixture inspired by MemCalib; label validation only checks schema and evidence identity, not actual model behavior. It also exposes a runtime projection containing only query, as-of timestamp, and evidence, excluding pair/mutation metadata. Tests link each gold-label pair back to its exact input pair and require every case to have one label.
+
+Run from the workspace root:
+
+```sh
+cargo run -p symthaea-broca --bin broca-counterfactual-audit -- crates/domains/symthaea-broca/tests/fixtures/counterfactual-evidence-audit-v1.jsonl
+cargo test -p symthaea-broca counterfactual_evidence_audit
+```
+
+**Validation boundary:** the Rust source and fixtures are authored but not compiled or executed here. A successful structural check is not semantic support evaluation, and the fixture suite is not a benchmark result. The CLI intentionally prints `semantic_support=NOT_EVALUATED`; it does not read the evaluator-only label file. Exact-head compilation and test execution remain required.
 
 ## Implementation prerequisites and next sequence
 

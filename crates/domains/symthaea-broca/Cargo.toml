@@ -92,6 +92,10 @@ path = "src/bin/broca_collect.rs"
 required-features = ["collect"]
 
 [[bin]]
+name = "broca-counterfactual-audit"
+path = "src/bin/broca_counterfactual_audit.rs"
+
+[[bin]]
 name = "broca-mamba-verify"
 path = "src/bin/broca_mamba_verify.rs"
 required-features = ["mamba-cpu"]

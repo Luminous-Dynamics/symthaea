@@ -19,6 +19,7 @@ pub mod checkpoint;
 pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod compiler_trainer;
+pub mod counterfactual_evidence_audit;
 pub mod consensus_engine;
 pub mod controller;
 pub mod decoder;

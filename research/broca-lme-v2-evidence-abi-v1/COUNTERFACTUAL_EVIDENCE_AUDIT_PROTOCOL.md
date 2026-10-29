@@ -29,14 +29,15 @@ The selector's `complete=true` is layer 3 only. A payload-span digest establishe
 
 Store fixtures as deterministic UTF-8 JSONL. One row is one pair; a pair contains two independently executed cases. Use a fixed schema version and reject unknown fields in the generator/validator. The generator emits only the data needed for the memory write/query path. Any byte-range witnesses in this protocol are defined against the exact text payload supplied to the selector, not automatically against the original trajectory JSON or raw source bytes. Keep gold labels in a separate evaluator-only file inaccessible to the system under test.
 
-Proposed pair record:
+Canonical input corpus: `crates/domains/symthaea-broca/tests/fixtures/counterfactual-evidence-audit-v1.jsonl`. The current strict Rust schema includes an `as_of` timestamp and explicit `source_family`, `entity_id`, and `scope` on every evidence record. The example below is intentionally short; executable examples in the fixture file are authoritative for field names and mutation paths.
 
 ```json
 {
   "schema_version": "BROCA-COUNTERFACTUAL-EVIDENCE-AUDIT-V1",
   "pair_id": "negation-0001",
   "family": "polarity_negation",
-  "query": "Did the service recover after the restart?",
+  "query": "Did service svc-17 recover after restart?",
+  "as_of": "2026-10-29T12:00:00Z",
   "cases": [
     {
       "case_id": "negation-0001-a",
@@ -44,10 +45,12 @@ Proposed pair record:
         {
           "evidence_id": "event-1",
           "source_id": "source-1",
+          "source_family": "ops-ticket-17",
+          "entity_id": "svc-17",
           "scope": "prod-east",
-          "observed_at": "2026-01-02T10:00:00Z",
+          "observed_at": "2026-10-29T10:00:00Z",
           "valid_until": null,
-          "text": "After the restart, the service recovered."
+          "text": "After the restart, service svc-17 recovered."
         }
       ]
     },
@@ -57,21 +60,27 @@ Proposed pair record:
         {
           "evidence_id": "event-1",
           "source_id": "source-1",
+          "source_family": "ops-ticket-17",
+          "entity_id": "svc-17",
           "scope": "prod-east",
-          "observed_at": "2026-01-02T10:00:00Z",
+          "observed_at": "2026-10-29T10:00:00Z",
           "valid_until": null,
-          "text": "After the restart, the service did not recover."
+          "text": "After the restart, service svc-17 did not recover."
         }
       ]
     }
   ],
   "mutation": {
     "kind": "polarity_flip",
-    "changed_fields": ["evidence.text"],
-    "expected_decision_relation": "answer_claim_must_flip_or_be_rejected"
+    "changed_fields": ["evidence[0].text"],
+    "expected_decision_relation": "claim_must_flip_or_be_rejected"
   }
 }
 ```
+
+The `changed_fields` list uses exact structural paths from the validator. For a fixed-length evidence array, a text mutation is `evidence[0].text`; when list length changes, the list path `evidence` is declared. The validator rejects undeclared differences, extra differences, duplicate IDs, malformed timestamps, unknown fields, evaluator-label fields, and unsupported mutation families/relations.
+
+The evaluator-only labels are physically separate at `crates/domains/symthaea-broca/tests/fixtures/evaluator-only/counterfactual-evidence-audit-labels-v1.jsonl`. The production validator does not open this file. `CounterfactualPairFixture::runtime_case(index)` returns only query, as-of time, and evidence; it omits pair IDs, mutation metadata, expected decision relations, and all gold labels.
 
 This is an illustrative schema, not a released dataset example. Replace timestamps, identifiers, and evidence with synthetic or properly licensed material in committed fixtures. The evaluator-only label file should map each case ID to: answerability, the required claim(s), supporting/rebutting source spans, expected current state, expected action/abstention, and the applicable mutation invariant.
 
@@ -100,9 +109,21 @@ Implement a positive control and a minimally changed negative/alternate case for
 | Missing requirement | Remove exactly one essential fact, value, relation, or constraint | Missing information remains missing; role labels must not invent it |
 | Ordered transition | Swap or remove an intermediate state/action while leaving endpoints similar | Workflow/transition answer must respect order and cannot infer an unobserved transition |
 | Qualifier truncation | Keep a matching phrase but remove surrounding negation, condition, exception, or attribution | Isolated lexical match must not override semantics carried by the omitted qualifier |
-| Integrity/lifecycle | Mutate payload bytes, source mapping, digest, lifecycle or authorization metadata | The responsible integrity/eligibility gate rejects or surfaces the failure; no silent fallback |
+| Memory influence | Add a high-overlap but non-decisive proposition to an otherwise answerable context | The answer should remain stable; the added atom should receive an Ignore target rather than changing a material conclusion |
 
-Each family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
+Integrity/lifecycle mutations remain mandatory **structural invariant tests**, but they are not counted as one of the ten semantic counterfactual families in the current JSONL schema. Test payload/digest corruption, source mapping, expiry, revocation and authorization directly against the responsible resolver/verifier; zero forbidden emissions and zero silent integrity fallbacks are hard gates.
+
+Each semantic family should include (a) clear answerable controls, (b) structurally complete but semantically unsupported cases, and (c) cases where abstention is correct. Always-abstain and always-answer policies are mandatory diagnostics so neither abstention nor answering everything can masquerade as robust performance.
+
+### Memory-influence calibration (MemCalib-inspired)
+
+The v1 fixture corpus now includes an explicit memory-influence pair. One case contains the decisive current configuration; its counterfactual twin adds a high-overlap but non-decisive note. The evaluator-only label file assigns each evidence atom a target influence level: **Ignore** (no answer-specific footprint), **Bound** (limited/local support), or **Control** (materially determines a conclusion or constraint). The test checks that all atoms are labelled and that targets reference evidence in the same case; it does not itself measure a language model's actual influence.
+
+This extension is motivated by [MemCalib](https://arxiv.org/abs/2609.24259), which evaluates over-use and under-use of memory propositions and reports directional trade-offs from conventional optimization. The relevant next experiment is an **atom-ablation intervention**: run the same query with the full context and with one atom removed, then measure whether answer claims, constraints, and action arguments change at the level warranted by that atom's target. For an Ignore atom, a material change is suspect; for a Control atom, absence of any expected effect can reveal under-use. Ablation is diagnostic, not proof of causality unless all other prompt/context differences are controlled.
+
+Report over-use and under-use separately. Do not combine them into a single accuracy number before showing both components, and never tune a response policy solely to reduce over-use if that causes the system to ignore required evidence. This complements QEMem's evidence-set sufficiency question with a separate question: once evidence reaches the reader, is each proposition given the appropriate influence?
+
+When a compatible MemCalib reader/judge protocol is used, report the paper's six metrics using its exact definitions: SCS and Exact (higher is better), plus sMOS, sMUS, AOR, and AUR (lower is better). Record the judge/model version and report results over three or more independent seeds, as the reference paper does. Do not reuse these metric names for ad hoc calculations. On this 10-pair synthetic smoke corpus, report fixture correctness and individual pair outcomes only; the sample is far too small to claim benchmark-level memory-use performance. A scaled held-out evaluation should aim for at least 100 reviewed pairs per mutation family, with source-family-disjoint development/test partitions and adjudicated target-use labels. This is a proposed Symthaea qualification target, not an established industry standard.
 
 ## 5. Test levels
 
@@ -166,6 +187,7 @@ For selective answering, publish risk–coverage curves and compare at matched c
 |---|---|
 | No-memory | Detect whether stored memory adds value |
 | Score-prefix retrieval | Ordinary relevance baseline |
+| Budgeted Flat Reconstruction (BFR) | Direct research comparator for requirement decomposition plus complementary evidence discovery; reproduce on the paper's original LongMemEval-S setup separately, never as a LongMemEval-V2 score |
 | Role-set selection | Isolate gains from explicit coverage annotations |
 | Payload-span witnesses | Isolate payload byte integrity and source-digest association; not raw-source offset mapping or semantic correctness |
 | Semantic support/contradiction gate | Test the semantic hypothesis when independently implemented |
@@ -192,8 +214,11 @@ If the support gate fails to distinguish the minimal pairs, report the failure m
 ## 9. Reference points and limits
 
 - QEMem, *From Relevant Memories to Sufficient Evidence*: https://arxiv.org/abs/2610.22668
+- Budgeted Flat Reconstruction (BFR), *Relevance Is Not Sufficiency: What Actually Closes the Evidence Gap in Long-Term Memory QA*: https://arxiv.org/abs/2610.09348
+- MemCalib, *Benchmarking and Optimizing Memory Use in LLM Agents*: https://arxiv.org/abs/2609.24259
 - LongMemEval-V2 official backend contract, evaluation harness and baselines: https://github.com/xiaowu0162/LongMemEval-V2
 - MemoryAgentBench: https://arxiv.org/abs/2507.05257
+- DynamicMem, *A Long-Horizon Memory Benchmark in Real-World Settings*: https://arxiv.org/abs/2606.22877
 - LongMINT: https://arxiv.org/abs/2605.18565
 
 These works motivate the protocol but use different datasets, memory interfaces, readers, evaluators and budgets. Their published accuracies are not target values for this component and must not be placed on the same chart as Symthaea results without a matched protocol.
