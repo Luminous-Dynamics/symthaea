@@ -286,8 +286,8 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         );
     }
 
-    let source_tracks: BTreeSet<&str> = source.track_ids.iter().map(String::as_str).collect();
-    let mut region_by_id: BTreeMap<&str, &RegionMask> = BTreeMap::new();
+    let source_tracks: BTreeSet<String> = source.track_ids.iter().cloned().collect();
+    let mut region_by_id: BTreeMap<String, &RegionMask> = BTreeMap::new();
 
     for region in &contract.authorization_mask {
         if region.region_id.trim().is_empty()
@@ -299,7 +299,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
                 format!("region {} has an empty identifier or track set", region.region_id),
             );
         }
-        if region_by_id.insert(region.region_id.as_str(), region).is_some() {
+        if region_by_id.insert(region.region_id.clone(), region).is_some() {
             push(
                 "DUPLICATE_REGION_ID",
                 format!("region ID {} is declared more than once", region.region_id),
@@ -321,7 +321,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             );
         }
         for track in &region.track_ids {
-            if !source_tracks.contains(track.as_str()) {
+            if !source_tracks.contains(track) {
                 push(
                     "UNKNOWN_TRACK_ID",
                     format!("region {} references unknown track {}", region.region_id, track),
@@ -363,7 +363,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
 
     for change in &contract.requested_changes {
         for region_id in &change.region_ids {
-            if !region_by_id.contains_key(region_id.as_str()) {
+            if !region_by_id.contains_key(region_id) {
                 push(
                     "UNKNOWN_REGION_ID",
                     format!("requested change references unknown region {}", region_id),
@@ -446,7 +446,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         }
         if let Some(track_ids) = &invariant.track_ids {
             for track_id in track_ids {
-                if !source_tracks.contains(track_id.as_str()) {
+                if !source_tracks.contains(track_id) {
                     push(
                         "UNKNOWN_TRACK_ID",
                         format!("protected invariant references unknown track {}", track_id),
@@ -554,6 +554,7 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         );
     }
 
+    drop(push);
     ContractValidationReport::finish(issues)
 }
 
