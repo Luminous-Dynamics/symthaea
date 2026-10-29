@@ -1,0 +1,34 @@
+name: Phi Cross-Language Digest Contract
+
+on:
+  push:
+    branches:
+      - research/phi-qualification-v0-1-20261028
+  pull_request:
+    paths:
+      - "validation/iit_digest_contract.py"
+      - "validation/test_iit_digest_contract.py"
+      - "validation/test_phi_reference_fixture_manifest.py"
+      - "validation/fixtures/pyphi-iit4-2023-fig1a-reference-v0.1.json"
+      - "validation/fixtures/pyphi-reference-run-v0.1.schema.json"
+      - ".github/workflows/phi-digest-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  digest-contract:
+    name: Verify Rust/Python digest golden vectors
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run dependency-free contract and fixture tests
+        run: python -m unittest validation.test_iit_digest_contract validation.test_phi_reference_fixture_manifest -v
