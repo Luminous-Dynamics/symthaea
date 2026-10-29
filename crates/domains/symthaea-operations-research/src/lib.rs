@@ -20,6 +20,7 @@
 //! - [`aviation_energy_dispatch`]: bounded exact/greedy energy sourcing with Pareto results and independent plan verification.
 //! - [`aviation_energy_hub`]: time-indexed synthetic airport electricity, storage, and Pareto dispatch with independent verification.
 //! - [`aviation_energy_hub_robustness`]: weighted stress replay, explicit feasibility coverage, and perfect-information recourse reference.
+//! - [`aviation_energy_hub_nonanticipativity`]: independent verification that scenarios with identical observed history take identical actions.
 //! - [`aviation_calibration_protocol`]: dataset-split integrity, event-cluster leakage,
 //!   chronology checks, and a fail-closed guard against declared test-set tuning.
 //! - [`aviation_probability_calibration`]: conservative finite-sample TV-radius calibration
@@ -48,6 +49,7 @@ pub mod aviation_energy_accounting;
 pub mod aviation_energy_dispatch;
 pub mod aviation_energy_hub;
 pub mod aviation_energy_hub_robustness;
+pub mod aviation_energy_hub_nonanticipativity;
 pub mod aviation_decision_readiness;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
