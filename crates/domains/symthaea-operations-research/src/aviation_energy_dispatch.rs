@@ -60,7 +60,7 @@ pub struct EnergySourceOffer {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CleanAirlineEnergyScenario {
     pub scenario_id: String,
-    /// Caller-supplied manifest digest; canonicalization and digest verification are external.
+    /// Canonical SHA-256 digest, set by `seal_scenario` and checked by every solver/verifier.
     pub input_digest: String,
     pub currency_code: String,
     pub quantum_kwh: f64,
