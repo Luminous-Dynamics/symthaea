@@ -11,7 +11,7 @@ A valid confidence sequence for one fixed target policy does not automatically j
 1. optional stopping over observation time;
 2. multiplicity / winner's curse over the selected policy.
 
-The benchmark separates these. It compares a reused pointwise Wald baseline, individually anytime-valid Hoeffding confidence sequences that each receive alpha=0.05, and familywise-valid Hoeffding sequences that allocate alpha/M to each of M policies. All three methods see the same logged actions and rewards.
+The benchmark separates these. It compares a reused pointwise Wald baseline, individually anytime-valid Hoeffding confidence sequences that each receive alpha=0.05, familywise-valid Hoeffding sequences that allocate alpha/M to each policy, and a **shared cell-mean Hoeffding sequence** that bounds the four primitive context/action reward means. All methods see the same logged actions and rewards. The shared method spends its error budget across four outcome cells rather than M policy estimates; if all four simultaneous mean bounds hold, every policy value formed as a nonnegative weighted sum is covered at once.
 
 A policy is **certified best** only when its lower bound strictly exceeds every other policy's upper bound. An empty or reversed interval makes the portfolio ineligible for certification. This is a selection contract, not just an estimation metric.
 
@@ -46,6 +46,7 @@ where `delta_{j,t} = alpha_policy / [2 t(t+1)]`. Because ∑_{t>=1} 1/[t(t+1)] =
 
 - **Independent CS:** alpha_policy=0.05 for every policy. This is time-valid for each fixed policy individually, but has no 0.05 guarantee for simultaneous coverage of the portfolio.
 - **Familywise CS:** alpha_policy=0.05/M. A union bound across policies makes all M confidence sequences jointly valid at every time with total error budget 0.05, subject to the bounded-score and sampling assumptions.
+- **Shared cell-mean CS:** builds four nested Hoeffding confidence sequences for E[R|context, action], with alpha_cell=0.05/4 per cell and per-tail local-count spending alpha_cell/[2 n(n+1)]. A policy interval is the target-context/action weighted sum of the cell lower and upper bounds. If the four cell sequences jointly cover their means at all times, every candidate policy (and any stochastic policy over the same finite support) is covered simultaneously; no extra M correction is needed. This holds for this tabular design with known context probabilities and does not automatically generalize to unknown context distributions or high-dimensional reward models.
 - **Reused Wald:** pointwise 95% normal interval from sample variance, recomputed at each look. It is intentionally not anytime-valid; its job is to expose the benefit of a valid time-uniform comparison, not to compete on equal guarantees.
 
 The portfolio certificate is conservative by design: even if one policy looks promising, the system abstains unless the entire interval family separates a unique best candidate.
@@ -61,12 +62,14 @@ Each logger/replicate has a fixed SplitMix64 seed. Candidate counts M=4,8,32 re-
 - mean across-policy interval width and mean maximum interval width;
 - IPS-argmax top-1 accuracy and simple regret.
 
+This adds a policy-family uncertainty-sharing ablation: Bonferroni OPE pays a correction that grows with M, whereas the shared-cell method pays for the number of primitive outcome cells and maps those same intervals into any number of policies. It is a fair comparison for the registered tabular DGP because context probabilities and the outcome-cell definition are known.
+
 A false certificate means some certified candidate is suboptimal relative to the known best policy. The false-certificate metric is cumulative over looks, so optional stopping remains visible.
 
 ## Hard gates
 
 The exact-head workflow checks:
-- expected output row counts and deterministic replay (wall-time rows excluded);
+- expected output row counts, including 88 explicit policy definitions, and deterministic replay (wall-time rows excluded);
 - every importance ratio stays below its computed policy-specific W_j;
 - the familywise CS has a sequence-coverage Wilson lower bound above 0.90 for every portfolio;
 - its false-certificate probability has a Wilson upper bound below 0.10;
