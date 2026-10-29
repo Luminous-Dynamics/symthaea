@@ -157,6 +157,7 @@
         "version",
         "master_seed",
         "parameterized_control_count",
+        "source_fixture_sha256",
         "algorithm",
         "known_answers_public"
       ],
@@ -180,6 +181,11 @@
         },
         "known_answers_public": {
           "const": true
+        },
+        "source_fixture_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of the exact source fixture bytes used by the generator."
         }
       }
     },
