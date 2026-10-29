@@ -428,6 +428,7 @@ impl EvidenceTrustStore {
             return Err("trusted signer registry must not be empty".into());
         }
         let mut signers = BTreeMap::new();
+        let mut verifying_key_material = BTreeSet::new();
         for config in configs {
             if config.key_id.trim().is_empty() {
                 return Err("trusted key_id must not be empty".into());
@@ -443,6 +444,12 @@ impl EvidenceTrustStore {
             })?;
             let verifying_key = VerifyingKey::from_bytes(&key_array)
                 .map_err(|error| format!("invalid public key for {}: {error}", config.key_id))?;
+            if !verifying_key_material.insert(key_array) {
+                return Err(
+                    "duplicate trusted public key material across key IDs; signing roles require distinct keypairs"
+                        .into(),
+                );
+            }
             let valid_from = DateTime::parse_from_rfc3339(&config.valid_from)
                 .map_err(|error| format!("valid_from must be RFC3339 with UTC offset: {error}"))?
                 .with_timezone(&Utc);
@@ -1069,6 +1076,18 @@ mod tests {
             "2026-01-01T00:00:00Z", None,
         )]);
         assert!(store.unwrap_err().contains("exactly one signing role"));
+    }
+
+    #[test]
+    fn same_public_key_cannot_be_aliased_across_signing_roles() {
+        let reused_key = key(7);
+        let store = EvidenceTrustStore::new(vec![
+            trust_config("policy-root", None, &reused_key, true, false, false,
+                "2026-01-01T00:00:00Z", None),
+            trust_config("ingest-root", None, &reused_key, false, false, true,
+                "2026-01-01T00:00:00Z", None),
+        ]);
+        assert!(store.unwrap_err().contains("duplicate trusted public key material"));
     }
 
     #[test]
