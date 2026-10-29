@@ -1,6 +1,6 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-004-value-add-report-v0.2";
+const REPORT_SCHEMA: &str = "cmaq-004-value-add-report-v0.3";
 const TRAIN_CONTEXTS: [usize; 3] = [0, 1, 2];
 const HELDOUT_CONTEXT: usize = 3;
 const SUPPORT_SAMPLES: usize = 1_024;
