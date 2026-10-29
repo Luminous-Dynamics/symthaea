@@ -90,6 +90,29 @@ These targets are intentionally falsifiable. They must be revised *before* a qua
 - Before connecting to production code, extend task families beyond sparse parity, add a blind mechanism split, authenticate outcome receipts, and implement an independent outcome recorder. The live cognitive loop should not be changed by this research harness.
 
 
+
+## Counterfactual world-model scorecard
+
+The separate `src/bin/score_world_model.rs` evaluates all action predictions from a world model, then scores the policy the model induces. This avoids confusing a low one-step prediction error with good decision support.
+
+It reports counterfactual reward MAE/RMSE, safety and success Brier scores, ranking agreement between actions that are safe in the evaluator's ground truth, regret of the selected policy, regret of the model-greedy policy, false-safe predictions, model optimism gap, and latency/memory cost. Unsafe selected actions and unsafe model-greedy actions fail its hard gate.
+
+Candidate output schema:
+
+```tsv
+case_id  predicted_reward_a0_milli ... predicted_reward_a2_milli
+         predicted_safe_a0_ppm ... predicted_safe_a2_ppm
+         predicted_success_a0_ppm ... predicted_success_a2_ppm
+         selected_action latency_us memory_bytes
+```
+
+The answer key is scorer-only input. The public smoke fixture intentionally produces perfect predictions to test the scorer's known-answer path; it is not evidence of a model result.
+
+```bash
+cargo test --locked --bin score_world_model
+cargo run --quiet --locked --bin score_world_model -- score fixtures/answer-key-smoke.tsv fixtures/world-model-predictions-smoke.tsv
+```
+
 ## Factor-composition task generator
 
 A second isolated Rust crate at `research/cmaq-001/generator/` generates deterministic sparse-parity causal-transfer cases. It keeps agent-visible event histories separate from evaluator-only active-factor masks and targets; the generator manifest SHA-256-binds both exact output files. This is synthetic benchmark infrastructure, not a score or evidence of model capability.
