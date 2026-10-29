@@ -984,11 +984,15 @@ mod tests {
         // Removing a Control atom causes no required claim change: under-use.
         let unchanged_control = rows[2]["full_fields"].clone();
         rows[2]["ablated_fields"] = unchanged_control;
+        // The Bound atom should affect only the retry-limit scope field; no change is under-use.
+        let unchanged_bound = rows[3]["full_fields"].clone();
+        rows[3]["ablated_fields"] = unchanged_bound;
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
         let result = score_atom_ablation_jsonl(&observations, FIXTURES, LABELS)
             .expect("valid but behaviorally faulty synthetic observations still score");
         assert_eq!(result.ignore_overuse_count, 1);
         assert_eq!(result.control_underuse_count, 1);
+        assert_eq!(result.bound_underuse_count, 1);
     }
 
     #[test]
