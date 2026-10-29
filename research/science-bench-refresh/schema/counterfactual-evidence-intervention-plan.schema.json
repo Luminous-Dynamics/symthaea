@@ -159,7 +159,7 @@
         },
         "evidence_manifest_sha256": {
           "$ref": "#/$defs/digest",
-          "description": "Digest of the condition's evidence/environment manifest. The manifest and source bytes remain evaluator-side as applicable."
+          "description": "Nonzero digest of the condition-specific evidence/environment manifest. Each pair must use a distinct digest per condition so a nominal intervention cannot silently reuse another condition's evidence provenance."
         },
         "randomization_order": {
           "type": "integer",
