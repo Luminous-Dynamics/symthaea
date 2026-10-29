@@ -229,6 +229,29 @@ fn rank_digest(component_id: &str) -> String {
 /// deterministic pseudo-random order; each goes to the split with the largest
 /// remaining *fractional* family-count deficit. The allocation is approximate
 /// when components are indivisible and is never allowed to change PITB v0.
+fn component_quotas(component_count: usize) -> [usize; 3] {
+    let train_end = component_count * 70 / 100;
+    let validation_end = component_count * 85 / 100;
+    [
+        train_end,
+        validation_end - train_end,
+        component_count - validation_end,
+    ]
+}
+
+fn family_balance_loss(family_counts: &[usize; 3], total_families: usize) -> f64 {
+    let total = total_families as f64;
+    TARGET_SHARES
+        .iter()
+        .enumerate()
+        .map(|(index, share)| {
+            let target = share * total;
+            let relative_error = (family_counts[index] as f64 - target) / target.max(1.0);
+            relative_error * relative_error
+        })
+        .sum()
+}
+
 fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>> {
     if units.is_empty() {
         bail!("cannot allocate an empty component set");
@@ -249,48 +272,110 @@ fn assign_components(units: &[ComponentUnit]) -> Result<BTreeMap<String, String>
         }
     }
 
-    let family_count = family_ids.len();
-    if family_count == 0 {
+    let total_families = family_ids.len();
+    if total_families == 0 {
         bail!("component set contains no families");
     }
-    let targets = TARGET_SHARES.map(|share| share * family_count as f64);
-    // Largest-first allocation prevents a late giant component from being
-    // assigned to whichever split happens to have the largest fractional
-    // deficit after many smaller components have already been placed. The hash
-    // ordering remains the deterministic tie-breaker, never an outcome signal.
+
+    // First allocate the independent units to exact, frozen 70/15/15 quotas
+    // using only a content-independent deterministic hash ordering. This makes
+    // component count—not family count—the primary split unit.
     let mut ranked = units.to_vec();
     ranked.sort_by(|left, right| {
-        right
-            .family_ids
-            .len()
-            .cmp(&left.family_ids.len())
-            .then_with(|| rank_digest(&left.component_id).cmp(&rank_digest(&right.component_id)))
+        rank_digest(&left.component_id)
+            .cmp(&rank_digest(&right.component_id))
             .then_with(|| left.component_id.cmp(&right.component_id))
     });
+    let quotas = component_quotas(ranked.len());
+    let mut component_to_split: BTreeMap<String, usize> = BTreeMap::new();
+    let mut family_counts = [0usize; 3];
+    for (index, unit) in ranked.iter().enumerate() {
+        let split = if index < quotas[0] {
+            0
+        } else if index < quotas[0] + quotas[1] {
+            1
+        } else {
+            2
+        };
+        component_to_split.insert(unit.component_id.clone(), split);
+        family_counts[split] += unit.family_ids.len();
+    }
 
-    let mut counts = [0usize; 3];
+    // Improve target-family balance via best-improving cross-split swaps.
+    // Every move exchanges exactly one component for another, so the frozen
+    // component quotas can never change. The objective is a declared design
+    // criterion (sum of squared relative family-count errors), not an outcome
+    // metric. Hash order and pair iteration provide deterministic tie-breaking.
+    const MIN_RELATIVE_LOSS_IMPROVEMENT: f64 = 1e-12;
+    loop {
+        let current_loss = family_balance_loss(&family_counts, total_families);
+        let mut best_gain = MIN_RELATIVE_LOSS_IMPROVEMENT;
+        let mut best_swap: Option<(usize, usize, [usize; 3])> = None;
+
+        for left_index in 0..ranked.len() {
+            let left = &ranked[left_index];
+            let left_split = *component_to_split
+                .get(&left.component_id)
+                .context("component assignment missing during balancing")?;
+            let left_size = left.family_ids.len();
+
+            for right_index in (left_index + 1)..ranked.len() {
+                let right = &ranked[right_index];
+                let right_split = *component_to_split
+                    .get(&right.component_id)
+                    .context("component assignment missing during balancing")?;
+                if left_split == right_split {
+                    continue;
+                }
+
+                let right_size = right.family_ids.len();
+                if left_size == right_size {
+                    continue;
+                }
+
+                let mut candidate_counts = family_counts;
+                candidate_counts[left_split] =
+                    candidate_counts[left_split] - left_size + right_size;
+                candidate_counts[right_split] =
+                    candidate_counts[right_split] - right_size + left_size;
+                let gain = current_loss
+                    - family_balance_loss(&candidate_counts, total_families);
+                if gain > best_gain {
+                    best_gain = gain;
+                    best_swap = Some((left_index, right_index, candidate_counts));
+                }
+            }
+        }
+
+        let Some((left_index, right_index, candidate_counts)) = best_swap else {
+            break;
+        };
+        let left_id = ranked[left_index].component_id.clone();
+        let right_id = ranked[right_index].component_id.clone();
+        let left_split = *component_to_split
+            .get(&left_id)
+            .context("left component assignment disappeared")?;
+        let right_split = *component_to_split
+            .get(&right_id)
+            .context("right component assignment disappeared")?;
+        component_to_split.insert(left_id, right_split);
+        component_to_split.insert(right_id, left_split);
+        family_counts = candidate_counts;
+    }
+
     let mut output = BTreeMap::new();
-    for unit in ranked {
-        let size = unit.family_ids.len();
-        let best_split = (0..3)
-            .max_by(|left, right| {
-                let left_deficit =
-                    (targets[*left] - counts[*left] as f64) / targets[*left].max(1.0);
-                let right_deficit =
-                    (targets[*right] - counts[*right] as f64) / targets[*right].max(1.0);
-                left_deficit
-                    .total_cmp(&right_deficit)
-                    // Stable tie-breaking: train, validation, then test.
-                    .then_with(|| right.cmp(left))
-            })
-            .context("three split destinations must exist")?;
-        let split = SPLITS[best_split].to_owned();
-        counts[best_split] += size;
-        for family_id in unit.family_ids {
-            output.insert(family_id, split.clone());
+    for unit in &ranked {
+        let split_index = *component_to_split
+            .get(&unit.component_id)
+            .with_context(|| format!("component {} was not assigned", unit.component_id))?;
+        let split = SPLITS[split_index].to_owned();
+        for family_id in &unit.family_ids {
+            if output.insert(family_id.clone(), split.clone()).is_some() {
+                bail!("internal error: family assigned more than once");
+            }
         }
     }
-    if output.len() != family_count {
+    if output.len() != total_families {
         bail!("internal allocation did not preserve all families");
     }
     Ok(output)
@@ -369,7 +454,7 @@ fn execute() -> Result<()> {
         "status": "candidate_only",
         "upstream_commit": UPSTREAM,
         "candidate_seed": CANDIDATE_SEED,
-        "allocation_algorithm": "order components by descending family count, then SHA-256(seed || NUL || component_id), then component ID; assign each whole component to the split with the largest remaining fraction of target family capacity; tie order train, validation, test",
+        "allocation_algorithm": "sort components by SHA-256(candidate_seed || NUL || component_id), then component ID; assign components to exact floor-based 70/15/15 component-count quotas; repeatedly apply the best deterministic cross-split component swap that reduces sum of squared relative family-count errors, never changing component quotas",
         "target_family_shares": {
             "train": TARGET_SHARES[0],
             "validation": TARGET_SHARES[1],
@@ -499,25 +584,50 @@ mod tests {
     }
 
     #[test]
-    fn largest_components_are_placed_before_smaller_components() {
-        // Total families = 372: target counts are approximately 260/56/56.
-        // The second and third components are larger than either validation or
-        // test target; placing them first avoids filling train with tiny units
-        // before those indivisible components can be assigned.
+    fn component_first_allocation_preserves_cluster_quotas_under_size_skew() {
         let source = units(&[200, 80, 50, 42]);
         let assignments = assign_components(&source).expect("valid skewed components allocate");
 
-        assert_eq!(assignments["family-0001"], "train");
-        assert_eq!(assignments["family-0201"], "validation");
-        assert_eq!(assignments["family-0281"], "test");
-        assert_eq!(assignments["family-0331"], "train");
-
+        // Four independent components yield floor-based quotas [2, 1, 1].
+        let component_splits: Vec<&str> = source
+            .iter()
+            .map(|unit| {
+                let splits: BTreeSet<&str> = unit
+                    .family_ids
+                    .iter()
+                    .map(|family| assignments[family].as_str())
+                    .collect();
+                assert_eq!(splits.len(), 1, "component {}", unit.component_id);
+                *splits.iter().next().expect("component has an assigned split")
+            })
+            .collect();
         let counts = [
-            assignments.values().filter(|split| *split == "train").count(),
-            assignments.values().filter(|split| *split == "validation").count(),
-            assignments.values().filter(|split| *split == "test").count(),
+            component_splits.iter().filter(|split| **split == "train").count(),
+            component_splits
+                .iter()
+                .filter(|split| **split == "validation")
+                .count(),
+            component_splits.iter().filter(|split| **split == "test").count(),
         ];
-        assert_eq!(counts, [242, 80, 50]);
+        assert_eq!(counts, component_quotas(source.len()));
+    }
+
+    #[test]
+    fn component_first_allocation_is_deterministic_after_swaps() {
+        let source = units(&[120, 70, 30, 20, 18, 16, 14, 12, 10, 8, 8, 7, 6, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 1, 1]);
+        let first = assign_components(&source).expect("valid components allocate");
+        let mut reversed = source.clone();
+        reversed.reverse();
+        for unit in &mut reversed {
+            unit.family_ids.reverse();
+        }
+        let second = assign_components(&reversed).expect("reordered input allocates");
+        assert_eq!(first, second);
+        assert_eq!(
+            partition_digest(&first),
+            partition_digest(&second),
+            "component swaps must preserve order-independent replay"
+        );
     }
 
     #[test]
