@@ -20,11 +20,12 @@ from typing import Any
 HEX = re.compile(r"^[a-f0-9]{64}$")
 REVISION = re.compile(r"^[a-f0-9]{40}$")
 IMAGE = re.compile(r"^sha256:[a-f0-9]{64}$")
+FAMILY_LABEL = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 NETWORK_MODES = {"none", "allowlisted", "enabled", "not_applicable"}
 OUTCOMES = {"pass", "fail", "unresolved"}
 TOP_KEYS = {
     "schema_version", "protocol_sha256", "cohort_id", "task_ids",
-    "task_contract_sha256_by_task", "seeds", "reference_arm", "arms",
+    "task_contract_sha256_by_task", "task_family_by_task", "seeds", "reference_arm", "arms",
     "bootstrap", "results",
 }
 ARM_KEYS = {"arm_id", "model_id", "model_version", "scaffold_sha256", "execution_profile_sha256"}
@@ -87,7 +88,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
     if not isinstance(manifest, dict):
         raise ValueError("manifest root must be an object")
     _exact_keys(manifest, TOP_KEYS, "manifest")
-    if manifest["schema_version"] != "vleb-paired-comparison-v1":
+    if manifest["schema_version"] != "vleb-paired-comparison-v2":
         raise ValueError("unsupported comparison manifest schema_version")
     _require_digest(manifest["protocol_sha256"], "manifest protocol_sha256")
     _require_digest(expected_protocol_sha256, "externally expected protocol_sha256")
@@ -105,6 +106,21 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         raise ValueError("task contract pin map must match the locked task inventory exactly")
     for task_id, value in task_pins.items():
         _require_digest(value, f"task contract pin for {task_id}")
+
+    task_family_by_task = manifest["task_family_by_task"]
+    if not isinstance(task_family_by_task, dict) or set(task_family_by_task) != set(task_ids):
+        raise ValueError("task-family map must match the locked task inventory exactly")
+    for task_id, family in task_family_by_task.items():
+        if not isinstance(family, str) or not FAMILY_LABEL.fullmatch(family):
+            raise ValueError(
+                f"task-family label for {task_id} must match {FAMILY_LABEL.pattern!r}"
+            )
+    tasks_by_family = {
+        family: [task_id for task_id in task_ids if task_family_by_task[task_id] == family]
+        for family in sorted(set(task_family_by_task.values()))
+    }
+    if not tasks_by_family or any(not task_ids_for_family for task_ids_for_family in tasks_by_family.values()):
+        raise ValueError("task-family inventory must contain no empty families")
 
     seeds = manifest["seeds"]
     if (not isinstance(seeds, list) or not seeds
@@ -142,7 +158,7 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         raise ValueError("bootstrap seed must be a non-negative integer")
     level = bootstrap["confidence_level"]
     if not _is_number(level) or float(level) != 0.95:
-        raise ValueError("v1 protocol requires a preregistered 0.95 confidence level")
+        raise ValueError("v2 protocol requires a preregistered 0.95 confidence level")
 
     rows = manifest["results"]
     if not isinstance(rows, list):
@@ -221,6 +237,8 @@ def validate_manifest(manifest: Any, expected_protocol_sha256: str) -> dict[str,
         "seeds": seeds,
         "arm_ids": arm_ids,
         "rows_by_cell": outcome_by_cell,
+        "task_family_by_task": task_family_by_task,
+        "tasks_by_family": tasks_by_family,
         "bootstrap": bootstrap,
     }
 
@@ -287,6 +305,9 @@ def analyze_manifest(
     seeds: list[int] = validated["seeds"]
     arm_ids: list[str] = validated["arm_ids"]
     rows_by_cell: dict[tuple[str, int, str], dict[str, Any]] = validated["rows_by_cell"]
+    task_family_by_task: dict[str, str] = validated["task_family_by_task"]
+    tasks_by_family: dict[str, list[str]] = validated["tasks_by_family"]
+    family_names = list(tasks_by_family)
     boot: dict[str, Any] = validated["bootstrap"]
     reference = manifest["reference_arm"]
     rows_by_arm = {
@@ -304,6 +325,15 @@ def analyze_manifest(
     # carrying every paired arm through the same sampled cells.
     samples_by_arm_two_way = {arm_id: [] for arm_id in arm_ids}
     samples_by_delta_two_way = {arm_id: [] for arm_id in arm_ids if arm_id != reference}
+    samples_by_arm_stratified = {arm_id: [] for arm_id in arm_ids}
+    samples_by_delta_stratified = {arm_id: [] for arm_id in arm_ids if arm_id != reference}
+    family_samples_by_arm = {
+        family: {arm_id: [] for arm_id in arm_ids} for family in family_names
+    }
+    family_samples_by_delta = {
+        family: {arm_id: [] for arm_id in arm_ids if arm_id != reference}
+        for family in family_names
+    }
     per_task_rates = {
         arm_id: {
             task_id: sum(
@@ -324,6 +354,43 @@ def analyze_manifest(
             samples_by_arm[arm_id].append(rate * 100.0)
         for arm_id in samples_by_delta:
             samples_by_delta[arm_id].append((rates[arm_id] - rates[reference]) * 100.0)
+
+        # Stratified task bootstrap keeps the admitted task-family composition
+        # fixed while resampling task clusters only within their predeclared family.
+        drawn_by_family = {
+            family: [
+                tasks_by_family[family][rng.randrange(len(tasks_by_family[family]))]
+                for _ in tasks_by_family[family]
+            ]
+            for family in family_names
+        }
+        drawn_stratified = [
+            task_id for family in family_names for task_id in drawn_by_family[family]
+        ]
+        stratified_rates = {
+            arm_id: sum(per_task_rates[arm_id][task_id] for task_id in drawn_stratified)
+            / len(drawn_stratified)
+            for arm_id in arm_ids
+        }
+        for arm_id, rate in stratified_rates.items():
+            samples_by_arm_stratified[arm_id].append(rate * 100.0)
+        for arm_id in samples_by_delta_stratified:
+            samples_by_delta_stratified[arm_id].append(
+                (stratified_rates[arm_id] - stratified_rates[reference]) * 100.0
+            )
+        for family in family_names:
+            sampled_family_tasks = drawn_by_family[family]
+            family_rates = {
+                arm_id: sum(per_task_rates[arm_id][task_id] for task_id in sampled_family_tasks)
+                / len(sampled_family_tasks)
+                for arm_id in arm_ids
+            }
+            for arm_id, rate in family_rates.items():
+                family_samples_by_arm[family][arm_id].append(rate * 100.0)
+            for arm_id in family_samples_by_delta[family]:
+                family_samples_by_delta[family][arm_id].append(
+                    (family_rates[arm_id] - family_rates[reference]) * 100.0
+                )
 
         # Crossed-cluster (pigeonhole) bootstrap: independently resample task
         # and seed labels with replacement. All arms share the same draws so
@@ -376,6 +443,7 @@ def analyze_manifest(
             "unresolved_rate_pct": round(100.0 * unresolved / expected_trials, 6),
             "success_rate_pct": round(rate, 6),
             "task_cluster_bootstrap_95ci_pp": ci,
+            "task_family_stratified_bootstrap_95ci_pp": interval(samples_by_arm_stratified[arm_id]),
             "two_way_task_seed_bootstrap_sensitivity_95ci_pp": interval(samples_by_arm_two_way[arm_id]),
             "total_cost_usd": round(total_cost, 8),
             "cost_per_scheduled_trial_usd": round(total_cost / expected_trials, 8),
@@ -429,6 +497,7 @@ def analyze_manifest(
             delta = deltas[task_id]
             task_level_comparisons.append({
                 "task_cluster_ordinal": ordinal,
+                "task_family": task_family_by_task[task_id],
                 "seed_count": len(seeds),
                 "reference_success_count": reference_successes,
                 "comparison_success_count": comparison_successes,
@@ -464,9 +533,68 @@ def analyze_manifest(
             "unresolved_pair_cells": unresolved_pair_cells,
             "task_level_comparisons": task_level_comparisons,
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
+            "task_family_stratified_bootstrap_95ci_pp": interval(samples_by_delta_stratified[arm_id]),
             "two_way_task_seed_bootstrap_sensitivity_95ci_pp": interval(samples_by_delta_two_way[arm_id]),
             "intervals_are_simultaneous": False,
         })
+
+    # Family summaries reveal heterogeneity hidden by the pooled cohort rate.
+    # Family-specific intervals are descriptive and intentionally do not produce
+    # unadjusted per-family significance claims.
+    task_family_summaries: dict[str, Any] = {}
+    for family in family_names:
+        family_tasks = tasks_by_family[family]
+        scheduled_in_family = len(family_tasks) * len(seeds)
+        family_arms: dict[str, Any] = {}
+        for arm_id in arm_ids:
+            family_rows = [
+                rows_by_cell[(task_id, seed, arm_id)]
+                for task_id in family_tasks for seed in seeds
+            ]
+            successes = sum(row["outcome"] == "pass" for row in family_rows)
+            failures = sum(row["outcome"] == "fail" for row in family_rows)
+            unresolved = sum(row["outcome"] == "unresolved" for row in family_rows)
+            family_rate = 100.0 * sum(
+                per_task_rates[arm_id][task_id] for task_id in family_tasks
+            ) / len(family_tasks)
+            family_arms[arm_id] = {
+                "scheduled_trial_count": scheduled_in_family,
+                "success_count": successes,
+                "failure_count": failures,
+                "unresolved_count": unresolved,
+                "unresolved_rate_pct": round(100.0 * unresolved / scheduled_in_family, 6),
+                "success_rate_pct": round(family_rate, 6),
+                "task_cluster_bootstrap_95ci_pp": interval(family_samples_by_arm[family][arm_id]),
+            }
+        family_pairwise: list[dict[str, Any]] = []
+        for arm_id in arm_ids:
+            if arm_id == reference:
+                continue
+            family_deltas = {
+                task_id: per_task_rates[arm_id][task_id] - per_task_rates[reference][task_id]
+                for task_id in family_tasks
+            }
+            wins = sum(delta > 0 for delta in family_deltas.values())
+            losses = sum(delta < 0 for delta in family_deltas.values())
+            family_pairwise.append({
+                "reference_arm": reference,
+                "comparison_arm": arm_id,
+                "task_cluster_count": len(family_tasks),
+                "score_delta_pp": round(100.0 * sum(family_deltas.values()) / len(family_tasks), 6),
+                "task_clusters_won": wins,
+                "task_clusters_lost": losses,
+                "task_clusters_tied": len(family_tasks) - wins - losses,
+                "paired_task_cluster_bootstrap_95ci_pp": interval(
+                    family_samples_by_delta[family][arm_id]
+                ),
+            })
+        task_family_summaries[family] = {
+            "task_cluster_count": len(family_tasks),
+            "scheduled_trial_count_per_arm": scheduled_in_family,
+            "arm_summaries": family_arms,
+            "pairwise_comparisons": family_pairwise,
+            "interpretation": "descriptive; family-specific intervals are not simultaneous across families or arms",
+        }
 
     raw_directional_pvalues = {
         row["comparison_arm"]: exact_two_sided_sign_test_pvalue(
@@ -497,9 +625,11 @@ def analyze_manifest(
         warnings.append("fewer than 30 independent task clusters; interval may be unstable")
     if len(seeds) < 2:
         warnings.append("single declared seed; crossed bootstrap cannot reveal between-seed variability")
+    if any(len(family_tasks) < 10 for family_tasks in tasks_by_family.values()):
+        warnings.append("one or more task families contain fewer than 10 task clusters; family-specific intervals are exploratory")
 
     return {
-        "schema_version": "vleb-paired-comparison-report-v1",
+        "schema_version": "vleb-paired-comparison-report-v2",
         "valid": True,
         "cohort_id": manifest["cohort_id"],
         "input_manifest_sha256": input_sha256,
@@ -519,7 +649,13 @@ def analyze_manifest(
             "cluster_unit": "task_id; each primary draw carries all paired seed outcomes and all comparison arms",
             "sensitivity_cluster_unit": "independently resampled task_id and seed labels; all paired arms share the same crossed draws",
             "sensitivity_interpretation": "descriptive seed-set sensitivity only when declared seeds are meaningful repeat units; not a full estimate of model-serving variance",
+            "family_stratification": "resample task IDs with replacement within each predeclared family, preserving the observed number of tasks in each family",
+            "family_stratified_interpretation": "cohort-family-mix-conditional sensitivity interval; report alongside the unstratified task bootstrap and per-family results",
         },
+        "task_family_distribution": {
+            family: len(tasks_by_family[family]) for family in family_names
+        },
+        "task_family_summaries": task_family_summaries,
         "arm_summaries": arm_summary,
         "pairwise_comparisons": pairwise,
         "warnings": warnings,
@@ -531,6 +667,8 @@ def analyze_manifest(
             "Bootstrap intervals are descriptive and are not simultaneous across multiple comparisons; the separately reported sign test measures direction across non-tied tasks, not effect magnitude.",
             "The crossed task/seed sensitivity interval assumes the preregistered seed labels represent meaningful repeat units; it does not capture nondeterministic serving variance that is independent of those labels.",
             "If only one seed is declared, the crossed sensitivity interval cannot reveal between-seed variability and must be interpreted as conditional on that sole seed.",
+            "Task-family-stratified bootstrap intervals condition on the family composition of this cohort; a changed deployment/task-family mix requires a separate reweighting or matched cohort analysis.",
+            "Family-specific intervals are exploratory for sparse families and are not simultaneous across families or comparison arms.",
             "The task-cluster sign test assumes independent task clusters; non-estimable sign tests use a null raw p-value and a conservative p=1 for Holm adjustment.",
             "No external benchmark is directly comparable without matching task distribution, agent scaffold, budgets, environment and protocol.",
         ],
@@ -561,7 +699,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
         result = {
-            "schema_version": "vleb-paired-comparison-report-v1",
+            "schema_version": "vleb-paired-comparison-report-v2",
             "analysis_only": True,
             "score_eligible": False,
             "valid": False,
