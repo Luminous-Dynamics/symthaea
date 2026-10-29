@@ -667,10 +667,16 @@ mod tests {
             );
             assert!((result.expected_attempts - recoverable_sum).abs() < 1e-12);
             assert!(
-                (result.expected_latency_ms - mean_latency_per_attempt * recoverable_sum).abs() < 1e-10
+                (result.expected_latency_ms
+                    - mean_latency_per_attempt * recoverable_sum)
+                    .abs()
+                    < 1e-10
             );
             assert!(
-                (result.expected_photons_consumed - mean_photons_per_attempt * recoverable_sum).abs() < 1e-12
+                (result.expected_photons_consumed
+                    - mean_photons_per_attempt * recoverable_sum)
+                    .abs()
+                    < 1e-12
             );
 
             let mut successful_attempt_moment = 0.0;
