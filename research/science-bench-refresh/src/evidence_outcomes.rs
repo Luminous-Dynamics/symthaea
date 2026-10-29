@@ -908,7 +908,7 @@ mod tests {
                 policy_input_sha256: digest(char::from(b'a' + index as u8)),
                 evidence_manifest_sha256: digest(char::from(b'd' + index as u8)),
                 randomization_order: index as u32,
-                seed_commitment_sha256: digest(char::from(b'g' + index as u8)),
+                seed_commitment_sha256: digest(char::from(b'7' + index as u8)),
             })
             .collect::<Vec<_>>();
         let fields = EvidenceInterventionPlanFieldsV1 {
@@ -957,7 +957,7 @@ mod tests {
             response_status: OutcomeResponseStatusV1::Answered,
             runner_receipt_sha256: Some(digest(char::from(b'a' + index as u8))),
             response_artifact_sha256: Some(digest(char::from(b'd' + index as u8))),
-            evaluator_record_sha256: Some(digest(char::from(b'f' + index as u8))),
+            evaluator_record_sha256: Some(digest(char::from(b'1' + index as u8))),
             task_correctness: if index == 1 {
                 TaskCorrectnessV1::Incorrect
             } else {
