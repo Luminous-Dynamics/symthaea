@@ -292,7 +292,7 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
         }
         if orders.len() == fields.required_conditions.len()
             && (0..fields.required_conditions.len())
-                .any(|order| !orders.contains(&(order as u32))
+                .any(|order| !orders.contains(&(order as u32)))
         {
             issues.push(format!(
                 "{pair_prefix}.randomization_order must be a complete permutation starting at zero"
