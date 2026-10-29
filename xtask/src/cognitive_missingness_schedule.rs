@@ -289,9 +289,9 @@ pub fn generate(input: &ScheduleInput, source_bytes: &[u8]) -> anyhow::Result<Ge
     }
 
     policy_messages.sort_by(|left, right| {
-        let (left_tick, left_id, left_priority) = policy_message_key(left);
-        let (right_tick, right_id, right_priority) = policy_message_key(right);
-        (left_tick, left_id, left_priority).cmp(&(right_tick, right_id, right_priority))
+        let left_key = policy_message_key(left);
+        let right_key = policy_message_key(right);
+        left_key.cmp(&right_key)
     });
 
     let count_state = |state| {
@@ -664,6 +664,21 @@ mod tests {
             let (right_tick, right_priority, right_id) = policy_message_key(&pair[1]);
             assert!((left_tick, left_priority, left_id) <= (right_tick, right_priority, right_id));
         }
+        let reveal_order = messages
+            .iter()
+            .filter_map(|message| match message {
+                PolicyVisibleMessage::OutcomeRevealed { event_id, .. } => Some(event_id.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let mut reveal_order_by_event = reveal_order.clone();
+        reveal_order_by_event.sort();
+        assert_ne!(
+            reveal_order,
+            reveal_order_by_event,
+            "heterogeneous delays should produce at least one out-of-order arrival"
+        );
+
         for message in messages {
             if let PolicyVisibleMessage::OutcomeRevealed { tick, event_id, .. } = message {
                 let record = generated.evaluator_schedule.events.iter().find(|e| &e.event_id == event_id).unwrap();
