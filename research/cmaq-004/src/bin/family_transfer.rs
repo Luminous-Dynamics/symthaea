@@ -539,6 +539,9 @@ mod tests {
                 _ => panic!("unknown lane"),
             });
             assert!(row.mean_net_lift_vs_direct.is_finite());
+            assert!(row.mean_gross_lift_vs_direct.is_finite());
+            assert!(row.mean_break_even_query_cost.is_finite());
+            assert!((0.0..=1.0).contains(&row.beneficial_family_rate_before_cost));
             assert!(row.lift_ci95_low.is_finite() && row.lift_ci95_high.is_finite());
             assert!(row.lift_ci95_low <= row.lift_ci95_high);
             assert!(row.minimum_family_net_lift <= row.lower_cvar05_net_lift + 1e-12);
