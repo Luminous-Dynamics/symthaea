@@ -526,7 +526,10 @@ fn validate_analysis_plan(
     if !valid_commit_sha(&analysis.analysis_implementation_revision) {
         issues.push("analysis_implementation_revision must be a full lowercase Git SHA".to_owned());
     } else if analysis.analysis_implementation_revision != crate::BUILT_GENERATOR_SOURCE_REVISION {
-        issues.push("analysis implementation revision does not match the inspected build source revision".to_owned());
+        issues.push(
+            "analysis implementation revision does not match the inspected build source revision"
+                .to_owned(),
+        );
     }
     if analysis.contrasts.is_empty() {
         issues.push("at least one contrast must be preregistered".to_owned());
@@ -546,13 +549,22 @@ fn validate_analysis_plan(
             issues.push(format!("duplicate contrast_id: {}", contrast.contrast_id));
         }
         if contrast.treatment_condition == contrast.reference_condition {
-            issues.push(format!("contrast {} compares a condition with itself", contrast.contrast_id));
+            issues.push(format!(
+                "contrast {} compares a condition with itself",
+                contrast.contrast_id
+            ));
         }
         if !conditions.contains(contrast.treatment_condition.as_str()) {
-            issues.push(format!("contrast {} uses an undeclared treatment condition", contrast.contrast_id));
+            issues.push(format!(
+                "contrast {} uses an undeclared treatment condition",
+                contrast.contrast_id
+            ));
         }
         if !conditions.contains(contrast.reference_condition.as_str()) {
-            issues.push(format!("contrast {} uses an undeclared reference condition", contrast.contrast_id));
+            issues.push(format!(
+                "contrast {} uses an undeclared reference condition",
+                contrast.contrast_id
+            ));
         }
     }
     let expected = expected_response_lookup(analysis);
@@ -569,14 +581,18 @@ fn validate_analysis_plan(
             condition: rule.condition.clone(),
         };
         if !seen.insert(key) {
-            issues.push(format!("duplicate expected response for pair {} condition {}", rule.pair_id, rule.condition));
+            issues.push(format!(
+                "duplicate expected response for pair {} condition {}",
+                rule.pair_id, rule.condition
+            ));
         }
     }
     if uses_expected_response {
         let expected_count = plan.pairs.len().saturating_mul(plan.required_conditions.len());
         if expected.len() != expected_count {
             issues.push(format!(
-                "expected_response endpoint requires an expectation for every pair/condition: expected {expected_count}, observed {}",
+                "expected_response endpoint requires an expectation for every pair/condition: \
+                 expected {expected_count}, observed {}",
                 expected.len()
             ));
         }
@@ -586,7 +602,10 @@ fn validate_analysis_plan(
                     pair_id: pair.pair_id.clone(),
                     condition: condition.clone(),
                 }) {
-                    issues.push(format!("missing expected response for pair {} condition {}", pair.pair_id, condition));
+                    issues.push(format!(
+                        "missing expected response for pair {} condition {}",
+                        pair.pair_id, condition
+                    ));
                 }
             }
         }
@@ -601,7 +620,10 @@ pub fn analyze_paired_evidence_outcomes(
 ) -> Result<PairedAnalysisVerificationV1, String> {
     let plan_verification = verify_evidence_intervention_plan(plan_bytes)?;
     if !plan_verification.valid {
-        return Err(format!("intervention plan is invalid: {}", plan_verification.issues.join("; ")));
+        return Err(format!(
+            "intervention plan is invalid: {}",
+            plan_verification.issues.join("; ")
+        ));
     }
     let outcome_verification = verify_evidence_outcome_report(plan_bytes, outcome_bytes)?;
     let outcome_report: EvidenceOutcomeReportV1 = serde_json::from_slice(outcome_bytes)
@@ -616,7 +638,10 @@ pub fn analyze_paired_evidence_outcomes(
         && analysis.analysis_implementation_revision == crate::BUILT_GENERATOR_SOURCE_REVISION;
     let mut issues = validate_analysis_plan(&plan, &analysis);
     if !analysis_plan_hash_matches {
-        issues.push("analysis plan bytes do not match the digest frozen in the intervention plan".to_owned());
+        issues.push(
+            "analysis plan bytes do not match the digest frozen in the intervention plan"
+                .to_owned(),
+        );
     }
     if !outcome_verification.valid {
         issues.push("outcome report is invalid and cannot be analyzed".to_owned());
@@ -655,8 +680,13 @@ pub fn analyze_paired_evidence_outcomes(
             generalized_accuracy_estimated: false,
             external_anchor_required: true,
             runner_execution_proven: false,
-            uncertainty_boundary: "exact conditional McNemar tests for binary matched endpoints; Wilson interval is for discordant-win probability only; resource deltas are descriptive; no generalized-performance interval".to_owned(),
-            claim_boundary: "preregistered fixed-benchmark paired contrasts only; evaluator and runner truth remain unauthenticated; no SOTA or generalized-performance claim".to_owned(),
+            uncertainty_boundary: "exact conditional McNemar tests for binary matched endpoints; \
+                Wilson interval is for discordant-win probability only; resource deltas are \
+                descriptive; no generalized-performance interval"
+                .to_owned(),
+            claim_boundary: "preregistered fixed-benchmark paired contrasts only; evaluator and \
+                runner truth remain unauthenticated; no SOTA or generalized-performance claim"
+                .to_owned(),
         };
         let bytes = serde_json::to_vec(&body)
             .map_err(|error| format!("cannot serialize paired analysis report: {error}"))?;
