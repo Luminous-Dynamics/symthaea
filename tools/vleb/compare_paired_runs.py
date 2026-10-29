@@ -354,9 +354,11 @@ def analyze_manifest(
             "success_rate_pct": round(rate, 6),
             "task_cluster_bootstrap_95ci_pp": ci,
             "total_cost_usd": round(total_cost, 8),
+            "cost_per_scheduled_trial_usd": round(total_cost / expected_trials, 8),
             "cost_per_successful_trial_usd": round(total_cost / successes, 8) if successes else None,
             "p50_duration_ms": duration_percentile(0.50),
             "p90_duration_ms": duration_percentile(0.90),
+            "duration_percentile_method": "nearest_rank",
         }
 
     pairwise = []
@@ -384,6 +386,35 @@ def analyze_manifest(
             left != "unresolved" and right != "unresolved" and left != right
             for left, right in paired_trial_cells
         )
+        task_level_comparisons = []
+        for ordinal, task_id in enumerate(task_ids, start=1):
+            reference_rows = [rows_by_cell[(task_id, seed, reference)] for seed in seeds]
+            comparison_rows = [rows_by_cell[(task_id, seed, arm_id)] for seed in seeds]
+            reference_successes = sum(row["outcome"] == "pass" for row in reference_rows)
+            comparison_successes = sum(row["outcome"] == "pass" for row in comparison_rows)
+            unresolved_pairs = sum(
+                left["outcome"] == "unresolved" or right["outcome"] == "unresolved"
+                for left, right in zip(reference_rows, comparison_rows)
+            )
+            resolved_disagreements = sum(
+                left["outcome"] != "unresolved"
+                and right["outcome"] != "unresolved"
+                and left["outcome"] != right["outcome"]
+                for left, right in zip(reference_rows, comparison_rows)
+            )
+            delta = deltas[task_id]
+            task_level_comparisons.append({
+                "task_cluster_ordinal": ordinal,
+                "seed_count": len(seeds),
+                "reference_success_count": reference_successes,
+                "comparison_success_count": comparison_successes,
+                "reference_success_rate_pct": round(100.0 * reference_successes / len(seeds), 6),
+                "comparison_success_rate_pct": round(100.0 * comparison_successes / len(seeds), 6),
+                "score_delta_pp": round(100.0 * delta, 6),
+                "direction": "comparison_win" if delta > 0 else ("reference_win" if delta < 0 else "tie"),
+                "unresolved_pair_cells": unresolved_pairs,
+                "resolved_disagreement_cells": resolved_disagreements,
+            })
         effective_task_clusters = sum(value != 0 for value in deltas.values())
         won = sum(value > 0 for value in deltas.values())
         lost = sum(value < 0 for value in deltas.values())
@@ -407,6 +438,7 @@ def analyze_manifest(
             "success_disagreement_cells": reference_only_success_cells + comparison_only_success_cells,
             "resolved_disagreement_cells": resolved_disagreement_cells,
             "unresolved_pair_cells": unresolved_pair_cells,
+            "task_level_comparisons": task_level_comparisons,
             "paired_cluster_bootstrap_95ci_pp": interval(samples_by_delta[arm_id]),
             "intervals_are_simultaneous": False,
         })
