@@ -432,6 +432,10 @@ pub struct AtomAblationObservation {
     pub case_id: String,
     pub evidence_id: String,
     pub reader_revision: String,
+    pub fixture_sha256: String,
+    pub prompt_sha256: String,
+    pub tokenizer_sha256: String,
+    pub system_commit_sha: String,
     pub full_context_tokens: usize,
     pub ablated_context_tokens: usize,
     pub full_fields: BTreeMap<String, String>,
@@ -456,6 +460,10 @@ pub struct AtomAblationScoreSummary {
     pub schema_version: String,
     pub run_id: String,
     pub reader_revision: String,
+    pub fixture_sha256: String,
+    pub prompt_sha256: String,
+    pub tokenizer_sha256: String,
+    pub system_commit_sha: String,
     pub observation_count: usize,
     pub ignore_count: usize,
     pub ignore_overuse_count: usize,
@@ -498,6 +506,10 @@ pub fn score_atom_ablation_jsonl(
         require_trimmed("case_id", &observation.case_id)?;
         require_trimmed("evidence_id", &observation.evidence_id)?;
         require_trimmed("reader_revision", &observation.reader_revision)?;
+        validate_hex_digest("fixture_sha256", &observation.fixture_sha256, 64)?;
+        validate_hex_digest("prompt_sha256", &observation.prompt_sha256, 64)?;
+        validate_hex_digest("tokenizer_sha256", &observation.tokenizer_sha256, 64)?;
+        validate_hex_digest("system_commit_sha", &observation.system_commit_sha, 40)?;
         if observation.ablated_context_tokens > observation.full_context_tokens {
             return Err(format!("ablated context tokens exceed full context tokens on line {line_number}"));
         }
@@ -562,8 +574,19 @@ pub fn score_atom_ablation_jsonl(
 
     let run_id = observations[0].run_id.clone();
     let reader_revision = observations[0].reader_revision.clone();
-    if observations.iter().any(|item| item.run_id != run_id || item.reader_revision != reader_revision) {
-        return Err("all observations in one score run must pin the same run_id and reader_revision".into());
+    let fixture_sha256 = observations[0].fixture_sha256.clone();
+    let prompt_sha256 = observations[0].prompt_sha256.clone();
+    let tokenizer_sha256 = observations[0].tokenizer_sha256.clone();
+    let system_commit_sha = observations[0].system_commit_sha.clone();
+    if observations.iter().any(|item| {
+        item.run_id != run_id
+            || item.reader_revision != reader_revision
+            || item.fixture_sha256 != fixture_sha256
+            || item.prompt_sha256 != prompt_sha256
+            || item.tokenizer_sha256 != tokenizer_sha256
+            || item.system_commit_sha != system_commit_sha
+    }) {
+        return Err("all observations in one score run must pin identical run, reader, fixture, prompt, tokenizer, and code revisions".into());
     }
 
     let mut judgments = Vec::with_capacity(observations.len());
@@ -612,6 +635,10 @@ pub fn score_atom_ablation_jsonl(
         schema_version: "BROCA-MEMORY-ATOM-ABLATION-SCORE-V1".into(),
         run_id,
         reader_revision,
+        fixture_sha256,
+        prompt_sha256,
+        tokenizer_sha256,
+        system_commit_sha,
         observation_count: judgments.len(),
         ignore_count,
         ignore_overuse_count,
@@ -629,6 +656,15 @@ pub fn score_atom_ablation_jsonl(
         context_tokens_removed_total,
         judgments,
     })
+}
+
+fn validate_hex_digest(field: &str, value: &str, expected_len: usize) -> Result<(), String> {
+    if value.len() != expected_len
+        || !value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(format!("{field} must be {expected_len} lowercase hexadecimal characters"));
+    }
+    Ok(())
 }
 
 fn validate_material_fields(
