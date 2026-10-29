@@ -19,6 +19,25 @@ cargo build --release --manifest-path tools/connectomics-intake-audit/Cargo.toml
 
 For reproducible CI, generate and commit this crate's `Cargo.lock`, then add `--locked` to both commands.
 
+## Query-specific stopping snapshot audit
+
+The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal for graph invariants and declared query metrics.
+
+```sh
+cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-stopping-audit -- \
+  --input snapshot-series.jsonl \
+  --tail-window 3 \
+  --relative-tolerance 0.01 \
+  --absolute-tolerance 1e-9 \
+  --output stopping-audit.json
+```
+
+Each JSONL record is one snapshot object conforming to `CONNECTOME_STOPPING_SNAPSHOT.schema.json`. Order records from oldest to newest. The first snapshot has sequence index 0 and no previous graph digest; each later snapshot names the immediately preceding snapshot's graph digest. Cumulative operation-class counts must sum to `cumulative_committed`.
+
+**Important:** the tool always reports `CONTINUE_REVIEW`; its status is only `VALIDATED_NOT_STOPPED` when consistency checks pass. Tail stability is descriptive, not an asymptotic forecast or proof of reconstruction correctness. The schema contains no independently calibrated residual high-impact-error risk, and global graph invariants can stabilize while local scientific errors persist. A valid automatic stopping gate requires separate risk evidence and held-out evaluation; this binary does not make that decision.
+
+
 ## Run
 
 ```sh
