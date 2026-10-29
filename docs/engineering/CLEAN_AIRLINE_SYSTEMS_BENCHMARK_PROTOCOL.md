@@ -417,3 +417,32 @@ Alongside cost, CO2e, service completion, grid peak, curtailment and terminal re
 - learned-policy training samples, wall time, seeds, memory, constraint violations and out-of-airport transfer performance.
 
 These are research dimensions to implement, not metrics the current synthetic slice already measures.
+
+
+## 15. P3 information-time gate — nonanticipativity for scenario policies (2026-10-29)
+
+The next verifier checks that a scenario-indexed policy does not use future information.
+
+### Policy contract
+
+Each scenario policy plan carries:
+- the exact scenario-bound plan and verified action sequence;
+- one information-set ID per decision stage;
+- a reference to the declared information/observation contract.
+
+The verifier independently validates each plan, then requires equal actions at stage \(t\) for every scenario pair assigned to the same information set at stage \(t\). If two scenarios share an information set at stage \(t\), their declared information history must also agree at every previous stage. This prevents malformed scenario trees that “merge” histories that were previously distinguishable.
+
+A canonical policy digest binds each scenario ID, scenario digest carried in the plan, all action fields, information-set IDs and information-contract reference. It is content identity, not a proof that caller-supplied information labels correspond to reality.
+
+### Synthetic falsifier
+
+The nominal energy schedule and a full-horizon optimizer for a future price-reversal scenario can choose different first-interval actions, even though the future price reversal is not yet observed at that decision. When both scenarios share the same first-stage information set, the verifier reports a nonanticipativity violation. The frozen nominal plan, rebound only to the alternate scenario identity and independently rechecked, is nonanticipative because it commits the same action before the future prices diverge.
+
+This tests a critical distinction:
+- **perfect-information recourse** is an optimistic reference that knows the whole future;
+- **nonanticipative policy** can act only on information available at each decision;
+- **rolling-horizon policy** must repeatedly replan after new observations while carrying the physical state forward.
+
+### Claim ceiling
+
+This verifier validates consistency with the supplied information partition. It does not validate the observation contract's realism or itself optimize a nonanticipative policy. A next implementation must combine state carryover, observable forecasts, actual realization, rolling replanning and paired held-out evaluation. Report first-action violations as hard failures; do not claim policy robustness from perfect-information results alone.
