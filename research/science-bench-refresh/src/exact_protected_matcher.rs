@@ -227,16 +227,27 @@ pub fn match_search_exposure_exact(
         .map_err(|error| format!("receipt does not match strict v1 shape: {error}"))?;
     let index = validate_protected_index_bytes(protected_index_bytes, &receipt.generation_id)?;
 
-    let mut protected_by_digest = BTreeMap::<String, String>::new();
+    let mut protected_by_digest = BTreeMap::<String, (String, String)>::new();
     for artifact in &index.artifacts {
         protected_by_digest
             .entry(artifact.content_sha256.clone())
             .and_modify(|current| {
-                if classification_rank(&artifact.classification) > classification_rank(current) {
-                    *current = artifact.classification.clone();
+                let new_rank = classification_rank(&artifact.classification);
+                let current_rank = classification_rank(&current.0);
+                if new_rank > current_rank
+                    || (new_rank == current_rank
+                        && artifact.reference_id_sha256 < current.1)
+                {
+                    *current = (
+                        artifact.classification.clone(),
+                        artifact.reference_id_sha256.clone(),
+                    );
                 }
             })
-            .or_insert_with(|| artifact.classification.clone());
+            .or_insert_with(|| (
+                artifact.classification.clone(),
+                artifact.reference_id_sha256.clone(),
+            ));
     }
 
     let mut records = Vec::with_capacity(receipt.events.len());
@@ -252,14 +263,22 @@ pub fn match_search_exposure_exact(
                 evidence_artifact_sha256: None,
             },
             Some(response_digest) => match protected_by_digest.get(response_digest) {
-                Some(classification) => SearchExposureMatchRecordV1 {
+                Some((classification, reference_id_sha256)) => SearchExposureMatchRecordV1 {
                     event_sha256: event.event_sha256.clone(),
                     classification: classification.clone(),
                     match_method: "exact_digest".to_owned(),
                     match_score_micros: MAX_DIGEST,
                     decision_threshold_micros: MAX_DIGEST,
-                    protected_reference_sha256: Some(response_digest.to_owned()),
-                    evidence_artifact_sha256: Some(response_digest.to_owned()),
+                    // Report only the opaque reference ID digest, not the protected
+                    // content digest, which could enable dictionary attacks.
+                    protected_reference_sha256: Some(reference_id_sha256.clone()),
+                    evidence_artifact_sha256: Some(sha256_hex(
+                        format!(
+                            "symthaea.search-evidence.v1\0{}\0{}",
+                            event.event_sha256, response_digest
+                        )
+                        .as_bytes(),
+                    )),
                 },
                 None => SearchExposureMatchRecordV1 {
                     event_sha256: event.event_sha256.clone(),
@@ -405,7 +424,15 @@ mod tests {
         assert_eq!(report.protected_index_sha256, sha256_hex(&index_bytes));
         assert_eq!(
             report.records[0].protected_reference_sha256,
+            Some(sha256_hex(b"answer-ref"))
+        );
+        assert_ne!(
+            report.records[0].protected_reference_sha256,
             report.records[0].evidence_artifact_sha256
+        );
+        assert_ne!(
+            report.records[0].protected_reference_sha256,
+            Some(sha256_hex(body))
         );
     }
 
