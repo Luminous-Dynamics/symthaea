@@ -270,7 +270,7 @@ The current public schema and semantic validator check structure and declared co
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and eighteen authored unit tests. The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, eighteen core evaluator unit tests, and six trace-auditor unit tests (24 authored in total). The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
@@ -283,11 +283,30 @@ This is a deliberately narrow initial evaluator, not an independent action-trace
 
 Next: run formatting/compilation/tests at an environment with the toolchain, fix concrete failures without relaxing checks, and then separate candidate output from evaluator-owned event traces and held-out known answers. Do not attach a production or real-world efficacy claim to this prototype.
 
-### GCRB-3 — Independent event trace and evaluation contract
+### GCRB-3 — Trace-derived hard-gate audit (prototype authored; not executed)
 
-Before adding Symthaea/Mycelix/Symtropy runtime adapters, define a separate event-trace contract. Candidate systems should emit bounded actions and evidence references; a separately implemented evaluator should derive whether prohibited transitions occurred from the trace, not from a candidate-supplied violation list. Public expected dispositions must remain development data. Hidden family templates and final outcomes must live outside the candidate-visible input and be released only after the frozen evaluation is complete. A pass must identify the exact code, manifest, adapter and evaluator versions.
+An initial structured trace auditor is committed at `research/gcrb-evaluator/src/trace_audit.rs`, with its input schema at `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json` and a synthetic demo at `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`.
 
-This is the next substantive research gate because a self-reported candidate flag cannot prove its own absence.
+The CLI accepts:
+
+```bash
+cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit docs/research/fixtures/governance-capture-resistance-v0.1.json docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json /tmp/gcrb-trace-audit.json
+```
+
+The rule-based audit checks exact fixture-byte binding; exact case-set coverage; unique event IDs; strictly increasing event sequence within each case; allowed event and actor-role types; digest syntax; and explicit fields for prior commitment versions, evidence-class changes, rights restrictions, punishment, appeal resolution, emergency bypass, and post-outcome evaluation configuration changes. It derives six hard-gate classes from event fields rather than trusting a self-reported `hard_gate_violations` list:
+
+- `silent_commitment_rewrite`;
+- `prohibited_rights_or_authority_transition`;
+- `simulation_to_observation_upgrade`;
+- `appeal_controlled_only_by_challenged_authority`;
+- `unbounded_emergency_bypass`;
+- `evaluator_truth_leakage`.
+
+The public demo contains six seeded unsafe events intended to produce one finding per rule. Twenty of its 26 case traces are marked capture status unknown. The module has six authored unit tests for detection, incomplete coverage, digest mismatch, missing case traces, sequence rollback, unknown event kinds, and duplicate event IDs.
+
+**Critical limitation:** this is rule derivation over the supplied trace, not authenticated observation. The trace bundle does not yet authenticate the recorder, prove complete capture, resolve authority/adjudication/measurement references, validate emergency expiry against trusted time, or establish legal validity. Capture status is producer-asserted. Therefore a report always returns `qualification_eligible = false` and `absence_of_findings_proven = false`, even if no event-level findings are produced. The prototype can demonstrate that specified bad events are detectable when present; it cannot prove no bad event occurred when the trace is missing, incomplete, or untrusted.
+
+The next substantive gate is trusted trace capture and evaluator/candidate separation: authenticate the trace collector, independently attest capture completeness, resolve referenced evidence/authority objects, then run hidden evaluator-owned scenarios without exposing expected outcomes to the candidate.
 
 ### GCRB-4 — Cross-system adapters
 
