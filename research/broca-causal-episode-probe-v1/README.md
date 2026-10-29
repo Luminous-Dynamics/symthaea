@@ -30,6 +30,7 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `score_probe.py`: strict, dependency-free scoring for required-support recall, ordinary and stale-aware complete chains, first-support reciprocal rank, stale-support hits, and distractor retrieval.
 - `fixtures/mutations/eligibility-ledger.jsonl` and `eligibility_filter.py`: a digest-bound, oracle-intent eligibility-first ablation over the same BM25 candidate pool; unknown source pointers fail closed.
 - `test_eligibility_filter.py`: unit tests for temporal eligibility, intent-specific behavior, fixed-budget selection, fail-closed handling, and receipt integrity.
+- `test_eligibility_filter.py`: unit tests for temporal eligibility, intent-specific behavior, fixed-budget selection, fail-closed handling, and receipt integrity.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -61,6 +62,8 @@ From the Symthaea repository root, after the worker compiles:
     python3 research/broca-causal-episode-probe-v1/test_episode_expand.py
     python3 research/broca-causal-episode-probe-v1/test_lifecycle_probe.py
     python3 research/broca-causal-episode-probe-v1/test_analyze_paired_runs.py
+    python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
+    python3 research/broca-causal-episode-probe-v1/test_eligibility_filter.py
 
     # Verify the explicit supersede operation through two clean worker processes:
     python3 research/broca-causal-episode-probe-v1/run_lifecycle_probe.py \
@@ -110,6 +113,14 @@ python3 research/broca-causal-episode-probe-v1/test_mutation_fixtures.py
 ```
 
 **Critical limitation:** `retrieval_intent` is human-annotated oracle metadata in this experiment. The ablation measures the potential value of applying an explicit eligibility policy before ranking; it does not prove that the query intent classifier or production memory worker implements this policy. The filter never reads the gold required/forbidden support arrays to decide eligibility, but it does use the independent hand-authored policy ledger. Report it as an upper bound, not a production win. Next, evaluate a non-oracle intent classifier separately and report its precision/recall, abstention, policy coverage, retained-candidate count, stale-aware complete-chain rate, latency and total lifecycle cost.
+
+## Eligibility-first currentness ablation
+
+The mutation suite now includes a versioned, explicit policy ledger covering all 107 string-valued source pointers. The ledger declares each candidate as current, historical, revoked, tentative, not-applied, causal, or contextual, and each question carries a manually assigned retrieval intent.
+
+Run `eligibility_filter.py` after obtaining a BM25 candidate pool with `--candidate-k 20 --k 5`. The filter removes ineligible sources **before final top-k selection**, preserves the remaining BM25 order, fails closed for source pointers missing from the ledger, and emits a receipt binding the original candidate manifest, worker digest, trajectory/question fixtures, policy ledger digest, and filtered prediction digest.
+
+This is explicitly an **oracle-intent upper-bound experiment**. It tests whether eligibility rules can prevent stale evidence from occupying the answer budget when the intended mode is known. It does not measure whether a production classifier can infer that mode or implement an actual pre-ranking index filter. A later classifier must be evaluated separately for intent precision/recall, abstention, policy coverage and downstream stale-aware quality. The filter never uses the gold support arrays to choose which candidates are eligible.
 
 ## Paired official-run decision analysis
 
