@@ -35,6 +35,7 @@ For this synthetic harness, the candidate selector receives predicted utility, a
 - **Predicted greedy:** selects the candidate with highest predicted utility.
 - **Uncertainty penalty:** selects predicted utility minus twice its stated uncertainty. The unsupported family intentionally under-reports uncertainty, testing whether a generic penalty can correct structural blind spots.
 - **Support gates:** filter candidate actions by score thresholds 0.40, 0.55, 0.75, 0.90 and 0.97, then select by predicted utility. No learned threshold is tuned on a qualification set.
+- **Shuffled-support negative controls:** apply the same 0.55 and 0.97 gates to a separate seeded random score stream independent of the truth labels. This checks whether the apparent gate benefit requires informative support evidence instead of chance filtering. The shuffled score is generated with an independent RNG, preserving the main candidate/utility tape and the earlier reported outputs.
 - **Oracle upper bound:** evaluator-only selector chooses the best true-utility action or direct fallback. This is not an eligible competitor.
 
 All candidates and methods are evaluated at the same search sizes and episode seeds. Increasing search size uses a prefix of the same 512-candidate catalog for that episode, making the search-pressure contrast paired.
@@ -66,6 +67,19 @@ The strict 0.97 gate table entry is reported as *unsupported selections / covera
 **Interpretation:** in this chosen synthetic construction, mean prediction MAE changes only from roughly 0.039 to 0.041, while the greedy planner's unsupported-action selection rises from 14.5% to 89.5% as search size increases. A generic uncertainty penalty is worse here because the structural blind spots are overconfident; at 512 candidates it selects unsupported actions in every episode. A very strict support gate reduces that risk but cannot eliminate it under the deliberately overlapping support scores, and broad search eventually finds high-scored unsupported actions more often. The gate can also perform worse than fallback at low search size because it takes low-coverage risks.
 
 This demonstrates the intended falsification signal for this synthetic setup; it does **not** show that all real planners behave this way, that a support gate universally fixes it, or that Symthaea outperforms an industry baseline. The same result must be challenged with corrupted support signals, correlated/horizon-amplified errors and independently held-out environments before any generalization claim.
+
+## Shuffled-support negative control (Rust exact-head run)
+
+The follow-up control passed at commit `b777d2f36b9731030c2915f28ea558dcdc0b3f6c`: **8 Rust tests passed**, and the 44-row report schema plus oracle/fallback/risk–coverage invariants passed ([workflow run 40952651960](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40952651960)). The subsequent workflow revision adds a stricter assertion that the informative 0.97 gate beats the shuffled-score gate at candidate-set sizes 32, 128 and 512; verify the latest exact-head run before treating that added assertion as passed.
+
+| Search candidates | Informative support gate .97: regret | Unsupported rate | Shuffled support gate .97: regret | Unsupported rate | Informative gate coverage | Shuffled gate coverage |
+|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 0.1616 | 1.2% | 0.1524 | 0.4% | 43.8% | 26.2% |
+| 32 | 0.1439 | 2.0% | 0.1944 | 3.1% | 91.0% | 63.7% |
+| 128 | 0.0731 | 8.2% | 0.1241 | 8.6% | 100% | 98.4% |
+| 512 | 0.0646 | 15.2% | 0.0919 | 20.3% | 100% | 100% |
+
+At size 8, the random score happens to have lower regret because it abstains more often; this is a useful reminder that one seed panel and one threshold do not prove superiority. From sizes 32 to 512, the informative score outperforms the shuffled score on both regret and unsupported-selection rate. But it still leaves substantial unsupported selection at 512 candidates, so support scoring is evidence—not a safety certificate. The workflow now encodes the large-search contrast as a regression assertion rather than a narrative-only observation.
 
 ## Falsifiable research questions
 
