@@ -81,12 +81,19 @@ impl fmt::Display for CliquePartitionError {
         match self {
             Self::InvalidGraph(message) => write!(f, "invalid canonical MIS graph: {message}"),
             Self::InvalidUtf8 => write!(f, "graph or certificate is not UTF-8"),
-            Self::NonCanonicalLineEndings => write!(f, "expected LF-only lines and a final newline"),
-            Self::InvalidCertificateHeader => write!(f, "invalid clique-partition certificate header"),
+            Self::NonCanonicalLineEndings => {
+                write!(f, "expected LF-only lines and a final newline")
+            },
+            Self::InvalidCertificateHeader => {
+                write!(f, "invalid clique-partition certificate header")
+            },
             Self::InvalidCountLine(field) => write!(f, "invalid count line: {field}"),
             Self::InvalidDecimal(field) => write!(f, "invalid canonical decimal token: {field}"),
             Self::GraphVertexCountMismatch { graph_vertices, certificate_vertices } =>
-                write!(f, "graph has {graph_vertices} vertices but certificate declares {certificate_vertices}"),
+                write!(
+                    f,
+                    "graph has {graph_vertices} vertices but certificate declares {certificate_vertices}"
+                ),
             Self::BlockCountMismatch { declared, encoded } =>
                 write!(f, "certificate declares {declared} blocks but encodes {encoded}"),
             Self::InvalidBlockLine(line) => write!(f, "invalid block line at 1-based line {line}"),
@@ -126,7 +133,9 @@ fn parse_count_line(line: &str, prefix: &'static str) -> Result<usize, CliquePar
     parse_decimal(value, prefix)
 }
 
-fn parse_graph_edges(graph_bytes: &[u8]) -> Result<(usize, HashSet<(usize, usize)>), CliquePartitionError> {
+fn parse_graph_edges(
+    graph_bytes: &[u8],
+) -> Result<(usize, HashSet<(usize, usize)>), CliquePartitionError> {
     let vertex_count = canonical_mis_graph_vertex_count(graph_bytes)
         .map_err(|error| CliquePartitionError::InvalidGraph(error.to_string()))?;
     let text = std::str::from_utf8(graph_bytes).map_err(|_| CliquePartitionError::InvalidUtf8)?;
@@ -139,10 +148,16 @@ fn parse_graph_edges(graph_bytes: &[u8]) -> Result<(usize, HashSet<(usize, usize
     let mut edges = HashSet::new();
     for line in &lines[3..] {
         let mut parts = line.split(' ');
-        let u = parts.next().ok_or_else(|| CliquePartitionError::InvalidGraph("missing edge endpoint".to_owned()))?
-            .parse::<usize>().map_err(|_| CliquePartitionError::InvalidGraph("invalid edge endpoint".to_owned()))?;
-        let v = parts.next().ok_or_else(|| CliquePartitionError::InvalidGraph("missing edge endpoint".to_owned()))?
-            .parse::<usize>().map_err(|_| CliquePartitionError::InvalidGraph("invalid edge endpoint".to_owned()))?;
+        let u = parts
+            .next()
+            .ok_or_else(|| CliquePartitionError::InvalidGraph("missing edge endpoint".to_owned()))?
+            .parse::<usize>()
+            .map_err(|_| CliquePartitionError::InvalidGraph("invalid edge endpoint".to_owned()))?;
+        let v = parts
+            .next()
+            .ok_or_else(|| CliquePartitionError::InvalidGraph("missing edge endpoint".to_owned()))?
+            .parse::<usize>()
+            .map_err(|_| CliquePartitionError::InvalidGraph("invalid edge endpoint".to_owned()))?;
         if parts.next().is_some() {
             return Err(CliquePartitionError::InvalidGraph("invalid edge line".to_owned()));
         }
@@ -169,7 +184,8 @@ pub fn verify_clique_partition_certificate(
     certificate_bytes: &[u8],
 ) -> Result<VerifiedCliquePartition, CliquePartitionError> {
     let (graph_vertices, edges) = parse_graph_edges(graph_bytes)?;
-    let text = std::str::from_utf8(certificate_bytes).map_err(|_| CliquePartitionError::InvalidUtf8)?;
+    let text =
+        std::str::from_utf8(certificate_bytes).map_err(|_| CliquePartitionError::InvalidUtf8)?;
     if !text.ends_with('\n') || text.contains('\r') {
         return Err(CliquePartitionError::NonCanonicalLineEndings);
     }
@@ -302,7 +318,10 @@ mod tests {
             Err(CliquePartitionError::MissingVertices { .. })
         ));
         assert!(matches!(
-            verify_clique_partition_certificate(GRAPH, &certificate(&[&[0, 1], &[2, 3], &[4], &[4, 5]])),
+            verify_clique_partition_certificate(
+                GRAPH,
+                &certificate(&[&[0, 1], &[2, 3], &[4], &[4, 5]])
+            ),
             Err(CliquePartitionError::DuplicateVertex(4))
         ));
         assert!(matches!(
@@ -331,7 +350,9 @@ mod tests {
             verify_clique_partition_certificate(GRAPH, &crlf),
             Err(CliquePartitionError::NonCanonicalLineEndings)
         ));
-        let leading_zero = format!("{CERTIFICATE_HEADER}\nvertices 06\nblocks 1\nblock 6 0 1 2 3 4 5\n");
+        let leading_zero = format!(
+            "{CERTIFICATE_HEADER}\nvertices 06\nblocks 1\nblock 6 0 1 2 3 4 5\n"
+        );
         assert!(matches!(
             verify_clique_partition_certificate(GRAPH, leading_zero.as_bytes()),
             Err(CliquePartitionError::InvalidDecimal("vertices "))
@@ -343,7 +364,8 @@ mod tests {
         let empty = format!("{CERTIFICATE_HEADER}\nvertices 6\nblocks 1\nblock 0\n");
         assert!(matches!(
             verify_clique_partition_certificate(GRAPH, empty.as_bytes()),
-            Err(CliquePartitionError::InvalidBlockLine(_)) | Err(CliquePartitionError::EmptyBlock(_))
+            Err(CliquePartitionError::InvalidBlockLine(_))
+                | Err(CliquePartitionError::EmptyBlock(_))
         ));
         assert!(matches!(
             verify_clique_partition_certificate(GRAPH, &certificate(&[&[1, 0], &[2, 3], &[4, 5]])),
@@ -362,7 +384,9 @@ mod tests {
             Err(CliquePartitionError::NonCliquePair { .. })
                 | Err(CliquePartitionError::InvalidGraph(_))
         ));
-        let wrong_graph_size = format!("{CERTIFICATE_HEADER}\nvertices 5\nblocks 1\nblock 5 0 1 2 3 4\n");
+        let wrong_graph_size = format!(
+            "{CERTIFICATE_HEADER}\nvertices 5\nblocks 1\nblock 5 0 1 2 3 4\n"
+        );
         assert!(matches!(
             verify_clique_partition_certificate(GRAPH, wrong_graph_size.as_bytes()),
             Err(CliquePartitionError::GraphVertexCountMismatch { .. })
@@ -421,7 +445,9 @@ mod tests {
     fn exact_mis_size(n: usize, edges: &HashSet<(usize, usize)>) -> usize {
         let mut best = 0;
         for mask in 0usize..(1usize << n) {
-            let selected: Vec<usize> = (0..n).filter(|vertex| (mask & (1 << vertex)) != 0).collect();
+            let selected: Vec<usize> = (0..n)
+                .filter(|vertex| (mask & (1 << vertex)) != 0)
+                .collect();
             let feasible = selected.iter().enumerate().all(|(i, &u)| {
                 selected.iter().skip(i + 1).all(|&v| !edges.contains(&(u.min(v), u.max(v))))
             });
@@ -430,6 +456,27 @@ mod tests {
             }
         }
         best
+    }
+
+
+    #[test]
+    fn digests_are_recomputed_from_exact_graph_and_certificate_bytes() {
+        let cert = certificate(&[&[0, 1], &[2, 3], &[4, 5]]);
+        let verified = verify_clique_partition_certificate(GRAPH, &cert).unwrap();
+
+        let graph_with_extra_cross_block_edge =
+            b"SYMTHEA-MIS-GRAPH-V1\nvertices 6\nedges 4\n0 1\n0 2\n2 3\n4 5\n";
+        let graph_changed = verify_clique_partition_certificate(
+            graph_with_extra_cross_block_edge,
+            &cert,
+        )
+        .unwrap();
+        assert_ne!(verified.graph_sha256(), graph_changed.graph_sha256());
+
+        let singleton_cert = certificate(&[&[0], &[1], &[2], &[3], &[4], &[5]]);
+        let certificate_changed =
+            verify_clique_partition_certificate(GRAPH, &singleton_cert).unwrap();
+        assert_ne!(verified.certificate_sha256(), certificate_changed.certificate_sha256());
     }
 
     #[test]
@@ -449,17 +496,30 @@ mod tests {
                 for blocks in &partitions {
                     let expected_valid = blocks.iter().all(|block| {
                         block.iter().enumerate().all(|(i, &u)| {
-                            block.iter().skip(i + 1).all(|&v| edge_set.contains(&(u.min(v), u.max(v))))
+                            block
+                                .iter()
+                                .skip(i + 1)
+                                .all(|&v| edge_set.contains(&(u.min(v), u.max(v))))
                         })
                     });
                     let cert = serialize_partition(n, blocks);
                     match verify_clique_partition_certificate(&graph, &cert) {
                         Ok(verified) => {
-                            assert!(expected_valid, "accepted non-clique partition: n={n}, edges={edges:?}, blocks={blocks:?}");
-                            assert!(verified.upper_bound() >= alpha, "understated bound: n={n}, edges={edges:?}, blocks={blocks:?}, alpha={alpha}, U={}", verified.upper_bound());
+                            assert!(
+                                expected_valid,
+                                "accepted non-clique partition: n={n}, edges={edges:?}, blocks={blocks:?}"
+                            );
+                            assert!(
+                                verified.upper_bound() >= alpha,
+                                "understated bound: n={n}, edges={edges:?}, blocks={blocks:?}, alpha={alpha}, U={}",
+                                verified.upper_bound()
+                            );
                         }
                         Err(error) => {
-                            assert!(!expected_valid, "rejected valid partition: n={n}, edges={edges:?}, blocks={blocks:?}, error={error}");
+                            assert!(
+                                !expected_valid,
+                                "rejected valid partition: n={n}, edges={edges:?}, blocks={blocks:?}, error={error}"
+                            );
                         }
                     }
                 }
