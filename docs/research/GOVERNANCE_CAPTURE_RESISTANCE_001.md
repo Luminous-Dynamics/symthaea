@@ -254,7 +254,7 @@ Freeze definitions, scope, attack families, negative controls, metrics, and clai
 
 ### GCRB-1 — Machine-readable synthetic protocol (development tranche)
 
-The public-development fixture is committed at `docs/research/fixtures/governance-capture-resistance-v0.1.json`, with 18 attack cases and eight benign control templates. The structural schema is `docs/research/fixtures/governance-capture-resistance-v0.1.schema.json` (JSON Schema Draft 2020-12).
+The public-development fixture is committed at `docs/research/fixtures/governance-capture-resistance-v0.1.json`, with 18 attack cases and eight benign control templates. The structural schema is `docs/research/fixtures/governance-capture-resistance-v0.1.schema.json` (JSON Schema Draft 2020-12). A frozen, public 1,018-case stress fixture is also committed at `docs/research/fixtures/governance-capture-resistance-stress-1000-v0.1.json`: it retains 18 attack cases and has 1,000 parameterized negative-control variants, evenly distributed across eight control families (125 each). The stress fixture pins the exact source-fixture SHA-256 and generator metadata. A deterministic JavaScript preflight checked both fixture documents against the schema's declared structure; this is not full JSON Schema engine conformance or Rust execution.
 
 The isolated Rust crate now contains a deterministic SplitMix64-based generator for parameterized benign controls. For example:
 
@@ -262,7 +262,7 @@ The isolated Rust crate now contains a deterministic SplitMix64-based generator 
 cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls docs/research/fixtures/governance-capture-resistance-v0.1.json 1000 20261029 /tmp/gcrb-stress-1000.json
 ```
 
-With that count and seed, the intended output contains 18 original attacks plus 1,000 seeded variants drawn from the eight declared benign-control families. The generated fixture records the generator version, master seed, count, algorithm, and the fact that expected answers remain public.
+With that count and seed, the intended output contains 18 original attacks plus 1,000 seeded variants drawn from the eight declared benign-control families. The generated fixture records the generator version, master seed, count, algorithm, exact source-fixture digest, and the fact that expected answers remain public. The CLI also prints the output fixture digest. The isolated crate includes a semantic golden test comparing generator output with the committed 1,018-case fixture; this test is authored but not executed.
 
 **Statistical limitation:** 1,000 generated variants are not 1,000 independent real-world samples. They are correlated variations over eight authored families and can exercise parameter sensitivity, malformed-input handling, and benign/attack separation under a declared synthetic distribution. They cannot establish a real-world false-positive rate, external validity, or blind qualification.
 
@@ -270,7 +270,7 @@ The current public schema and semantic validator check structure and declared co
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and sixteen authored unit tests. The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, and eighteen authored unit tests. The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
