@@ -408,6 +408,14 @@ fn export_performance_midi_impl(
                 },
             },
         ];
+        if voice.notes.len() != voice.source_event_indices.len() {
+            return Err(format!(
+                "performed MIDI lineage length mismatch for {}: {} notes, {} source IDs",
+                voice.name,
+                voice.notes.len(),
+                voice.source_event_indices.len()
+            ));
+        }
         let scheduled: Vec<ScheduledNote> = voice
             .notes
             .iter()
@@ -581,6 +589,13 @@ pub fn export_score_midi(
             .enumerate()
             .filter_map(|(index, event)| (event.role == role).then_some(index))
             .collect();
+        if role_notes.len() != source_indices.len() {
+            return Err(format!(
+                "symbolic MIDI lineage length mismatch for {name}: {} notes, {} source IDs",
+                role_notes.len(),
+                source_indices.len()
+            ));
+        }
         let scheduled: Vec<ScheduledNote> = role_notes
             .iter()
             .zip(source_indices)
@@ -988,6 +1003,59 @@ mod tests {
             })
             .count();
         assert_eq!(note_ons, 9);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn score_export_lineage_markers_round_trip_through_event_map_verifier() {
+        use symthaea_music_theory::score::VoiceRole as TheoryRole;
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let mut score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let mut selected_notes = Vec::new();
+        for role in [
+            TheoryRole::Melody,
+            TheoryRole::Harmony,
+            TheoryRole::Bass,
+            TheoryRole::CounterMelody,
+        ] {
+            if let Some(note) = score.voice(role).first() {
+                selected_notes.push(note.clone());
+            }
+        }
+        score.notes = selected_notes;
+        let expected_events = score.events();
+        assert!(!expected_events.is_empty());
+
+        let path = std::env::temp_dir().join(format!(
+            "muse_score_lineage_test_{}.mid",
+            std::process::id()
+        ));
+        export_score_midi(&score, Style::Classical, 0, &path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let target_score_sha256 = "a".repeat(64);
+        let total_frames = u64::from(48_000u32) * 3_600;
+        let map = crate::performed_event_map::PerformedEventMap::from_midi_bytes(
+            &bytes,
+            &target_score_sha256,
+            48_000,
+            total_frames,
+        )
+        .expect("exported MIDI markers must parse into event lineage");
+        let expected_midi_pitches: Vec<u8> = expected_events
+            .iter()
+            .map(|event| event.pitch.midi())
+            .collect();
+        assert_eq!(map.events.len(), expected_events.len());
+        map.verify_for_score_and_pitches(
+            &target_score_sha256,
+            &map.performed_midi_sha256,
+            48_000,
+            total_frames,
+            expected_events.len(),
+            &expected_midi_pitches,
+        )
+        .expect("serialized MIDI must retain exact source IDs and pitches");
         let _ = std::fs::remove_file(&path);
     }
 
