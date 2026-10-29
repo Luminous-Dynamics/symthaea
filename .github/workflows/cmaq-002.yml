@@ -48,6 +48,11 @@ jobs:
           assert by_name["oracle"]["mean_regret"] == 0
           assert all(row["unsafe_actions"] == 0 for row in report["results"])
           assert all(row["contradictions"] == 0 for row in report["results"])
-          print("CMAQ-002 report schema and hard-gate counters valid")
+          control = report["open_class_control"]
+          assert control["tested_mechanisms"] == 3
+          assert control["detected"] == control["tested_mechanisms"]
+          assert control["max_queries_to_detection"] <= 12
+          assert by_name["evoi"]["mean_net_regret"] < by_name["max_information"]["mean_net_regret"]
+          print("CMAQ-002 report schema, EVoI calibration, and open-class control valid")
           print(json.dumps(by_name, sort_keys=True))
           PY
