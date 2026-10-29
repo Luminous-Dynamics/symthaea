@@ -37,4 +37,6 @@ A passing report establishes only that the bundled schema and implemented consis
 
 Fixture digests are synthetic placeholders. The fixtures are conformance fixtures, not evidence of production runs. The duplicate-key fixture is intentionally rejected by the strict parser before it reaches schema validation.
 
+A one-off local cross-check of the current schema and four structural fixtures was run with Python `jsonschema` 4.26.0, `Draft202012Validator.check_schema`, and `FormatChecker`: the valid and stale-target predicates were accepted; queued-but-passed and missing-target predicates were rejected. A strict Python `object_pairs_hook` also rejected the committed duplicate-key fixture. These are independent schema/fixture checks only; they do not run the Rust implementation or its tests.
+
 The source is a prototype. Rust compilation and tests have not been run in the current authoring environment, which has no rustc/cargo/Nix toolchain. A generated standalone Cargo.lock and executable test result are required before treating it as release-ready.
