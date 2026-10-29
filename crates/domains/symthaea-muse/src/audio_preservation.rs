@@ -473,15 +473,23 @@ fn compare_channel_windows(
 ) -> (f32, f32) {
     let rms_delta_db = (rms_db(reference) - rms_db(candidate)).abs();
 
+    // Normalize spectral inputs only when their peak magnitude exceeds one.
+    // This prevents f32 FFT overflow on finite high-amplitude input while
+    // never amplifying quiet signals. Absolute gain remains covered by RMS dB.
+    let reference_peak = reference.iter().fold(0.0f32, |peak, sample| peak.max(sample.abs()));
+    let candidate_peak = candidate.iter().fold(0.0f32, |peak, sample| peak.max(sample.abs()));
+    let reference_scale = if reference_peak > 1.0 { 1.0 / reference_peak } else { 1.0 };
+    let candidate_scale = if candidate_peak > 1.0 { 1.0 / candidate_peak } else { 1.0 };
+
     let mut reference_spectrum: Vec<Complex<f32>> = reference
         .iter()
         .zip(window)
-        .map(|(sample, weight)| Complex::new(sample * weight, 0.0))
+        .map(|(sample, weight)| Complex::new(sample * weight * reference_scale, 0.0))
         .collect();
     let mut candidate_spectrum: Vec<Complex<f32>> = candidate
         .iter()
         .zip(window)
-        .map(|(sample, weight)| Complex::new(sample * weight, 0.0))
+        .map(|(sample, weight)| Complex::new(sample * weight * candidate_scale, 0.0))
         .collect();
     fft.process(&mut reference_spectrum);
     fft.process(&mut candidate_spectrum);
@@ -1271,6 +1279,23 @@ mod tests {
                 "onset frame_size exceeds the maximum supported analysis allocation"
             )
         );
+    }
+
+    #[test]
+    fn finite_high_amplitude_audio_does_not_overflow_spectral_measurement() {
+        let samples = vec![f32::MAX; 4096];
+        let report = audit_protected_audio(
+            view(&samples),
+            view(&samples),
+            &[],
+            &calibrated_config(),
+        )
+        .expect("finite high-amplitude audio is stabilized before FFT");
+
+        assert_eq!(report.verdict, PreservationVerdict::Pass);
+        assert!(report.worst_rms_delta_db.is_finite());
+        assert!(report.worst_spectral_distance.is_finite());
+        assert!(verify_audio_preservation_receipt(&report).expect("finite receipt serializes"));
     }
 
 }
