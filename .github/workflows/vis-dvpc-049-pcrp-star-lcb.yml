@@ -47,6 +47,8 @@ jobs:
           test "$(grep -c '^RESULT_CI' /tmp/vis-dvpc-049-smoke-a.tsv)" -ge "80"
           test "$(grep -c '^PAIR_METRIC' /tmp/vis-dvpc-049-smoke-a.tsv)" = "48"
           ! grep '^RESULT_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a-stable.tsv
+          ! grep '^RESULT_CI.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a.tsv
+          ! grep '^PAIR_METRIC.*zero_support_logger' /tmp/vis-dvpc-049-smoke-a.tsv
       - name: Run the paired selection pilot
         run: |
           /tmp/vis-dvpc-049 --benchmark > /tmp/vis-dvpc-049-results.tsv
