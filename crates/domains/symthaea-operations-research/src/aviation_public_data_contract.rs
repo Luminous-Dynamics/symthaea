@@ -89,6 +89,8 @@ pub enum DataContractError {
     TooManyPartitions,
     UnknownPartitionSource { source_id: String },
     PartitionSourceNotRetrieved { source_id: String },
+    SourceNotScoringReady { source_id: String },
+    LicenseNotCleared { source_id: String },
     MissingRetrievedPartition { source_id: String },
     UnexpectedPartitionForUnretrievedSource { source_id: String },
     PartitionOutOfSourceCoverage { partition_id: String },
@@ -132,6 +134,12 @@ impl fmt::Display for DataContractError {
             }
             Self::PartitionSourceNotRetrieved { source_id } => {
                 write!(f, "partition source {source_id} is not marked retrieved")
+            }
+            Self::SourceNotScoringReady { source_id } => {
+                write!(f, "source {source_id} is not retrieved for benchmark scoring")
+            }
+            Self::LicenseNotCleared { source_id } => {
+                write!(f, "source {source_id} has unresolved or restricted use terms")
             }
             Self::MissingRetrievedPartition { source_id } => {
                 write!(f, "retrieved source {source_id} has no partition")
@@ -384,6 +392,27 @@ pub fn validate_manifest(manifest: &PublicDataManifest) -> Result<(), DataContra
                     });
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+/// Require every source in the manifest to be retrieved and its use terms reviewed
+/// before any benchmark score is produced. Cataloguing alone is intentionally insufficient.
+pub fn validate_scoring_ready_manifest(
+    manifest: &PublicDataManifest,
+) -> Result<(), DataContractError> {
+    validate_manifest(manifest)?;
+    for source in &manifest.sources {
+        if source.acquisition_status != AcquisitionStatus::Retrieved {
+            return Err(DataContractError::SourceNotScoringReady {
+                source_id: source.source_id.clone(),
+            });
+        }
+        if matches!(source.license_status, LicenseStatus::Unknown | LicenseStatus::Restricted) {
+            return Err(DataContractError::LicenseNotCleared {
+                source_id: source.source_id.clone(),
+            });
         }
     }
     Ok(())
