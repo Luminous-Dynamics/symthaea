@@ -81,7 +81,7 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
         Value::Null => Ok(Value::Null),
         Value::Bool(value) => Ok(Value::Bool(*value)),
         Value::String(value) => Ok(Value::String(value.clone())),
-        Value::Number(number) if !numeric_tolerant => Ok(Value::Number(number.clone())),
+        Value::Number(number) if !numeric_tolerant => Ok(Value::Number(canonical_exact_number(number)?)),
         Value::Number(number) => {
             let value = number.as_f64().ok_or_else(|| {
                 "numeric fingerprint cannot represent a JSON number as f64".to_owned()
@@ -109,6 +109,27 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
             Ok(Value::Object(canonical))
         }
     }
+}
+
+fn canonical_exact_number(number: &Number) -> Result<Number, String> {
+    if let Some(value) = number.as_i64() {
+        return Ok(Number::from(value));
+    }
+    if let Some(value) = number.as_u64() {
+        return Ok(Number::from(value));
+    }
+    let value = number
+        .as_f64()
+        .ok_or_else(|| "exact canonicalization cannot represent a JSON number".to_owned())?;
+    // Normalize integral decimal spellings such as 1 and 1.0 without losing
+    // precision for integers beyond the exactly representable f64 range.
+    if value.is_finite()
+        && value.fract() == 0.0
+        && value.abs() <= 9_007_199_254_740_991.0
+    {
+        return Ok(Number::from(value as i64));
+    }
+    Ok(number.clone())
 }
 
 fn round_three_significant_digits(value: f64) -> Result<f64, String> {
@@ -291,7 +312,7 @@ fn build_near_groups(
         let left_candidates: Vec<&IndexedTask> = left_tasks
             .iter()
             .copied()
-            .filter(|task| right_exact_set.iter().any(|exact| *exact != task.exact_fingerprint))
+            .filter(|task| right_exact_set.iter().any(|exact| *exact != task.exact_fingerprint.as_str()))
             .collect();
         let right_candidates: Vec<&IndexedTask> = right_tasks
             .iter()
