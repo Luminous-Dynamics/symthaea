@@ -88,7 +88,10 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
             aggregation = receipt["aggregate_metrics_macro_averaged_over_target_tasks"][policy]
             self.assertEqual(aggregation["target_task_units"], 4)
             self.assertTrue(aggregation["target_points_nested_within_tasks"])
-        self.assertNotEqual(receipt["target_task_count"], receipt["target_points_per_task"] * receipt["target_task_count"])
+            self.assertEqual(
+                sum(row["policy_metrics"][policy]["audit_sample_count"] for row in receipt["target_task_results"]),
+                4 * 20,
+            )
 
     def test_source_archive_cannot_contain_target_task_ids(self):
         receipt = run_benchmark(history_points=2, test_points=8, nearest_k=3, reuse_count=1)
