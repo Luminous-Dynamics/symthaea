@@ -31,7 +31,7 @@ Never place answer-key values, unobserved counterfactual outcomes, or test split
 Each state transition should be represented as:
 `(episode_id, step_id, state_digest, action_id, action_time, observation_id, outcome_time, evidence_ids, regime_id, source_revision)`
 
-Do not equate an agent's reported belief or claimed observation with an environment observation. The environment recorder emits the outcome receipt. The evaluator checks receipt-to-action identity and event ordering.
+Do not equate an agent's reported belief or claimed observation with an environment observation. The environment recorder emits the outcome receipt, including external approval and postcondition status. The evaluator checks receipt-to-action identity and event ordering. The current `recorder_verified` bit is not a signature or authenticated identity.
 
 ### Required task families
 
