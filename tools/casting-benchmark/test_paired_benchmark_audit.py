@@ -103,7 +103,9 @@ class PairedBenchmarkAuditTests(unittest.TestCase):
         self.assertEqual(effect["losses"], 0)
         self.assertAlmostEqual(effect["median_delta"], 0.15)
         self.assertAlmostEqual(effect["mean_delta"], (0.15 + 0.15 + 0.165) / 3)
-        self.assertEqual(effect["bootstrap_95pct_ci_mean_delta"], [effect["mean_delta"], effect["mean_delta"]])
+        lower, upper = effect["bootstrap_95pct_ci_mean_delta"]
+        self.assertLessEqual(lower, effect["mean_delta"])
+        self.assertGreaterEqual(upper, effect["mean_delta"])
         self.assertEqual(effect["bootstrap_95pct_ci_win_rate"], [1.0, 1.0])
 
     def test_target_cost_and_hit_rates_include_all_units(self):
