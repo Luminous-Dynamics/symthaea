@@ -1,0 +1,135 @@
+{
+  "schema_version": "qarch-006-robust-experiment-fixture/1",
+  "fixture_id": "QARCH-006-NOMINAL-WINNER-COLLAPSE",
+  "evidence_class": "synthetic_analytic_fixture",
+  "boundary": "Contract fixture only; not a calibrated physical model, hardware observation, or quantum advantage claim.",
+  "units": {
+    "utility": "utility_points",
+    "measurement_cost": "measurement_seconds"
+  },
+  "decision_problem": {
+    "hypotheses": [
+      "H0",
+      "H1"
+    ],
+    "prior_by_scenario": {
+      "nominal": [
+        0.5,
+        0.5
+      ],
+      "plausible-alternative": [
+        0.5,
+        0.5
+      ]
+    },
+    "actions": [
+      "choose-H0",
+      "choose-H1"
+    ],
+    "utilities_by_action_and_hypothesis": [
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "candidate_experiments": [
+    {
+      "id": "A-perfect-nominal",
+      "measurement_cost": 1,
+      "outcomes": [
+        "outcome-0",
+        "outcome-1"
+      ],
+      "likelihoods_by_scenario": {
+        "nominal": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "plausible-alternative": [
+          [
+            0.5,
+            0.5
+          ],
+          [
+            0.5,
+            0.5
+          ]
+        ]
+      },
+      "expected_by_scenario": {
+        "nominal": {
+          "evsi": 0.5,
+          "evsi_per_cost": 0.5
+        },
+        "plausible-alternative": {
+          "evsi": 0,
+          "evsi_per_cost": 0
+        }
+      },
+      "expected_robust_worst_case_evsi_per_cost": 0
+    },
+    {
+      "id": "B-robust-moderate",
+      "measurement_cost": 1,
+      "outcomes": [
+        "outcome-0",
+        "outcome-1"
+      ],
+      "likelihoods_by_scenario": {
+        "nominal": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ],
+        "plausible-alternative": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ]
+      },
+      "expected_by_scenario": {
+        "nominal": {
+          "evsi": 0.3,
+          "evsi_per_cost": 0.3
+        },
+        "plausible-alternative": {
+          "evsi": 0.3,
+          "evsi_per_cost": 0.3
+        }
+      },
+      "expected_robust_worst_case_evsi_per_cost": 0.3
+    }
+  ],
+  "expected_rankings": {
+    "nominal_evsi_per_cost": [
+      "A-perfect-nominal",
+      "B-robust-moderate"
+    ],
+    "robust_worst_case_evsi_per_cost": [
+      "B-robust-moderate",
+      "A-perfect-nominal"
+    ]
+  },
+  "expected_lesson": "An experiment can be optimal under one model and worthless under a plausible alternative; preserve model sensitivity and choose the candidate with higher worst-case decision value when minimax robustness is the declared objective."
+}
