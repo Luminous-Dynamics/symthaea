@@ -44,6 +44,7 @@ pub mod migration;
 pub mod noise_sweep;
 pub mod phase_hdc;
 pub mod photonic_architecture;
+pub mod fusion_process;
 pub mod preflight;
 pub mod presets;
 pub mod probe;
@@ -113,6 +114,10 @@ pub use matrix::{
 pub use migration::{MigrationGuide, MigrationRisk, MigrationStep, alpha9_to_alpha10_migration};
 pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, NoiseSweepRunner};
 pub use phase_hdc::PhaseHypervector;
+pub use fusion_process::{
+    FusionOutcome, FusionProcess, FusionProcessError, FusionProcessEstimate, FusionState,
+    FusionTransition,
+};
 pub use photonic_architecture::{
     BoundedCostInterval, LossIntervalDb, OpticalChannel, OpticalChannelInterval,
     OpticalLink, OpticalRoute, OpticalRouteObjective, PhotonicEnvelopeError,
