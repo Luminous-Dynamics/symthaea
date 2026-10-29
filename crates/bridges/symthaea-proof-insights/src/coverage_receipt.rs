@@ -787,6 +787,30 @@ mod tests {
     }
 
     #[test]
+    fn reconstructed_component_graph_joins_hard_edges_and_keeps_singletons() {
+        let families = test_families();
+        let inventory = Inventory {
+            schema_version: "pitb.family-leakage-edges.v0".to_owned(),
+            source_partition_digest_sha256: partition_digest(&families),
+            coverage_status: "independently_reviewed_complete".to_owned(),
+            coverage_receipt_sha256: Some(digest('b')),
+            edges: vec![test_edges().remove(0)],
+        };
+        let bytes = serde_json::to_vec(&inventory).unwrap();
+        let components = expected_components_from_inventory(&bytes, &families).unwrap();
+        assert_eq!(components.len(), 2);
+        assert!(components.iter().any(|component| {
+            component.family_ids == vec!["001".to_owned(), "002".to_owned()]
+                && component.hard_edge_ids == vec!["edge-1".to_owned()]
+                && component.confirmed_edge_ids == vec!["edge-1".to_owned()]
+        }));
+        assert!(components.iter().any(|component| {
+            component.family_ids == vec!["003".to_owned()]
+                && component.hard_edge_ids.is_empty()
+        }));
+    }
+
+    #[test]
     fn full_frozen_partition_fixture_verifies_without_granting_analyzer_qualification() {
         let fixture = test_support::full_partition_fixture().unwrap();
         assert_eq!(fixture.families.len(), 372);
