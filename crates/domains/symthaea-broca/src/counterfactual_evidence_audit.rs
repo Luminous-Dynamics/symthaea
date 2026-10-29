@@ -443,6 +443,14 @@ pub struct AtomAblationObservation {
     pub prompt_sha256: String,
     pub tokenizer_sha256: String,
     pub system_commit_sha: String,
+    /// Evidence IDs present in the exact canonical runtime projection, in fixture order.
+    pub full_context_evidence_ids: Vec<String>,
+    /// Evidence IDs present after removing exactly the target atom, in fixture order.
+    pub ablated_context_evidence_ids: Vec<String>,
+    /// SHA-256 of canonical serde_json bytes for the full CounterfactualRuntimeCase.
+    pub full_runtime_case_sha256: String,
+    /// SHA-256 of canonical serde_json bytes for the atom-ablated CounterfactualRuntimeCase.
+    pub ablated_runtime_case_sha256: String,
     pub full_context_tokens: usize,
     pub ablated_context_tokens: usize,
     pub full_fields: BTreeMap<String, String>,
@@ -496,18 +504,23 @@ pub fn score_atom_ablation_jsonl(
     input_fixture_jsonl: &str,
     evaluator_labels_jsonl: &str,
 ) -> Result<AtomAblationScoreSummary, String> {
-    const OBSERVATION_SCHEMA: &str = "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1";
+    const OBSERVATION_SCHEMA: &str = "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V2";
     let fixtures = validate_counterfactual_fixture_jsonl(input_fixture_jsonl)?;
     let expected_fixture_sha256 = hex::encode(Sha256::digest(input_fixture_jsonl.as_bytes()));
     let mut fixture_evidence_keys = BTreeSet::<(String, String)>::new();
     let mut fixture_case_evidence = BTreeMap::<String, BTreeSet<String>>::new();
     let mut fixture_pair_cases = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut fixture_runtime_cases = BTreeMap::<String, CounterfactualRuntimeCase>::new();
     for pair in &fixtures {
         fixture_pair_cases.insert(
             pair.pair_id.clone(),
             pair.cases.iter().map(|case| case.case_id.clone()).collect(),
         );
-        for case in &pair.cases {
+        for (case_index, case) in pair.cases.iter().enumerate() {
+            fixture_runtime_cases.insert(
+                case.case_id.clone(),
+                pair.runtime_case(case_index).expect("case index comes from pair.cases"),
+            );
             let case_evidence_ids: BTreeSet<_> = case
                 .evidence
                 .iter()
@@ -543,6 +556,56 @@ pub fn score_atom_ablation_jsonl(
         validate_hex_digest("prompt_sha256", &observation.prompt_sha256, 64)?;
         validate_hex_digest("tokenizer_sha256", &observation.tokenizer_sha256, 64)?;
         validate_hex_digest("system_commit_sha", &observation.system_commit_sha, 40)?;
+        validate_hex_digest("full_runtime_case_sha256", &observation.full_runtime_case_sha256, 64)?;
+        validate_hex_digest("ablated_runtime_case_sha256", &observation.ablated_runtime_case_sha256, 64)?;
+        let runtime_case = fixture_runtime_cases
+            .get(&observation.case_id)
+            .ok_or_else(|| format!("observation references unknown fixture case {:?}", observation.case_id))?;
+        let expected_full_evidence_ids: Vec<_> = runtime_case
+            .evidence
+            .iter()
+            .map(|evidence| evidence.evidence_id.clone())
+            .collect();
+        if observation.full_context_evidence_ids != expected_full_evidence_ids {
+            return Err(format!(
+                "full-context evidence manifest differs from fixture for case {:?}",
+                observation.case_id
+            ));
+        }
+        let mut expected_ablated_case = runtime_case.clone();
+        let original_evidence_count = expected_ablated_case.evidence.len();
+        expected_ablated_case.evidence.retain(|evidence| evidence.evidence_id != observation.evidence_id);
+        if expected_ablated_case.evidence.len() == original_evidence_count {
+            return Err(format!(
+                "ablation target {:?} is absent from case {:?}",
+                observation.evidence_id, observation.case_id
+            ));
+        }
+        let expected_ablated_evidence_ids: Vec<_> = expected_ablated_case
+            .evidence
+            .iter()
+            .map(|evidence| evidence.evidence_id.clone())
+            .collect();
+        if observation.ablated_context_evidence_ids != expected_ablated_evidence_ids {
+            return Err(format!(
+                "ablated-context evidence manifest is not exactly the full fixture minus target {:?} for case {:?}",
+                observation.evidence_id, observation.case_id
+            ));
+        }
+        let expected_full_runtime_case_sha256 = canonical_runtime_case_sha256(runtime_case)?;
+        let expected_ablated_runtime_case_sha256 = canonical_runtime_case_sha256(&expected_ablated_case)?;
+        if observation.full_runtime_case_sha256 != expected_full_runtime_case_sha256 {
+            return Err(format!(
+                "full runtime-case digest mismatch for case {:?}",
+                observation.case_id
+            ));
+        }
+        if observation.ablated_runtime_case_sha256 != expected_ablated_runtime_case_sha256 {
+            return Err(format!(
+                "ablated runtime-case digest mismatch for case {:?} / evidence {:?}",
+                observation.case_id, observation.evidence_id
+            ));
+        }
         validate_material_fields(&observation.full_fields, line_number, "full_fields")?;
         validate_material_fields(&observation.ablated_fields, line_number, "ablated_fields")?;
         if !observation_keys.insert((observation.case_id.clone(), observation.evidence_id.clone())) {
@@ -756,6 +819,14 @@ pub fn score_atom_ablation_jsonl(
         context_tokens_saved_total,
         judgments,
     })
+}
+
+/// Hash the canonical runtime projection. The adapter must send these exact compact JSON
+/// bytes as the case payload; the evaluator recomputes them from the frozen fixture.
+fn canonical_runtime_case_sha256(case: &CounterfactualRuntimeCase) -> Result<String, String> {
+    let canonical_bytes = serde_json::to_vec(case)
+        .map_err(|error| format!("cannot serialize canonical runtime case: {error}"))?;
+    Ok(hex::encode(Sha256::digest(canonical_bytes)))
 }
 
 fn validate_hex_digest(field: &str, value: &str, expected_len: usize) -> Result<(), String> {
@@ -992,6 +1063,7 @@ mod tests {
         use serde_json::json;
 
         fn observation(
+            fixture_jsonl: &str,
             fixture_sha256: &str,
             case_id: &str,
             evidence_id: &str,
@@ -1000,9 +1072,27 @@ mod tests {
             full_context_tokens: usize,
             ablated_context_tokens: usize,
         ) -> Value {
-            serde_json::json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
+            let pairs = validate_counterfactual_fixture_jsonl(fixture_jsonl)
+                .expect("synthetic test fixture must validate");
+            let runtime_case = pairs.iter().find_map(|pair| {
+                pair.cases
+                    .iter()
+                    .position(|case| case.case_id == case_id)
+                    .and_then(|index| pair.runtime_case(index))
+            }).expect("synthetic case must exist in fixture");
+            let full_context_evidence_ids: Vec<_> = runtime_case.evidence
+                .iter().map(|evidence| evidence.evidence_id.clone()).collect();
+            let full_runtime_case_sha256 = canonical_runtime_case_sha256(&runtime_case)
+                .expect("canonical full request must serialize");
+            let mut ablated_case = runtime_case.clone();
+            ablated_case.evidence.retain(|evidence| evidence.evidence_id != evidence_id);
+            let ablated_context_evidence_ids: Vec<_> = ablated_case.evidence
+                .iter().map(|evidence| evidence.evidence_id.clone()).collect();
+            let ablated_runtime_case_sha256 = canonical_runtime_case_sha256(&ablated_case)
+                .expect("canonical ablated request must serialize");
+            json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V2",
+                "run_id": "synthetic-scorer-test-v2",
                 "case_id": case_id,
                 "evidence_id": evidence_id,
                 "reader_revision": "synthetic-reader-v1",
@@ -1010,6 +1100,10 @@ mod tests {
                 "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
                 "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+                "full_context_evidence_ids": full_context_evidence_ids,
+                "ablated_context_evidence_ids": ablated_context_evidence_ids,
+                "full_runtime_case_sha256": full_runtime_case_sha256,
+                "ablated_runtime_case_sha256": ablated_runtime_case_sha256,
                 "full_context_tokens": full_context_tokens,
                 "ablated_context_tokens": ablated_context_tokens,
                 "full_fields": full_fields,
@@ -1029,14 +1123,13 @@ mod tests {
             "claim.retry_limit.scope": "transient_network_errors"
         });
         vec![
-            observation(fixture_sha256, "memory-influence-0001-a", "retry-config-1", full.clone(), no_value.clone(), 50, 40),
-            observation(fixture_sha256, "memory-influence-0001-a", "retry-applicability-2", full.clone(), scope_bounded.clone(), 50, 42),
-            observation(fixture_sha256, "memory-influence-0001-b", "retry-config-1", full.clone(), no_value, 60, 50),
-            observation(fixture_sha256, "memory-influence-0001-b", "retry-applicability-2", full.clone(), scope_bounded, 60, 52),
-            observation(fixture_sha256, "memory-influence-0001-b", "notification-note-2", full.clone(), full, 60, 55),
+            observation(FIXTURES, fixture_sha256, "memory-influence-0001-a", "retry-config-1", full.clone(), no_value.clone(), 50, 40),
+            observation(FIXTURES, fixture_sha256, "memory-influence-0001-a", "retry-applicability-2", full.clone(), scope_bounded.clone(), 50, 42),
+            observation(FIXTURES, fixture_sha256, "memory-influence-0001-b", "retry-config-1", full.clone(), no_value, 60, 50),
+            observation(FIXTURES, fixture_sha256, "memory-influence-0001-b", "retry-applicability-2", full.clone(), scope_bounded, 60, 52),
+            observation(FIXTURES, fixture_sha256, "memory-influence-0001-b", "notification-note-2", full.clone(), full, 60, 55),
         ]
     }
-
     #[test]
     fn atom_ablation_scorer_reports_ignore_bound_and_control_separately() {
         let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
@@ -1091,6 +1184,22 @@ mod tests {
     }
 
     #[test]
+    fn atom_ablation_scorer_rejects_context_manifest_drift() {
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
+        // The ablated request must contain precisely the fixture evidence minus its target.
+        rows[0]["ablated_context_evidence_ids"] = rows[0]["full_context_evidence_ids"].clone();
+        let mismatched_manifest = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&mismatched_manifest, FIXTURES, LABELS).is_err());
+
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
+        rows[0]["ablated_runtime_case_sha256"] =
+            serde_json::json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        let mismatched_digest = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&mismatched_digest, FIXTURES, LABELS).is_err());
+    }
+
+    #[test]
     fn atom_ablation_scorer_binds_fixture_digest_and_allows_signed_token_delta() {
         let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
         let mut rows = synthetic_ablation_rows(&fixture_sha256);
@@ -1117,7 +1226,7 @@ mod tests {
         assert!(score_atom_ablation_jsonl(&incomplete_observations, FIXTURES, LABELS).is_err());
 
         let extra = serde_json::json!({
-            "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+            "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V2",
             "run_id": "synthetic-scorer-test-v1",
             "case_id": "memory-influence-0001-b",
             "evidence_id": "unlabelled-atom",
@@ -1126,6 +1235,10 @@ mod tests {
             "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "full_context_evidence_ids": [],
+            "ablated_context_evidence_ids": [],
+            "full_runtime_case_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "ablated_runtime_case_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             "full_context_tokens": 10,
             "ablated_context_tokens": 5,
             "full_fields": {"claim.retry_limit.value": "4"},
