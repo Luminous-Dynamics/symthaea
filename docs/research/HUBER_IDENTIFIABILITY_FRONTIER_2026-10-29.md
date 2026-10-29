@@ -27,7 +27,7 @@ Take model risk `m = 0.37` and allowed absolute clean-risk error `0.05`.
 - **Safe world:** clean mean `p = 0.37`, contamination `rho = 0`, so observed mean `q = 0.37` and model error is `0`.
 - **Unsafe world:** clean mean `p = 0.43`, contaminant mean `r = 0`, and `rho = 1 - 0.37/0.43 = 0.1395348837...`. The observed mean is also exactly `q = 0.37`, while clean model error is `0.06` and therefore unsafe.
 
-These worlds induce the *same observed Bernoulli distribution*, not merely similar sample means. No procedure that sees only those observations can distinguish them better than chance: its decision distribution is identical in both worlds. A method may admit, reject, or abstain, but it cannot simultaneously admit the safe world at a high rate and guarantee rejecting/never admitting the unsafe world without additional assumptions or evidence.
+These worlds induce the *same observed Bernoulli distribution*, not merely similar sample means. Any procedure that sees only those observations has the same decision distribution in both worlds, because the observable laws are identical. A method may admit, reject, or abstain, but it cannot simultaneously admit the safe world at a high rate and guarantee rejecting/never admitting the unsafe world without additional assumptions or evidence.
 
 For the exact observed mean `q = 0.37`:
 
