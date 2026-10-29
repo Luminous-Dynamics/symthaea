@@ -456,8 +456,9 @@ mod tests {
         let mut fields = fields();
         fields.required_conditions.swap(0, 1);
         fields.pairs[0].trials[0].policy_input_sha256 = "not-a-digest".to_owned();
-        fields.pairs[0].trials[1].evidence_manifest_sha256 =
+        let first_evidence_manifest =
             fields.pairs[0].trials[0].evidence_manifest_sha256.clone();
+        fields.pairs[0].trials[1].evidence_manifest_sha256 = first_evidence_manifest;
         let issues = validate_fields(&fields);
         assert!(issues.iter().any(|issue| issue.contains("canonical order")));
         assert!(issues.iter().any(|issue| issue.contains("policy_input_sha256")));
