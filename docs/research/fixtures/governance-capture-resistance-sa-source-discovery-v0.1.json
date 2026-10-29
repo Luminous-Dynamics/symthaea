@@ -35,7 +35,7 @@
         "Excel",
         "versioned JSON REST API"
       ],
-      "reported_license": "Official portal says detailed monthly downloads are CC BY 4.0; re-check terms for each exact artifact and derived output.",
+      "reported_license": "The portal terms permit free use and republication for commercial/non-commercial purposes subject to stated limitations and require a link to the original source. Confirm the current terms and any exact artifact metadata before redistribution; do not assume a specific CC license without verifying it for the selected export.",
       "known_caveats": [
         "Portal states the published data cover only a subset of public procurement captured by eTender.",
         "Absence from the published dataset is not evidence that a procurement did not occur.",
@@ -51,7 +51,8 @@
       "identifier_and_access_notes": [
         "The portal documents OCDS-style Open Contracting IDs (OCIDs) using the ocds-9t57fa prefix for contracting processes.",
         "Portal documentation describes a versioned JSON REST API with query filters including OCID, release date, and buyer; actual API schema, pagination behavior, and selected endpoint responses must be snapshotted before implementation.",
-        "Monthly bulk downloads of JSON, CSV, and XLSX are reported from May 2021 onward."
+        "Monthly bulk downloads of JSON, CSV, and XLSX are reported from May 2021 onward.",
+        "The official publication policy says no obligation requires municipal governments and state-owned entities to share procurement data with Treasury, which is consistent with the declared partial-coverage warning."
       ]
     },
     {
@@ -101,6 +102,23 @@
         "The documentation says quarterly Municipal Money views are based on snapshots; later corrected submissions may appear in the next monthly snapshot and quarterly reports are locked to snapshots.",
         "Repair-and-maintenance spending is contextual financial evidence, not proof that a specific work order was completed, a particular asset was repaired, or water service improved.",
         "Audited actuals may be available for some tables/years, but the audit status of each selected row and its corresponding annual statements must be verified."
+      ],
+      "api_metadata": {
+        "documented_api_root": "https://municipaldata.treasury.gov.za/api",
+        "documented_cube_index": "https://municipaldata.treasury.gov.za/api/cubes",
+        "verified_cube_names_from_published_index": [
+          "repmaint",
+          "repmaint_v2",
+          "incexp",
+          "incexp_v2",
+          "audit_opinions"
+        ],
+        "source_update_note": "Published documentation reported latest 2026 Q2 data on 2026-10-29; this is documentation discovery, not a downloaded data snapshot."
+      },
+      "snapshot_and_audit_notes": [
+        "Published API documentation says the product is refreshed quarterly from local-government database snapshots, and quarterly reports are tied to snapshots.",
+        "The documentation says municipality corrections are supplied as adjustments in subsequent months and locked quarters are not modified, while the current API can contain amended numbers; preserve retrieval time and avoid comparing unmatched snapshots.",
+        "The documentation defines Amount Type = Audited Actual as figures audited by the Auditor General and says Treasury verifies them against audited Annual Financial Statements, but the selected amount type and row must be checked individually."
       ]
     },
     {
@@ -119,11 +137,20 @@
         "Municipality/location resolution, time frequency, latency, definitions, and historical depth have not been profiled.",
         "An aggregate dashboard indicator may not be granular enough to validate a specific repair episode.",
         "Dashboard presentation is not independent verification by itself.",
-        "Initial page discovery identifies dashboard themes, but access and raw export/API behavior have not been validated in this work; do not imply a machine-readable series is already available."
+        "Initial page discovery identifies dashboard themes, but access and raw export/API behavior have not been validated in this work; do not imply a machine-readable series is already available.",
+        "The official NIWIS page describes dashboards and indicator families, including water-supply reliability, access to water infrastructure, and non-revenue water; stable raw data, historical coverage and site-specific linkage remain unverified."
       ],
       "intended_use": "Candidate outcome/context source only if series definitions, time/location resolution, and reuse terms pass the audit.",
       "validation_status": "dashboard_discovered_export_and_series_unverified",
-      "independent_truth_oracle": false
+      "independent_truth_oracle": false,
+      "candidate_indicators": [
+        "Access to Water Infrastructure",
+        "Water Supply Reliability",
+        "Non-revenue Water",
+        "Water Services Development Plans",
+        "Drinking Water Quality / Water Quality dashboards",
+        "Sanitation service access and type"
+      ]
     }
   ],
   "required_evidence_classes": [
@@ -181,7 +208,9 @@
     "review privacy, retaliation, POPIA, license, and safe-publication constraints",
     "freeze eligibility rules before inspecting which municipalities or officials appear favorable or unfavorable",
     "For eTender, preserve OCID/release identifiers and each release chronology; record the portal's beta, partial-coverage, accuracy, completeness, timeliness, and critical/legal-use disclaimers.",
-    "For municipal finance, retain amount type, financial year/period, municipality code, cube/item code, source snapshot, and audited-status evidence; distinguish a locked quarterly snapshot from later corrected submissions."
+    "For municipal finance, retain amount type, financial year/period, municipality code, cube/item code, source snapshot, and audited-status evidence; distinguish a locked quarterly snapshot from later corrected submissions.",
+    "Do not infer a specific Creative Commons license for eTender artifacts without confirming current terms/metadata; preserve source attribution requirements.",
+    "Snapshot the Municipal Finance API cube index and selected cube/queries at retrieval time; compare a chosen Audited Actual against the matching published Annual Financial Statement and Treasury report snapshot."
   ],
   "go_no_go_rules": [
     "Do not infer nonexistence from an absent eTender record because portal coverage is partial.",
