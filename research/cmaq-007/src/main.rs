@@ -1,11 +1,17 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-007-exploitability-report-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-007-exploitability-report-v0.2";
 const EPISODES: usize = 256;
 const SEARCH_SIZES: [usize; 4] = [8, 32, 128, 512];
 const MAX_ACTIONS: usize = 512;
 const BASELINE_UTILITY: f64 = 0.35;
 const BASE_SEED: u64 = 0xC0A7_0007_2026_1029;
+const CALIBRATION_SEED: u64 = 0xCA11_BA7E_2026_1029;
+const QUALIFICATION_SEED: u64 = 0x0A11_F1ED_2026_1029;
+const RISK_THRESHOLDS: [f64; 6] = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01];
+const UNSUPPORTED_RISK_TARGET: f64 = 0.05;
+const FAMILYWISE_ALPHA: f64 = 0.05;
+
 
 #[derive(Clone, Copy, Debug)]
 struct SplitMix64 {
@@ -290,6 +296,218 @@ fn summarize(
     }
 }
 
+#[derive(Clone, Debug)]
+struct RiskControlSummary {
+    search_size: usize,
+    target_unsupported_risk: f64,
+    familywise_alpha: f64,
+    alpha_per_threshold: f64,
+    threshold_count: usize,
+    selected_threshold: f64,
+    calibration_episode_count: usize,
+    calibration_unsupported_count: usize,
+    calibration_unsupported_rate: f64,
+    calibration_upper_bound: f64,
+    calibration_coverage_rate: f64,
+    qualification_episode_count: usize,
+    qualification_unsupported_count: usize,
+    qualification_unsupported_rate: f64,
+    qualification_coverage_rate: f64,
+    qualification_mean_regret: f64,
+    direct_fallback_mean_regret: f64,
+}
+
+fn log_factorials(n: usize) -> Vec<f64> {
+    let mut values = vec![0.0; n + 1];
+    for value in 1..=n {
+        values[value] = values[value - 1] + (value as f64).ln();
+    }
+    values
+}
+
+fn binomial_cdf_at_most(k: usize, n: usize, p: f64, log_factorial: &[f64]) -> f64 {
+    if k >= n {
+        return 1.0;
+    }
+    if p <= 0.0 {
+        return 1.0;
+    }
+    if p >= 1.0 {
+        return 0.0;
+    }
+
+    let log_p = p.ln();
+    let log_q = (1.0 - p).ln();
+    let log_weights: Vec<f64> = (0..=k)
+        .map(|i| {
+            log_factorial[n] - log_factorial[i] - log_factorial[n - i]
+                + (i as f64) * log_p
+                + ((n - i) as f64) * log_q
+        })
+        .collect();
+    let largest = log_weights.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let scaled_sum = log_weights
+        .iter()
+        .map(|value| (value - largest).exp())
+        .sum::<f64>();
+    (largest + scaled_sum.ln()).exp().clamp(0.0, 1.0)
+}
+
+// One-sided Clopper-Pearson upper confidence bound for a binomial event rate.
+// The caller applies Bonferroni correction across the preregistered threshold grid.
+fn clopper_pearson_upper(k: usize, n: usize, alpha: f64) -> f64 {
+    assert!(n > 0, "binomial interval requires nonzero sample size");
+    assert!(alpha > 0.0 && alpha < 1.0, "alpha must lie in (0, 1)");
+    if k >= n {
+        return 1.0;
+    }
+    if k == 0 {
+        return 1.0 - alpha.powf(1.0 / n as f64);
+    }
+
+    let log_factorial = log_factorials(n);
+    let mut lower = k as f64 / n as f64;
+    let mut upper = 1.0;
+    for _ in 0..64 {
+        let midpoint = 0.5 * (lower + upper);
+        if binomial_cdf_at_most(k, n, midpoint, &log_factorial) > alpha {
+            lower = midpoint;
+        } else {
+            upper = midpoint;
+        }
+    }
+    upper
+}
+
+fn risk_control_summaries() -> Vec<RiskControlSummary> {
+    let alpha_per_threshold = FAMILYWISE_ALPHA / RISK_THRESHOLDS.len() as f64;
+    let mut output = Vec::with_capacity(SEARCH_SIZES.len());
+
+    for search_size in SEARCH_SIZES {
+        let mut calibration_by_threshold: Vec<Vec<EpisodeMetrics>> = RISK_THRESHOLDS
+            .iter()
+            .map(|_| Vec::with_capacity(EPISODES))
+            .collect();
+
+        // This seed stream is separate from both the descriptive panel and
+        // the held-out qualification stream.
+        for episode in 0..EPISODES {
+            let seed = CALIBRATION_SEED
+                ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            let catalog = candidate_catalog(seed);
+            let actions = &catalog[..search_size];
+            for (threshold_index, threshold) in RISK_THRESHOLDS.iter().enumerate() {
+                calibration_by_threshold[threshold_index]
+                    .push(evaluate_episode(actions, Strategy::SupportGate(*threshold)));
+            }
+        }
+
+        let threshold_stats: Vec<(usize, usize, f64, f64, f64)> = calibration_by_threshold
+            .iter()
+            .enumerate()
+            .map(|(index, samples)| {
+                let unsupported_count = samples
+                    .iter()
+                    .filter(|sample| sample.unsupported_selected > 0.0)
+                    .count();
+                let unsupported_rate = unsupported_count as f64 / EPISODES as f64;
+                let upper_bound = clopper_pearson_upper(
+                    unsupported_count,
+                    EPISODES,
+                    alpha_per_threshold,
+                );
+                let coverage_rate = samples.iter().map(|sample| sample.coverage).sum::<f64>()
+                    / EPISODES as f64;
+                (index, unsupported_count, unsupported_rate, upper_bound, coverage_rate)
+            })
+            .collect();
+
+        // Select the highest-coverage threshold whose simultaneous upper
+        // confidence bound clears the target; ties prefer the stricter gate.
+        let mut selected: Option<(usize, f64)> = None;
+        for (index, _, _, upper_bound, coverage_rate) in &threshold_stats {
+            if *upper_bound > UNSUPPORTED_RISK_TARGET {
+                continue;
+            }
+            let prefer = selected
+                .map(|(best_index, best_coverage)| {
+                    *coverage_rate > best_coverage
+                        || (*coverage_rate == best_coverage
+                            && RISK_THRESHOLDS[*index] > RISK_THRESHOLDS[best_index])
+                })
+                .unwrap_or(true);
+            if prefer {
+                selected = Some((*index, *coverage_rate));
+            }
+        }
+        let selected_index = selected
+            .expect("the 1.01 threshold must force fallback and meet the risk target")
+            .0;
+        let selected_threshold = RISK_THRESHOLDS[selected_index];
+        let (_, calibration_unsupported_count, calibration_unsupported_rate,
+            calibration_upper_bound, calibration_coverage_rate) =
+            threshold_stats[selected_index];
+
+        let mut qualification_samples = Vec::with_capacity(EPISODES);
+        let mut fallback_samples = Vec::with_capacity(EPISODES);
+        for episode in 0..EPISODES {
+            let seed = QUALIFICATION_SEED
+                ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            let catalog = candidate_catalog(seed);
+            let actions = &catalog[..search_size];
+            qualification_samples.push(evaluate_episode(
+                actions,
+                Strategy::SupportGate(selected_threshold),
+            ));
+            fallback_samples.push(evaluate_episode(actions, Strategy::DirectFallback));
+        }
+
+        let qualification_unsupported_count = qualification_samples
+            .iter()
+            .filter(|sample| sample.unsupported_selected > 0.0)
+            .count();
+        let qualification_unsupported_rate =
+            qualification_unsupported_count as f64 / EPISODES as f64;
+        let qualification_coverage_rate = qualification_samples
+            .iter()
+            .map(|sample| sample.coverage)
+            .sum::<f64>()
+            / EPISODES as f64;
+        let qualification_mean_regret = qualification_samples
+            .iter()
+            .map(|sample| sample.regret)
+            .sum::<f64>()
+            / EPISODES as f64;
+        let direct_fallback_mean_regret = fallback_samples
+            .iter()
+            .map(|sample| sample.regret)
+            .sum::<f64>()
+            / EPISODES as f64;
+
+        output.push(RiskControlSummary {
+            search_size,
+            target_unsupported_risk: UNSUPPORTED_RISK_TARGET,
+            familywise_alpha: FAMILYWISE_ALPHA,
+            alpha_per_threshold,
+            threshold_count: RISK_THRESHOLDS.len(),
+            selected_threshold,
+            calibration_episode_count: EPISODES,
+            calibration_unsupported_count,
+            calibration_unsupported_rate,
+            calibration_upper_bound,
+            calibration_coverage_rate,
+            qualification_episode_count: EPISODES,
+            qualification_unsupported_count,
+            qualification_unsupported_rate,
+            qualification_coverage_rate,
+            qualification_mean_regret,
+            direct_fallback_mean_regret,
+        });
+    }
+
+    output
+}
+
 fn run_benchmark() -> Vec<Summary> {
     let strategies = Strategy::all();
     let mut summaries = Vec::with_capacity(SEARCH_SIZES.len() * strategies.len());
@@ -327,7 +545,7 @@ fn run_benchmark() -> Vec<Summary> {
     summaries
 }
 
-fn render_report(summaries: &[Summary]) -> String {
+fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> String {
     let mut output = String::new();
     output.push_str("{\n");
     output.push_str(&format!("  \"schema_version\": \"{REPORT_SCHEMA}\",\n"));
@@ -366,6 +584,52 @@ fn render_report(summaries: &[Summary]) -> String {
         }
         output.push('\n');
     }
+    output.push_str("  ],\n");
+    output.push_str("  \"risk_control\": [\n");
+    for (index, row) in risk_control.iter().enumerate() {
+        output.push_str(&format!(
+            concat!(
+                "    {{\"search_size\": {}, ",
+                "\"target_unsupported_risk\": {:.6}, ",
+                "\"familywise_alpha\": {:.6}, ",
+                "\"alpha_per_threshold\": {:.8}, ",
+                "\"threshold_count\": {}, ",
+                "\"selected_threshold\": {:.4}, ",
+                "\"calibration_episode_count\": {}, ",
+                "\"calibration_unsupported_count\": {}, ",
+                "\"calibration_unsupported_rate\": {:.8}, ",
+                "\"calibration_upper_bound\": {:.8}, ",
+                "\"calibration_coverage_rate\": {:.8}, ",
+                "\"qualification_episode_count\": {}, ",
+                "\"qualification_unsupported_count\": {}, ",
+                "\"qualification_unsupported_rate\": {:.8}, ",
+                "\"qualification_coverage_rate\": {:.8}, ",
+                "\"qualification_mean_regret\": {:.8}, ",
+                "\"direct_fallback_mean_regret\": {:.8}}}"
+            ),
+            row.search_size,
+            row.target_unsupported_risk,
+            row.familywise_alpha,
+            row.alpha_per_threshold,
+            row.threshold_count,
+            row.selected_threshold,
+            row.calibration_episode_count,
+            row.calibration_unsupported_count,
+            row.calibration_unsupported_rate,
+            row.calibration_upper_bound,
+            row.calibration_coverage_rate,
+            row.qualification_episode_count,
+            row.qualification_unsupported_count,
+            row.qualification_unsupported_rate,
+            row.qualification_coverage_rate,
+            row.qualification_mean_regret,
+            row.direct_fallback_mean_regret
+        ));
+        if index + 1 != risk_control.len() {
+            output.push(',');
+        }
+        output.push('\n');
+    }
     output.push_str("  ]\n}\n");
     output
 }
@@ -380,7 +644,9 @@ fn main() {
         eprintln!("unexpected argument: {}; use --help", args[0]);
         process::exit(2);
     }
-    let report = render_report(&run_benchmark());
+    let summaries = run_benchmark();
+    let risk_control = risk_control_summaries();
+    let report = render_report(&summaries, &risk_control);
     print!("{report}");
 }
 
@@ -443,6 +709,30 @@ mod tests {
             assert!(metrics.regret.is_finite() && metrics.regret >= 0.0);
             assert!(metrics.selected_optimism_gap.is_finite());
             assert!((0.0..=1.0).contains(&metrics.coverage));
+        }
+    }
+
+    #[test]
+    fn clopper_pearson_bound_handles_zero_and_all_failures() {
+        let alpha = FAMILYWISE_ALPHA / RISK_THRESHOLDS.len() as f64;
+        let zero_upper = clopper_pearson_upper(0, EPISODES, alpha);
+        assert!(zero_upper > 0.0 && zero_upper < UNSUPPORTED_RISK_TARGET);
+        assert!((zero_upper - (1.0 - alpha.powf(1.0 / EPISODES as f64))).abs() < 1e-12);
+        assert_eq!(clopper_pearson_upper(EPISODES, EPISODES, alpha), 1.0);
+        assert!(clopper_pearson_upper(12, EPISODES, alpha) > 12.0 / EPISODES as f64);
+    }
+
+    #[test]
+    fn calibrated_gate_uses_disjoint_panel_and_respects_calibration_risk_target() {
+        let rows = risk_control_summaries();
+        assert_eq!(rows.len(), SEARCH_SIZES.len());
+        for row in rows {
+            assert_eq!(row.calibration_episode_count, EPISODES);
+            assert_eq!(row.qualification_episode_count, EPISODES);
+            assert!(RISK_THRESHOLDS.contains(&row.selected_threshold));
+            assert!(row.calibration_upper_bound <= UNSUPPORTED_RISK_TARGET);
+            assert!((0.0..=1.0).contains(&row.qualification_unsupported_rate));
+            assert!((0.0..=1.0).contains(&row.qualification_coverage_rate));
         }
     }
 
