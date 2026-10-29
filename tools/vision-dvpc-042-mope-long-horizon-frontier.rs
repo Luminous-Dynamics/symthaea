@@ -460,7 +460,7 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                 }
             }
             while look_index<horizons.len() && horizons[look_index]==t {
-                for method in 0..4 {
+                for method in 0..5 {
                     let interval=intervals[method];
                     let diag=if method==0 {mope.diagnostics} else {MopeDiagnostics::default()};
                     let grid_advances=if method==1 {mope_grid.diagnostics.endpoint_advances} else {0};
@@ -529,7 +529,10 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tpromotion_time_median_conditional\t{}\t-\t-\t-",result.scenario,method,horizon,med.map(|x|x.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tpromotion_time_p90_conditional\t{}\t-\t-\t-",result.scenario,method,horizon,p90.map(|x|x.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
             if method_idx==0 {
-                let _=writeln!(out,"ROOT_METRIC\t{}\t{}\tchecks\t{}\tfailures\t{}",result.scenario,horizon,a.root_checks,a.root_failures);
+                let _=writeln!(out,"ROOT_METRIC\t{}\t{}\tchecks\t{}\tfailures\t{}\tcollisions\t{}",result.scenario,horizon,a.root_checks,a.root_failures,a.endpoint_collisions);
+            }
+            if method_idx==1 {
+                let _=writeln!(out,"GRID_METRIC\t{}\t{}\tendpoint_advances\t{}",result.scenario,horizon,a.grid_endpoint_advances);
             }
         }
     }
@@ -588,6 +591,18 @@ mod tests {
         assert!(close(got.lower,0.2,1e-12));
         assert!(close(got.upper,0.7,1e-12));
         assert!(got.width()<=previous.width()+1e-12);
+    }
+
+    #[test]
+    fn upstream_grid_comparator_is_bounded_and_reports_advances() {
+        let mut grid=MopeGridPair::new(1.0).unwrap();
+        assert_eq!(grid.values.len(),GRID_SIZE);
+        assert!(close(grid.values[0],0.0,1e-12));
+        assert!(close(grid.values[GRID_SIZE-1],1.0,1e-12));
+        let interval=grid.update(1.0,1.0).unwrap();
+        assert!(interval.lower>=0.0 && interval.upper<=1.0);
+        assert!(!interval.reversed());
+        assert_eq!(grid.diagnostics.endpoint_advances,0);
     }
 
     #[test]
