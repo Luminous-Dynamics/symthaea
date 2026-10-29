@@ -68,9 +68,9 @@ The available-case Wald interval is kept only as a pointwise diagnostic. It is n
 
 ## Metrics
 
-For every fixture and each horizon 128, 512 and 4,096, common metrics report available-case IPS estimate, bias, absolute error, pointwise Wald coverage/width, zero-filled estimate/bias, overall maturity fraction, target-action maturity fraction and mature sample count.
+For every fixture and each horizon 128, 512 and 4,096, common metrics report available-case IPS estimate, bias, absolute error and squared error, pointwise Wald coverage/width, zero-filled estimate/bias/absolute error/squared error, overall maturity fraction, target-action maturity fraction and mature sample count.
 
-Only in `IDENTIFIED_MAR` fixtures, additional rows report IPCW estimate, bias, absolute error, pointwise and sequence-wide CS coverage, CS width, effective sample size, and the registered IPCW score bound.
+Only in `IDENTIFIED_MAR` fixtures, additional rows report IPCW estimate, bias, absolute error and squared error, pointwise Hoeffding interval coverage, sequence-wide CS coverage, CS width, effective sample size, and the registered IPCW score bound.
 
 Results summarize 1,024 fixed-seed replicates and include Monte Carlo standard errors. These are synthetic averages, not a claim that any estimator dominates on real traffic.
 
@@ -83,7 +83,7 @@ Results summarize 1,024 fixed-seed replicates and include Monte Carlo standard e
 - all IPCW CSs are nested and bounded by [0,1];
 - observed IPCW scores respect B;
 - pointwise and sequence coverage for the valid IPCW CS pass 0.90 empirical regression threshold in every registered fixture/look;
-- deterministic replay, exact metric counts and source/output SHA-256 receipt.
+- deterministic replay, exact metric counts (276 full metric rows; 184 smoke rows) and source/output SHA-256 receipt.
 
 The 0.90 coverage threshold is a simulation gate, not the theorem. Formal validity follows from the bounded-score Hoeffding confidence sequence only when the target cells have positive known q and censoring is independent of reward conditional on context/action.
 
