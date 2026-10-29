@@ -131,3 +131,82 @@ jobs:
               }
           }, sort_keys=True))
           PY
+- name: Run horizon-amplified error stress panel
+        working-directory: research/cmaq-007
+        run: cargo run --quiet --locked --bin horizon_stress > /tmp/cmaq-007-horizon-stress.json
+      - name: Validate horizon stress schema and falsification controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-007-horizon-stress.json").read_text())
+          assert report["schema_version"] == "cmaq-007-horizon-stress-v0.1"
+          assert report["seed_count"] == 128
+          assert report["search_sizes"] == [8, 32, 128, 512]
+          assert report["horizons"] == [1, 4, 16]
+          assert report["rollout_growth_values"] == [0.0, 0.2]
+          rows = report["summary"]
+          assert len(rows) == 144
+          by_key = {
+              (r["search_size"], r["horizon"], round(r["rollout_growth"], 2), r["strategy"]): r
+              for r in rows
+          }
+          assert len(by_key) == len(rows)
+          strategies = {
+              "direct_fallback", "predicted_greedy", "uncertainty_penalty",
+              "support_gate_060", "support_gate_090", "oracle_upper_bound",
+          }
+          assert {r["strategy"] for r in rows} == strategies
+          for size in report["search_sizes"]:
+              for horizon in report["horizons"]:
+                  for growth in report["rollout_growth_values"]:
+                      oracle = by_key[(size, horizon, round(growth, 2), "oracle_upper_bound")]
+                      fallback = by_key[(size, horizon, round(growth, 2), "direct_fallback")]
+                      assert oracle["mean_regret"] <= 1e-8
+                      assert fallback["model_action_coverage"] == 0.0
+                      assert fallback["unsupported_selection_rate"] == 0.0
+                      for row in (by_key[(size, horizon, round(growth, 2), s)] for s in strategies):
+                          for key in (
+                              "mean_prediction_mae", "mean_realized_utility",
+                              "mean_selected_optimism_gap", "mean_regret",
+                              "unsupported_selection_rate", "unsupported_rate_given_model_action",
+                              "model_action_coverage", "paired_regret_reduction_vs_greedy",
+                              "paired_regret_reduction_ci95_low", "paired_regret_reduction_ci95_high",
+                          ):
+                              assert math.isfinite(row[key]), (key, row)
+                          assert row["mean_prediction_mae"] >= 0
+                          assert row["mean_regret"] >= -1e-9
+                          for key in ("unsupported_selection_rate", "unsupported_rate_given_model_action", "model_action_coverage"):
+                              assert 0.0 <= row[key] <= 1.0
+                          assert row["paired_regret_reduction_ci95_low"] <= row["paired_regret_reduction_ci95_high"]
+                      assert by_key[(size, horizon, round(growth, 2), "support_gate_090")]["model_action_coverage"] <= by_key[(size, horizon, round(growth, 2), "support_gate_060")]["model_action_coverage"]
+          # Preregistered falsification checks: search pressure, rollout depth, and
+          # geometric error propagation must be visible rather than inferred from MAE alone.
+          greedy_8 = by_key[(8, 16, 0.2, "predicted_greedy")]
+          greedy_512 = by_key[(512, 16, 0.2, "predicted_greedy")]
+          assert greedy_512["unsupported_selection_rate"] > greedy_8["unsupported_selection_rate"]
+          shallow = by_key[(512, 1, 0.2, "predicted_greedy")]
+          deep = by_key[(512, 16, 0.2, "predicted_greedy")]
+          assert deep["mean_selected_optimism_gap"] > shallow["mean_selected_optimism_gap"]
+          no_growth = by_key[(512, 16, 0.0, "predicted_greedy")]
+          assert deep["mean_prediction_mae"] > no_growth["mean_prediction_mae"]
+          print("CMAQ-007 v0.5 horizon stress schema, paired policies, oracle/fallback controls, and search/depth falsification checks validated")
+          print(json.dumps({
+              "search_pressure": {
+                  "size_8_unsupported_rate": greedy_8["unsupported_selection_rate"],
+                  "size_512_unsupported_rate": greedy_512["unsupported_selection_rate"],
+              },
+              "rollout_depth": {
+                  "horizon_1_optimism_gap": shallow["mean_selected_optimism_gap"],
+                  "horizon_16_optimism_gap": deep["mean_selected_optimism_gap"],
+              },
+              "error_growth": {
+                  "no_growth_prediction_mae": no_growth["mean_prediction_mae"],
+                  "growth_0_20_prediction_mae": deep["mean_prediction_mae"],
+              },
+          }, sort_keys=True))
+          PY
