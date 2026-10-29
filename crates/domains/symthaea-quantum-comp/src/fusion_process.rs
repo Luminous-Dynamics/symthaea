@@ -616,6 +616,78 @@ mod tests {
     }
 
     #[test]
+    fn one_state_geometric_control_matches_closed_form_across_caps() {
+        let success = 0.5_f64;
+        let recoverable = 0.3_f64;
+        let destructive = 0.2_f64;
+        let mean_latency_per_attempt = 2.27_f64;
+        let mean_photons_per_attempt = 1.7_f64;
+
+        for cap in 1usize..=8 {
+            let result = one_state_rus(cap).estimate().unwrap();
+            let recoverable_sum = (1.0 - recoverable.powi(cap as i32)) / (1.0 - recoverable);
+            let success_probability = success * recoverable_sum;
+            let terminal_failure_probability = destructive * recoverable_sum;
+            let exhaustion_probability = recoverable.powi(cap as i32);
+
+            assert!((result.success_probability - success_probability).abs() < 1e-12);
+            assert!((result.terminal_failure_probability - terminal_failure_probability).abs() < 1e-12);
+            assert!((result.attempt_cap_exhaustion_probability - exhaustion_probability).abs() < 1e-12);
+            assert!((result.expected_attempts - recoverable_sum).abs() < 1e-12);
+            assert!((result.expected_latency_ms - mean_latency_per_attempt * recoverable_sum).abs() < 1e-10);
+            assert!((result.expected_photons_consumed - mean_photons_per_attempt * recoverable_sum).abs() < 1e-12);
+
+            let mut successful_attempt_moment = 0.0;
+            let mut successful_latency_moment = 0.0;
+            let mut successful_photon_moment = 0.0;
+            for attempt_index in 0..cap {
+                let path_probability = recoverable.powi(attempt_index as i32) * success;
+                successful_attempt_moment += path_probability * (attempt_index + 1) as f64;
+                successful_latency_moment +=
+                    path_probability * (attempt_index as f64 * 2.5 + 2.2);
+                successful_photon_moment += path_probability * (attempt_index as f64 + 2.0);
+            }
+            assert!(
+                (result.expected_attempts_given_success.unwrap()
+                    - successful_attempt_moment / success_probability).abs() < 1e-12
+            );
+            assert!(
+                (result.expected_latency_ms_given_success.unwrap()
+                    - successful_latency_moment / success_probability).abs() < 1e-12
+            );
+            assert!(
+                (result.expected_photons_consumed_given_success.unwrap()
+                    - successful_photon_moment / success_probability).abs() < 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_probabilities_and_overflowing_combined_latency() {
+        let mut process = one_state_rus(2);
+        process.states[0].outcomes[0].probability = f64::NAN;
+        assert!(matches!(
+            process.estimate(),
+            Err(FusionProcessError::InvalidOutcomeProbability { .. })
+        ));
+
+        process = one_state_rus(2);
+        process.states[0].outcomes[0].probability = 1.1;
+        assert!(matches!(
+            process.estimate(),
+            Err(FusionProcessError::InvalidOutcomeProbability { .. })
+        ));
+
+        process = one_state_rus(1);
+        process.states[0].attempt_latency_ms = 1.0e308;
+        process.states[0].outcomes[0].feedforward_latency_ms = 1.0e308;
+        assert!(matches!(
+            process.estimate(),
+            Err(FusionProcessError::InvalidTotalLatency { .. })
+        ));
+    }
+
+    #[test]
     fn estimate_is_deterministic_for_the_same_declared_process() {
         let process = one_state_rus(5);
         assert_eq!(process.estimate().unwrap(), process.estimate().unwrap());
