@@ -163,7 +163,7 @@ First qualify the Rust invariants and produce a benchmark-native adapter for the
 - Respect the harness's `--memory-context-max-tokens` limit after final serialization.
 - Do not expose benchmark IDs, reference answers, evidence labels or evaluator state at query time.
 
-Run the official reader and baseline configurations, including the packaged strong baseline where feasible. Separately run MemoryAgentBench and LongMINT for incremental update/forgetting and interference stress. Never combine scores across benchmark versions into one leaderboard number.
+Run the official reader and baseline configurations, including the packaged strong baseline where feasible. Separately run MemoryAgentBench and LongMINT for incremental update/forgetting and interference stress. Use [MemUse](https://aclanthology.org/2026.emnlp-main.804/) for natural-response integration questions and [HiR](https://aclanthology.org/2026.findings-emnlp.1927/) as a reference-view calibration comparator when compatible evaluation artifacts are available. Never combine scores across benchmark versions or task definitions into one leaderboard number.
 
 ## 6. Required metrics
 
@@ -181,6 +181,8 @@ Always disaggregate by mutation family and report the denominator:
 - Paired counterfactual consistency: fraction of pairs where the decision relation matches the pre-registered expected relation.
 - Contradiction, stale-state, wrong-entity and cross-scope detection.
 - Requirement/evidence recall and visibility of annotated supporting source spans in the final serialized context.
+- Natural-integration relevance/omission rates and privacy-sensitive resurfacing errors, reported separately from explicit Direct QA.
+- Reference-view sensitivity: material answer/action changes between full hierarchy and coarse-only reference view, with equal reader/prompt settings and actual token counts.
 - Actual prompt/context tokens, retrieval/refinement calls, p50/p95/p99 latency, memory/index bytes and cost per query.
 - Paired question-level confidence intervals, failure traces and all preregistered exclusions.
 
@@ -219,6 +221,8 @@ If the support gate fails to distinguish the minimal pairs, report the failure m
 ## 9. Reference points and limits
 
 - QEMem, *From Relevant Memories to Sufficient Evidence*: https://arxiv.org/abs/2610.22668
+- MemUse, *Moving Memory Evaluation from Direct QA to Natural Integration in Long-Term Human-AI Conversation*: https://aclanthology.org/2026.emnlp-main.804/
+- HiR, *Calibrating Hierarchical Memory Utilization for Long-Term Memory QA*: https://aclanthology.org/2026.findings-emnlp.1927/
 - Budgeted Flat Reconstruction (BFR), *Relevance Is Not Sufficiency: What Actually Closes the Evidence Gap in Long-Term Memory QA*: https://arxiv.org/abs/2610.09348
 - MemCalib, *Benchmarking and Optimizing Memory Use in LLM Agents*: https://arxiv.org/abs/2609.24259
 - LongMemEval-V2 official backend contract, evaluation harness and baselines: https://github.com/xiaowu0162/LongMemEval-V2
