@@ -16,8 +16,7 @@ pub const EVIDENCE_BEHAVIOR_CONTRACT_PLAN_SCHEMA: &str =
 pub const EVIDENCE_BEHAVIOR_CONTRACT_REPORT_SCHEMA: &str =
     "symthaea.science_bench_refresh_evidence_behavior_contract_report.v1";
 
-const HASH_PREFIX: &[u8] =
-    b"symthaea.science_bench_refresh.evidence_behavior_contracts.v1\0";
+const HASH_PREFIX: &[u8] = b"symthaea.science_bench_refresh.evidence_behavior_contracts.v1\0";
 const PLAN_DOMAIN: &[u8] = b"plan.v1\0";
 const REPORT_DOMAIN: &[u8] = b"report.v1\0";
 const MAX_CASES: usize = 100_000;
@@ -298,9 +297,7 @@ fn digest_domain_framed(domain: &[u8], payload: &[u8]) -> Result<String, String>
     Ok(hex_digest(&hasher.finalize()))
 }
 
-fn expected_pair(
-    family: ContractFamilyV1,
-) -> (ContractInterventionV1, ExpectedBehaviorV1) {
+fn expected_pair(family: ContractFamilyV1) -> (ContractInterventionV1, ExpectedBehaviorV1) {
     match family {
         ContractFamilyV1::UpdateCompliance => (
             ContractInterventionV1::CoherentUpdate,
@@ -383,11 +380,13 @@ fn validate_plan_fields(fields: &EvidenceBehaviorContractPlanFieldsV1) -> Vec<St
             issues.push(format!("case {} has invalid condition pair", item.case_id));
         }
         if item.decision_rule_id.trim().is_empty() || item.decision_rule_id.len() > 128 {
-            issues.push(format!("case {} has invalid decision_rule_id", item.case_id));
+            issues.push(format!(
+                "case {} has invalid decision_rule_id",
+                item.case_id
+            ));
         }
         let (expected_intervention, expected_behavior) = expected_pair(item.family);
-        if item.intervention != expected_intervention
-            || item.expected_behavior != expected_behavior
+        if item.intervention != expected_intervention || item.expected_behavior != expected_behavior
         {
             issues.push(format!(
                 "case {} has intervention/behavior incompatible with family {:?}",
@@ -396,7 +395,10 @@ fn validate_plan_fields(fields: &EvidenceBehaviorContractPlanFieldsV1) -> Vec<St
         }
         if item.family == ContractFamilyV1::EvidenceForceMonotonicity {
             if item.force_axis == ForceAxisV1::NotApplicable {
-                issues.push(format!("force case {} must declare a force axis", item.case_id));
+                issues.push(format!(
+                    "force case {} must declare a force axis",
+                    item.case_id
+                ));
             }
         } else if item.force_axis != ForceAxisV1::NotApplicable {
             issues.push(format!(
@@ -538,9 +540,9 @@ pub fn verify_evidence_behavior_contract_plan(
     if !matches {
         issues.push("plan commitment does not match typed plan fields".to_owned());
     }
-    let structural_valid = issues.iter().all(|issue| {
-        issue != "plan commitment does not match typed plan fields"
-    });
+    let structural_valid = issues
+        .iter()
+        .all(|issue| issue != "plan commitment does not match typed plan fields");
     Ok(EvidenceBehaviorContractPlanVerificationV1 {
         schema: "symthaea.science_bench_refresh_evidence_behavior_contract_plan_verification.v1"
             .to_owned(),
@@ -626,11 +628,17 @@ fn validate_report_fields(
     let mut seen = BTreeSet::new();
     for record in &fields.records {
         if !seen.insert(record.case_id.as_str()) {
-            issues.push(format!("duplicate outcome record for case {}", record.case_id));
+            issues.push(format!(
+                "duplicate outcome record for case {}",
+                record.case_id
+            ));
             continue;
         }
         if !planned.contains_key(record.case_id.as_str()) {
-            issues.push(format!("outcome contains unplanned case {}", record.case_id));
+            issues.push(format!(
+                "outcome contains unplanned case {}",
+                record.case_id
+            ));
         }
         if !valid_digest(&record.adjudication_record_sha256, allow_zero) {
             issues.push(format!(
@@ -729,7 +737,10 @@ fn validate_report_fields(
     }
     for item in &plan.items {
         if !seen.contains(item.case_id.as_str()) {
-            issues.push(format!("missing terminal outcome for case {}", item.case_id));
+            issues.push(format!(
+                "missing terminal outcome for case {}",
+                item.case_id
+            ));
         }
     }
     Ok(issues)
@@ -745,17 +756,17 @@ fn validate_response_digest(
 ) {
     match digest {
         Some(value) if valid_digest(value, allow_zero) => {}
-        Some(_) => issues.push(format!("case {case_id} has invalid {label} response digest")),
-        None if required => {
-            issues.push(format!("case {case_id} is missing {label} response artifact"))
-        }
+        Some(_) => issues.push(format!(
+            "case {case_id} has invalid {label} response digest"
+        )),
+        None if required => issues.push(format!(
+            "case {case_id} is missing {label} response artifact"
+        )),
         None => {}
     }
 }
 
-fn report_commitment(
-    fields: &EvidenceBehaviorContractReportFieldsV1,
-) -> Result<String, String> {
+fn report_commitment(fields: &EvidenceBehaviorContractReportFieldsV1) -> Result<String, String> {
     let payload = OutcomeCommitmentPayloadV1 {
         schema: &fields.schema,
         purpose: fields.purpose,
@@ -785,9 +796,8 @@ pub fn compute_evidence_behavior_contract_report_commitment(
     }
     let plan: EvidenceBehaviorContractPlanV1 = serde_json::from_slice(plan_bytes)
         .map_err(|error| format!("contract plan is invalid: {error}"))?;
-    let fields: EvidenceBehaviorContractReportFieldsV1 =
-        serde_json::from_slice(fields_bytes)
-            .map_err(|error| format!("contract report fields are invalid: {error}"))?;
+    let fields: EvidenceBehaviorContractReportFieldsV1 = serde_json::from_slice(fields_bytes)
+        .map_err(|error| format!("contract report fields are invalid: {error}"))?;
     let issues = validate_report_fields(&plan, plan_bytes, &fields)?;
     if !issues.is_empty() {
         return Err(issues.join("; "));
@@ -830,8 +840,7 @@ fn family_scorecard(
             let rate = if eligible == 0 {
                 None
             } else {
-                let numerator =
-                    u128::from(value.violations) * 1_000_000 + u128::from(eligible) / 2;
+                let numerator = u128::from(value.violations) * 1_000_000 + u128::from(eligible) / 2;
                 Some((numerator / u128::from(eligible)) as u32)
             };
             ContractFamilySummaryV1 {
@@ -877,22 +886,27 @@ pub fn verify_evidence_behavior_contract_report(
     let missing_count = plan
         .items
         .iter()
-        .filter(|item| !report.records.iter().any(|record| record.case_id == item.case_id))
+        .filter(|item| {
+            !report
+                .records
+                .iter()
+                .any(|record| record.case_id == item.case_id)
+        })
         .count() as u64;
-    let valid = final_issues.is_empty()
-        && commitment_matches
-        && report.purpose.is_qualified();
-    let record_counts = report.records.iter().fold((0_u64, 0_u64, 0_u64), |mut acc, r| {
-        match r.status {
-            ContractOutcomeStatusV1::Pass => acc.0 += 1,
-            ContractOutcomeStatusV1::Violation => acc.1 += 1,
-            ContractOutcomeStatusV1::NotEvaluable => acc.2 += 1,
-        }
-        acc
-    });
+    let valid = final_issues.is_empty() && commitment_matches && report.purpose.is_qualified();
+    let record_counts = report
+        .records
+        .iter()
+        .fold((0_u64, 0_u64, 0_u64), |mut acc, r| {
+            match r.status {
+                ContractOutcomeStatusV1::Pass => acc.0 += 1,
+                ContractOutcomeStatusV1::Violation => acc.1 += 1,
+                ContractOutcomeStatusV1::NotEvaluable => acc.2 += 1,
+            }
+            acc
+        });
     let scorecard = Some(EvidenceBehaviorContractScorecardV1 {
-        schema: "symthaea.science_bench_refresh_evidence_behavior_contract_scorecard.v1"
-            .to_owned(),
+        schema: "symthaea.science_bench_refresh_evidence_behavior_contract_scorecard.v1".to_owned(),
         plan_sha256: hex_digest(&Sha256::digest(plan_bytes)),
         plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
         report_sha256: hex_digest(&Sha256::digest(report_bytes)),
@@ -1059,11 +1073,9 @@ mod tests {
         let plan_bytes = committed_plan_bytes();
         let fields = outcome_fields(&plan_bytes);
         let fields_bytes = serde_json::to_vec(&fields).unwrap();
-        let commitment = compute_evidence_behavior_contract_report_commitment(
-            &plan_bytes,
-            &fields_bytes,
-        )
-        .unwrap();
+        let commitment =
+            compute_evidence_behavior_contract_report_commitment(&plan_bytes, &fields_bytes)
+                .unwrap();
         let report = EvidenceBehaviorContractReportV1 {
             schema: fields.schema,
             purpose: fields.purpose,
