@@ -19507,6 +19507,12 @@ dependencies = [
 [[package]]
 name = "symthaea-operations-research"
 version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "symthaea-optics"
