@@ -30,6 +30,7 @@ const MANIFEST_KEYS: &[&str] = &[
     "transform_severity",
     "selection_transform_family",
     "selection_transform_severity",
+    "intervention_config_path",
     "intervention_config_sha256",
     "rng_algorithm",
     "transition_shape",
@@ -45,6 +46,20 @@ const MANIFEST_KEYS: &[&str] = &[
     "label_reveal_policy",
     "label_delay_steps",
     "label_observation_fraction",
+];
+
+const INTERVENTION_CONFIG_KEYS: &[&str] = &[
+    "schema_version",
+    "scenario_class",
+    "transform_family",
+    "transform_severity",
+    "selection_transform_family",
+    "selection_transform_severity",
+    "transition_shape",
+    "change_start",
+    "change_end",
+    "seed",
+    "rng_algorithm",
 ];
 
 const RECEIPT_KEYS: &[&str] = &[
@@ -140,6 +155,19 @@ fn is_spdx_token(value: &str) -> bool {
         && bytes
             .iter()
             .all(|byte| byte.is_ascii_alphanumeric() || b".-_:+".contains(byte))
+}
+
+fn validate_safe_relative_path(value: &str, field: &str) -> Result<(), String> {
+    if value.starts_with('/')
+        || value.contains('\\')
+        || value.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+        || value
+            .bytes()
+            .any(|byte| !(byte.is_ascii_alphanumeric() || b"._-/".contains(&byte)))
+    {
+        return Err(fail(format!("{field} must be a canonical safe relative path")));
+    }
+    Ok(())
 }
 
 fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
@@ -318,6 +346,10 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
         required(fields, "selection_transform_severity")?,
         "selection_transform_severity",
     )?;
+    validate_safe_relative_path(
+        required(fields, "intervention_config_path")?,
+        "intervention_config_path",
+    )?;
     validate_sha256(required(fields, "intervention_config_sha256")?, "intervention_config_sha256")?;
     let rng = required(fields, "rng_algorithm")?;
     if !matches!(rng, "none" | "chacha20_v1" | "splitmix64_v1") {
@@ -462,13 +494,43 @@ fn validate_receipt(fields: &Fields, manifest: &Fields) -> Result<(), String> {
     if required(fields, "source_sha256")? != required(manifest, "source_sha256")? {
         return Err(fail("receipt source_sha256 does not match manifest source_sha256"));
     }
-    let path = required(fields, "artifact_path")?;
-    if path.starts_with('/')
-        || path.contains('\\')
-        || path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
-        || path.bytes().any(|byte| !(byte.is_ascii_alphanumeric() || b"._-/".contains(&byte)))
-    {
-        return Err(fail("artifact_path must be a canonical safe relative path"));
+    validate_safe_relative_path(required(fields, "artifact_path")?, "artifact_path")?;
+    Ok(())
+}
+
+fn validate_intervention_config(manifest_path: &Path, manifest: &Fields) -> Result<(), String> {
+    let relative_path = required(manifest, "intervention_config_path")?;
+    validate_safe_relative_path(relative_path, "intervention_config_path")?;
+    let manifest_dir = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let root = manifest_dir
+        .canonicalize()
+        .map_err(|error| fail(format!("cannot resolve manifest directory: {error}")))?;
+    let joined = root.join(relative_path);
+    let config_path = joined
+        .canonicalize()
+        .map_err(|error| fail(format!("cannot resolve intervention config: {error}")))?;
+    if !config_path.starts_with(&root) {
+        return Err(fail("intervention config resolves outside the manifest directory"));
+    }
+
+    let digest = hash_file(&config_path)?;
+    if required(manifest, "intervention_config_sha256")? != digest {
+        return Err(fail("intervention_config_sha256 does not match intervention config bytes"));
+    }
+
+    let config_text = fs::read_to_string(&config_path)
+        .map_err(|error| fail(format!("cannot read intervention config: {error}")))?;
+    let config = parse_canonical(&config_text, INTERVENTION_CONFIG_KEYS, "intervention config")?;
+    for key in INTERVENTION_CONFIG_KEYS {
+        let manifest_key = match *key {
+            "seed" => "seed",
+            other => other,
+        };
+        if required(&config, key)? != required(manifest, manifest_key)? {
+            return Err(fail(format!(
+                "intervention config field {key} does not match manifest"
+            )));
+        }
     }
     Ok(())
 }
@@ -515,6 +577,7 @@ fn execute(args: &[String]) -> Result<(), String> {
                 .map_err(|error| fail(format!("cannot read manifest: {error}")))?;
             let fields = parse_canonical(&input, MANIFEST_KEYS, "manifest")?;
             validate_manifest(&fields)?;
+            validate_intervention_config(Path::new(manifest_path), &fields)?;
             let digest = hash_file(Path::new(manifest_path))?;
             println!(
                 "PASS: canonical source-derived manifest run_id={} manifest_sha256={digest}",
@@ -537,6 +600,7 @@ fn execute(args: &[String]) -> Result<(), String> {
                 .map_err(|error| fail(format!("cannot read manifest: {error}")))?;
             let manifest = parse_canonical(&manifest_text, MANIFEST_KEYS, "manifest")?;
             validate_manifest(&manifest)?;
+            validate_intervention_config(Path::new(manifest_path), &manifest)?;
             let receipt_text = fs::read_to_string(receipt_path)
                 .map_err(|error| fail(format!("cannot read receipt: {error}")))?;
             let receipt = parse_canonical(&receipt_text, RECEIPT_KEYS, "receipt")?;
@@ -610,7 +674,8 @@ mod tests {
             ("transform_severity", "0.500000"),
             ("selection_transform_family", "none"),
             ("selection_transform_severity", "0.000000"),
-            ("intervention_config_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            ("intervention_config_path", "zero-shift-intervention.conf"),
+            ("intervention_config_sha256", "94bd34abce35b380f901ca711ce9d83a4ec01ac367e41c2a57bca849982b7426"),
             ("rng_algorithm", "chacha20_v1"),
             ("transition_shape", "gradual"),
             ("change_start", "100"),
