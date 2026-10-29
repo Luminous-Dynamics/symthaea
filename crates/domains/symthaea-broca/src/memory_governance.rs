@@ -110,7 +110,7 @@ pub fn parse_event_json(input: &str) -> Result<LedgerEvent, String> {
         .get("kind")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "event kind must be a string".to_string())?;
-    let expected: BTreeSet<&str> = match kind {
+    let expected: BTreeSet<String> = match kind {
         "assert" => [
             "event_id",
             "kind",
@@ -123,6 +123,7 @@ pub fn parse_event_json(input: &str) -> Result<LedgerEvent, String> {
             "source",
         ]
         .into_iter()
+        .map(str::to_owned)
         .collect(),
         "retract" => [
             "event_id",
@@ -132,13 +133,14 @@ pub fn parse_event_json(input: &str) -> Result<LedgerEvent, String> {
             "source",
         ]
         .into_iter()
+        .map(str::to_owned)
         .collect(),
         _ => return Err("event kind must be assert or retract".into()),
     };
-    let actual: BTreeSet<&str> = object.keys().map(String::as_str).collect();
+    let actual: BTreeSet<String> = object.keys().cloned().collect();
     if actual != expected {
-        let extra: Vec<&str> = actual.difference(&expected).copied().collect();
-        let missing: Vec<&str> = expected.difference(&actual).copied().collect();
+        let extra: Vec<String> = actual.difference(&expected).cloned().collect();
+        let missing: Vec<String> = expected.difference(&actual).cloned().collect();
         return Err(format!(
             "event schema mismatch: extra={extra:?}, missing={missing:?}"
         ));
