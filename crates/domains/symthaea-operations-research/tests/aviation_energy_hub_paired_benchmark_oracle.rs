@@ -167,6 +167,34 @@ fn paired_report_is_deterministic_under_scenario_input_order() {
 }
 
 #[test]
+fn paired_scenarios_must_share_decision_and_observation_timing() {
+    let (baseline, mut episodes) = panel();
+    let plan = solve_exact_energy_hub_pareto(&baseline, 100_000).unwrap().frontier[0]
+        .plan
+        .clone();
+    episodes[1].episode.decision_times_epoch[0] += 1;
+
+    assert_eq!(
+        evaluate_paired_rolling_benchmark(&baseline, &plan, &episodes, 100_000).unwrap_err(),
+        PairedBenchmarkError::IncompatibleScenario(
+            "decision/observation/forecast timing protocol"
+        )
+    );
+
+    let (baseline, mut episodes) = panel();
+    let plan = solve_exact_energy_hub_pareto(&baseline, 100_000).unwrap().frontier[0]
+        .plan
+        .clone();
+    episodes[1].episode.forecasts_by_stage[0].available_at_epoch += 1;
+    assert_eq!(
+        evaluate_paired_rolling_benchmark(&baseline, &plan, &episodes, 100_000).unwrap_err(),
+        PairedBenchmarkError::IncompatibleScenario(
+            "decision/observation/forecast timing protocol"
+        )
+    );
+}
+
+#[test]
 fn weights_must_sum_to_one_million_and_ids_must_be_unique() {
     let (baseline, mut episodes) = panel();
     let plan = solve_exact_energy_hub_pareto(&baseline, 100_000).unwrap().frontier[0]
