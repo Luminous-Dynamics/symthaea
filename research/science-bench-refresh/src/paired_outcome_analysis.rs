@@ -140,8 +140,12 @@ pub struct ContrastAnalysisResultV1 {
     /// Mean of paired binary treatment-reference differences on eligible pairs.
     pub paired_risk_difference: Option<f64>,
     pub discordant_pair_count: Option<u64>,
-    /// Exact two-sided conditional binomial p-value for equal discordant directions.
+    /// Two-sided conditional binomial p-value for equal discordant directions.
+    /// If float underflow occurs, this is the smallest positive float, a
+    /// conservative upper bound; see the log10 value and floor flag.
     pub exact_mcnemar_two_sided_p: Option<f64>,
+    pub exact_mcnemar_log10_p: Option<f64>,
+    pub mcnemar_p_value_numerically_floored: Option<bool>,
     pub holm_adjusted_p: Option<f64>,
     /// Wilson 95% interval for treatment wins / all discordant pairs. This is
     /// conditional preference among discordances, not a risk-difference interval.
@@ -398,10 +402,10 @@ fn wilson_interval(successes: u64, trials: u64) -> Option<(f64, f64, f64)> {
 }
 
 /// Exact two-sided McNemar p-value, conditional on the discordant-pair count.
-fn exact_mcnemar_p(wins: u64, losses: u64) -> f64 {
+fn exact_mcnemar_log10_p(wins: u64, losses: u64) -> f64 {
     let discordant = wins.saturating_add(losses);
     if discordant == 0 {
-        return 1.0;
+        return 0.0;
     }
     let k = wins.min(losses);
     let n = discordant as f64;
@@ -418,7 +422,19 @@ fn exact_mcnemar_p(wins: u64, losses: u64) -> f64 {
         relative_tail_sum += relative_mass;
         i -= 1;
     }
-    (2.0 * max_log_probability.exp() * relative_tail_sum).min(1.0)
+    (2.0_f64.ln() + max_log_probability + relative_tail_sum.ln()) / 10.0_f64.ln()
+}
+
+fn exact_mcnemar_statistics(wins: u64, losses: u64) -> (f64, f64, bool) {
+    let log10_p = exact_mcnemar_log10_p(wins, losses).min(0.0);
+    let smallest_positive = f64::from_bits(1);
+    let floored = log10_p < smallest_positive.log10();
+    let p_value = if floored {
+        smallest_positive
+    } else {
+        10.0_f64.powf(log10_p).min(1.0)
+    };
+    (p_value, log10_p, floored)
 }
 
 fn outcome_lookup<'a>(
@@ -555,8 +571,8 @@ fn build_contrast(
     let assigned = u64::try_from(pairs.len())
         .map_err(|_| "assigned pair count exceeds u64".to_owned())?;
     let is_resource = contrast.endpoint.is_resource();
-    let (risk_difference, discordant, p_value, win_rate, win_low, win_high) = if is_resource {
-        (None, None, None, None, None, None)
+    let (risk_difference, discordant, win_rate, win_low, win_high) = if is_resource {
+        (None, None, None, None, None)
     } else {
         let difference = if eligible_pair_count == 0 {
             None
@@ -572,15 +588,15 @@ fn build_contrast(
         (
             difference,
             Some(discordant),
-            if inferential_tests_allowed && eligible_pair_count > 0 {
-                Some(exact_mcnemar_p(wins, losses))
-            } else {
-                None
-            },
             interval.map(|value| value.0),
             interval.map(|value| value.1),
             interval.map(|value| value.2),
         )
+    };
+    let mcnemar_statistics = if inferential_tests_allowed && !is_resource && eligible_pair_count > 0 {
+        Some(exact_mcnemar_statistics(wins, losses))
+    } else {
+        None
     };
     let mean_resource_delta = if is_resource && !resource_deltas.is_empty() {
         Some(resource_deltas.iter().sum::<f64>() / resource_deltas.len() as f64)
@@ -602,7 +618,9 @@ fn build_contrast(
         ties: if is_resource { None } else { Some(ties) },
         paired_risk_difference: risk_difference,
         discordant_pair_count: discordant,
-        exact_mcnemar_two_sided_p: p_value,
+        exact_mcnemar_two_sided_p: mcnemar_statistics.map(|stats| stats.0),
+        exact_mcnemar_log10_p: mcnemar_statistics.map(|stats| stats.1),
+        mcnemar_p_value_numerically_floored: mcnemar_statistics.map(|stats| stats.2),
         holm_adjusted_p: None,
         discordant_win_rate: win_rate,
         discordant_win_rate_wilson_95_low: win_low,
@@ -883,10 +901,19 @@ mod tests {
 
     #[test]
     fn exact_paired_discordance_test_behaves_sensibly() {
-        assert_eq!(exact_mcnemar_p(0, 0), 1.0);
-        assert!((exact_mcnemar_p(5, 0) - 0.0625).abs() < 1.0e-12);
-        assert!((exact_mcnemar_p(6, 0) - 0.03125).abs() < 1.0e-12);
-        assert_eq!(exact_mcnemar_p(3, 3), 1.0);
+        assert_eq!(exact_mcnemar_statistics(0, 0).0, 1.0);
+        assert!((exact_mcnemar_statistics(5, 0).0 - 0.0625).abs() < 1.0e-12);
+        assert!((exact_mcnemar_statistics(6, 0).0 - 0.03125).abs() < 1.0e-12);
+        assert_eq!(exact_mcnemar_statistics(3, 3).0, 1.0);
+    }
+
+    #[test]
+    fn exact_mcnemar_avoids_zero_p_values_from_float_underflow() {
+        let (p_value, log10_p, floored) = exact_mcnemar_statistics(50_000, 0);
+        assert!(p_value > 0.0);
+        assert!(log10_p < -300.0);
+        assert!(floored);
+    }
     }
 
     #[test]
