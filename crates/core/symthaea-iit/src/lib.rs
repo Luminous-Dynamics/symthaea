@@ -127,6 +127,24 @@ pub enum PartitionApplyError {
     CutMatrixShapeMismatch { expected: usize, actual: usize },
 }
 
+/// Exact counters for one completed directed-partition enumeration.
+///
+/// Counts distinguish combinatorial work from unique severance matrices, allowing
+/// fairer cost-frontier comparisons than reporting only output-list length.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartitionEnumerationReport {
+    /// All unique cuts, including TotalCut when requested/required.
+    pub partitions: Vec<DirectedSystemPartition>,
+    /// Number of block-direction assignments fully materialized and evaluated.
+    pub block_direction_assignments_evaluated: usize,
+    /// Number of unique non-total cut matrices retained.
+    pub unique_non_total_cuts: usize,
+    /// Number of assignments whose matrix was already seen and was discarded.
+    pub duplicate_cut_matrices_suppressed: usize,
+    /// Whether the returned partition list includes the special TotalCut.
+    pub total_cut_included: bool,
+}
+
 /// Failures from directed system-partition enumeration.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum PartitionEnumerationError {
@@ -163,6 +181,23 @@ pub fn enumerate_iit4_system_partitions(
     include_total_cut: bool,
     max_combinations: usize,
 ) -> Result<Vec<DirectedSystemPartition>, PartitionEnumerationError> {
+    Ok(enumerate_iit4_system_partitions_with_stats(
+        candidate_system, unit_count, include_total_cut, max_combinations,
+    )?.partitions)
+}
+
+/// Enumerate directed set partitions and return exact counters for the completed run.
+///
+/// The counter contract is stable for this enumerator version: total-cut insertion is
+/// not counted as a block-direction assignment; every fully materialized directional
+/// assignment increments the work counter; a duplicate matrix increments the
+/// duplicate counter and is not returned twice.
+pub fn enumerate_iit4_system_partitions_with_stats(
+    candidate_system: &[usize],
+    unit_count: usize,
+    include_total_cut: bool,
+    max_combinations: usize,
+) -> Result<PartitionEnumerationReport, PartitionEnumerationError> {
     if candidate_system.is_empty() {
         return Err(PartitionEnumerationError::EmptyCandidateSystem);
     }
@@ -196,7 +231,13 @@ pub fn enumerate_iit4_system_partitions(
     }
 
     if n == 1 {
-        return Ok(output);
+        return Ok(PartitionEnumerationReport {
+            partitions: output,
+            block_direction_assignments_evaluated: 0,
+            unique_non_total_cuts: 0,
+            duplicate_cut_matrices_suppressed: 0,
+            total_cut_included: true,
+        });
     }
 
     let mut blocks = Vec::<Vec<usize>>::new();
@@ -211,7 +252,15 @@ pub fn enumerate_iit4_system_partitions(
         &mut visited_combinations,
         max_combinations,
     )?;
-    Ok(output)
+    let unique_non_total_cuts = output.iter().filter(|partition| !partition.is_total_cut()).count();
+    let total_cut_included = output.iter().any(DirectedSystemPartition::is_total_cut);
+    Ok(PartitionEnumerationReport {
+        partitions: output,
+        block_direction_assignments_evaluated: visited_combinations,
+        unique_non_total_cuts,
+        duplicate_cut_matrices_suppressed: visited_combinations - unique_non_total_cuts,
+        total_cut_included,
+    })
 }
 
 /// Restricted-growth recursion enumerates each unordered set partition once.
@@ -1767,6 +1816,31 @@ mod tests {
             model.forward_cause_likelihood(&[], &[true, false], &[0, 1]).unwrap(),
             vec![1.0; 4]
         );
+    }
+
+    #[test]
+    fn partition_enumeration_report_distinguishes_work_from_unique_cuts() {
+        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, false, 54).unwrap();
+        assert_eq!(report.block_direction_assignments_evaluated, 54);
+        assert_eq!(report.unique_non_total_cuts, 22);
+        assert_eq!(report.duplicate_cut_matrices_suppressed, 32);
+        assert!(!report.total_cut_included);
+        assert_eq!(report.partitions.len(), 22);
+
+        let with_total = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, true, 54).unwrap();
+        assert_eq!(with_total.block_direction_assignments_evaluated, 54);
+        assert_eq!(with_total.unique_non_total_cuts, 22);
+        assert_eq!(with_total.duplicate_cut_matrices_suppressed, 32);
+        assert!(with_total.total_cut_included);
+        assert_eq!(with_total.partitions.len(), 23);
+    }
+
+    #[test]
+    fn partition_enumeration_report_counts_large_duplicate_pressure() {
+        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2, 3, 4], 5, false, 1_863).unwrap();
+        assert_eq!(report.block_direction_assignments_evaluated, 1_863);
+        assert_eq!(report.unique_non_total_cuts, 1_061);
+        assert_eq!(report.duplicate_cut_matrices_suppressed, 802);
     }
 
 }
