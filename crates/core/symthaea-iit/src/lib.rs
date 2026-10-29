@@ -65,6 +65,14 @@ pub enum ModelError {
 
     #[error("quantity {quantity} is not supported by formalism {formalism}")]
     IncompatibleQuantity { quantity: &'static str, formalism: &'static str },
+
+    #[error("connectivity omits causal influence {source_unit}->{target_unit} between states {state_without_source} and {state_with_source}")]
+    MissingCausalEdge {
+        source_unit: usize,
+        target_unit: usize,
+        state_without_source: usize,
+        state_with_source: usize,
+    },
 }
 
 
@@ -126,6 +134,36 @@ impl BinaryCausalModel {
         for (index, value) in transition_probabilities.iter().copied().enumerate() {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                 return Err(ModelError::InvalidProbability { index, value });
+            }
+        }
+
+        // A declared connectivity matrix may include extra edges, but it must not
+        // omit an influence present in the TPM. Use exact inequality as a
+        // conservative rule: even a small nonzero numeric effect requires an edge.
+        // State pairs differ only in the candidate source unit.
+        for source_unit in 0..n_units {
+            for target_unit in 0..n_units {
+                if connectivity[source_unit * n_units + target_unit] {
+                    continue;
+                }
+                for state_without_source in 0..state_count {
+                    if ((state_without_source >> source_unit) & 1) != 0 {
+                        continue;
+                    }
+                    let state_with_source = state_without_source | (1usize << source_unit);
+                    let p_without = transition_probabilities
+                        [state_without_source * n_units + target_unit];
+                    let p_with = transition_probabilities
+                        [state_with_source * n_units + target_unit];
+                    if p_without != p_with {
+                        return Err(ModelError::MissingCausalEdge {
+                            source_unit,
+                            target_unit,
+                            state_without_source,
+                            state_with_source,
+                        });
+                    }
+                }
             }
         }
 
@@ -548,8 +586,8 @@ mod tests {
                 0.9, 0.8,
             ],
             vec![
+                true, true,
                 false, true,
-                true, false,
             ],
         ).expect("valid fixture")
     }
@@ -631,7 +669,7 @@ mod tests {
         let changed_connectivity = BinaryCausalModel::new(
             2,
             model.transition_probabilities().to_vec(),
-            vec![false, false, true, false],
+            vec![true, false, false, true],
         ).unwrap();
         assert_ne!(model.model_sha256(), changed_connectivity.model_sha256());
     }
@@ -735,7 +773,7 @@ mod tests {
         let model = BinaryCausalModel::new(
             2,
             vec![0.1, 0.3, 0.9, 0.3, 0.1, 0.3, 0.9, 0.3],
-            vec![false, true, false, false],
+            vec![true, false, false, false],
         ).unwrap();
         let repertoire = model.effect_repertoire(&[0], &[true, false], &[1]).unwrap();
         assert!((repertoire[0] - 0.7).abs() < 1e-12);
@@ -750,7 +788,7 @@ mod tests {
         let model = BinaryCausalModel::new(
             2,
             vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
-            vec![false; 4],
+            vec![false, false, true, true],
         ).unwrap();
         let repertoire = model.effect_repertoire(&[0], &[true, false], &[0, 1]).unwrap();
         for probability in repertoire {
@@ -765,7 +803,7 @@ mod tests {
         let model = BinaryCausalModel::new(
             2,
             vec![0.1, 0.3, 0.9, 0.3, 0.1, 0.3, 0.9, 0.3],
-            vec![false, true, false, false],
+            vec![true, false, false, false],
         ).unwrap();
         let repertoire = model.cause_repertoire(&[0], &[true, false], &[1]).unwrap();
         assert!((repertoire[0] - 0.5).abs() < 1e-12);
@@ -791,6 +829,24 @@ mod tests {
         assert!(matches!(
             model.cause_repertoire(&[0], &[true], &[0]),
             Err(RepertoireError::UndefinedCauseRepertoire)
+        ));
+    }
+
+    #[test]
+    fn rejects_connectivity_that_omits_a_tpm_influence() {
+        // Unit 0 changes target 1's transition probability, but the declared
+        // graph omits edge 0 -> 1. PyPhi likewise rejects such under-specified connectivity.
+        assert!(matches!(
+            BinaryCausalModel::new(
+                2,
+                vec![0.1, 0.2, 0.9, 0.2, 0.1, 0.8, 0.9, 0.8],
+                vec![true, false, false, true]
+            ),
+            Err(ModelError::MissingCausalEdge {
+                source_unit: 1,
+                target_unit: 1,
+                ..
+            })
         ));
     }
 
