@@ -1072,6 +1072,450 @@ pub fn validate_combined_campaign_bytes(
     })
 }
 
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CrossSystemEvidenceBundleSummary {
+    pub schema_version: String,
+    pub benchmark_id: String,
+    pub bundle_sha256: String,
+    pub record_count: usize,
+    pub unique_evidence_ids: usize,
+    pub dependency_count: usize,
+    pub resolved_dependency_count: usize,
+    pub class_counts: BTreeMap<String, usize>,
+    pub source_system_counts: BTreeMap<String, usize>,
+    pub dependency_graph_acyclic: bool,
+    pub valid_synthetic_evidence_bundle: bool,
+    pub qualification_eligible: bool,
+    pub warning: String,
+}
+
+fn is_lower_hex(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn required_string<'a>(
+    value: &'a serde_json::Value,
+    field: &str,
+    record_id: &str,
+) -> Result<&'a str, String> {
+    value[field]
+        .as_str()
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| format!("record {record_id} requires non-empty {field}"))
+}
+
+fn validate_cross_system_source_type(
+    source_system: &str,
+    source_record_type: &str,
+    evidence_id: &str,
+) -> Result<(), String> {
+    let compatible = match source_system {
+        "mycelix_justice" => matches!(
+            source_record_type,
+            "justice_case" | "justice_evidence" | "justice_decision" | "justice_appeal"
+        ),
+        "mycelix_desci" => matches!(
+            source_record_type,
+            "mycelix_desci_signed_event"
+                | "mycelix_desci_authority_receipt"
+                | "mycelix_desci_transparency_checkpoint"
+        ),
+        "symtropy_world" => {
+            matches!(source_record_type, "symtropy_sim_snapshot" | "symtropy_sim_event")
+        }
+        "independent_measurement" => source_record_type == "independent_measurement",
+        "gcrb_evaluator" => {
+            matches!(source_record_type, "public_report" | "gcrb_derived_claim")
+        }
+        _ => false,
+    };
+    if compatible {
+        Ok(())
+    } else {
+        Err(format!(
+            "record {evidence_id} has incompatible source_system={source_system} and source_record_type={source_record_type}"
+        ))
+    }
+}
+
+fn validate_cross_system_record(
+    record: &serde_json::Value,
+    known_ids: &BTreeSet<String>,
+) -> Result<(String, String, Vec<String>), String> {
+    let evidence_id = required_string(record, "evidence_id", "<unknown>")?.to_owned();
+    if !valid_case_id(&evidence_id, "", evidence_id.len()) || evidence_id.len() < 3 {
+        return Err(format!("record has invalid evidence_id {evidence_id}"));
+    }
+    let source_system = required_string(record, "source_system", &evidence_id)?;
+    let source_type = required_string(record, "source_record_type", &evidence_id)?;
+    let assertion_class = required_string(record, "assertion_class", &evidence_id)?;
+    let _claim = required_string(record, "claim", &evidence_id)?;
+    let source_record_ref = required_string(record, "source_record_ref", &evidence_id)?;
+    let limitations = record["limitations"]
+        .as_array()
+        .ok_or_else(|| format!("record {evidence_id} requires a limitations array"))?;
+    if limitations.is_empty()
+        || limitations.iter().any(|item| {
+            item.as_str()
+                .is_none_or(|text| text.trim().is_empty())
+        })
+    {
+        return Err(format!(
+            "record {evidence_id} must preserve explicit non-empty limitations"
+        ));
+    }
+    if !source_record_ref.starts_with("synthetic:") {
+        return Err(format!(
+            "record {evidence_id} must use synthetic: source references because the bundle is synthetic_only"
+        ));
+    }
+    validate_cross_system_source_type(source_system, source_type, &evidence_id)?;
+    if !matches!(
+        assertion_class,
+        "observed" | "reported" | "inferred" | "simulated" | "unknown"
+    ) {
+        return Err(format!(
+            "record {evidence_id} has unsupported assertion_class {assertion_class}"
+        ));
+    }
+
+    let type_definition = record["type_definition_ref"]
+        .as_object()
+        .ok_or_else(|| format!("record {evidence_id} requires type_definition_ref"))?;
+    for key in ["owner", "path", "revision"] {
+        if type_definition
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .is_none_or(|text| text.trim().is_empty())
+        {
+            return Err(format!(
+                "record {evidence_id} requires non-empty type_definition_ref.{key}"
+            ));
+        }
+    }
+    if let Some(blob_sha) = type_definition.get("git_blob_sha") {
+        let value = blob_sha
+            .as_str()
+            .ok_or_else(|| format!("record {evidence_id} git_blob_sha must be a string"))?;
+        if !is_lower_hex(value, 40) {
+            return Err(format!(
+                "record {evidence_id} type_definition_ref.git_blob_sha must be 40 lowercase hex chars"
+            ));
+        }
+    }
+    if let Some(digest) = record.get("source_record_digest_sha256") {
+        let value = digest
+            .as_str()
+            .ok_or_else(|| format!("record {evidence_id} source digest must be a string"))?;
+        if !is_lower_hex(value, 64) {
+            return Err(format!(
+                "record {evidence_id} source_record_digest_sha256 must be 64 lowercase hex chars"
+            ));
+        }
+    }
+
+    let depends = record["depends_on"]
+        .as_array()
+        .ok_or_else(|| format!("record {evidence_id} requires depends_on array"))?;
+    let mut dependencies = Vec::with_capacity(depends.len());
+    let mut seen = BTreeSet::new();
+    for dependency in depends {
+        let dependency_id = dependency.as_str().ok_or_else(|| {
+            format!("record {evidence_id} has non-string dependency ID")
+        })?;
+        if dependency_id == evidence_id {
+            return Err(format!("record {evidence_id} cannot depend on itself"));
+        }
+        if !seen.insert(dependency_id.to_owned()) {
+            return Err(format!(
+                "record {evidence_id} repeats dependency {dependency_id}"
+            ));
+        }
+        if !known_ids.contains(dependency_id) {
+            return Err(format!(
+                "record {evidence_id} has unresolved dependency {dependency_id}"
+            ));
+        }
+        dependencies.push(dependency_id.to_owned());
+    }
+
+    let has_simulation_context = record.get("simulation_context").is_some();
+    let has_observation_basis = record.get("observation_basis").is_some();
+    let has_derivation = record.get("derivation").is_some();
+
+    match assertion_class {
+        "simulated" => {
+            if source_system != "symtropy_world" || !has_simulation_context {
+                return Err(format!(
+                    "simulated record {evidence_id} must originate from symtropy_world and include simulation_context"
+                ));
+            }
+            if has_observation_basis {
+                return Err(format!(
+                    "simulated record {evidence_id} cannot carry observation_basis as if it were independently observed"
+                ));
+            }
+            let sim = &record["simulation_context"];
+            let simulator_id = required_string(sim, "simulator_id", &evidence_id)?;
+            let source_revision = required_string(sim, "source_revision", &evidence_id)?;
+            if !(7..=64).contains(&source_revision.len())
+                || !source_revision.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(format!(
+                    "simulated record {evidence_id} has invalid simulator source_revision"
+                ));
+            }
+            for field in [
+                "build_digest_sha256",
+                "scenario_digest_sha256",
+                "config_digest_sha256",
+                "output_digest_sha256",
+            ] {
+                let digest = required_string(sim, field, &evidence_id)?;
+                if !is_lower_hex(digest, 64) {
+                    return Err(format!(
+                        "simulated record {evidence_id} has invalid simulation_context.{field}"
+                    ));
+                }
+            }
+            let seed = sim["seed"]
+                .as_u64()
+                .ok_or_else(|| format!("simulated record {evidence_id} requires u64 seed"))?;
+            let tick_start = sim["tick_start"]
+                .as_u64()
+                .ok_or_else(|| format!("simulated record {evidence_id} requires tick_start"))?;
+            let tick_end = sim["tick_end"]
+                .as_u64()
+                .ok_or_else(|| format!("simulated record {evidence_id} requires tick_end"))?;
+            let _ = (simulator_id, seed);
+            if tick_end < tick_start {
+                return Err(format!(
+                    "simulated record {evidence_id} has tick_end before tick_start"
+                ));
+            }
+            for field in ["horizon", "validity_scope"] {
+                let _ = required_string(sim, field, &evidence_id)?;
+            }
+            if sim["limitations"]
+                .as_array()
+                .is_none_or(|items| items.is_empty())
+            {
+                return Err(format!(
+                    "simulated record {evidence_id} must preserve simulation limitations"
+                ));
+            }
+        }
+        "observed" => {
+            if source_system != "independent_measurement" || !has_observation_basis {
+                return Err(format!(
+                    "observed record {evidence_id} must originate from independent_measurement and include observation_basis"
+                ));
+            }
+            if has_simulation_context {
+                return Err(format!(
+                    "observed record {evidence_id} cannot use simulation_context as its observation basis"
+                ));
+            }
+            let basis = &record["observation_basis"];
+            for field in [
+                "measurement_ref",
+                "measurement_method",
+                "measured_at",
+                "location_scope",
+                "independent_corroboration_ref",
+            ] {
+                let _ = required_string(basis, field, &evidence_id)?;
+            }
+            for field in ["measurement_ref", "independent_corroboration_ref"] {
+                let value = required_string(basis, field, &evidence_id)?;
+                if !value.starts_with("synthetic:") {
+                    return Err(format!(
+                        "observed record {evidence_id} has non-synthetic {field} in a synthetic bundle"
+                    ));
+                }
+            }
+            if basis["quality_limits"]
+                .as_array()
+                .is_none_or(|items| items.is_empty())
+            {
+                return Err(format!(
+                    "observed record {evidence_id} must declare quality_limits"
+                ));
+            }
+        }
+        "inferred" => {
+            if !has_derivation {
+                return Err(format!(
+                    "inferred record {evidence_id} requires a derivation object"
+                ));
+            }
+            if has_observation_basis || has_simulation_context {
+                return Err(format!(
+                    "inferred record {evidence_id} cannot be relabeled directly as observed or simulated; record inputs and derivation separately"
+                ));
+            }
+            let derivation = &record["derivation"];
+            for field in ["method_id", "method_version"] {
+                let _ = required_string(derivation, field, &evidence_id)?;
+            }
+            let inputs = derivation["input_evidence_ids"]
+                .as_array()
+                .ok_or_else(|| {
+                    format!("inferred record {evidence_id} requires input_evidence_ids")
+                })?;
+            let mut input_ids = BTreeSet::new();
+            for input in inputs {
+                let input_id = input
+                    .as_str()
+                    .ok_or_else(|| format!("inferred record {evidence_id} has non-string input ID"))?;
+                if !known_ids.contains(input_id) {
+                    return Err(format!(
+                        "inferred record {evidence_id} has unresolved derivation input {input_id}"
+                    ));
+                }
+                input_ids.insert(input_id.to_owned());
+            }
+            let dependency_ids = dependencies.iter().cloned().collect::<BTreeSet<_>>();
+            if input_ids.is_empty() || input_ids != dependency_ids {
+                return Err(format!(
+                    "inferred record {evidence_id} derivation inputs must exactly match depends_on"
+                ));
+            }
+            for field in ["assumptions", "limitations"] {
+                if derivation[field]
+                    .as_array()
+                    .is_none_or(|items| items.is_empty())
+                {
+                    return Err(format!(
+                        "inferred record {evidence_id} requires derivation.{field}"
+                    ));
+                }
+            }
+        }
+        "reported" | "unknown" => {
+            if has_simulation_context && assertion_class != "simulated" {
+                return Err(format!(
+                    "record {evidence_id} cannot carry simulation_context unless assertion_class is simulated"
+                ));
+            }
+            if has_observation_basis && assertion_class != "observed" {
+                return Err(format!(
+                    "record {evidence_id} cannot carry observation_basis unless assertion_class is observed"
+                ));
+            }
+            if has_derivation && assertion_class != "inferred" {
+                return Err(format!(
+                    "record {evidence_id} cannot carry derivation unless assertion_class is inferred"
+                ));
+            }
+        }
+        _ => unreachable!("assertion classes were checked"),
+    }
+
+    Ok((source_system.to_owned(), assertion_class.to_owned(), dependencies))
+}
+
+fn validate_dependency_acyclic(
+    evidence_id: &str,
+    dependency_map: &BTreeMap<String, Vec<String>>,
+    visiting: &mut BTreeSet<String>,
+    visited: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    if visited.contains(evidence_id) {
+        return Ok(());
+    }
+    if !visiting.insert(evidence_id.to_owned()) {
+        return Err(format!("cross-system evidence dependency cycle contains {evidence_id}"));
+    }
+    if let Some(dependencies) = dependency_map.get(evidence_id) {
+        for dependency in dependencies {
+            validate_dependency_acyclic(dependency, dependency_map, visiting, visited)?;
+        }
+    }
+    visiting.remove(evidence_id);
+    visited.insert(evidence_id.to_owned());
+    Ok(())
+}
+
+/// Validate a synthetic cross-system evidence bundle without granting its claims
+/// real-world truth. This validator checks source/class compatibility, required
+/// simulation/observation/derivation fields, closed dependencies and acyclicity.
+pub fn validate_cross_system_evidence_bundle_bytes(
+    bytes: &[u8],
+) -> Result<CrossSystemEvidenceBundleSummary, String> {
+    let document: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|error| format!("cross-system evidence JSON is invalid: {error}"))?;
+    if document["schema_version"].as_str()
+        != Some("gcrb-cross-system-evidence-envelope-v0.1")
+        || document["benchmark_id"].as_str() != Some(BENCHMARK_ID)
+        || document["dataset_status"].as_str() != Some("synthetic_only")
+    {
+        return Err("cross-system bundle must use the v0.1 schema, GOV-CAP-001, and synthetic_only status".to_owned());
+    }
+    if document["purpose"].as_str().is_none_or(|value| value.trim().is_empty()) {
+        return Err("cross-system bundle requires a non-empty purpose".to_owned());
+    }
+    if document["limits"]
+        .as_array()
+        .is_none_or(|items| items.len() < 4)
+    {
+        return Err("cross-system bundle requires at least four explicit limits".to_owned());
+    }
+    let records = document["records"]
+        .as_array()
+        .ok_or_else(|| "cross-system bundle requires records array".to_owned())?;
+    if records.is_empty() {
+        return Err("cross-system bundle must contain at least one record".to_owned());
+    }
+    let mut known_ids = BTreeSet::new();
+    for record in records {
+        let id = record["evidence_id"]
+            .as_str()
+            .ok_or_else(|| "record has missing evidence_id".to_owned())?;
+        if !known_ids.insert(id.to_owned()) {
+            return Err(format!("duplicate cross-system evidence_id: {id}"));
+        }
+    }
+
+    let mut dependency_map = BTreeMap::<String, Vec<String>>::new();
+    let mut class_counts = BTreeMap::<String, usize>::new();
+    let mut source_system_counts = BTreeMap::<String, usize>::new();
+    let mut dependency_count = 0usize;
+    for record in records {
+        let id = record["evidence_id"].as_str().expect("IDs validated above");
+        let (source_system, assertion_class, dependencies) =
+            validate_cross_system_record(record, &known_ids)?;
+        dependency_count += dependencies.len();
+        *class_counts.entry(assertion_class).or_insert(0) += 1;
+        *source_system_counts.entry(source_system).or_insert(0) += 1;
+        dependency_map.insert(id.to_owned(), dependencies);
+    }
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    for evidence_id in &known_ids {
+        validate_dependency_acyclic(evidence_id, &dependency_map, &mut visiting, &mut visited)?;
+    }
+    Ok(CrossSystemEvidenceBundleSummary {
+        schema_version: "gcrb-cross-system-evidence-envelope-v0.1".to_owned(),
+        benchmark_id: BENCHMARK_ID.to_owned(),
+        bundle_sha256: sha256_hex(bytes),
+        record_count: records.len(),
+        unique_evidence_ids: known_ids.len(),
+        dependency_count,
+        resolved_dependency_count: dependency_count,
+        class_counts,
+        source_system_counts,
+        dependency_graph_acyclic: true,
+        valid_synthetic_evidence_bundle: true,
+        qualification_eligible: false,
+        warning: "This validator checks type boundaries and references in synthetic fixtures only. It does not authenticate source records, verify source truth, validate real measurement quality, prove capture completeness, or qualify cross-system runtime integration.".to_owned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1394,4 +1838,94 @@ mod tests {
         let result = validate_combined_campaign_bytes(fixture, &serde_json::to_vec(&unknown).unwrap());
         assert!(result.unwrap_err().contains("unknown hard-gate label"));
     }
+
+
+    #[test]
+    fn validates_cross_system_evidence_demo_and_preserves_class_separation() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let summary = validate_cross_system_evidence_bundle_bytes(bytes).unwrap();
+        assert_eq!(summary.record_count, 5);
+        assert_eq!(summary.unique_evidence_ids, 5);
+        assert_eq!(summary.dependency_count, 2);
+        assert_eq!(summary.resolved_dependency_count, 2);
+        assert!(summary.dependency_graph_acyclic);
+        assert_eq!(summary.class_counts.get("reported"), Some(&2usize));
+        assert_eq!(summary.class_counts.get("simulated"), Some(&1usize));
+        assert_eq!(summary.class_counts.get("observed"), Some(&1usize));
+        assert_eq!(summary.class_counts.get("inferred"), Some(&1usize));
+        assert!(!summary.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_a_symtropy_snapshot_labeled_observed() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][2]["assertion_class"] = serde_json::Value::String("observed".to_owned());
+        value["records"][2]["observation_basis"] = serde_json::json!({
+            "measurement_ref":"synthetic:measurement-bogus",
+            "measurement_method":"made up",
+            "measured_at":"synthetic-time",
+            "location_scope":"synthetic",
+            "independent_corroboration_ref":"synthetic:corr-bogus",
+            "quality_limits":["not real"]
+        });
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("must originate from independent_measurement"));
+    }
+
+    #[test]
+    fn rejects_observed_record_without_independent_corroboration() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][3]["observation_basis"]["independent_corroboration_ref"] = serde_json::Value::String(String::new());
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("requires non-empty independent_corroboration_ref"));
+    }
+
+    #[test]
+    fn rejects_inferred_claim_without_exact_dependency_inputs() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][4]["derivation"]["input_evidence_ids"] = serde_json::json!(["MYCELIX-CASE-001"]);
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("must exactly match depends_on"));
+    }
+
+    #[test]
+    fn rejects_unresolved_cross_system_dependency() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][4]["depends_on"] = serde_json::json!(["NO-SUCH-RECORD"]);
+        value["records"][4]["derivation"]["input_evidence_ids"] = serde_json::json!(["NO-SUCH-RECORD"]);
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("unresolved dependency"));
+    }
+
+    #[test]
+    fn rejects_cross_system_dependency_cycles() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][0]["depends_on"] = serde_json::json!(["GCRB-FORECAST-ERROR-001"]);
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("dependency cycle"));
+    }
+
+    #[test]
+    fn rejects_non_synthetic_source_reference_in_synthetic_bundle() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][0]["source_record_ref"] = serde_json::Value::String("https://example.invalid/real-record".to_owned());
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("must use synthetic: source references"));
+    }
+
+    #[test]
+    fn rejects_bad_source_definition_blob_sha() {
+        let bytes = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+        value["records"][0]["type_definition_ref"]["git_blob_sha"] = serde_json::Value::String("bad".to_owned());
+        let result = validate_cross_system_evidence_bundle_bytes(&serde_json::to_vec(&value).unwrap());
+        assert!(result.unwrap_err().contains("must be 40 lowercase hex chars"));
+    }
+
 }
