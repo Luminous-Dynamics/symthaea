@@ -93,7 +93,7 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 
 ## Eligibility-first currentness ablation
 
-The mutation suite includes a versioned policy ledger covering all 107 string-valued source pointers exactly once. Each question has a manually annotated retrieval intent. The filter runs after BM25 candidate generation but **before final top-k selection**, preserves the BM25 order among eligible candidates, fails closed for unannotated pointers, and emits a receipt binding the candidate manifest, worker hash, fixture hashes, policy-ledger hash, intent mode, policy and output digest.
+The mutation suite includes a versioned policy ledger covering all 107 string-valued source pointers exactly once. The CLI verifies that coverage against the source trajectories. Each question has a manually annotated retrieval intent. The filter runs after BM25 candidate generation but **before final top-k selection**, preserves the BM25 order among eligible candidates, fails closed for unannotated pointers, and emits a receipt binding the candidate manifest, worker hash, fixture hashes, policy-ledger hash, filter-code SHA-256, intent mode, policy and output digest.
 
 Run both modes against the same candidate pool:
 
