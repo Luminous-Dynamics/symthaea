@@ -6,8 +6,9 @@
 //! Operations research for Symthaea: inventory optimization, queueing, and
 //! shortest paths. A practical decision-science layer the workspace lacked.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form results
-//! and an exact Dijkstra, checked against known values.
+//! Core algorithms remain lightweight and avoid a `symthaea-core` link. The
+//! aviation evidence-bundle module uses SHA-256 and Ed25519 from established
+//! cryptographic crates to verify immutable manifests and trusted receipts.
 //!
 //! ## Scope
 //!
@@ -21,6 +22,8 @@
 //!   from frozen calibration-partition frequencies, with explicit sampling allowance.
 //! - [`aviation_online_drift`]: frozen-reference, anytime-valid likelihood-ratio monitoring
 //!   for predeclared categorical alternatives, with a separate out-of-support alarm.
+//! - [`aviation_evidence_bundle`]: canonical manifest digests and Ed25519-bound verifier
+//!   receipts checked against an independently supplied trust store.
 //! - [`aviation_decision_readiness`]: composed fail-closed human-review gate over feature,
 //!   split, plan verification, active calibration, drift and robust-cost assessments.
 //! - [`aviation_distributional_robustness`]: finite total-variation uncertainty evaluation
@@ -42,6 +45,7 @@ pub mod aviation_data_contract;
 pub mod aviation_decision_readiness;
 pub mod aviation_distributional_robustness;
 pub mod aviation_enterprise;
+pub mod aviation_evidence_bundle;
 pub mod aviation_robustness;
 pub mod aviation_network_externalities;
 pub mod aviation_network_robustness;

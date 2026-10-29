@@ -6,3 +6,6 @@ license = "AGPL-3.0-or-later"
 description = "Operations research for Symthaea: economic order quantity (EOQ), M/M/1 queueing, and Dijkstra shortest paths. Closed-form + exact algorithms, ground-truth-checked."
 
 [dependencies]
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
