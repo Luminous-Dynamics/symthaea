@@ -150,7 +150,7 @@ jobs:
           assert report["horizons"] == [1, 4, 16]
           assert report["rollout_growth_values"] == [0.0, 0.2]
           rows = report["summary"]
-          assert len(rows) == 144
+          assert len(rows) == 168
           by_key = {
               (r["search_size"], r["horizon"], round(r["rollout_growth"], 2), r["strategy"]): r
               for r in rows
@@ -158,7 +158,7 @@ jobs:
           assert len(by_key) == len(rows)
           strategies = {
               "direct_fallback", "predicted_greedy", "uncertainty_penalty",
-              "support_gate_060", "support_gate_090", "oracle_upper_bound",
+              "support_gate_060", "support_gate_090", "ensemble_min", "oracle_upper_bound",
           }
           assert {r["strategy"] for r in rows} == strategies
           for size in report["search_sizes"]:
@@ -172,7 +172,7 @@ jobs:
                       for row in (by_key[(size, horizon, round(growth, 2), s)] for s in strategies):
                           for key in (
                               "mean_prediction_mae", "mean_realized_utility",
-                              "mean_selected_optimism_gap", "mean_regret",
+                              "mean_selected_optimism_gap", "mean_selected_decision_score_gap", "mean_regret",
                               "unsupported_selection_rate", "unsupported_rate_given_model_action",
                               "model_action_coverage", "paired_regret_reduction_vs_greedy",
                               "paired_regret_reduction_ci95_low", "paired_regret_reduction_ci95_high",
