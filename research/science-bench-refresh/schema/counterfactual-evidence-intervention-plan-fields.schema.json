@@ -53,10 +53,10 @@
       "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
     },
     "evaluator_revision_sha256": {
-      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/nonzero_digest"
     },
     "decision_rules_sha256": {
-      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/nonzero_digest"
     },
     "randomization_commitment_sha256": {
       "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
