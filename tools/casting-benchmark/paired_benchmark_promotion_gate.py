@@ -160,11 +160,15 @@ def validate_validation_manifest(raw: Any) -> dict[str, Any]:
         if validation[field] is not True:
             raise ValueError(f"validation.{field} must be true")
     _nonblank(validation["independence_unit"], "validation.independence_unit")
+    if validation["independence_unit"] != "unit_id":
+        raise ValueError("validation.independence_unit must be unit_id; nested outcomes cannot be counted as independent trials")
     _nonblank(validation["independence_note"], "validation.independence_note")
     records = validation["records"]
     if not isinstance(records, list) or not records:
         raise ValueError("validation records must be a non-empty array")
     seen_units: set[str] = set()
+    seen_decision_digests: set[str] = set()
+    seen_outcome_digests: set[str] = set()
     for index, raw_record in enumerate(records):
         record = _strict_object(raw_record, RECORD_FIELDS, f"validation.records[{index}]")
         unit_id = _nonblank(record["unit_id"], f"validation.records[{index}].unit_id")
@@ -176,8 +180,14 @@ def validate_validation_manifest(raw: Any) -> dict[str, Any]:
         for field in ("predicted_feasible", "observed_feasible"):
             if not isinstance(record[field], bool):
                 raise ValueError(f"validation.records[{index}].{field} must be boolean")
-        _sha256(record["decision_receipt_sha256"], f"validation.records[{index}].decision_receipt_sha256")
-        _sha256(record["outcome_receipt_sha256"], f"validation.records[{index}].outcome_receipt_sha256")
+        decision_digest = _sha256(record["decision_receipt_sha256"], f"validation.records[{index}].decision_receipt_sha256")
+        outcome_digest = _sha256(record["outcome_receipt_sha256"], f"validation.records[{index}].outcome_receipt_sha256")
+        if decision_digest in seen_decision_digests:
+            raise ValueError("validation decision receipt digest must be unique per unit")
+        if outcome_digest in seen_outcome_digests:
+            raise ValueError("validation outcome receipt digest must be unique per unit")
+        seen_decision_digests.add(decision_digest)
+        seen_outcome_digests.add(outcome_digest)
     return validation
 
 
@@ -215,6 +225,11 @@ def assess_promotion(
         raise ValueError("paired receipt benchmark_id mismatch")
     if paired_receipt.get("receipt_label") != PAIRED_RECEIPT_LABEL:
         raise ValueError("paired receipt label is invalid")
+    paired_sources = paired_receipt.get("source_artifacts")
+    if not isinstance(paired_sources, dict):
+        raise ValueError("paired receipt source_artifacts missing")
+    _sha256(paired_sources.get("raw_manifest_sha256"), "paired receipt raw_manifest_sha256")
+    _sha256(paired_receipt.get("evaluator_sha256"), "paired receipt evaluator_sha256")
     if paired_receipt.get("baseline_policy") != contract["baseline_policy"]:
         raise ValueError("paired receipt baseline does not match contract")
     if paired_receipt.get("protocol_sha256") != contract["benchmark_protocol_sha256"]:
