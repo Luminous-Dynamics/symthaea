@@ -80,6 +80,7 @@ pub enum RetimingEnsembleError {
     ProbabilityMassMismatch { actual_ppm: u64 },
     NoGreedyPlan { scenario_id: String, reason: String },
     NoSearchPlanWithinBudget { scenario_id: String },
+    SearchSolverError { scenario_id: String, reason: String },
     GreedyVerificationFailed { scenario_id: String },
     SearchVerificationFailed { scenario_id: String },
     CostDeltaOutOfRange { scenario_id: String },
@@ -181,8 +182,9 @@ pub fn evaluate_retiming_ensemble(
                 max_absolute_optimality_gap: options.max_absolute_optimality_gap,
             },
         )
-        .map_err(|_| RetimingEnsembleError::NoSearchPlanWithinBudget {
+        .map_err(|reason| RetimingEnsembleError::SearchSolverError {
             scenario_id: scenario.id.clone(),
+            reason,
         })?;
         let search_plan = search.best_plan.as_ref().ok_or_else(|| {
             RetimingEnsembleError::NoSearchPlanWithinBudget {
