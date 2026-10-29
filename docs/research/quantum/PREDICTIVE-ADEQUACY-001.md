@@ -19,7 +19,7 @@ QARCH-007 does not claim these ideas are new. It adds a small, explicit predicti
 
 ## What the module does
 
-Given a declared outcome set, predicted categorical probabilities, and held-out observation counts, it reports:
+Given a declared outcome set, predicted categorical probabilities, a workload fingerprint, a model/version identifier, a holdout artifact digest, and held-out observation counts, it reports:
 
 - empirical outcome frequencies;
 - observed total-variation distance between predicted and empirical distributions;
