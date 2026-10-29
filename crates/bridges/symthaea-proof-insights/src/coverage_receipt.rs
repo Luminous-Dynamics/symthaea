@@ -545,6 +545,25 @@ pub fn verify_receipt(
         bail!("coverage requires at least two trusted signers from distinct organizations");
     }
 
+    // Edge-level attribution must refer to reviewers authenticated by the same
+    // receipt. A valid top-level signature set cannot repair invented, unknown,
+    // or unsigned reviewer IDs embedded in individual relationship assessments.
+    for edge in &inventory.edges {
+        let mut edge_organizations = BTreeSet::new();
+        for reviewer_id in &edge.reviewer_ids {
+            let reviewer = trusted_by_id
+                .get(reviewer_id.as_str())
+                .context("edge reviewer ID is not trusted")?;
+            if !signer_ids.contains(reviewer_id.as_str()) {
+                bail!("edge reviewer is not among the verified receipt signers");
+            }
+            edge_organizations.insert(reviewer.organization_id.as_str());
+        }
+        if edge.assessment_status != "unresolved" && edge_organizations.len() < 2 {
+            bail!("resolved edge reviewers must span two registered organizations");
+        }
+    }
+
     Ok(VerificationReport {
         schema_version: "pitb.coverage-receipt-verification.v1",
         verification_status: "verified_signature_set",
@@ -702,7 +721,7 @@ mod tests {
             relation_kind: "formal_dependency".to_owned(),
             assessment_status: "confirmed".to_owned(),
             evidence_sha256: digest('a'),
-            reviewer_ids: vec!["auditor-a".to_owned(), "auditor-b".to_owned()],
+            reviewer_ids: vec!["reviewer-a".to_owned(), "reviewer-b".to_owned()],
         }]
     }
 
@@ -717,14 +736,31 @@ mod tests {
     fn signed_fixture(
         organizations: [&str; 2],
     ) -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, String, BTreeMap<String, String>) {
+        signed_fixture_with_edge_reviewers(
+            [organizations[0], organizations[1], "research-lab-c"],
+            ["reviewer-a", "reviewer-b"],
+            false,
+        )
+    }
+
+    fn signed_fixture_with_edge_reviewers(
+        organizations: [&str; 3],
+        edge_reviewer_ids: [&str; 2],
+        sign_third_reviewer: bool,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, String, BTreeMap<String, String>) {
         let families = test_families();
         let test_partition_digest = partition_digest(&families);
         let mut edges = test_edges();
+        edges[0].reviewer_ids = edge_reviewer_ids.iter().map(|id| (*id).to_owned()).collect();
         let edges_digest = canonical_edges_digest(&edges, &families).unwrap();
         edges[0].reviewer_ids.sort();
         let methodology = b"synthetic review methodology v1\n".to_vec();
         let method_digest = sha256_hex(&methodology);
-        let keys = [SigningKey::from_bytes(&[7_u8; 32]), SigningKey::from_bytes(&[9_u8; 32])];
+        let keys = [
+            SigningKey::from_bytes(&[7_u8; 32]),
+            SigningKey::from_bytes(&[9_u8; 32]),
+            SigningKey::from_bytes(&[11_u8; 32]),
+        ];
         let reviewers = vec![
             TrustedReviewer {
                 reviewer_id: "reviewer-a".to_owned(),
@@ -740,6 +776,13 @@ mod tests {
                 role: "coverage_auditor".to_owned(),
                 public_key_hex: hex::encode(keys[1].verifying_key().as_bytes()),
             },
+            TrustedReviewer {
+                reviewer_id: "reviewer-c".to_owned(),
+                key_id: "key-c".to_owned(),
+                organization_id: organizations[2].to_owned(),
+                role: "coverage_auditor".to_owned(),
+                public_key_hex: hex::encode(keys[2].verifying_key().as_bytes()),
+            },
         ];
         let trust = TrustStore {
             schema_version: TRUST_SCHEMA.to_owned(),
@@ -754,6 +797,7 @@ mod tests {
             &method_digest,
             &trust_digest,
         );
+        let key_count = if sign_third_reviewer { 3 } else { 2 };
         let receipt = Receipt {
             schema_version: RECEIPT_SCHEMA.to_owned(),
             upstream_commit: UPSTREAM_COMMIT.to_owned(),
@@ -764,10 +808,11 @@ mod tests {
             attestation: "complete_relationship_inventory".to_owned(),
             signatures: keys
                 .iter()
+                .take(key_count)
                 .enumerate()
                 .map(|(index, key)| ReviewerSignature {
-                    reviewer_id: format!("reviewer-{}", if index == 0 { "a" } else { "b" }),
-                    key_id: format!("key-{}", if index == 0 { "a" } else { "b" }),
+                    reviewer_id: format!("reviewer-{}", ["a", "b", "c"][index]),
+                    key_id: format!("key-{}", ["a", "b", "c"][index]),
                     signature_hex: hex::encode(key.sign(&message).to_bytes()),
                 })
                 .collect(),
@@ -889,6 +934,72 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("distinct organizations"));
+    }
+
+    #[test]
+    fn resolved_edge_rejects_untrusted_reviewer_ids_even_when_the_inventory_is_signed() {
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
+            signed_fixture_with_edge_reviewers(
+                ["org-a", "org-b", "org-c"],
+                ["reviewer-a", "not-registered"],
+                false,
+            );
+        let error = verify_receipt(
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("edge reviewer ID is not trusted"));
+    }
+
+    #[test]
+    fn resolved_edge_rejects_trusted_reviewer_who_did_not_sign_the_inventory() {
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
+            signed_fixture_with_edge_reviewers(
+                ["org-a", "org-b", "org-c"],
+                ["reviewer-a", "reviewer-c"],
+                false,
+            );
+        let error = verify_receipt(
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("edge reviewer is not among the verified receipt signers"));
+    }
+
+    #[test]
+    fn resolved_edge_reviewers_must_span_two_registered_organizations() {
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
+            signed_fixture_with_edge_reviewers(
+                ["same-org", "other-org", "same-org"],
+                ["reviewer-a", "reviewer-c"],
+                true,
+            );
+        let error = verify_receipt(
+            &inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("resolved edge reviewers must span two registered organizations"));
     }
 
     #[test]
