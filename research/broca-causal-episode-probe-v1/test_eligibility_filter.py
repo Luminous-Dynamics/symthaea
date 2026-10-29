@@ -234,11 +234,14 @@ class EligibilityFilterTests(unittest.TestCase):
 
     def test_composite_intent_retains_both_current_and_historical_evidence(self) -> None:
         q = [question(intent="current_and_history")]
+        q[0]["query"] = (
+            "What is the current support office address, and what was it before the update?"
+        )
         predictions = [{
             "question_id": "Q1",
             "audit": [
-                candidate("/states/0/text"),
                 candidate("/states/1/action"),
+                candidate("/states/0/text"),
                 candidate("/states/1/text"),
             ],
         }]
@@ -250,7 +253,7 @@ class EligibilityFilterTests(unittest.TestCase):
         result, metrics = filter_dataset(q, predictions, policy, 3, intent_source="heuristic")
         self.assertEqual(
             [row["source_pointer"] for row in result[0]["audit"]],
-            ["/states/1/action", "/states/1/text", "/states/0/text"],
+            ["/states/1/action", "/states/0/text", "/states/1/text"],
         )
         self.assertEqual(metrics["intent_evaluation"]["accuracy"], 1.0)
 
