@@ -86,3 +86,18 @@ A meaningful claim requires fixed and disclosed reader/model settings, split and
 4. Identical semantics after update, restart, replay, index rebuild and rollback.
 5. A paired official end-to-end benchmark shows either the preregistered accuracy improvement with grouped uncertainty, or a lifecycle-cost reduction at a preregistered non-inferiority margin.
 6. No production promotion without authenticated source identity and policy distribution; JSON hashes alone are not authentication.
+
+
+## Rust-side API
+
+The branch also exports a typed research module at crates/domains/symthaea-broca/src/memory_governance.rs. It uses the crate's existing serde, chrono and sha2 dependencies; it is separate from the JSONL worker protocol and must not be treated as production-integrated.
+
+The Rust API exposes strict event JSON parsing, source/policy types, a validated PolicyPinnedLedger, a query object, resolution state, selected evidence provenance, applied retractions, excluded-event reasons, and a deterministic digest over normalized policy versions. The module contains 17 authored unit tests.
+
+Once the workspace Rust toolchain is available, run:
+
+~~~sh
+cargo test -p symthaea-broca memory_governance --lib
+~~~
+
+No Rust compilation or Cargo test result is claimed in the current research environment. Before integration, require Rust/Python fixture parity, authenticated writer identity, signed policy distribution, and update/restart/replay/index-rebuild tests. The existing worker's JSONL request protocol is unchanged.
