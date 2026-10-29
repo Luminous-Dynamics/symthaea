@@ -1,0 +1,7 @@
+task_id	state_id	action_id	next_state_id	reward_milli	safe	done
+smoke	s0	0	s1	1000	true	false
+smoke	s0	1	s2	2000	true	false
+smoke	s1	0	goal	5000	true	true
+smoke	s1	1	goal	1000	true	true
+smoke	s2	0	goal	500	true	true
+smoke	s2	1	goal	600	true	true
