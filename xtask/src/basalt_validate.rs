@@ -1334,6 +1334,25 @@ mod tests {
     }
 
     #[test]
+    fn required_check_must_pass_even_if_verifier_claims_pass() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["verifier"]["checks"][1]["status"] =
+                Value::String("unresolved".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIRED_CHECK_NOT_PASSED"));
+    }
+
+    #[test]
+    fn manifest_cannot_omit_all_required_checks() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["required_checks"] = Value::Array(Vec::new());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_MANIFEST_REQUIRED_CHECKS_EMPTY"));
+    }
+
+    #[test]
     fn observed_usage_over_declared_budget_is_rejected() {
         let report = validate_value(|v| {
             v["task_records"][0]["trials"][1]["usage"]["tool_calls"] = Value::from(31);
