@@ -3,7 +3,9 @@
 //! This harness measures downstream decision utility under a held-out,
 //! declared ground-truth decision model. It compares nominal EVSI, nominal
 //! information gain, robust worst-case EVSI, uniform random choice (evaluated
-//! exactly, not by Monte Carlo), and a fixed-first baseline. All policies use
+//! exactly, not by Monte Carlo), fixed-first, and no-measurement baselines.
+//! Including no-measurement makes harmful or unnecessary experiments visible.
+//! All measuring policies use
 //! the same equal-weight model-averaged posterior to choose an action after an
 //! observation, so the comparison isolates the experiment-selection policy.
 //!
@@ -34,6 +36,8 @@ pub enum ExperimentSelectionPolicy {
     UniformRandom,
     /// Select the first experiment in the nominal problem's declared order.
     FixedFirst,
+    /// Do not measure; choose the best action from the declared planning prior.
+    NoMeasurement,
 }
 
 /// True expected result of using the declared planner posterior for one experiment.
@@ -57,7 +61,7 @@ pub struct ExperimentTruthEvaluation {
 pub struct ExperimentPolicyEvaluation {
     /// Selection policy.
     pub policy: ExperimentSelectionPolicy,
-    /// Selected experiment; None for the exact uniform-random expectation.
+    /// Selected experiment; None for uniform-random or no-measurement baselines.
     pub selected_experiment_id: Option<String>,
     /// Expected decision utility under held-out ground truth.
     pub expected_decision_utility: f64,
@@ -85,8 +89,10 @@ pub struct ExperimentPolicyBakeoffReport {
     pub utility_unit: String,
     /// Measurement cost units.
     pub measurement_cost_unit: String,
-    /// Expected utility of taking no measurement and choosing the best prior action.
+    /// Oracle utility from no measurement using the held-out true prior.
     pub no_measurement_expected_utility: f64,
+    /// Utility of the deployable no-measurement policy using the planning prior.
+    pub policy_no_measurement_expected_utility: f64,
     /// Oracle expected utility, taking the best of no measurement or one experiment.
     pub oracle_expected_utility: f64,
     /// Experiment attaining oracle utility, if measuring is weakly better than abstaining.
@@ -184,10 +190,19 @@ pub fn run_experiment_policy_bakeoff(
     let reference = nominal.problem();
     validate_ground_truth_contract(reference, ground_truth)?;
 
-    let no_measurement_action = best_action(ground_truth, ground_truth.prior())?;
+    // The deployed no-measurement baseline must select its action with the same
+    // planning information as the other policies. Held-out truth is used only
+    // to score that action and to compute the oracle reference.
+    let policy_no_measurement_action = best_action(reference, &averaged_prior(planning_scenarios))?;
+    let policy_no_measurement_expected_utility = expected_action_utility(
+        ground_truth,
+        policy_no_measurement_action,
+        ground_truth.prior(),
+    )?;
+    let oracle_no_measurement_action = best_action(ground_truth, ground_truth.prior())?;
     let no_measurement_expected_utility = expected_action_utility(
         ground_truth,
-        no_measurement_action,
+        oracle_no_measurement_action,
         ground_truth.prior(),
     )?;
 
@@ -307,6 +322,14 @@ pub fn run_experiment_policy_bakeoff(
         random_unsupported,
         oracle_expected_utility,
     )?);
+    policy_results.push(policy_result(
+        ExperimentSelectionPolicy::NoMeasurement,
+        None,
+        policy_no_measurement_expected_utility,
+        0.0,
+        0.0,
+        oracle_expected_utility,
+    )?);
 
     Ok(ExperimentPolicyBakeoffReport {
         ground_truth_model_id,
@@ -318,6 +341,7 @@ pub fn run_experiment_policy_bakeoff(
         utility_unit: reference.utility_unit().to_string(),
         measurement_cost_unit: reference.measurement_cost_unit().to_string(),
         no_measurement_expected_utility,
+        policy_no_measurement_expected_utility,
         oracle_expected_utility,
         oracle_experiment_id,
         candidate_results,
@@ -730,4 +754,216 @@ mod tests {
             Err(ExperimentPolicyBenchmarkError::GroundTruthCandidateMismatch)
         );
     }
+
+    fn problem_with_prior(
+        prior: Vec<f64>,
+        likelihood_a: Vec<Vec<f64>>,
+        likelihood_b: Vec<Vec<f64>>,
+    ) -> ActiveExperimentProblem {
+        ActiveExperimentProblem::new(
+            vec!["H0".into(), "H1".into()],
+            prior,
+            vec!["choose-H0".into(), "choose-H1".into()],
+            vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            "utility_points",
+            "measurement_seconds",
+            vec![
+                experiment("A-nominal-perfect", 1.0, likelihood_a),
+                experiment("B-moderate", 1.0, likelihood_b),
+            ],
+        )
+        .unwrap()
+    }
+
+    fn scenario_for_problem(
+        id: &str,
+        nominal: bool,
+        problem: ActiveExperimentProblem,
+    ) -> RobustModelScenario {
+        RobustModelScenario::new(id, nominal, problem).unwrap()
+    }
+
+    #[test]
+    fn prior_shift_exposes_no_measurement_as_a_strongest_baseline() {
+        let (models, _) = fixture_models();
+        let truth = problem_with_prior(
+            vec![0.9, 0.1],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+        );
+        let report =
+            run_experiment_policy_bakeoff("prior-shifted-truth", &truth, &models).unwrap();
+
+        assert!((report.no_measurement_expected_utility - 0.9).abs() < 1e-12);
+        assert!((report.oracle_expected_utility - 0.9).abs() < 1e-12);
+        assert_eq!(report.oracle_experiment_id, None);
+
+        let nominal = policy(&report, ExperimentSelectionPolicy::NominalEvsiPerCost);
+        assert!((nominal.expected_decision_utility - 0.5).abs() < 1e-12);
+        assert!((nominal.decision_regret - 0.4).abs() < 1e-12);
+        let robust = policy(&report, ExperimentSelectionPolicy::RobustWorstCaseEvsiPerCost);
+        assert_eq!(robust.selected_experiment_id.as_deref(), Some("B-moderate"));
+        assert!((robust.expected_decision_utility - 0.8).abs() < 1e-12);
+        assert!((robust.decision_regret - 0.1).abs() < 1e-12);
+
+        let no_measurement = policy(&report, ExperimentSelectionPolicy::NoMeasurement);
+        assert_eq!(no_measurement.selected_experiment_id, None);
+        assert!((no_measurement.expected_decision_utility - 0.9).abs() < 1e-12);
+        assert_eq!(no_measurement.expected_measurement_cost, 0.0);
+        assert_eq!(no_measurement.decision_regret, 0.0);
+    }
+
+    #[test]
+    fn robustification_cost_is_reported_when_truth_favors_nominal_selection() {
+        let (models, _) = fixture_models();
+        let truth = problem_with_prior(
+            vec![0.5, 0.5],
+            vec![vec![0.65, 0.35], vec![0.35, 0.65]],
+            vec![vec![0.55, 0.45], vec![0.45, 0.55]],
+        );
+        let report =
+            run_experiment_policy_bakeoff("nominal-favored-truth", &truth, &models).unwrap();
+
+        let nominal = policy(&report, ExperimentSelectionPolicy::NominalEvsiPerCost);
+        let robust = policy(&report, ExperimentSelectionPolicy::RobustWorstCaseEvsiPerCost);
+        assert_eq!(nominal.selected_experiment_id.as_deref(), Some("A-nominal-perfect"));
+        assert!((nominal.expected_decision_utility - 0.65).abs() < 1e-12);
+        assert!(nominal.decision_regret.abs() < 1e-12);
+        assert_eq!(robust.selected_experiment_id.as_deref(), Some("B-moderate"));
+        assert!((robust.expected_decision_utility - 0.55).abs() < 1e-12);
+        assert!((robust.decision_regret - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn out_of_ensemble_reversed_sensor_is_not_hidden_by_robust_label() {
+        let (models, _) = fixture_models();
+        let truth = problem_with_prior(
+            vec![0.5, 0.5],
+            vec![vec![0.0, 1.0], vec![1.0, 0.0]],
+            vec![vec![0.55, 0.45], vec![0.45, 0.55]],
+        );
+        let report =
+            run_experiment_policy_bakeoff("reversed-sensor-truth", &truth, &models).unwrap();
+
+        let nominal = policy(&report, ExperimentSelectionPolicy::NominalEvsiPerCost);
+        let robust = policy(&report, ExperimentSelectionPolicy::RobustWorstCaseEvsiPerCost);
+        assert_eq!(nominal.selected_experiment_id.as_deref(), Some("A-nominal-perfect"));
+        assert!(nominal.expected_decision_utility.abs() < 1e-12);
+        assert!((nominal.decision_regret - 1.0).abs() < 1e-12);
+        assert_eq!(robust.selected_experiment_id.as_deref(), Some("B-moderate"));
+        assert!((robust.expected_decision_utility - 0.55).abs() < 1e-12);
+        assert!((robust.decision_regret - 0.45).abs() < 1e-12);
+        assert!((report.oracle_expected_utility - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn no_information_suite_has_no_false_robust_advantage() {
+        let uninformative = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
+        let make_problem = || {
+            problem_with_prior(
+                vec![0.5, 0.5],
+                uninformative.clone(),
+                uninformative.clone(),
+            )
+        };
+        let models = vec![
+            scenario_for_problem("nominal", true, make_problem()),
+            scenario_for_problem("alternative", false, make_problem()),
+        ];
+        let truth = make_problem();
+        let report =
+            run_experiment_policy_bakeoff("no-information-truth", &truth, &models).unwrap();
+
+        assert!((report.no_measurement_expected_utility - 0.5).abs() < 1e-12);
+        assert!((report.oracle_expected_utility - 0.5).abs() < 1e-12);
+        assert_eq!(report.oracle_experiment_id, None);
+        for result in &report.policy_results {
+            assert!((result.expected_decision_utility - 0.5).abs() < 1e-12);
+            assert!(result.decision_regret.abs() < 1e-12);
+        }
+        assert_eq!(
+            policy(&report, ExperimentSelectionPolicy::NoMeasurement)
+                .expected_measurement_cost,
+            0.0
+        );
+    }
+
+
+    #[test]
+    fn no_measurement_policy_does_not_leak_the_held_out_prior() {
+        let (models, _) = fixture_models();
+        let truth = problem_with_prior(
+            vec![0.1, 0.9],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+        );
+        let report =
+            run_experiment_policy_bakeoff("opposite-prior-shift", &truth, &models).unwrap();
+
+        assert!((report.no_measurement_expected_utility - 0.9).abs() < 1e-12);
+        assert!((report.policy_no_measurement_expected_utility - 0.1).abs() < 1e-12);
+        assert!((report.oracle_expected_utility - 0.9).abs() < 1e-12);
+        let no_measurement = policy(&report, ExperimentSelectionPolicy::NoMeasurement);
+        assert!((no_measurement.expected_decision_utility - 0.1).abs() < 1e-12);
+        assert!((no_measurement.decision_regret - 0.8).abs() < 1e-12);
+    }
+
+    #[test]
+    fn planning_scenario_order_does_not_change_policy_choices() {
+        let (models, truth) = fixture_models();
+        let forward =
+            run_experiment_policy_bakeoff("heldout-alternative", &truth, &models).unwrap();
+        let reverse_models = vec![models[1].clone(), models[0].clone()];
+        let reverse =
+            run_experiment_policy_bakeoff("heldout-alternative", &truth, &reverse_models).unwrap();
+
+        for strategy in [
+            ExperimentSelectionPolicy::NominalEvsiPerCost,
+            ExperimentSelectionPolicy::NominalInformationGainPerCost,
+            ExperimentSelectionPolicy::RobustWorstCaseEvsiPerCost,
+            ExperimentSelectionPolicy::FixedFirst,
+            ExperimentSelectionPolicy::NoMeasurement,
+        ] {
+            assert_eq!(
+                policy(&forward, strategy).selected_experiment_id,
+                policy(&reverse, strategy).selected_experiment_id
+            );
+            assert!(
+                (policy(&forward, strategy).decision_regret
+                    - policy(&reverse, strategy).decision_regret)
+                    .abs()
+                    < 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn policy_reports_keep_cost_regret_and_unsupported_mass_separate() {
+        let (models, truth) = fixture_models();
+        let report =
+            run_experiment_policy_bakeoff("heldout-alternative", &truth, &models).unwrap();
+
+        for result in &report.policy_results {
+            assert!(result.expected_decision_utility.is_finite());
+            assert!(result.decision_regret.is_finite());
+            assert!(result.decision_regret >= 0.0);
+            assert!(result.expected_measurement_cost.is_finite());
+            assert!((0.0..=1.0).contains(&result.unsupported_outcome_probability));
+            match result.policy {
+                ExperimentSelectionPolicy::NoMeasurement => {
+                    assert_eq!(result.expected_measurement_cost, 0.0);
+                    assert_eq!(result.selected_experiment_id, None);
+                }
+                ExperimentSelectionPolicy::UniformRandom => {
+                    assert_eq!(result.expected_measurement_cost, 1.0);
+                    assert_eq!(result.selected_experiment_id, None);
+                }
+                _ => {
+                    assert_eq!(result.expected_measurement_cost, 1.0);
+                    assert!(result.selected_experiment_id.is_some());
+                }
+            }
+        }
+    }
+
 }
