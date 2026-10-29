@@ -57,6 +57,11 @@ pub struct EnergyHubInterval {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnergyStorageSpec {
     pub capacity_quanta: u32,
+    /// Physically carried state of charge at the start of this planning horizon.
+    pub initial_soc_quanta: u32,
+    /// Identity of the external/prefix ledger that already attributes this inventory's
+    /// upstream cost and emissions. Use an explicit no-opening-inventory sentinel at SOC 0.
+    pub initial_soc_ledger_ref: String,
     pub max_charge_input_quanta_per_interval: u32,
     pub max_discharge_output_quanta_per_interval: u32,
     pub charge_efficiency_ppm: u32,
@@ -99,7 +104,8 @@ pub struct EnergyHubPlan {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnergyHubMetrics {
-    /// Lifecycle cost/emissions of declared energy entering the airport bus.
+    /// Accounting ledger. The source-energy aggregate includes secondary storage-output
+    /// flow records; use the separate generation/import counters for primary inputs.
     pub source_ledger: AccountingSummary,
     pub renewable_generation_quanta: u32,
     pub renewable_direct_quanta: u32,
@@ -212,6 +218,8 @@ pub fn canonical_energy_hub_digest(
     put_f64(&mut bytes, scenario.service.available_seat_km);
 
     put_u32(&mut bytes, scenario.storage.capacity_quanta);
+    put_u32(&mut bytes, scenario.storage.initial_soc_quanta);
+    put_string(&mut bytes, &scenario.storage.initial_soc_ledger_ref);
     put_u32(&mut bytes, scenario.storage.max_charge_input_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.max_discharge_output_quanta_per_interval);
     put_u32(&mut bytes, scenario.storage.charge_efficiency_ppm);
@@ -276,7 +284,7 @@ pub fn verify_energy_hub_plan(
         return Err(EnergyHubError::ActionCountMismatch);
     }
 
-    let mut soc = 0_u32;
+    let mut soc = scenario.storage.initial_soc_quanta;
     let mut renewable_generation_quanta = 0_u32;
     let mut renewable_direct_quanta = 0_u32;
     let mut renewable_charge_input_quanta = 0_u32;
@@ -392,7 +400,9 @@ pub fn verify_energy_hub_plan(
                 evidence_class: interval.renewable_evidence_class,
                 carrier: EnergyCarrier::Electricity,
                 source_energy_kwh: energy,
-                delivered_energy_kwh: f64::from(renewable_used) * scenario.quantum_kwh,
+                // Delivered energy is energy served to load; charging input remains
+                // represented in generation/source cost and emissions, but is not load delivery.
+                delivered_energy_kwh: f64::from(action.renewable_direct_quanta) * scenario.quantum_kwh,
                 upstream_co2e_kg: f64::from(interval.renewable_generation_quanta)
                     * interval.renewable_lifecycle_co2e_kg_per_quantum,
                 direct_operational_co2e_kg: 0.0,
@@ -402,6 +412,32 @@ pub fn verify_energy_hub_plan(
                 non_co2: NonCo2Evidence::NotAssessed,
             });
         }
+        if action.battery_discharge_output_quanta > 0 {
+            // The primary energy cost and lifecycle emissions are attributed when the
+            // storage is charged. This secondary-bus record makes the discharged energy
+            // visible as load delivery without re-booking those upstream impacts. Opening
+            // SOC must therefore have its prior source ledger reconciled outside this horizon.
+            let energy =
+                f64::from(action.battery_discharge_output_quanta) * scenario.quantum_kwh;
+            records.push(EnergyRecord {
+                id: format!("storage-output:{}", interval.id),
+                source_id: "pre-accounted-storage-inventory".to_owned(),
+                boundary_id: format!("energy-hub-storage-output:{}", interval.id),
+                lifecycle_boundary_id: scenario.service.lifecycle_boundary_id.clone(),
+                period_id: scenario.service.period_id.clone(),
+                evidence_ref: "energy-hub:storage-input-impacts-attributed-at-charge".to_owned(),
+                evidence_class: EvidenceClass::UncalibratedModel,
+                carrier: EnergyCarrier::Electricity,
+                source_energy_kwh: energy,
+                delivered_energy_kwh: energy,
+                upstream_co2e_kg: 0.0,
+                direct_operational_co2e_kg: 0.0,
+                cost_amount: 0.0,
+                currency_code: scenario.currency_code.clone(),
+                non_co2: NonCo2Evidence::NotAssessed,
+            });
+        }
+
         if action.grid_import_quanta > 0 {
             let energy = f64::from(action.grid_import_quanta) * scenario.quantum_kwh;
             records.push(EnergyRecord {
@@ -473,7 +509,7 @@ pub fn solve_exact_energy_hub_pareto(
         frontier: Vec::new(),
         actions: Vec::with_capacity(scenario.intervals.len()),
     };
-    search.visit(0, 0)?;
+    search.visit(0, scenario.storage.initial_soc_quanta)?;
     if search.exhausted {
         return Err(EnergyHubError::SearchBudgetExceeded {
             nodes_visited: search.nodes_visited,
@@ -498,7 +534,7 @@ pub fn solve_renewable_first_greedy(
 ) -> Result<EvaluatedEnergyHubPlan, EnergyHubError> {
     validate_scenario(scenario)?;
     verify_energy_hub_digest(scenario)?;
-    let mut soc = 0_u32;
+    let mut soc = scenario.storage.initial_soc_quanta;
     let mut actions = Vec::with_capacity(scenario.intervals.len());
 
     for interval in &scenario.intervals {
@@ -722,7 +758,16 @@ fn validate_scenario(
         return Err(EnergyHubError::TooManyIntervals);
     }
     let storage = &scenario.storage;
+    require_identifier(&storage.initial_soc_ledger_ref, "opening SOC inventory ledger reference")?;
+    if storage.initial_soc_quanta > 0
+        && storage.initial_soc_ledger_ref == "none:opening-soc"
+    {
+        return Err(EnergyHubError::MissingIdentifier(
+            "opening SOC inventory ledger reference",
+        ));
+    }
     if storage.capacity_quanta > MAX_QUANTA_PER_INTERVAL
+        || storage.initial_soc_quanta > storage.capacity_quanta
         || storage.max_charge_input_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
         || storage.max_discharge_output_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
         || storage.minimum_terminal_soc_quanta > storage.capacity_quanta

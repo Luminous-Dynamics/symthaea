@@ -446,3 +446,61 @@ This tests a critical distinction:
 ### Claim ceiling
 
 This verifier validates consistency with the supplied information partition. It does not validate the observation contract's realism or itself optimize a nonanticipative policy. A next implementation must combine state carryover, observable forecasts, actual realization, rolling replanning and paired held-out evaluation. Report first-action violations as hard failures; do not claim policy robustness from perfect-information results alone.
+
+
+## 16. P3 executable slice — nonanticipative rolling-horizon dispatch (2026-10-29)
+
+The rolling module advances beyond checking scenario labels: it runs a policy that observes the actual current interval, plans against forecasts for future intervals only, commits the first action, verifies that action against current observed conditions, advances state of charge, and replans.
+
+### Information-time contract
+
+For each stage, the input binds:
+- a monotonically increasing decision timestamp;
+- the timestamp when the current observation became available;
+- the future-forecast issue and availability timestamps;
+- a forecast vector for future interval IDs only; the vector cannot overwrite the current observed interval;
+- a digest over forecast issue/availability times and material future interval fields;
+- a planning-scenario digest over current observations, forecast suffix, and current SOC.
+
+Observed data and forecast data remain separate. A future forecast is usable only if it was issued and available no later than the decision time. The runner uses the realized scenario to retrieve current-stage observations and stable interval IDs, but it does not use later realized prices, renewable output or loads in the suffix optimization. The episode digest is retrospective audit identity and includes the pinned realized scenario; it must not be exposed as a policy feature at earlier decision times.
+
+### State and execution contract
+
+- The initial state of charge and a non-empty opening-inventory ledger reference are explicit and bound into the energy-hub scenario digest. Positive opening SOC cannot use the no-opening-inventory sentinel.
+- State of charge carried from the previous committed interval becomes the initial state of the next suffix optimization. Its inventory-ledger reference becomes a canonical digest over the verified committed prefix, actions, and realized source-cost/emissions summaries.
+- At each stage, the exact solver returns a Pareto frontier and the reference policy selects its first cost-ordered point; this is one deterministic baseline policy, not a proof that cost is the only objective.
+- The selected action is the first action from a complete plan independently verified by the exact solver against the current observation and forecast suffix. A separate whole-horizon service ledger is not constructed for the one-step check, because a zero-load interval may validly generate/charge energy without delivering load until later.
+- Per-stage reporting uses a distinct interval-local flow ledger (current generation/import cost and CO2e, primary source energy, and load-delivered energy), rather than dividing one interval's values by the entire episode passenger-km denominator.
+- Every committed action remains immutable; later observations only affect later actions.
+- After all stages, the assembled plan is independently verified against the complete realized scenario.
+- Search-budget exhaustion, definite no-plan and other solver failures produce different run statuses and never a completed run with a fabricated zero cost.
+- The input opening SOC is an externally reconciled inventory: upstream cost and lifecycle emissions for this opening inventory must have been attributed to the prior charging/source ledger. Battery discharge records load delivery without charging those upstream impacts again.
+
+### Load-delivery and energy-accounting correction
+
+The energy-hub ledger now distinguishes generation from load delivery:
+- all declared renewable generation still incurs its declared cost and lifecycle CO2e, even when some is curtailed;
+- the renewable source record marks only direct renewable use as load-delivered energy; charging input is not counted as load delivery;
+- battery discharge is separately represented as load delivery, with its upstream cost/emissions attributed at the original charging/source event;
+- use per-source generation/import/curtailment/storage metrics when assessing primary energy. The aggregate source-energy field includes a secondary storage-output flow and is not a substitute for primary source-energy accounting.
+
+The opening SOC source and its upstream ledger must be reconciled before a whole-lifecycle claim. The module does not invent a zero lifecycle factor for the original source; the zero marginal attribution at discharge prevents re-booking impacts already assigned at charge.
+
+### Synthetic future-leak falsifier
+
+A two-interval fixture starts with one unit of previously accounted stored energy. At the first decision, the observed current grid price is 1; the future grid price forecast is 10, while the realized future price is 0.1 but is not yet available. The rolling policy uses grid at the first interval and preserves SOC based on the issued forecast, then discharges the stored unit after observing the cheap future interval. A clairvoyant full-horizon solver instead discharges immediately and imports cheap grid energy later. The test asserts that the rolling first action follows the forecast, not the hidden future realized price. These values are synthetic.
+
+### Limitations and next gates
+
+This is a bounded deterministic replay/reference policy, not a live controller. It does not yet include probabilistic forecast calibration, forecast ensembles, nonanticipative stochastic programming, CVaR/distributionally robust objectives, time-varying grid demand charges, battery degradation, aircraft missions, physical power-flow, flight schedule recovery, live data connectors or real airport authorization.
+
+Required next gates:
+- independent state-transition and energy-accounting oracle parity for tiny cases;
+- deliberate future-leak negative control;
+- source/observation timestamps and forecast digests retained in every result;
+- paired comparison against frozen static plan, greedy baseline and perfect-information reference;
+- report forecast error and the value/cost of recourse, not just cost;
+- zero hard-constraint and terminal-reserve violations in every completed run;
+- separately report infeasible and unresolved weight, runtime, P50/P95/P99, and work counters.
+
+No real airport saving, robust probability claim, or SOTA result follows from the synthetic runner.

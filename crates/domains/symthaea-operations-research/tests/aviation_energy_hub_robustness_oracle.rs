@@ -11,6 +11,8 @@ use symthaea_operations_research::aviation_energy_hub_robustness::{
 fn storage() -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: 2,
+        initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: 2,
         max_discharge_output_quanta_per_interval: 2,
         charge_efficiency_ppm: 1_000_000,
@@ -188,7 +190,7 @@ fn stress_set_digest_matches_independent_known_answer_vector() {
     ];
     assert_eq!(
         canonical_stress_set_digest(&cases).unwrap(),
-        "sha256:4527573bd739e6b24d9681f1fa2c18fc0dff0f8cd5efdc64bb81a5fb399f6c13"
+        "sha256:cb26438fa90b252f9e616b5d162dfdff16f3d853200cf70577d51eee5da5dca8"
     );
 }
 

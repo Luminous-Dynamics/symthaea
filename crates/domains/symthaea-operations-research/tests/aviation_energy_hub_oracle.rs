@@ -9,6 +9,8 @@ use symthaea_operations_research::aviation_energy_hub::{
 fn storage(capacity: u32, charge: u32, discharge: u32, terminal: u32) -> EnergyStorageSpec {
     EnergyStorageSpec {
         capacity_quanta: capacity,
+        initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: charge,
         max_discharge_output_quanta_per_interval: discharge,
         charge_efficiency_ppm: 1_000_000,
@@ -166,7 +168,7 @@ fn insufficient_grid_and_no_storage_is_infeasible() {
 fn canonical_digest_matches_independent_known_answer_vector() {
     assert_eq!(
         canonical_energy_hub_digest(&frontier_scenario()).unwrap(),
-        "sha256:21048e86350e423468d5fcac5a137c6cfea74922df14894ad5331c05b70ac2e7"
+        "sha256:db27ae3b8b27a9e3a23821e581b2a3dea6893407740ce52384939df5fff136c8"
     );
 }
 
@@ -194,10 +196,68 @@ fn renewable_curtailment_is_not_counted_as_delivered_energy() {
     }).expect("renewable surplus should serve demand, charge storage, and curtail remainder");
 
     assert_eq!(plan.metrics.source_ledger.total_source_energy_kwh, 4.0);
-    assert_eq!(plan.metrics.source_ledger.total_delivered_energy_kwh, 2.0);
+    assert_eq!(plan.metrics.source_ledger.total_delivered_energy_kwh, 1.0);
     assert_eq!(plan.metrics.renewable_generation_quanta, 4);
     assert_eq!(plan.metrics.renewable_curtailed_quanta, 2);
     assert_eq!(plan.metrics.final_soc_quanta, 1);
+}
+
+#[test]
+fn initial_soc_is_bound_to_scenario_identity() {
+    let mut case = frontier_scenario();
+    let original_digest = case.input_digest.clone();
+    case.storage.initial_soc_quanta = 1;
+    case.storage.initial_soc_ledger_ref = "synthetic:external-opening-inventory-ledger-v1".to_owned();
+
+    assert_ne!(canonical_energy_hub_digest(&case).unwrap(), original_digest);
+    assert_eq!(
+        solve_exact_energy_hub_pareto(&case, 100_000).unwrap_err(),
+        EnergyHubError::ScenarioDigestMismatch
+    );
+}
+
+#[test]
+fn positive_opening_soc_requires_a_non_sentinel_inventory_ledger_reference() {
+    let mut case = frontier_scenario();
+    case.storage.initial_soc_quanta = 1;
+    assert_eq!(
+        solve_exact_energy_hub_pareto(&case, 100_000).unwrap_err(),
+        EnergyHubError::MissingIdentifier("opening SOC inventory ledger reference")
+    );
+}
+
+#[test]
+fn opening_storage_inventory_can_serve_demand_without_rebooking_upstream_impacts() {
+    let case = seal(TimeIndexedEnergyHubScenario {
+        scenario_id: "hub-opening-inventory-synthetic-v1".to_owned(),
+        input_digest: "pending".to_owned(),
+        currency_code: "USD".to_owned(),
+        quantum_kwh: 1.0,
+        service: TransportService {
+            period_id: "opening-inventory-period".to_owned(),
+            lifecycle_boundary_id: "source-to-load-v1".to_owned(),
+            completed_passenger_km: 100.0,
+            available_seat_km: 120.0,
+        },
+        storage: EnergyStorageSpec {
+            capacity_quanta: 1,
+            initial_soc_quanta: 1,
+            initial_soc_ledger_ref: "synthetic:external-opening-inventory-ledger-v1".to_owned(),
+            max_charge_input_quanta_per_interval: 1,
+            max_discharge_output_quanta_per_interval: 1,
+            charge_efficiency_ppm: 1_000_000,
+            discharge_efficiency_ppm: 1_000_000,
+            minimum_terminal_soc_quanta: 0,
+        },
+        intervals: vec![interval("t0", 1, 1, 0, 0, 0.0, 0.0, 0.0, 0.0)],
+    });
+    let result = solve_exact_energy_hub_pareto(&case, 10_000).unwrap();
+    let evaluated = verify_energy_hub_plan(&case, &result.frontier[0].plan).unwrap();
+
+    assert_eq!(evaluated.metrics.battery_discharge_output_quanta, 1);
+    assert_eq!(evaluated.metrics.source_ledger.total_delivered_energy_kwh, 1.0);
+    assert_eq!(evaluated.metrics.source_ledger.total_cost, 0.0);
+    assert_eq!(evaluated.metrics.source_ledger.accounted_lifecycle_co2e_kg, 0.0);
 }
 
 #[test]
@@ -309,6 +369,8 @@ fn storage_efficiency_uses_conservative_integer_rounding() {
     let mut case = frontier_scenario();
     case.storage = EnergyStorageSpec {
         capacity_quanta: 2,
+        initial_soc_quanta: 0,
+        initial_soc_ledger_ref: "none:opening-soc".to_owned(),
         max_charge_input_quanta_per_interval: 4,
         max_discharge_output_quanta_per_interval: 1,
         charge_efficiency_ppm: 500_000,
