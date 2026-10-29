@@ -46,8 +46,9 @@ jobs:
         run: |
           /tmp/vis-dvpc-042 --benchmark > /tmp/vis-dvpc-042-results.tsv
           test "$(grep -c '^DGP' /tmp/vis-dvpc-042-results.tsv)" = "4"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-042-results.tsv)" = "576"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-042-results.tsv)" = "720"
           test "$(grep -c '^ROOT_METRIC' /tmp/vis-dvpc-042-results.tsv)" = "12"
+          test "$(grep -c '^GRID_METRIC' /tmp/vis-dvpc-042-results.tsv)" = "12"
           test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-042-results.tsv)" = "4"
           awk -F '\t' '$1=="ROOT_METRIC" && $6=="failures" && $7 != 0 { exit 1 }' /tmp/vis-dvpc-042-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="pointwise_coverage" || $5=="sequence_coverage" || $5=="sequence_false_exclusion_probability" || $5=="false_promotion_probability" || $5=="promotion_power" || $5=="empty_or_reversed_probability") { exit 1 }' /tmp/vis-dvpc-042-results.tsv
