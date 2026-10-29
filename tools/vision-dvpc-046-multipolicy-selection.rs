@@ -130,6 +130,21 @@ fn hoeffding_cs_factor(mean:f64,w_max:f64,radius_factor:f64)->Interval{
 fn hoeffding_cs(mean:f64,w_max:f64,n:usize,alpha_policy:f64)->Interval{
     hoeffding_cs_factor(mean,w_max,hoeffding_radius_factor(n,alpha_policy))
 }
+
+fn empirical_bernstein_logterm(n:usize,alpha_policy:f64)->f64{
+    (2.0*(n as f64)*((n+1) as f64)/alpha_policy).ln()
+}
+fn empirical_bernstein_cs(sum:f64,sum_sq:f64,n:usize,w_max:f64,logterm:f64)->Interval{
+    if n<2{return FULL;}
+    let t=n as f64;
+    let mean=sum/t;
+    // SCOPE-RL's documented finite-sample empirical-Bernstein form uses the
+    // population-normalized sample variance and the n-1 correction below.
+    let variance=(sum_sq-sum*sum/t).max(0.0)/t;
+    let radius=(2.0*variance*logterm/(t-1.0)).sqrt()
+        +7.0*w_max*logterm/(3.0*(t-1.0));
+    Interval{lower:(mean-radius).max(0.0),upper:(mean+radius).min(1.0)}
+}
 fn intersect(previous:Interval,next:Interval)->Interval{
     Interval{lower:previous.lower.max(next.lower),upper:previous.upper.min(next.upper)}
 }
@@ -260,7 +275,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
     let values:Vec<f64>=policies.iter().map(|p|p.value).collect();
     let best_value=values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
     let max_look=*looks.last().unwrap();
-    let mut agg=vec![vec![MethodAggregate::default();looks.len()];4];
+    let mut agg=vec![vec![MethodAggregate::default();looks.len()];6];
     let mut selection=vec![SelectionAggregate::default();looks.len()];
     let started=Instant::now();
     let mut observations=0usize;
@@ -272,10 +287,10 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
         let mut cell_counts=[[0usize;2];2];
         let mut cell_reward_sums=[[0.0_f64;2];2];
         let mut cell_bounds=[[FULL;2];2];
-        let mut bounds=vec![vec![FULL;m];4];
-        let mut sequence_covered=[true;4];
-        let mut ever_false_certificate=[false;4];
-        let mut first_certificate:[Option<usize>;4]=[None;4];
+        let mut bounds=vec![vec![FULL;m];6];
+        let mut sequence_covered=[true;6];
+        let mut ever_false_certificate=[false;6];
+        let mut first_certificate:[Option<usize>;6]=[None;6];
         let mut look_index=0usize;
 
         for t in 1..=max_look{
@@ -301,20 +316,22 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                 sums[j]+=x;sums_sq[j]+=x*x;
             }
 
-            // Radius factors depend only on the look and alpha allocation, not
-            // on the policy. Compute logarithms once per method/look rather than
-            // once per candidate policy.
+            // Cache look/alpha-dependent logs once per method/look, not once
+            // per candidate policy. This matters for the M=32 horizon-4096 sweep.
             let independent_radius_factor=hoeffding_radius_factor(t,ALPHA);
             let familywise_radius_factor=hoeffding_radius_factor(t,ALPHA/(m as f64));
-            for method in 0..3{
+            let independent_eb_logterm=empirical_bernstein_logterm(t,ALPHA);
+            let familywise_eb_logterm=empirical_bernstein_logterm(t,ALPHA/(m as f64));
+            for method in 0..5{
                 for j in 0..m{
                     let mean=sums[j]/t as f64;
-                    let raw=if method==0{
-                        wald_interval(sums[j],sums_sq[j],t)
-                    }else if method==1{
-                        hoeffding_cs_factor(mean,policies[j].w_max,independent_radius_factor)
-                    }else{
-                        hoeffding_cs_factor(mean,policies[j].w_max,familywise_radius_factor)
+                    let raw=match method{
+                        0=>wald_interval(sums[j],sums_sq[j],t),
+                        1=>hoeffding_cs_factor(mean,policies[j].w_max,independent_radius_factor),
+                        2=>hoeffding_cs_factor(mean,policies[j].w_max,familywise_radius_factor),
+                        3=>empirical_bernstein_cs(sums[j],sums_sq[j],t,policies[j].w_max,independent_eb_logterm),
+                        4=>empirical_bernstein_cs(sums[j],sums_sq[j],t,policies[j].w_max,familywise_eb_logterm),
+                        _=>unreachable!(),
                     };
                     bounds[method][j]=if method==0{raw}else{intersect(bounds[method][j],raw)};
                 }
@@ -323,9 +340,9 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
             // reward mean induces valid intervals for every policy value. The
             // Bonferroni correction is over four cells, not over M policies.
             for j in 0..m{
-                bounds[3][j]=shared_policy_interval(&policies[j],cell_bounds);
+                bounds[5][j]=shared_policy_interval(&policies[j],cell_bounds);
             }
-            for method in 0..4{
+            for method in 0..6{
                 let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
                 sequence_covered[method]&=point;
                 if let Some(k)=certified_best(&bounds[method]){
@@ -339,7 +356,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                 let best_set=values.iter().enumerate().filter(|(_,v)|(**v-best_value).abs()<=1e-9).map(|(i,_)|i).collect::<Vec<_>>();
                 selection[look_index].add(best_set.contains(&estimate_winner),best_value-values[estimate_winner]);
 
-                for method in 0..4{
+                for method in 0..6{
                     let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
                     let average_width=bounds[method].iter().map(|b|b.width()).sum::<f64>()/(m as f64);
                     let max_width=bounds[method].iter().map(|b|b.width()).fold(0.0_f64,f64::max);
@@ -369,8 +386,8 @@ fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
         let _=writeln!(out,"POLICY\t{}\tid\t{}\tpi_action1_context0\t{:.8}\tpi_action1_context1\t{:.8}\ttrue_value\t{:.8}\tW_max\t{:.8}\tis_best\t{}",
             r.name,policy.id,policy.pi1[0],policy.pi1[1],policy.value,policy.w_max,(policy.value-best_value).abs()<=EPS);
     }
-    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4"];
-    for method in 0..4{
+    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Empirical_Bernstein_CS_per_policy_alpha_0.05","Empirical_Bernstein_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4"];
+    for method in 0..6{
         for (li,look) in looks.iter().copied().enumerate(){
             let a=&r.aggregates[method][li];
             for (name,count) in [
@@ -473,6 +490,20 @@ mod tests{
             let independent=hoeffding_cs(mean,w,t,ALPHA);
             let family=hoeffding_cs(mean,w,t,ALPHA/32.0);
             assert!(family.width()>=independent.width()-EPS);
+        }
+    }
+
+
+    #[test]
+    fn empirical_bernstein_intervals_are_bounded_and_familywise_allocation_is_wider(){
+        for n in [1,2,16,256,4096]{
+            let sum=0.37*n as f64;
+            let sum_sq=0.2*n as f64;
+            let ind=empirical_bernstein_cs(sum,sum_sq,n,2.0,empirical_bernstein_logterm(n,ALPHA));
+            let fam=empirical_bernstein_cs(sum,sum_sq,n,2.0,empirical_bernstein_logterm(n,ALPHA/32.0));
+            assert!(ind.lower>=0.0 && ind.upper<=1.0 && !ind.reversed());
+            assert!(fam.lower>=0.0 && fam.upper<=1.0 && !fam.reversed());
+            assert!(fam.width()>=ind.width()-EPS);
         }
     }
 
