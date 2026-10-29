@@ -1,0 +1,277 @@
+{
+  "schema_version": "luminous.phys_chain_claim_ledger.v1",
+  "audit_metadata": {
+    "audit_date": "2026-10-29",
+    "status": "starter_ledger_source_read_not_full_independent_reproduction",
+    "subject": "Alex D. Wissner-Gross, Chain Theory working-draft release dated 2026-10-23",
+    "source_snapshot_note": "The 24-page alpha letter, its published single-file Lean artifact, the 2026-10-24 announcement, and targeted portions of the 754-page compendium were inspected. This is not an exhaustive line-by-line audit of every claim in the compendium.",
+    "independent_reproduction_performed": false,
+    "browser_source_refs": [
+      "https://alexwg.org/publications/ChainTheoryAlpha.pdf",
+      "https://alexwg.org/publications/ChainAlpha.lean",
+      "https://alexwg.org/publications/ChainTheoryCompendium.pdf",
+      "https://theinnermostloop.substack.com/p/chain-theory"
+    ]
+  },
+  "author_reported_compendium_scope": {
+    "document_status": "working draft / preliminary findings",
+    "theorem_count": 100,
+    "conditional_theorem_count": 109,
+    "open_result_count": 198,
+    "theorem_statements_tied_to_named_lean_declarations": 64,
+    "note": "Counts are transcribed from the compendium abstract; not independently recounted. The source says the named Lean declarations check finite computations used in derivations, not that all 64 claims are complete formal proofs of physical correspondence."
+  },
+  "status_vocabulary": [
+    "axiom_or_postulate",
+    "formal_computation_from_definitions",
+    "theorem_within_model",
+    "conditional_theorem",
+    "open_result_or_open_question",
+    "physical_identification_conjecture",
+    "mixed_conditional_and_open",
+    "research_hypothesis_not_chain_theory_claim"
+  ],
+  "claim_count": 9,
+  "claims": [
+    {
+      "claim_id": "CT-AXIOM-001",
+      "family": "base ontology",
+      "source_status": "axiom_or_postulate",
+      "source_locator": {
+        "letter": "ChainTheoryAlpha.pdf, pp. 1-2",
+        "compendium": "Part I, framework / definitions 1.1-1.6",
+        "urls": [
+          "https://alexwg.org/publications/ChainTheoryAlpha.pdf",
+          "https://alexwg.org/publications/ChainTheoryCompendium.pdf"
+        ]
+      },
+      "proposition_summary": "The model starts from a finite collection of finite-dimensional quantum systems linked in maximally entangled pairs, with some systems shared and knowledge limited by the defined distillation operation.",
+      "dependency_ids": [],
+      "mathematical_or_computational_result": "This is the starting axiom; it is not a result derived from weaker premises inside the model.",
+      "physical_bridge_gap": "Axiom choice is not itself evidence that the observed universe has this ontology. Support must come from consequences that differ from other models and agree with independent observations.",
+      "discriminating_test": "Collect downstream claims into dependency groups and identify at least one quantitative prediction that is fixed by the axiom plus definitions and differs from standard alternatives before the comparison data are viewed.",
+      "falsifier_or_failure_condition": "A core downstream prediction that is genuinely entailed by the specified model fails an adequately powered, systematic-error-controlled independent test; alternatively, the advertised result depends on extra undeclared premises.",
+      "independence_group": "shared_base_axiom",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8923",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8921"
+      ],
+      "independent_reproduction_status": "not_performed"
+    },
+    {
+      "claim_id": "CT-ALPHA-CALC-001",
+      "family": "fine-structure candidate arithmetic",
+      "source_status": "formal_computation_from_definitions",
+      "source_locator": {
+        "letter": "ChainTheoryAlpha.pdf, Theorems 1-2, Eq. (6), pp. 2-5",
+        "lean_artifact": "ChainAlpha.lean, Parts 0-7 and main theorem",
+        "urls": [
+          "https://alexwg.org/publications/ChainTheoryAlpha.pdf",
+          "https://alexwg.org/publications/ChainAlpha.lean"
+        ]
+      },
+      "proposition_summary": "Given the paper's selected qutrit-qubit construction and definitions, the weighted count of 172 records evaluates to (79 + 48√2 + 42√3 + 3√6) / 31104, with inverse approximately 137.035999189566155...",
+      "dependency_ids": [
+        "CT-AXIOM-001",
+        "CT-GAUGE-001"
+      ],
+      "mathematical_or_computational_result": "The supplied single-file Lean 4 artifact states that it checks the finite computation and supporting record/algebra properties from the definitions, with no imported Mathlib or Lake dependencies.",
+      "physical_bridge_gap": "The Lean file explicitly excludes proof that the definitions are the right physics, formalization of the cited readability-cap theorems, statements over the full unitary group, and identification of the number with a physical constant.",
+      "discriminating_test": "Independently reconstruct the record set and normalization from the text in a separately written implementation, compare exact algebraic values, and freeze candidate digits before evaluation against future high-precision determinations.",
+      "falsifier_or_failure_condition": "Independent reconstruction disagrees with the published expression, semantics-preserving changes alter the result, or the stated derivation requires hidden target-informed choices not represented in the formal specification.",
+      "independence_group": "alpha_construction",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8921",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/8922"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-ALPHA-PHOTON-001",
+      "family": "fine-structure physical identification",
+      "source_status": "physical_identification_conjecture",
+      "source_locator": {
+        "letter": "ChainTheoryAlpha.pdf, Conjecture 1 (Photon), p. 5; discussion/supplement pp. 18-20",
+        "urls": [
+          "https://alexwg.org/publications/ChainTheoryAlpha.pdf",
+          "https://theinnermostloop.substack.com/p/chain-theory"
+        ]
+      },
+      "proposition_summary": "The paper conjectures that its selected qutrit-qubit link is the elementary link of the photon and that the constructed readout is the electromagnetic coupling α(0).",
+      "dependency_ids": [
+        "CT-ALPHA-CALC-001",
+        "CT-AXIOM-001"
+      ],
+      "mathematical_or_computational_result": "The candidate is exact within the definitions; the mapping from the constructed object/readout to the physical photon coupling is stated as a conjecture, not proved by the Lean computation.",
+      "physical_bridge_gap": "The paper itself says it does not construct a momentum-transfer-dependent propagator and that the spacetime, helicity and charge mapping lies beyond the letter. The agreement with a CODATA aggregate is not independent confirmation if underlying measurements contribute to that aggregate.",
+      "discriminating_test": "Freeze the candidate value and comparison protocol; compare it with future independent α determinations, keeping electron-g-2 inference, rubidium recoil, cesium recoil, and CODATA adjustment separate and accounting for correlations and unresolved method tensions.",
+      "falsifier_or_failure_condition": "A preregistered independent determination, with controlled systematics and uncertainty adequate to discriminate, excludes the candidate at the frozen rejection threshold; or the candidate can only be defended by changing the physical mapping after seeing results.",
+      "independence_group": "alpha_construction",
+      "current_comparison_note": "The letter reports the candidate as 0.6σ from CODATA 2022, +1.6σ from the cited electron-magnetic-moment determination, -1.5σ from rubidium recoil, and 5.3σ from cesium recoil. Those are the paper's comparisons, not newly recalculated measurements in this ledger.",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8921",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/8922"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-GAUGE-001",
+      "family": "Standard Model gauge-group structure",
+      "source_status": "theorem_within_model",
+      "source_locator": {
+        "letter": "ChainTheoryAlpha.pdf, abstract and Theorem 1, pp. 1-3",
+        "announcement": "Chain Theory, 2026-10-24",
+        "urls": [
+          "https://alexwg.org/publications/ChainTheoryAlpha.pdf",
+          "https://theinnermostloop.substack.com/p/chain-theory"
+        ]
+      },
+      "proposition_summary": "Local basis changes at the ends of the selected qutrit-qubit link yield a group isomorphic to (SU(3) × SU(2) × U(1))/Z6 within the stated construction.",
+      "dependency_ids": [
+        "CT-AXIOM-001",
+        "CT-ALPHA-CALC-001"
+      ],
+      "mathematical_or_computational_result": "This is stated as a theorem about the constructed object/group action in the letter.",
+      "physical_bridge_gap": "Showing a mathematical group structure is not by itself a full derivation of the Standard Model's observed particles, representations, charges, chirality, coupling dynamics or low-energy phenomenology. Those need separate claims and conditions.",
+      "discriminating_test": "Independent formal/group-theoretic reconstruction followed by an explicit representation-and-charge map for all Standard Model matter and interactions, with anomalies, generations and quantitative observables accounted for without adding untracked assumptions.",
+      "falsifier_or_failure_condition": "The quotient/group-action statement fails on independent reconstruction, or the claimed physical mapping cannot recover observed representations/charges and leaves unexplained extra inputs while being advertised as a complete Standard Model derivation.",
+      "independence_group": "same_selected_qutrit_qubit_construction",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8923",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8921"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-BORN-001",
+      "family": "Born rule / measurement",
+      "source_status": "conditional_theorem",
+      "source_locator": {
+        "compendium": "Part III, Ch. 2-2 and 2-4; printed pp. 111 and 116",
+        "url": "https://alexwg.org/publications/ChainTheoryCompendium.pdf"
+      },
+      "proposition_summary": "The compendium presents a Born-rule result conditional on the axiom plus imported premises about the Hilbert space of a qudit and a pair as a ray; measurement, collapse and POVM language is also described through correspondence and retained open results.",
+      "dependency_ids": [
+        "CT-AXIOM-001"
+      ],
+      "mathematical_or_computational_result": "The source's summary marks the Born rule among conditional theorems, not as an unconditional theorem of the axiom alone.",
+      "physical_bridge_gap": "The physical measurement map, probe/readout interpretation, and conditions associated with the open parent results need explicit justification. A recovered formula is not sufficient unless the probability objects and experimental outcomes map operationally.",
+      "discriminating_test": "Audit the conditional proof against its exact imports, then specify a measurement model that maps network state, readout and outcomes to laboratory observables and compare the predicted probabilities with an independently defined quantum-measurement benchmark.",
+      "falsifier_or_failure_condition": "A hidden prerequisite is absent or circular, an open prerequisite fails, or the proposed operational mapping gives systematically incorrect measurement probabilities under a controlled test.",
+      "independence_group": "quantum_measurement_correspondence",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8923"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-TIME-001",
+      "family": "time and order",
+      "source_status": "theorem_within_model",
+      "source_locator": {
+        "compendium": "Part IV, Theorem 50.1, printed p. 135",
+        "url": "https://alexwg.org/publications/ChainTheoryCompendium.pdf"
+      },
+      "proposition_summary": "The compendium defines the order coordinate as a discrete count incremented by specified construction/depth steps; the source explicitly characterizes it as a count, not a flow, and reports acyclicity across the 64 catalogued networks.",
+      "dependency_ids": [
+        "CT-AXIOM-001"
+      ],
+      "mathematical_or_computational_result": "A discrete construction order can be a theorem/property of the specified finite move graph.",
+      "physical_bridge_gap": "A construction-order counter is not automatically a laboratory clock, proper time, Lorentz-covariant temporal interval, or thermodynamic arrow. The physical map is a separate dependency.",
+      "discriminating_test": "First reproduce the finite transition graph and acyclicity claim independently. Then state an operational mapping to clock observables and derive a transformation law that can be compared quantitatively with proper-time / Lorentz benchmarks.",
+      "falsifier_or_failure_condition": "The enumerated graph contains a prohibited cycle, the count does not match allowed moves, or the proposed physical-time map violates the stated operational timing/Lorentz constraints.",
+      "independence_group": "construction_order",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8941",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8964"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-THERMO-001",
+      "family": "entropy and thermodynamics",
+      "source_status": "mixed_conditional_and_open",
+      "source_locator": {
+        "compendium": "Part XIII, especially Theorems 217.1-217.2, Open Result 217.3, Open Results 218.1-218.2, Open Result 223.1, Theorem 223.2; printed pp. 537-552",
+        "url": "https://alexwg.org/publications/ChainTheoryCompendium.pdf"
+      },
+      "proposition_summary": "The compendium defines a boundary-record count and a separate whole-register count W; some monotonicity is proved for specified construction/closure scopes, while several mappings to thermodynamic entropy, equilibrium and irreversible behavior remain open or are identified by correspondence only.",
+      "dependency_ids": [
+        "CT-AXIOM-001",
+        "CT-TIME-001"
+      ],
+      "mathematical_or_computational_result": "Combinatorial monotonicity can hold within one specified forward graph without establishing the standard thermodynamic second law or a physical entropy function.",
+      "physical_bridge_gap": "The source records open parent results around the thermal state/bath, horizon boundary count, and order parameter; it reports that W and boundary counts can part company under closure/stop-condition variations.",
+      "discriminating_test": "Independently enumerate the stated finite graphs under frozen closure/stop rules and compare each count to explicit von Neumann/Gibbs entropy and standard reversible/irreversible controls. Require state, dynamics, observable and coarse-graining maps, not name matching.",
+      "falsifier_or_failure_condition": "A pointwise monotonicity claim is violated on a permitted forward edge, or the asserted physical entropy/irreversibility correspondence fails the predefined comparator without a prospectively justified model revision.",
+      "independence_group": "order_and_thermodynamic_correspondence",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8941",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/8942",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8964"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "CT-PARTICLE-SPECTRUM-001",
+      "family": "generations, particle masses and interactions",
+      "source_status": "mixed_conditional_and_open",
+      "source_locator": {
+        "compendium": "Abstract and Parts XI-XVI; printed pp. 20 and later sections; includes three generations, masses, confinement and interaction-sector mappings",
+        "url": "https://alexwg.org/publications/ChainTheoryCompendium.pdf"
+      },
+      "proposition_summary": "The compendium lists three generations, masses, confinement and several particle-sector outputs among conditional theorems and open results; the announcement describes these as derivations with remaining conditions.",
+      "dependency_ids": [
+        "CT-AXIOM-001",
+        "CT-GAUGE-001",
+        "CT-BORN-001"
+      ],
+      "mathematical_or_computational_result": "This ledger cannot classify the whole family as one theorem; individual claims need their exact local source text, conditions, and dependency closure.",
+      "physical_bridge_gap": "A derivation is more probative when it yields the full measured spectrum/charges/couplings without importing the desired outcome through a premise or calibration choice. Shared upstream premises also mean several downstream claims are not automatically independent confirmations.",
+      "discriminating_test": "Split the family into claim-level entries and require independent quantitative predictions of representation content, mass ratios/couplings or other observables, with all open dependencies exposed before comparison to data.",
+      "falsifier_or_failure_condition": "A claim's supposed prediction is already fixed by an imported premise, a required open parent fails, or a frozen quantitative prediction disagrees with the corresponding independent observable.",
+      "independence_group": "shared_particle_sector_dependencies",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8923"
+      ],
+      "independent_reproduction_status": "not_performed_in_this_ledger"
+    },
+    {
+      "claim_id": "LD-REL-GRAMMAR-001",
+      "family": "Luminous relational/generative ontology hypothesis",
+      "source_status": "research_hypothesis_not_chain_theory_claim",
+      "source_locator": {
+        "symthaea_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8919",
+        "symtropy_issue": "https://github.com/Luminous-Dynamics/symtropy/issues/2870",
+        "symtropy_pr": "https://github.com/Luminous-Dynamics/symtropy/pull/2871",
+        "external_benchmarks": [
+          "https://arxiv.org/abs/2510.07172",
+          "https://www.nature.com/articles/s43588-025-00904-8",
+          "https://cavalab.org/srbench/"
+        ]
+      },
+      "proposition_summary": "Research hypothesis: a compact, typed relational grammar shared across several generated worlds may transfer better to held-out compositions and interventions than independent equation fitting or a conventional state/dependency graph.",
+      "dependency_ids": [],
+      "mathematical_or_computational_result": "This is a Luminous research hypothesis inspired by structural similarities; it is not a claim made or established by Chain Theory's quantum axiom.",
+      "physical_bridge_gap": "Representational elegance does not prove the universe is literally grammatical. Observationally equivalent models may fit all existing data; an active experiment must seek a discriminating intervention.",
+      "discriminating_test": "On a held-out benchmark with hidden grammar families, compare shared grammar learner, independent symbolic regression, conventional graph learner, known-equation oracle and null models. Include canonical laws and systematically altered ('metaphysical shift') laws, noise, missing observations, unseen compositions and heterogeneous worlds with no shared grammar.",
+      "falsifier_or_failure_condition": "At matched data and compute budgets the grammar representation provides no robust improvement in held-out intervention prediction, structural recovery, model-selection calibration, description length or experiment-selection efficiency, or fails to detect when no shared grammar exists.",
+      "independence_group": "relational_grammar_benchmark_not_physics_confirmation",
+      "repository_tracks": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8919",
+        "https://github.com/Luminous-Dynamics/symtropy/issues/2870",
+        "https://github.com/Luminous-Dynamics/symtropy/pull/2871"
+      ],
+      "independent_reproduction_status": "protocol_and_reference_parity_only_no_discovery_win_claimed"
+    }
+  ],
+  "anti_double_counting_rules": [
+    "Theorem/proof status within a formal model is not itself empirical confirmation that the model describes nature.",
+    "An exact α-candidate computation and the photon-to-α physical identification are separate claims.",
+    "A correspondence between a construction count and physical time/entropy is separate from a theorem about the count.",
+    "Multiple claims sharing the same axiom, selected construction or external prerequisites are not independent confirmations by default.",
+    "The CODATA recommendation is an adjustment using measurement inputs; comparison to an aggregate is not independent evidence from the source measurements that enter it.",
+    "A failed/open dependency must propagate to downstream claims unless a proof shows it is irrelevant.",
+    "Claims in this starter ledger are source-classified and test-planned; no independent Lean, numerical, physics or experimental result is asserted."
+  ]
+}
