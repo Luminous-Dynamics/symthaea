@@ -361,7 +361,14 @@ mod tests{
                 assert!((0.0..=IPS_MAX_WEIGHT).contains(&(w*f.north_star[c][a])));
             }
         }
-        assert!(close(policy_value(f,pol),0.5*(f.north_star[0][pol[0]]+f.north_star[1][pol[1]]),1e-12));
+        let mut expected_ips=0.0;
+        for context in 0..CONTEXTS{
+            for action in 0..ARMS{
+                let score_mean=if action==pol[context]{IPS_MAX_WEIGHT*f.north_star[context][action]}else{0.0};
+                expected_ips+=0.5*(1.0/ARMS as f64)*score_mean;
+            }
+        }
+        assert!(close(expected_ips,policy_value(f,pol),1e-12));
     }
     #[test]
     fn zero_headroom_never_exceeds_best_global_value_in_expectation(){
