@@ -1,0 +1,7 @@
+[package]
+name = "cmaq-005-heldout-causal-transfer"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]

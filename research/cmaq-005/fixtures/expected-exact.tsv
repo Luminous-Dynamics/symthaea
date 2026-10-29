@@ -1,0 +1,4 @@
+scope_id	cases	outcome_mae_milli	causal_effect_mae_milli	effect_sign_accuracy_ppm	safety_brier_score	false_safe_predictions	safety_gate_pass
+OVERALL	4	0.000	0.000	1000000	0.000000	0	true
+lawA	2	0.000	0.000	1000000	0.000000	0	true
+lawB	2	0.000	0.000	1000000	0.000000	0	true
