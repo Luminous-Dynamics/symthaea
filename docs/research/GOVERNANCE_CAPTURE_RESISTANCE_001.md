@@ -343,6 +343,12 @@ Proposed adapter sequence:
 
 Use typed references into existing owners; do not duplicate ledger, governance, policy, or simulation state machines. The adapter map is a source-audited design artifact; no runtime adapter, cross-repository contract test, or production interoperability is claimed.
 
+A machine-readable evidence-class contract is also committed at `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-v0.1.schema.json`, with a synthetic example at `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json`. The isolated Rust evaluator now has `validate_cross_system_evidence_bundle_bytes` and a `validate-evidence-bundle` CLI command.
+
+The contract distinguishes five assertion classes: `observed`, `reported`, `inferred`, `simulated`, and `unknown`. In the current prototype, `simulated` must originate from a Symtropy-world record and carry simulator build/scenario/config/seed/horizon/output metadata; `observed` must originate from an independent-measurement record with method, time/location scope, quality limits, and a corroboration reference; `inferred` must declare a derivation method and exactly the same input IDs as its dependency list. The validator also checks source-system/type compatibility, source-reference scope, unresolved dependencies, and cycles.
+
+The five-record demo is explicitly synthetic. Its observed-class row is a hypothetical measurement-shaped example, not an actual water-service observation; all record refs begin with `synthetic:`, and simulation digests are illustrative placeholders. This validator establishes type-boundary and lineage checks on the provided bytes, not authenticity, measurement quality, source truth, real-world interoperability, or qualification. A custom JavaScript structural preflight matched the JSON Schema for this fixture; Rust compilation and execution remain pending.
+
 ### GCRB-5 — Public retrospective corpus
 
 Select documented public cases with traceable records and sufficient ground truth. Use official adjudications and verifiable procedural facts; treat allegations and media claims as evidence to assess, not as established labels. Publish the coding guide and inter-reviewer disagreement.
