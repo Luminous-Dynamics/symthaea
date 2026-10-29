@@ -12,7 +12,7 @@ mod stream;
 use std::env;
 use std::fmt::Write as _;
 
-const ALPHA_SIDE: f64 = 0.025;
+const ALPHA: f64 = 0.05;
 const HORIZON: usize = 8;
 const PATH_COUNT: usize = 65_536;
 const TRUE_VALUE: f64 = 0.5;
@@ -196,9 +196,9 @@ fn certify_root(history: &[BetRecord], root: f64, level: f64) -> bool {
 fn positive_root_control() -> Result<f64, String> {
     // A deliberately strong fixed-logger control creates a root without
     // relying on the horizon-8 DGPs being informative enough to cross.
-    let mut fixed_stream = stream::StreamState::new(1.0, ALPHA_SIDE)?;
+    let mut fixed_stream = stream::StreamState::new(1.0, ALPHA)?;
     let mut history = Vec::new();
-    let level = (2.0 / ALPHA_SIDE).ln();
+    let level = (2.0 / ALPHA).ln();
     for _ in 0..24 {
         let lambda = fixed_stream.current_lambda();
         let report = fixed_stream.observe(1.0, 1.0)?;
@@ -218,7 +218,7 @@ fn run_scenario(scenario: Scenario, horizon: usize) -> Result<ScenarioResult, St
         return Err("exact path audit supports horizons 1 through 8".to_owned());
     }
     let path_count = 4_usize.pow(horizon as u32);
-    let level = (2.0 / ALPHA_SIDE).ln();
+    let level = (2.0 / ALPHA).ln();
     let mut looks = vec![LookTotals::default(); horizon];
     let mut sequence_coverage_mass = 0.0;
     let mut sequence_false_exclusion_mass = 0.0;
@@ -241,8 +241,8 @@ fn run_scenario(scenario: Scenario, horizon: usize) -> Result<ScenarioResult, St
             continue;
         }
 
-        let mut lower_stream = stream::StreamState::new(scenario.max_weight, ALPHA_SIDE)?;
-        let mut complement_stream = stream::StreamState::new(scenario.max_weight, ALPHA_SIDE)?;
+        let mut lower_stream = stream::StreamState::new(scenario.max_weight, ALPHA)?;
+        let mut complement_stream = stream::StreamState::new(scenario.max_weight, ALPHA)?;
         let mut lower_history: Vec<BetRecord> = Vec::with_capacity(horizon);
         let mut complement_history: Vec<BetRecord> = Vec::with_capacity(horizon);
         let mut lower_endpoint = 0.0f64;
@@ -468,9 +468,9 @@ mod tests {
 
     #[test]
     fn direct_root_certificate_accepts_real_crossing_and_rejects_invalid_bets() {
-        let mut fixed_stream = stream::StreamState::new(1.0, ALPHA_SIDE).unwrap();
+        let mut fixed_stream = stream::StreamState::new(1.0, ALPHA).unwrap();
         let mut history = Vec::new();
-        let level = (2.0 / ALPHA_SIDE).ln();
+        let level = (2.0 / ALPHA).ln();
         let mut certified_root = None;
         for _ in 0..24 {
             let lambda = fixed_stream.current_lambda();
