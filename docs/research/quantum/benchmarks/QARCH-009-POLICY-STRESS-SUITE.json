@@ -205,7 +205,8 @@
             "expected_measurement_cost": 0,
             "unsupported_outcome_probability": 0
           }
-        }
+        },
+        "policy_no_measurement_expected_utility": 0.5
       }
     },
     {
@@ -298,7 +299,8 @@
             "expected_measurement_cost": 0,
             "unsupported_outcome_probability": 0
           }
-        }
+        },
+        "policy_no_measurement_expected_utility": 0.9
       }
     },
     {
@@ -391,7 +393,8 @@
             "expected_measurement_cost": 0,
             "unsupported_outcome_probability": 0
           }
-        }
+        },
+        "policy_no_measurement_expected_utility": 0.5
       }
     },
     {
@@ -484,7 +487,8 @@
             "expected_measurement_cost": 0,
             "unsupported_outcome_probability": 0
           }
-        }
+        },
+        "policy_no_measurement_expected_utility": 0.5
       }
     },
     {
@@ -639,19 +643,114 @@
             "expected_measurement_cost": 0,
             "unsupported_outcome_probability": 0
           }
+        },
+        "policy_no_measurement_expected_utility": 0.5
+      }
+    },
+    {
+      "id": "Q009-06-opposite-prior-shift",
+      "purpose": "The planner prior tie-break conflicts with held-out truth; the no-measurement policy must not leak the true prior.",
+      "held_out_truth": {
+        "id": "truth-prior-0.1-0.9",
+        "evaluator_only": true,
+        "prior": [
+          0.1,
+          0.9
+        ],
+        "candidates": {
+          "A-nominal-perfect": [
+            [
+              0.5,
+              0.5
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ],
+          "B-moderate": [
+            [
+              0.8,
+              0.2
+            ],
+            [
+              0.2,
+              0.8
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "no_measurement_expected_utility": 0.9,
+        "policy_no_measurement_expected_utility": 0.1,
+        "oracle_expected_utility": 0.9,
+        "oracle_experiment_id": null,
+        "per_candidate": {
+          "A-nominal-perfect": {
+            "expected_decision_utility": 0.5,
+            "ground_truth_posterior_utility": 0.9
+          },
+          "B-moderate": {
+            "expected_decision_utility": 0.8,
+            "ground_truth_posterior_utility": 0.9
+          }
+        },
+        "policies": {
+          "nominal_evsi_per_cost": {
+            "selected_experiment_id": "A-nominal-perfect",
+            "expected_decision_utility": 0.5,
+            "decision_regret": 0.4,
+            "expected_measurement_cost": 1,
+            "unsupported_outcome_probability": 0
+          },
+          "nominal_information_gain_per_cost": {
+            "selected_experiment_id": "A-nominal-perfect",
+            "expected_decision_utility": 0.5,
+            "decision_regret": 0.4,
+            "expected_measurement_cost": 1,
+            "unsupported_outcome_probability": 0
+          },
+          "robust_worst_case_evsi_per_cost": {
+            "selected_experiment_id": "B-moderate",
+            "expected_decision_utility": 0.8,
+            "decision_regret": 0.1,
+            "expected_measurement_cost": 1,
+            "unsupported_outcome_probability": 0
+          },
+          "fixed_first": {
+            "selected_experiment_id": "A-nominal-perfect",
+            "expected_decision_utility": 0.5,
+            "decision_regret": 0.4,
+            "expected_measurement_cost": 1,
+            "unsupported_outcome_probability": 0
+          },
+          "uniform_random_exact_expectation": {
+            "selected_experiment_id": null,
+            "expected_decision_utility": 0.65,
+            "decision_regret": 0.25,
+            "expected_measurement_cost": 1,
+            "unsupported_outcome_probability": 0
+          },
+          "no_measurement": {
+            "selected_experiment_id": null,
+            "expected_decision_utility": 0.1,
+            "decision_regret": 0.8,
+            "expected_measurement_cost": 0,
+            "unsupported_outcome_probability": 0
+          }
         }
       }
     }
   ],
   "aggregate_analytic_reference": {
-    "metric": "mean decision regret across these five declared synthetic cases; not an external benchmark score",
+    "metric": "mean decision regret across these six declared synthetic cases; not an external benchmark score",
     "mean_regret": {
-      "nominal_evsi_per_cost": 0.34,
-      "nominal_information_gain_per_cost": 0.34,
-      "robust_worst_case_evsi_per_cost": 0.13,
-      "fixed_first": 0.34,
-      "uniform_random_exact_expectation": 0.235,
-      "no_measurement": 0.19
+      "nominal_evsi_per_cost": 0.35,
+      "nominal_information_gain_per_cost": 0.35,
+      "robust_worst_case_evsi_per_cost": 0.125,
+      "fixed_first": 0.35,
+      "uniform_random_exact_expectation": 0.2375,
+      "no_measurement": 0.2916666667
     },
     "worst_case_regret": {
       "nominal_evsi_per_cost": 1,
@@ -659,7 +758,7 @@
       "robust_worst_case_evsi_per_cost": 0.45,
       "fixed_first": 1,
       "uniform_random_exact_expectation": 0.725,
-      "no_measurement": 0.5
+      "no_measurement": 0.8
     },
     "nominal_per_case_regret_paid_by_robustification": {
       "Q009-03-robustification-cost": 0.1
