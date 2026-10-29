@@ -176,12 +176,28 @@ class PairedComparisonTests(unittest.TestCase):
             pair["effective_comparison_task_cluster_fraction_pct"],
             round(100.0 * pair["effective_comparison_task_cluster_count"] / len(self.fixture.task_ids), 6),
         )
+        self.assertEqual(pair["task_win_sign_test"]["non_tied_task_clusters"], pair["task_clusters_won"] + pair["task_clusters_lost"])
+        self.assertEqual(pair["task_win_sign_test"]["p_value_two_sided"], 0.25)
+        self.assertEqual(pair["task_win_sign_test"]["holm_adjusted_p_value"], 0.25)
+        self.assertTrue(pair["task_win_sign_test"]["estimable"])
 
     def test_deterministic_bootstrap_repeats_exactly(self) -> None:
         first = self.fixture.analyze()
         second = self.fixture.analyze()
         self.assertEqual(first["arm_summaries"], second["arm_summaries"])
         self.assertEqual(first["pairwise_comparisons"], second["pairwise_comparisons"])
+
+
+    def test_exact_task_win_sign_test_is_directional_and_handles_ties(self) -> None:
+        self.assertAlmostEqual(analyzer.exact_two_sided_sign_test_pvalue(5, 0), 0.0625)
+        self.assertEqual(analyzer.exact_two_sided_sign_test_pvalue(4, 4), 1.0)
+        self.assertIsNone(analyzer.exact_two_sided_sign_test_pvalue(0, 0))
+
+    def test_holm_adjustment_is_monotone_and_caps_at_one(self) -> None:
+        adjusted = analyzer.holm_adjust_pvalues({"arm-a": 0.01, "arm-b": 0.04, "arm-c": 0.03})
+        self.assertEqual(adjusted, {"arm-a": 0.03, "arm-c": 0.06, "arm-b": 0.06})
+        capped = analyzer.holm_adjust_pvalues({"arm-a": 0.8, "arm-b": 0.9})
+        self.assertEqual(capped, {"arm-a": 1.0, "arm-b": 1.0})
 
     def test_missing_cartesian_cell_is_rejected(self) -> None:
         manifest = copy.deepcopy(self.fixture.manifest)
