@@ -435,7 +435,16 @@ fn execute(args: &[String]) -> Result<(), String> {
             if required(&receipt, "manifest_sha256")? != manifest_digest {
                 return Err(fail("receipt manifest_sha256 does not match the manifest bytes"));
             }
-            let output_path = Path::new(artifact_root).join(required(&receipt, "artifact_path")?);
+            let root_path = Path::new(artifact_root)
+                .canonicalize()
+                .map_err(|error| fail(format!("cannot resolve artifact root: {error}")))?;
+            let joined_output = root_path.join(required(&receipt, "artifact_path")?);
+            let output_path = joined_output
+                .canonicalize()
+                .map_err(|error| fail(format!("cannot resolve receipt artifact: {error}")))?;
+            if !output_path.starts_with(&root_path) {
+                return Err(fail("receipt artifact resolves outside the artifact root"));
+            }
             let output_digest = hash_file(&output_path)?;
             if required(&receipt, "output_sha256")? != output_digest {
                 return Err(fail("receipt output_sha256 does not match the artifact at artifact_path"));
