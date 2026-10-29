@@ -1,0 +1,21 @@
+{
+  "schema_version": "pitb.component-coverage-receipt.v1",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "source_partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "relationship_inventory_edges_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "review_methodology_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "trust_store_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "attestation": "complete_relationship_inventory",
+  "signatures": [
+    {
+      "reviewer_id": "synthetic-reviewer-a",
+      "key_id": "synthetic-key-a",
+      "signature_hex": "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "reviewer_id": "synthetic-reviewer-b",
+      "key_id": "synthetic-key-b",
+      "signature_hex": "22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}
