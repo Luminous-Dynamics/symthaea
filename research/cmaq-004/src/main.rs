@@ -1,12 +1,12 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-004-value-add-report-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-004-value-add-report-v0.2";
 const TRAIN_CONTEXTS: [usize; 3] = [0, 1, 2];
 const HELDOUT_CONTEXT: usize = 3;
 const SUPPORT_SAMPLES: usize = 1_024;
 const EVALUATION_EPISODES: usize = 4_096;
 const SEED: u64 = 4_204_2026;
-const MODEL_QUERY_COST: f64 = 0.04;
+const MODEL_QUERY_COST_LEVELS: [f64; 6] = [0.0, 0.02, 0.04, 0.08, 0.12, 0.16];
 const MODEL_QUERIES_PER_DECISION: usize = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -188,7 +188,7 @@ fn choose_action(values: [f64; 2]) -> usize {
     if values[1] > values[0] { 1 } else { 0 }
 }
 
-fn decide(world: WorldFamily, support: SupportMeans, strategy: Strategy) -> Decision {
+fn decide(world: WorldFamily, support: SupportMeans, strategy: Strategy, cost_per_query: f64) -> Decision {
     let model_prediction = support.additive_prediction_at_heldout();
     let (action, predictions) = match strategy {
         Strategy::DirectTabular => (choose_action(support.nearest_context_action_values()), None),
@@ -219,7 +219,7 @@ fn decide(world: WorldFamily, support: SupportMeans, strategy: Strategy) -> Deci
         action,
         predictions,
         model_query_count,
-        query_cost: model_query_count as f64 * MODEL_QUERY_COST,
+        query_cost: model_query_count as f64 * cost_per_query,
     }
 }
 
@@ -236,6 +236,7 @@ struct StrategyResult {
     mean_regret: f64,
     mean_net_regret: f64,
     net_lift_vs_direct: f64,
+    model_query_cost_per_query: f64,
 }
 
 fn nearest_model_mae(predictions: Option<[f64; 2]>, world: WorldFamily) -> Option<f64> {
@@ -248,8 +249,8 @@ fn nearest_model_mae(predictions: Option<[f64; 2]>, world: WorldFamily) -> Optio
     })
 }
 
-fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direct_net: f64, seed: u64) -> StrategyResult {
-    let decision = decide(world, support, strategy);
+fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direct_net: f64, seed: u64, cost_per_query: f64) -> StrategyResult {
+    let decision = decide(world, support, strategy, cost_per_query);
     let chosen_probability = reward_probability(world, HELDOUT_CONTEXT, decision.action);
     let oracle_probability = reward_probability(world, HELDOUT_CONTEXT, 0)
         .max(reward_probability(world, HELDOUT_CONTEXT, 1));
@@ -288,17 +289,34 @@ fn evaluate(world: WorldFamily, strategy: Strategy, support: SupportMeans, direc
         mean_regret,
         mean_net_regret,
         net_lift_vs_direct: mean_net_utility - direct_net,
+        model_query_cost_per_query: cost_per_query,
     }
 }
 
 fn evaluate_family(world: WorldFamily) -> Vec<StrategyResult> {
     let support = SupportMeans::fit(world, SEED);
-    let direct = evaluate(world, Strategy::DirectTabular, support, 0.0, SEED);
-    Strategy::ALL
-        .iter()
-        .copied()
-        .map(|strategy| evaluate(world, strategy, support, direct.mean_net_utility, SEED))
-        .collect()
+    let mut rows = Vec::with_capacity(Strategy::ALL.len() * MODEL_QUERY_COST_LEVELS.len());
+    for cost_per_query in MODEL_QUERY_COST_LEVELS {
+        let direct = evaluate(
+            world,
+            Strategy::DirectTabular,
+            support,
+            0.0,
+            SEED,
+            cost_per_query,
+        );
+        rows.extend(Strategy::ALL.iter().copied().map(|strategy| {
+            evaluate(
+                world,
+                strategy,
+                support,
+                direct.mean_net_utility,
+                SEED,
+                cost_per_query,
+            )
+        }));
+    }
+    rows
 }
 
 fn emit_optional_float(value: Option<f64>) {
@@ -310,8 +328,8 @@ fn emit_optional_float(value: Option<f64>) {
 
 fn emit_report() {
     print!(
-        "{{\"schema_version\":\"{}\",\"seed\":{},\"support_contexts\":[0,1,2],\"heldout_context\":{},\"support_samples_per_context_action\":{},\"evaluation_episodes\":{},\"model_query_cost\":{:.4},\"families\":[",
-        REPORT_SCHEMA, SEED, HELDOUT_CONTEXT, SUPPORT_SAMPLES, EVALUATION_EPISODES, MODEL_QUERY_COST
+        "{{\"schema_version\":\"{}\",\"seed\":{},\"support_contexts\":[0,1,2],\"heldout_context\":{},\"support_samples_per_context_action\":{},\"evaluation_episodes\":{},\"model_query_cost_levels\":[0.0,0.02,0.04,0.08,0.12,0.16],\"families\":[",
+        REPORT_SCHEMA, SEED, HELDOUT_CONTEXT, SUPPORT_SAMPLES, EVALUATION_EPISODES
     );
     for (world_index, world) in WorldFamily::ALL.iter().copied().enumerate() {
         if world_index > 0 {
@@ -324,8 +342,8 @@ fn emit_report() {
                 print!(",");
             }
             print!(
-                "{{\"strategy\":\"{}\",\"chosen_action\":{},\"model_query_count\":{},\"model_query_cost\":{:.4},\"model_prediction_mae\":",
-                row.name, row.chosen_action, row.model_query_count, row.model_query_cost
+                "{{\"strategy\":\"{}\",\"chosen_action\":{},\"model_query_count\":{},\"model_query_cost_per_query\":{:.4},\"model_query_cost\":{:.4},\"model_prediction_mae\":",
+                row.name, row.chosen_action, row.model_query_count, row.model_query_cost_per_query, row.model_query_cost
             );
             emit_optional_float(row.model_prediction_mae);
             print!(
@@ -351,15 +369,15 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn result_for(world: WorldFamily, strategy: Strategy) -> StrategyResult {
+    fn result_for(world: WorldFamily, strategy: Strategy, cost_per_query: f64) -> StrategyResult {
         let support = SupportMeans::fit(world, SEED);
-        let direct = evaluate(world, Strategy::DirectTabular, support, 0.0, SEED);
-        evaluate(world, strategy, support, direct.mean_net_utility, SEED)
+        let direct = evaluate(world, Strategy::DirectTabular, support, 0.0, SEED, cost_per_query);
+        evaluate(world, strategy, support, direct.mean_net_utility, SEED, cost_per_query)
     }
 
     #[test]
     fn fitted_model_lifts_net_utility_on_heldout_additive_composition() {
-        let result = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel);
+        let result = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(result.chosen_action, 1);
         assert!(result.net_lift_vs_direct > 0.10);
         assert!(result.model_query_cost > 0.0);
@@ -368,7 +386,7 @@ mod tests {
 
     #[test]
     fn interaction_only_negative_control_exposes_additive_model_misspecification() {
-        let result = result_for(WorldFamily::InteractionOnly, Strategy::LearnedAdditiveModel);
+        let result = result_for(WorldFamily::InteractionOnly, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(result.chosen_action, 0);
         assert!(result.net_lift_vs_direct < -0.05);
         assert!(result.model_prediction_mae.unwrap() > 0.20);
@@ -376,8 +394,8 @@ mod tests {
 
     #[test]
     fn stale_model_can_be_worse_than_direct_policy_after_regime_reversal() {
-        let direct = result_for(WorldFamily::AdditiveReversed, Strategy::DirectTabular);
-        let stale = result_for(WorldFamily::AdditiveReversed, Strategy::StaleAdditiveModel);
+        let direct = result_for(WorldFamily::AdditiveReversed, Strategy::DirectTabular, 0.04);
+        let stale = result_for(WorldFamily::AdditiveReversed, Strategy::StaleAdditiveModel, 0.04);
         assert_eq!(direct.chosen_action, 0);
         assert_eq!(stale.chosen_action, 1);
         assert!(stale.mean_net_utility < direct.mean_net_utility - 0.30);
@@ -386,14 +404,27 @@ mod tests {
 
     #[test]
     fn shuffled_model_control_breaks_action_prediction_alignment() {
-        let direct = result_for(WorldFamily::AdditivePositive, Strategy::DirectTabular);
-        let shuffled = result_for(WorldFamily::AdditivePositive, Strategy::ShuffledModel);
-        let fitted = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel);
+        let direct = result_for(WorldFamily::AdditivePositive, Strategy::DirectTabular, 0.04);
+        let shuffled = result_for(WorldFamily::AdditivePositive, Strategy::ShuffledModel, 0.04);
+        let fitted = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(direct.chosen_action, 0);
         assert_eq!(shuffled.chosen_action, 0);
         assert!(shuffled.mean_net_utility < direct.mean_net_utility);
         assert!(shuffled.net_lift_vs_direct < 0.0);
         assert!(fitted.mean_net_utility > shuffled.mean_net_utility);
+    }
+
+    #[test]
+    fn cost_frontier_exposes_model_break_even_point() {
+        let free = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.0);
+        let normal_cost = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
+        let expensive = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.16);
+        assert!(free.net_lift_vs_direct > normal_cost.net_lift_vs_direct);
+        assert!(normal_cost.net_lift_vs_direct > expensive.net_lift_vs_direct);
+        assert!(free.net_lift_vs_direct > 0.10);
+        assert!(expensive.net_lift_vs_direct < 0.0);
+        assert_eq!(expensive.model_query_count, 2);
+        assert!((expensive.model_query_cost - 0.32).abs() < 1e-9);
     }
 
     #[test]
@@ -414,8 +445,8 @@ mod tests {
 
     #[test]
     fn evaluation_is_deterministic_for_fixed_seed() {
-        let first = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel);
-        let second = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel);
+        let first = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
+        let second = result_for(WorldFamily::AdditivePositive, Strategy::LearnedAdditiveModel, 0.04);
         assert_eq!(first.mean_reward, second.mean_reward);
         assert_eq!(first.mean_net_utility, second.mean_net_utility);
         assert_eq!(first.mean_regret, second.mean_regret);
