@@ -11,6 +11,7 @@
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const COUNTERFACTUAL_FIXTURE_SCHEMA: &str = "BROCA-COUNTERFACTUAL-EVIDENCE-AUDIT-V1";
@@ -486,9 +487,22 @@ pub struct AtomAblationScoreSummary {
 /// labelled atom. This function is not part of the production inference path.
 pub fn score_atom_ablation_jsonl(
     observations_jsonl: &str,
+    input_fixture_jsonl: &str,
     evaluator_labels_jsonl: &str,
 ) -> Result<AtomAblationScoreSummary, String> {
     const OBSERVATION_SCHEMA: &str = "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1";
+    let fixtures = validate_counterfactual_fixture_jsonl(input_fixture_jsonl)?;
+    let expected_fixture_sha256 = hex::encode(Sha256::digest(input_fixture_jsonl.as_bytes()));
+    let mut fixture_evidence_keys = BTreeSet::<(String, String)>::new();
+    let mut fixture_case_ids = BTreeSet::<String>::new();
+    for pair in &fixtures {
+        for case in &pair.cases {
+            fixture_case_ids.insert(case.case_id.clone());
+            for evidence in &case.evidence {
+                fixture_evidence_keys.insert((case.case_id.clone(), evidence.evidence_id.clone()));
+            }
+        }
+    }
     let mut observations = Vec::new();
     let mut observation_keys = BTreeSet::new();
 
@@ -507,6 +521,9 @@ pub fn score_atom_ablation_jsonl(
         require_trimmed("evidence_id", &observation.evidence_id)?;
         require_trimmed("reader_revision", &observation.reader_revision)?;
         validate_hex_digest("fixture_sha256", &observation.fixture_sha256, 64)?;
+        if observation.fixture_sha256 != expected_fixture_sha256 {
+            return Err(format!("fixture digest mismatch on observation line {line_number}"));
+        }
         validate_hex_digest("prompt_sha256", &observation.prompt_sha256, 64)?;
         validate_hex_digest("tokenizer_sha256", &observation.tokenizer_sha256, 64)?;
         validate_hex_digest("system_commit_sha", &observation.system_commit_sha, 40)?;
@@ -549,9 +566,15 @@ pub fn score_atom_ablation_jsonl(
             if !case_ids.insert(case.case_id.clone()) {
                 return Err(format!("duplicate labeled case {:?}", case.case_id));
             }
+            if !fixture_case_ids.contains(&case.case_id) {
+                return Err(format!("evaluator label references unknown fixture case {:?}", case.case_id));
+            }
             for target in case.atom_use_targets {
                 validate_atom_target(&target)?;
                 let key = (case.case_id.clone(), target.evidence_id.clone());
+                if !fixture_evidence_keys.contains(&key) {
+                    return Err(format!("evaluator target references absent fixture evidence {key:?}"));
+                }
                 if targets.insert(key.clone(), target).is_some() {
                     return Err(format!("duplicate atom-use target for {key:?}"));
                 }
@@ -931,7 +954,7 @@ mod tests {
     fn atom_ablation_scorer_reports_ignore_bound_and_control_separately() {
         let rows = synthetic_ablation_rows();
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
-        let result = score_atom_ablation_jsonl(&observations, LABELS)
+        let result = score_atom_ablation_jsonl(&observations, FIXTURES, LABELS)
             .expect("well-formed synthetic ablation run must score");
         assert_eq!(result.observation_count, 5);
         assert_eq!(result.ignore_count, 1);
@@ -959,7 +982,7 @@ mod tests {
         let unchanged_control = rows[2]["full_fields"].clone();
         rows[2]["ablated_fields"] = unchanged_control;
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
-        let result = score_atom_ablation_jsonl(&observations, LABELS)
+        let result = score_atom_ablation_jsonl(&observations, FIXTURES, LABELS)
             .expect("valid but behaviorally faulty synthetic observations still score");
         assert_eq!(result.ignore_overuse_count, 1);
         assert_eq!(result.control_underuse_count, 1);
@@ -969,7 +992,7 @@ mod tests {
     fn atom_ablation_scorer_rejects_missing_or_unlabelled_observations() {
         let rows = synthetic_ablation_rows();
         let observations = rows.iter().take(4).map(Value::to_string).collect::<Vec<_>>().join("\n");
-        assert!(score_atom_ablation_jsonl(&observations, LABELS).is_err());
+        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
 
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
         let extra = serde_json::json!({
@@ -988,7 +1011,7 @@ mod tests {
             "ablated_fields": {}
         });
         let observations = format!("{}\n{}", observations, extra);
-        assert!(score_atom_ablation_jsonl(&observations, LABELS).is_err());
+        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
     }
 
     #[test]
