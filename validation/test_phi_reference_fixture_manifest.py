@@ -40,6 +40,12 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
         for quantity in quantities:
             self.assertGreater(quantity["absolute_tolerance"], 0)
             self.assertTrue(quantity["kind"])
+            self.assertIn(quantity["quantity_id"], {
+                "iit4_system_phi_s",
+                "iit4_cause_phi_c",
+                "iit4_effect_phi_e",
+                "iit4_structure_big_phi",
+            })
 
     def test_system_phi_and_structure_phi_are_distinct(self):
         by_id = {quantity["id"]: quantity for quantity in self.fixture["quantities"]}
@@ -56,6 +62,12 @@ class PyPhiReferenceAnchorManifestTests(unittest.TestCase):
         )
         self.assertEqual(
             pass_guard["properties"]["summary"]["properties"]["passed_anchor_count"]["const"], 6
+        )
+        self.assertIn("evaluation_sha256", self.schema["properties"]["provenance"]["required"])
+        self.assertIn("reference_manifest_sha256", self.schema["properties"]["provenance"]["required"])
+        self.assertIn(
+            "analysis_request_sha256",
+            self.schema["properties"]["comparisons"]["items"]["required"],
         )
 
 
