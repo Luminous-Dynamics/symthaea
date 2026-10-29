@@ -1733,15 +1733,18 @@ mod tests {
     }
 
     #[test]
-    fn forward_cause_likelihood_is_unormalized_and_matches_complete_tpm_rows() {
+    fn forward_cause_likelihood_is_unnormalized_and_matches_complete_tpm_rows() {
         let model = two_unit_model();
         let forward = model.forward_cause_likelihood(
             &[0, 1],
             &[true, false],
             &[0, 1],
         ).unwrap();
-        assert_eq!(forward, vec![0.08, 0.72, 0.02, 0.18]);
-        // Its role is a likelihood vector, so normalization is not a type invariant.
+        let expected = [0.08, 0.72, 0.02, 0.18];
+        for (actual, expected) in forward.iter().zip(expected) {
+            assert!((actual - expected).abs() < 1e-12);
+        }
+        // Its role is a likelihood vector; its entries are not generally normalized.
         assert!((forward.iter().sum::<f64>() - 1.0).abs() < 1e-12);
     }
 
