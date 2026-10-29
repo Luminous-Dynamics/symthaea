@@ -310,6 +310,9 @@ pub fn account_energy_ledger(
         return Err(AccountingError::ArithmeticOverflow);
     }
 
+    non_co2_not_assessed_record_ids.sort();
+    non_co2_observations.sort_by(|left, right| left.record_id.cmp(&right.record_id));
+
     let currency_code = currency.ok_or(AccountingError::MissingIdentifier("currency code"))?;
     Ok(AccountingSummary {
         period_id: service.period_id.clone(),
