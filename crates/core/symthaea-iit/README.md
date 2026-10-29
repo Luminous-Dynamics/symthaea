@@ -212,3 +212,22 @@ of matrices—not merely the count—against the optimized enumerator for 2–5 
 The existing assignment/unique-cut counts remain fixed. This is an exact-semantic
 optimization candidate; runtime improvement must still be measured in the Rust
 release microbenchmark before claiming a speedup.
+
+
+For context before timing is available, the combinatorics imply the following
+matrix-loop work counts for the previous implementation (one full n² pass per
+block and assignment) versus the current implementation (one full n² pass per
+block-direction assignment). These are analytical operation counts, not elapsed
+time or a claim of end-to-end speedup:
+
+| Units | Assignments | Previous block-by-matrix iterations | Current matrix-cell checks | Ratio |
+|---:|---:|---:|---:|---:|
+| 2 | 9 | 72 | 36 | 2.00× |
+| 3 | 54 | 1,215 | 486 | 2.50× |
+| 4 | 306 | 14,976 | 4,896 | 3.06× |
+| 5 | 1,863 | 168,750 | 46,575 | 3.62× |
+
+The older path also performed linear membership scans for both endpoints within
+each block iteration; the new path uses the precomputed block index plus incoming/
+outgoing flags. Actual performance must be established by the release microbenchmark
+on a pinned build and machine, including allocation and deduplication costs.
