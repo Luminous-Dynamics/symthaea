@@ -499,8 +499,10 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                         });
                     let mut certified_winner = None;
                     for i in 0..lower_bounds.len() {
-                        if (0..upper_bounds.len()).filter(|&j| j != i)
-                            .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
+                        // Suppress a certificate if its own interval is numerically reversed.
+                        if lower_bounds[i] <= upper_bounds[i] + EPS
+                            && (0..upper_bounds.len()).filter(|&j| j != i)
+                                .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
                         {
                             certified_winner = Some(i);
                             break;
