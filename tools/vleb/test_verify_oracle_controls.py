@@ -377,6 +377,19 @@ class ContractTest(unittest.TestCase):
         with self.assertRaisesRegex(verifier.ControlError, "symlink entry"):
             verifier.extract_test_bundle(output.getvalue(), self.root / "safe-root")
 
+    def test_zip_directory_entry_cannot_follow_symlink_parent(self) -> None:
+        workspace = self.root / "safe-workspace"
+        outside = self.root / "outside"
+        workspace.mkdir()
+        outside.mkdir()
+        (workspace / "linked").symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(verifier.ControlError, "symlink directory in test bundle path"):
+            verifier.extract_test_bundle(
+                zip_bytes([("linked/escape-dir/", b"")]),
+                workspace,
+            )
+        self.assertFalse((outside / "escape-dir").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
