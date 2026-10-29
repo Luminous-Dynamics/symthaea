@@ -67,6 +67,7 @@ This is not a statistical bug. It is a change of estimand: equal-component weigh
 3. Preregister a broader simulator grid over component count, size CV, maximum component share, baseline success, ICC, effect heterogeneity, effect-size correlation with component size, and paired-outcome association. Include selective missingness and alternate data-generating families.
 4. Compare at least one small-sample-corrected method and a randomization-based method only where its assignment/exchangeability assumptions are actually met. The percentile component bootstrap is a candidate, not an endorsed universal solution.
 5. Obtain independent statistical review, and test the production Rust implementation separately. This exploratory NumPy harness cannot qualify itself or substitute for exact-head CI evidence.
+6. Treat the follow-on interval-method comparison in `pitb-inference-method-comparison-2026-10-29.md` as a diagnostic, not a replacement decision. It does not establish that either estimator meets simultaneous calibration criteria.
 
 ## External methodology context
 
