@@ -624,6 +624,62 @@ impl BinaryCausalModel {
         Ok(repertoire)
     }
 
+    /// Compute the forward cause likelihood over past purview states.
+    ///
+    /// For each purview state, average the probability of the observed mechanism
+    /// state over all unconstrained background units under a uniform prior. Each
+    /// mechanism unit's likelihood factor is marginalized separately, matching the
+    /// factored TPM repertoire convention; those factors are then multiplied.
+    ///
+    /// The result is a likelihood vector and is deliberately **not normalized**
+    /// over past purview states. For system-level GID, this is the forward cause
+    /// repertoire; its selectivity weighting is supplied separately by the
+    /// normalized cause repertoire. The first purview unit is the least-significant
+    /// bit in the output index.
+    pub fn forward_cause_likelihood(
+        &self,
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(mechanism, "mechanism")?;
+        self.validate_subset(purview, "purview")?;
+
+        let purview_state_count = 1usize << purview.len();
+        let background_count = 1usize << (self.n_units - purview.len());
+        let mut per_mechanism_unit = vec![vec![0.0; purview_state_count]; mechanism.len()];
+
+        for past_index in 0..self.n_states() {
+            let purview_state = purview.iter().copied().enumerate().fold(
+                0usize,
+                |state_index, (slot, unit)| {
+                    if ((past_index >> unit) & 1) != 0 {
+                        state_index | (1usize << slot)
+                    } else {
+                        state_index
+                    }
+                },
+            );
+            for (mechanism_slot, target_unit) in mechanism.iter().copied().enumerate() {
+                let p_on = self.transition_probabilities[past_index * self.n_units + target_unit];
+                let likelihood = if current_state[target_unit] { p_on } else { 1.0 - p_on };
+                per_mechanism_unit[mechanism_slot][purview_state] += likelihood;
+            }
+        }
+
+        let mut forward = vec![1.0; purview_state_count];
+        for factor in &mut per_mechanism_unit {
+            for likelihood in factor.iter_mut() {
+                *likelihood /= background_count as f64;
+            }
+            for (state_likelihood, factor_likelihood) in forward.iter_mut().zip(factor.iter()) {
+                *state_likelihood *= factor_likelihood;
+            }
+        }
+        Ok(forward)
+    }
+
     /// Compute a cause repertoire as a normalized product of single-unit cause repertoires.
     ///
     /// Each mechanism unit contributes a distribution over past purview states:
@@ -1674,6 +1730,40 @@ mod tests {
         assert!((cut.probability_next_one(&[false, false, false], 1).unwrap() - 0.2).abs() < 1e-12);
         assert!((cut.probability_next_one(&[true, false, false], 1).unwrap() - 0.2).abs() < 1e-12);
         assert_eq!(cut.probability_next_one(&[false, false, false], 2).unwrap(), 0.3);
+    }
+
+    #[test]
+    fn forward_cause_likelihood_is_unormalized_and_matches_complete_tpm_rows() {
+        let model = two_unit_model();
+        let forward = model.forward_cause_likelihood(
+            &[0, 1],
+            &[true, false],
+            &[0, 1],
+        ).unwrap();
+        assert_eq!(forward, vec![0.08, 0.72, 0.02, 0.18]);
+        // Its role is a likelihood vector, so normalization is not a type invariant.
+        assert!((forward.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn forward_cause_likelihood_marginalizes_hidden_background_units() {
+        let model = two_unit_model();
+        let forward = model.forward_cause_likelihood(
+            &[0],
+            &[true, false],
+            &[1],
+        ).unwrap();
+        assert!((forward[0] - 0.5).abs() < 1e-12);
+        assert!((forward[1] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn empty_mechanism_has_unit_forward_cause_likelihood() {
+        let model = two_unit_model();
+        assert_eq!(
+            model.forward_cause_likelihood(&[], &[true, false], &[0, 1]).unwrap(),
+            vec![1.0; 4]
+        );
     }
 
 }
