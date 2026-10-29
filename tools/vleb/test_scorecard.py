@@ -92,6 +92,18 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
     if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
         errors.append("last_secure_benchmark_reference_drift")
+    oracle_mutation_target = data.get("proposed_targets", {}).get("oracle_control_verifier_mutation_kill_rate_pct", {})
+    oracle_mutation_current = data.get("current_measurements", {}).get("oracle_control_verifier_mutation_kill_rate_pct", {})
+    oracle_mutation_definition = data.get("metric_definitions", {}).get("oracle_control_verifier_mutation_kill_rate", {})
+    if oracle_mutation_target.get("target") != 100 or oracle_mutation_target.get("status") != "target_not_measured":
+        errors.append("oracle_control_verifier_mutation_target_drift")
+    if oracle_mutation_current.get("value") is not None or oracle_mutation_current.get("eligible") is not False:
+        errors.append("oracle_control_verifier_mutation_score_fabricated")
+    if oracle_mutation_definition.get("composite_weighted_score") is not False:
+        errors.append("oracle_control_verifier_mutation_must_not_use_weighted_score")
+    if not any("do not drop a surviving or invalid mutation" in rule for rule in oracle_mutation_definition.get("denominator_rules", [])):
+        errors.append("oracle_control_verifier_mutation_denominator_drift")
+
     oracle_replay_target = data.get("proposed_targets", {}).get("two_sided_oracle_control_replay_coverage_pct", {})
     oracle_replay_current = data.get("current_measurements", {}).get("two_sided_oracle_control_replay_coverage_pct", {})
     oracle_replay_definition = data.get("metric_definitions", {}).get("two_sided_oracle_control_replay_coverage", {})
@@ -177,6 +189,16 @@ class ScorecardTests(unittest.TestCase):
         target = self.scorecard["proposed_targets"]["two_sided_oracle_control_replay_coverage_pct"]
         current = self.scorecard["current_measurements"]["two_sided_oracle_control_replay_coverage_pct"]
         definition = self.scorecard["metric_definitions"]["two_sided_oracle_control_replay_coverage"]
+        self.assertEqual(target["target"], 100)
+        self.assertEqual(target["status"], "target_not_measured")
+        self.assertIsNone(current["value"])
+        self.assertFalse(current["eligible"])
+        self.assertFalse(definition["composite_weighted_score"])
+
+    def test_oracle_control_mutation_metric_remains_unmeasured(self) -> None:
+        target = self.scorecard["proposed_targets"]["oracle_control_verifier_mutation_kill_rate_pct"]
+        current = self.scorecard["current_measurements"]["oracle_control_verifier_mutation_kill_rate_pct"]
+        definition = self.scorecard["metric_definitions"]["oracle_control_verifier_mutation_kill_rate"]
         self.assertEqual(target["target"], 100)
         self.assertEqual(target["status"], "target_not_measured")
         self.assertIsNone(current["value"])
