@@ -1,0 +1,73 @@
+name: VIS-DVPC-038 hedged scalar-betting grid audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-038-scalar-grid-cs.rs"
+      - "tests/fixtures/vision-dvpc-038-scalar-grid.tsv"
+      - "tests/fixtures/vision-dvpc-038.SHA256SUMS"
+      - "docs/research/VIS_DVPC_038_SCALAR_GRID_CS_V1.md"
+      - ".github/workflows/vis-dvpc-038-scalar-grid-cs.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-038-scalar-grid-cs.rs"
+      - "tests/fixtures/vision-dvpc-038-scalar-grid.tsv"
+      - "tests/fixtures/vision-dvpc-038.SHA256SUMS"
+      - "docs/research/VIS_DVPC_038_SCALAR_GRID_CS_V1.md"
+      - ".github/workflows/vis-dvpc-038-scalar-grid-cs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source and frozen DGPs
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Verify frozen fixture digest
+        run: sha256sum -c tests/fixtures/vision-dvpc-038.SHA256SUMS
+      - name: Run exact-grid unit tests
+        run: |
+          rustc --edition=2024 --test tools/vision-dvpc-038-scalar-grid-cs.rs -o /tmp/vis-dvpc-038-tests
+          /tmp/vis-dvpc-038-tests
+      - name: Enumerate all paths and verify calibration controls
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-038-scalar-grid-cs.rs -o /tmp/vis-dvpc-038
+          /tmp/vis-dvpc-038 --sweep > /tmp/vis-dvpc-038-results.tsv
+          test "$(grep -c '^GRID_METRIC' /tmp/vis-dvpc-038-results.tsv)" = "3024"
+          test "$(grep -c '^DP_LOOK' /tmp/vis-dvpc-038-results.tsv)" = "96"
+          test "$(grep -c '^SCENARIO.*enumerated_paths' /tmp/vis-dvpc-038-results.tsv)" = "6"
+          test "$(grep -c '^TRUE_VALUE' /tmp/vis-dvpc-038-results.tsv)" = "48"
+          grep -Fq $'SCENARIO\tweak_null_p099\t8\t0.50\ttrue_candidate_ever_rejection_probability\t0.008101857334' /tmp/vis-dvpc-038-results.tsv
+          grep -Fq $'GRID_METRIC\tweak_small_alt_p099\t8\t0.50\tever_rejection_probability\t0.007547226594' /tmp/vis-dvpc-038-results.tsv
+          grep -Fq $'SCENARIO\tweak_small_alt_p099\t8\t0.55\ttrue_candidate_ever_rejection_probability\t0.004168114688' /tmp/vis-dvpc-038-results.tsv
+          grep -Fq $'SCENARIO\tweak_clear_alt_p099\t8\t0.65\ttrue_candidate_ever_rejection_probability\t0.002021686820' /tmp/vis-dvpc-038-results.tsv
+          awk -F '\t' '$1=="SCENARIO" && $5=="true_candidate_ever_rejection_probability" { if ($6 < 0 || $6 > 0.05000001) exit 1; n++ } END { if (n != 6) exit 1 }' /tmp/vis-dvpc-038-results.tsv
+          awk -F '\t' '$1=="DP_LOOK" && $5=="probability_mass" { if ($6 < 0.99999999 || $6 > 1.00000001) exit 1; n++ } END { if (n != 48) exit 1 }' /tmp/vis-dvpc-038-results.tsv
+          grep -Fq 'TRUE_VALUE_ON_FROZEN_GRID_ONLY' /tmp/vis-dvpc-038-results.tsv
+          grep -Fq 'expected_convex_hull_width_diagnostic_only' /tmp/vis-dvpc-038-results.tsv
+          grep '^SCENARIO' /tmp/vis-dvpc-038-results.tsv > /tmp/vis-dvpc-038-summaries.tsv
+      - name: Create reproducibility receipt
+        run: |
+          {
+            printf 'VIS_DVPC_038_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-038-scalar-grid-cs.rs tests/fixtures/vision-dvpc-038.SHA256SUMS tests/fixtures/vision-dvpc-038-scalar-grid.tsv /tmp/vis-dvpc-038-results.tsv /tmp/vis-dvpc-038-summaries.tsv
+          } > /tmp/vis-dvpc-038-receipt.tsv
+          cat /tmp/vis-dvpc-038-receipt.tsv
+      - name: Publish candidate grid and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-038-scalar-grid-cs
+          path: |
+            /tmp/vis-dvpc-038-results.tsv
+            /tmp/vis-dvpc-038-summaries.tsv
+            /tmp/vis-dvpc-038-receipt.tsv
+          retention-days: 90
