@@ -281,3 +281,17 @@ This file is a qualification protocol and source-informed research proposal. It 
 The branch now includes `validation/generate_pyphi_reference_fixtures.py` and a documented anchor manifest for PyPhi's IIT 4.0 (2023) Fig. 1A example. The runner requires the exact PyPI version `2.0.0rc4`, explicitly requests `IIT_4_0_2023`, extracts the TPM and declared connectivity, hashes the canonical model record, and checks six published quantities. It emits a run artifact that is scoped to the upstream reference only; it does not compare against Symthaea's HDC score.
 
 The fixture manifest is marked `documented_reference_anchor_not_locally_reexecuted`. The runner, schema, and tests have not been executed in this environment. Keep the result unqualified until the pinned package runs successfully and the resulting artifact is independently inspected.
+
+
+## Follow-on work: cross-language digest contract
+
+The research branch now includes `validation/iit_digest_contract.py`, a dependency-free encoder that mirrors the byte encoding in `crates/core/symthaea-iit`. The PyPhi smoke-test runner imports those helpers rather than maintaining a second implementation.
+
+The shared contract separates:
+- model digest: canonical TPM bytes and explicitly declared directed connectivity;
+- evaluation digest: model bytes plus the evaluation state;
+- analysis-request digest: model bytes, state, candidate subsystem, formalism profile, and quantity identity.
+
+Golden vectors cover a two-unit TPM, one evaluation state, and an IIT 4.0 (2023) system-φ_s request. The vectors exist in both Rust unit tests and Python's dependency-free tests. The encoder rejects connectivity that omits an influence present in the TPM, matching the Rust input-validation policy.
+
+This is a byte-identity contract only; it does not establish that the scientific model is causally correct, that the repertoire algorithm is formally equivalent to PyPhi, or that any Phi quantity is correctly calculated. The Python tests and Rust tests have not been executed in this environment; static readback alone is not qualification evidence.
