@@ -616,7 +616,7 @@ fn print_help() {
            --seed N          random-probe seed (default 7)\n\
            --probe-budget N  maximum probes per mechanism, 0..=8 (default 2)\n\
            --probe-cost X    utility units charged per probe, 0..=100 (default 0.25)\n\
-           --decision-horizon N  downstream decision rounds, 1..=10000 (default 1)\n\\
+           --decision-horizon N  downstream decision rounds, 1..=10000 (default 1)\n\
            --help            print this help"
     );
 }
