@@ -67,6 +67,8 @@ struct CandidateSplit {
     dataset_kind: String,
     bytes_sha256: String,
     partition_digest_sha256: String,
+    source_component_manifest_sha256: String,
+    relationship_inventory_sha256: String,
     family_to_split: BTreeMap<String, String>,
     family_to_component: BTreeMap<String, String>,
     components: BTreeMap<String, ComponentRow>,
@@ -335,10 +337,132 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         dataset_kind: dataset_kind.to_owned(),
         bytes_sha256: sha256(bytes),
         partition_digest_sha256: expected_partition_digest.to_owned(),
+        source_component_manifest_sha256: doc["source_component_manifest_sha256"]
+            .as_str()
+            .context("candidate component manifest digest is missing")?
+            .to_owned(),
+        relationship_inventory_sha256: doc["relationship_inventory_sha256"]
+            .as_str()
+            .context("candidate relationship inventory digest is missing")?
+            .to_owned(),
         family_to_split,
         family_to_component,
         components,
     })
+}
+
+fn validate_component_manifest(bytes: &[u8], split: &CandidateSplit) -> Result<()> {
+    if sha256(bytes) != split.source_component_manifest_sha256 {
+        bail!("component manifest bytes do not match the candidate's pinned manifest digest");
+    }
+    let doc: Value = serde_json::from_slice(bytes).context("parse source component manifest")?;
+    if doc["schema_version"].as_str() != Some("pitb.independent-component-manifest.v0")
+        || doc["upstream_commit"].as_str() != Some(UPSTREAM)
+        || doc["source_partition_digest_sha256"].as_str() != Some(V0_PARTITION)
+        || doc["relationship_inventory_sha256"].as_str()
+            != Some(split.relationship_inventory_sha256.as_str())
+    {
+        bail!("source component manifest is not bound to the pinned upstream and relationship inventory");
+    }
+    if split.dataset_kind == "synthetic_fixture"
+        && doc["dataset_kind"].as_str() != Some("synthetic_fixture")
+    {
+        bail!("synthetic split fixture requires an explicitly synthetic component manifest");
+    }
+
+    let expected_family_count = split.family_to_split.len();
+    let expected_component_count = split.components.len();
+    if doc["total_family_count"].as_u64() != Some(expected_family_count as u64)
+        || doc["total_component_count"].as_u64() != Some(expected_component_count as u64)
+    {
+        bail!("source component manifest declared counts do not match candidate counts");
+    }
+    if split.dataset_kind == "candidate_only"
+        && (expected_family_count != 372
+            || family_universe_digest(&split.family_to_split.keys().cloned().collect())
+                != EXPECTED_FAMILY_UNIVERSE_SHA256)
+    {
+        bail!("source component manifest validation requires the pinned real family universe");
+    }
+
+    let family_rows = doc["families"]
+        .as_array()
+        .context("source component manifest families must be an array")?;
+    let component_rows = doc["components"]
+        .as_array()
+        .context("source component manifest components must be an array")?;
+    if family_rows.len() != expected_family_count
+        || component_rows.len() != expected_component_count
+    {
+        bail!("source component manifest row counts do not match declared totals");
+    }
+
+    let mut source_family_to_component = BTreeMap::new();
+    for row in family_rows {
+        let family_id = row["family_id"]
+            .as_str()
+            .context("source component manifest family missing family_id")?;
+        let component_id = row["component_id"]
+            .as_str()
+            .context("source component manifest family missing component_id")?;
+        if source_family_to_component
+            .insert(family_id.to_owned(), component_id.to_owned())
+            .is_some()
+        {
+            bail!("source component manifest contains a duplicate family ID");
+        }
+    }
+    if source_family_to_component.len() != split.family_to_component.len()
+        || source_family_to_component != split.family_to_component
+    {
+        bail!("candidate family-to-component mapping disagrees with exact source manifest bytes");
+    }
+
+    let mut source_component_members = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut seen_members = BTreeSet::new();
+    for row in component_rows {
+        let component_id = row["component_id"]
+            .as_str()
+            .context("source component manifest component missing component_id")?;
+        let members = row["family_ids"]
+            .as_array()
+            .context("source component manifest family_ids must be an array")?;
+        if members.is_empty() {
+            bail!("source component manifest contains an empty component");
+        }
+        let mut member_set = BTreeSet::new();
+        for member in members {
+            let family_id = member
+                .as_str()
+                .context("source component member ID must be a string")?;
+            if !split.family_to_split.contains_key(family_id)
+                || !seen_members.insert(family_id.to_owned())
+                || !member_set.insert(family_id.to_owned())
+            {
+                bail!("source component manifest has an unknown or repeated family");
+            }
+            if split.family_to_component[family_id] != component_id {
+                bail!("source component membership disagrees with the family-to-component table");
+            }
+        }
+        if source_component_members
+            .insert(component_id.to_owned(), member_set)
+            .is_some()
+        {
+            bail!("source component IDs must be unique");
+        }
+    }
+    if seen_members.len() != expected_family_count
+        || source_component_members.len() != expected_component_count
+    {
+        bail!("source component manifest does not cover every family exactly once");
+    }
+    for (component_id, candidate_component) in &split.components {
+        if source_component_members.get(component_id) != Some(&candidate_component.family_ids) {
+            bail!("candidate component membership disagrees with exact source manifest bytes");
+        }
+    }
+    Ok(())
 }
 
 fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result<()> {
@@ -460,17 +584,25 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
 
 fn execute() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 4 {
-        println!("usage: {} <component-first-candidate.json> <pre-split-target-census.json> <report.json>", args.first().map(String::as_str).unwrap_or("audit_component_split_feasibility"));
-        bail!("expected three file arguments");
+    if args.len() != 5 {
+        println!(
+            "usage: {} <component-first-candidate.json> <pre-split-target-census.json> <source-component-manifest.json> <report.json>",
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("audit_component_split_feasibility")
+        );
+        bail!("expected four file arguments");
     }
 
     let split_bytes = fs::read(&args[1])
         .with_context(|| format!("read candidate split {}", args[1]))?;
     let census_bytes = fs::read(&args[2])
         .with_context(|| format!("read target census {}", args[2]))?;
-    let output_path = &args[3];
+    let component_manifest_bytes = fs::read(&args[3])
+        .with_context(|| format!("read source component manifest {}", args[3]))?;
+    let output_path = &args[4];
     let split = parse_candidate_split(&split_bytes)?;
+    validate_component_manifest(&component_manifest_bytes, &split)?;
     let census: EligibilityCensus = serde_json::from_slice(&census_bytes)
         .context("parse outcome-blind eligibility census")?;
     validate_census(&census, &split)?;
@@ -558,6 +690,7 @@ fn execute() -> Result<()> {
         "status": "diagnostic_only",
         "candidate_dataset_kind": split.dataset_kind,
         "candidate_split_sha256": split.bytes_sha256,
+        "source_component_manifest_sha256": split.source_component_manifest_sha256,
         "candidate_partition_digest_sha256": split.partition_digest_sha256,
         "eligibility_census_sha256": sha256(&census_bytes),
         "family_universe_sha256": census.family_universe_sha256,
