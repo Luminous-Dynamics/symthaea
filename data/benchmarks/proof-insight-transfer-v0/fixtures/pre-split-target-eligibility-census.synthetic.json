@@ -13,42 +13,48 @@
       "candidate_target_ids": [
         "t-a"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "eligible"
     },
     {
       "family_id": "b",
       "candidate_target_ids": [
         "t-b"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "eligible"
     },
     {
       "family_id": "c",
       "candidate_target_ids": [
         "t-c"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "eligible"
     },
     {
       "family_id": "d",
       "candidate_target_ids": [
         "t-d"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "excluded"
     },
     {
       "family_id": "e",
       "candidate_target_ids": [
         "t-e"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "eligible"
     },
     {
       "family_id": "f",
       "candidate_target_ids": [
         "t-f"
       ],
-      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "eligibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility_status": "unknown"
     }
   ],
   "targets": [
