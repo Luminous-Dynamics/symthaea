@@ -824,7 +824,7 @@ fn family_scorecard(
             let rate = if eligible == 0 {
                 None
             } else {
-                Some(((u128::from(value.violations) * 1_000_000) / u128::from(eligible)) as u32)
+                Some(((u128::from(value.violations) * 1_000_000 + u128::from(eligible) / 2) / u128::from(eligible)) as u32)
             };
             ContractFamilySummaryV1 {
                 family,
