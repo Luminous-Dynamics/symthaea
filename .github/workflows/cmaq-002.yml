@@ -1,0 +1,53 @@
+name: CMAQ-002 active causal learning
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-002/**"
+      - ".github/workflows/cmaq-002.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-002/**"
+      - ".github/workflows/cmaq-002.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evoi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-002
+        run: cargo test --locked
+      - name: Run benchmark and validate report schema
+        working-directory: research/cmaq-002
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked -- --seed 4242 --probe-budget 2 --probe-cost 0.25 > /tmp/cmaq-002-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-002-report.json").read_text())
+          assert report["schema_version"] == "cmaq-002-evoi-report-v0.1"
+          assert report["mechanisms"] == 9
+          assert report["families"] == 3
+          assert report["contexts"] == 4
+          assert report["actions"] == 3
+          by_name = {row["strategy"]: row for row in report["results"]}
+          assert set(by_name) == {
+              "no_probe", "fixed", "random", "max_information", "evoi", "oracle"
+          }
+          assert by_name["oracle"]["mean_regret"] == 0
+          assert all(row["unsafe_actions"] == 0 for row in report["results"])
+          assert all(row["contradictions"] == 0 for row in report["results"])
+          print("CMAQ-002 report schema and hard-gate counters valid")
+          print(json.dumps(by_name, sort_keys=True))
+          PY
