@@ -22,8 +22,9 @@ class ReferenceCrosscheckUtilityTests(unittest.TestCase):
 
     def test_nonfinite_mismatch_is_not_hidden(self):
         result = compare_bounds((0.0, 1.0), (float("-inf"), 1.0))
-        self.assertTrue(np.isinf(result["lower_abs_error"]))
-        self.assertTrue(np.isinf(result["max_abs_error"]))
+        self.assertIsNone(result["lower_abs_error"])
+        self.assertIsNone(result["max_abs_error"])
+        self.assertTrue(result["nonfinite_mismatch"])
 
     def test_streams_are_seeded_and_support_bounded(self):
         first = make_streams(32, 7)
