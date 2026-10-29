@@ -65,6 +65,26 @@ jobs:
           python3 tools/casting-benchmark/test_forecast_event_journal.py
           python3 tools/casting-benchmark/test_paired_benchmark_audit.py
           python3 tools/casting-benchmark/test_paired_benchmark_promotion_gate.py
+          python3 tools/casting-benchmark/test_historical_transfer_benchmark.py
+
+          # Synthetic leave-task-family-out history-transfer smoke. This is a
+          # predictor audit, not an optimizer-superiority or physical result.
+          python3 tools/casting-benchmark/historical_transfer_benchmark.py \
+            --history-points 2 --test-points 8 --nearest-k 3 --reuse-count 10 \
+            --output /tmp/casting-history-transfer.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("/tmp/casting-history-transfer.json").read_text())
+          assert receipt["receipt_label"] == "HISTORICAL_TRANSFER_SYNTHETIC_PREDICTION_AUDIT_NOT_OPTIMIZER_SOTA_EVIDENCE"
+          assert receipt["evidence_class"] == "synthetic"
+          assert receipt["source_task_count"] == 8
+          assert receipt["target_task_count"] == 4
+          assert receipt["target_high_fidelity_used_by_predictor"] is False
+          assert receipt["history_pair_count"] == 16
+          assert receipt["claim_ceiling"].startswith("Deterministic synthetic prediction-transfer audit only")
+          print("historical transfer synthetic receipt validated")
+          PY
 
           # End-to-end synthetic diagnostic: runner -> frozen selection/shift
           # manifests -> hash-checking adapter -> independent receipt evaluator.
