@@ -24621,9 +24621,11 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "proc-macro2",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "syn 2.0.117",
  "toml 0.8.23",
 ]
 

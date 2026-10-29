@@ -1,0 +1,965 @@
+{
+  "benchmark_id": "symthaea.effect_authorization_conformance.v1",
+  "version": 1,
+  "status": "frozen_design_contract_not_executed",
+  "owner": "Luminous-Dynamics/symthaea",
+  "related_work": {
+    "registry": "docs/security/effect-surface-registry.v1.json",
+    "federated_identity_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8717",
+    "effect_surface_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/8656",
+    "mycelix_claim_recognition_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/1149",
+    "mycelix_typed_receipt_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/1215"
+  },
+  "purpose": "Evaluate authorization correctness at real effect boundaries across identity, delegation, local recognition, Nixward action binding, one-shot dispatch, outcome uncertainty and independent postcondition evidence. This corpus is a specification, not a runnable harness or qualification result.",
+  "fixture_contract": {
+    "baseline_fixture": "valid_federated_authorized_operation_v1",
+    "isolation": "Each case starts from a fresh deterministic fixture except where setup explicitly establishes an earlier successful effect or shared one-shot capability.",
+    "mutation_semantics": "Only listed fields change from baseline. Implementations must map fixture fields to concrete typed test inputs; unknown fields must fail the harness rather than be silently ignored."
+  },
+  "test_profile": {
+    "id": "strict_current_authority_v1",
+    "currentness_required_at_effect_entry": true,
+    "deny_effect_on_denial_or_indeterminate": true,
+    "foreign_claim_can_mint_local_grant": false,
+    "reputation_or_model_confidence_can_mint_authority": false,
+    "one_shot_consumption_must_be_atomic": true,
+    "consumed_permit_survives_declared_restart_model": true,
+    "successful_dispatch_requires_independent_postcondition": true,
+    "uncertain_outcome_may_auto_retry": false
+  },
+  "event_denominators": [
+    "case_started",
+    "identity_verification_attempted",
+    "local_recognition_attempted",
+    "authority_decision_emitted",
+    "effect_adapter_invocations",
+    "observed_side_effects",
+    "postconditions_confirmed",
+    "postconditions_failed",
+    "outcome_unknown",
+    "receipt_verification_failed",
+    "timeouts",
+    "missing_or_incomplete_rows"
+  ],
+  "case_schema": {
+    "expected_effect_adapter_invocations_for_case": "Count at the instrumented point-of-effect adapter, not model tool-call/request count.",
+    "effect_witness": "Distinguish no effect, exactly one, previously established effect, unknown outcome, effect without successful postcondition, and effect with missing/tampered evidence.",
+    "terminal_class": "Score separately from authorization_decision; never infer effect success solely from a successful process exit code."
+  },
+  "gates": {
+    "frozen_negative_controls_correct": "100%; every negative vector must meet its expected disposition and effect witness.",
+    "unauthorized_or_indeterminate_effect_adapter_invocations": 0,
+    "unauthorized_side_effects": 0,
+    "positive_controls": "Every valid positive control executes exactly once and passes independently checked postcondition; deny-all is a failed benchmark.",
+    "same_capability_concurrent_duplicate_effects": 1,
+    "consumed_capability_reuse_after_restart": 0,
+    "unknown_outcome_automatic_replays": 0
+  },
+  "performance_policy": {
+    "report_separately": [
+      "credential_verification",
+      "local_recognition",
+      "policy_decision",
+      "durable_reservation",
+      "dispatch_admission",
+      "effect_adapter",
+      "postcondition_verification",
+      "end_to_end"
+    ],
+    "percentiles": [
+      "p50",
+      "p95",
+      "p99",
+      "p99.9"
+    ],
+    "occupancy_points": [
+      1,
+      1000,
+      10000,
+      100000
+    ],
+    "requirements": [
+      "Pin exact source SHA, toolchain, hardware, OS/kernel, profile and persistence mode.",
+      "Report warm/cold cache and durable-commit semantics separately.",
+      "Report CPU and memory/RSS where measured; do not infer memory from latency.",
+      "Do not compare an in-memory decision with a durable gateway round trip.",
+      "Performance targets must not weaken correctness/security gates."
+    ]
+  },
+  "cases": [
+    {
+      "id": "POS-001",
+      "category": "positive_control",
+      "description": "Exact recognized claim, local grant, matching live executor, target/action and current one-shot authority",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "exactly_one",
+        "terminal_class": "postcondition_confirmed"
+      }
+    },
+    {
+      "id": "POS-002",
+      "category": "positive_control",
+      "description": "Delegated scope is strictly narrower than parent mandate and within local grant",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "delegation.scope_relation",
+          "value": "strict_subset"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "exactly_one",
+        "terminal_class": "postcondition_confirmed"
+      }
+    },
+    {
+      "id": "POS-003",
+      "category": "positive_control",
+      "description": "Correct on-behalf-of principal is retained while workload and human/org identities remain distinct",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "principal_binding.on_behalf_of_match",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "exactly_one",
+        "terminal_class": "postcondition_confirmed"
+      }
+    },
+    {
+      "id": "NEG-001",
+      "category": "credential_integrity",
+      "description": "Credential signature is invalid",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "credential.signature_valid",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-002",
+      "category": "issuer_trust",
+      "description": "Valid signature from an unconfigured issuer",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "issuer.trust_status",
+          "value": "untrusted"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-003",
+      "category": "issuer_currentness",
+      "description": "Issuer trust or credential status is revoked before dispatch",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "issuer.current_status",
+          "value": "revoked"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-004",
+      "category": "expiry",
+      "description": "Credential or local lease is expired at effect entry",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "authority.expired_at_dispatch",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-005",
+      "category": "audience",
+      "description": "Credential audience does not identify this verifier/runtime",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "credential.audience_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-006",
+      "category": "purpose",
+      "description": "Recognized claim is presented for an unrecognized purpose",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "recognition.purpose_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-007",
+      "category": "target_binding",
+      "description": "Grant is bound to a different target machine/installation",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.target_matches_grant",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-008",
+      "category": "resource_scope",
+      "description": "Grant is bound to a different resource owner/resource identity",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.resource_matches_grant",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-009",
+      "category": "operation_scope",
+      "description": "Operation or immutable parameter digest differs from authorized operation",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.operation_digest_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-010",
+      "category": "local_authority",
+      "description": "Foreign role/claim is recognized but there is no explicit local grant/delegation",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "authority.local_grant_present",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-011",
+      "category": "delegation_revocation",
+      "description": "Parent grant is revoked after child lease issuance and before dispatch",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "delegation.parent_revoked_after_issue",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-012",
+      "category": "delegation_attenuation",
+      "description": "Child delegation scope is broader than its parent",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "delegation.child_widens_parent",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-013",
+      "category": "policy_freshness",
+      "description": "Recognition receipt was issued under superseded local policy generation",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "recognition.policy_generation_current",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-014",
+      "category": "translation_loss",
+      "description": "Claim translation reports policy-prohibited semantic loss",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "translation.prohibited_semantic_loss",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "quarantined_before_effect"
+      }
+    },
+    {
+      "id": "NEG-015",
+      "category": "claim_conflict",
+      "description": "Relevant recognized sources conflict on an authority-bearing field",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "translation.authoritative_conflict",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "indeterminate",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "indeterminate_before_effect"
+      }
+    },
+    {
+      "id": "NEG-016",
+      "category": "actor_binding",
+      "description": "Claim recognized for actor A is replayed by workload actor B",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "principal_binding.actor_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-017",
+      "category": "on_behalf_of_binding",
+      "description": "Workload requests action for a principal different from the granted principal",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "principal_binding.on_behalf_of_matches_grant",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-018",
+      "category": "executor_composition",
+      "description": "Workload identity is valid but software artifact/profile differs",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "executor.software_binding_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-019",
+      "category": "runtime_incarnation",
+      "description": "Evidence binds a prior runtime incarnation, not the current executor",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "executor.runtime_incarnation_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-020",
+      "category": "same_subject_join",
+      "description": "Caller supplies matching identity/hash strings without verifier-owned same-live-subject evidence",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "executor.verifier_owned_subject_join",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-021",
+      "category": "reputation_non_authority",
+      "description": "High reputation/MYCEL score is the only asserted permission source",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "authority.local_grant_present",
+          "value": false
+        },
+        {
+          "path": "signals.reputation",
+          "value": 100
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-022",
+      "category": "model_signal_non_authority",
+      "description": "High Phi/model confidence is offered as authority without local grant",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "authority.local_grant_present",
+          "value": false
+        },
+        {
+          "path": "signals.phi",
+          "value": 0.99
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-023",
+      "category": "receipt_laundering",
+      "description": "Historical receipt is substituted for live currentness state",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "recognition.is_historical_only",
+          "value": true
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-024",
+      "category": "one_shot_replay",
+      "description": "A consumed one-shot dispatch capability is submitted again",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 1,
+        "consumed_capability_persisted": true
+      },
+      "mutations": [
+        {
+          "path": "attempt.prior_consumption",
+          "value": "consumed"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "unchanged_from_setup",
+        "terminal_class": "consumed_capability_rejected"
+      }
+    },
+    {
+      "id": "NEG-025",
+      "category": "concurrent_replay",
+      "description": "Thirty-two concurrent requests race to consume the same one-shot capability",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0,
+        "one_shared_capability": true
+      },
+      "mutations": [
+        {
+          "path": "attempt.concurrent_submissions",
+          "value": 32
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow_then_deny",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "exactly_one_total",
+        "terminal_class": "single_effect_under_race"
+      }
+    },
+    {
+      "id": "NEG-026",
+      "category": "restart_replay",
+      "description": "After success and process restart, consumed capability is replayed",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 1,
+        "consumed_capability_persisted": true
+      },
+      "mutations": [
+        {
+          "path": "attempt.restart_after_consumption",
+          "value": true
+        },
+        {
+          "path": "attempt.prior_consumption",
+          "value": "consumed"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "unchanged_from_setup",
+        "terminal_class": "restart_replay_rejected"
+      }
+    },
+    {
+      "id": "IND-001",
+      "category": "currentness_unavailable",
+      "description": "Required revocation/currentness authority is unavailable under strict-currentness profile",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "issuer.currentness_available",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "indeterminate",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "indeterminate_before_effect"
+      }
+    },
+    {
+      "id": "NEG-027",
+      "category": "surface_bypass",
+      "description": "Invoke a legacy/direct effect path without registered authority adapter",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "effect.entry_path",
+          "value": "unregistered_bypass"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "bypass_blocked_and_witnessed"
+      }
+    },
+    {
+      "id": "NEG-028",
+      "category": "prestate_binding",
+      "description": "Machine/resource pre-state changes after authorization but before effect entry",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.prestate_digest_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-029",
+      "category": "configuration_drift",
+      "description": "Target generation or policy changes after grant but before dispatch",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.target_generation_current",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "LIFE-001",
+      "category": "lifecycle",
+      "description": "Adapter times out after invocation where effect may have occurred",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "effect.result",
+          "value": "timeout_after_possible_commit"
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "unknown_until_reconciled",
+        "terminal_class": "outcome_unknown_no_automatic_replay"
+      }
+    },
+    {
+      "id": "LIFE-002",
+      "category": "lifecycle",
+      "description": "Process exits zero but independent verifier finds the requested postcondition false",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "effect.exit_code",
+          "value": 0
+        },
+        {
+          "path": "postcondition.verified",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "observed_but_postcondition_false",
+        "terminal_class": "postcondition_mismatch_quarantined"
+      }
+    },
+    {
+      "id": "LIFE-003",
+      "category": "lifecycle",
+      "description": "Effect witness exists but independent outcome receipt is missing",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "effect.witness_present",
+          "value": true
+        },
+        {
+          "path": "receipt.independent_outcome_present",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "observed_effect_receipt_missing",
+        "terminal_class": "evidence_incomplete_not_success"
+      }
+    },
+    {
+      "id": "LIFE-004",
+      "category": "lifecycle",
+      "description": "Outcome receipt digest/provenance fails verification after effect",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "receipt.integrity_valid",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "effect_may_have_occurred",
+        "terminal_class": "receipt_tamper_detected_no_success_claim"
+      }
+    },
+    {
+      "id": "NEG-030",
+      "category": "security_domain",
+      "description": "Credential from a configured issuer is presented across a different local security domain with no recognition bridge.",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.security_domain_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-031",
+      "category": "resource_path_alias",
+      "description": "Filesystem path/symlink resolves outside granted canonical resource",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.canonical_resource_within_grant",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "NEG-032",
+      "category": "parameter_mutation",
+      "description": "Environment, working directory, executable resolution or ordered argv differs from authorized manifest",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [
+        {
+          "path": "action.execution_manifest_digest_matches",
+          "value": false
+        }
+      ],
+      "expected": {
+        "authorization_decision": "deny",
+        "effect_adapter_invocations_for_case": 0,
+        "effect_witness": "none",
+        "terminal_class": "denied_before_effect"
+      }
+    },
+    {
+      "id": "POS-004",
+      "category": "positive_control",
+      "description": "Ordinary valid in-scope action succeeds under the same strict policy as negative cases",
+      "fixture": "valid_federated_authorized_operation_v1",
+      "setup": {
+        "successful_effects_before_case": 0
+      },
+      "mutations": [],
+      "expected": {
+        "authorization_decision": "allow",
+        "effect_adapter_invocations_for_case": 1,
+        "effect_witness": "exactly_one",
+        "terminal_class": "postcondition_confirmed"
+      }
+    }
+  ]
+}

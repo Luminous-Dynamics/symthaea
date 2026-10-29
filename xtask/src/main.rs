@@ -3,6 +3,11 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod effect_surface_registry;
+mod effect_authorization_conformance;
+mod effect_harness_mutations;
+mod effect_evidence_ledger;
+mod effect_primitive_scan;
 mod manifest;
 mod rhn_sweep;
 
@@ -65,6 +70,42 @@ enum Commands {
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
+    },
+    /// Check effect-surface registry schema and recorded source anchors.
+    /// This is inventory integrity only, not security qualification.
+    EffectSurfaceRegistry {
+        #[arg(long, default_value = "docs/security/effect-surface-registry.v1.json")]
+        registry: PathBuf,
+        /// Refuse success while any record lacks a complete recorded qualification-evidence entry.
+        #[arg(long)]
+        require_evidence_records: bool,
+    },
+    /// Discover selected direct-call and receiver-chain process/filesystem/socket effect candidates.
+    /// Syntactic candidate discovery does not establish reachability or authorization correctness.
+    EffectPrimitiveScan {
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// Optional path for a deterministic JSON report; otherwise prints JSON to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Validate an evidence ledger's event chain, case completeness and stage invariants.
+    /// This checks integrity/consistency only and does not authenticate event truth.
+    AuthorizationEvidenceLedger {
+        #[arg(long, default_value = "docs/research/authorization-evidence-ledger.smoke.v0.json")]
+        ledger: PathBuf,
+        #[arg(long, default_value = "docs/research/authorization-evidence-ledger.expected-cases.v0.json")]
+        expected_cases: PathBuf,
+    },
+    /// Validate the frozen effect-authorization conformance contract; does not execute cases.
+    EffectAuthorizationConformance {
+        #[arg(long, default_value = "docs/security/effect-authorization-conformance.v1.json")]
+        corpus: PathBuf,
+    },
+    /// Validate the frozen authorization harness mutation inventory; does not inject mutations.
+    AuthorizationHarnessMutations {
+        #[arg(long, default_value = "docs/research/authorization-harness-mutations.v0.json")]
+        inventory: PathBuf,
     },
 }
 
@@ -147,6 +188,67 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::EffectSurfaceRegistry { registry, require_evidence_records } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let registry_path = if registry.is_absolute() {
+                registry
+            } else {
+                root.join(registry)
+            };
+            effect_surface_registry::check(&root, &registry_path, require_evidence_records)?;
+        }
+        Commands::EffectPrimitiveScan { root, out } => {
+            let root = if root.is_absolute() {
+                root
+            } else {
+                std::env::current_dir()?.join(root)
+            };
+            effect_primitive_scan::scan(&root, out.as_deref())?;
+        }
+        Commands::AuthorizationEvidenceLedger { ledger, expected_cases } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let ledger_path = if ledger.is_absolute() {
+                ledger
+            } else {
+                root.join(ledger)
+            };
+            let expected_cases_path = if expected_cases.is_absolute() {
+                expected_cases
+            } else {
+                root.join(expected_cases)
+            };
+            effect_evidence_ledger::check(&ledger_path, &expected_cases_path)?;
+        }
+        Commands::EffectAuthorizationConformance { corpus } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let corpus_path = if corpus.is_absolute() {
+                corpus
+            } else {
+                root.join(corpus)
+            };
+            effect_authorization_conformance::check(&corpus_path)?;
+        }
+        Commands::AuthorizationHarnessMutations { inventory } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let inventory_path = if inventory.is_absolute() {
+                inventory
+            } else {
+                root.join(inventory)
+            };
+            effect_harness_mutations::check(&inventory_path)?;
         }
     }
     Ok(())

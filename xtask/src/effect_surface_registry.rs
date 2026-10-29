@@ -1,0 +1,391 @@
+//! Versioned inventory for known external-effect entry points.
+//!
+//! This command checks registry integrity and source anchors. It is not a
+//! complete Rust/FFI/macro/indirect-effect scanner and does not qualify any
+//! execution surface. An inventory-integrity PASS must never be reported as a
+//! security or repository-wide no-bypass PASS.
+
+use anyhow::{bail, Context, Result};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Component, Path, PathBuf},
+    process::Command,
+};
+
+const REGISTRY_ID: &str = "symthaea.effect_surface_registry.v1";
+const REGISTRY_VERSION: u32 = 1;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Registry {
+    registry_id: String,
+    version: u32,
+    source_baseline: SourceBaseline,
+    entries: Vec<SurfaceEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceBaseline {
+    repository: String,
+    baseline_ref: String,
+    baseline_commit: String,
+    audited_at: String,
+    completeness: String,
+    scope_note: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SurfaceEntry {
+    id: String,
+    source_path: String,
+    entrypoint_symbol: String,
+    source_anchor: String,
+    effect_classes: Vec<String>,
+    execution_modes: Vec<String>,
+    disposition: String,
+    owner_issue: String,
+    authority_boundary: String,
+    test_seam: String,
+    negative_control: String,
+    positive_control: String,
+    tests_status: String,
+    known_limitations: Vec<String>,
+    qualification_evidence: Option<QualificationEvidence>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QualificationEvidence {
+    subject_commit: String,
+    registry_digest_sha256: String,
+    test_receipt_sha256: String,
+    verification_profile: String,
+}
+
+struct Summary {
+    entries: usize,
+    source_anchors_checked: usize,
+    entries_marked_qualified: usize,
+    entries_not_marked_qualified: usize,
+}
+
+pub fn check(root: &Path, registry_path: &Path, require_evidence_records: bool) -> Result<()> {
+    let raw = fs::read_to_string(registry_path)
+        .with_context(|| format!("read effect-surface registry: {}", registry_path.display()))?;
+    let registry: Registry =
+        serde_json::from_str(&raw).context("parse effect-surface registry JSON")?;
+    let registry_digest = registry_identity_digest(&raw)?;
+    let summary = validate(root, &registry, &registry_digest)?;
+
+    println!("registry_id={}", registry.registry_id);
+    println!("registry_version={}", registry.version);
+    println!("registry_identity_sha256={registry_digest}");
+    println!(
+        "registry_baseline={}@{}",
+        registry.source_baseline.baseline_ref, registry.source_baseline.baseline_commit
+    );
+    println!("working_tree_head={}", working_tree_head(root).unwrap_or_else(|| "UNKNOWN".to_string()));
+    println!("registry_integrity=PASS");
+    println!(
+        "source_anchors_checked={}/{}",
+        summary.source_anchors_checked, summary.entries
+    );
+    println!("entry_count={}", summary.entries);
+    println!("records_marked_qualified={}", summary.entries_marked_qualified);
+    println!("records_not_marked_qualified={}", summary.entries_not_marked_qualified);
+    println!(
+        "inventory_completeness={}",
+        registry.source_baseline.completeness
+    );
+    println!("registry_record_status=NOT_INDEPENDENTLY_VERIFIED");
+    println!("security_qualification=NOT_EVALUATED_BY_THIS_COMMAND");
+    println!("repository_wide_no_bypass=NOT_CLAIMED");
+
+    if require_evidence_records && summary.entries_not_marked_qualified > 0 {
+        bail!(
+            "--require-evidence-records failed: {} of {} records are not marked qualified with a complete evidence record; this command does not independently verify receipts",
+            summary.entries_not_marked_qualified,
+            summary.entries
+        );
+    }
+    Ok(())
+}
+
+fn validate(root: &Path, registry: &Registry, registry_digest: &str) -> Result<Summary> {
+    if registry.registry_id != REGISTRY_ID {
+        bail!(
+            "unsupported registry_id {:?}; expected {:?}",
+            registry.registry_id,
+            REGISTRY_ID
+        );
+    }
+    if registry.version != REGISTRY_VERSION {
+        bail!(
+            "unsupported registry version {}; expected {}",
+            registry.version,
+            REGISTRY_VERSION
+        );
+    }
+    if registry.source_baseline.repository != "Luminous-Dynamics/symthaea" {
+        bail!("registry repository identity does not match this project");
+    }
+    if registry.source_baseline.baseline_ref.trim().is_empty()
+        || registry.source_baseline.audited_at.trim().is_empty()
+        || registry.source_baseline.scope_note.trim().is_empty()
+    {
+        bail!("source baseline must identify its ref, audit date, and scope limits");
+    }
+    if registry.source_baseline.completeness != "initial_known_surfaces_only" {
+        bail!("v1 registry must preserve its explicit incomplete-inventory claim boundary");
+    }
+    if !is_sha(&registry.source_baseline.baseline_commit, 40) {
+        bail!("source_baseline.baseline_commit must be a 40-character hexadecimal commit SHA");
+    }
+    if registry.entries.is_empty() {
+        bail!("effect-surface registry must not be empty");
+    }
+
+    let mut ids = BTreeSet::new();
+    let mut source_anchors_checked = 0usize;
+    let mut qualified_entries = 0usize;
+
+    for entry in &registry.entries {
+        if entry.id.trim().is_empty()
+            || !entry
+                .id
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+            || !ids.insert(entry.id.clone())
+        {
+            bail!("invalid or duplicate effect-surface id: {:?}", entry.id);
+        }
+        if entry.source_path.trim().is_empty()
+            || entry.entrypoint_symbol.trim().is_empty()
+            || entry.source_anchor.trim().is_empty()
+            || entry.owner_issue.trim().is_empty()
+            || entry.authority_boundary.trim().is_empty()
+            || entry.test_seam.trim().is_empty()
+            || entry.negative_control.trim().is_empty()
+            || entry.positive_control.trim().is_empty()
+            || entry.tests_status.trim().is_empty()
+        {
+            bail!("surface {} is missing required descriptive fields", entry.id);
+        }
+        if !is_safe_relative_path(&entry.source_path) {
+            bail!(
+                "surface {} has unsafe repository-relative source_path {:?}",
+                entry.id,
+                entry.source_path
+            );
+        }
+        if entry.effect_classes.is_empty() || entry.execution_modes.is_empty() {
+            bail!(
+                "surface {} must declare at least one effect class and execution mode",
+                entry.id
+            );
+        }
+        const EFFECT_CLASSES: &[&str] = &[
+            "process_spawn",
+            "filesystem_read",
+            "filesystem_write",
+            "filesystem_delete",
+            "directory_create",
+            "directory_list",
+            "system_configuration_mutation",
+            "network_io",
+            "device_actuation",
+            "subprocess_control",
+            "other_external_effect",
+        ];
+        if entry
+            .effect_classes
+            .iter()
+            .any(|class| !EFFECT_CLASSES.contains(&class.as_str()))
+        {
+            bail!("surface {} contains an unknown effect class", entry.id);
+        }
+        const EXECUTION_MODES: &[&str] = &[
+            "real",
+            "conditionally_real",
+            "simulated_for_selected_families",
+            "real_filesystem_effects",
+            "conditionally_real_process",
+            "simulated",
+            "dry_run",
+            "observation_only",
+        ];
+        if entry
+            .execution_modes
+            .iter()
+            .any(|mode| !EXECUTION_MODES.contains(&mode.as_str()))
+        {
+            bail!("surface {} contains an unknown execution mode", entry.id);
+        }
+        if !entry.owner_issue.starts_with('#') {
+            bail!("surface {} owner_issue must be a repository issue reference", entry.id);
+        }
+        if !matches!(
+            entry.tests_status.as_str(),
+            "source_review_only" | "not_present" | "executed" | "failed" | "unavailable"
+        ) {
+            bail!("surface {} has unsupported tests_status {:?}", entry.id, entry.tests_status);
+        }
+        if entry.known_limitations.is_empty()
+            || entry.known_limitations.iter().any(|item| item.trim().is_empty())
+        {
+            bail!(
+                "surface {} must state at least one known limitation",
+                entry.id
+            );
+        }
+        if !matches!(
+            entry.disposition.as_str(),
+            "migration_required" | "partial_guard" | "unqualified" | "qualified"
+        ) {
+            bail!(
+                "surface {} has unsupported disposition {:?}",
+                entry.id,
+                entry.disposition
+            );
+        }
+
+        let source_path = root.join(&entry.source_path);
+        let source = fs::read_to_string(&source_path).with_context(|| {
+            format!(
+                "surface {} source does not exist or is unreadable: {}",
+                entry.id,
+                source_path.display()
+            )
+        })?;
+        if !source.contains(&entry.source_anchor) {
+            bail!(
+                "surface {} source anchor {:?} not found in {} (entrypoint recorded as {})",
+                entry.id,
+                entry.source_anchor,
+                entry.source_path,
+                entry.entrypoint_symbol
+            );
+        }
+        source_anchors_checked += 1;
+
+        match (&entry.disposition[..], &entry.qualification_evidence) {
+            ("qualified", Some(evidence)) => {
+                if !is_sha(&evidence.subject_commit, 40)
+                    || !is_sha(&evidence.registry_digest_sha256, 64)
+                    || evidence.registry_digest_sha256 != registry_digest
+                    || !is_sha(&evidence.test_receipt_sha256, 64)
+                    || evidence.verification_profile.trim().is_empty()
+                {
+                    bail!(
+                        "qualified surface {} requires exact subject SHA, registry SHA-256, test-receipt SHA-256, and verification profile",
+                        entry.id
+                    );
+                }
+                qualified_entries += 1;
+            }
+            ("qualified", None) => {
+                bail!("surface {} is marked qualified without qualification evidence", entry.id)
+            }
+            (_, Some(_)) => {
+                bail!(
+                    "surface {} carries qualification evidence but is not marked qualified; resolve the disposition explicitly",
+                    entry.id
+                )
+            }
+            (_, None) => {}
+        }
+    }
+
+    Ok(Summary {
+        entries: registry.entries.len(),
+        source_anchors_checked,
+        entries_marked_qualified: qualified_entries,
+        entries_not_marked_qualified: registry.entries.len() - qualified_entries,
+    })
+}
+
+// The registry identity excludes the evidence payloads that refer back to it.
+// This avoids a self-referential digest while binding every other registry field.
+fn registry_identity_digest(raw: &str) -> Result<String> {
+    let mut value: serde_json::Value =
+        serde_json::from_str(raw).context("parse registry for identity digest")?;
+    let entries = value
+        .get_mut("entries")
+        .and_then(serde_json::Value::as_array_mut)
+        .context("registry identity requires an entries array")?;
+    for entry in entries {
+        let object = entry
+            .as_object_mut()
+            .context("registry identity entries must be JSON objects")?;
+        object.remove("qualification_evidence");
+    }
+    let canonical = serde_json::to_vec(&value).context("serialize normalized registry identity")?;
+    Ok(format!("{:x}", Sha256::digest(canonical)))
+}
+
+fn is_safe_relative_path(value: &str) -> bool {
+    let path = Path::new(value);
+    !value.trim().is_empty()
+        && !value.contains('\\')
+        && !value.contains(':')
+        && !value.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+        && !path.is_absolute()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn is_sha(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn working_tree_head(root: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout)
+        .ok()
+        .map(|value| value.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_safe_relative_path, is_sha};
+
+    #[test]
+    fn source_paths_must_stay_inside_repository() {
+        assert!(is_safe_relative_path("src/action/mod.rs"));
+        assert!(!is_safe_relative_path("../outside.rs"));
+        assert!(!is_safe_relative_path("/tmp/source.rs"));
+        assert!(!is_safe_relative_path(""));
+        assert!(!is_safe_relative_path("src/../secrets.rs"));
+    }
+
+    #[test]
+    fn digests_require_exact_hex_lengths() {
+        assert!(is_sha("a".repeat(40).as_str(), 40));
+        assert!(is_sha("a".repeat(64).as_str(), 64));
+        assert!(!is_sha("g".repeat(40).as_str(), 40));
+        assert!(!is_sha("a".repeat(39).as_str(), 40));
+    }
+
+    #[test]
+    fn registry_identity_excludes_evidence_payload_to_avoid_self_reference() {
+        let first = r#"{"registry_id":"v1","entries":[{"id":"x","qualification_evidence":null}]}"#;
+        let second = r#"{"registry_id":"v1","entries":[{"id":"x","qualification_evidence":{"test_receipt_sha256":"different"}}]}"#;
+        assert_eq!(
+            super::registry_identity_digest(first).unwrap(),
+            super::registry_identity_digest(second).unwrap()
+        );
+    }
+}

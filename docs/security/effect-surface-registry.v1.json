@@ -1,0 +1,192 @@
+{
+  "registry_id": "symthaea.effect_surface_registry.v1",
+  "version": 1,
+  "source_baseline": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "baseline_ref": "main",
+    "baseline_commit": "c6355cc6ffe01843b841f6b9a8a09eabd2556deb",
+    "audited_at": "2026-10-28",
+    "completeness": "initial_known_surfaces_only",
+    "scope_note": "Initial known-surface baseline derived from #8656 and direct source inspection. Not a comprehensive census of all Rust, FFI, generated, macro, shell, plugin, network, device, or indirect effect routes."
+  },
+  "entries": [
+    {
+      "id": "NIXWARD_PROCESS_EXECUTE_V1",
+      "source_path": "crates/core/nixward/src/action/executor.rs",
+      "entrypoint_symbol": "NixOSExecutor::execute",
+      "source_anchor": "pub async fn execute",
+      "effect_classes": [
+        "process_spawn"
+      ],
+      "execution_modes": [
+        "real"
+      ],
+      "disposition": "partial_guard",
+      "owner_issue": "#8575",
+      "authority_boundary": "The ordinary executor path performs local scoring/confirmation checks; the baseline entrypoint does not consume a one-shot authenticated execution capability. Do not infer approval lifecycle correctness from Phi/risk scores.",
+      "test_seam": "No injectable runner is recorded on the main baseline.",
+      "negative_control": "An unauthorized or stale action must produce zero process-runner invocations at the actual effect boundary.",
+      "positive_control": "A validly authorized built-in action must invoke the runner exactly once.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "Does not inventory every daemon, plan, rollback, watchdog, retry, timeout, or cancellation caller.",
+        "Baseline is main commit c6355cc6ffe01843b841f6b9a8a09eabd2556deb, not PR #8585."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "NIXWARD_CONFIRMED_PROCESS_EXECUTE_V1",
+      "source_path": "crates/core/nixward/src/action/executor.rs",
+      "entrypoint_symbol": "NixOSExecutor::execute_confirmed",
+      "source_anchor": "execute_confirmed",
+      "effect_classes": [
+        "process_spawn"
+      ],
+      "execution_modes": [
+        "real"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#8575",
+      "authority_boundary": "Confirmed execution assumes a real upstream gate and does not itself bind a verifiable approval identity, freshness, revocation state, or one-shot use to the exact dispatch.",
+      "test_seam": "No injectable runner is recorded on the main baseline.",
+      "negative_control": "Wrong, stale, replayed, revoked, and unauthenticated authority must produce zero process invocations.",
+      "positive_control": "A valid current approval for the exact command and argv must dispatch exactly once.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "Caller correctness is currently part of the trust boundary.",
+        "Rollback/recovery require explicitly distinct authority semantics."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "ROOT_NIXOS_ROLLBACK_EXECUTE_V1",
+      "source_path": "src/action/nixos_patterns.rs",
+      "entrypoint_symbol": "NixOSExecutor::execute_with_rollback",
+      "source_anchor": "execute_with_rollback",
+      "effect_classes": [
+        "process_spawn",
+        "system_configuration_mutation"
+      ],
+      "execution_modes": [
+        "real"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#6822",
+      "authority_boundary": "A second root-level NixOS executor exists outside the Nixward capability path. Similar naming, Phi thresholds, and rollback behavior do not prove it shares Nixward's authority checks.",
+      "test_seam": "No independently verified point-of-entry seam recorded in this baseline.",
+      "negative_control": "The same protected command reached through this legacy path without authority must be rejected before process spawn.",
+      "positive_control": "A valid bounded command must dispatch once and preserve rollback/outcome evidence.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "This entry records a known surface, not proof that every call path is exploitable.",
+        "Rollback is a distinct effect and needs a separate policy profile."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "SIMPLE_EXECUTOR_EFFECTS_V1",
+      "source_path": "src/action/mod.rs",
+      "entrypoint_symbol": "SimpleExecutor::execute",
+      "source_anchor": "pub fn execute(",
+      "effect_classes": [
+        "process_spawn",
+        "filesystem_read",
+        "filesystem_write",
+        "filesystem_delete",
+        "directory_create"
+      ],
+      "execution_modes": [
+        "simulated_for_selected_families",
+        "real_filesystem_effects",
+        "conditionally_real_process"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#4593",
+      "authority_boundary": "Local PolicyBundle, sandbox containment, budgets, and cognition-derived Phi may restrict behavior but are not the repaired V2 action-authority capability. Default simulated mode is not a guarantee that all filesystem variants are simulated.",
+      "test_seam": "Mode-specific adapter and filesystem witness requirements need to be registered per effect family.",
+      "negative_control": "Unauthorized process and filesystem attempts must leave zero process invocations and zero filesystem side-effect witnesses.",
+      "positive_control": "Authorized in-scope operations must produce exactly one expected effect with an independently checked postcondition.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "One entry groups multiple action variants; qualification must split it by effect family before any per-surface PASS.",
+        "Do not describe SimpleExecutor::new() as fully simulated."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "MOLECULE_EXECUTOR_PROCESS_V1",
+      "source_path": "src/action/primitives.rs",
+      "entrypoint_symbol": "MoleculeExecutor::execute_atom_real",
+      "source_anchor": "execute_atom_real",
+      "effect_classes": [
+        "process_spawn"
+      ],
+      "execution_modes": [
+        "conditionally_real"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#6849",
+      "authority_boundary": "real_exec=true exposes a real process path that does not take a governed PolicyBundle/SandboxRoot capability at the point of entry.",
+      "test_seam": "Requires an injectable process adapter with invocation counting.",
+      "negative_control": "Missing authority, shell/interpreter substitution, and disallowed command families must fail before process spawn.",
+      "positive_control": "A correctly scoped command under explicit governed context must invoke exactly once.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "Execution-mode flag and action metadata are not authority.",
+        "Filesystem effects are registered separately."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "MOLECULE_EXECUTOR_FILESYSTEM_V1",
+      "source_path": "src/action/primitives.rs",
+      "entrypoint_symbol": "MoleculeExecutor::execute_atom_real",
+      "source_anchor": "execute_atom_real",
+      "effect_classes": [
+        "filesystem_read",
+        "filesystem_write",
+        "filesystem_delete",
+        "directory_list"
+      ],
+      "execution_modes": [
+        "conditionally_real"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#6850",
+      "authority_boundary": "The real molecule executor performs filesystem operations on supplied paths without a SandboxRoot/capability carrier at the effect boundary.",
+      "test_seam": "Requires temporary-directory side-effect witnesses and canonical-path enforcement tests.",
+      "negative_control": "Out-of-scope read/write/edit/delete attempts must fail before touching the target; sentinel files must remain unchanged.",
+      "positive_control": "Authorized in-scope writes/deletes must produce the exact expected postcondition once.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "Path containment needs canonicalization and race/symlink treatment.",
+        "Process authority and filesystem authority are separate controls."
+      ],
+      "qualification_evidence": null
+    },
+    {
+      "id": "CLI_STRUCTURED_PROCESS_V1",
+      "source_path": "src/bin/symthaea.rs",
+      "entrypoint_symbol": "run_structured_command",
+      "source_anchor": "fn run_structured_command(",
+      "effect_classes": [
+        "process_spawn"
+      ],
+      "execution_modes": [
+        "real"
+      ],
+      "disposition": "migration_required",
+      "owner_issue": "#8656",
+      "authority_boundary": "The helper parses a command and spawns the process. Authentication or endpoint admission elsewhere is not itself evidence that the exact executable/argv is authorized at this point of effect.",
+      "test_seam": "Requires an injectable process adapter and request-to-dispatch identity checks.",
+      "negative_control": "Missing or mismatched authorization must leave the process invocation count at zero.",
+      "positive_control": "An authorized structured command runs once with exact ordered argv.",
+      "tests_status": "source_review_only",
+      "known_limitations": [
+        "The registry does not characterize all HTTP/CLI routes or prove reachability.",
+        "Executable resolution, environment, working directory, and target context need explicit binding."
+      ],
+      "qualification_evidence": null
+    }
+  ]
+}
