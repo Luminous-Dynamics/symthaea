@@ -1,0 +1,101 @@
+{
+  "all_gates_passed": true,
+  "base_seed": 20261029,
+  "benchmark": "pev_factorial_transportability_v3",
+  "clustered_calibration": {
+    "coverage_95": {
+      "cluster_mean_t": 0.943,
+      "row_iid_naive": 0.576
+    },
+    "design": {
+      "blocks_per_cluster": 8,
+      "cluster_effect_sd": 0.05,
+      "clusters": 40,
+      "seeds": 1000,
+      "true_interaction": 0.12,
+      "within_cluster_noise_sd": 0.03
+    },
+    "mean_interval_width": {
+      "cluster_mean_t": 0.032461511558325926,
+      "row_iid_naive": 0.012672108115043181
+    },
+    "scope": "Calibration for this planted random-intercept process only."
+  },
+  "gates": {
+    "all_guard_tests_passed": true,
+    "cluster_aware_coverage_93_97": true,
+    "iid_interval_exposes_cluster_undercoverage": true,
+    "pooled_equivalence_with_subgroup_sign_recovery": true,
+    "randomization_removes_drift_bias": true,
+    "randomized_order_coverage_93_97": true
+  },
+  "guard_tests": {
+    "fixed_order_drift_flagged": true,
+    "missing_joint_arm_abstains": true,
+    "opposing_subgroups_preserved": true
+  },
+  "limitations": [
+    "No production Symthaea Rust path imported or executed.",
+    "Synthetic generators do not cover every dependence or nonstationarity mechanism.",
+    "No CAR/REFLECT/DCFA/GCJR implementation was executed; no direct SOTA comparison is claimed.",
+    "Passing establishes only these reference-method properties, not task utility or SOTA superiority."
+  ],
+  "order_drift": {
+    "design": {
+      "arm_noise_sd": 0.03,
+      "blocks_per_seed": 512,
+      "fixed_order": [
+        "Y00",
+        "Y10",
+        "Y01",
+        "Y11"
+      ],
+      "quadratic_drift": 0.02,
+      "randomized_order": "uniform permutation per block",
+      "seeds": 1000,
+      "true_interaction": 0
+    },
+    "fixed_order_expected_bias": 0.08,
+    "mean_ci_width": {
+      "fixed": 0.010413993219139127,
+      "randomized": 0.02997510068743774
+    },
+    "mean_interaction": {
+      "fixed": 0.08016332777016748,
+      "randomized": 0.0002584574107201513
+    },
+    "scope": "Randomization removes expectation-level arm/order confounding in this fixture, not all possible nonstationarity.",
+    "zero_coverage_95": {
+      "fixed": 0.0,
+      "randomized": 0.947
+    }
+  },
+  "status": "synthetic_reference_only",
+  "subgroup_sign_reversal": {
+    "design": {
+      "blocks_per_cluster": 8,
+      "cluster_sd": 0.005000000000000001,
+      "clusters_per_subgroup": 20,
+      "equivalence_margin": 0.02,
+      "noise_sd": 0.03,
+      "pooled_truth": 0.0,
+      "seeds": 1000,
+      "true_interactions": [
+        0.12,
+        -0.12
+      ]
+    },
+    "gate_rates": {
+      "both_subgroups_recovered": 1.0,
+      "negative_sign_recovery": 1.0,
+      "pooled_equivalence": 1.0,
+      "positive_sign_recovery": 1.0
+    },
+    "interpretation": "Pooled equivalence does not imply homogeneous null effects when opposing subgroup effects cancel.",
+    "median_estimates": {
+      "negative": -0.1200358678267501,
+      "pooled": 6.011118533900961e-05,
+      "positive": 0.12001013612979647
+    }
+  }
+}

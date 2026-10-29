@@ -1,0 +1,29 @@
+{
+  "artifacts": {
+    "pev_factorial_transportability_v3.md": {
+      "bytes": 7505,
+      "git_blob_sha1": "3431d8d93b66beabcdd20ae742e5cf2501934b86",
+      "sha256": "c9aa5074948cac05280d203fb576ad3e85b90966df12dcd0cc14ca9a5f6875d4"
+    },
+    "pev_factorial_transportability_v3.py": {
+      "bytes": 9250,
+      "git_blob_sha1": "8b5114953659bab187d8ff763f18e37f00ccf5c3",
+      "sha256": "fd9a6d618cfac67281c9cae8c0fdda3624ecf33b4537310fbb547d790e926605"
+    },
+    "pev_factorial_transportability_v3_results.json": {
+      "bytes": 3073,
+      "git_blob_sha1": "72f997424431b81559a1b8dca87b9bd2ac17772d",
+      "sha256": "df73416000848cdb6db3ddedfc39c558c87300e5cb8b60f86d68aa7f888764cb"
+    }
+  },
+  "benchmark": "pev_factorial_transportability_v3",
+  "execution": {
+    "all_gates_passed": true,
+    "command": "python3 pev_factorial_transportability_v3.py --seeds 1000 --clusters 40 --blocks-per-cluster 8 --drift-blocks 512 --seed 20261029 --output pev_factorial_transportability_v3_results.json",
+    "gates_passed": 6,
+    "gates_total": 6,
+    "py_compile_passed": true
+  },
+  "scope": "No production Symthaea Rust path imported or executed; no real trace validation, no direct SOTA comparison, and no production utility gain claimed.",
+  "status": "synthetic_reference_only"
+}

@@ -1,0 +1,52 @@
+{
+  "causal_replay_source": {
+    "path": "/mnt/data/pev_causal_replay_effect_benchmark_v1.py",
+    "sha256": "4a672619171450d44b04df208a7729af5e93ca5de5883128db41eea3df98620e",
+    "git_blob_sha1": "652e4e94839c722fa8dc1aec89c0c981166f3133",
+    "repository_source_matches_local_git_blob": true,
+    "python_syntax_compile": "PASS",
+    "reference_execution": "PASS_CAUSAL_REPLAY_REFERENCE_ONLY",
+    "pairs_per_arm": 512,
+    "mutations_detected": 16,
+    "mutations_injected": 16,
+    "rust_compiled_or_executed": false
+  },
+  "causal_replay_results": {
+    "path": "/mnt/data/pev_causal_replay_effect_benchmark_v1_hardened_results.json",
+    "sha256": "2fced0a870bf84e4706d979298ef54993292dfea56cf2cef122eb8e6773f8d2f",
+    "git_blob_sha1": "fda256ddfc906df8216215be489c1c01c2b4febb",
+    "repository_results_match_local_git_blob": true,
+    "valid_pe_effect_mean": 0.08078448826171875,
+    "valid_pe_effect_ci95": [0.07743304251953126, 0.08419991818359375],
+    "placebo_effect_mean": -0.0036833531445312493,
+    "placebo_effect_ci95": [-0.0070997624023437485, -0.00042342859374999833],
+    "placebo_equivalence_margin": 0.02
+  },
+  "seed_sweep_source": {
+    "path": "/mnt/data/pev_causal_replay_seed_sweep_v1.py",
+    "sha256": "4f62434eb7a686f54798a5f4eddc0224137da2a4346b2280233b034e287b50e2",
+    "git_blob_sha1": "bea1eea5b77a8cf26ea3d04c43a673dcea2c3fc7",
+    "repository_source_matches_local_git_blob": true,
+    "python_syntax_compile": "PASS",
+    "reference_execution": "PASS_ESTIMATOR_SEED_SWEEP_ONLY"
+  },
+  "seed_sweep_results": {
+    "path": "/mnt/data/pev_causal_replay_seed_sweep_v1_1000_results.json",
+    "sha256": "cdde845a03f0a634f1b660132ac754620a2639de88f8a314b0e79ef9b8f70bc0",
+    "git_blob_sha1": "4ddfaa38e90f461cdc89561e5aaf5ebc104b5c8e",
+    "repository_results_match_local_git_blob": true,
+    "seeds": 1000,
+    "pairs_per_arm": 512,
+    "bootstrap_replicates_per_arm_per_seed": 500,
+    "total_paired_effect_observations": 1024000,
+    "percentile_bootstrap_coverage_valid": 0.945,
+    "percentile_bootstrap_coverage_placebo": 0.95,
+    "paired_t_coverage_valid": 0.944,
+    "paired_t_coverage_placebo": 0.948,
+    "positive_control_gate_pass_rate": 1.0,
+    "placebo_equivalence_gate_pass_rate": 1.0,
+    "placebo_ci_excludes_zero_rate_not_a_gate": 0.05
+  },
+  "rust_compiled_or_executed": false,
+  "status": "PASS_SYNTHETIC_REFERENCE_AND_CALIBRATION_ONLY"
+}

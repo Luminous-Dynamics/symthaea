@@ -1,0 +1,231 @@
+# PEV-2 — Decision-time evidence binding for prediction-error learning
+
+**Status:** research contract / follow-on specification. This is not yet a production implementation or a measured Symthaea result.
+
+**Tracks:** [Issue #8714](https://github.com/Luminous-Dynamics/symthaea/issues/8714), [CodingAgent PE/confidence separation PR #8700](https://github.com/Luminous-Dynamics/symthaea/pull/8700), [cognitive-loop evidence benchmark PR #8495](https://github.com/Luminous-Dynamics/symthaea/pull/8495).
+
+## 1. Paradigm shift
+
+Move from **“a decision has a PE number”** to **“a decision references the exact evidence snapshot that was available when it was made.”**
+
+An optional scalar preserves missingness, but it does not prove which prediction/observation pair produced it, whether the sample was stale or replayed, or whether an outcome accidentally attached a later value. Decision-time evidence must be immutable and provenance-bearing.
+
+> A posthoc outcome may resolve later, but it may not rewrite what evidence the system possessed at decision time.
+
+Thus: **missing at decision time is not zero PE, maximum PE, or later PE.**
+
+A decision outcome remains recordable when PE is unavailable. Missing PE must not disable independent reward, coherence, uncertainty, or gate-result calibration.
+
+## 2. Evidence contract
+
+Each decision freezes a bounded metadata snapshot, conceptually equivalent to:
+
+    struct DecisionEvidenceSnapshotV1 {
+        decision_id: DecisionId,
+        decision_tick: u64,
+        observation_cycle: u64,
+        prediction_source_cycle: Option<u64>,
+        status: PredictionEvidenceStatus,
+        prediction_error: Option<f64>,
+        evidence_event_id: Option<EvidenceEventId>,
+        evidence_digest: Option<[u8; 32]>,
+    }
+
+This is a proposed contract, not a claim that these exact types already exist. Construction must reject contradictions: Valid requires finite PE and a cycle-consistent source; non-valid statuses cannot expose a usable PE. A legacy scalar API may remain as an explicit adapter, but it must not fabricate source cycles or a digest.
+
+The digest should commit to canonical, domain-separated metadata (stable IDs, status, cycles and value representation as appropriate). It should not hash or log raw user text by default. A digest binds a record to metadata; it does not prove the honesty of the process that generated the record.
+
+PendingReasoningOutcome freezes the snapshot when the decision is created. PosthocOutcome retains the same snapshot reference when the outcome arrives. The outcome timestamp may be later; the evidence reference must not be.
+
+## 3. Required invariants
+
+| ID | Invariant | Required result |
+|---|---|---|
+| DTA-01 | Decision-time freeze | Later PE cannot replace or fill an earlier decision's PE snapshot. |
+| DTA-02 | Missingness | Invalid PE remains unavailable; compatibility sentinels cannot become evidence. |
+| DTA-03 | Source/observation ordering | Stale, future, out-of-order, or cross-reset samples are rejected or explicitly classified. |
+| DTA-04 | Exactly-once | Replayed evidence IDs produce at most one PE-driven admission. |
+| DTA-05 | Counterfactual invariance | Changing only an invalid compatibility payload does not change PE-dependent outputs. |
+| DTA-06 | Independent channels | Missing PE does not suppress coherence, uncertainty, explicit reward, or gate/outcome results. |
+| DTA-07 | Positive control | Fresh valid PE reaches its intended PE-sensitive consumer once; a no-op system fails. |
+| DTA-08 | Recovery | After a missing, stale, or invalid event, a later fresh valid event is admitted without restart. |
+| DTA-09 | Resume equivalence | Checkpoint/restore preserves admission identity and matches uninterrupted execution. |
+| DTA-10 | Trace closure | Every PE-driven transition references one admitted event; invalid, duplicate, stale, or future events have no downstream influence. |
+
+## 4. Adversarial benchmark panel
+
+Use paired deterministic replays with identical initial state, seed, exogenous observations, actions, and non-PE channels. Change one evidence condition at a time.
+
+1. **Invalid-payload metamorphism:** repeat an invalid record with 0, 1, NaN, positive/negative infinity, and absence. Compare PE-sensitive histories, learning value, action/readiness signals, and outcome records with a no-PE control.
+2. **Future-PE substitution:** make a decision without PE, then deliver high valid PE in the next cycle before outcome resolution. The original decision remains PE-missing; the later PE stays attached to its own event.
+3. **Valid-value freeze:** decide with valid PE p; later deliver q; posthoc resolution must still reference p and its event ID.
+4. **Replay burst:** replay a valid event 2–6 times, including across snapshot/restore; PE-driven admission count remains one.
+5. **Temporal/reset faults:** inject stale, future, out-of-order, wrong-epoch, and pre-reset evidence; prove fail-closed handling and subsequent recovery.
+6. **Independent-channel negative control:** remove PE while retaining coherence, uncertainty, and explicit reward. Independent outputs must match the corresponding valid-PE-free control.
+7. **Positive control:** inject valid PE in a scenario where the consuming policy should respond. Verify a traceable response, ruling out “pass” by disabling all learning.
+8. **Trace-level audit:** independently reconstruct evidence references from raw events; reject duplicate IDs, timestamp inversions, unresolved source references, and decision snapshots changed after creation.
+
+## 5. Acceptance gates and reported metrics
+
+These are **proposed targets**, not measured Rust performance or published SOTA results.
+
+### Hard correctness gates
+
+- Zero invalid-sentinel leakage, duplicate admissions, stale/future leakage, and orphan PE-driven transitions in the fixed panel and at least 100,000 generated event cases.
+- 100% detection of five injected implementation defects: sentinel promotion, duplicate replay admission, stale-cycle admission, future-PE substitution, and suppression of an independent channel.
+- Exact equality of PE-dependent outputs for invalid-payload counterfactuals; exact decision-time evidence linkage for posthoc records.
+- Positive-control sensitivity and independent-channel preservation both pass.
+- Rejected cases report a classified reason; no missing case is silently counted as valid zero/high error.
+
+### Utility and cost — only after hard gates pass
+
+Report task loss, adaptation gain, time-to-recovery, forgetting/retention, false PE-driven updates, decision/gate outcome calibration, wall-clock latency, and memory overhead. Use paired seeds and identical evidence-access tracks, held-out tasks, dataset-macro effects and confidence intervals. Keep raw counts and failure traces; do not collapse everything into one weighted score.
+
+Proposed initial engineering budget: at most 5% p95 latency overhead for provenance instrumentation, measured against the same build and workload. If it is exceeded, report the trade-off rather than weakening provenance or correctness gates.
+
+## 6. Relation to state of the art and industry
+
+This audit is **orthogonal** to the drift-detector benchmark in #8495. KDD 2026's drift-evaluation work compares 14 methods across seven real-world datasets, four drift types, abrupt/gradual transitions, and advocates leave-one-dataset-out tuning ([paper DOI](https://doi.org/10.1145/3770855.3819070)). That is the appropriate rigor for detector-performance claims. PEV-2 asks whether the evidence and outcome attribution are trustworthy before comparing the detector's utility.
+
+Comparison sequence:
+
+1. Establish evidence correctness and mutation sensitivity.
+2. Run the same pinned streams and information-access track for candidate and baselines.
+3. Compare utility, false alarms, recovery, forgetting, and cost with paired uncertainty intervals.
+4. Publish exact configs, data digests, seeds, raw traces, and negative controls.
+
+A typed contract or clean synthetic fixture does **not** prove better adaptation, general intelligence, consciousness, or SOTA performance. Beating an industry baseline requires a matched full protocol and measured gains, not more internal checks alone.
+
+## 7. Reference-model smoke experiment (not product verification)
+
+The authoring-side Python reference model checks the contract against generated/adversarial traces. Its output is recorded separately so model-only checks are not confused with Rust tests:
+
+- 25,000 invalid-payload counterfactuals: 25,000 rejected without PE history; exact invalid-payload invariance.
+- 10,000 events over 39,838 admission attempts: exactly 10,000 unique admissions; 29,838 replays rejected.
+- 5,000 checkpoint round trips: resumed state equals uninterrupted state exactly.
+- Five deliberately injected faults: all five detected.
+- Stale and pre-reset evidence rejected; fresh evidence after reset admitted.
+- Later PE did not backfill a prior decision that lacked PE; outcome calibration was preserved.
+
+This is a reference-model smoke test only. It does not compile or run Symthaea, prove the Rust call graph, establish real runner honesty, or measure predictive utility. Production acceptance gates remain pending until Rust implementation and exact-head workflows execute.
+
+## 8. Implementation path
+
+1. **Partial implementation in draft PR #8716:** CodingAgent pending outcomes now carry the typed evidence and explicit decision cycle; posthoc outcomes retain the cycle and evidence. A cycle mismatch is converted to `StaleOrOutOfOrder`, and its scalar PE becomes unavailable. The compatibility scalar-only route remains explicitly provenance-free.
+2. Complete stable event identity / canonical digest and propagate that immutable reference through telemetry. The current cycle binding is not an event-ID or tamper-proof guarantee.
+3. Add/execute focused Rust unit and integration tests for DTA-01 through DTA-10, including positive controls and serialization migration cases. Tests are authored but have not executed.
+4. Add an independent raw-trace auditor and deterministic generated-case test in Rust; keep its scoring separate from model utility.
+5. Validate at the exact commit with formatting, compile, focused tests, relevant full suite, and workflow evidence. Queued, skipped, or stale-head runs are not passes.
+
+## 9. External benchmark frontier: correctness is not utility
+
+Current research suggests keeping the evidence-integrity question separate from the learning-algorithm question:
+
+- **Concept-drift detection:** Cerqueira et al., *A Framework for Evaluating and Benchmarking Concept Drift Detection Methods* (KDD 2026) evaluates 14 detector families across seven real-world datasets, four drift types, and abrupt/gradual transitions. It highlights timing-aware metrics and leave-one-dataset-out tuning. Use its stream/dataset protocol for detector claims instead of inventing a separate drift score: [paper](https://doi.org/10.1145/3770855.3819070), [arXiv version](https://arxiv.org/abs/2606.07789).
+- **Reliability-aware reinforcement-learning replay:** ReaPER reports improved performance over uniform replay and prioritized experience replay in its evaluated classic-control and Atari-10 settings. It is a comparator only for a matched RL/replay experiment, not for proving provenance correctness: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60e3d7caf8cfdaf6598467f9b0ebf36a-Abstract-Conference.html).
+- **Continual-learning reliability:** IDER uses idempotence-oriented training and distillation and reports improvements in prediction reliability, accuracy, and forgetting on its evaluated continual-learning benchmarks. Compare it only in a compatible continual-learning setting and reproduce the relevant baseline configuration: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/e34f98c14b861d6f24879e861fcbce1a-Abstract-Conference.html).
+- **Memory-rich regimes:** *Forget Forgetting: Continual Learning in a World of Abundant Memory* argues that when storage is abundant but GPU time is scarce, strong simple replay can outperform more elaborate methods at lower compute cost. This motivates reporting compute and wall-clock efficiency, not only average accuracy: [ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/17fc58b1ba92abbb72c5f457e140d851-Abstract-Conference.html).
+
+These results are from different task families and are **not directly rankable on a single leaderboard**. The proposed evaluation therefore has three separate scorecards:
+
+1. **Integrity:** exact counterfactual invariance, zero invalid/stale/future/duplicate PE influence, mutation sensitivity, positive controls, and decision-time trace closure.
+2. **Detection:** timing-aware drift F1, false alarms per 1,000 valid observations, missed-drift rate and normalized detection delay under matched information access.
+3. **Learning utility and cost:** held-out task score, calibration, adaptation/regret, retention/forgetting, recovery time, optimizer/update cost, p95 latency, memory and energy.
+
+The first scorecard is a hard admission gate for claiming evidence correctness. It must not be added to the utility score to compensate for task failure, and passing it does not make a SOTA claim. The second and third scorecards require real comparator implementations, pinned datasets/configurations, paired seeds and uncertainty intervals; the currently available synthetic reference results do not fill those cells.
+
+### Proposed falsifiable superiority criterion
+
+After correctness gates pass, pre-register a practical superiority target: improve the **dataset-macro primary utility metric by at least 5% relative to the strongest matched baseline**, with a paired 95% confidence interval excluding zero, while meeting the same access track and compute/memory budget. Report all datasets, worst-task results and negative controls. If this threshold is not met, publish the result as non-superior or inconclusive; do not change the threshold after seeing held-out results. The 5% target is a proposed engineering criterion, not a literature-derived universal standard.
+
+## 10. Independent trajectory-trace auditor (reference implementation)
+
+The repository now includes `pev_trace_audit_reference_v1.py` and its deterministic results JSON. This auditor is deliberately separate from the production Rust call graph; it consumes ordered JSON event traces and checks decision-time evidence identity, cycle binding, invalid-payload non-use, posthoc immutability, duplicate admission, and positive controls.
+
+Run from the repository root:
+
+```sh
+python3 docs/research/pev_trace_audit_reference_v1.py --self-test --cases 100000 --seed 20261028
+```
+
+The checked reference run accepted 100,000 clean generated trace cases (69,740 valid PE, 20,268 non-valid evidence, 9,992 missing/no-reference cases) and detected all six injected defects: invalid-sentinel promotion, duplicate evidence replay, stale-cycle admission, future-PE substitution, independent outcome suppression, and a no-op learner that suppresses all valid-PE influence.
+
+**Interpretation limit:** this is an independent Python reference auditor, not production Python and not Rust verification. It tests the trace contract against synthetic fixtures; it does not establish that the current live Rust integration emits complete traces, that the Rust tests compile, or that Symthaea beats a task-utility baseline. The next step is to port the minimal invariants into Rust tests and feed the auditor traces emitted from exact-head production test runs.
+
+### Why separate trace reliability from task score?
+
+The newly available paper *Trial by Trace: Benchmarking AI Agent Harnesses for Reliability and Failure Attribution* (arXiv:2610.32285, posted 23 October 2026) proposes separating task success from harness reliability, using trajectory traces and mechanism-based failure attribution. It reports that some runs can succeed at the task while still failing a harness criterion. This supports a two-axis evaluation design for Symthaea: one score for task/learning utility, another for evidence and harness integrity. Its reported scores are not directly comparable to this PE-specific synthetic audit: [paper](https://arxiv.org/abs/2610.32285).
+
+That statement describes v1's original scope. Section 11 adds a v2 reference envelope for stable event identity, reset epochs, and hash-chain checking. Neither reference version proves that the production Rust path emits complete traces or validates cross-process checkpoint/restore.
+
+
+## 11. Reset-aware canonical trace envelope (v2 reference implementation)
+
+The follow-on v2 files add stable trace-event IDs, gap-free sequence checking, a domain-separated canonical SHA-256 hash chain, explicit reset epochs, cycle-regression detection, cross-epoch evidence rejection, and exact decision-event/epoch retention for delayed posthoc outcomes. The v2 reference auditor imports the v1 semantic auditor as a sibling module; run it from the repository root:
+
+    python3 docs/research/pev_trace_audit_reference_v2.py --self-test --cases 100000 --seed 20261028
+
+The deterministic synthetic run accepted 100,000 single-epoch traces and six tests mutated the envelope/temporal contract; all six were rejected. A multi-epoch positive control confirms that a delayed outcome can arrive after reset without re-binding the old decision's evidence. It is not evidence that production Rust emits this trace shape or that Rust compiles.
+
+**Security qualification:** the hash chain is tamper-evident only if the trusted root is retained; it is not an authenticity proof because an editor who can rewrite the whole trace can recompute the chain. Signing or externally anchoring a root digest is a separate design decision. Keep hashed content to canonical metadata only; do not include raw user text or secrets.
+
+See pev_trace_audit_v2_contract.md for the complete v2 protocol, limits, and implementation gate. The missing next proof is still an exact-head Rust test that emits real decision/posthoc traces, including checkpoint/restore and reset boundaries, and passes those raw traces to the independent auditor.
+
+
+## 12. Counterfactual causal-influence benchmark
+
+Section 10's trace audit and section 11's envelope still establish only record consistency. A correctly hashed trace can claim PE influence while the consumer ignores the evidence, or hide invalid-PE effects outside recorded channels. The new paired counterfactual reference benchmark therefore holds input, initial-state digest, and gate/outcome calibration constant while replaying no-PE, seven invalid compatibility payloads, and a valid-PE positive control.
+
+The locally executed synthetic run accepted 100,000 paired trials (900,000 branch summaries) and rejected all seventeen deliberate mutations: invalid-payload state divergence, valid-PE no-op, missing/duplicate positive-control admission, protected-channel collateral change, counterfactual input mismatch, independent-outcome suppression, the missing-target-consumer fail-open case, invalid-variant payload gaps, malformed state digests, scalar/evidence mismatch, unclassified consumers, branch-label mismatch, duplicate trial/evidence IDs, and invalid-status promotion. See pev_counterfactual_influence_benchmark_v1.md for the schema and exact reproduction command.
+
+**Interpretation limit:** these are synthetic state-digest fixtures, not production Rust causality evidence. The next gate is to replay identical observations/actions/seeds through the real PE consumer path, emit accepted evidence IDs and independently auditable before/after state summaries, then run this checker against those exact-head traces. Keep correctness and utility as separate scorecards.
+
+
+### Strict-schema corrections added after adversarial review
+
+The reference checker now requires the exact seven distinct invalid-payload variants; valid compatibility scalar and typed PE value must agree; state and trial metadata digests must be lowercase SHA-256 hex; every declared consumer must be classified; and batch trial/evidence IDs must be unique. Importantly, expected branch role is derived from the paired-trial structure, NOT from a branch's self-reported pe_status; this closes a status-promotion path where an invalid branch might try to masquerade as the positive control. A dedicated invalid_status_promotion mutation covers it.
+
+The updated local run accepted 100,000 generated paired trials, audited 900,000 branch summaries, and rejected 17/17 deliberate mutations. The result JSON is byte-identical to the local deterministic output. The repository source is separately source-scanned; the fetched repo bytes were not executed byte-for-byte locally. All results remain reference-only until real Rust consumer traces are emitted and tested.
+
+
+## 13. Causal replay: estimate effects under stochastic continuation
+
+The strict counterfactual benchmark tests channel integrity, but it does not quantify downstream outcome effects for a stochastic learner. A separate reference estimator now pairs no-PE controls with valid-PE interventions and invalid-PE placebo runs, requiring a shared pre-intervention state, scenario digest, randomness-tape identity, and outcome-calibration digest. It replays downstream behavior after intervention and estimates paired outcome differences with bootstrap confidence intervals.
+
+This layer is informed by *Causal Agent Replay: Counterfactual Attribution for LLM-Agent Failures* (arXiv:2606.08275), which frames causal attribution as intervention followed by forward re-execution, reports outcome distributions and uncertainty, and emphasizes validation against planted causal ground truth. This benchmark is a related protocol adaptation, not an independent replication or comparable score.
+
+### Deterministic reference result
+
+- 512 pairs for valid PE and 512 invalid-PE placebo pairs; 2,048 run summaries total.
+- 3,000 percentile-bootstrap resamples per arm.
+- Planted valid-PE effect +0.08; estimated mean +0.07981, 95% interval [+0.07632, +0.08311].
+- Planted invalid-PE effect 0; estimated mean +0.00249, 95% interval [-0.00083, +0.00585], inside the preregistered equivalence margin ±0.02.
+- 13/13 injected malformed-pair mutations rejected.
+
+The committed source and result JSON Git blob IDs match the local tested artifacts. These figures validate the reference estimator against planted synthetic effects only. They are not measurements of Symthaea's real PE influence, production behavior, or task utility.
+
+### Production acceptance gate
+
+Emit real Rust run summaries from the PE decision boundary, replay the same pre-intervention state and exogenous randomness across matched branches, and use a versioned independent outcome evaluator. Keep integrity/invalid-PE equivalence gates separate from the valid-PE utility effect. If stochastic paths diverge, do not demand identical whole trajectories; estimate effects across independent scenario pairs and disclose replay fidelity. Then compare held-out task utility against matched baselines under equal data and compute/memory budgets.
+
+
+## 14. Repeated-seed calibration and interaction-aware next step
+
+The causal-replay estimator now has a separate calibration script. Across 1,000 synthetic seeds, each with 512 paired outcome differences per arm and 500 bootstrap resamples per arm, nominal 95% interval coverage was 94.5% for the planted valid-PE effect and 95.0% for the zero-effect placebo under percentile bootstrap. The paired-t cross-check covered 94.4% and 94.8%. The valid-effect lower-bound gate and placebo-equivalence gate each passed for all 1,000 synthetic seeds; the placebo interval excluded zero in 5% of runs. These are Monte Carlo calibration measurements for the simple approximately Gaussian planted-effect model, not universal guarantees and not production Symthaea results. Exact source and result identities are recorded in pev_causal_replay_seed_sweep_v1_source_audit.json.
+
+The next research increment should test **interaction attribution** rather than assume a single average PE effect generalizes to every cognitive context. Use a preregistered 2×2 factorial design: no PE/no context, PE only, context only, and PE+context. Estimate the PE main effect, context main effect, factorial interaction contrast, and Shapley credit split; compare with single-factor attribution under a fixed replay-call budget. Include planted synergistic and antagonistic cases so that a method that always attributes to PE, or ignores interactions, fails controls.
+
+This direction is motivated by *Causal Agent Replay*, which describes budget-bounded Monte Carlo Shapley attribution for interacting steps (https://arxiv.org/abs/2606.08275), and *Localizing Emergent Failures in Agentic AI: Recovering Minimal Repair Families via Counterfactual Replay*, which studies jointly necessary interventions and shows why single-event repair searches can miss interactions (https://arxiv.org/abs/2608.29228). These results motivate the benchmark design; they are not performance claims about Symthaea.
+
+## 15. Transportability, cluster dependence, subgroup reversal, and replay-order drift
+
+The v3 synthetic robustness harness adds three failure modes to the 2×2 PE/context factorial benchmark: clustered observations, opposite interaction signs across subgroups, and arm-order confounding under nonlinear drift. Exact implementation, output, and artifact identity audit are in `pev_factorial_transportability_v3.py`, `pev_factorial_transportability_v3_results.json`, and `pev_factorial_transportability_v3_source_audit.json`.
+
+On 1,000 synthetic seeds, a row-IID interval covered the planted +0.12 population interaction in 57.6% of replicates, while a cluster-mean interval covered it in 94.3%. This demonstrates pseudoreplication risk in the declared random-intercept data generator; it is not a universal coverage claim.
+
+In a balanced sign-reversal fixture, subgroup interactions +0.12 and −0.12 produced a pooled estimate around +0.00006. Both subgroup signs were recovered in 100% of 1,000 seeds, and the pooled estimate passed a ±0.02 practical-equivalence test in 100%. This illustrates why a pooled null/equivalence conclusion must not be interpreted as homogeneous treatment effect.
+
+With zero true interaction and quadratic order drift coefficient 0.02, fixed order produced mean estimated interaction +0.08016 with 0% nominal 95% CI coverage of zero; randomized arm order reduced the mean estimate to +0.00026 and achieved 94.7% coverage. Randomization addresses this planted arm/order confound but does not prove robustness to every form of real replay nonstationarity.
+
+All six v3 gates pass. These are synthetic reference tests only; no production Rust execution, real trace authenticity, task-utility improvement, or direct SOTA win is claimed. The next comparison should place this method alongside CAR (https://arxiv.org/abs/2606.08275), REFLECT (https://arxiv.org/abs/2606.09071), GCJR/MRFR (https://arxiv.org/abs/2608.29228), DCFA (https://aclanthology.org/2026.emnlp-main.1887/), and TraceTrial-Bench (https://github.com/TraceLite-AI/TraceTrial-Bench) on identical held-out traces with equal replay/model-call budgets and shared outcome adjudication.
+
