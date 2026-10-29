@@ -813,13 +813,13 @@ fn paired_deltas_for_policy(
         let count = (*fraction * rows.len() as f64).ceil().max(1.0);
         results.push(paired_delta_bootstrap(
             rows, baseline, "items", count, Some(*fraction), replicates,
-            &format!("{seed_prefix}:{}:items", baseline.id()),
+            seed_prefix,
         ));
     }
     for minutes in minute_budgets {
         results.push(paired_delta_bootstrap(
             rows, baseline, "minutes", *minutes, None, replicates,
-            &format!("{seed_prefix}:{}:minutes", baseline.id()),
+            seed_prefix,
         ));
     }
     results
