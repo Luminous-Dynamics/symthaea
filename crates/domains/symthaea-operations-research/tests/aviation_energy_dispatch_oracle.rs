@@ -1,6 +1,5 @@
 use symthaea_operations_research::aviation_energy_accounting::{EnergyCarrier, EvidenceClass, TransportService};
 use symthaea_operations_research::aviation_energy_dispatch::{
-    solve_cost_greedy, solve_exact_pareto, verify_energy_plan, CleanAirlineEnergyScenario,
     canonical_scenario_digest, seal_scenario, solve_cost_greedy, solve_exact_pareto,
     verify_energy_plan, verify_scenario_digest, CleanAirlineEnergyScenario, EnergyAllocation,
     EnergyDemand, EnergyDispatchError, EnergyPlan, EnergySourceOffer,
