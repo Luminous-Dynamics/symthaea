@@ -1,7 +1,9 @@
 //! VIS-DVPC-042: reproducible long-horizon OPE coverage/power/width frontier.
 //!
 //! Methods compared on identical seeded streams:
-//! - MOPE two-tail confidence sequence,
+//! - MOPE analytic-root quadratic lower bound,
+//! - the same lower bound evaluated on a 1,000-point grid,
+//! - upstream-style actual-wealth grid with the same Rust bet optimizer,
 //! - reused pointwise Wald interval (non-anytime-valid comparator),
 //! - two-sided Hoeffding alpha-spending sequence,
 //! - two-sided empirical-Bernstein alpha-spending interval.
@@ -705,8 +707,13 @@ mod tests {
             let second=simulate_scenario(s,index,8,&[8]).unwrap();
             assert_eq!(first.path_count,second.path_count);
             assert_eq!(first.sample_count,second.sample_count);
-            assert_eq!(first.aggregates[0][0].point_hits,second.aggregates[0][0].point_hits);
-            assert_eq!(first.aggregates[0][0].sequence_hits,second.aggregates[0][0].sequence_hits);
+            for method in 0..METHOD_NAMES.len() {
+                assert_eq!(first.aggregates[method][0].point_hits,second.aggregates[method][0].point_hits);
+                assert_eq!(first.aggregates[method][0].sequence_hits,second.aggregates[method][0].sequence_hits);
+                assert_eq!(first.aggregates[method][0].promotion_hits,second.aggregates[method][0].promotion_hits);
+                assert_eq!(first.aggregates[method][0].root_failures,second.aggregates[method][0].root_failures);
+                assert_eq!(first.aggregates[method][0].grid_endpoint_advances,second.aggregates[method][0].grid_endpoint_advances);
+            }
             assert_eq!(first.aggregates[0][0].root_failures,0);
         }
     }
