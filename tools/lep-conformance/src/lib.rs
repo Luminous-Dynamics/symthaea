@@ -10,13 +10,118 @@
 //! is true. Callers must combine this with the versioned schema, a trusted
 //! attestation verifier, artifact verification, and domain-specific checks.
 
-use serde::Serialize;
-use serde_json::Value;
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::{Map, Number, Value};
+use std::fmt;
 use std::collections::BTreeSet;
 
 pub const STATEMENT_TYPE: &str = "https://in-toto.io/Statement/v1";
 pub const PREDICATE_TYPE: &str = "https://luminousdynamics.io/attestations/evidence/v0.1";
 pub const SCHEMA_VERSION: &str = "0.1.0";
+
+/// A JSON value deserialized with duplicate object keys rejected.
+///
+/// Ordinary deserialization into `serde_json::Value` overwrites
+/// duplicate keys. Rejecting them at the parse boundary avoids different
+/// consumers assigning different meanings to the same signed statement bytes.
+struct StrictJsonValue(Value);
+
+impl<'de> Deserialize<'de> for StrictJsonValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StrictJsonVisitor;
+
+        impl<'de> Visitor<'de> for StrictJsonVisitor {
+            type Value = StrictJsonValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a JSON value with no duplicate object keys")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::Bool(value)))
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::Number(Number::from(value))))
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::Number(Number::from(value))))
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Number::from_f64(value)
+                    .map(|number| StrictJsonValue(Value::Number(number)))
+                    .ok_or_else(|| E::custom("JSON numbers must be finite"))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::String(value.to_owned())))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::String(value)))
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::Null))
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E> {
+                Ok(StrictJsonValue(Value::Null))
+            }
+
+            fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut values = Vec::new();
+                while let Some(value) = sequence.next_element::<StrictJsonValue>()? {
+                    values.push(value.0);
+                }
+                Ok(StrictJsonValue(Value::Array(values)))
+            }
+
+            fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut values = Map::new();
+                while let Some(key) = object.next_key::<String>()? {
+                    if values.contains_key(&key) {
+                        return Err(serde::de::Error::custom(format!(
+                            "duplicate JSON object key: {key:?}"
+                        )));
+                    }
+                    let value = object.next_value::<StrictJsonValue>()?;
+                    values.insert(key, value.0);
+                }
+                Ok(StrictJsonValue(Value::Object(values)))
+            }
+        }
+
+        deserializer.deserialize_any(StrictJsonVisitor)
+    }
+}
+
+/// Parse JSON while rejecting duplicate keys at every object depth.
+///
+/// Call this before any schema or semantic validation. It also requires that
+/// the input contain exactly one complete JSON value.
+pub fn parse_json_unique_keys(input: &[u8]) -> Result<Value, String> {
+    let mut deserializer = serde_json::Deserializer::from_slice(input);
+    let StrictJsonValue(value) =
+        StrictJsonValue::deserialize(&mut deserializer).map_err(|error| error.to_string())?;
+    deserializer.end().map_err(|error| error.to_string())?;
+    Ok(value)
+}
 
 const LEP_SCHEMA_JSON: &str = include_str!("../../../docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json");
 
@@ -802,6 +907,20 @@ mod tests {
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
         report.violations.iter().any(|violation| violation.code == code)
+    }
+
+    #[test]
+    fn duplicate_top_level_json_keys_are_rejected_before_validation() {
+        let input = br#"{"_type":"first","_type":"second"}"#;
+        let error = parse_json_unique_keys(input).expect_err("duplicate keys must be rejected");
+        assert!(error.contains("duplicate JSON object key"));
+    }
+
+    #[test]
+    fn duplicate_nested_json_keys_are_rejected_before_validation() {
+        let input = br#"{"predicate":{"claim":{"id":"one","id":"two"}}}"#;
+        let error = parse_json_unique_keys(input).expect_err("nested duplicate keys must be rejected");
+        assert!(error.contains("duplicate JSON object key"));
     }
 
     #[test]
