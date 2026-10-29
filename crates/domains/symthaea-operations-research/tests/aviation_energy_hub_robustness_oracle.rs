@@ -174,6 +174,25 @@ fn stress_set_digest_and_outcomes_ignore_case_input_order() {
 }
 
 #[test]
+fn stress_set_digest_matches_independent_known_answer_vector() {
+    let base = nominal();
+    let cases = vec![
+        WeightedEnergyHubScenario {
+            scenario: stress_price_reversal(&base),
+            weight_ppm: 500_000,
+        },
+        WeightedEnergyHubScenario {
+            scenario: stress_renewable_shortfall(&base),
+            weight_ppm: 500_000,
+        },
+    ];
+    assert_eq!(
+        canonical_stress_set_digest(&cases).unwrap(),
+        "sha256:4527573bd739e6b24d9681f1fa2c18fc0dff0f8cd5efdc64bb81a5fb399f6c13"
+    );
+}
+
+#[test]
 fn scenario_weights_must_sum_to_one_million_ppm() {
     let base = nominal();
     let nominal_plan = solve_exact_energy_hub_pareto(&base, 100_000).unwrap().frontier[0]
