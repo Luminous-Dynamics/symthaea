@@ -39,7 +39,7 @@ Each scored row carries:
 - an explicitly declared feature schema and each feature's availability timestamp; and
 - optional central prediction interval with a nominal coverage level.
 
-The module rejects Training/Calibration rows, mixed partitions, duplicate record IDs, invalid chronology, target windows inconsistent with the labelled duration by more than one second, predictions issued after target start in prospective mode, and any model input with missing or future availability. A declared intercept-only baseline may use an explicitly declared empty feature schema; an undeclared schema is an error.
+The module requires a run context with syntactically valid digests for the dataset snapshot, prediction artifact, model/configuration, feature schema, evaluation protocol, and evaluator commit; it preserves those identifiers in the report. It rejects Training/Calibration rows, mixed partitions, duplicate record IDs, invalid chronology, target windows inconsistent with the labelled duration by more than one second, predictions issued after target start in prospective mode, and any model input with missing or future availability. The caller must compute these digests from the actual files; syntax checks alone do not prove the digest matches a file. A declared intercept-only baseline may use an explicitly declared empty feature schema; an undeclared schema is an error.
 
 The one-second target-window tolerance accommodates timestamp precision differences. If a data source's target is not directly the difference between the specified target-window endpoints, define a different target contract rather than silently relaxing this check.
 
@@ -68,7 +68,7 @@ Cohort results prevent a large airport from hiding failure at a smaller or more 
 
 ## Test coverage defined
 
-The module defines unit tests for point metrics, per-cohort sorting, prospective-versus-retrospective timing, future/missing feature times, target-field leakage, partition separation, duplicate IDs, interval coverage/width/Winkler score, mixed interval outputs, explicit intercept-only schema, non-finite predictions, and target-window consistency.
+The module defines unit tests for provenance binding/invalid hashes, point metrics, per-cohort sorting, prospective-versus-retrospective timing, future/missing feature times, target-field leakage, partition separation, duplicate IDs, interval coverage/width/Winkler score, mixed interval outputs, explicit intercept-only schema, non-finite predictions, and target-window consistency.
 
 A separately compiled test oracle recomputes RMSE, MAE, bias, and P90 absolute error from raw fixtures without using production metric helpers. It also checks the prospective timing gate, feature-time leakage rejection, deterministic cohort ordering, and partition separation.
 

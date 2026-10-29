@@ -35,6 +35,21 @@ pub struct PredictionInterval {
     pub nominal_coverage: f64,
 }
 
+/// Hashes and identity for the exact scorecard run. Digests must be computed by
+/// the caller from frozen source artifacts; this scorer validates their encoding
+/// and carries them into the output but does not hash external files itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForecastEvaluationContext {
+    pub run_id: String,
+    pub data_snapshot_sha256: String,
+    pub prediction_artifact_sha256: String,
+    pub model_config_sha256: String,
+    pub feature_schema_sha256: String,
+    pub evaluation_protocol_sha256: String,
+    /// Git commit object ID from the evaluator checkout (40 or 64 lowercase hex).
+    pub evaluator_source_commit_sha: String,
+}
+
 /// One scored forecast row with explicit event-time, prediction-time, target-time,
 /// feature-availability, event-cluster and evaluation-partition metadata.
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +80,7 @@ pub struct ForecastObservation {
 pub enum ForecastScoringError {
     EmptyObservationSet,
     InvalidIdentity { record_id: String, field: &'static str },
+    InvalidProvenanceField { field: &'static str },
     DuplicateRecordId { record_id: String },
     InvalidEvaluationPartition { partition: EvaluationPartition },
     MixedEvaluationPartitions,
@@ -111,6 +127,13 @@ pub struct CohortForecastScore {
 /// retrospective score cannot be mislabeled as a prospective operational forecast.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ForecastEvaluationReport {
+    pub run_id: String,
+    pub data_snapshot_sha256: String,
+    pub prediction_artifact_sha256: String,
+    pub model_config_sha256: String,
+    pub feature_schema_sha256: String,
+    pub evaluation_protocol_sha256: String,
+    pub evaluator_source_commit_sha: String,
     pub mode: ForecastEvaluationMode,
     pub partition: EvaluationPartition,
     pub overall: ForecastScoreSummary,
@@ -138,9 +161,11 @@ struct ScoredRow {
 /// interval outputs. It reports aggregate and cohort metrics without silently
 /// removing difficult rows.
 pub fn evaluate_forecasts(
+    context: &ForecastEvaluationContext,
     observations: &[ForecastObservation],
     mode: ForecastEvaluationMode,
 ) -> Result<ForecastEvaluationReport, ForecastScoringError> {
+    validate_context(context)?;
     if observations.is_empty() {
         return Err(ForecastScoringError::EmptyObservationSet);
     }
@@ -319,7 +344,51 @@ pub fn evaluate_forecasts(
         });
     }
 
-    Ok(ForecastEvaluationReport { mode, partition, overall, by_cohort })
+    Ok(ForecastEvaluationReport {
+        run_id: context.run_id.clone(),
+        data_snapshot_sha256: context.data_snapshot_sha256.clone(),
+        prediction_artifact_sha256: context.prediction_artifact_sha256.clone(),
+        model_config_sha256: context.model_config_sha256.clone(),
+        feature_schema_sha256: context.feature_schema_sha256.clone(),
+        evaluation_protocol_sha256: context.evaluation_protocol_sha256.clone(),
+        evaluator_source_commit_sha: context.evaluator_source_commit_sha.clone(),
+        mode,
+        partition,
+        overall,
+        by_cohort,
+    })
+}
+
+fn validate_context(context: &ForecastEvaluationContext) -> Result<(), ForecastScoringError> {
+    if context.run_id.trim().is_empty() {
+        return Err(ForecastScoringError::InvalidProvenanceField { field: "run_id" });
+    }
+    for (field, digest) in [
+        ("data_snapshot_sha256", context.data_snapshot_sha256.as_str()),
+        ("prediction_artifact_sha256", context.prediction_artifact_sha256.as_str()),
+        ("model_config_sha256", context.model_config_sha256.as_str()),
+        ("feature_schema_sha256", context.feature_schema_sha256.as_str()),
+        ("evaluation_protocol_sha256", context.evaluation_protocol_sha256.as_str()),
+    ] {
+        if !is_lower_hex_sha256(digest) {
+            return Err(ForecastScoringError::InvalidProvenanceField { field });
+        }
+    }
+    if !((context.evaluator_source_commit_sha.len() == 40
+        || context.evaluator_source_commit_sha.len() == 64)
+        && context.evaluator_source_commit_sha.as_bytes().iter()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b)))
+    {
+        return Err(ForecastScoringError::InvalidProvenanceField {
+            field: "evaluator_source_commit_sha",
+        });
+    }
+    Ok(())
+}
+
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value.as_bytes().iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b))
 }
 
 fn summarize(rows: &[&ScoredRow]) -> Result<ForecastScoreSummary, ForecastScoringError> {
@@ -404,6 +473,25 @@ fn linear_quantile_sorted(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
 
+    fn context() -> ForecastEvaluationContext {
+        ForecastEvaluationContext {
+            run_id: "fixture-run".into(),
+            data_snapshot_sha256: "a".repeat(64),
+            prediction_artifact_sha256: "b".repeat(64),
+            model_config_sha256: "c".repeat(64),
+            feature_schema_sha256: "d".repeat(64),
+            evaluation_protocol_sha256: "e".repeat(64),
+            evaluator_source_commit_sha: "f".repeat(40),
+        }
+    }
+
+    fn score(
+        observations: &[ForecastObservation],
+        mode: ForecastEvaluationMode,
+    ) -> Result<ForecastEvaluationReport, ForecastScoringError> {
+        evaluate_forecasts(&context(), observations, mode)
+    }
+
     fn row(
         id: &str,
         cohort: &str,
@@ -435,13 +523,44 @@ mod tests {
     }
 
     #[test]
+    fn binds_source_prediction_model_schema_and_protocol_identities() {
+        let observations = vec![row(
+            "r1", "EDDF", 10.0, 11.0, 1_000, 1_000, EvaluationPartition::Test
+        )];
+        let report = score(&observations, ForecastEvaluationMode::ProspectiveOperational).unwrap();
+        let context = context();
+        assert_eq!(report.run_id, context.run_id);
+        assert_eq!(report.data_snapshot_sha256, context.data_snapshot_sha256);
+        assert_eq!(report.prediction_artifact_sha256, context.prediction_artifact_sha256);
+        assert_eq!(report.model_config_sha256, context.model_config_sha256);
+        assert_eq!(report.feature_schema_sha256, context.feature_schema_sha256);
+        assert_eq!(report.evaluation_protocol_sha256, context.evaluation_protocol_sha256);
+        assert_eq!(report.evaluator_source_commit_sha, context.evaluator_source_commit_sha);
+    }
+
+    #[test]
+    fn invalid_provenance_digest_fails_closed() {
+        let mut context = context();
+        context.data_snapshot_sha256 = "not-a-sha256".into();
+        let observations = vec![row(
+            "r1", "EDDF", 10.0, 11.0, 1_000, 1_000, EvaluationPartition::Test
+        )];
+        assert_eq!(
+            evaluate_forecasts(&context, &observations, ForecastEvaluationMode::ProspectiveOperational),
+            Err(ForecastScoringError::InvalidProvenanceField {
+                field: "data_snapshot_sha256"
+            })
+        );
+    }
+
+    #[test]
     fn computes_rmse_mae_bias_p90_and_cohort_slices() {
         let observations = vec![
             row("r1", "ZAAA", 10.0, 12.0, 1_000, 1_000, EvaluationPartition::Test),
             row("r2", "AAAA", 20.0, 18.0, 2_000, 2_000, EvaluationPartition::Test),
             row("r3", "AAAA", 30.0, 33.0, 3_000, 3_000, EvaluationPartition::Test),
         ];
-        let report = evaluate_forecasts(&observations, ForecastEvaluationMode::ProspectiveOperational).unwrap();
+        let report = score(&observations, ForecastEvaluationMode::ProspectiveOperational).unwrap();
         assert_eq!(report.partition, EvaluationPartition::Test);
         assert_eq!(report.mode, ForecastEvaluationMode::ProspectiveOperational);
         assert!((report.overall.rmse_seconds - (17.0_f64 / 3.0).sqrt()).abs() < 1e-12);
@@ -458,10 +577,10 @@ mod tests {
     fn retrospective_challenge_is_scored_but_not_mislabeled_operational() {
         let observation = row("r1", "EDDF", 600.0, 590.0, 10_000, 10_600, EvaluationPartition::Test);
         assert!(matches!(
-            evaluate_forecasts(&[observation.clone()], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[observation.clone()], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::PredictionAfterTargetStart { .. })
         ));
-        let report = evaluate_forecasts(&[observation], ForecastEvaluationMode::RetrospectiveChallenge).unwrap();
+        let report = score(&[observation], ForecastEvaluationMode::RetrospectiveChallenge).unwrap();
         assert_eq!(report.mode, ForecastEvaluationMode::RetrospectiveChallenge);
         assert_eq!(report.overall.observation_count, 1);
     }
@@ -471,7 +590,7 @@ mod tests {
         let mut observation = row("r1", "EDDF", 10.0, 10.0, 1_000, 1_000, EvaluationPartition::Test);
         observation.features[0].available_at_epoch_seconds = Some(1_001);
         assert!(matches!(
-            evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[observation], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::FeatureAvailabilityFailed { status: AuditStatus::Reject, .. })
         ));
     }
@@ -481,7 +600,7 @@ mod tests {
         let mut observation = row("r1", "EDDF", 10.0, 10.0, 1_000, 1_000, EvaluationPartition::Test);
         observation.features[0].available_at_epoch_seconds = None;
         assert!(matches!(
-            evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[observation], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::FeatureAvailabilityFailed { status: AuditStatus::Indeterminate, .. })
         ));
     }
@@ -491,7 +610,7 @@ mod tests {
         let mut observation = row("r1", "EDDF", 10.0, 10.0, 1_000, 1_000, EvaluationPartition::Test);
         observation.features[0].role = crate::aviation_data_contract::FieldRole::TargetOnly;
         assert!(matches!(
-            evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[observation], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::FeatureAvailabilityFailed { status: AuditStatus::Reject, .. })
         ));
     }
@@ -501,7 +620,7 @@ mod tests {
         for partition in [EvaluationPartition::Training, EvaluationPartition::Calibration] {
             let observation = row("r1", "EDDF", 10.0, 10.0, 1_000, 1_000, partition);
             assert!(matches!(
-                evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational),
+                score(&[observation], ForecastEvaluationMode::ProspectiveOperational),
                 Err(ForecastScoringError::InvalidEvaluationPartition { .. })
             ));
         }
@@ -514,7 +633,7 @@ mod tests {
             row("r2", "EDDF", 10.0, 10.0, 2_000, 2_000, EvaluationPartition::Test),
         ];
         assert_eq!(
-            evaluate_forecasts(&observations, ForecastEvaluationMode::ProspectiveOperational),
+            score(&observations, ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::MixedEvaluationPartitions)
         );
     }
@@ -525,12 +644,12 @@ mod tests {
         let mut second = duplicated.clone();
         second.cohort_id = "EGLL".into();
         assert!(matches!(
-            evaluate_forecasts(&[duplicated.clone(), second], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[duplicated.clone(), second], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::DuplicateRecordId { .. })
         ));
         duplicated.event_cluster_id = " ".into();
         assert!(matches!(
-            evaluate_forecasts(&[duplicated], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[duplicated], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::InvalidIdentity { field: "event_cluster_id", .. })
         ));
     }
@@ -541,7 +660,7 @@ mod tests {
         let mut b = row("r2", "EDDF", 20.0, 20.0, 2_000, 2_000, EvaluationPartition::Test);
         a.interval = Some(PredictionInterval { lower_seconds: 8.0, upper_seconds: 12.0, nominal_coverage: 0.90 });
         b.interval = Some(PredictionInterval { lower_seconds: 18.0, upper_seconds: 22.0, nominal_coverage: 0.90 });
-        let report = evaluate_forecasts(&[a, b], ForecastEvaluationMode::ProspectiveOperational).unwrap();
+        let report = score(&[a, b], ForecastEvaluationMode::ProspectiveOperational).unwrap();
         assert_eq!(report.overall.nominal_interval_coverage, Some(0.90));
         assert_eq!(report.overall.empirical_interval_coverage, Some(1.0));
         assert_eq!(report.overall.mean_interval_width_seconds, Some(4.0));
@@ -552,7 +671,7 @@ mod tests {
     fn interval_penalty_increases_when_observation_misses_bounds() {
         let mut a = row("r1", "EDDF", 20.0, 20.0, 1_000, 1_000, EvaluationPartition::Test);
         a.interval = Some(PredictionInterval { lower_seconds: 8.0, upper_seconds: 12.0, nominal_coverage: 0.90 });
-        let report = evaluate_forecasts(&[a], ForecastEvaluationMode::ProspectiveOperational).unwrap();
+        let report = score(&[a], ForecastEvaluationMode::ProspectiveOperational).unwrap();
         assert_eq!(report.overall.empirical_interval_coverage, Some(0.0));
         assert_eq!(report.overall.mean_winkler_score_seconds, Some(164.0));
     }
@@ -563,12 +682,12 @@ mod tests {
         let mut b = row("r2", "EDDF", 10.0, 10.0, 2_000, 2_000, EvaluationPartition::Test);
         a.interval = Some(PredictionInterval { lower_seconds: 8.0, upper_seconds: 12.0, nominal_coverage: 0.90 });
         assert!(matches!(
-            evaluate_forecasts(&[a.clone(), b.clone()], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[a.clone(), b.clone()], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::MixedIntervalPresence)
         ));
         b.interval = Some(PredictionInterval { lower_seconds: 8.0, upper_seconds: 12.0, nominal_coverage: 0.95 });
         assert!(matches!(
-            evaluate_forecasts(&[a, b], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[a, b], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::MixedIntervalCoverage)
         ));
     }
@@ -577,7 +696,7 @@ mod tests {
     fn explicit_constant_baseline_can_have_empty_feature_schema() {
         let mut observation = row("r1", "EDDF", 10.0, 11.0, 1_000, 1_000, EvaluationPartition::Validation);
         observation.features.clear();
-        let report = evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational).unwrap();
+        let report = score(&[observation], ForecastEvaluationMode::ProspectiveOperational).unwrap();
         assert_eq!(report.overall.observation_count, 1);
     }
 
@@ -586,7 +705,7 @@ mod tests {
         let mut observation = row("r1", "EDDF", 10.0, 11.0, 1_000, 1_000, EvaluationPartition::Validation);
         observation.feature_schema_declared = false;
         assert!(matches!(
-            evaluate_forecasts(&[observation], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[observation], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::FeatureSchemaNotDeclared { .. })
         ));
     }
@@ -596,13 +715,13 @@ mod tests {
         let mut negative = row("r1", "EDDF", 10.0, 11.0, 1_000, 1_000, EvaluationPartition::Test);
         negative.predicted_seconds = -1.0;
         assert!(matches!(
-            evaluate_forecasts(&[negative], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[negative], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::InvalidPrediction { .. })
         ));
         let mut non_finite = row("r2", "EDDF", 10.0, 11.0, 2_000, 2_000, EvaluationPartition::Test);
         non_finite.predicted_seconds = f64::NAN;
         assert!(matches!(
-            evaluate_forecasts(&[non_finite], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[non_finite], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::InvalidPrediction { .. })
         ));
     }
@@ -612,13 +731,13 @@ mod tests {
         let mut bad_window = row("r1", "EDDF", 10.0, 10.0, 1_000, 1_000, EvaluationPartition::Test);
         bad_window.target_window_end_epoch_seconds = bad_window.target_window_start_epoch_seconds;
         assert!(matches!(
-            evaluate_forecasts(&[bad_window], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[bad_window], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::InvalidTargetWindow { .. })
         ));
         let mut bad_label = row("r2", "EDDF", 10.0, 10.0, 2_000, 2_000, EvaluationPartition::Test);
         bad_label.actual_seconds = 30.0;
         assert!(matches!(
-            evaluate_forecasts(&[bad_label], ForecastEvaluationMode::ProspectiveOperational),
+            score(&[bad_label], ForecastEvaluationMode::ProspectiveOperational),
             Err(ForecastScoringError::TargetWindowDurationMismatch { .. })
         ));
     }
