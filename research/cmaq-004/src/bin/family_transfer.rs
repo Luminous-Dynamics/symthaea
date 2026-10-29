@@ -6,7 +6,7 @@
 
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-004-family-transfer-v0.2";
+const REPORT_SCHEMA: &str = "cmaq-004-family-transfer-v0.3";
 const FAMILY_COUNT: usize = 256;
 const SUPPORT_SAMPLES: usize = 256;
 const BASE_SEED: u64 = 0xC0A4_F411_1E5E_2026;
@@ -195,15 +195,21 @@ fn expected_action_reward(spec: FamilySpec, action: usize) -> f64 {
 enum Strategy {
     DirectNearest,
     AdditiveModel,
+    MarginGate005,
+    MarginGate020,
+    MarginGate050,
     ShuffledModel,
     StaleModel,
     Oracle,
 }
 
 impl Strategy {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 8] = [
         Self::DirectNearest,
         Self::AdditiveModel,
+        Self::MarginGate005,
+        Self::MarginGate020,
+        Self::MarginGate050,
         Self::ShuffledModel,
         Self::StaleModel,
         Self::Oracle,
@@ -213,6 +219,9 @@ impl Strategy {
         match self {
             Self::DirectNearest => "direct_nearest_context",
             Self::AdditiveModel => "additive_model",
+            Self::MarginGate005 => "margin_gate_005",
+            Self::MarginGate020 => "margin_gate_020",
+            Self::MarginGate050 => "margin_gate_050",
             Self::ShuffledModel => "shuffled_model_control",
             Self::StaleModel => "stale_model_control",
             Self::Oracle => "oracle_evaluator_only",
@@ -220,7 +229,7 @@ impl Strategy {
     }
 
     fn uses_model(self) -> bool {
-        matches!(self, Self::AdditiveModel | Self::ShuffledModel | Self::StaleModel)
+        matches!(self, Self::AdditiveModel | Self::MarginGate005 | Self::MarginGate020 | Self::MarginGate050 | Self::ShuffledModel | Self::StaleModel)
     }
 }
 
@@ -231,14 +240,27 @@ struct FamilyOutcome {
     net_lift_vs_direct: f64,
     action: usize,
     model_abs_error: f64,
+    action_override: bool,
 }
 
 fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, query_cost: f64) -> FamilyOutcome {
     let additive = support.additive_extrapolation();
     let direct = choose(support.direct_nearest_context());
+    let proposed_additive_action = choose(additive);
+    let margin_gate = |threshold: f64| {
+        let estimated_lift = additive[proposed_additive_action] - additive[direct];
+        if proposed_additive_action != direct && estimated_lift >= threshold {
+            proposed_additive_action
+        } else {
+            direct
+        }
+    };
     let action = match strategy {
         Strategy::DirectNearest => direct,
-        Strategy::AdditiveModel => choose(additive),
+        Strategy::AdditiveModel => proposed_additive_action,
+        Strategy::MarginGate005 => margin_gate(0.005),
+        Strategy::MarginGate020 => margin_gate(0.020),
+        Strategy::MarginGate050 => margin_gate(0.050),
         Strategy::ShuffledModel => choose([additive[1], additive[0]]),
         Strategy::StaleModel => choose([0.5, 0.75]),
         Strategy::Oracle => {
@@ -255,7 +277,7 @@ fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, que
     let gross_lift = candidate_reward - direct_reward;
     let net_utility = candidate_reward - cost;
     let model_abs_error = match strategy {
-        Strategy::AdditiveModel | Strategy::ShuffledModel => {
+        Strategy::AdditiveModel | Strategy::MarginGate005 | Strategy::MarginGate020 | Strategy::MarginGate050 | Strategy::ShuffledModel => {
             let truth = [0.5, spec.heldout_action_one_probability()];
             ((additive[0] - truth[0]).abs() + (additive[1] - truth[1]).abs()) / 2.0
         }
@@ -270,6 +292,7 @@ fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, que
         net_lift_vs_direct: gross_lift - cost,
         action,
         model_abs_error,
+        action_override: action != direct,
     }
 }
 
@@ -312,6 +335,7 @@ struct Summary {
     harmed_family_rate: f64,
     mean_additive_prediction_mae: f64,
     action_one_rate: f64,
+    action_override_rate: f64,
 }
 
 fn summarize(
@@ -325,6 +349,7 @@ fn summarize(
     let utilities = outcomes.iter().map(|(_, outcome)| outcome.absolute_net_utility).collect::<Vec<_>>();
     let errors = outcomes.iter().map(|(_, outcome)| outcome.model_abs_error).collect::<Vec<_>>();
     let actions = outcomes.iter().map(|(_, outcome)| outcome.action as f64).collect::<Vec<_>>();
+    let override_values = outcomes.iter().map(|(_, outcome)| outcome.action_override as u8 as f64).collect::<Vec<_>>();
     let (avg, low, high) = mean_ci95(&lifts);
     Summary {
         lane,
@@ -341,8 +366,9 @@ fn summarize(
         lower_cvar05_net_lift: lower_cvar05(&lifts),
         minimum_family_net_lift: lifts.iter().copied().fold(f64::INFINITY, f64::min),
         harmed_family_rate: if lifts.is_empty() { 0.0 } else { lifts.iter().filter(|value| **value < -1e-12).count() as f64 / lifts.len() as f64 },
-        mean_additive_prediction_mae: if matches!(strategy, Strategy::AdditiveModel | Strategy::ShuffledModel) { mean(&errors) } else { 0.0 },
+        mean_additive_prediction_mae: if matches!(strategy, Strategy::AdditiveModel | Strategy::MarginGate005 | Strategy::MarginGate020 | Strategy::MarginGate050 | Strategy::ShuffledModel) { mean(&errors) } else { 0.0 },
         action_one_rate: mean(&actions),
+        action_override_rate: mean(&override_values),
     }
 }
 
@@ -400,14 +426,16 @@ fn render(rows: &[Summary]) -> String {
                 "\"minimum_family_net_lift\":{:.8},",
                 "\"harmed_family_rate\":{:.8},",
                 "\"mean_additive_prediction_mae\":{:.8},",
-                "\"action_one_rate\":{:.8}",
+                "\"action_one_rate\":{:.8},",
+                "\"action_override_rate\":{:.8}",
                 "}}"
             ),
             row.lane, row.strategy, row.query_cost_per_query, row.family_count,
             row.mean_net_utility, row.mean_gross_lift_vs_direct, row.mean_break_even_query_cost,
             row.beneficial_family_rate_before_cost, row.mean_net_lift_vs_direct, row.lift_ci95_low,
             row.lift_ci95_high, row.lower_cvar05_net_lift, row.minimum_family_net_lift,
-            row.harmed_family_rate, row.mean_additive_prediction_mae, row.action_one_rate
+            row.harmed_family_rate, row.mean_additive_prediction_mae, row.action_one_rate,
+            row.action_override_rate
         ));
         if i + 1 != rows.len() { out.push(','); }
         out.push('\n');
@@ -440,6 +468,44 @@ mod tests {
             rows[context][1] = spec.support_action_one_probability(context);
         }
         SupportMeans { by_context_action: rows }
+    }
+
+    #[test]
+    fn stricter_margin_gate_never_overrides_direct_more_often() {
+        let mut takeovers = [0_usize; 3];
+        for index in 0..FAMILY_COUNT {
+            let spec = FamilySpec::draw(index);
+            let support = SupportMeans::fit(spec, index);
+            for (gate_index, strategy) in [
+                Strategy::MarginGate005,
+                Strategy::MarginGate020,
+                Strategy::MarginGate050,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let outcome = score_family(spec, support, strategy, 0.0);
+                takeovers[gate_index] += outcome.action_override as usize;
+            }
+        }
+        assert!(takeovers[0] >= takeovers[1]);
+        assert!(takeovers[1] >= takeovers[2]);
+    }
+
+    #[test]
+    fn margin_gate_still_pays_model_inference_cost() {
+        let spec = FamilySpec::draw(17);
+        let support = SupportMeans::fit(spec, 17);
+        for strategy in [
+            Strategy::MarginGate005,
+            Strategy::MarginGate020,
+            Strategy::MarginGate050,
+        ] {
+            let free = score_family(spec, support, strategy, 0.0);
+            let priced = score_family(spec, support, strategy, 0.04);
+            assert!((free.gross_lift_vs_direct - priced.gross_lift_vs_direct).abs() < 1e-12);
+            assert!((free.net_lift_vs_direct - priced.net_lift_vs_direct - 0.08).abs() < 1e-12);
+        }
     }
 
     #[test]
