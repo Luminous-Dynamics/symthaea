@@ -132,7 +132,7 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf)>, String> {
                 println!(
                     "HARDSEC-001 split-manifest audit\n\n\
                      Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT\n\n\
-                     Requires a strict 15-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
+                     Requires a strict 16-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
                 );
                 return Ok(None);
             }
@@ -872,6 +872,28 @@ mod tests {
         text = text.replace("a.trace", "../a.trace");
         fs::write(&path, text).unwrap();
         assert!(fixture.audit().unwrap_err().contains("clean relative path"));
+    }
+
+    #[test]
+    fn evaluation_split_without_both_classes_is_rejected() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows.pop();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("must contain both benign and attack labels"));
+    }
+
+    #[test]
+    fn benign_sample_cannot_claim_attack_success() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[1][12] = "success_observed".into();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("security_outcome is incompatible"));
     }
 
     #[test]
