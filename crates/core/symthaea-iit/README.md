@@ -157,3 +157,23 @@ This operation is tested on a directed cross-edge, a total cut including self-lo
 and a cut restricted to a candidate system that leaves links to external units intact.
 It is a model-transform primitive; its exact agreement with PyPhi's induced cut
 system remains to be tested differentially.
+
+
+## Partition-search observability
+
+The convenience enumerator returns the partition list. The companion
+`enumerate_iit4_system_partitions_with_stats` returns a `PartitionEnumerationReport`
+that separates:
+- block-direction assignments actually evaluated;
+- unique non-total cut matrices retained;
+- duplicate matrices suppressed;
+- whether the special TotalCut was included.
+
+For the current enumerator and no TotalCut, the combinatorial fixtures specify:
+- 3 units: 54 assignments, 22 unique cuts, 32 duplicates;
+- 4 units: 306 assignments, 150 unique cuts, 156 duplicates;
+- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates.
+
+These counts are implementation regression anchors, not performance measurements.
+They make future optimizations measurable: reduce wall time/memory or allocation cost
+while preserving the exact cut-matrix set and reporting candidate work transparently.
