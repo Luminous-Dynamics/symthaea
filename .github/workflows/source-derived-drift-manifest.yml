@@ -1,0 +1,142 @@
+name: Source-derived Drift Manifest
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/source-derived-drift-manifest/**"
+      - ".github/workflows/source-derived-drift-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Source-derived manifest qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- --check
+
+      - name: Locked tests
+        run: cargo test --locked --manifest-path tools/source-derived-drift-manifest/Cargo.toml
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/source-derived-drift-manifest/Cargo.toml --all-targets -- -D warnings
+
+      - name: Validate canonical fixture and receipt hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="tools/source-derived-drift-manifest/fixtures/example.manifest"
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$manifest"
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- canonicalize "$manifest" "$temp_dir/canonical.manifest"
+          cmp "$manifest" "$temp_dir/canonical.manifest"
+
+          mkdir -p "$temp_dir/artifacts/example_run"
+          output="$temp_dir/artifacts/example_run/results.csv"
+          printf 'scenario,value\nzero_shift,0\n' > "$output"
+          manifest_sha256="$(sha256sum -- "$manifest" | cut -d' ' -f1)"
+          output_sha256="$(sha256sum -- "$output" | cut -d' ' -f1)"
+          source_sha256="$(sed -n 's/^source_sha256=//p' "$manifest")"
+          run_id="$(sed -n 's/^run_id=//p' "$manifest")"
+          receipt="$temp_dir/result.receipt"
+          cat > "$receipt" <<EOF
+          schema_version=1
+          run_id=$run_id
+          manifest_sha256=$manifest_sha256
+          source_sha256=$source_sha256
+          output_sha256=$output_sha256
+          artifact_path=artifacts/example_run/results.csv
+          EOF
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$receipt" "$temp_dir"
+
+          bad_manifest="$temp_dir/leaked.manifest"
+          sed 's/^calibration_sources=.*/calibration_sources=dataset_a_v1,example_stream_v1/' "$manifest" > "$bad_manifest"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$bad_manifest"; then
+            echo "validator accepted held-out source leakage" >&2
+            exit 1
+          fi
+
+          bad_receipt="$temp_dir/bad.receipt"
+          sed 's/^output_sha256=.*/output_sha256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/' "$receipt" > "$bad_receipt"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$bad_receipt" "$temp_dir"; then
+            echo "validator accepted a mismatched output digest" >&2
+            exit 1
+          fi
+
+          target_dir="$temp_dir/target-shift"
+          mkdir -p "$target_dir"
+          target_manifest="$target_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/target-shift-intervention.conf "$target_dir/target-shift-intervention.conf"
+          sed \
+            -e 's/^scenario_class=zero_shift_control$/scenario_class=target_distribution_shift/' \
+            -e 's/^transform_family=none$/transform_family=feature_permutation/' \
+            -e 's/^transform_severity=0.000000$/transform_severity=0.500000/' \
+            -e 's/^intervention_config_path=zero-shift-intervention.conf$/intervention_config_path=target-shift-intervention.conf/' \
+            -e 's/^intervention_config_sha256=94bd34abce35b380f901ca711ce9d83a4ec01ac367e41c2a57bca849982b7426$/intervention_config_sha256=8a41df021348ee87e2b70a85af606634ebb9edd96fe73028490888d628502f1f/' \
+            -e 's/^rng_algorithm=none$/rng_algorithm=chacha20_v1/' \
+            -e 's/^transition_shape=none$/transition_shape=abrupt/' \
+            -e 's/^change_start=NA$/change_start=100/' \
+            -e 's/^change_end=NA$/change_end=100/' \
+            "$manifest" > "$target_manifest"
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$target_manifest"
+
+          selection_mislabeled="$target_dir/target-as-selection-only.manifest"
+          sed 's/^scenario_class=target_distribution_shift$/scenario_class=selection_only_shift/' "$target_manifest" > "$selection_mislabeled"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$selection_mislabeled"; then
+            echo "validator accepted target-population drift mislabeled as selection-only drift" >&2
+            exit 1
+          fi
+
+          config_mutation_dir="$temp_dir/config-mutation"
+          mkdir -p "$config_mutation_dir"
+          cp "$manifest" "$config_mutation_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/zero-shift-intervention.conf "$config_mutation_dir/zero-shift-intervention.conf"
+          sed 's/^scenario_class=zero_shift_control$/scenario_class=target_distribution_shift/' "$config_mutation_dir/zero-shift-intervention.conf" > "$config_mutation_dir/changed-intervention.conf"
+          mv "$config_mutation_dir/changed-intervention.conf" "$config_mutation_dir/zero-shift-intervention.conf"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$config_mutation_dir/manifest"; then
+            echo "validator accepted mutated intervention config bytes" >&2
+            exit 1
+          fi
+
+          semantic_mismatch_manifest="$config_mutation_dir/semantic-mismatch.manifest"
+          changed_config_sha256="$(sha256sum -- "$config_mutation_dir/zero-shift-intervention.conf" | cut -d' ' -f1)"
+          sed "s/^intervention_config_sha256=.*/intervention_config_sha256=$changed_config_sha256/" "$manifest" > "$semantic_mismatch_manifest"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$semantic_mismatch_manifest"; then
+            echo "validator accepted intervention config whose digest matches but semantics disagree with manifest" >&2
+            exit 1
+          fi
+
+          bad_intervention_digest="$temp_dir/bad-intervention-digest.manifest"
+          sed 's/^intervention_config_sha256=.*/intervention_config_sha256=short/' "$target_manifest" > "$bad_intervention_digest"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$bad_intervention_digest"; then
+            echo "validator accepted a malformed intervention configuration digest" >&2
+            exit 1
+          fi
+
+          symlink_dir="$temp_dir/config-symlink"
+          mkdir -p "$symlink_dir"
+          cp "$manifest" "$symlink_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/zero-shift-intervention.conf "$temp_dir/outside-config.conf"
+          ln -s "$temp_dir/outside-config.conf" "$symlink_dir/zero-shift-intervention.conf"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$symlink_dir/manifest"; then
+            echo "validator accepted an intervention config symlink escaping manifest directory" >&2
+            exit 1
+          fi
