@@ -16,7 +16,7 @@
 #![deny(unsafe_code)]
 
 #[path = "vision-dvpc-039-mope-bet-optimizer.rs"]
-mod optimizer;
+pub(crate) mod optimizer;
 
 use std::env;
 use std::fmt::Write as _;
