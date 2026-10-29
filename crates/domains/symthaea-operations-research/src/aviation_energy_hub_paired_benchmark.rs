@@ -185,6 +185,7 @@ pub fn evaluate_paired_rolling_benchmark(
             });
         }
         ensure_comparable(static_baseline_scenario, scenario)?;
+        ensure_same_timing_protocol(&episodes[0].episode, &weighted.episode)?;
         total_weight = total_weight
             .checked_add(u64::from(weighted.weight_ppm))
             .ok_or(PairedBenchmarkError::ArithmeticOverflow)?;
@@ -469,6 +470,34 @@ fn ensure_comparable(
     let candidate_ids = candidate.intervals.iter().map(|item| item.id.as_str()).collect::<Vec<_>>();
     if baseline_ids != candidate_ids {
         return Err(PairedBenchmarkError::IncompatibleScenario("ordered interval grid"));
+    }
+    Ok(())
+}
+
+fn ensure_same_timing_protocol(
+    reference: &RollingHorizonEpisode,
+    candidate: &RollingHorizonEpisode,
+) -> Result<(), PairedBenchmarkError> {
+    if reference.decision_times_epoch != candidate.decision_times_epoch
+        || reference.observation_available_at_epoch != candidate.observation_available_at_epoch
+        || reference.forecasts_by_stage.len() != candidate.forecasts_by_stage.len()
+    {
+        return Err(PairedBenchmarkError::IncompatibleScenario(
+            "decision/observation/forecast timing protocol",
+        ));
+    }
+    for (reference_forecast, candidate_forecast) in reference
+        .forecasts_by_stage
+        .iter()
+        .zip(candidate.forecasts_by_stage.iter())
+    {
+        if reference_forecast.issued_at_epoch != candidate_forecast.issued_at_epoch
+            || reference_forecast.available_at_epoch != candidate_forecast.available_at_epoch
+        {
+            return Err(PairedBenchmarkError::IncompatibleScenario(
+                "decision/observation/forecast timing protocol",
+            ));
+        }
     }
     Ok(())
 }
