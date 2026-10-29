@@ -25,7 +25,7 @@ jobs:
       - name: Unit tests
         working-directory: research/cmaq-004
         run: cargo test --locked
-      - name: Generate report and validate model value-add
+      - name: Generate report and validate model value-add frontier
         working-directory: research/cmaq-004
         shell: bash
         run: |
@@ -36,41 +36,70 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-004-report.json").read_text())
-          assert report["schema_version"] == "cmaq-004-value-add-report-v0.1"
+          assert report["schema_version"] == "cmaq-004-value-add-report-v0.2"
           assert report["support_contexts"] == [0, 1, 2]
           assert report["heldout_context"] == 3
           assert report["support_samples_per_context_action"] == 1024
           assert report["evaluation_episodes"] == 4096
+          cost_levels = [0.0, 0.02, 0.04, 0.08, 0.12, 0.16]
+          assert report["model_query_cost_levels"] == cost_levels
           families = {item["world_family"]: item for item in report["families"]}
           assert set(families) == {"additive_positive", "interaction_only", "additive_reversed"}
-          for family in families.values():
-              rows = {row["strategy"]: row for row in family["results"]}
-              assert set(rows) == {
-                  "direct_nearest_context", "learned_additive_model", "shuffled_model_control",
-                  "stale_model_control", "oracle_evaluator_only"
+          expected_strategies = {
+              "direct_nearest_context", "learned_additive_model", "shuffled_model_control",
+              "stale_model_control", "oracle_evaluator_only"
+          }
+
+          def rows_at_cost(family, cost):
+              rows = {
+                  row["strategy"]: row
+                  for row in families[family]["results"]
+                  if abs(row["model_query_cost_per_query"] - cost) < 1e-9
               }
-              assert rows["oracle_evaluator_only"]["mean_net_utility"] >= max(
-                  row["mean_net_utility"] for key, row in rows.items() if key != "oracle_evaluator_only"
-              )
-          additive = {row["strategy"]: row for row in families["additive_positive"]["results"]}
-          assert additive["learned_additive_model"]["net_lift_vs_direct"] > 0.10
-          assert additive["learned_additive_model"]["model_prediction_mae"] < 0.05
-          interaction = {row["strategy"]: row for row in families["interaction_only"]["results"]}
-          assert interaction["learned_additive_model"]["net_lift_vs_direct"] < -0.05
-          assert interaction["learned_additive_model"]["model_prediction_mae"] > 0.20
-          reversed_world = {row["strategy"]: row for row in families["additive_reversed"]["results"]}
+              assert set(rows) == expected_strategies
+              return rows
+
+          for family_name in families:
+              assert len(families[family_name]["results"]) == len(cost_levels) * len(expected_strategies)
+              for cost in cost_levels:
+                  rows = rows_at_cost(family_name, cost)
+                  oracle = rows["oracle_evaluator_only"]["mean_net_utility"]
+                  assert oracle >= max(
+                      row["mean_net_utility"]
+                      for key, row in rows.items()
+                      if key != "oracle_evaluator_only"
+                  )
+
+          additive_free = rows_at_cost("additive_positive", 0.0)["learned_additive_model"]
+          additive_base = rows_at_cost("additive_positive", 0.04)["learned_additive_model"]
+          additive_expensive = rows_at_cost("additive_positive", 0.16)["learned_additive_model"]
+          assert additive_base["net_lift_vs_direct"] > 0.10
+          assert additive_base["model_prediction_mae"] < 0.05
+          assert additive_free["net_lift_vs_direct"] > additive_base["net_lift_vs_direct"]
+          assert additive_expensive["net_lift_vs_direct"] < 0.0
+
+          interaction = rows_at_cost("interaction_only", 0.04)["learned_additive_model"]
+          assert interaction["net_lift_vs_direct"] < -0.05
+          assert interaction["model_prediction_mae"] > 0.20
+
+          reversed_world = rows_at_cost("additive_reversed", 0.04)
           assert reversed_world["stale_model_control"]["net_lift_vs_direct"] < -0.30
-          print("CMAQ-004 schema, held-out value-add, model misspecification and stale-model controls validated")
+          assert reversed_world["learned_additive_model"]["net_lift_vs_direct"] < 0.0
+
+          print("CMAQ-004 schema, held-out lift, misspecification, stale-model and query-cost frontier validated")
           print(json.dumps({
               family_name: {
-                  row["strategy"]: {
-                      "action": row["chosen_action"],
-                      "net_utility": row["mean_net_utility"],
-                      "net_lift": row["net_lift_vs_direct"],
-                      "prediction_mae": row["model_prediction_mae"],
+                  str(cost): {
+                      row["strategy"]: {
+                          "action": row["chosen_action"],
+                          "net_utility": row["mean_net_utility"],
+                          "net_lift": row["net_lift_vs_direct"],
+                          "prediction_mae": row["model_prediction_mae"],
+                      }
+                      for row in rows_at_cost(family_name, cost).values()
                   }
-                  for row in family["results"]
+                  for cost in cost_levels
               }
-              for family_name, family in families.items()
+              for family_name in families
           }, sort_keys=True))
           PY
