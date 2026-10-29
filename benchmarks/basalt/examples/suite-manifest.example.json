@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "program": "BASALT",
+  "suite_id": "basalt-smoke",
+  "version": "0.1.0",
+  "split": "development",
+  "tasks": [
+    {
+      "task_id": "rust-repair-0001",
+      "family": "compiler_repair",
+      "languages": ["Rust"],
+      "base_tree_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "spec_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "paired_transform_id": null,
+      "quality_audit": {
+        "status": "accepted",
+        "audit_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "oracle_independent": true,
+        "ambiguity": "none",
+        "notes": "Synthetic example only; not an executed BASALT result."
+      }
+    }
+  ]
+}
