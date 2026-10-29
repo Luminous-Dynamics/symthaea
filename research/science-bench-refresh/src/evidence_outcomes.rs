@@ -22,6 +22,7 @@ const HASH_PREFIX: &[u8] = b"symthaea.science_bench_refresh.evidence_outcomes.v1
 pub enum OutcomeTerminalStatusV1 {
     Completed,
     Contaminated,
+    BudgetViolation,
     Timeout,
     Blocked,
     InvalidReceipt,
@@ -34,6 +35,7 @@ impl OutcomeTerminalStatusV1 {
         match self {
             Self::Completed => "completed",
             Self::Contaminated => "contaminated",
+            Self::BudgetViolation => "budget_violation",
             Self::Timeout => "timeout",
             Self::Blocked => "blocked",
             Self::InvalidReceipt => "invalid_receipt",
@@ -528,10 +530,10 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                 issues.push(format!("{label} records confidence without an answered response"));
             }
         }
-        OutcomeTerminalStatusV1::Contaminated => {
+        OutcomeTerminalStatusV1::Contaminated | OutcomeTerminalStatusV1::BudgetViolation => {
             if record.evaluator_record_sha256.is_none() {
                 issues.push(format!(
-                    "{label} is contaminated but lacks an evaluator disposition digest"
+                    "{label} has a non-scoreable disposition but lacks an evaluator disposition digest"
                 ));
             }
             if record.response_status == OutcomeResponseStatusV1::NoResponse {
@@ -546,7 +548,9 @@ fn validate_record(record: &EvidenceOutcomeRecordV1, position: usize) -> Vec<Str
                 ));
             }
             if !unscored(record) {
-                issues.push(format!("{label} is contaminated and must not carry scored outcomes"));
+                issues.push(format!(
+                    "{label} is contaminated/budget-violating and must not carry scored outcomes"
+                ));
             }
         }
         OutcomeTerminalStatusV1::Timeout
@@ -1109,7 +1113,7 @@ mod tests {
     }
 
     #[test]
-    fn contaminated_trials_cannot_receive_task_scores() {
+    fn contaminated_and_budget_violating_trials_cannot_receive_task_scores() {
         let plan = intervention_plan();
         let mut contaminated = fields(&plan);
         let row = &mut contaminated.records[0];
@@ -1128,6 +1132,24 @@ mod tests {
         assert!(compute_evidence_outcome_report_commitment(
             &plan,
             &serde_json::to_vec(&contaminated).unwrap()
+        )
+        .is_err());
+
+        let mut over_budget = fields(&plan);
+        over_budget.records[1].terminal_status = OutcomeTerminalStatusV1::BudgetViolation;
+        over_budget.records[1].task_correctness = TaskCorrectnessV1::NotEvaluated;
+        over_budget.records[1].evidence_use = EvidenceUseV1::NotEvaluated;
+        over_budget.records[1].claim_support = ClaimSupportV1::NotEvaluated;
+        over_budget.records[1].abstention_quality = AbstentionQualityV1::NotEvaluated;
+        over_budget.records[1].confidence_millionths = None;
+        over_budget.records[1].confidence_source = ConfidenceSourceV1::None;
+        let report = full_report(over_budget.clone());
+        let verification = verify_evidence_outcome_report(&plan, &report).unwrap();
+        assert!(verification.valid, "{:?}", verification.issues);
+        over_budget.records[1].task_correctness = TaskCorrectnessV1::Incorrect;
+        assert!(compute_evidence_outcome_report_commitment(
+            &plan,
+            &serde_json::to_vec(&over_budget).unwrap()
         )
         .is_err());
     }
