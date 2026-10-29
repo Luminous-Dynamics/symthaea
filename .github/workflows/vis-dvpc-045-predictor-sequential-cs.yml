@@ -1,0 +1,79 @@
+name: VIS-DVPC-045 predictor-adjusted MOPE confidence sequence
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-045-predictor-sequential-cs.rs"
+      - "docs/research/VIS_DVPC_045_PREDICTOR_SEQUENTIAL_CS_V1.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-045-predictor-sequential-cs.rs"
+      - "docs/research/VIS_DVPC_045_PREDICTOR_SEQUENTIAL_CS_V1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact predictor sequence and parent proof kernels
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run all Rust tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-045-predictor-sequential-cs.rs -o /tmp/vis-dvpc-045-tests
+          /tmp/vis-dvpc-045-tests
+      - name: Verify deterministic seed stream
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-045-predictor-sequential-cs.rs -o /tmp/vis-dvpc-045
+          /tmp/vis-dvpc-045 --seed-smoke > /tmp/vis-dvpc-045-seed-a.txt
+          /tmp/vis-dvpc-045 --seed-smoke > /tmp/vis-dvpc-045-seed-b.txt
+          cmp /tmp/vis-dvpc-045-seed-a.txt /tmp/vis-dvpc-045-seed-b.txt
+      - name: Verify deterministic statistical replay
+        run: |
+          /tmp/vis-dvpc-045 --smoke > /tmp/vis-dvpc-045-smoke-a.tsv
+          /tmp/vis-dvpc-045 --smoke > /tmp/vis-dvpc-045-smoke-b.tsv
+          grep -v -E 'mean_method_elapsed_seconds|^SYSTEM' /tmp/vis-dvpc-045-smoke-a.tsv > /tmp/vis-dvpc-045-smoke-a-stable.tsv
+          grep -v -E 'mean_method_elapsed_seconds|^SYSTEM' /tmp/vis-dvpc-045-smoke-b.tsv > /tmp/vis-dvpc-045-smoke-b-stable.tsv
+          cmp /tmp/vis-dvpc-045-smoke-a-stable.tsv /tmp/vis-dvpc-045-smoke-b-stable.tsv
+      - name: Run paired predictor benchmark (2,000 sequences per DGP, horizon 512)
+        run: |
+          /tmp/vis-dvpc-045 --benchmark > /tmp/vis-dvpc-045-results.tsv
+          test "$(grep -c '^DGP' /tmp/vis-dvpc-045-results.tsv)" = "12"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-045-results.tsv)" = "792"
+          test "$(grep -c '^ROOT_METRIC' /tmp/vis-dvpc-045-results.tsv)" = "72"
+          test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-045-results.tsv)" = "12"
+          awk -F '\t' '$1=="ROOT_METRIC" { n++; if ($7=="failures" && $8 != 0) bad=1 } END { if (n != 72 || bad) exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="ROOT_METRIC" && $5=="checks" { total += $6; n++ } END { if (n != 72 || total < 1) exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="ROOT_METRIC" && $4=="MOPE_predictor_safe" && $5=="checks" { total += $6; n++ } END { if (n != 36 || total < 1) exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($3=="MOPE_raw" || $3=="MOPE_predictor_safe") && $5=="sequence_coverage" && $8 < 0.90 { exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($3=="MOPE_raw" || $3=="MOPE_predictor_safe") && $5=="false_promotion_probability" && $9 > 0.10 { exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && ($6 < -0.000001 || $6 > 1.000001) && ($5=="pointwise_coverage" || $5=="sequence_coverage" || $5=="sequence_false_exclusion_probability" || $5=="false_promotion_probability" || $5=="promotion_power" || $5=="reversed_interval_probability") { exit 1 }' /tmp/vis-dvpc-045-results.tsv
+          grep '^SEED_SCHEDULE' /tmp/vis-dvpc-045-results.tsv > /tmp/vis-dvpc-045-seeds.tsv
+          grep '^DGP\|^RESULT_METRIC\|^ROOT_METRIC\|^SYSTEM\|^BENCHMARK_CONFIG' /tmp/vis-dvpc-045-results.tsv > /tmp/vis-dvpc-045-summary.tsv
+      - name: Create exact source and output receipt
+        run: |
+          {
+            printf 'VIS_DVPC_045_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-045-predictor-sequential-cs.rs tools/vision-dvpc-044-control-variate-feasibility-audit.rs tools/vision-dvpc-040-mope-sufficient-stats.rs tools/vision-dvpc-039-mope-bet-optimizer.rs /tmp/vis-dvpc-045-results.tsv /tmp/vis-dvpc-045-summary.tsv /tmp/vis-dvpc-045-seeds.tsv
+          } > /tmp/vis-dvpc-045-receipt.tsv
+          cat /tmp/vis-dvpc-045-receipt.tsv
+      - name: Publish paired benchmark and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-045-predictor-sequential-cs
+          path: |
+            /tmp/vis-dvpc-045-results.tsv
+            /tmp/vis-dvpc-045-summary.tsv
+            /tmp/vis-dvpc-045-seeds.tsv
+            /tmp/vis-dvpc-045-smoke-a-stable.tsv
+            /tmp/vis-dvpc-045-receipt.tsv
+          retention-days: 90
