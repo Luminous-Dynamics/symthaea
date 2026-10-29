@@ -1,0 +1,19 @@
+{
+  "schema_version": "pitb.coverage-reviewer-trust-store.v1",
+  "reviewers": [
+    {
+      "reviewer_id": "synthetic-reviewer-a",
+      "key_id": "synthetic-key-a",
+      "organization_id": "synthetic-org-a",
+      "role": "coverage_auditor",
+      "public_key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "reviewer_id": "synthetic-reviewer-b",
+      "key_id": "synthetic-key-b",
+      "organization_id": "synthetic-org-b",
+      "role": "coverage_auditor",
+      "public_key_hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}
