@@ -4,29 +4,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 """
-PyPhi Cross-Validation Framework
-================================
+Legacy PyPhi cross-validation scaffold — NOT QUALIFIED.
 
-Validates Symthaea's HDC-based Φ approximation against PyPhi's exact IIT 3.0 calculation.
+The previous implementation mixed topology-generated inputs with an HDC adapter
+that was not present, and could substitute hard-coded scores when it failed.
+That fallback has been removed. This module now fails closed until both sides
+compute named quantities over the same explicit causal model/state with a
+pinned formalism and provenance record.
 
-This framework:
-1. Generates small topologies (n ≤ 8) where exact Φ is tractable
-2. Calculates Φ using both methods
-3. Computes correlation and agreement metrics
-4. Produces validation report for publication
-
-Target: r > 0.90 correlation between HDC-Φ and exact Φ
-
-Requirements:
-    pip install pyphi numpy scipy matplotlib seaborn
-
-Author: Tristan Stoltz & Claude
-Date: 2026-01-04
-Version: 1.0.0
+Use validation/generate_pyphi_reference_fixtures.py to run the independent
+upstream PyPhi literature-reference smoke test. It does not validate Symthaea's
+HDC proxy and must not be described as consciousness validation.
 """
 
-import subprocess
-import json
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass, field
@@ -61,9 +51,9 @@ class ValidationResult:
     """Result of cross-validation for a single topology."""
     topology_name: str
     n_nodes: int
-    hdc_phi: float
+    hdc_phi: Optional[float]
     pyphi_phi: Optional[float]
-    hdc_std: float = 0.0
+    hdc_std: Optional[float] = None
     pyphi_computation_time: float = 0.0
     hdc_computation_time: float = 0.0
     error_message: Optional[str] = None
@@ -83,7 +73,7 @@ class ValidationReport:
 
 
 class PyPhiValidator:
-    """Validates HDC-Φ against exact PyPhi Φ calculation."""
+    """Legacy scaffold; it cannot qualify an HDC-to-IIT comparison."""
 
     def __init__(self, symthaea_binary: str = "cargo"):
         """
@@ -254,71 +244,12 @@ class PyPhiValidator:
         return adj
 
     def compute_pyphi_phi(self, topology: TopologySpec) -> Tuple[float, float]:
-        """
-        Compute exact Φ using PyPhi.
-
-        Args:
-            topology: Topology specification
-
-        Returns:
-            (phi_value, computation_time_seconds)
-        """
-        if not PYPHI_AVAILABLE:
-            raise RuntimeError("PyPhi not installed")
-
-        import time
-
-        # Create adjacency matrix
-        adj = self.edges_to_adjacency(topology.n_nodes, topology.edges)
-
-        # PyPhi requires a TPM (transition probability matrix)
-        # For a simple deterministic network, we use identity-like TPM
-        # This is a simplification - real validation would use actual network dynamics
-
-        # Create simple network: each node XORs its inputs
-        # TPM shape: (2^n_nodes, n_nodes) - probability of each node being ON
-        # given each possible past state
-
-        n = topology.n_nodes
-        n_states = 2 ** n
-
-        # Simple TPM: each node takes OR of neighbors
-        tpm = np.zeros((n_states, n))
-        for state in range(n_states):
-            state_bits = [(state >> i) & 1 for i in range(n)]
-            for node in range(n):
-                # Node is ON if any neighbor was ON
-                neighbors = [j for j in range(n) if adj[node, j] == 1]
-                if neighbors:
-                    neighbor_or = any(state_bits[j] for j in neighbors)
-                    tpm[state, node] = 1.0 if neighbor_or else 0.0
-                else:
-                    tpm[state, node] = state_bits[node]  # Isolated nodes stay same
-
-        # Add small noise to avoid deterministic issues
-        tpm = np.clip(tpm * 0.98 + 0.01, 0.01, 0.99)
-
-        start = time.time()
-
-        try:
-            # Create PyPhi network
-            network = pyphi.Network(tpm, connectivity_matrix=adj)
-
-            # Get subsystem for all nodes in all-on state
-            state = tuple([1] * n)
-            subsystem = pyphi.Subsystem(network, state)
-
-            # Compute Φ (this is the expensive operation)
-            sia = pyphi.compute.sia(subsystem)
-            phi = sia.phi
-
-            elapsed = time.time() - start
-            return phi, elapsed
-
-        except Exception as e:
-            logger.error(f"PyPhi computation failed for {topology.name}: {e}")
-            raise
-
+        """Fail closed: the legacy topology-to-TPM path is not a qualified reference adapter."""
+        raise RuntimeError(
+            "NOT QUALIFIED: this legacy PyPhi 1.x-style adapter does not bind an "
+            "explicit shared causal-model digest and formalism; use the pinned "
+            "literature reference runner instead"
+        )
     def compute_hdc_phi(self, topology: TopologySpec, n_samples: int = 10) -> Tuple[float, float, float]:
         """Fail closed until a maintained same-model Rust adapter exists."""
         raise RuntimeError("NOT QUALIFIED: no maintained Rust adapter computes this estimator from the same explicit causal model and state")
@@ -337,8 +268,9 @@ class PyPhiValidator:
         result = ValidationResult(
             topology_name=topology.name,
             n_nodes=topology.n_nodes,
-            hdc_phi=0.0,
-            pyphi_phi=None
+            hdc_phi=None,
+            pyphi_phi=None,
+            hdc_std=None
         )
 
         # HDC calculation (always possible)
@@ -382,7 +314,7 @@ class PyPhiValidator:
             result = self.validate_topology(topology)
             report.results.append(result)
 
-            if result.pyphi_phi is not None and result.error_message is None:
+            if result.hdc_phi is not None and result.pyphi_phi is not None and result.error_message is None:
                 report.n_validated += 1
             else:
                 report.n_failed += 1
@@ -394,7 +326,7 @@ class PyPhiValidator:
 
     def _compute_report_metrics(self, report: ValidationReport):
         """Compute descriptive metrics only; correlation cannot qualify this scaffold."""
-        paired = [(r.hdc_phi, r.pyphi_phi) for r in report.results if r.pyphi_phi is not None and r.error_message is None]
+        paired = [(r.hdc_phi, r.pyphi_phi) for r in report.results if r.hdc_phi is not None and r.pyphi_phi is not None and r.error_message is None]
         report.qualification_status = "NOT_QUALIFIED"
         if len(paired) < 5:
             logger.warning("NOT QUALIFIED: fewer than five valid paired cases")
@@ -453,34 +385,32 @@ class PyPhiValidator:
         md.append("|----------|-------|-------|---------|-------|--------|")
 
         for r in report.results:
+            hdc_str = f"{r.hdc_phi:.4f}" if r.hdc_phi is not None else "N/A"
             pyphi_str = f"{r.pyphi_phi:.4f}" if r.pyphi_phi is not None else "N/A"
-            if r.pyphi_phi is not None:
-                error = abs(r.hdc_phi - r.pyphi_phi)
-                error_str = f"{error:.4f}"
-                status = "✅" if error < 0.05 else "⚠️"
+            if r.hdc_phi is not None and r.pyphi_phi is not None:
+                error_str = f"{abs(r.hdc_phi - r.pyphi_phi):.4f}"
+                status = "DESCRIPTIVE ONLY"
             else:
                 error_str = "N/A"
-                status = "⏳"
+                status = "NOT MEASURED"
 
-            md.append(f"| {r.topology_name} | {r.n_nodes} | {r.hdc_phi:.4f} | "
+            md.append(f"| {r.topology_name} | {r.n_nodes} | {hdc_str} | "
                      f"{pyphi_str} | {error_str} | {status} |")
 
         md.append("")
         md.append("## Notes")
         md.append("")
-        md.append("- HDC-Φ: Approximation using algebraic connectivity of HDC similarity graph")
-        md.append("- PyPhi-Φ: Exact IIT 3.0 calculation (intractable for n > 10)")
-        md.append("- Error: Absolute difference between methods")
-        md.append("- N/A: PyPhi computation failed or exceeded timeout")
+        md.append("- N/A means no measurement was produced; it is never replaced with a numeric estimate.")
+        md.append("- The legacy HDC adapter and legacy PyPhi adapter are deliberately disabled pending a shared causal-model contract.")
+        md.append("- This report is NOT QUALIFIED and makes no IIT-validation or consciousness claim.")
         md.append("")
 
         md.append("## Methodology")
         md.append("")
-        md.append("1. Generate identical topologies for both methods")
-        md.append("2. Compute HDC-Φ using Symthaea's RealPhiCalculator")
-        md.append("3. Compute exact Φ using PyPhi (IIT 3.0)")
-        md.append("4. Calculate Pearson correlation coefficient")
-        md.append("5. Report absolute and relative errors")
+        md.append("1. This legacy scaffold does not currently perform a paired reference comparison.")
+        md.append("2. The independent pinned PyPhi literature-reference smoke test is in validation/generate_pyphi_reference_fixtures.py.")
+        md.append("3. Implement a maintained Rust adapter and shared TPM/state digests before re-enabling HDC-to-reference metrics.")
+        md.append("4. Select the formalism explicitly and record the PyPhi artifact/version in every generated result.")
         md.append("")
 
         output_path.write_text("\n".join(md))
