@@ -46,6 +46,7 @@ pub struct EnergyHubStressOutcome {
 pub struct ConditionalMetricSummary {
     pub feasible_weight_ppm: u64,
     pub infeasible_weight_ppm: u64,
+    pub unresolved_weight_ppm: u64,
     pub mean_cost_given_feasible: Option<f64>,
     pub mean_accounted_co2e_kg_given_feasible: Option<f64>,
     pub worst_cost_among_feasible_cases: Option<f64>,
@@ -273,6 +274,8 @@ fn summarize_outcomes(
     let mut worst_co2e: Option<f64> = None;
     let mut worst_soc: Option<u32> = None;
     let mut best_soc: Option<u32> = None;
+    let mut infeasible_weight_ppm = 0_u64;
+    let mut unresolved_weight_ppm = 0_u64;
 
     for outcome in outcomes {
         let evaluated = if use_static_replay {
@@ -281,6 +284,24 @@ fn summarize_outcomes(
             outcome.perfect_information_recourse.as_ref()
         };
         let Some(evaluated) = evaluated else {
+            if use_static_replay {
+                infeasible_weight_ppm = infeasible_weight_ppm
+                    .checked_add(u64::from(outcome.weight_ppm))
+                    .ok_or(EnergyHubRobustnessError::ArithmeticOverflow)?;
+            } else if matches!(
+                outcome.recourse_error.as_ref(),
+                Some(EnergyHubError::NoFeasiblePlan)
+            ) {
+                infeasible_weight_ppm = infeasible_weight_ppm
+                    .checked_add(u64::from(outcome.weight_ppm))
+                    .ok_or(EnergyHubRobustnessError::ArithmeticOverflow)?;
+            } else {
+                // Budget exhaustion and other solver failures are unresolved, not
+                // proof that the scenario has no feasible plan.
+                unresolved_weight_ppm = unresolved_weight_ppm
+                    .checked_add(u64::from(outcome.weight_ppm))
+                    .ok_or(EnergyHubRobustnessError::ArithmeticOverflow)?;
+            }
             continue;
         };
         let weight = f64::from(outcome.weight_ppm);
@@ -300,20 +321,25 @@ fn summarize_outcomes(
             |old| old.max(evaluated.metrics.source_ledger.accounted_lifecycle_co2e_kg),
         ));
         worst_soc = Some(worst_soc.map_or(evaluated.metrics.final_soc_quanta, |old| {
-            old.max(evaluated.metrics.final_soc_quanta)
+            old.min(evaluated.metrics.final_soc_quanta)
         }));
         best_soc = Some(best_soc.map_or(evaluated.metrics.final_soc_quanta, |old| {
-            old.min(evaluated.metrics.final_soc_quanta)
+            old.max(evaluated.metrics.final_soc_quanta)
         }));
     }
 
-    let infeasible_weight_ppm = PPM
-        .checked_sub(feasible_weight_ppm)
+    let accounted_weight_ppm = feasible_weight_ppm
+        .checked_add(infeasible_weight_ppm)
+        .and_then(|value| value.checked_add(unresolved_weight_ppm))
         .ok_or(EnergyHubRobustnessError::ArithmeticOverflow)?;
+    if accounted_weight_ppm != PPM {
+        return Err(EnergyHubRobustnessError::ArithmeticOverflow);
+    }
     let denominator = feasible_weight_ppm as f64;
     Ok(ConditionalMetricSummary {
         feasible_weight_ppm,
         infeasible_weight_ppm,
+        unresolved_weight_ppm,
         mean_cost_given_feasible: (feasible_weight_ppm > 0).then_some(weighted_cost / denominator),
         mean_accounted_co2e_kg_given_feasible:
             (feasible_weight_ppm > 0).then_some(weighted_co2e / denominator),
