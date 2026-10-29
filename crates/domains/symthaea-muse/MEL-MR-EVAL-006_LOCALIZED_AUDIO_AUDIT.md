@@ -25,7 +25,7 @@ This is a deliberately narrow, deterministic detector suite—not a claim of per
 
 ## Tests included
 
-The Rust unit suite contains 12 tests covering identity preservation, one localized protected-region mutation, authorized-only changes, no-calibration abstention, stereo mutation, mismatched duration, non-finite samples, boundary guards, onset identity, delayed protected transients, onset masking, and onset abstention. An independent JS numerical reference check using a direct DFT also checked the synthetic burst fixture: the baseline onset was detected at frame 992 and the delayed onset at frame 1504 (512-frame displacement). This is an algorithm sanity check, **not execution of the committed Rust code**. Rust tests, formatting, and clippy remain unexecuted in this environment; a passing CI result must be attached to the exact PR head before implementation validation is claimed.
+The Rust unit suite contains 13 tests covering identity preservation, one localized protected-region mutation, authorized-only changes, no-calibration abstention, stereo mutation, mismatched duration, non-finite samples, boundary guards, onset identity, delayed protected transients, onset masking, onset abstention, and abstention when no reference onsets can be measured. An independent JS numerical reference check using a direct DFT also checked the synthetic burst fixture: the baseline onset was detected at frame 992 and the delayed onset at frame 1504 (512-frame displacement). This is an algorithm sanity check, **not execution of the committed Rust code**. Rust tests, formatting, and clippy remain unexecuted in this environment; a passing CI result must be attached to the exact PR head before implementation validation is claimed.
 
 ## Calibration and benchmark plan
 
@@ -36,6 +36,17 @@ The Rust unit suite contains 12 tests covering identity preservation, one locali
 5. Calibrate the spectral-flux onset threshold and timing tolerance separately from the RMS/spectral thresholds. Evaluate onset precision/recall, timing-error percentiles, missing/extra events, and false positives under sustain, vibrato, slow attacks, reverb, and phase/pitch-preserving shifts.
 6. Add source-aware checks before expanding the detector's claim domain.
 7. Run blinded listening trials to measure whether detector verdicts track audible collateral changes. Keep technical preservation, requested-edit success, naturalness, and preference as separate endpoints.
+
+## Positioning against public benchmarks
+
+Treat the evaluator as one layer in a broader stack, not as a replacement for music or instruction-level benchmarks:
+
+- **Known-truth mutations:** this module checks localized acoustic and temporal fault injection, where intended outcome is deterministic.
+- **Symbolic edit locality:** MEL-MR-EVAL-004 / MEL-MR-EVAL-005 evaluate the requested symbolic change and protected symbolic properties.
+- **Music context preservation:** [MuseCPBench](https://arxiv.org/abs/2512.14629) and the companion [MuseCPEval implementation](https://github.com/Yashvishe13/MuseCPEval) cover musical facets such as harmony, rhythm, structure, melody, and timbre. Use these scores as complementary measures; do not let a high global facet score compensate for a known critical local mutation.
+- **General editing instructions:** [MMAE](https://arxiv.org/abs/2606.07229) reports instruction-following, consistency, and exact-match outcomes. A future guarded-editor ablation should report all three on a matched public split.
+
+The research hypothesis is that complementary oracles reduce blind spots: exact symbolic assertions for symbolic content, localized signal measurements for acoustics and timing, musical-context metrics for higher-level facets, and blinded human ratings for perceptual validity. The hypothesis must be tested; combining more metrics does not by itself guarantee better decisions.
 
 ## Required reporting
 
