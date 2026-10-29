@@ -1060,8 +1060,8 @@ mod tests {
         assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
 
         let mismatched_pair_labels = LABELS.replace(
-            "\\\"pair_id\\\":\\\"memory-influence-0001\\\"",
-            "\\\"pair_id\\\":\\\"unknown-pair\\\"",
+            r#""pair_id":"memory-influence-0001""#,
+            r#""pair_id":"unknown-pair""#,
         );
         assert!(score_atom_ablation_jsonl(&observations, FIXTURES, &mismatched_pair_labels).is_err());
     }
