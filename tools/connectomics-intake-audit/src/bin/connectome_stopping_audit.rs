@@ -519,6 +519,17 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_example_is_valid_and_shows_query_instability() {
+        let bytes = include_str!("../../../../docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl").as_bytes();
+        let snapshots = parse_jsonl(bytes).expect("example should parse");
+        let report = build_report(bytes, &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.query_metrics_stable_in_tail, Some(false));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
     fn valid_series_reports_validated_but_never_stopped() {
         let a = snapshot(0, 0, &"1".repeat(64), None, 0.5, 12.0);
         let b = snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 0.501, 12.01);
