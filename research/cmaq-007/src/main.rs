@@ -1,6 +1,6 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-007-exploitability-report-v0.3";
+const REPORT_SCHEMA: &str = "cmaq-007-exploitability-report-v0.4";
 const EPISODES: usize = 256;
 const RISK_EPISODES: usize = 2048;
 const SEARCH_SIZES: [usize; 4] = [8, 32, 128, 512];
@@ -50,6 +50,10 @@ struct CandidateAction {
 }
 
 fn candidate_catalog(seed: u64) -> Vec<CandidateAction> {
+    candidate_catalog_with_support_shift(seed, false)
+}
+
+fn candidate_catalog_with_support_shift(seed: u64, shift_unsupported_scores: bool) -> Vec<CandidateAction> {
     let mut rng = SplitMix64::new(seed);
     let mut shuffled_score_rng = SplitMix64::new(seed ^ 0xC07A_7EED_55AA_0011);
     (0..MAX_ACTIONS)
@@ -74,10 +78,15 @@ fn candidate_catalog(seed: u64) -> Vec<CandidateAction> {
             // Intentionally imperfect support confidence: supported and
             // unsupported score distributions overlap, so thresholds trade
             // off coverage against selected-action risk.
+            let support_draw = rng.unit();
             let support_score = if unsupported {
-                0.15 + 0.85 * rng.unit()
+                if shift_unsupported_scores {
+                    0.90 + 0.10 * support_draw
+                } else {
+                    0.15 + 0.85 * support_draw
+                }
             } else {
-                0.55 + 0.45 * rng.unit()
+                0.55 + 0.45 * support_draw
             };
             CandidateAction {
                 true_utility,
@@ -344,6 +353,15 @@ struct RiskControlSummary {
     qualification_coverage_rate: f64,
     qualification_mean_regret: f64,
     direct_fallback_mean_regret: f64,
+    shifted_qualification_episode_count: usize,
+    shifted_qualification_unsupported_count: usize,
+    shifted_qualification_unsupported_rate: f64,
+    shifted_qualification_downside_count: usize,
+    shifted_qualification_downside_rate: f64,
+    shifted_qualification_mean_utility_lift_vs_fallback: f64,
+    shifted_qualification_coverage_rate: f64,
+    shifted_qualification_mean_regret: f64,
+    shifted_direct_fallback_mean_regret: f64,
 }
 
 fn log_factorials(n: usize) -> Vec<f64> {
@@ -510,6 +528,8 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
 
         let mut qualification_samples = Vec::with_capacity(RISK_EPISODES);
         let mut fallback_samples = Vec::with_capacity(RISK_EPISODES);
+        let mut shifted_qualification_samples = Vec::with_capacity(RISK_EPISODES);
+        let mut shifted_fallback_samples = Vec::with_capacity(RISK_EPISODES);
         for episode in 0..RISK_EPISODES {
             let seed = QUALIFICATION_SEED
                 ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
@@ -520,6 +540,16 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
                 Strategy::RiskControlledGate(selected_threshold),
             ));
             fallback_samples.push(evaluate_episode(actions, Strategy::DirectFallback));
+
+            // Paired shift control: hold action truth and model predictions fixed,
+            // but inflate support scores for unsupported candidates after calibration.
+            let shifted_catalog = candidate_catalog_with_support_shift(seed, true);
+            let shifted_actions = &shifted_catalog[..search_size];
+            shifted_qualification_samples.push(evaluate_episode(
+                shifted_actions,
+                Strategy::RiskControlledGate(selected_threshold),
+            ));
+            shifted_fallback_samples.push(evaluate_episode(shifted_actions, Strategy::DirectFallback));
         }
 
         let qualification_unsupported_count = qualification_samples
@@ -552,6 +582,34 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
             .map(|sample| sample.regret)
             .sum::<f64>()
             / RISK_EPISODES as f64;
+        let shifted_qualification_unsupported_count = shifted_qualification_samples
+            .iter()
+            .filter(|sample| sample.unsupported_selected > 0.0)
+            .count();
+        let shifted_qualification_unsupported_rate =
+            shifted_qualification_unsupported_count as f64 / RISK_EPISODES as f64;
+        let shifted_qualification_downside_count = shifted_qualification_samples
+            .iter()
+            .filter(|sample| sample.coverage > 0.0 && sample.realized_utility <= BASELINE_UTILITY)
+            .count();
+        let shifted_qualification_downside_rate =
+            shifted_qualification_downside_count as f64 / RISK_EPISODES as f64;
+        let shifted_qualification_mean_utility_lift_vs_fallback = shifted_qualification_samples
+            .iter()
+            .map(|sample| sample.realized_utility - BASELINE_UTILITY)
+            .sum::<f64>() / RISK_EPISODES as f64;
+        let shifted_qualification_coverage_rate = shifted_qualification_samples
+            .iter()
+            .map(|sample| sample.coverage)
+            .sum::<f64>() / RISK_EPISODES as f64;
+        let shifted_qualification_mean_regret = shifted_qualification_samples
+            .iter()
+            .map(|sample| sample.regret)
+            .sum::<f64>() / RISK_EPISODES as f64;
+        let shifted_direct_fallback_mean_regret = shifted_fallback_samples
+            .iter()
+            .map(|sample| sample.regret)
+            .sum::<f64>() / RISK_EPISODES as f64;
 
         output.push(RiskControlSummary {
             search_size,
@@ -583,6 +641,15 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
             qualification_coverage_rate,
             qualification_mean_regret,
             direct_fallback_mean_regret,
+            shifted_qualification_episode_count: RISK_EPISODES,
+            shifted_qualification_unsupported_count,
+            shifted_qualification_unsupported_rate,
+            shifted_qualification_downside_count,
+            shifted_qualification_downside_rate,
+            shifted_qualification_mean_utility_lift_vs_fallback,
+            shifted_qualification_coverage_rate,
+            shifted_qualification_mean_regret,
+            shifted_direct_fallback_mean_regret,
         });
     }
 
@@ -634,6 +701,7 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
     output.push_str(&format!("  \"base_seed\": \"{BASE_SEED:016x}\",\n"));
     output.push_str(&format!("  \"calibration_seed_root\": \"{CALIBRATION_SEED:016x}\",\n"));
     output.push_str(&format!("  \"qualification_seed_root\": \"{QUALIFICATION_SEED:016x}\",\n"));
+    output.push_str("  \"support_score_shift\": \"unsupported scores moved to [0.90, 1.00); utilities and predictions held fixed in paired qualification\",\n");
     output.push_str("  \"search_sizes\": [8, 32, 128, 512],\n");
     output.push_str("  \"summary\": [\n");
     for (index, row) in summaries.iter().enumerate() {
@@ -700,7 +768,16 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
                 "\"qualification_mean_utility_lift_vs_fallback\": {:.8}, ",
                 "\"qualification_coverage_rate\": {:.8}, ",
                 "\"qualification_mean_regret\": {:.8}, ",
-                "\"direct_fallback_mean_regret\": {:.8}}}"
+                "\"direct_fallback_mean_regret\": {:.8}, ",
+                "\"shifted_qualification_episode_count\": {}, ",
+                "\"shifted_qualification_unsupported_count\": {}, ",
+                "\"shifted_qualification_unsupported_rate\": {:.8}, ",
+                "\"shifted_qualification_downside_count\": {}, ",
+                "\"shifted_qualification_downside_rate\": {:.8}, ",
+                "\"shifted_qualification_mean_utility_lift_vs_fallback\": {:.8}, ",
+                "\"shifted_qualification_coverage_rate\": {:.8}, ",
+                "\"shifted_qualification_mean_regret\": {:.8}, ",
+                "\"shifted_direct_fallback_mean_regret\": {:.8}}}"
             ),
             row.search_size,
             row.target_unsupported_risk,
@@ -730,7 +807,16 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
             row.qualification_mean_utility_lift_vs_fallback,
             row.qualification_coverage_rate,
             row.qualification_mean_regret,
-            row.direct_fallback_mean_regret
+            row.direct_fallback_mean_regret,
+            row.shifted_qualification_episode_count,
+            row.shifted_qualification_unsupported_count,
+            row.shifted_qualification_unsupported_rate,
+            row.shifted_qualification_downside_count,
+            row.shifted_qualification_downside_rate,
+            row.shifted_qualification_mean_utility_lift_vs_fallback,
+            row.shifted_qualification_coverage_rate,
+            row.shifted_qualification_mean_regret,
+            row.shifted_direct_fallback_mean_regret
         ));
         if index + 1 != risk_control.len() {
             output.push(',');
@@ -809,6 +895,24 @@ mod tests {
     }
 
     #[test]
+    fn support_shift_changes_only_unsupported_scores() {
+        let baseline = candidate_catalog(BASE_SEED);
+        let shifted = candidate_catalog_with_support_shift(BASE_SEED, true);
+        for (base, changed) in baseline.iter().zip(&shifted) {
+            assert_eq!(base.true_utility, changed.true_utility);
+            assert_eq!(base.predicted_utility, changed.predicted_utility);
+            assert_eq!(base.predicted_uncertainty, changed.predicted_uncertainty);
+            assert_eq!(base.shuffled_support_score, changed.shuffled_support_score);
+            assert_eq!(base.supported, changed.supported);
+            if base.supported {
+                assert_eq!(base.support_score, changed.support_score);
+            } else {
+                assert!((0.90..1.0).contains(&changed.support_score));
+            }
+        }
+    }
+
+    #[test]
     fn regret_and_optimism_are_finite_for_all_baselines() {
         let catalog = candidate_catalog(BASE_SEED);
         for strategy in Strategy::all() {
@@ -836,6 +940,7 @@ mod tests {
         for row in rows {
             assert_eq!(row.calibration_episode_count, RISK_EPISODES);
             assert_eq!(row.qualification_episode_count, RISK_EPISODES);
+            assert_eq!(row.shifted_qualification_episode_count, RISK_EPISODES);
             assert!(RISK_THRESHOLDS.contains(&row.selected_threshold));
             assert!(row.calibration_unsupported_upper_bound <= UNSUPPORTED_RISK_TARGET);
             assert!(row.calibration_downside_upper_bound <= FALLBACK_DOWNSIDE_RISK_TARGET);
@@ -844,6 +949,9 @@ mod tests {
             assert!((0.0..=1.0).contains(&row.qualification_unsupported_rate));
             assert!((0.0..=1.0).contains(&row.qualification_downside_rate));
             assert!((0.0..=1.0).contains(&row.qualification_coverage_rate));
+            assert!((0.0..=1.0).contains(&row.shifted_qualification_unsupported_rate));
+            assert!((0.0..=1.0).contains(&row.shifted_qualification_downside_rate));
+            assert!((0.0..=1.0).contains(&row.shifted_qualification_coverage_rate));
         }
     }
 
