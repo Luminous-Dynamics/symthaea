@@ -942,6 +942,23 @@ mod tests {
         assert_eq!(receiver.pending_count(), 1);
     }
 
+    #[test]
+    fn oversized_fragment_count_is_rejected_before_pending_allocation() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(3, PEER_A, 0x94);
+        let wire = to_wire(&packet.fragment());
+        let mut oversized = wire[0].clone();
+        oversized[3] = u8::MAX;
+        recompute_wire_crc(&mut oversized);
+
+        // This is individually valid under the legacy frame syntax and has a
+        // valid CRC, but 255 total shards exceed the configured encoded-size cap.
+        assert!(receiver.receive_fragment(PEER_A, &oversized).is_none());
+        assert_eq!(receiver.pending_count(), 0);
+        assert_eq!(receiver.stats().fragments_oversize, 1);
+        assert_eq!(receiver.stats().fragments_received, 0);
+    }
+
     // -- Timeout expiry --
 
     #[test]
