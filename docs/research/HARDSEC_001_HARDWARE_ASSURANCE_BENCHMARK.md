@@ -206,12 +206,14 @@ For these corpora, a classifier may learn to recognize an *attack workload or at
 
 ### Phase A implementation slice
 
-An opt-in Rust example is now proposed on the HARDSEC-001 branch:
+An opt-in Rust example is present on the HARDSEC-001 draft branch:
 
 ```bash
-cargo run --example hardsec_split_audit --features hardsec-audit -- \
-  --manifest /path/to/splits.tsv --root /path/to/dataset
+cargo fmt --check --example hardsec_split_audit --features hardsec-audit
 cargo test --example hardsec_split_audit --features hardsec-audit
+cargo run --example hardsec_split_audit --features hardsec-audit -- \
+  --manifest /path/to/splits.tsv --root /path/to/dataset \
+  --receipt /path/to/new-receipt.json
 ```
 
 The strict TSV header is:
@@ -224,7 +226,9 @@ These are tab-separated columns, not space-delimited. The initial auditor intent
 
 The auditor hashes the exact manifest bytes and each referenced regular source artifact with SHA-256, and prints the manifest digest in its deterministic summary under a `HARDSEC_SPLIT_AUDIT_OK` status that must not be interpreted as a security pass. It fails closed on digest mismatch, malformed columns, duplicate sample IDs, identical source bytes reused across different splits, missing split groups, path traversal, symlinks, inconsistent source-artifact metadata, execution IDs crossing splits, or a held-out group crossing splits. Exact duplicate bytes under different artifact IDs inside the same split are counted as aliases and reported, not automatically rejected; they are not independent evidence and require deduplication or weighting before statistical evaluation. For attack-family holdout, attack rows are grouped by family and benign rows by program so a single generic benign label cannot accidentally collapse all benign controls into one group. Capture-configuration holdout is separately supported so evaluation can ask whether a monitor generalizes beyond a particular acquisition setup. It also requires non-missing program, execution, device/configuration, acquisition configuration, and counter-set identifiers; every attack-labeled row needs an attack-family ID. Validation and test must each contain both benign and attack labels so binary recall and false-positive metrics are defined; training may be one-class for an explicitly unsupervised anomaly detector. Repeated windows from a single artifact may remain in one split, but may not be presented as independent artifacts. The selected holdout key is enforced in addition to the invariant that one execution cannot cross splits.
 
-**Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Unit tests are authored with the example but have not yet been executed in this environment.
+**Receipt semantics:** the optional JSON receipt is deterministic metadata for the split audit and is created only at a new path; the tool refuses to overwrite an existing file. It includes the exact manifest SHA-256, split counts and a claim-scope label of `metadata_and_split_integrity_only`. The receipt is not signed, independently anchored, or proof of factual labels; an attacker who can rewrite both inputs and outputs can forge a self-consistent result.
+
+**Scope limit:** this checks the metadata and file identities supplied to it; it does not prove that a program/family label is factually correct, that the data are licensed for the proposed use, or that an attack is exploitable. Those remain explicit data-audit and security-review tasks. Twenty-one unit tests are authored with the example but have not yet been executed in this environment.
 
 Phase A is the first deliverable. The protocol intentionally does not depend on completion of runners to begin data and split audits; any execution claims still require retained exact-input and exact-code receipts.
 
