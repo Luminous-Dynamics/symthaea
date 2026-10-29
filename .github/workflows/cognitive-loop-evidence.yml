@@ -466,7 +466,8 @@ jobs:
               has("missingness_probability") or has("was_selected_missing") or
               has("expected_reveal_tick") or has("declaration_tick") or
               has("scenario_id") or has("seed")
-            )] | length) == 0
+            )] | length) == 0 and
+            ([.messages[] | select((.event_id | startswith("evt_")) | not)] | length) == 0
           ' "$RUNNER_TEMP/missingness-policy-tick.json"
           jq -e '
             . as $schedule |
