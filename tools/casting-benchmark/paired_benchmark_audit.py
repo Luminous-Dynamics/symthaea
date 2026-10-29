@@ -144,6 +144,7 @@ def validate_manifest(document: Any) -> dict[str, Any]:
     by_unit: dict[str, dict[str, dict[str, Any]]] = {}
     all_policies: set[str] = set()
     shared_meta: dict[str, tuple[Any, ...]] = {}
+    seen_run_receipts: set[str] = set()
     for index, raw in enumerate(runs):
         run = _strict_object(raw, RUN_FIELDS, f"runs[{index}]")
         unit_id = _nonblank(run["unit_id"], f"runs[{index}].unit_id")
@@ -153,6 +154,10 @@ def validate_manifest(document: Any) -> dict[str, Any]:
         for digest_field in ("run_receipt_sha256", "policy_source_sha256", "policy_config_sha256",
                              "environment_sha256", "suite_manifest_sha256"):
             _sha256(run[digest_field], f"runs[{index}].{digest_field}")
+        receipt_digest = run["run_receipt_sha256"].lower()
+        if receipt_digest in seen_run_receipts:
+            raise ValueError("run_receipt_sha256 must uniquely identify each policy × unit run")
+        seen_run_receipts.add(receipt_digest)
         dimension = _integer(run["dimension"], f"runs[{index}].dimension", minimum=1)
         _integer(run["seed"], f"runs[{index}].seed")
         severity = _number(run["severity"], f"runs[{index}].severity", minimum=0.0)
@@ -240,12 +245,29 @@ def validate_manifest(document: Any) -> dict[str, Any]:
                 f"policy coverage mismatch for unit {unit_id}; "
                 f"missing={sorted(policies - set(unit_runs))}, extra={sorted(set(unit_runs) - policies)}"
             )
+        initial_qualities = {run["curve"][0]["quality"] for run in unit_runs.values()}
+        if len(initial_qualities) != 1:
+            raise ValueError(f"paired runs must share the same cost-zero quality for unit {unit_id}")
         for policy_id, run in unit_runs.items():
             shift_ids = set(run["shift_map"])
             if expected_shift_set is None:
                 expected_shift_set = shift_ids
             elif shift_ids != expected_shift_set:
                 raise ValueError(f"shift coverage mismatch for unit {unit_id}, policy {policy_id}")
+    # A method must not silently change between paired units. Run receipts vary;
+    # policy code, config, environment and suite digests must stay frozen.
+    for policy_id in policies:
+        provenance = {
+            (
+                by_unit[unit_id][policy_id]["policy_source_sha256"].lower(),
+                by_unit[unit_id][policy_id]["policy_config_sha256"].lower(),
+                by_unit[unit_id][policy_id]["environment_sha256"].lower(),
+                by_unit[unit_id][policy_id]["suite_manifest_sha256"].lower(),
+            )
+            for unit_id in by_unit
+        }
+        if len(provenance) != 1:
+            raise ValueError(f"policy source/config/environment/suite provenance changes across units: {policy_id}")
     if len(by_unit) < 2:
         raise ValueError("at least two declared independent units are required for uncertainty reporting")
     if len(policies) < 2:
