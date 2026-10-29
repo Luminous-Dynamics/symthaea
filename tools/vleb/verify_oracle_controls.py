@@ -258,6 +258,45 @@ def _worktree_add(source_repo: Path, revision: str, destination: Path) -> None:
     _git(destination, "config", "core.hooksPath", "/dev/null")
 
 
+def tracked_tree_delta_sha256(workspace: Path) -> str:
+    """Hash tracked changes relative to HEAD; source mutations during tests are invalid."""
+    raw = _git(workspace, "diff", "--binary", "--no-ext-diff", "HEAD").stdout.encode("utf-8")
+    return digest(raw)
+
+
+def verify_test_bundle_files(workspace: Path, files: list[dict[str, Any]], arm_name: str) -> tuple[list[dict[str, Any]], list[str]]:
+    observations: list[dict[str, Any]] = []
+    issues: list[str] = []
+    root = workspace.resolve(strict=True)
+    for item in files:
+        relative = item["path"]
+        rel = PurePosixPath(relative)
+        cursor = root
+        for component in rel.parts:
+            cursor = cursor / component
+            if cursor.is_symlink():
+                issues.append(f"{arm_name}: pinned test bundle path became a symlink: {relative!r}")
+                break
+        else:
+            try:
+                resolved = cursor.resolve(strict=True)
+                if not resolved.is_relative_to(root) or not resolved.is_file():
+                    raise ControlError("test bundle member is not a regular in-worktree file")
+                observed = digest(resolved.read_bytes())
+            except (OSError, ControlError) as exc:
+                observed = None
+                issues.append(f"{arm_name}: pinned test bundle file unavailable after execution: {relative!r}: {exc}")
+            observations.append({
+                "path": relative,
+                "expected_sha256": item["sha256"],
+                "observed_sha256": observed,
+                "unchanged": observed == item["sha256"],
+            })
+            if observed != item["sha256"]:
+                issues.append(f"{arm_name}: test bundle file changed during oracle control execution: {relative!r}")
+    return observations, issues
+
+
 def _run_arm(
     workspace: Path,
     commands: list[dict[str, Any]],
@@ -416,12 +455,36 @@ def run_two_sided_controls(
             if apply.returncode != 0:
                 raise ControlError(f"reference patch application failed: {apply.stdout[-2000:]}")
 
+            baseline_delta_before = tracked_tree_delta_sha256(baseline)
+            reference_delta_before = tracked_tree_delta_sha256(reference)
+            baseline_files = bundle_manifest[0]["files"]
+            reference_files = bundle_manifest[1]["files"]
+
             baseline_results, baseline_issues = _run_arm(
                 baseline, commands, arm_name="baseline", evidence_root=evidence_root,
             )
             reference_results, reference_issues = _run_arm(
                 reference, commands, arm_name="reference", evidence_root=evidence_root,
             )
+            baseline_delta_after = tracked_tree_delta_sha256(baseline)
+            reference_delta_after = tracked_tree_delta_sha256(reference)
+            baseline_file_observations, baseline_file_issues = verify_test_bundle_files(
+                baseline, baseline_files, "baseline",
+            )
+            reference_file_observations, reference_file_issues = verify_test_bundle_files(
+                reference, reference_files, "reference",
+            )
+            baseline_integrity_valid = (
+                baseline_delta_before == baseline_delta_after and not baseline_file_issues
+            )
+            reference_integrity_valid = (
+                reference_delta_before == reference_delta_after and not reference_file_issues
+            )
+            integrity_issues = baseline_file_issues + reference_file_issues
+            if baseline_delta_before != baseline_delta_after:
+                integrity_issues.append("baseline tracked source tree changed during control execution")
+            if reference_delta_before != reference_delta_after:
+                integrity_issues.append("reference tracked source tree changed during control execution")
 
             baseline_failed = any(row["observed_test_outcome"] == "failed" for row in baseline_results)
             reference_all_passed = (
@@ -433,7 +496,7 @@ def run_two_sided_controls(
                 and all(row["observed_test_outcome"] in ("passed", "failed") for row in baseline_results)
             )
             controls_passed = baseline_failed and baseline_complete and reference_all_passed
-            issues = baseline_issues + reference_issues
+            issues = baseline_issues + reference_issues + integrity_issues
             if not baseline_failed:
                 issues.append("empty-patch baseline did not demonstrate a test-level failure")
             if not baseline_complete:
@@ -453,6 +516,18 @@ def run_two_sided_controls(
                 "test_bundle_sha256": digest(test_bundle_raw),
                 "verifier_sha256": verifier_sha,
                 "test_bundle_files_by_arm": bundle_manifest,
+                "baseline_tree_integrity": {
+                    "valid": baseline_integrity_valid,
+                    "tracked_diff_sha256_before": baseline_delta_before,
+                    "tracked_diff_sha256_after": baseline_delta_after,
+                    "test_bundle_file_observations": baseline_file_observations,
+                },
+                "reference_tree_integrity": {
+                    "valid": reference_integrity_valid,
+                    "tracked_diff_sha256_before": reference_delta_before,
+                    "tracked_diff_sha256_after": reference_delta_after,
+                    "test_bundle_file_observations": reference_file_observations,
+                },
                 "baseline_results": baseline_results,
                 "reference_results": reference_results,
                 "baseline_test_failure_count": sum(row["observed_test_outcome"] == "failed" for row in baseline_results),
