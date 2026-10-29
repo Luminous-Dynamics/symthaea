@@ -24,7 +24,7 @@ from typing import Any
 import pyphi
 
 
-PINNED_PYPHI_VERSION = "2.0.0"
+PINNED_PYPHI_VERSION = "2.0.0rc4"
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "pyphi-iit4-2023-fig1a-reference-v0.1.json"
 
 
@@ -84,7 +84,7 @@ def run(output_path: Path) -> dict[str, Any]:
     try:
         installed_version = importlib.metadata.version("pyphi")
     except importlib.metadata.PackageNotFoundError as exc:
-        raise RuntimeError("PyPhi distribution metadata unavailable; install the pinned pyphi==2.0.0 artifact") from exc
+        raise RuntimeError("PyPhi distribution metadata unavailable; install the pinned pyphi==2.0.0rc4 artifact") from exc
 
     if installed_version != PINNED_PYPHI_VERSION:
         raise RuntimeError(
