@@ -30,7 +30,7 @@ For W > 1, the feasible set is a triangle with vertices
 - (0, 1/2)
 - (1/2, 0).
 
-The optimizer checks the unconstrained stationary point when A is invertible and feasible. It also optimizes the quadratic along each edge exactly as a one-dimensional concave quadratic. This handles singular or flat boundary directions without relying on a matrix inverse. Vertices are always included.
+The optimizer checks the unconstrained stationary point when A is invertible and feasible, using a scale-relative determinant test so small but well-conditioned matrices are not incorrectly classified as singular. It also optimizes the quadratic along each edge exactly as a one-dimensional concave quadratic, without an absolute curvature cutoff that would erase small-scale optima. This handles singular or flat boundary directions without relying on a matrix inverse. Vertices are always included.
 
 For W = 1, valid importance ratios are exactly one, so lambda_1's contribution and its sufficient statistics vanish. The kernel verifies that degeneracy invariant and optimizes only lambda_2 over [0, 1/2], avoiding division by zero in the vertex formula.
 
@@ -44,7 +44,8 @@ Eight deterministic numeric fixtures exercise:
 - the lambda_2 = 0 edge;
 - a generic high-weight boundary case;
 - the W = 1 degeneracy;
-- interior optima on both slanted edges.
+- interior optima on both slanted edges;
+- a known interior optimum with A scaled by 1e-8 to exercise scale-relative singularity handling.
 
 Each fixture is compared to a dense feasible triangular grid. The exact candidate must be at least as good as the grid maximum within a stated numeric tolerance. The grid is only an independent diagnostic; it is not the optimizer.
 
