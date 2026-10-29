@@ -194,7 +194,7 @@ struct StepReport {
 
 impl StreamState {
     fn new(max_weight: f64, alpha: f64) -> Result<Self, String> {
-        if !max_weight.is_finite() || max_weight < 1.0 - EPS {
+        if !max_weight.is_finite() || max_weight < 1.0 {
             return Err("max_weight must be finite and at least 1".to_owned());
         }
         if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
@@ -210,12 +210,12 @@ impl StreamState {
     }
 
     fn observe(&mut self, w: f64, r: f64) -> Result<StepReport, String> {
-        if !w.is_finite() || !r.is_finite() || w < 0.0 || w > self.max_weight + FEAS_TOL
+        if !w.is_finite() || !r.is_finite() || w < 0.0 || w > self.max_weight
             || !(0.0..=1.0).contains(&r)
         {
             return Err("sample requires finite w in [0,W] and reward r in [0,1]".to_owned());
         }
-        if (self.max_weight - 1.0).abs() <= EPS && (w - 1.0).abs() > FEAS_TOL {
+        if self.max_weight == 1.0 && w != 1.0 {
             return Err("W=1 requires unit importance weights w=1".to_owned());
         }
         if !lambda_feasible(self.current_lambda, self.max_weight) {
@@ -237,6 +237,9 @@ impl StreamState {
     }
 
     fn choose_next_bet(&mut self, candidate_value: f64) -> Result<optimizer::Vec2, String> {
+        if self.observed.count != self.polynomial.count {
+            return Err("observed and bet-polynomial sample counts diverged".to_owned());
+        }
         if !candidate_value.is_finite() || !(0.0..=1.0).contains(&candidate_value) {
             return Err("candidate_value must lie in [0,1]".to_owned());
         }
@@ -444,6 +447,7 @@ mod tests {
         assert!(stream.observe(f64::NAN,0.5).is_err());
         assert!(stream.observe(1.0,-0.1).is_err());
         assert!(stream.observe(3.0,0.5).is_err());
+        assert!(stream.observe(2.0 + f64::EPSILON * 4.0,0.5).is_err());
         let mut unit=StreamState::new(1.0,0.05).unwrap();
         assert!(unit.observe(0.5,0.5).is_err());
     }
