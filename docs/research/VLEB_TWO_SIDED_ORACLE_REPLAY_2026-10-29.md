@@ -33,9 +33,9 @@ Example for Python unittest (JSON):
           "argv": ["python3", "-m", "unittest", "test_contract"],
           "working_directory": ".",
           "timeout_seconds": 300,
-          "test_start_pattern": "Ran \\\\d+ tests?",
+          "test_start_pattern": "Ran \\d+ tests?",
           "pass_pattern": "^OK$",
-          "fail_pattern": "^FAILED(?: \\\\(|$)"
+          "fail_pattern": "^FAILED(?: \\(|$)"
         }
       ]
     }
