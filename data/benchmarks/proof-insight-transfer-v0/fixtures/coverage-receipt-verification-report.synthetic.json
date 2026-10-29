@@ -1,0 +1,19 @@
+{
+  "schema_version": "pitb.coverage-receipt-verification.v1",
+  "verification_status": "verified_signature_set",
+  "cryptographically_verified": true,
+  "resampling_qualification": "requires_component_and_analyzer_validation",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "source_partition_digest_sha256": "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+  "relationship_inventory_edges_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "relationship_inventory_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "coverage_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "review_methodology_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "trust_store_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "verified_reviewer_ids": [
+    "synthetic-reviewer-a",
+    "synthetic-reviewer-b"
+  ],
+  "distinct_reviewer_organization_count": 2,
+  "limitation": "Synthetic fixture only; no actual reviewer identity or receipt is asserted."
+}
