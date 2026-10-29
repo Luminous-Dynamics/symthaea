@@ -41,7 +41,7 @@ Each method uses a familywise delta of 0.10 split across four cells; paired meth
 | 2.5% | Sensitivity beta CS | 14/50 | 36/50 | 16,384 |
 | 2.5% | Huber–Catoni CS | 0/50 | 50/50 | 16,384 |
 | 5% | Sensitivity beta CS | 0/50 | 50/50 | 16,384 |
-| 5% | Huber–Catoni CS | 0/50 | 50/50 |
+| 5% | Huber–Catoni CS | 0/50 | 50/50 | 16,384 |
 | 18% (covers actual) | Sensitivity beta CS | 0/50 | 50/50 | 16,384 |
 | 18% (covers actual) | Huber–Catoni CS | 0/50 | 50/50 | 16,384 |
 
