@@ -1,3 +1,8 @@
+const HASH_A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const HASH_B: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const HASH_C: &str = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const HASH_D: &str = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
 use symthaea_operations_research::aviation_energy_accounting::{EvidenceClass, TransportService};
 use symthaea_operations_research::aviation_energy_hub::{
     seal_energy_hub_scenario, solve_exact_energy_hub_pareto, EnergyHubInterval, EnergyHubPlan,
@@ -87,12 +92,14 @@ fn policy(
     scenario: &TimeIndexedEnergyHubScenario,
     plan: EnergyHubPlan,
     information_sets: &[&str],
+    observed_history_digests: &[&str],
 ) -> ScenarioPolicyPlan {
     ScenarioPolicyPlan {
         scenario_id: scenario.scenario_id.clone(),
         plan,
         information_contract_ref: "synthetic-observation-contract-v1".to_owned(),
         information_set_ids_by_stage: information_sets.iter().map(|id| (*id).to_owned()).collect(),
+        observed_history_digest_by_stage: observed_history_digests.iter().map(|digest| (*digest).to_owned()).collect(),
     }
 }
 
@@ -112,8 +119,8 @@ fn perfect_information_optima_can_violate_nonanticipativity() {
     let report = verify_nonanticipative_policy(
         &[base.clone(), price.clone()],
         &[
-            policy(&base, nominal_plan, &["root", "normal-future"]),
-            policy(&price, price_plan, &["root", "cheap-future"]),
+            policy(&base, nominal_plan, &["root", "normal-future"], &[HASH_A, HASH_B]),
+            policy(&price, price_plan, &["root", "cheap-future"], &[HASH_A, HASH_C]),
         ],
     )
     .unwrap();
@@ -146,8 +153,8 @@ fn the_same_verified_action_sequence_passes_shared_information_constraints() {
     let report = verify_nonanticipative_policy(
         &[base.clone(), price.clone()],
         &[
-            policy(&base, nominal_plan.clone(), &["root", "normal-future"]),
-            policy(&price, price_bound_plan.clone(), &["root", "cheap-future"]),
+            policy(&base, nominal_plan.clone(), &["root", "normal-future"], &[HASH_A, HASH_B]),
+            policy(&price, price_bound_plan.clone(), &["root", "cheap-future"], &[HASH_A, HASH_C]),
         ],
     )
     .unwrap();
@@ -158,8 +165,8 @@ fn the_same_verified_action_sequence_passes_shared_information_constraints() {
     let reversed = verify_nonanticipative_policy(
         &[price.clone(), base.clone()],
         &[
-            policy(&price, price_bound_plan, &["root", "cheap-future"]),
-            policy(&base, nominal_plan, &["root", "normal-future"]),
+            policy(&price, price_bound_plan, &["root", "cheap-future"], &[HASH_A, HASH_C]),
+            policy(&base, nominal_plan, &["root", "normal-future"], &[HASH_A, HASH_B]),
         ],
     )
     .unwrap();
@@ -179,16 +186,36 @@ fn information_sets_cannot_merge_inconsistent_prior_histories() {
         verify_nonanticipative_policy(
             &[base.clone(), price.clone()],
             &[
-                policy(&base, base_plan, &["path-a", "merged-late"]),
-                policy(&price, price_plan, &["path-b", "merged-late"]),
+                policy(&base, base_plan, &["path-a", "merged-late"], &[HASH_A, HASH_B]),
+                policy(&price, price_plan, &["path-b", "merged-late"], &[HASH_C, HASH_D]),
             ],
         )
         .unwrap_err(),
-        NonanticipativityError::InvalidInformationHistory {
-            scenario_id: "nominal-energy-recourse-v1".to_owned(),
+        NonanticipativityError::InformationSetHistoryMismatch {
             stage_index: 1,
             information_set_id: "merged-late".to_owned(),
         }
+    );
+}
+
+#[test]
+fn identical_observed_histories_cannot_be_split_across_information_sets() {
+    let base = nominal();
+    let price = price_reversal(&base);
+    let base_plan = solve_exact_energy_hub_pareto(&base, 100_000).unwrap().frontier[0]
+        .plan
+        .clone();
+    let price_plan = bind_plan(&base_plan, &price);
+
+    assert_eq!(
+        verify_nonanticipative_policy(
+            &[base.clone(), price.clone()],
+            &[
+                policy(&base, base_plan, &["root-a", "normal-future"], &[HASH_A, HASH_B]),
+                policy(&price, price_plan, &["root-b", "cheap-future"], &[HASH_A, HASH_C]),
+            ],
+        ).unwrap_err(),
+        NonanticipativityError::IdenticalHistorySplitAcrossInformationSets { stage_index: 0 }
     );
 }
 
@@ -207,8 +234,8 @@ fn incompatible_time_grids_and_missing_policy_plans_are_rejected() {
         verify_nonanticipative_policy(
             &[base.clone(), incompatible.clone()],
             &[
-                policy(&base, base_plan.clone(), &["root", "future-a"]),
-                policy(&incompatible, incompatible_plan, &["root", "future-b"]),
+                policy(&base, base_plan.clone(), &["root", "future-a"], &[HASH_A, HASH_B]),
+                policy(&incompatible, incompatible_plan, &["root", "future-b"], &[HASH_A, HASH_C]),
             ],
         )
         .unwrap_err(),
@@ -218,7 +245,7 @@ fn incompatible_time_grids_and_missing_policy_plans_are_rejected() {
     assert_eq!(
         verify_nonanticipative_policy(
             &[base.clone(), price_reversal(&base)],
-            &[policy(&base, base_plan, &["root", "future-a"])],
+            &[policy(&base, base_plan, &["root", "future-a"], &[HASH_A, HASH_B])],
         )
         .unwrap_err(),
         NonanticipativityError::MissingIdentifier("one plan per scenario")
@@ -236,7 +263,7 @@ fn plan_verification_is_required_before_information_consistency() {
     assert_eq!(
         verify_nonanticipative_policy(
             &[base.clone()],
-            &[policy(&base, invalid_plan, &["root", "future"])],
+            &[policy(&base, invalid_plan, &["root", "future"], &[HASH_A, HASH_B])],
         )
         .unwrap_err(),
         NonanticipativityError::PlanVerification {
