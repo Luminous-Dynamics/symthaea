@@ -106,12 +106,14 @@ fn delay_steps(f:Fixture,draw:f64)->usize{
 }
 
 #[derive(Clone,Copy,Debug)]
-struct LoggedObservation{context:usize,action:usize,reward:f64}
-fn logged_observation(rng:&mut SplitMix64,f:Fixture)->LoggedObservation{
+struct LoggedObservation{context:usize,action:usize,reward:f64,mature_at:usize}
+fn logged_observation(rng:&mut SplitMix64,f:Fixture,t:usize)->LoggedObservation{
     let context=if rng.unit()<0.5{0}else{1};
     let action=(rng.unit()*ARMS as f64).floor() as usize;
     let reward=bernoulli(rng,f.north_star[context][action]);
-    LoggedObservation{context,action,reward}
+    let delay_draw=rng.unit();
+    let delay=delay_steps(f,delay_draw);
+    LoggedObservation{context,action,reward,mature_at:t+delay}
 }
 fn choose_ucb(context:usize,context_count:usize,counts:&[[usize;ARMS];CONTEXTS],sums:&[[f64;ARMS];CONTEXTS])->usize{
     for arm in 0..ARMS{if counts[context][arm]==0{return arm;}}
@@ -131,14 +133,14 @@ fn policy_code(policy:[usize;CONTEXTS])->usize{policy[0]*ARMS+policy[1]}
 fn policy_value(f:Fixture,policy:[usize;CONTEXTS])->f64{
     0.5*(f.north_star[0][policy[0]]+f.north_star[1][policy[1]])
 }
-fn ips_interval(sum:f64,sum_sq:f64,n:usize)->(f64,f64,f64){
-    if n<2{return(0.0,1.0,1.0);}
+fn ips_interval(sum:f64,sum_sq:f64,n:usize)->(f64,f64,f64,f64){
+    if n<2{return(0.0,1.0,1.0,0.5);}
     let mean=sum/n as f64;
     let variance=((sum_sq-sum*sum/n as f64).max(0.0))/(n-1) as f64;
     let radius=1.959_963_984_540_054*(variance/n as f64).sqrt();
     let lower=(mean-radius).max(0.0).min(1.0);
     let upper=(mean+radius).max(0.0).min(1.0);
-    (lower,upper,(upper-lower).max(0.0))
+    (lower,upper,(upper-lower).max(0.0),mean)
 }
 fn seed_for(replicate:usize)->u64{
     SEED ^ (replicate as u64).wrapping_mul(0xA076_1D64_78BD_642F)
@@ -148,7 +150,7 @@ fn evaluation_seed_for(replicate:usize)->u64{
         ^ (replicate as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
 }
 
-const METRIC_NAMES:[&str;12]=[
+const METRIC_NAMES:[&str;13]=[
     "online_north_star_value",
     "online_north_star_regret_per_decision",
     "online_proxy_reward_value",
@@ -161,6 +163,7 @@ const METRIC_NAMES:[&str;12]=[
     "batch_ips_absolute_error_for_learned_greedy_policy",
     "batch_ips_pointwise_wald_coverage",
     "batch_ips_wald_interval_width",
+    "batch_ips_matured_sample_fraction",
 ];
 #[derive(Clone,Copy,Debug,Default)]
 struct MetricAgg{sum:f64,sum_sq:f64,n:usize}
@@ -186,7 +189,8 @@ fn snapshot_metrics(f:Fixture, t:usize,
     ns_sum:f64,proxy_sum:f64,ns_regret:f64,proxy_regret:f64,
     matured_count:usize,matured_sum:f64,
     ips_sum:&[f64;ARMS*ARMS],
-    ips_sq:&[f64;ARMS*ARMS]) -> [f64;12]
+    ips_sq:&[f64;ARMS*ARMS],
+    ips_n:usize) -> [f64;13]
 {
     let greedy=estimated_greedy_actions(counts,proxy_sums);
     let proxy_best=[best_action(f,0,true),best_action(f,1,true)];
@@ -198,8 +202,7 @@ fn snapshot_metrics(f:Fixture, t:usize,
     let offset=code;
     // All 16 deterministic context-to-action policies share the same independent
     // uniform evaluation log. The flattened index is policy_code * 1.
-    let ips_estimate=ips_sum[offset]/t as f64;
-    let (ips_lower,ips_upper,ips_width)=ips_interval(ips_sum[offset],ips_sq[offset],t);
+    let (ips_lower,ips_upper,ips_width,ips_estimate)=ips_interval(ips_sum[offset],ips_sq[offset],ips_n);
     let ips_covered=(ips_lower<=learned_true+EPS&&ips_upper>=learned_true-EPS) as u8 as f64;
     [
         ns_sum/t as f64,
@@ -214,6 +217,7 @@ fn snapshot_metrics(f:Fixture, t:usize,
         (ips_estimate-learned_true).abs(),
         ips_covered,
         ips_width,
+        ips_n as f64/t as f64,
     ]
 }
 
@@ -227,7 +231,7 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
     for rep in 0..reps{
         let mut rng=SplitMix64::new(seed_for(rep));
         let mut eval_rng=SplitMix64::new(evaluation_seed_for(rep));
-        let eval_log:Vec<LoggedObservation>=(0..max_look).map(|_|logged_observation(&mut eval_rng,f)).collect();
+        let eval_log:Vec<LoggedObservation>=(0..max_look).map(|i|logged_observation(&mut eval_rng,f,i+1)).collect();
         let mut counts=[[0usize;ARMS];CONTEXTS];
         let mut context_counts=[0usize;CONTEXTS];
         let mut proxy_sums=[[0.0_f64;ARMS];CONTEXTS];
@@ -239,15 +243,19 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
         let mut maturity_sum=vec![0.0_f64;max_look+513];
         let mut ips_sum=[0.0_f64;ARMS*ARMS];
         let mut ips_sq=[0.0_f64;ARMS*ARMS];
+        let mut ips_n=0usize;
         let mut look_i=0usize;
         for t in 1..=max_look{
             let obs=eval_log[t-1];
-            for code in 0..ARMS*ARMS{
-                let a0=code/ARMS;
-                let a1=code%ARMS;
-                let target=if obs.context==0{a0}else{a1};
-                let score=if obs.action==target{IPS_MAX_WEIGHT*obs.reward}else{0.0};
-                ips_sum[code]+=score;ips_sq[code]+=score*score;
+            if obs.mature_at<=t{
+                ips_n+=1;
+                for code in 0..ARMS*ARMS{
+                    let a0=code/ARMS;
+                    let a1=code%ARMS;
+                    let target=if obs.context==0{a0}else{a1};
+                    let score=if obs.action==target{IPS_MAX_WEIGHT*obs.reward}else{0.0};
+                    ips_sum[code]+=score;ips_sq[code]+=score*score;
+                }
             }
 
             let context=if rng.unit()<0.5{0}else{1};
@@ -275,7 +283,7 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
 
             if t==looks.get(look_i).copied().unwrap_or(usize::MAX){
                 let snapshot=snapshot_metrics(f,t,&counts,&proxy_sums,ns_sum,proxy_sum,ns_regret,proxy_regret,
-                    matured_count,matured_sum,&ips_sum,&ips_sq);
+                    matured_count,matured_sum,&ips_sum,&ips_sq,ips_n);
                 for i in 0..METRIC_NAMES.len(){metrics[look_i][i].add(snapshot[i]);}
                 look_i+=1;
             }
