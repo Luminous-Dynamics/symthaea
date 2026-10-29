@@ -127,7 +127,7 @@ ANYTIME_UPWARD_ALTERNATIVES = (0.55, 0.60, 0.70, 0.80, 0.90)
 ANYTIME_DOWNWARD_ALTERNATIVES = (0.45, 0.40, 0.30, 0.20, 0.10)
 ANYTIME_CHANGE_HAZARDS = (0.04, 0.01, 0.0025)
 ANYTIME_PROBE_FIELDS = (
-    "trace_id", "scenario", "scenario_class", "horizon", "change_after", "pre_rate", "post_rate",
+    "trace_id", "scenario", "scenario_class", "horizon", "change_after", "schedule_policy", "pre_rate", "post_rate",
     "alpha", "log_threshold", "component_count", "first_alarm_step", "alarm_phase", "final_log_e_value",
     "upward_alternatives", "downward_alternatives", "change_hazards",
 )
@@ -1386,13 +1386,26 @@ def anytime_mixture_reference_rows():
             alarm_phase = "alarm_on_control"
         else:
             alarm_phase = "no_alarm"
+        schedule_policy = (
+            "alternating_band_endpoints" if name == "within_band_alternating"
+            else "previsible_e_value_feedback" if name == "within_band_feedback"
+            else "single_step_after_100" if name.startswith("step_")
+            else "all_ones_extreme_path" if name == "all_ones_adversarial"
+            else "all_zeros_extreme_path" if name == "all_zeros_adversarial"
+            else "constant_probability"
+        )
+        pre_rate_text = (
+            "NA" if name in ("within_band_alternating", "within_band_feedback")
+            else f"{pre_p:.12f}"
+        )
         rows.append({
             "trace_id": str(index + 1),
             "scenario": name,
             "scenario_class": kind,
             "horizon": str(horizon),
             "change_after": str(change_after) if post_p is not None else "NA",
-            "pre_rate": f"{pre_p:.12f}",
+            "schedule_policy": schedule_policy,
+            "pre_rate": pre_rate_text,
             "post_rate": f"{post_p:.12f}" if post_p is not None else "NA",
             "alpha": f"{alpha:.12f}",
             "log_threshold": f"{log_threshold:.12f}",
@@ -1472,11 +1485,11 @@ def check_anytime_mixture_probe_csv(path):
     if len(actual) != len(expected):
         raise ValueError(f"anytime-mixture probe row count mismatch: expected {len(expected)}, got {len(actual)}")
     text_fields = (
-        "trace_id", "scenario", "scenario_class", "horizon", "change_after", "post_rate",
-        "component_count", "first_alarm_step", "alarm_phase", "upward_alternatives",
+        "trace_id", "scenario", "scenario_class", "horizon", "change_after", "schedule_policy",
+        "pre_rate", "post_rate", "component_count", "first_alarm_step", "alarm_phase", "upward_alternatives",
         "downward_alternatives", "change_hazards",
     )
-    numeric_fields = ("pre_rate", "alpha", "log_threshold", "final_log_e_value")
+    numeric_fields = ("alpha", "log_threshold", "final_log_e_value")
     for line, (got, want) in enumerate(zip(actual, expected), 2):
         for field in text_fields:
             if got[field] != want[field]:
