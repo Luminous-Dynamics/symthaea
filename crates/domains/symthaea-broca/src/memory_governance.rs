@@ -855,7 +855,7 @@ mod tests {
         let ledger = sample_ledger();
         let result = ledger.resolve(&query("at-retract", "2026-04-01T00:00:00Z")).unwrap();
         assert_eq!(result.value.as_deref(), Some("C"));
-        assert_eq!(result.applied_retractions, vec!["R1"]);
+        assert_eq!(result.applied_retractions, vec!["R1".to_owned()]);
     }
 
     #[test]
@@ -917,7 +917,7 @@ mod tests {
         let result = ledger.resolve(&query("conflict", "2026-01-22T00:00:00Z")).unwrap();
         assert_eq!(result.state, ResolutionState::Conflict);
         assert!(result.value.is_none());
-        assert_eq!(result.conflicting_values, vec!["A", "B"]);
+        assert_eq!(result.conflicting_values, vec!["A".to_owned(), "B".to_owned()]);
     }
 
     #[test]
