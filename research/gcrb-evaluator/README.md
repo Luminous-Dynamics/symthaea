@@ -6,7 +6,7 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 ## Status
 
-- The isolated Rust CLI/library is authored with 33 core evaluator tests and seven trace-auditor tests (40 authored total). None has been compiled or executed.
+- The isolated Rust CLI/library is authored with 34 core evaluator tests and seven trace-auditor tests (41 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
 
 The current cross-system source audit is published at `docs/research/fixtures/governance-capture-resistance-adapter-map-v0.1.json`. It records the real Mycelix Justice Cases `Case/Evidence/Decision/Appeal` owner, the separate DeSci signed-event/receipt/checkpoint pattern, Symtropy's transient `SimSnapshot/SimEvent` interface, and the fact that the standalone Symtropy–Mycelix simulation bridge is not wired as a default dependency. These are source references and an integration plan—not working runtime adapters.
