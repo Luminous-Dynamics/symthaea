@@ -6,7 +6,7 @@
 
 The previous Huber-sensitivity experiment assumed the declared contamination upper bound was valid. A robust confidence set is only robust relative to that assumption. If the bound is understated, even a mathematically correct sensitivity transformation can narrow the clean-target set too much and admit an unsafe model. The bound must therefore be an independently defended input—not estimated optimistically from the same contaminated stream and then treated as truth.
 
-Wang & Ramdas's Huber-robust confidence sequences explicitly allow a bounded fraction of arbitrary corruption and are valid at arbitrary stopping times under their stated assumptions. Their official implementation is HJ-Wg/catoni-confseq (GPL-3.0). This experiment does not reproduce that algorithm; it stress-tests the simpler Bernoulli sensitivity inversion already developed in this research lane. See https://proceedings.mlr.press/v206/wang23p.html and https://github.com/HJ-Wg/catoni-confseq.
+Wang & Ramdas's Huber-robust confidence sequences explicitly allow a bounded fraction of arbitrary corruption and are valid at arbitrary stopping times under their stated assumptions. Their official implementation is HJ-Wg/catoni-confseq (GPL-3.0). This experiment does **not** reproduce that algorithm; it stress-tests the simpler Bernoulli sensitivity inversion already developed in this research lane. See https://proceedings.mlr.press/v206/wang23p.html and https://github.com/HJ-Wg/catoni-confseq.
 
 ## Matched protocol
 
@@ -21,7 +21,7 @@ Wang & Ramdas's Huber-robust confidence sequences explicitly allow a bounded fra
 
 ## Core results
 
-Each table cell is unsafe admissions / 100, with unresolved count in parentheses. No run conclusively rejected; the model error is masked toward the model by this particular contaminant.
+Each table cell is `unsafe admissions / 100`, with unresolved count in parentheses. No run conclusively rejected; the model error is masked toward the model by this particular contaminant.
 
 | Actual contamination | Declared 0% | Declared 2.5% | Declared 5% | Declared bound equal to actual |
 |---:|---:|---:|---:|---:|
@@ -40,7 +40,7 @@ Cost reveals the danger of rewarding early stopping without conditioning on vali
 The certificate depends jointly on (1) the sequential statistical construction and (2) the integrity of its assumptions. A sensitivity interval cannot compensate for a bound that is falsely declared. The appropriate system design is an **assumption-carrying certificate**:
 
 1. bind the bound to an independently sourced, versioned measurement/attestation and explicit validity scope;
-2. if the bound is unavailable or its provenance/validity window fails, return refuse_unresolved before inference;
+2. if the bound is unavailable or its provenance/validity window fails, return `refuse_unresolved` before inference;
 3. publish a decision-versus-contamination sensitivity frontier when the bound is merely a scenario, not an attested fact;
 4. never tune the declared bound on the same contaminated sample and subsequently use it as a guarantee.
 
@@ -48,22 +48,16 @@ The result also exposes the availability trade-off: a large honest contamination
 
 ## Literature / comparison discipline
 
-- Wang & Ramdas, Huber-robust confidence sequences, AISTATS 2023. The paper uses robust exponential supermartingales under a known corruption fraction and a known upper bound on a central moment; its guarantee is stronger than our simple Bernoulli sensitivity inversion and is the appropriate implementation baseline for the next phase. https://proceedings.mlr.press/v206/wang23p.html
+- Wang & Ramdas, *Huber-robust confidence sequences*, AISTATS 2023. The paper uses robust exponential supermartingales under a known corruption fraction and a known upper bound on a central moment; its guarantee is stronger than our simple Bernoulli sensitivity inversion and is the appropriate implementation baseline for the next phase. https://proceedings.mlr.press/v206/wang23p.html
 - Official reference implementation: https://github.com/HJ-Wg/catoni-confseq (GPL-3.0; assess license compatibility before incorporating code into another project).
-- Cai & Kandasamy, Constrained Best Arm Identification with Tests for Feasibility, AAAI 2026: related to allocation among performance and feasibility measurements. https://ojs.aaai.org/index.php/AAAI/article/view/39063
-- Jourdan et al., An Anytime Algorithm for Good Arm Identification (APGAI), JMLR 2026. https://www.jmlr.org/papers/v27/24-0680.html
+- Cai & Kandasamy, *Constrained Best Arm Identification with Tests for Feasibility*, AAAI 2026: related to allocation among performance and feasibility measurements. https://ojs.aaai.org/index.php/AAAI/article/view/39063
+- Jourdan et al., *An Anytime Algorithm for Good Arm Identification* (APGAI), JMLR 2026. https://www.jmlr.org/papers/v27/24-0680.html
 
 No published SOTA implementation was executed in this experiment. No SOTA/industry superiority is claimed.
 
 ## Reproduction
 
-```sh
-PYTHONPATH=. python -m unittest -v test_decision_risk_huber_bound_misspecification.py
-PYTHONPATH=. python decision_risk_huber_bound_misspecification.py \
-  --repeats 100 \
-  --actual-rhos 0.10,0.12,0.18 \
-  --claimed-rhos 0.00,0.025,0.05,0.075,0.10,0.12,0.15,0.18,0.20 \
-  --output DECISION_RISK_HUBER_BOUND_MISSPECIFICATION_RESULTS_2026-10-29_100.json
-```
+    PYTHONPATH=. python -m unittest -v test_decision_risk_huber_bound_misspecification.py
+    PYTHONPATH=. python decision_risk_huber_bound_misspecification.py --repeats 100 --actual-rhos 0.10,0.12,0.18 --claimed-rhos 0.00,0.025,0.05,0.075,0.10,0.12,0.15,0.18,0.20 --output DECISION_RISK_HUBER_BOUND_MISSPECIFICATION_RESULTS_2026-10-29_100.json
 
 The local test suite passed 5/5. This is Python research code, not Rust production integration; no remote CI pass is claimed.
