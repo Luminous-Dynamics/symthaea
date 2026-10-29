@@ -20,6 +20,9 @@ enum Commands {
         /// Path to the run-record JSON file.
         #[arg(long)]
         input: PathBuf,
+        /// Path to the frozen suite manifest; its exact bytes must match source.manifest_digest.
+        #[arg(long)]
+        manifest: PathBuf,
     },
     /// Discovery check: flag a new crate that re-implements an existing symthaea-core module.
     /// Fails only on an UNADJUDICATED collision; known ones live in docs/crate-status.toml.
@@ -77,8 +80,8 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::BasaltValidate { input } => {
-            let report = basalt_validate::validate_file(&input)?;
+        Commands::BasaltValidate { input, manifest } => {
+            let report = basalt_validate::validate_file(&input, &manifest)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.valid {
                 anyhow::bail!("BASALT run-record validation failed");
