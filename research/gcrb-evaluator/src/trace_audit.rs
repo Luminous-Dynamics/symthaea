@@ -614,4 +614,16 @@ mod tests {
         let result = audit_trace_bytes(fixture_bytes(), &bytes);
         assert!(result.unwrap_err().contains("duplicate global event_id"));
     }
+
+
+    #[test]
+    fn trace_audit_matches_committed_demo_report_semantically() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let trace = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json");
+        let expected = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-trace-demo-report-v0.1.json");
+        let actual = audit_trace_bytes(fixture, trace).unwrap();
+        let actual_value = serde_json::to_value(actual).unwrap();
+        let expected_value: Value = serde_json::from_slice(expected).unwrap();
+        assert_eq!(actual_value, expected_value);
+    }
 }
