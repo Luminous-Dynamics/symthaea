@@ -453,7 +453,7 @@ pub struct AtomAblationJudgment {
     pub disallowed_changes: Vec<String>,
     pub overuse: bool,
     pub underuse: bool,
-    pub context_tokens_removed: usize,
+    pub context_tokens_saved: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -479,7 +479,7 @@ pub struct AtomAblationScoreSummary {
     pub control_overuse_rate: Option<f64>,
     pub control_underuse_count: usize,
     pub control_underuse_rate: Option<f64>,
-    pub context_tokens_removed_total: usize,
+    pub context_tokens_saved_total: i64,
     pub judgments: Vec<AtomAblationJudgment>,
 }
 
@@ -527,9 +527,6 @@ pub fn score_atom_ablation_jsonl(
         validate_hex_digest("prompt_sha256", &observation.prompt_sha256, 64)?;
         validate_hex_digest("tokenizer_sha256", &observation.tokenizer_sha256, 64)?;
         validate_hex_digest("system_commit_sha", &observation.system_commit_sha, 40)?;
-        if observation.ablated_context_tokens > observation.full_context_tokens {
-            return Err(format!("ablated context tokens exceed full context tokens on line {line_number}"));
-        }
         validate_material_fields(&observation.full_fields, line_number, "full_fields")?;
         validate_material_fields(&observation.ablated_fields, line_number, "ablated_fields")?;
         if !observation_keys.insert((observation.case_id.clone(), observation.evidence_id.clone())) {
@@ -621,6 +618,10 @@ pub fn score_atom_ablation_jsonl(
         let allowed: BTreeSet<_> = target.allowed_change_fields.iter().cloned().collect();
         let missing_required_changes: Vec<_> = required.difference(&actual).cloned().collect();
         let disallowed_changes: Vec<_> = actual.difference(&allowed).cloned().collect();
+        let full_tokens = i64::try_from(observation.full_context_tokens)
+            .map_err(|_| "full_context_tokens exceeds signed receipt range".to_string())?;
+        let ablated_tokens = i64::try_from(observation.ablated_context_tokens)
+            .map_err(|_| "ablated_context_tokens exceeds signed receipt range".to_string())?;
         judgments.push(AtomAblationJudgment {
             case_id: observation.case_id,
             evidence_id: observation.evidence_id,
@@ -630,7 +631,7 @@ pub fn score_atom_ablation_jsonl(
             underuse: !missing_required_changes.is_empty(),
             missing_required_changes,
             disallowed_changes,
-            context_tokens_removed: observation.full_context_tokens - observation.ablated_context_tokens,
+            context_tokens_saved: full_tokens - ablated_tokens,
         });
     }
     judgments.sort_by(|left, right| {
@@ -652,7 +653,7 @@ pub fn score_atom_ablation_jsonl(
     let bound_underuse_count = count_flag("bound", |item| item.underuse);
     let control_overuse_count = count_flag("control", |item| item.overuse);
     let control_underuse_count = count_flag("control", |item| item.underuse);
-    let context_tokens_removed_total = judgments.iter().map(|item| item.context_tokens_removed).sum();
+    let context_tokens_saved_total = judgments.iter().map(|item| item.context_tokens_saved).sum();
 
     Ok(AtomAblationScoreSummary {
         schema_version: "BROCA-MEMORY-ATOM-ABLATION-SCORE-V1".into(),
@@ -676,7 +677,7 @@ pub fn score_atom_ablation_jsonl(
         control_overuse_rate: rate(control_overuse_count, control_count),
         control_underuse_count,
         control_underuse_rate: rate(control_underuse_count, control_count),
-        context_tokens_removed_total,
+        context_tokens_saved_total,
         judgments,
     })
 }
@@ -967,7 +968,7 @@ mod tests {
         assert_eq!(result.control_count, 2);
         assert_eq!(result.control_underuse_count, 0);
         assert_eq!(result.control_overuse_count, 0);
-        assert_eq!(result.context_tokens_removed_total, 41);
+        assert_eq!(result.context_tokens_saved_total, 41);
         assert_eq!(result.ignore_overuse_rate, Some(0.0));
         assert_eq!(result.control_underuse_rate, Some(0.0));
     }
