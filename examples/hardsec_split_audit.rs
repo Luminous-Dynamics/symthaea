@@ -574,7 +574,7 @@ mod tests {
             split_protocol,
             split,
             label,
-);
+            );
         }
 
         fn add_row_with_capture(
@@ -644,7 +644,7 @@ mod tests {
             "program_holdout",
             "train",
             "attack",
-);
+        );
         fixture.add_row(
             "s-train-benign",
             "b",
@@ -655,7 +655,7 @@ mod tests {
             "program_holdout",
             "train",
             "benign",
-);
+        );
         fixture.add_row(
             "s-val-attack",
             "c",
@@ -666,7 +666,7 @@ mod tests {
             "program_holdout",
             "validation",
             "attack",
-);
+        );
         fixture.add_row(
             "s-val-benign",
             "d",
@@ -677,7 +677,7 @@ mod tests {
             "program_holdout",
             "validation",
             "benign",
-);
+        );
         fixture.add_row(
             "s-test-attack",
             "e",
@@ -688,7 +688,7 @@ mod tests {
             "program_holdout",
             "test",
             "attack",
-);
+        );
         fixture.add_row(
             "s-test-benign",
             "f",
@@ -699,7 +699,7 @@ mod tests {
             "program_holdout",
             "test",
             "benign",
-);
+        );
     }
 
     impl Drop for Fixture {
@@ -738,7 +738,7 @@ mod tests {
             "program_holdout",
             "train",
             "attack",
-);
+        );
         fixture.add_row(
             "s-train-2",
             "a",
@@ -749,7 +749,7 @@ mod tests {
             "program_holdout",
             "train",
             "attack",
-);
+        );
         fixture.add_row(
             "s-train-benign",
             "b",
@@ -760,7 +760,7 @@ mod tests {
             "program_holdout",
             "train",
             "benign",
-);
+        );
         fixture.add_row(
             "s-val-attack",
             "c",
@@ -771,7 +771,7 @@ mod tests {
             "program_holdout",
             "validation",
             "attack",
-);
+        );
         fixture.add_row(
             "s-val-benign",
             "d",
@@ -782,7 +782,7 @@ mod tests {
             "program_holdout",
             "validation",
             "benign",
-);
+        );
         fixture.add_row(
             "s-test-attack",
             "e",
@@ -793,7 +793,7 @@ mod tests {
             "program_holdout",
             "test",
             "attack",
-);
+        );
         fixture.add_row(
             "s-test-benign",
             "f",
@@ -804,7 +804,7 @@ mod tests {
             "program_holdout",
             "test",
             "benign",
-);
+        );
         let summary = fixture.audit().expect("repeated windows should pass");
         assert_eq!(summary.samples, 7);
         assert_eq!(summary.artifacts, 6);
@@ -831,7 +831,7 @@ mod tests {
             "attack_family_holdout",
             "train",
             "attack",
-);
+        );
         fixture.add_row(
             "s-val-attack",
             "b",
@@ -842,7 +842,7 @@ mod tests {
             "attack_family_holdout",
             "validation",
             "attack",
-);
+        );
         fixture.add_row(
             "s-test-attack",
             "c",
@@ -853,7 +853,7 @@ mod tests {
             "attack_family_holdout",
             "test",
             "attack",
-);
+        );
         fixture.add_row(
             "s-train-benign",
             "d",
@@ -864,7 +864,7 @@ mod tests {
             "attack_family_holdout",
             "train",
             "benign",
-);
+        );
         fixture.add_row(
             "s-val-benign",
             "e",
@@ -875,7 +875,7 @@ mod tests {
             "attack_family_holdout",
             "validation",
             "benign",
-);
+        );
         fixture.add_row(
             "s-test-benign",
             "f",
@@ -886,7 +886,7 @@ mod tests {
             "attack_family_holdout",
             "test",
             "benign",
-);
+        );
         assert_eq!(fixture.audit().expect("valid family holdout").samples, 6);
     }
 
@@ -905,7 +905,7 @@ mod tests {
             "capture_config_holdout",
             "train",
             "attack",
-);
+        );
         fixture.add_row_with_capture(
             "s-train-benign",
             "b",
@@ -918,7 +918,7 @@ mod tests {
             "capture_config_holdout",
             "train",
             "benign",
-);
+        );
         fixture.add_row_with_capture(
             "s-val-attack",
             "c",
@@ -931,7 +931,7 @@ mod tests {
             "capture_config_holdout",
             "validation",
             "attack",
-);
+        );
         fixture.add_row_with_capture(
             "s-val-benign",
             "d",
@@ -944,7 +944,7 @@ mod tests {
             "capture_config_holdout",
             "validation",
             "benign",
-);
+        );
         fixture.add_row_with_capture(
             "s-test-attack",
             "e",
@@ -957,7 +957,7 @@ mod tests {
             "capture_config_holdout",
             "test",
             "attack",
-);
+        );
         fixture.add_row_with_capture(
             "s-test-benign",
             "f",
@@ -970,7 +970,7 @@ mod tests {
             "capture_config_holdout",
             "test",
             "benign",
-);
+        );
         assert!(fixture.audit().unwrap_err().contains("crosses splits"));
     }
 
