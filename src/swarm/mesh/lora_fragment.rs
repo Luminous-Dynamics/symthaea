@@ -168,14 +168,28 @@ impl LoRaFragment {
         let flags = buf[5];
         let checksum = u16::from_le_bytes([buf[6], buf[7]]);
 
-        // Sanity checks
-        if total_fragments == 0 || fragment_index >= total_fragments {
+        // Fail closed on unknown flags. This also prevents versioned frames
+        // from being ambiguously interpreted as legacy 8-byte-header frames.
+        if flags & !FLAG_FEC != 0 {
             return None;
         }
-        if payload_len as usize > PAYLOAD_SIZE {
+
+        // The protocol always has at least one data fragment plus parity.
+        if total_fragments < 2 || fragment_index >= total_fragments {
             return None;
         }
-        if buf.len() < HEADER_SIZE + payload_len as usize {
+        let is_final_index = fragment_index == total_fragments - 1;
+        if (flags & FLAG_FEC != 0) != is_final_index {
+            return None;
+        }
+        if payload_len == 0 || payload_len as usize > PAYLOAD_SIZE {
+            return None;
+        }
+        if is_final_index && payload_len as usize != PAYLOAD_SIZE {
+            return None;
+        }
+        let expected_wire_len = HEADER_SIZE.checked_add(payload_len as usize)?;
+        if buf.len() != expected_wire_len {
             return None;
         }
 
@@ -330,6 +344,10 @@ pub struct FragmentAssembler {
     fragments: Vec<Option<[u8; PAYLOAD_SIZE]>>,
     payload_lens: Vec<u8>,
     fec: Option<[u8; PAYLOAD_SIZE]>,
+    /// Whether the caller guarantees expected_payload_size is exact enough to
+    /// reconstruct a missing final data fragment. The legacy MeshReceiver
+    /// disables this because compressed/enveloped payload lengths vary.
+    allow_final_fec_recovery: bool,
 }
 
 impl FragmentAssembler {
@@ -337,7 +355,9 @@ impl FragmentAssembler {
     ///
     /// - `thought_id`: must match incoming fragments
     /// - `total_fragments`: data_count + 1 (from any received fragment header)
-    /// - `expected_payload_size`: total original payload size (e.g., 2048 for BinaryHV)
+    /// - `expected_payload_size`: exact original size, required to reconstruct a lost final
+    ///   data fragment. If the encoded envelope can vary (e.g. compression), use
+    ///   `new_without_final_fragment_recovery` until the wire format carries the exact length.
     pub fn new(thought_id: u16, total_fragments: u8, expected_payload_size: usize) -> Self {
         let data_count = total_fragments.saturating_sub(1);
         Self {
@@ -349,30 +369,105 @@ impl FragmentAssembler {
             fragments: vec![None; data_count as usize],
             payload_lens: vec![0; data_count as usize],
             fec: None,
+            allow_final_fec_recovery: true,
         }
     }
 
-    /// Feed a received fragment. Returns `true` when the payload is reconstructable.
-    pub fn feed(&mut self, frag: &LoRaFragment) -> bool {
-        if frag.thought_id != self.thought_id {
+    /// Create a legacy receiver assembler when the exact encoded message length
+    /// is not carried on the wire. Single-loss recovery still works for a
+    /// missing non-final data fragment, but recovery of the final data fragment
+    /// is disabled because its original length cannot be inferred safely.
+    pub fn new_without_final_fragment_recovery(
+        thought_id: u16,
+        total_fragments: u8,
+        nominal_payload_size: usize,
+    ) -> Self {
+        let mut assembler = Self::new(thought_id, total_fragments, nominal_payload_size);
+        assembler.allow_final_fec_recovery = false;
+        assembler
+    }
+
+    fn layout_is_valid(&self) -> bool {
+        if self.expected_payload_size == 0
+            || self.total_fragments < 2
+            || self.data_count == 0
+            || self.data_count > 254
+            || self.total_fragments as usize != self.data_count as usize + 1
+        {
             return false;
         }
-        if frag.fragment_index >= self.total_fragments {
+
+        if !self.allow_final_fec_recovery {
+            // Legacy receiver mode: exact encoded length is not carried on wire.
+            return true;
+        }
+
+        // Exact-size mode: expected bytes and shard count must agree.
+        let Some(rounded_size) = self.expected_payload_size.checked_add(PAYLOAD_SIZE - 1)
+        else {
+            return false;
+        };
+        let expected_data_count = rounded_size / PAYLOAD_SIZE;
+        expected_data_count == self.data_count as usize && expected_data_count <= 254
+    }
+
+    /// Feed a received fragment. Returns true when the payload is reconstructable.
+    /// Invalid shape/metadata is rejected before any assembler state advances.
+    pub fn feed(&mut self, frag: &LoRaFragment) -> bool {
+        if !self.layout_is_valid()
+            || frag.thought_id != self.thought_id
+            || frag.total_fragments != self.total_fragments
+            || frag.flags & !FLAG_FEC != 0
+            || frag.payload_len == 0
+            || frag.payload_len as usize > PAYLOAD_SIZE
+            || frag.compute_checksum() != frag.checksum
+        {
             return false;
         }
 
         let idx = frag.fragment_index as usize;
+        if idx >= self.received.len() {
+            return false;
+        }
+        if frag.is_fec() != (idx == self.data_count as usize) {
+            return false;
+        }
 
-        // Duplicate — ignore but report current status
+        // Parity and non-final data shards are always full-size.
+        if frag.is_fec() || idx + 1 < self.data_count as usize {
+            if frag.payload_len as usize != PAYLOAD_SIZE {
+                return false;
+            }
+        } else if self.allow_final_fec_recovery {
+            // In exact-size mode the final shard length is known before state
+            // advances; in legacy compatibility mode it is learned from wire.
+            let Some(prefix_len) =
+                (self.data_count as usize - 1).checked_mul(PAYLOAD_SIZE)
+            else {
+                return false;
+            };
+            let Some(expected_final_len) = self.expected_payload_size.checked_sub(prefix_len)
+            else {
+                return false;
+            };
+            if expected_final_len == 0
+                || expected_final_len > PAYLOAD_SIZE
+                || frag.payload_len as usize != expected_final_len
+            {
+                return false;
+            }
+        }
+
+        // Duplicate — ignore but report current status.
         if self.received[idx] {
             return self.is_complete();
         }
 
         self.received[idx] = true;
-
         if frag.is_fec() {
             self.fec = Some(frag.payload);
         } else {
+            // Index/FEC consistency above ensures idx is a valid data slot.
             self.fragments[idx] = Some(frag.payload);
             self.payload_lens[idx] = frag.payload_len;
         }
@@ -382,22 +477,47 @@ impl FragmentAssembler {
 
     /// Whether the payload can be fully reconstructed.
     pub fn is_complete(&self) -> bool {
-        let data_received = self.received[..self.data_count as usize]
-            .iter()
-            .filter(|&&r| r)
-            .count();
+        if !self.layout_is_valid() {
+            return false;
+        }
         let data_count = self.data_count as usize;
-        let has_fec = self.fec.is_some();
+        let data_received = self.received[..data_count]
+            .iter()
+            .filter(|&&received| received)
+            .count();
 
-        // All data fragments present
+        // All data fragments present; their observed lengths are authoritative.
         if data_received == data_count {
             return true;
         }
-        // Exactly one missing + FEC available → recoverable
-        if data_received == data_count - 1 && has_fec {
-            return true;
+        if data_received + 1 != data_count || self.fec.is_none() {
+            return false;
         }
-        false
+
+        // A missing non-final shard has a known full length. A missing final
+        // shard can only be trimmed exactly when the caller guarantees the
+        // expected payload size is authoritative.
+        let Some(missing) = self.received[..data_count]
+            .iter()
+            .position(|&received| !received)
+        else {
+            return false;
+        };
+        if missing + 1 == data_count {
+            if !self.allow_final_fec_recovery {
+                return false;
+            }
+            let Some(prefix_len) = (data_count - 1).checked_mul(PAYLOAD_SIZE) else {
+                return false;
+            };
+            let Some(last_len) = self.expected_payload_size.checked_sub(prefix_len) else {
+                return false;
+            };
+            if last_len == 0 || last_len > PAYLOAD_SIZE {
+                return false;
+            }
+        }
+        true
     }
 
     /// Number of fragments not yet received.
@@ -428,64 +548,68 @@ impl FragmentAssembler {
                 .any(|&r| !r)
     }
 
-    /// Reconstruct the original payload. Returns `None` if insufficient fragments.
+    /// Reconstruct the original payload. Returns None on insufficient or inconsistent input.
     pub fn assemble(&self) -> Option<Vec<u8>> {
         if !self.is_complete() {
             return None;
         }
 
         let data_count = self.data_count as usize;
+        let missing_idx = self.received[..data_count]
+            .iter()
+            .position(|&received| !received);
 
-        // Find the missing data fragment index (if any)
-        let missing_idx = self.received[..data_count].iter().position(|&r| !r);
-
-        // Recover the missing fragment via XOR
-        let recovered: Option<[u8; PAYLOAD_SIZE]> = missing_idx.map(|missing| {
-            let fec = self
-                .fec
-                .as_ref()
-                .expect("FEC required when data fragment missing");
-            let mut recovered = *fec;
+        let recovered = if let Some(missing) = missing_idx {
+            let mut recovered = *self.fec.as_ref()?;
             for i in 0..data_count {
-                if i != missing {
-                    let frag = self.fragments[i].as_ref().expect("data fragment present");
-                    for (r, &f) in recovered.iter_mut().zip(frag.iter()) {
-                        *r ^= f;
-                    }
+                if i == missing {
+                    continue;
+                }
+                let frag = self.fragments.get(i)?.as_ref()?;
+                for (dst, &src) in recovered.iter_mut().zip(frag.iter()) {
+                    *dst ^= src;
                 }
             }
-            recovered
-        });
+            Some(recovered)
+        } else {
+            None
+        };
 
-        // Assemble the full payload
-        let mut payload = Vec::with_capacity(self.expected_payload_size);
+        // Bound allocation by the maximum bytes representable by these shards,
+        // even if a caller supplied an invalidly large nominal payload size.
+        let max_payload_size = data_count.checked_mul(PAYLOAD_SIZE)?;
+        let mut payload =
+            Vec::with_capacity(self.expected_payload_size.min(max_payload_size));
         for i in 0..data_count {
-            let frag_data = if Some(i) == missing_idx {
-                recovered
-                    .as_ref()
-                    .expect("FEC recovery must produce data for missing fragment")
+            let frag_data: &[u8; PAYLOAD_SIZE] = if Some(i) == missing_idx {
+                recovered.as_ref()?
             } else {
-                self.fragments[i]
-                    .as_ref()
-                    .expect("non-missing fragment must be present")
+                self.fragments.get(i)?.as_ref()?
             };
 
             let len = if Some(i) == missing_idx {
-                // Recovered fragment: compute its length from the expected total
-                if i < data_count - 1 {
+                if i + 1 < data_count {
                     PAYLOAD_SIZE
                 } else {
-                    // Last data fragment — infer from expected payload size
-                    self.expected_payload_size - (data_count - 1) * PAYLOAD_SIZE
+                    let prefix_len = (data_count - 1).checked_mul(PAYLOAD_SIZE)?;
+                    self.expected_payload_size.checked_sub(prefix_len)?
                 }
             } else {
-                self.payload_lens[i] as usize
+                usize::from(*self.payload_lens.get(i)?)
             };
-
+            if len == 0 || len > PAYLOAD_SIZE {
+                return None;
+            }
             payload.extend_from_slice(&frag_data[..len]);
         }
 
-        Some(payload)
+        if self.allow_final_fec_recovery {
+            (payload.len() == self.expected_payload_size).then_some(payload)
+        } else {
+            // The legacy wire format does not carry exact encoded length. Use
+            // observed shard lengths, but never infer a lost final shard's tail.
+            Some(payload)
+        }
     }
 }
 
@@ -749,9 +873,129 @@ mod tests {
     }
 
     #[test]
-    fn truncated_buffer_rejected() {
+    fn truncated_and_trailing_wire_bytes_rejected() {
         assert!(LoRaFragment::from_bytes(&[0; 4]).is_none());
         assert!(LoRaFragment::from_bytes(&[]).is_none());
+
+        let frags = fragment(123, &[0x1a, 0x2b, 0x3c]);
+        let mut wire = [0u8; LORA_MTU];
+        let len = frags[0].to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len - 1]).is_none());
+
+        let mut with_trailing = wire[..len].to_vec();
+        with_trailing.push(0);
+        assert!(LoRaFragment::from_bytes(&with_trailing).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_fec_flag_on_nonfinal_index_with_valid_checksum() {
+        let data = vec![0x5a; PAYLOAD_SIZE * 2 + 7];
+        let mut malformed = fragment(7, &data)[0].clone();
+        malformed.flags |= FLAG_FEC;
+        malformed.checksum = malformed.compute_checksum();
+
+        let mut wire = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len]).is_none());
+    }
+
+    #[test]
+    fn parser_rejects_final_fragment_without_fec_with_valid_checksum() {
+        let data = vec![0x6b; PAYLOAD_SIZE * 2 + 7];
+        let mut malformed = fragment(8, &data).pop().unwrap();
+        malformed.flags &= !FLAG_FEC;
+        malformed.checksum = malformed.compute_checksum();
+
+        let mut wire = [0u8; LORA_MTU];
+        let len = malformed.to_bytes(&mut wire);
+        assert!(LoRaFragment::from_bytes(&wire[..len]).is_none());
+    }
+
+    #[test]
+    fn assembler_rejects_mismatched_count_without_advancing_state() {
+        let data = vec![0x7c; 2048];
+        let frags = fragment(9, &data);
+        let mut assembler = FragmentAssembler::new(9, frags.len() as u8, data.len());
+        let mut malformed = frags[0].clone();
+        malformed.total_fragments -= 1;
+        malformed.checksum = malformed.compute_checksum();
+
+        assert!(!assembler.feed(&malformed));
+        assert!(!assembler.has_fragment(malformed.fragment_index));
+        assert_eq!(assembler.received_data_count(), 0);
+
+        let mut malformed_fec = frags[0].clone();
+        malformed_fec.flags |= FLAG_FEC;
+        malformed_fec.checksum = malformed_fec.compute_checksum();
+        assert!(!assembler.feed(&malformed_fec));
+        assert!(!assembler.has_fragment(malformed_fec.fragment_index));
+        assert_eq!(assembler.received_data_count(), 0);
+
+        for frag in &frags {
+            assembler.feed(frag);
+        }
+        assert_eq!(assembler.assemble().as_deref(), Some(data.as_slice()));
+    }
+
+    #[test]
+    fn invalid_final_length_inference_fails_closed_without_panicking() {
+        let data = vec![0x8d; 2048];
+        let frags = fragment(10, &data);
+
+        // Exact-size mode rejects a payload-size/count mismatch before state advances.
+        let mut wrong_exact_size = FragmentAssembler::new(10, frags.len() as u8, 100);
+        for frag in &frags {
+            assert!(!wrong_exact_size.feed(frag));
+        }
+        assert!(!wrong_exact_size.is_complete());
+        assert!(wrong_exact_size.assemble().is_none());
+
+        // Legacy compatibility mode relies on observed lengths when every data
+        // shard arrives, because compressed/enveloped payload sizes may differ.
+        let mut all_data =
+            FragmentAssembler::new_without_final_fragment_recovery(10, frags.len() as u8, 100);
+        for frag in &frags {
+            all_data.feed(frag);
+        }
+        assert!(all_data.is_complete());
+        assert_eq!(all_data.assemble().as_deref(), Some(data.as_slice()));
+
+        // Even a nonsensical nominal hint cannot trigger an unbounded allocation;
+        // allocation is capped by the representable shard layout.
+        let mut huge_nominal = FragmentAssembler::new_without_final_fragment_recovery(
+            10,
+            frags.len() as u8,
+            usize::MAX,
+        );
+        for frag in &frags {
+            huge_nominal.feed(frag);
+        }
+        assert_eq!(huge_nominal.assemble().as_deref(), Some(data.as_slice()));
+
+        // If the final data shard is missing, compatibility mode cannot safely
+        // infer the encoded tail length from a nominal packet-size hint.
+        let mut missing_final = FragmentAssembler::new_without_final_fragment_recovery(
+            10,
+            frags.len() as u8,
+            100,
+        );
+        for (index, frag) in frags.iter().enumerate() {
+            if index != frags.len() - 2 {
+                missing_final.feed(frag);
+            }
+        }
+        assert!(!missing_final.is_complete());
+        assert!(missing_final.assemble().is_none());
+
+        let zero_data_count = FragmentAssembler::new(10, 1, 2048);
+        assert!(!zero_data_count.is_complete());
+        assert!(zero_data_count.assemble().is_none());
+
+        // Checked size arithmetic must reject oversized exact-size metadata
+        // rather than wrapping or allocating based on the caller's size.
+        let overflow_size = FragmentAssembler::new(10, 11, usize::MAX);
+        assert!(!overflow_size.is_complete());
+        assert!(overflow_size.assemble().is_none());
     }
 
     // -- Wrong thought_id rejected --

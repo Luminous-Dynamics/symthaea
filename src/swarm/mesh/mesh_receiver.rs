@@ -17,7 +17,7 @@
 //! - **Peer discovery**: Learns about peers from received data.
 //! - **Telemetry**: Fragment loss rates, FEC recovery stats, peer visibility.
 
-use super::{FragmentAssembler, LoRaFragment, WISDOM_PACKET_SIZE, WisdomPacket};
+use super::{FragmentAssembler, LoRaFragment, PAYLOAD_SIZE, WISDOM_PACKET_SIZE, WisdomPacket};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -74,6 +74,9 @@ pub struct ReceiverStats {
     pub fragments_received: u64,
     /// Fragments rejected by CRC-16 validation (corrupted in transit).
     pub fragments_corrupt: u64,
+    /// Valid-CRC fragments rejected because the advertised shard count exceeds the
+    /// configured encoded-message size budget.
+    pub fragments_oversize: u64,
     /// Duplicate fragments (same position already received, ignored).
     pub fragments_duplicate: u64,
     /// Whole packets received (B.A.T.M.A.N./Yggdrasil, no fragmentation).
@@ -140,8 +143,11 @@ pub struct MeshReceiver {
     peers: HashMap<[u8; 8], MeshPeer>,
     /// Timeout for incomplete assemblies before expiry.
     timeout: Duration,
-    /// Expected payload size for WisdomPacket reassembly.
+    /// Expected decoded payload size for WisdomPacket reassembly (nominal for legacy envelopes).
     expected_payload_size: usize,
+    /// Maximum allowed encoded bytes for a fragmented envelope before state allocation.
+    /// Defaults to WISDOM_PACKET_SIZE plus 30 bytes for compression and optional versioned AEAD.
+    max_encoded_payload_size: usize,
     /// Maximum concurrent pending assemblies (prevents memory exhaustion).
     max_pending: usize,
     /// Maximum recently-completed keys to remember (ring buffer).
@@ -167,6 +173,7 @@ impl MeshReceiver {
             peers: HashMap::new(),
             timeout: Duration::from_secs(30),
             expected_payload_size: WISDOM_PACKET_SIZE,
+            max_encoded_payload_size: WISDOM_PACKET_SIZE + 30,
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),
@@ -215,6 +222,16 @@ impl MeshReceiver {
     /// Set the expected payload size (default: [`WISDOM_PACKET_SIZE`]).
     pub fn with_expected_payload_size(mut self, size: usize) -> Self {
         self.expected_payload_size = size;
+        self
+    }
+
+    /// Set the maximum accepted encoded envelope length before any assembly state is allocated.
+    ///
+    /// The default is WISDOM_PACKET_SIZE + 30 for one compression byte, an optional key-version byte,
+    /// a 12-byte nonce and a 16-byte authentication tag.
+    /// This is an independent admission limit from the nominal decoded payload size.
+    pub fn with_max_encoded_payload_size(mut self, size: usize) -> Self {
+        self.max_encoded_payload_size = size;
         self
     }
 
@@ -287,6 +304,25 @@ impl MeshReceiver {
             }
         }
 
+        // Bound peer-controlled fragment-count metadata before creating an assembler.
+        // Legacy headers do not carry exact encoded length, so use the configured maximum
+        // envelope size as an upper bound and reject impossible counts before allocation.
+        let Some(rounded_max_size) = self
+            .max_encoded_payload_size
+            .checked_add(PAYLOAD_SIZE - 1)
+        else {
+            self.stats.fragments_oversize += 1;
+            return None;
+        };
+        let max_data_fragments = rounded_max_size / PAYLOAD_SIZE;
+        let max_total_fragments = max_data_fragments.saturating_add(1).min(255);
+        if self.max_encoded_payload_size == 0
+            || usize::from(frag.total_fragments) > max_total_fragments
+        {
+            self.stats.fragments_oversize += 1;
+            return None;
+        }
+
         self.stats.fragments_received += 1;
         let now = Instant::now();
 
@@ -322,7 +358,10 @@ impl MeshReceiver {
 
         // Get or create the assembler for this stream
         let assembly = self.pending.entry(key).or_insert_with(|| PendingAssembly {
-            assembler: FragmentAssembler::new(
+            // Legacy frames do not carry exact encoded length. The configured
+            // payload size is nominal for compressed envelopes, so never infer
+            // a lost final shard's true length from it.
+            assembler: FragmentAssembler::new_without_final_fragment_recovery(
                 frag.thought_id,
                 frag.total_fragments,
                 self.expected_payload_size,
@@ -334,9 +373,8 @@ impl MeshReceiver {
             key_fingerprint: None,
         });
 
-        assembly.last_fragment_at = now;
-
-        // Track duplicates before feeding
+        // Track duplicates before feeding. A duplicate does not count as
+        // progress and must not extend the inactivity deadline.
         if assembly.assembler.has_fragment(frag.fragment_index) {
             self.stats.fragments_duplicate += 1;
             return None;
@@ -359,7 +397,6 @@ impl MeshReceiver {
                 return None;
             }
         }
-        assembly.last_fragment_index = Some(frag.fragment_index);
 
         // Item 12: Reject fragments if encryption key changed mid-stream
         #[cfg(feature = "mesh-encryption")]
@@ -377,6 +414,13 @@ impl MeshReceiver {
         }
 
         let is_complete = assembly.assembler.feed(&frag);
+
+        // Only an actually admitted, previously unseen fragment is progress.
+        // Malformed/rejected frames and duplicates must not keep stale state alive.
+        if assembly.assembler.has_fragment(frag.fragment_index) {
+            assembly.last_fragment_at = now;
+            assembly.last_fragment_index = Some(frag.fragment_index);
+        }
 
         if is_complete {
             // Extract the completed assembly
@@ -593,7 +637,7 @@ impl Default for MeshReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::swarm::mesh::{LORA_MTU, MeshUrgency, PayloadType};
+    use crate::swarm::mesh::{crc16_ccitt, LORA_MTU, MeshUrgency, PayloadType};
     use symthaea_core::hdc::BinaryHV;
 
     fn test_hv(seed: u8) -> BinaryHV {
@@ -628,6 +672,16 @@ mod tests {
                 buf[..len].to_vec()
             })
             .collect()
+    }
+
+    /// Recompute the legacy fragment CRC after deliberately mutating metadata.
+    fn recompute_wire_crc(raw: &mut [u8]) {
+        let mut checksum_input = Vec::with_capacity(raw.len());
+        checksum_input.extend_from_slice(&raw[0..2]);
+        checksum_input.extend_from_slice(&raw[2..6]);
+        checksum_input.extend_from_slice(&raw[8..]);
+        let checksum = crc16_ccitt(&checksum_input);
+        raw[6..8].copy_from_slice(&checksum.to_le_bytes());
     }
 
     const PEER_A: [u8; 8] = [0xAA; 8];
@@ -774,6 +828,34 @@ mod tests {
         assert_eq!(receiver.stats().packets_recovered, 1);
     }
 
+    #[test]
+    fn receiver_does_not_recover_final_shard_without_exact_encoded_length() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(11, PEER_A, 0x93);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        let final_data_index = frags.len() - 2;
+
+        for (index, raw) in wire.iter().enumerate() {
+            if index != final_data_index {
+                receiver.receive_fragment(PEER_A, raw);
+            }
+        }
+
+        // The fixed nominal WisdomPacket size is not an authenticated length
+        // bound for a compressed/enveloped datagram. Do not guess the final
+        // recovered tail length from it.
+        assert_eq!(receiver.stats().packets_complete, 0);
+        assert_eq!(receiver.stats().packets_recovered, 0);
+        assert_eq!(receiver.pending_count(), 1);
+
+        // A later actual final data shard makes exact assembly possible again.
+        let recovered = receiver.receive_fragment(PEER_A, &wire[final_data_index]);
+        assert!(recovered.is_some());
+        assert_eq!(receiver.stats().packets_complete, 1);
+        assert_eq!(receiver.pending_count(), 0);
+    }
+
     // -- Duplicate fragments --
 
     #[test]
@@ -796,6 +878,83 @@ mod tests {
         // The 11 duplicates from the second pass go to NEW assemblers
         // (old one was removed), but CRC pass so they're not "corrupt".
         // They create a new assembly that never completes.
+    }
+
+    #[test]
+    fn duplicate_fragment_does_not_refresh_assembly_inactivity() {
+        let mut receiver = MeshReceiver::new().with_timeout(Duration::from_secs(60));
+        let packet = test_packet(1, PEER_A, 0x91);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let key = StreamKey {
+            source: PEER_A,
+            thought_id: packet.thought_id(),
+        };
+        // Backdate deterministically instead of depending on sleep timing.
+        let before = Instant::now() - Duration::from_secs(1);
+        receiver.pending.get_mut(&key).unwrap().last_fragment_at = before;
+
+        // A duplicate must not count as new progress or move the deadline.
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let after = receiver
+            .pending
+            .get(&key)
+            .expect("duplicate must not remove the pending assembly")
+            .last_fragment_at;
+        assert_eq!(after, before);
+        assert_eq!(receiver.stats().fragments_duplicate, 1);
+    }
+
+    #[test]
+    fn rejected_metadata_does_not_refresh_assembly_inactivity_or_progress_index() {
+        let mut receiver = MeshReceiver::new().with_timeout(Duration::from_secs(60));
+        let packet = test_packet(2, PEER_A, 0x92);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+        receiver.receive_fragment(PEER_A, &wire[0]);
+
+        let key = StreamKey {
+            source: PEER_A,
+            thought_id: packet.thought_id(),
+        };
+        let assembly = receiver.pending.get(&key).unwrap();
+        assert_eq!(assembly.last_fragment_index, Some(0));
+
+        // Fragment 1 still looks like a valid non-final data fragment, but its
+        // advertised total count conflicts with the already-open assembly.
+        let mut malformed = wire[1].clone();
+        malformed[3] = malformed[3].saturating_add(1);
+        recompute_wire_crc(&mut malformed);
+
+        // Backdate to make any accidental refresh visible deterministically.
+        let before = Instant::now() - Duration::from_secs(1);
+        receiver.pending.get_mut(&key).unwrap().last_fragment_at = before;
+        assert!(receiver.receive_fragment(PEER_A, &malformed).is_none());
+
+        let after = receiver.pending.get(&key).unwrap();
+        assert_eq!(after.last_fragment_at, before);
+        assert_eq!(after.last_fragment_index, Some(0));
+        assert_eq!(receiver.pending_count(), 1);
+    }
+
+    #[test]
+    fn oversized_fragment_count_is_rejected_before_pending_allocation() {
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(3, PEER_A, 0x94);
+        let wire = to_wire(&packet.fragment());
+        let mut oversized = wire[0].clone();
+        oversized[3] = u8::MAX;
+        recompute_wire_crc(&mut oversized);
+
+        // This is individually valid under the legacy frame syntax and has a
+        // valid CRC, but 255 total shards exceed the configured encoded-size cap.
+        assert!(receiver.receive_fragment(PEER_A, &oversized).is_none());
+        assert_eq!(receiver.pending_count(), 0);
+        assert_eq!(receiver.stats().fragments_oversize, 1);
+        assert_eq!(receiver.stats().fragments_received, 0);
     }
 
     // -- Timeout expiry --
