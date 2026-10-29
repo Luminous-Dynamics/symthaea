@@ -858,6 +858,8 @@ jobs:
           jq empty research/science-bench-refresh/schema/paired-outcome-analysis-report.schema.json
           jq empty research/science-bench-refresh/schema/evidence-behavior-contract-plan.schema.json
           jq empty research/science-bench-refresh/schema/evidence-behavior-contract-report.schema.json
+          jq empty research/science-bench-refresh/schema/judge-robustness-plan.schema.json
+          jq empty research/science-bench-refresh/schema/judge-robustness-report.schema.json
           cargo test --locked --manifest-path "$cargo_manifest" paired_outcome_analysis -- --nocapture
 
           # The analysis artifact is created first, hashed into a new plan, then
@@ -998,4 +1000,23 @@ jobs:
             /tmp/sbr-evidence-behavior-contracts
           jq -e '.synthetic_positive_control == true and .planned_cases == 7 and .pass_count == 4 and .violation_count == 2 and .not_evaluable_count == 1 and .repeat_verification_deterministic == true and .tampered_plan_rejected == true and .wrong_revision_rejected == true and .duplicate_and_missing_records_rejected == true and .tampered_report_rejected == true and .runner_execution_proven == false and .external_anchor_required == true and .empirical_system_result == false' \
             /tmp/sbr-evidence-behavior-contracts/summary.json >/dev/null
+
+      - name: Judge robustness schema and non-scoring controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          plan_fixture="research/science-bench-refresh/fixtures/judge-robustness-plan.example.json"
+          report_fixture="research/science-bench-refresh/fixtures/judge-robustness-report.example.json"
+          jq empty "$plan_fixture" "$report_fixture"
+          jq -e '.purpose == "example_only" and .judge_source_revision == "NOT_IMPLEMENTED_YET" and .plan_commitment_sha256 == ("0" * 64) and (.cases | length == 6) and ([.cases[].case_id] | unique | length == 6)' "$plan_fixture" >/dev/null
+          jq -e --slurpfile plan "$plan_fixture" '([.cases[].case_id] | sort) == ([$plan[0].cases[].case_id] | sort) and ([.cases[] | select((.observations | length) != 4)] | length) == 0' "$report_fixture" >/dev/null
+
+      - name: Judge robustness end-to-end CLI controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/science-bench-refresh/tools/judge_robustness_test_vectors.py \
+            /tmp/sbr-judge-robustness
+          jq -e '.synthetic_positive_control == true and .planned_cases == 6 and .planned_observations == 36 and .repeat_verification_deterministic == true and .repeatability_control_passed == true and .position_swap_identity_control_passed == true and .confidence_style_bias_detected == true and .semantic_sensitivity_control_passed == true and .tampered_plan_rejected == true and .wrong_revision_rejected == true and .duplicate_and_missing_observations_rejected == true and .wrong_input_digest_rejected == true and .tampered_report_rejected == true and .runner_execution_proven == false and .external_anchor_required == true and .empirical_judge_result == false' \
+            /tmp/sbr-judge-robustness/summary.json >/dev/null
 
