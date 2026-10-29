@@ -102,7 +102,7 @@ fn read_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String>
     if task_set.schema != TASK_SET_SCHEMA {
         return Err(format!("{label} task-set schema must be {TASK_SET_SCHEMA}"));
     }
-    if task_set.generation_id.trim().is_empty() {
+    if task_set.generation_id.trim().is_empty() || task_set.generation_id.len() > 128 {
         return Err(format!("{label} generation_id must not be empty"));
     }
     if task_set.tasks.is_empty() {
@@ -110,11 +110,17 @@ fn read_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String>
     }
     let mut task_ids = BTreeSet::new();
     for task in &task_set.tasks {
-        if task.task_id.trim().is_empty() {
+        if task.task_id.trim().is_empty() || task.task_id.len() > 256 {
             return Err(format!("{label} task set contains an empty task ID"));
         }
+        if task.family_id.trim().is_empty() || task.family_id.len() > 128 {
+            return Err(format!("{label} task {} has invalid family_id", task.task_id));
+        }
         if !task_ids.insert(task.task_id.as_str()) {
-            return Err(format!("{label} task set contains duplicate task ID {}", task.task_id));
+            return Err(format!(
+                "{label} task set contains duplicate task ID {}",
+                task.task_id
+            ));
         }
         if !task.policy_input.is_object() || !task.evaluator_only.is_object() {
             return Err(format!(
@@ -133,18 +139,24 @@ fn read_and_validate_ledger(
 ) -> Result<(TaskSetArtifactV1, LineageLedgerV1), String> {
     let task_set = read_task_set(task_set_bytes, label)?;
     let ledger: LineageLedgerV1 = serde_json::from_slice(ledger_bytes)
-        .map_err(|error| format!("{label} lineage ledger does not match strict v1 shape: {error}"))?;
+        .map_err(|error| {
+            format!("{label} lineage ledger does not match strict v1 shape: {error}")
+        })?;
 
     if ledger.schema != LEDGER_SCHEMA {
         return Err(format!("{label} lineage-ledger schema must be {LEDGER_SCHEMA}"));
     }
     if ledger.generation_id != task_set.generation_id {
-        return Err(format!("{label} lineage ledger generation_id does not match the task set"));
+        return Err(format!(
+            "{label} lineage ledger generation_id does not match the task set"
+        ));
     }
     validate_split_label(&ledger.split_label)
         .map_err(|error| format!("{label} lineage ledger: {error}"))?;
     if !is_lower_hex_digest(&ledger.task_set_sha256) {
-        return Err(format!("{label} ledger task_set_sha256 must be 64 lowercase hex characters"));
+        return Err(format!(
+            "{label} ledger task_set_sha256 must be 64 lowercase hex characters"
+        ));
     }
     let actual_task_set_sha256 = sha256_hex(task_set_bytes);
     if ledger.task_set_sha256 != actual_task_set_sha256 {
@@ -168,11 +180,16 @@ fn read_and_validate_ledger(
             return Err(format!("{label} lineage ledger contains an empty task ID"));
         }
         if !observed.insert(record.task_id.as_str()) {
-            return Err(format!("{label} lineage ledger contains duplicate task ID {}", record.task_id));
+            return Err(format!(
+                "{label} lineage ledger contains duplicate task ID {}",
+                record.task_id
+            ));
         }
         let task = task_by_id
             .get(record.task_id.as_str())
-            .ok_or_else(|| format!("{label} lineage ledger has orphan task ID {}", record.task_id))?;
+            .ok_or_else(|| {
+                format!("{label} lineage ledger has orphan task ID {}", record.task_id)
+            })?;
 
         if !is_lower_hex_digest(&record.policy_input_sha256) {
             return Err(format!(
@@ -312,8 +329,10 @@ pub fn audit_lineage_overlap(
         shared_lineage.push(SharedLineageGroupV1 {
             kind: kind.clone(),
             commitment_sha256: digest.clone(),
-            left_task_count: u64::try_from(left_ids.len()).map_err(|_| "left task count overflow")?,
-            right_task_count: u64::try_from(right_ids.len()).map_err(|_| "right task count overflow")?,
+            left_task_count: u64::try_from(left_ids.len())
+                .map_err(|_| "left task count overflow")?,
+            right_task_count: u64::try_from(right_ids.len())
+                .map_err(|_| "right task count overflow")?,
             cross_split_task_pair_count: pairs,
             left_task_ids_sample: bounded_sample(left_ids),
             right_task_ids_sample: bounded_sample(right_ids),
@@ -350,8 +369,10 @@ pub fn audit_lineage_overlap(
         right_task_set_sha256: sha256_hex(right_task_set_bytes),
         left_ledger_sha256: sha256_hex(left_ledger_bytes),
         right_ledger_sha256: sha256_hex(right_ledger_bytes),
-        left_task_count: u64::try_from(left_set.tasks.len()).map_err(|_| "left task count overflow")?,
-        right_task_count: u64::try_from(right_set.tasks.len()).map_err(|_| "right task count overflow")?,
+        left_task_count: u64::try_from(left_set.tasks.len())
+            .map_err(|_| "left task count overflow")?,
+        right_task_count: u64::try_from(right_set.tasks.len())
+            .map_err(|_| "right task count overflow")?,
         shared_lineage_root_count,
         shared_lineage_task_pair_count,
         shared_lineage,
@@ -376,7 +397,10 @@ mod tests {
             "tasks": [{
                 "task_id": task_id,
                 "family_id": "shared-schema-is-not-lineage",
-                "policy_input": {"instruction":"Recover relationship","observations":[{"x":x,"y":y}]},
+                "policy_input": {
+                    "instruction": "Recover relationship",
+                    "observations": [{"x": x, "y": y}]
+                },
                 "evaluator_only": {"expected_law":"must-not-appear-in-report"}
             }]
         }))
