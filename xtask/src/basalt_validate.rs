@@ -1194,12 +1194,8 @@ mod tests {
     #[test]
     fn predeclared_invalid_task_trials_remain_accounted_without_becoming_successes() {
         let report = validate_value_and_manifest(|run, manifest| {
-            for value in [
-                &mut run["task_records"][0]["quality_audit"]["status"],
-                &mut manifest["tasks"][0]["quality_audit"]["status"],
-            ] {
-                *value = Value::String("invalid".into());
-            }
+            run["task_records"][0]["quality_audit"]["status"] = Value::String("invalid".into());
+            manifest["tasks"][0]["quality_audit"]["status"] = Value::String("invalid".into());
             run["task_records"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "b".repeat(64)));
             manifest["tasks"][0]["quality_audit"]["audit_digest"] = Value::String(format!("sha256:{}", "b".repeat(64)));
             for trial in run["task_records"][0]["trials"].as_array_mut().unwrap() {
