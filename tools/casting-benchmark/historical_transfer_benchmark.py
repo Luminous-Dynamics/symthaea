@@ -281,6 +281,11 @@ def _f1(left: set[int], right: set[int]) -> float:
 
 
 def _validate_task_registry() -> None:
+    current_suite_sha256 = hashlib.sha256(
+        json.dumps(TASK_SUITE, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+    if current_suite_sha256 != TASK_SUITE_SHA256:
+        raise ValueError("task suite changed after its frozen digest was computed")
     all_tasks = (*SOURCE_TASKS, *TARGET_TASKS)
     ids = [task["task_id"] for task in all_tasks]
     if len(set(ids)) != len(ids):
