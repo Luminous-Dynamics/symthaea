@@ -458,8 +458,9 @@ jobs:
             )] | length) == 0
           ' "$RUNNER_TEMP/missingness-policy-feed.json"
           jq -e '
+            . as $schedule |
             (.events | length) == 64 and
             ([.events[] | select(.state_at_horizon == "observed")] | length) > 0 and
             ([.events[] | select(.state_at_horizon == "declared_missing")] | length) > 0 and
-            ([.events[] | select(.state_at_horizon == "observed" and (.expected_reveal_tick > .evaluation_horizon_tick))] | length) == 0
+            ([.events[] | select(.state_at_horizon == "observed" and (.expected_reveal_tick > $schedule.evaluation_horizon_tick))] | length) == 0
           ' "$RUNNER_TEMP/missingness-evaluator-schedule.json"
