@@ -31,9 +31,10 @@ const ENDPOINT_TOL: f64 = 1e-10;
 const Z_975: f64 = 1.959_963_984_540_054;
 
 const GRID_SIZE: usize = 1000;
-const METHOD_NAMES: [&str; 5] = [
+const METHOD_NAMES: [&str; 6] = [
     "MOPE_analytic_root_audited",
-    "MOPE_upstream_style_grid_1000",
+    "MOPE_quadratic_bound_grid_1000",
+    "MOPE_upstream_style_actual_wealth_grid_1000",
     "Wald_pointwise_reused",
     "Hoeffding_alpha_spending_intersection",
     "Empirical_Bernstein_alpha_spending_intersection",
@@ -247,6 +248,69 @@ impl MopeGridPair {
         self.lower_stream.choose_next_bet(self.lower_endpoint)?;
         self.complement_stream.choose_next_bet(self.complement_endpoint)?;
         Ok(Interval { lower: self.lower_endpoint, upper: 1.0-self.complement_endpoint })
+    }
+}
+
+/// Fair precision comparator: evaluates the same quadratic lower-bound
+/// polynomial used by the analytic-root method on GRID_SIZE candidates.
+/// This isolates root finding versus grid discretization from actual wealth.
+struct MopeBoundGridPair {
+    lower_stream: stream::StreamState,
+    complement_stream: stream::StreamState,
+    values: Vec<f64>,
+    lower_bound: Vec<f64>,
+    complement_bound: Vec<f64>,
+    lower_endpoint: f64,
+    complement_endpoint: f64,
+    diagnostics: GridDiagnostics,
+}
+
+impl MopeBoundGridPair {
+    fn new(max_weight: f64) -> Result<Self, String> {
+        let values: Vec<f64>=(0..GRID_SIZE).map(|i|i as f64/(GRID_SIZE-1) as f64).collect();
+        Ok(Self {
+            lower_stream:stream::StreamState::new(max_weight,ALPHA_SIDE)?,
+            complement_stream:stream::StreamState::new(max_weight,ALPHA_SIDE)?,
+            lower_bound:vec![0.0;GRID_SIZE],
+            complement_bound:vec![0.0;GRID_SIZE],
+            values,
+            lower_endpoint:0.0,
+            complement_endpoint:0.0,
+            diagnostics:GridDiagnostics::default(),
+        })
+    }
+
+    fn update(&mut self,w:f64,r:f64)->Result<Interval,String>{
+        let lo=self.lower_stream.current_lambda();
+        let hi=self.complement_stream.current_lambda();
+        let _=self.lower_stream.observe(w,r)?;
+        let _=self.complement_stream.observe(w,1.0-r)?;
+        let z=w-1.0;
+        for i in 0..GRID_SIZE{
+            let v=self.values[i];
+            let d=w*r-v;
+            let contribution=lo.x*z+lo.y*d+PSI*(lo.x*lo.x*z*z+2.0*lo.x*lo.y*z*d+lo.y*lo.y*d*d);
+            self.lower_bound[i]+=contribution;
+            let dc=w*(1.0-r)-v;
+            let contribution_c=hi.x*z+hi.y*dc+PSI*(hi.x*hi.x*z*z+2.0*hi.x*hi.y*z*dc+hi.y*hi.y*dc*dc);
+            self.complement_bound[i]+=contribution_c;
+        }
+        let level=(2.0/ALPHA_SIDE).ln();
+        let lower_index=self.lower_bound.iter().position(|p|*p<level).unwrap_or(0);
+        let complement_index=self.complement_bound.iter().position(|p|*p<level).unwrap_or(0);
+        let proposed_lower=self.lower_endpoint.max(self.values[lower_index]);
+        let lower_cap=1.0-self.complement_endpoint;
+        let updated_lower=proposed_lower.min(lower_cap);
+        if updated_lower>self.lower_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
+        self.lower_endpoint=updated_lower;
+        let proposed_complement=self.complement_endpoint.max(self.values[complement_index]);
+        let complement_cap=1.0-self.lower_endpoint;
+        let updated_complement=proposed_complement.min(complement_cap);
+        if updated_complement>self.complement_endpoint+ENDPOINT_TOL{self.diagnostics.endpoint_advances+=1;}
+        self.complement_endpoint=updated_complement;
+        self.lower_stream.choose_next_bet(self.lower_endpoint)?;
+        self.complement_stream.choose_next_bet(self.complement_endpoint)?;
+        Ok(Interval{lower:self.lower_endpoint,upper:1.0-self.complement_endpoint})
     }
 }
 
