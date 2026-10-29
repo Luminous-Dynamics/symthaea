@@ -271,6 +271,21 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(result["two_sided_gate_passed"])
         self.assertTrue(any("empty-patch baseline" in issue for issue in result["issues"]))
 
+    def test_oracle_that_passes_both_empty_and_reference_arms_is_rejected(self) -> None:
+        bundle = zip_bytes([
+            ("test_contract.py", b"""import unittest
+
+class ContractTest(unittest.TestCase):
+    def test_uninformative_control(self):
+        self.assertTrue(True)
+""")
+        ])
+        result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "both-pass-evidence")
+        self.assertFalse(result["two_sided_gate_passed"])
+        self.assertEqual(result["baseline_test_failure_count"], 0)
+        self.assertEqual(result["reference_passed_command_count"], 1)
+        self.assertTrue(any("empty-patch baseline did not demonstrate" in issue for issue in result["issues"]))
+
     def test_wrong_manifest_pin_is_rejected(self) -> None:
         with self.assertRaisesRegex(verifier.ControlError, "manifest differs"):
             self.run_controls(expected_manifest="f" * 64)
