@@ -113,18 +113,9 @@ cargo test --locked --bin score_world_model
 cargo run --quiet --locked --bin score_world_model -- score fixtures/answer-key-smoke.tsv fixtures/world-model-predictions-smoke.tsv
 ```
 
-## Factor-composition task generator
+## Task generation is a companion tranche
 
-A second isolated Rust crate at `research/cmaq-001/generator/` generates deterministic sparse-parity causal-transfer cases. It keeps agent-visible event histories separate from evaluator-only active-factor masks and targets; the generator manifest SHA-256-binds both exact output files. This is synthetic benchmark infrastructure, not a score or evidence of model capability.
-
-```bash
-cd research/cmaq-001/generator
-cargo test --locked
-cargo run --quiet --locked -- --seed 4242 --factors 8 --radius 2 --out /tmp/cmaq-factor-pilot
-```
-
-The generator has its own focused workflow. Its tests and smoke run must pass on the exact PR head before the generator is treated as qualified. Extend its task families before drawing conclusions about general causal competence.
-
+The factor-composition generator is being developed separately in [draft PR #8886](https://github.com/Luminous-Dynamics/symthaea/pull/8886), stacked over the scoring work. This PR keeps the scorer and world-model decision evaluation independent from dataset generation so one does not silently validate the other. The generator should be treated as unavailable until its branch is reconciled with the current base and its exact-head tests pass.
 
 ## Run the scorer
 
