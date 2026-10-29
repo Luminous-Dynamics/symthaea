@@ -925,6 +925,32 @@ mod tests {
         }
     }
 
+    fn fixture_profile() -> AudioPreservationProfile {
+        AudioPreservationProfile {
+            profile_version: "audio-preservation-profile-v0.1".to_owned(),
+            profile_id: "symbolic-audio-binding-test-fixture".to_owned(),
+            acoustic_config: PreservationConfig {
+                frame_size: 128,
+                hop_size: 64,
+                boundary_guard_frames: 0,
+                rms_delta_db_tolerance: 0.5,
+                spectral_distance_tolerance: 0.08,
+                minimum_protected_windows: 4,
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
+            },
+            onset_config: OnsetPreservationConfig {
+                frame_size: 128,
+                hop_size: 32,
+                novelty_threshold: 0.12,
+                minimum_separation_ms: 8,
+                onset_time_tolerance_ms: 4,
+                boundary_guard_frames: 0,
+                minimum_protected_duration_ms: 100,
+                calibration_id: Some("symbolic-audio-binding-test-fixture".to_owned()),
+            },
+        }
+    }
+
     fn build_fixture() -> (
         Vec<LocalityEvent>,
         Vec<LocalityEvent>,
@@ -1094,6 +1120,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         ).expect("supported full-score edit should bind");
         assert_eq!(binding.projected_binding.overall_verdict, PreservationVerdict::Pass);
         assert_ne!(
@@ -1104,6 +1132,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest, &binding,
+        ,
+            &fixture_profile()
         ).expect("full score binding should replay"));
 
         let mut tampered = binding.clone();
@@ -1112,6 +1142,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest, &tampered,
+        ,
+            &fixture_profile()
         ).expect("modified full-score digest should be rejected as a verdict"));
     }
 
@@ -1160,6 +1192,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         ).expect("a failed edit result should be represented by a fail verdict");
         assert_eq!(result.projected_binding.overall_verdict, PreservationVerdict::Fail);
         assert!(result.projected_binding.reasons.iter().any(|reason| reason.contains("RMS envelopes")));
@@ -1177,6 +1211,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         );
         assert!(matches!(
             result,
@@ -1201,6 +1237,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         );
         assert!(matches!(
             result,
@@ -1223,6 +1261,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         );
         assert!(matches!(
             result,
@@ -1270,6 +1310,8 @@ mod tests {
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
             &acoustic, &onset, &manifest,
+        ,
+            &fixture_profile()
         );
         assert!(matches!(
             result,
@@ -1288,4 +1330,16 @@ mod tests {
         );
         assert!(matches!(result, Err(SymbolicAudioBindingError::InvalidRendererManifest(_))));
     }
+    #[test]
+    fn frozen_profile_rejects_child_config_drift() {
+        let (_source_events, _target_events, _symbolic, _source_audio, _target_audio, acoustic, onset, _manifest) =
+            build_fixture();
+        let profile = fixture_profile();
+        let mut changed_profile = profile.clone();
+        changed_profile.acoustic_config.rms_delta_db_tolerance = 1.0;
+        assert!(require_profile_matches_reports(&changed_profile, &acoustic, &onset).is_err());
+        assert!(require_profile_matches_reports(&profile, &acoustic, &onset).is_ok());
+    }
+
+
 }
