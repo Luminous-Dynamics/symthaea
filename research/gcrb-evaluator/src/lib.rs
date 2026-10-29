@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 const FIXTURE_SCHEMA: &str = "gcrb-synthetic-case-manifest-v0.1";
 const CANDIDATE_SCHEMA: &str = "gcrb-candidate-report-v0.1";
@@ -428,26 +428,28 @@ pub fn evaluate_public_development(
             *family_matches += 1;
         }
 
-        let observed_required = observed
-            .observed_required_behaviors
-            .iter()
-            .collect::<HashSet<_>>();
         let required_matches = expected
             .required_behaviors
             .iter()
-            .filter(|behavior| observed_required.contains(behavior))
+            .filter(|behavior| {
+                observed
+                    .observed_required_behaviors
+                    .iter()
+                    .any(|candidate| candidate == *behavior)
+            })
             .count();
         required_total += expected.required_behaviors.len();
         required_matches_total += required_matches;
 
-        let expected_forbidden = expected
-            .forbidden_behaviors
-            .iter()
-            .collect::<HashSet<_>>();
         let forbidden_matches = observed
             .observed_forbidden_behaviors
             .iter()
-            .filter(|behavior| expected_forbidden.contains(behavior))
+            .filter(|behavior| {
+                expected
+                    .forbidden_behaviors
+                    .iter()
+                    .any(|expected_behavior| expected_behavior == *behavior)
+            })
             .count();
         forbidden_matches_total += forbidden_matches;
 
@@ -591,7 +593,8 @@ mod tests {
             .replace("]}\n        }", "]}\n        }");
         let parsed: serde_json::Value = serde_json::from_str(&bytes).unwrap();
         let mut mutated = parsed;
-        mutated["cases"].as_array_mut().unwrap().push(mutated["cases"][0].clone());
+        let first_case = mutated["cases"][0].clone();
+        mutated["cases"].as_array_mut().unwrap().push(first_case);
         mutated["expected_case_count"] = serde_json::json!(3);
         mutated["expected_attack_count"] = serde_json::json!(2);
         let result = validate_fixture_bytes(&serde_json::to_vec(&mutated).unwrap());
