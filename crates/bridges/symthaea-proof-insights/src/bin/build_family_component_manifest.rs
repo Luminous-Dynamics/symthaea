@@ -714,7 +714,10 @@ mod tests {
             manifest.coverage_receipt_verification_status,
             "verified_signature_set"
         );
-        assert_eq!(manifest.coverage_receipt_sha256.as_deref(), Some(fixture.receipt_digest.as_str()));
+        assert_eq!(
+            manifest.coverage_receipt_sha256.as_deref(),
+            Some(fixture.receipt_digest.as_str())
+        );
         assert_eq!(manifest.relationship_inventory_sha256, fixture.inventory_digest);
         assert_eq!(manifest.total_family_count, 372);
         assert_eq!(manifest.total_component_count, 372);
