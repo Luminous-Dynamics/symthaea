@@ -91,6 +91,16 @@ class BitemporalReferenceTests(unittest.TestCase):
         self.assertEqual(result["state"], "resolved")
         self.assertEqual(result["value"], "true")
         self.assertEqual(result["selected_event_ids"], ["E010", "E011"])
+        self.assertEqual([item["source"] for item in result["selected_evidence"]], ["service-owner", "audit-agent"])
+
+    def test_selected_evidence_carries_time_and_authority_provenance(self):
+        result = self.result("Q006")
+        evidence = result["selected_evidence"]
+        self.assertEqual(len(evidence), 1)
+        self.assertEqual(evidence[0]["event_id"], "E005")
+        self.assertEqual(evidence[0]["source"], "security")
+        self.assertEqual(evidence[0]["authority_rank"], 3)
+        self.assertEqual(evidence[0]["recorded_at"], "2026-03-01T08:00:00Z")
 
     def test_missing_evidence_returns_unknown_not_guess(self):
         result = self.result("Q009")
