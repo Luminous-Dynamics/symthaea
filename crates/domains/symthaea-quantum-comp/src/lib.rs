@@ -115,8 +115,9 @@ pub use noise_sweep::{NoiseSweepConfig, NoiseSweepPoint, NoiseSweepReport, Noise
 pub use phase_hdc::PhaseHypervector;
 pub use photonic_architecture::{
     BoundedCostInterval, LossIntervalDb, OpticalChannel, OpticalChannelInterval,
-    PhotonicEnvelopeError, PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope,
-    PrimitiveEnvelopeEstimate, ProbabilityInterval, RobustPrimitiveEnvelopeEstimate,
+    OpticalLink, OpticalRoute, OpticalRouteObjective, PhotonicEnvelopeError,
+    PhotonicPrimitiveEnvelope, PhotonicPrimitiveUncertaintyEnvelope, PrimitiveEnvelopeEstimate,
+    ProbabilityInterval, RobustPrimitiveEnvelopeEstimate, find_optical_route,
     multiplexed_source_success_probability, transmission_probability,
 };
 pub use preflight::{
