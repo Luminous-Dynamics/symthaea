@@ -23,7 +23,9 @@ use crate::aviation_distributional_robustness::{
     DistributionalRobustConstraints, DistributionalRobustError, DistributionalRobustReport,
     ScenarioCostDelta,
 };
-use crate::aviation_energy_hub::{canonical_energy_hub_digest, TimeIndexedEnergyHubScenario};
+use crate::aviation_energy_hub::{
+    canonical_energy_hub_digest, verify_energy_hub_plan, TimeIndexedEnergyHubScenario,
+};
 use crate::aviation_energy_hub_paired_benchmark::{
     PairedRollingBenchmarkReport, PairedScenarioOutcome,
 };
@@ -87,6 +89,16 @@ pub enum PairedDistributionalRiskError {
     SamePolicyComparison,
     BaselineScenarioInvalid,
     BaselineScenarioDigestMismatch,
+    InvalidRealizedScenarioDigest { scenario_id: String },
+    RealizedScenarioSupportMismatch { scenario_id: String },
+    PolicyPlanVerificationFailed {
+        scenario_id: String,
+        policy: DeployableEnergyPolicy,
+    },
+    ReportedPolicyMetricsMismatch {
+        scenario_id: String,
+        policy: DeployableEnergyPolicy,
+    },
     InvalidCostUnitScale { scale: u64 },
     DuplicateScenarioId { scenario_id: String },
     CalibrationSupportMismatch { scenario_id: String },
@@ -122,6 +134,20 @@ impl std::fmt::Display for PairedDistributionalRiskError {
             Self::BaselineScenarioDigestMismatch => {
                 write!(f, "paired report is not bound to the supplied baseline scenario")
             }
+            Self::InvalidRealizedScenarioDigest { scenario_id } => {
+                write!(f, "realized scenario digest is invalid for {scenario_id}")
+            }
+            Self::RealizedScenarioSupportMismatch { scenario_id } => {
+                write!(f, "paired report and realized scenario set differ at {scenario_id}")
+            }
+            Self::PolicyPlanVerificationFailed { scenario_id, policy } => write!(
+                f, "independent plan verification failed for {} in scenario {scenario_id}",
+                policy.as_str()
+            ),
+            Self::ReportedPolicyMetricsMismatch { scenario_id, policy } => write!(
+                f, "reported metrics differ from independent plan evaluation for {} in scenario {scenario_id}",
+                policy.as_str()
+            ),
             Self::InvalidCostUnitScale { scale } => {
                 write!(f, "cost unit scale {scale} is outside the supported range")
             }
@@ -176,6 +202,7 @@ impl std::error::Error for PairedDistributionalRiskError {}
 pub fn evaluate_paired_policy_distributional_risk(
     benchmark: &PairedRollingBenchmarkReport,
     baseline_scenario: &TimeIndexedEnergyHubScenario,
+    realized_scenarios: &[TimeIndexedEnergyHubScenario],
     candidate_policy: DeployableEnergyPolicy,
     baseline_policy: DeployableEnergyPolicy,
     calibration_frequencies: &[CalibrationFrequency],
@@ -215,20 +242,56 @@ pub fn evaluate_paired_policy_distributional_risk(
         return Err(PairedDistributionalRiskError::BaselineScenarioDigestMismatch);
     }
 
+    // Recompute every realized scenario digest and require an exact one-to-one
+    // mapping to report outcomes. The adapter will independently re-evaluate each
+    // selected policy plan against this scenario manifest before reading its cost.
+    let mut realized_by_id: BTreeMap<String, &TimeIndexedEnergyHubScenario> = BTreeMap::new();
+    for scenario in realized_scenarios {
+        if scenario.scenario_id.trim().is_empty()
+            || realized_by_id.contains_key(&scenario.scenario_id)
+        {
+            return Err(PairedDistributionalRiskError::DuplicateScenarioId {
+                scenario_id: scenario.scenario_id.clone(),
+            });
+        }
+        let scenario_digest = canonical_energy_hub_digest(scenario).map_err(|_| {
+            PairedDistributionalRiskError::InvalidRealizedScenarioDigest {
+                scenario_id: scenario.scenario_id.clone(),
+            }
+        })?;
+        if scenario.input_digest != scenario_digest {
+            return Err(PairedDistributionalRiskError::InvalidRealizedScenarioDigest {
+                scenario_id: scenario.scenario_id.clone(),
+            });
+        }
+        realized_by_id.insert(scenario.scenario_id.clone(), scenario);
+    }
+
     let mut outcome_ids = BTreeSet::new();
     for outcome in &benchmark.outcomes {
         if outcome.scenario_id.trim().is_empty()
-            || !outcome_ids.insert(outcome.scenario_id.as_str())
+            || !outcome_ids.insert(outcome.scenario_id.clone())
         {
             return Err(PairedDistributionalRiskError::DuplicateScenarioId {
                 scenario_id: outcome.scenario_id.clone(),
             });
         }
     }
+    let realized_ids: BTreeSet<String> = realized_by_id.keys().cloned().collect();
+    if outcome_ids != realized_ids {
+        let differing_id = outcome_ids
+            .symmetric_difference(&realized_ids)
+            .next()
+            .cloned()
+            .unwrap_or_else(|| "<unknown>".to_owned());
+        return Err(PairedDistributionalRiskError::RealizedScenarioSupportMismatch {
+            scenario_id: differing_id,
+        });
+    }
 
-    let calibration_ids: BTreeSet<&str> = calibration_frequencies
+    let calibration_ids: BTreeSet<String> = calibration_frequencies
         .iter()
-        .map(|item| item.scenario_id.as_str())
+        .map(|item| item.scenario_id.clone())
         .collect();
     if calibration_ids.len() != calibration_frequencies.len() {
         // Ask the calibration validator to return its specific duplicate-ID error.
@@ -239,10 +302,10 @@ pub fn evaluate_paired_policy_distributional_risk(
         let differing_id = outcome_ids
             .symmetric_difference(&calibration_ids)
             .next()
-            .copied()
-            .unwrap_or("<unknown>");
+            .cloned()
+            .unwrap_or_else(|| "<unknown>".to_owned());
         return Err(PairedDistributionalRiskError::CalibrationSupportMismatch {
-            scenario_id: differing_id.to_owned(),
+            scenario_id: differing_id,
         });
     }
 
@@ -274,8 +337,13 @@ pub fn evaluate_paired_policy_distributional_risk(
                 scenario_id: outcome.scenario_id.clone(),
             })?;
 
-        let candidate_cost = policy_cost(outcome, candidate_policy)?;
-        let baseline_cost = policy_cost(outcome, baseline_policy)?;
+        let realized_scenario = realized_by_id.get(&outcome.scenario_id).ok_or_else(|| {
+            PairedDistributionalRiskError::RealizedScenarioSupportMismatch {
+                scenario_id: outcome.scenario_id.clone(),
+            }
+        })?;
+        let candidate_cost = policy_cost(outcome, candidate_policy, realized_scenario)?;
+        let baseline_cost = policy_cost(outcome, baseline_policy, realized_scenario)?;
         let candidate_units = quantize_cost(
             &outcome.scenario_id, candidate_policy, candidate_cost,
             cost_units_per_currency_unit,
@@ -316,6 +384,7 @@ pub fn evaluate_paired_policy_distributional_risk(
         constraints,
         calibration_frequencies,
         &deltas,
+        &realized_by_id,
     );
 
     Ok(PairedDistributionalRiskReport {
@@ -339,30 +408,46 @@ pub fn evaluate_paired_policy_distributional_risk(
 fn policy_cost(
     outcome: &PairedScenarioOutcome,
     policy: DeployableEnergyPolicy,
+    realized_scenario: &TimeIndexedEnergyHubScenario,
 ) -> Result<f64, PairedDistributionalRiskError> {
-    let cost = match policy {
+    let reported_plan = match policy {
         DeployableEnergyPolicy::Static => match (&outcome.static_plan, &outcome.static_plan_error) {
-            (Some(plan), None) => Some(plan.metrics.source_ledger.total_cost),
+            (Some(plan), None) => Some(plan),
             _ => None,
         },
         DeployableEnergyPolicy::Greedy => match (&outcome.greedy_plan, &outcome.greedy_error) {
-            (Some(plan), None) => Some(plan.metrics.source_ledger.total_cost),
+            (Some(plan), None) => Some(plan),
             _ => None,
         },
         DeployableEnergyPolicy::RollingHorizon => match (
             &outcome.rolling_run.status,
             &outcome.rolling_run.evaluated_realized_plan,
         ) {
-            (RollingHorizonStatus::Completed, Some(plan)) => {
-                Some(plan.metrics.source_ledger.total_cost)
-            }
+            (RollingHorizonStatus::Completed, Some(plan)) => Some(plan),
             _ => None,
         },
-    };
-    cost.ok_or_else(|| PairedDistributionalRiskError::PolicyOutcomeNotUsable {
+    }
+    .ok_or_else(|| PairedDistributionalRiskError::PolicyOutcomeNotUsable {
         scenario_id: outcome.scenario_id.clone(),
         policy,
-    })
+    })?;
+
+    // Do not trust caller-supplied summary metrics. Recompute the feasible plan and
+    // complete ledger from the pinned realized scenario; reject any divergence.
+    let independently_evaluated =
+        verify_energy_hub_plan(realized_scenario, &reported_plan.plan).map_err(|_| {
+            PairedDistributionalRiskError::PolicyPlanVerificationFailed {
+                scenario_id: outcome.scenario_id.clone(),
+                policy,
+            }
+        })?;
+    if independently_evaluated.metrics != reported_plan.metrics {
+        return Err(PairedDistributionalRiskError::ReportedPolicyMetricsMismatch {
+            scenario_id: outcome.scenario_id.clone(),
+            policy,
+        });
+    }
+    Ok(independently_evaluated.metrics.source_ledger.total_cost)
 }
 
 fn quantize_cost(
@@ -406,6 +491,7 @@ fn paired_risk_digest(
     constraints: DistributionalRobustConstraints,
     frequencies: &[CalibrationFrequency],
     deltas: &[ScenarioCostDelta],
+    realized_scenarios: &BTreeMap<String, &TimeIndexedEnergyHubScenario>,
 ) -> String {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"symthaea.clean-airline.paired-distributional-risk.v1\0");
@@ -420,6 +506,12 @@ fn paired_risk_digest(
     bytes.extend_from_slice(&constraints.tv_radius_ppm.to_le_bytes());
     bytes.extend_from_slice(&constraints.max_worst_case_expected_delta_units.to_le_bytes());
     bytes.extend_from_slice(&constraints.max_single_scenario_regression_units.to_le_bytes());
+
+    bytes.extend_from_slice(&(realized_scenarios.len() as u64).to_le_bytes());
+    for (scenario_id, scenario) in realized_scenarios {
+        put_str(&mut bytes, scenario_id);
+        put_str(&mut bytes, &scenario.input_digest);
+    }
 
     let mut sorted_frequencies: Vec<&CalibrationFrequency> = frequencies.iter().collect();
     sorted_frequencies.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
@@ -449,76 +541,126 @@ fn put_str(bytes: &mut Vec<u8>, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::aviation_energy_accounting::{AccountingSummary, EvidenceClass, TransportService};
+    use crate::aviation_energy_accounting::{EvidenceClass, TransportService};
     use crate::aviation_energy_hub::{
-        seal_energy_hub_scenario, EnergyHubInterval, EnergyHubMetrics, EnergyHubPlan,
+        seal_energy_hub_scenario, EnergyHubInterval, EnergyHubPlan, EnergyHubStepAction,
         EnergyStorageSpec, EvaluatedEnergyHubPlan,
     };
-    use crate::aviation_energy_hub_paired_benchmark::{PairedDeltaSummary, PolicyCoverageSummary};
+    use crate::aviation_energy_hub_paired_benchmark::{
+        PairedDeltaSummary, PolicyCoverageSummary,
+    };
     use crate::aviation_energy_hub_rolling::RollingHorizonRun;
 
-    fn evaluated_plan(scenario_id: &str, cost: f64) -> EvaluatedEnergyHubPlan {
-        EvaluatedEnergyHubPlan {
-            plan: EnergyHubPlan {
-                scenario_id: scenario_id.to_owned(),
-                input_digest: format!("digest-{scenario_id}"),
-                actions: vec![],
+    fn realized_scenario(scenario_id: &str, grid_cost: f64) -> TimeIndexedEnergyHubScenario {
+        let mut scenario = TimeIndexedEnergyHubScenario {
+            scenario_id: scenario_id.to_owned(),
+            input_digest: "pending".to_owned(),
+            currency_code: "USD".to_owned(),
+            quantum_kwh: 1.0,
+            service: TransportService {
+                period_id: "paired-panel-period-v1".into(),
+                lifecycle_boundary_id: "source-to-load-v1".into(),
+                completed_passenger_km: 100.0,
+                available_seat_km: 120.0,
             },
-            metrics: EnergyHubMetrics {
-                source_ledger: AccountingSummary {
-                    period_id: "period-v1".into(),
-                    lifecycle_boundary_id: "source-to-load-v1".into(),
-                    currency_code: "USD".into(),
-                    record_evidence: vec![],
-                    energy_by_source: vec![],
-                    total_source_energy_kwh: 0.0,
-                    total_delivered_energy_kwh: 0.0,
-                    upstream_co2e_kg: 0.0,
-                    direct_operational_co2e_kg: 0.0,
-                    accounted_lifecycle_co2e_kg: 0.0,
-                    total_cost: cost,
-                    completed_passenger_km: 100.0,
-                    available_seat_km: 120.0,
-                    accounted_co2e_kg_per_completed_passenger_km: 0.0,
-                    cost_per_completed_passenger_km: cost / 100.0,
-                    cost_per_available_seat_km: cost / 120.0,
-                    non_co2_not_assessed_record_ids: vec![],
-                    non_co2_observations: vec![],
-                },
-                renewable_generation_quanta: 0,
-                renewable_direct_quanta: 0,
-                renewable_charge_input_quanta: 0,
-                renewable_curtailed_quanta: 0,
-                grid_import_quanta: 0,
-                battery_discharge_output_quanta: 0,
-                battery_charge_loss_quanta: 0,
-                battery_discharge_loss_quanta: 0,
-                final_soc_quanta: 0,
+            storage: EnergyStorageSpec {
+                capacity_quanta: 0,
+                initial_soc_quanta: 0,
+                initial_soc_ledger_ref: "synthetic:no-opening-inventory".into(),
+                max_charge_input_quanta_per_interval: 0,
+                max_discharge_output_quanta_per_interval: 0,
+                charge_efficiency_ppm: 1_000_000,
+                discharge_efficiency_ppm: 1_000_000,
+                minimum_terminal_soc_quanta: 0,
             },
-        }
+            intervals: vec![EnergyHubInterval {
+                id: "t0".into(),
+                demand_quanta: 1,
+                charger_capacity_quanta: 1,
+                renewable_generation_quanta: 1,
+                grid_import_capacity_quanta: 1,
+                renewable_cost_per_quantum: 0.0,
+                renewable_lifecycle_co2e_kg_per_quantum: 0.0,
+                renewable_evidence_ref: "synthetic:renewable:t0".into(),
+                renewable_evidence_class: EvidenceClass::Synthetic,
+                grid_cost_per_quantum: grid_cost,
+                grid_lifecycle_co2e_kg_per_quantum: 10.0 * grid_cost,
+                grid_evidence_ref: "synthetic:grid:t0".into(),
+                grid_evidence_class: EvidenceClass::Synthetic,
+            }],
+        };
+        seal_energy_hub_scenario(&mut scenario).unwrap();
+        scenario
     }
 
-    fn paired_report() -> PairedRollingBenchmarkReport {
+    fn realized_panel() -> Vec<TimeIndexedEnergyHubScenario> {
+        vec![
+            realized_scenario("normal", 1.0),
+            realized_scenario("disruption", 2.0),
+        ]
+    }
+
+    fn evaluated_plan(
+        scenario: &TimeIndexedEnergyHubScenario,
+        use_grid: bool,
+    ) -> EvaluatedEnergyHubPlan {
+        let action = if use_grid {
+            EnergyHubStepAction {
+                interval_id: "t0".into(),
+                renewable_direct_quanta: 0,
+                grid_import_quanta: 1,
+                battery_discharge_output_quanta: 0,
+                renewable_charge_input_quanta: 0,
+                renewable_curtailed_quanta: 1,
+                soc_before_quanta: 0,
+                soc_after_quanta: 0,
+            }
+        } else {
+            EnergyHubStepAction {
+                interval_id: "t0".into(),
+                renewable_direct_quanta: 1,
+                grid_import_quanta: 0,
+                battery_discharge_output_quanta: 0,
+                renewable_charge_input_quanta: 0,
+                renewable_curtailed_quanta: 0,
+                soc_before_quanta: 0,
+                soc_after_quanta: 0,
+            }
+        };
+        let plan = EnergyHubPlan {
+            scenario_id: scenario.scenario_id.clone(),
+            input_digest: scenario.input_digest.clone(),
+            actions: vec![action],
+        };
+        verify_energy_hub_plan(scenario, &plan).unwrap()
+    }
+
+    fn paired_report(scenarios: &[TimeIndexedEnergyHubScenario]) -> PairedRollingBenchmarkReport {
         let mut outcomes = Vec::new();
-        for (id, static_cost, greedy_cost, rolling_cost, weight) in [
-            ("normal", 10.0, 11.0, 9.0, 900_000),
-            ("disruption", 12.0, 10.0, 10.0, 100_000),
-        ] {
+        for scenario in scenarios {
+            let static_plan = evaluated_plan(scenario, true);
+            let greedy_plan = evaluated_plan(scenario, true);
+            let rolling_plan = evaluated_plan(scenario, false);
+            let weight_ppm = if scenario.scenario_id == "normal" {
+                900_000
+            } else {
+                100_000
+            };
             outcomes.push(PairedScenarioOutcome {
-                scenario_id: id.into(),
-                weight_ppm: weight,
-                static_plan: Some(evaluated_plan(id, static_cost)),
+                scenario_id: scenario.scenario_id.clone(),
+                weight_ppm,
+                static_plan: Some(static_plan),
                 static_plan_error: None,
-                greedy_plan: Some(evaluated_plan(id, greedy_cost)),
+                greedy_plan: Some(greedy_plan),
                 greedy_error: None,
                 rolling_run: RollingHorizonRun {
-                    episode_digest: format!("episode-{id}"),
+                    episode_digest: format!("episode-{}", scenario.scenario_id),
                     steps: vec![],
                     status: RollingHorizonStatus::Completed,
                     final_soc_quanta: 0,
-                    evaluated_realized_plan: Some(evaluated_plan(id, rolling_cost)),
+                    evaluated_realized_plan: Some(rolling_plan.clone()),
                 },
-                perfect_information_plan: Some(evaluated_plan(id, rolling_cost)),
+                perfect_information_plan: Some(rolling_plan),
                 perfect_information_error: None,
             });
         }
@@ -558,45 +700,7 @@ mod tests {
     }
 
     fn baseline_scenario() -> TimeIndexedEnergyHubScenario {
-        let mut scenario = TimeIndexedEnergyHubScenario {
-            scenario_id: "nominal-baseline-v1".into(),
-            input_digest: "pending".into(),
-            currency_code: "USD".into(),
-            quantum_kwh: 1.0,
-            service: TransportService {
-                period_id: "paired-panel-period-v1".into(),
-                lifecycle_boundary_id: "source-to-load-v1".into(),
-                completed_passenger_km: 100.0,
-                available_seat_km: 120.0,
-            },
-            storage: EnergyStorageSpec {
-                capacity_quanta: 1,
-                initial_soc_quanta: 1,
-                initial_soc_ledger_ref: "synthetic:external-opening-inventory-ledger-v1".into(),
-                max_charge_input_quanta_per_interval: 1,
-                max_discharge_output_quanta_per_interval: 1,
-                charge_efficiency_ppm: 1_000_000,
-                discharge_efficiency_ppm: 1_000_000,
-                minimum_terminal_soc_quanta: 0,
-            },
-            intervals: vec![EnergyHubInterval {
-                id: "t0".into(),
-                demand_quanta: 1,
-                charger_capacity_quanta: 1,
-                renewable_generation_quanta: 0,
-                grid_import_capacity_quanta: 1,
-                renewable_cost_per_quantum: 0.0,
-                renewable_lifecycle_co2e_kg_per_quantum: 0.0,
-                renewable_evidence_ref: "synthetic:renewable:t0".into(),
-                renewable_evidence_class: EvidenceClass::Synthetic,
-                grid_cost_per_quantum: 1.0,
-                grid_lifecycle_co2e_kg_per_quantum: 10.0,
-                grid_evidence_ref: "synthetic:grid:t0".into(),
-                grid_evidence_class: EvidenceClass::Synthetic,
-            }],
-        };
-        seal_energy_hub_scenario(&mut scenario).unwrap();
-        scenario
+        realized_scenario("nominal-baseline-v1", 1.0)
     }
 
     fn calibration() -> Vec<CalibrationFrequency> {
@@ -625,17 +729,24 @@ mod tests {
 
     #[test]
     fn uses_calibrated_probabilities_not_scenario_design_weights() {
-        let scenario = baseline_scenario();
-        let mut benchmark = paired_report();
-        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&scenario).unwrap();
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
         let frequencies = calibration();
         let report = evaluate_paired_policy_distributional_risk(
-            &benchmark, &scenario,
+            &benchmark,
+            &baseline,
+            &scenarios,
             DeployableEnergyPolicy::RollingHorizon,
             DeployableEnergyPolicy::Static,
-            &frequencies, 50_000, "calibration-receipt-v1", 1_000_000,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
             constraints(&frequencies),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(report.distributional_risk.probabilities()[0].scenario_id, "disruption");
         assert_eq!(
@@ -649,20 +760,27 @@ mod tests {
 
     #[test]
     fn refuses_missing_policy_outcome_instead_of_dropping_probability_mass() {
-        let scenario = baseline_scenario();
-        let mut benchmark = paired_report();
-        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&scenario).unwrap();
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
         benchmark.outcomes[1].static_plan = None;
         benchmark.outcomes[1].static_plan_error =
             Some(crate::aviation_energy_hub::EnergyHubError::NoFeasiblePlan);
         let frequencies = calibration();
         let result = evaluate_paired_policy_distributional_risk(
-            &benchmark, &scenario,
+            &benchmark,
+            &baseline,
+            &scenarios,
             DeployableEnergyPolicy::RollingHorizon,
             DeployableEnergyPolicy::Static,
-            &frequencies, 50_000, "calibration-receipt-v1", 1_000_000,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
             constraints(&frequencies),
         );
+
         assert!(matches!(
             result,
             Err(PairedDistributionalRiskError::PolicyOutcomeNotUsable {
@@ -674,19 +792,25 @@ mod tests {
 
     #[test]
     fn refuses_different_calibration_support() {
-        let scenario = baseline_scenario();
-        let mut benchmark = paired_report();
-        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&scenario).unwrap();
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
         let frequencies = vec![CalibrationFrequency {
             scenario_id: "normal".into(),
             nominal_probability_ppm: 1_000_000,
             observed_count: 100,
         }];
         let result = evaluate_paired_policy_distributional_risk(
-            &benchmark, &scenario,
+            &benchmark,
+            &baseline,
+            &scenarios,
             DeployableEnergyPolicy::RollingHorizon,
             DeployableEnergyPolicy::Static,
-            &frequencies, 50_000, "calibration-receipt-v1", 1_000_000,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
             constraints(&frequencies),
         );
         assert!(matches!(
@@ -696,16 +820,82 @@ mod tests {
     }
 
     #[test]
+    fn refuses_realized_scenario_set_mismatch() {
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
+        let frequencies = calibration();
+        let result = evaluate_paired_policy_distributional_risk(
+            &benchmark,
+            &baseline,
+            &scenarios[..1],
+            DeployableEnergyPolicy::RollingHorizon,
+            DeployableEnergyPolicy::Static,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
+            constraints(&frequencies),
+        );
+        assert!(matches!(
+            result,
+            Err(PairedDistributionalRiskError::RealizedScenarioSupportMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_a_plan_whose_reported_metrics_were_tampered() {
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
+        benchmark.outcomes[0]
+            .static_plan
+            .as_mut()
+            .unwrap()
+            .metrics
+            .source_ledger
+            .total_cost = 999.0;
+        let frequencies = calibration();
+        let result = evaluate_paired_policy_distributional_risk(
+            &benchmark,
+            &baseline,
+            &scenarios,
+            DeployableEnergyPolicy::RollingHorizon,
+            DeployableEnergyPolicy::Static,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
+            constraints(&frequencies),
+        );
+        assert!(matches!(
+            result,
+            Err(PairedDistributionalRiskError::ReportedPolicyMetricsMismatch {
+                scenario_id,
+                policy: DeployableEnergyPolicy::Static,
+            }) if scenario_id == "normal"
+        ));
+    }
+
+    #[test]
     fn refuses_a_benchmark_not_bound_to_the_supplied_static_scenario() {
-        let scenario = baseline_scenario();
-        let mut benchmark = paired_report();
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
         benchmark.baseline_scenario_digest = "f".repeat(64);
         let frequencies = calibration();
         let result = evaluate_paired_policy_distributional_risk(
-            &benchmark, &scenario,
+            &benchmark,
+            &baseline,
+            &scenarios,
             DeployableEnergyPolicy::RollingHorizon,
             DeployableEnergyPolicy::Static,
-            &frequencies, 50_000, "calibration-receipt-v1", 1_000_000,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
             constraints(&frequencies),
         );
         assert!(matches!(
@@ -716,17 +906,23 @@ mod tests {
 
     #[test]
     fn refuses_a_risk_gate_with_unmatched_tv_radius() {
-        let scenario = baseline_scenario();
-        let mut benchmark = paired_report();
-        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&scenario).unwrap();
+        let scenarios = realized_panel();
+        let baseline = baseline_scenario();
+        let mut benchmark = paired_report(&scenarios);
+        benchmark.baseline_scenario_digest = canonical_energy_hub_digest(&baseline).unwrap();
         let frequencies = calibration();
         let mut bad_constraints = constraints(&frequencies);
         bad_constraints.tv_radius_ppm = bad_constraints.tv_radius_ppm.saturating_sub(1);
         let result = evaluate_paired_policy_distributional_risk(
-            &benchmark, &scenario,
+            &benchmark,
+            &baseline,
+            &scenarios,
             DeployableEnergyPolicy::RollingHorizon,
             DeployableEnergyPolicy::Static,
-            &frequencies, 50_000, "calibration-receipt-v1", 1_000_000,
+            &frequencies,
+            50_000,
+            "calibration-receipt-v1",
+            1_000_000,
             bad_constraints,
         );
         assert!(matches!(
