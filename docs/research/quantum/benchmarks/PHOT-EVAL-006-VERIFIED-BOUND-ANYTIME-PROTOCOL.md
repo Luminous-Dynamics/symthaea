@@ -66,6 +66,13 @@ Additional upper-bound certificate types (for example, proof logs from exact sol
 
 This boundary does not authenticate a compromised host or prove that the authoring process honestly measured elapsed time. Trusted-runner signatures or attested execution are a separate threat-model decision; a valid hash alone is not an attestation.
 
+## Trace artifacts
+
+- Structural trace schema: [PHOT-EVAL-006-VERIFIED-BOUND-ANYTIME-TRACE-SCHEMA.json](PHOT-EVAL-006-VERIFIED-BOUND-ANYTIME-TRACE-SCHEMA.json)
+- Illustrative four-event trace: [PHOT-EVAL-006-EXAMPLE-TRACE.json](PHOT-EVAL-006-EXAMPLE-TRACE.json)
+
+The example is deliberately marked `example_only: true`. Its digest strings and artifact references are structural placeholders, not a real evidence bundle: they must not be submitted as a run result or treated as verifier-passing evidence. The schema checks the record shape; the runtime evaluator must still read exact bytes and recompute all digests, independently verify the artifacts, and enforce cross-event invariants that JSON Schema cannot express.
+
 ## Worked reference calculation
 
 For a graph with n=6 and horizon H=600 ms, suppose:
