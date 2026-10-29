@@ -4,6 +4,9 @@ use anyhow::{Context,Result,bail};
 use serde::{Deserialize,Serialize};
 use serde_json::Value;
 use sha2::{Digest,Sha256};
+#[path = "../coverage_receipt.rs"]
+mod coverage_receipt;
+use coverage_receipt::verify_receipt;
 const UPSTREAM:&str="1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const SEED:&str="pitb-v0-openai-math-2026-10-19";
 const ALGORITHM:&str="sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
@@ -61,32 +64,65 @@ fn components(splits:&BTreeMap<String,String>,edges:&[Edge])->Vec<Component>{
  let sort=|mut v:Vec<String>|{v.sort();v};let all=sort(rel.iter().map(|e|e.edge_id.clone()).collect());let conf=sort(rel.iter().filter(|e|e.assessment_status=="confirmed").map(|e|e.edge_id.clone()).collect());let unresolved=sort(rel.iter().filter(|e|e.assessment_status=="unresolved").map(|e|e.edge_id.clone()).collect());out.push(Component{component_id:component_id(&family_ids),split_names,family_ids,hard_edge_ids:all,confirmed_edge_ids:conf,unresolved_edge_ids:unresolved})}
  out.sort_by(|a,b|a.family_ids.cmp(&b.family_ids));out
 }
-fn qualification_state(coverage_complete: bool, cross_split_components: usize) -> (&'static str, bool) {
- let status = if !coverage_complete {
-  "not_qualified_incomplete_inventory"
- } else if cross_split_components > 0 {
-  "not_qualified_cross_split_hard_relationships"
- } else {
-  "structurally_eligible_receipt_unverified"
- };
- // This version does not consume/authenticate the underlying coverage receipt.
- (status, false)
+fn qualification_state(
+    coverage_complete: bool,
+    cross_split_components: usize,
+    receipt_verified: bool,
+) -> (&'static str, bool) {
+    if !coverage_complete {
+        ("not_qualified_incomplete_inventory", false)
+    } else if cross_split_components > 0 {
+        ("not_qualified_cross_split_hard_relationships", false)
+    } else if !receipt_verified {
+        ("structurally_eligible_receipt_unverified", false)
+    } else {
+        ("qualified_coverage_verified_no_cross_split_hard_relationships", true)
+    }
 }
 
-fn build(doc:&Value,inv:&Inventory,raw:&[u8])->Result<Manifest>{
+fn build(doc:&Value,inv:&Inventory,raw:&[u8],receipt_verified:bool)->Result<Manifest>{
  let(d,splits)=validate_splits(doc)?;let receipt=validate_edges(inv,&d,&splits)?;let comps=components(&splits,&inv.edges);let mut ec=EdgeCounts{total_edges:inv.edges.len(),hard_edges_included:0,confirmed_hard_edges:0,unresolved_hard_edges:0,dismissed_hard_edges:0,soft_edges:0,cross_split_hard_edges:0,unresolved_cross_split_hard_edges:0};
  for e in &inv.edges{if !hard(&e.relation_kind){ec.soft_edges+=1;continue}match e.assessment_status.as_str(){"confirmed"=>ec.confirmed_hard_edges+=1,"unresolved"=>ec.unresolved_hard_edges+=1,"dismissed"=>ec.dismissed_hard_edges+=1,_=>unreachable!()}if e.assessment_status=="dismissed"{continue}ec.hard_edges_included+=1;if splits[&e.source_family_id]!=splits[&e.target_family_id]{ec.cross_split_hard_edges+=1;if e.assessment_status=="unresolved"{ec.unresolved_cross_split_hard_edges+=1}}}
  let cross=comps.iter().filter(|c|c.split_names.len()>1).count();
- let (status, ok) = qualification_state(inv.coverage_status == "independently_reviewed_complete", cross);
+ let (status, ok) = qualification_state(inv.coverage_status == "independently_reviewed_complete", cross, receipt_verified);
  let mut counts=Counts{train:0,validation:0,test:0};let mut rows=Vec::new();for c in &comps{if c.split_names.len()==1{match c.split_names[0].as_str(){"train"=>counts.train+=1,"validation"=>counts.validation+=1,"test"=>counts.test+=1,_=>unreachable!()}}for id in &c.family_ids{rows.push(FamilyRow{family_id:id.clone(),split:splits[id].clone(),component_id:c.component_id.clone()})}}rows.sort_by(|a,b|a.family_id.cmp(&b.family_id));
- Ok(Manifest{schema_version:"pitb.independent-component-manifest.v0",upstream_commit:UPSTREAM.to_owned(),source_partition_digest_sha256:d,relationship_inventory_sha256:sha(raw),relationship_inventory_status:inv.coverage_status.clone(),coverage_receipt_sha256:receipt,total_family_count:splits.len(),total_component_count:comps.len(),independent_component_count_by_split:counts,cross_split_component_count:cross,edge_counts:ec,families:rows,components:comps,qualification_status:status,coverage_receipt_verification_status:"not_verified_receipt_bytes_not_supplied",qualified_for_confirmatory_resampling:ok,qualification_limitations:vec!["Only the digest was supplied; the underlying coverage receipt bytes and reviewer attestations were not verified, so this builder never authorizes confirmatory resampling.".into(),"Unresolved non-dismissed hard links are joined; any cross-split component blocks qualification.".into(),"Primary scorer, power planner, and test bootstrap must bind and consume this exact manifest digest before confirmatory qualification.".into()]})
+ Ok(Manifest{schema_version:"pitb.independent-component-manifest.v0",upstream_commit:UPSTREAM.to_owned(),source_partition_digest_sha256:d,relationship_inventory_sha256:sha(raw),relationship_inventory_status:inv.coverage_status.clone(),coverage_receipt_sha256:receipt,total_family_count:splits.len(),total_component_count:comps.len(),independent_component_count_by_split:counts,cross_split_component_count:cross,edge_counts:ec,families:rows,components:comps,qualification_status:status,coverage_receipt_verification_status:if receipt_verified{"verified_signature_set"}else{"not_verified_receipt_bytes_not_supplied"},qualified_for_confirmatory_resampling:ok,qualification_limitations:vec![
+  if receipt_verified {"Coverage receipt signatures were verified against caller-pinned methodology and trust-store digests; this attestation cannot mathematically prove reviewer competence or exhaustive discovery.".into()} else {"Receipt bytes, reviewer trust-root bytes, and review-methodology bytes were not supplied and verified; the manifest remains unqualified.".into()},
+  "Unresolved non-dismissed hard links are joined; any cross-split component blocks qualification.".into(),
+  "Primary scorer and power planner must independently reverify the pinned receipt inputs and bind this exact manifest digest before confirmatory qualification.".into()
+]})
 }
-fn main()->Result<()>{let a:Vec<String>=env::args().skip(1).collect();if a.len()!=3{bail!("usage: build_family_component_manifest <splits.json> <edges.json> <manifest.json>")}let sb=fs::read(&a[0]).with_context(||format!("cannot read {}",a[0]))?;let eb=fs::read(&a[1]).with_context(||format!("cannot read {}",a[1]))?;let doc:Value=serde_json::from_slice(&sb).context("invalid split JSON")?;let inv:Inventory=serde_json::from_slice(&eb).context("invalid relationship JSON")?;let m=build(&doc,&inv,&eb)?;fs::write(&a[2],serde_json::to_vec_pretty(&m)?).with_context(||format!("cannot write {}",a[2]))?;println!("PITB_COMPONENT_MANIFEST: qualification={} families={} components={} cross_split_components={} coverage={}",m.qualification_status,m.total_family_count,m.total_component_count,m.cross_split_component_count,m.relationship_inventory_status);Ok(())}
+fn main()->Result<()>{
+ let a:Vec<String>=env::args().skip(1).collect();
+ if a.len()!=8{bail!("usage: build_family_component_manifest <splits.json> <edges.json> <receipt.json|none> <trust-store.json|none> <review-methodology.md|none> <expected-trust-store-sha256|none> <expected-methodology-sha256|none> <manifest.json>")}
+ let sb=fs::read(&a[0]).with_context(||format!("cannot read {}",a[0]))?;
+ let eb=fs::read(&a[1]).with_context(||format!("cannot read {}",a[1]))?;
+ let doc:Value=serde_json::from_slice(&sb).context("invalid split JSON")?;
+ let inv:Inventory=serde_json::from_slice(&eb).context("invalid relationship JSON")?;
+ let (partition_digest,families)=validate_splits(&doc)?;
+ let all_none=a[2..7].iter().all(|value|value=="none");
+ let all_supplied=a[2..7].iter().all(|value|value!="none");
+ if !all_none && !all_supplied{bail!("receipt, trust store, methodology, and both expected digests must be supplied together or all be none")}
+ let receipt_verified=if all_supplied {
+  if inv.coverage_status!="independently_reviewed_complete"{bail!("a receipt cannot qualify an inventory declared incomplete")}
+  let rb=fs::read(&a[2]).with_context(||format!("cannot read {}",a[2]))?;
+  let tb=fs::read(&a[3]).with_context(||format!("cannot read {}",a[3]))?;
+  let mb=fs::read(&a[4]).with_context(||format!("cannot read {}",a[4]))?;
+  let report=verify_receipt(&eb,&rb,&tb,&mb,&a[5],&a[6],&partition_digest,&families)?;
+  if !report.cryptographically_verified {bail!("coverage receipt verifier did not verify signatures")}
+  true
+ } else {false};
+ let m=build(&doc,&inv,&eb,receipt_verified)?;
+ fs::write(&a[7],serde_json::to_vec_pretty(&m)?).with_context(||format!("cannot write {}",a[7]))?;
+ println!("PITB_COMPONENT_MANIFEST: qualification={} families={} components={} cross_split_components={} coverage={} receipt_verified={}",m.qualification_status,m.total_family_count,m.total_component_count,m.cross_split_component_count,m.relationship_inventory_status,receipt_verified);
+ Ok(())
+}
 #[cfg(test)]mod tests{
-#[test]fn qualification_never_passes_without_receipt_verifier(){
- assert_eq!(qualification_state(false,0),("not_qualified_incomplete_inventory",false));
- assert_eq!(qualification_state(true,1),("not_qualified_cross_split_hard_relationships",false));
- assert_eq!(qualification_state(true,0),("structurally_eligible_receipt_unverified",false));
+#[test]fn qualification_requires_complete_coverage_signed_receipt_and_no_cross_split_links(){
+ assert_eq!(qualification_state(false,0,false),("not_qualified_incomplete_inventory",false));
+ assert_eq!(qualification_state(true,1,true),("not_qualified_cross_split_hard_relationships",false));
+ assert_eq!(qualification_state(true,0,false),("structurally_eligible_receipt_unverified",false));
+ assert_eq!(qualification_state(true,0,true),("qualified_coverage_verified_no_cross_split_hard_relationships",true));
 }
 #[test]fn deterministic_split_assignment_is_stable_and_balanced(){
  let ids=vec!["a".to_owned(),"b".to_owned(),"c".to_owned(),"d".to_owned()];
