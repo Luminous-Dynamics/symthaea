@@ -126,9 +126,27 @@ class PairedComparisonTests(unittest.TestCase):
         self.assertEqual(result["expected_trial_count_per_arm"], 16)
         self.assertEqual(result["observed_trial_count"], 32)
         self.assertEqual(result["arm_summaries"]["candidate"]["scheduled_trial_count"], 16)
+        candidate = result["arm_summaries"]["candidate"]
+        self.assertAlmostEqual(candidate["cost_per_scheduled_trial_usd"], candidate["total_cost_usd"] / 16)
+        self.assertEqual(candidate["duration_percentile_method"], "nearest_rank")
         self.assertTrue(result["pairwise_comparisons"])
         self.assertEqual(result["pairwise_comparisons"][0]["paired_task_cluster_count"], 8)
         self.assertEqual(result["pairwise_comparisons"][0]["seeds_per_task"], 2)
+        task_rows = result["pairwise_comparisons"][0]["task_level_comparisons"]
+        self.assertEqual([row["task_cluster_ordinal"] for row in task_rows], list(range(1, 9)))
+        self.assertTrue(all("task_id" not in row for row in task_rows))
+        self.assertEqual(
+            sum(row["direction"] == "comparison_win" for row in task_rows),
+            result["pairwise_comparisons"][0]["task_clusters_won"],
+        )
+        self.assertEqual(
+            sum(row["direction"] == "reference_win" for row in task_rows),
+            result["pairwise_comparisons"][0]["task_clusters_lost"],
+        )
+        self.assertEqual(
+            sum(row["direction"] == "tie" for row in task_rows),
+            result["pairwise_comparisons"][0]["task_clusters_tied"],
+        )
         self.assertEqual(result["bootstrap"]["cluster_unit"], "task_id; each draw carries all paired seed outcomes and all comparison arms")
         self.assertTrue(result["analysis_only"])
         self.assertFalse(result["score_eligible"])
