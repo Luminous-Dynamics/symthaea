@@ -1,6 +1,6 @@
 # CMAQ-001 causal-intervention protocol v0.1
 
-**Status:** design specification plus first deterministic generator tranche; qualification agent adapters not yet implemented  
+**Status:** design specification; factor-composition generator is a separate companion PR; qualification agent adapters not yet implemented  
 **Date:** 2026-10-29  
 **Repository:** `research/cmaq-001/`  
 **Research claim under test:** provenance-aware episodic memory plus an action-conditioned world model improves safe decisions on held-out causal mechanisms, compared with matched-cost memory and planning baselines.
@@ -127,7 +127,7 @@ If pilot variance suggests these thresholds are inappropriate, revise them befor
 ## Execution order
 
 1. Finish scorer tests and receipt contract in `research/cmaq-001/`.
-2. Extend `research/cmaq-001/generator/` beyond its current sparse-parity mechanism to observation/intervention confounding, revision invalidation, partial observability, and regime shifts; preserve separate agent/evaluator outputs.
+2. Reconcile companion PR #8886's factor-composition generator with the scorer branch; then extend it beyond one additive law to held-out causal-law families, regime shifts, stale evidence, and partial observability.
 3. Replace the smoke receipt's caller-supplied verification bit with an authenticated recorder identity/signature and action/outcome digest binding before any production integration.
 4. Add the scorer adapter for generated agent cases and evaluator-only keys.
 5. Run negative controls (shuffled action/outcome labels, stale revisions, altered receipts, missing source IDs) and baseline sanity checks.
@@ -136,4 +136,4 @@ If pilot variance suggests these thresholds are inappropriate, revise them befor
 
 ## Current evidence state
 
-The standalone scorer, receipt-bound smoke path, protocol/schema, and a deterministic sparse-parity factor-composition generator have been authored on a draft branch. The generator unit tests and CI workflow have not yet produced a verified pass at the time of this update; the generated tasks are not yet scored by an agent baseline. No SOTA or production qualification claim is made.
+The standalone scorer, receipt-bound smoke path, world-model decision scorecard, and protocol/schema are authored on this draft branch. Factor-composition task generation is tracked separately in companion PR #8886. Neither scorer nor generator has an observed exact-head passing CI result at the time of this update; no model has been scored and no SOTA or production qualification claim is made.
