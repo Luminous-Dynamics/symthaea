@@ -351,6 +351,23 @@ jobs:
           grep -q '"exact_overlap_pair_count": 1' /tmp/sbr-overlap-exact-report.json
           ! grep -Eq 'secret-fixture-label|different-secret' /tmp/sbr-overlap-exact-report.json
 
+          # Reusing a task ID across splits blocks even when the policy input differs.
+          jq '.generation_id = "refresh-shared-id" |
+              .tasks[0].policy_input.observations[0].x = 9.0 |
+              .tasks[0].policy_input.observations[0].y = 18.0 |
+              .tasks[0].policy_input.observations[1].x = 10.0 |
+              .tasks[0].policy_input.observations[1].y = 20.0' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-shared-id.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:shared-id /tmp/sbr-overlap-shared-id.json > /tmp/sbr-overlap-shared-id-report.json
+          shared_id_exit=$?
+          set -e
+          test "$shared_id_exit" -eq 6
+          grep -q '"shared_task_id_count": 1' /tmp/sbr-overlap-shared-id-report.json
+          grep -q '"exact_overlap_pair_count": 0' /tmp/sbr-overlap-shared-id-report.json
+
           # A coarse numerical match pauses for review; it is not classified as a leak.
           jq '.generation_id = "refresh-near" |
               .tasks[0].task_id = "near-1" |
