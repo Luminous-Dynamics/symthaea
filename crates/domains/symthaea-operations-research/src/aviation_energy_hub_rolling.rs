@@ -192,6 +192,8 @@ pub fn run_rolling_horizon(
         planning_scenario.scenario_id = format!("{}-rolling-stage-{}", realized.scenario_id, stage);
         planning_scenario.input_digest = "pending".to_owned();
         planning_scenario.storage.initial_soc_quanta = soc;
+        planning_scenario.storage.initial_soc_ledger_ref =
+            prefix_inventory_ledger_ref(&realized.storage.initial_soc_ledger_ref, &steps)?;
         planning_scenario.intervals.clear();
         planning_scenario.intervals.push(realized.intervals[stage].clone());
         planning_scenario.intervals.extend(forecast.future_intervals.iter().cloned());
@@ -339,6 +341,53 @@ fn canonical_episode_digest(
         put_string(&mut bytes, &forecast_digest);
     }
     Ok(sha256_hex(&bytes))
+}
+
+/// Bind carried inventory to the already verified prior episode prefix. This digest
+/// contains only committed actions and realized current-stage accounting, never future
+/// realized values. At stage zero the external opening-inventory ledger reference is used.
+fn prefix_inventory_ledger_ref(
+    opening_ledger_ref: &str,
+    prior_steps: &[RollingHorizonStep],
+) -> Result<String, RollingHorizonError> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"symthaea.clean-airline.storage-prefix-ledger.v1\0");
+    put_string(&mut bytes, opening_ledger_ref);
+    put_u32(&mut bytes, usize_to_u32(prior_steps.len())?);
+    for step in prior_steps {
+        put_u32(&mut bytes, usize_to_u32(step.stage_index)?);
+        encode_action(&mut bytes, &step.action);
+        put_f64(&mut bytes, step.realized_step_metrics.source_ledger.total_cost);
+        put_f64(
+            &mut bytes,
+            step.realized_step_metrics.source_ledger.accounted_lifecycle_co2e_kg,
+        );
+        put_f64(
+            &mut bytes,
+            step.realized_step_metrics.source_ledger.total_source_energy_kwh,
+        );
+        put_f64(
+            &mut bytes,
+            step.realized_step_metrics.source_ledger.total_delivered_energy_kwh,
+        );
+        put_string(&mut bytes, &step.planning_scenario_digest);
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+fn encode_action(bytes: &mut Vec<u8>, action: &EnergyHubStepAction) {
+    put_string(bytes, &action.interval_id);
+    for value in [
+        action.renewable_direct_quanta,
+        action.grid_import_quanta,
+        action.battery_discharge_output_quanta,
+        action.renewable_charge_input_quanta,
+        action.renewable_curtailed_quanta,
+        action.soc_before_quanta,
+        action.soc_after_quanta,
+    ] {
+        put_u32(bytes, value);
+    }
 }
 
 fn encode_interval(bytes: &mut Vec<u8>, interval: &EnergyHubInterval) {
