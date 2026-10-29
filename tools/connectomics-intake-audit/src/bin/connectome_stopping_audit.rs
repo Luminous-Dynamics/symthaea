@@ -186,6 +186,9 @@ struct ForecastSeriesSummary {
     asymptotic_mean_absolute_error: Option<f64>,
     persistence_mean_absolute_error: Option<f64>,
     linear_mean_absolute_error: Option<f64>,
+    /// Baseline MAEs on the exact target snapshots where the asymptotic model was estimable.
+    persistence_mae_on_asymptotic_estimable_cases: Option<f64>,
+    linear_mae_on_asymptotic_estimable_cases: Option<f64>,
     asymptotic_relative_mae_improvement_over_persistence: Option<f64>,
     asymptotic_relative_mae_improvement_over_linear: Option<f64>,
 }
@@ -615,19 +618,27 @@ fn walk_forward_forecasts(
         }
 
         let observations = &forecasts[series_forecasts_start..];
-        let asym_mae = mean_absolute_error(observations.iter().filter_map(|forecast| forecast.asymptotic_absolute_error));
+        let asymptotic_mae_rows: Vec<&WalkForwardForecast> = observations.iter()
+            .filter(|forecast| forecast.asymptotic_absolute_error.is_some())
+            .collect();
+        let asym_mae = mean_absolute_error(asymptotic_mae_rows.iter().filter_map(|forecast| forecast.asymptotic_absolute_error));
         let persistence_mae = mean_absolute_error(observations.iter().map(|forecast| forecast.persistence_absolute_error));
         let linear_mae = mean_absolute_error(observations.iter().filter_map(|forecast| forecast.linear_absolute_error));
+        // Model deltas must be paired on the same target snapshots to avoid estimability-selection bias.
+        let paired_persistence_mae = mean_absolute_error(asymptotic_mae_rows.iter().map(|forecast| forecast.persistence_absolute_error));
+        let paired_linear_mae = mean_absolute_error(asymptotic_mae_rows.iter().filter_map(|forecast| forecast.linear_absolute_error));
         summaries.push(ForecastSeriesSummary {
             metric_id,
             metric_kind,
             forecast_count: observations.len(),
-            asymptotic_estimable_count: observations.iter().filter(|forecast| forecast.asymptotic_absolute_error.is_some()).count(),
+            asymptotic_estimable_count: asymptotic_mae_rows.len(),
             asymptotic_mean_absolute_error: asym_mae,
             persistence_mean_absolute_error: persistence_mae,
             linear_mean_absolute_error: linear_mae,
-            asymptotic_relative_mae_improvement_over_persistence: relative_mae_improvement(persistence_mae, asym_mae),
-            asymptotic_relative_mae_improvement_over_linear: relative_mae_improvement(linear_mae, asym_mae),
+            persistence_mae_on_asymptotic_estimable_cases: paired_persistence_mae,
+            linear_mae_on_asymptotic_estimable_cases: paired_linear_mae,
+            asymptotic_relative_mae_improvement_over_persistence: relative_mae_improvement(paired_persistence_mae, asym_mae),
+            asymptotic_relative_mae_improvement_over_linear: relative_mae_improvement(paired_linear_mae, asym_mae),
         });
     }
     (forecasts, summaries)
