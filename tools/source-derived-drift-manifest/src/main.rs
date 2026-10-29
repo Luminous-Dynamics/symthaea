@@ -84,8 +84,8 @@ fn parse_fields(input: &str, keys: &[&str]) -> Result<Fields, String> {
         if !allowed.contains(key) {
             return Err(fail(format!("unknown key at line {}: {key}", index + 1)));
         }
-        if value.is_empty() || value.trim() != value || value.contains('=') {
-            return Err(fail(format!("empty, padded, or ambiguous value for {key}")));
+        if value.is_empty() || value.trim() != value {
+            return Err(fail(format!("empty or padded value for {key}")));
         }
         if fields.insert(key.to_owned(), value.to_owned()).is_some() {
             return Err(fail(format!("duplicate key: {key}")));
