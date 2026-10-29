@@ -47,7 +47,7 @@ class DependencyCascadeTests(unittest.TestCase):
         cls.snapshots, _ = read_jsonl_bytes(FIXTURE)
         cls.reports = {r["snapshot_id"]: r for r in evaluate_dataset(cls.snapshots)["snapshots"]}
 
-    def test_fixture_has_four_distinct_lifecycle_snapshots(self) -> None:
+    def test_fixture_has_seven_distinct_lifecycle_snapshots(self) -> None:
         self.assertEqual(
             list(self.reports),
             [
