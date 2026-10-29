@@ -8,6 +8,8 @@
     "schema",
     "analysis_implementation_revision",
     "multiplicity_policy",
+    "pair_dependence_policy",
+    "dependence_justification_sha256",
     "contrasts",
     "expected_responses"
   ],
@@ -22,7 +24,23 @@
       "description": "Full source commit SHA of the analyzer. Must match the source revision embedded in the inspected build."
     },
     "multiplicity_policy": {
-      "enum": ["holm_across_binary_contrasts", "unadjusted_exploratory"]
+      "enum": [
+        "holm_across_binary_contrasts",
+        "unadjusted_exploratory",
+        "descriptive_no_p_values"
+      ]
+    },
+    "pair_dependence_policy": {
+      "enum": [
+        "exact_conditional_independent_pairs",
+        "descriptive_only_dependence_unknown"
+      ]
+    },
+    "dependence_justification_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "not": { "pattern": "^0{64}$" },
+      "description": "Digest of the evaluator-side rationale for the declared pair-dependence policy. It must be fixed before outcomes are revealed."
     },
     "contrasts": {
       "type": "array",
