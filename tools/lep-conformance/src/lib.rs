@@ -917,9 +917,12 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_nested_json_keys_are_rejected_before_validation() {
-        let input = br#"{"predicate":{"claim":{"id":"one","id":"two"}}}"#;
-        let error = parse_json_unique_keys(input).expect_err("nested duplicate keys must be rejected");
+    fn repository_duplicate_key_fixture_is_rejected_before_validation() {
+        let input = include_bytes!(
+            "../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-duplicate-key.json"
+        );
+        let error = parse_json_unique_keys(input)
+            .expect_err("duplicate keys in the committed fixture must be rejected");
         assert!(error.contains("duplicate JSON object key"));
     }
 
