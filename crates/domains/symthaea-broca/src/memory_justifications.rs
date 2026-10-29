@@ -498,7 +498,7 @@ mod tests {
         let first = graph.invalidate_source_event("A").unwrap();
         assert!(first.newly_unsupported_fact_ids.is_empty());
         assert_eq!(first.retained_with_alternative_support, vec!["C"]);
-        assert_eq!(first.inactive_justifications_by_fact.get("C"), Some(&vec!["from-A".into()]));
+        assert_eq!(first.inactive_justifications_by_fact.get("C"), Some(&vec!["from-A".to_owned()]));
         assert!(graph.current_fact("C").is_some());
         assert!(graph.current_fact("D").is_some());
         assert_eq!(
