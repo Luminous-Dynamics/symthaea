@@ -146,7 +146,7 @@ pub struct MeshReceiver {
     /// Expected decoded payload size for WisdomPacket reassembly (nominal for legacy envelopes).
     expected_payload_size: usize,
     /// Maximum allowed encoded bytes for a fragmented envelope before state allocation.
-    /// Defaults to WISDOM_PACKET_SIZE plus 92 bytes of envelope/transport margin.
+    /// Defaults to WISDOM_PACKET_SIZE plus 30 bytes for compression and optional versioned AEAD.
     max_encoded_payload_size: usize,
     /// Maximum concurrent pending assemblies (prevents memory exhaustion).
     max_pending: usize,
@@ -173,7 +173,7 @@ impl MeshReceiver {
             peers: HashMap::new(),
             timeout: Duration::from_secs(30),
             expected_payload_size: WISDOM_PACKET_SIZE,
-            max_encoded_payload_size: WISDOM_PACKET_SIZE + 92,
+            max_encoded_payload_size: WISDOM_PACKET_SIZE + 30,
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),
@@ -227,7 +227,8 @@ impl MeshReceiver {
 
     /// Set the maximum accepted encoded envelope length before any assembly state is allocated.
     ///
-    /// The default is WISDOM_PACKET_SIZE + 92 to allow compression/encryption envelope overhead.
+    /// The default is WISDOM_PACKET_SIZE + 30 for one compression byte, an optional key-version byte,
+    /// a 12-byte nonce and a 16-byte authentication tag.
     /// This is an independent admission limit from the nominal decoded payload size.
     pub fn with_max_encoded_payload_size(mut self, size: usize) -> Self {
         self.max_encoded_payload_size = size;
