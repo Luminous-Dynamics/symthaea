@@ -16,6 +16,7 @@ use std::process::ExitCode;
 use symthaea_muse::audio_preservation::{
     AudioView, FrameInterval, OnsetPreservationConfig, PreservationConfig,
     PreservationVerdict, audit_onset_preservation, audit_protected_audio,
+    verify_audio_preservation_receipt, verify_onset_preservation_receipt,
 };
 
 const SAMPLE_RATE_HZ: u32 = 16_000;
@@ -153,6 +154,7 @@ fn acoustic_case(
     ) {
         Ok(report) => {
             let actual = verdict_name(report.verdict);
+            let receipt_verified = verify_audio_preservation_receipt(&report).unwrap_or(false);
             json!({
                 "id": id,
                 "mutation_family": mutation_family,
@@ -160,7 +162,9 @@ fn acoustic_case(
                 "description": description,
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
-                "expected_outcome_reproduced": report.verdict == expected,
+                "receipt_sha256": report.receipt_sha256,
+                "receipt_verified": receipt_verified,
+                "expected_outcome_reproduced": report.verdict == expected && receipt_verified,
                 "protected_windows": report.protected_windows,
                 "audited_channel_windows": report.audited_channel_windows,
                 "violating_channel_windows": report.violating_channel_windows,
@@ -178,6 +182,7 @@ fn acoustic_case(
             "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
+            "receipt_verified": false,
             "input_error": error.to_string(),
             "expected_outcome_reproduced": false,
         }),
@@ -202,6 +207,7 @@ fn onset_case(
     ) {
         Ok(report) => {
             let actual = verdict_name(report.verdict);
+            let receipt_verified = verify_onset_preservation_receipt(&report).unwrap_or(false);
             json!({
                 "id": id,
                 "mutation_family": mutation_family,
@@ -209,7 +215,9 @@ fn onset_case(
                 "description": description,
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
-                "expected_outcome_reproduced": report.verdict == expected,
+                "receipt_sha256": report.receipt_sha256,
+                "receipt_verified": receipt_verified,
+                "expected_outcome_reproduced": report.verdict == expected && receipt_verified,
                 "reference_onset_count": report.reference_onsets.len(),
                 "candidate_onset_count": report.candidate_onsets.len(),
                 "matched_events": report.matched_events,
@@ -230,6 +238,7 @@ fn onset_case(
             "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
+            "receipt_verified": false,
             "input_error": error.to_string(),
             "expected_outcome_reproduced": false,
         }),
@@ -389,6 +398,10 @@ fn main() -> ExitCode {
         .filter(|case| case["expected_outcome_reproduced"] == Value::Bool(true))
         .count();
     let failed = cases.len() - passed;
+    let receipt_failures = cases
+        .iter()
+        .filter(|case| case["receipt_verified"] != Value::Bool(true))
+        .count();
 
     // Report failure modes rather than only a single fixture pass percentage.
     // A critical false accept cannot be hidden by benign abstention or another
@@ -464,6 +477,7 @@ fn main() -> ExitCode {
         "cases_total": cases.len(),
         "cases_expected_outcome_reproduced": passed,
         "cases_expected_outcome_not_reproduced": failed,
+        "receipt_failures": receipt_failures,
         "critical_mutations_total": critical_mutations_total,
         "critical_false_accepts": critical_false_accepts,
         "critical_false_accept_metrics": critical_false_accept_metrics,
@@ -472,7 +486,7 @@ fn main() -> ExitCode {
         "false_rejection_metrics": rate_interval_json(false_rejections, positive_controls_total),
         "abstentions": abstentions,
         "per_family_summary": per_family_summary,
-        "status": if failed == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
+        "status": if failed == 0 && receipt_failures == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
         "limitations": [
             "synthetic fixtures only; not a human listening study",
             "thresholds are fixture settings and are not production-calibrated",
