@@ -130,7 +130,17 @@ def component_first_with_family_swaps(sizes: list[int]) -> tuple[list[int], int]
     actual = tuple(assignment.count(i) for i in range(3))
     if actual != expected:
         raise AssertionError(f"component quota changed: expected {expected}, got {actual}")
-    return assignment, iterations
+    # Return assignments in original input-ID order because the metric
+    # reporter pairs each split label with the original component-size vector.
+    assignment_by_id = {
+        component_id: assignment[index]
+        for index, (component_id, _size) in enumerate(components)
+    }
+    original_order_assignment = [
+        assignment_by_id[f"component-{index:04d}"]
+        for index in range(len(sizes))
+    ]
+    return original_order_assignment, iterations
 
 
 def synthetic_random_partition(rng: random.Random) -> list[int]:
