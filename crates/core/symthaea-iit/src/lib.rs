@@ -1345,4 +1345,17 @@ mod tests {
         assert!(cuts.iter().any(|m| *m == [false, true, true, false]));
     }
 
+    #[test]
+    fn three_unit_directed_set_partition_count_matches_bell_partition_expansion() {
+        // Bell(3) has four unordered set partitions; removing the trivial block
+        // leaves 3 two-block partitions and one three-block partition:
+        // 3 * 3^2 + 1 * 3^3 = 54 block-direction assignments.
+        let without_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, false, 54).unwrap();
+        assert_eq!(without_total.len(), 22); // Deduplicated matrices, not raw assignments.
+        assert!(without_total.iter().all(|p| !p.is_total_cut()));
+        let with_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, true, 54).unwrap();
+        assert_eq!(with_total.len(), 23);
+        assert!(with_total[0].is_total_cut());
+    }
+
 }
