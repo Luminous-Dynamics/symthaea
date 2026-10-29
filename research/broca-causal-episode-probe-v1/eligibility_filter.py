@@ -28,6 +28,9 @@ ALLOWED_STATUSES = {
 ELIGIBLE_BY_INTENT: dict[str, frozenset[str]] = {
     "current_state": frozenset({"current", "contextual"}),
     "historical_state": frozenset({"historical", "contextual"}),
+    # Composite questions need both current and superseded evidence; do not force
+    # them into a single temporal mode that discards half of the requested answer.
+    "current_and_history": frozenset({"current", "historical", "contextual"}),
     "revocation_status": frozenset({"revoked", "contextual"}),
     "approved_state": frozenset({"current", "contextual"}),
     "proposal_history": frozenset({"tentative", "not_applied", "contextual"}),
@@ -42,6 +45,19 @@ def infer_retrieval_intent(query: str) -> tuple[str | None, str]:
     if not isinstance(query, str) or not query.strip():
         return None, "empty_query"
     text = " ".join(query.casefold().split())
+
+    # Composite queries must be detected before the single-mode temporal rules.
+    has_current_cue = any(
+        term in text for term in ("current", "currently", "right now", "at present", "today", "now")
+    )
+    has_history_cue = any(
+        term in text for term in (
+            "before ", "prior to ", "previous", "formerly", "former ", "historical",
+            "what was it", "what did it use", "what was the initial",
+        )
+    )
+    if has_current_cue and has_history_cue:
+        return "current_and_history", "composite_current_history"
 
     # Order matters: proposal history is more specific than the word "approved";
     # revocation is more specific than generic state/currentness language.
