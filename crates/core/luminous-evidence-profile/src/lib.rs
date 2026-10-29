@@ -709,6 +709,27 @@ mod tests {
     }
 
     #[test]
+    fn failed_verification_requires_a_failed_check() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["verification"]["outcome"] = json!("failed");
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "FAILED_VERIFICATION_WITHOUT_FAILED_CHECK"));
+    }
+
+    #[test]
+    fn inconclusive_verification_cannot_hide_a_failed_check() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["verification"]["outcome"] = json!("inconclusive");
+        statement["predicate"]["verification"]["checks"] = json!([
+            {"id": "check", "outcome": "failed"}
+        ]);
+        let report = verify_statement(&statement);
+        assert!(!report.valid);
+        assert!(has_code(&report, "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT"));
+    }
+
+    #[test]
     fn duplicate_check_ids_are_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["checks"] = json!([
