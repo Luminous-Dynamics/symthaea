@@ -33,7 +33,7 @@ VALIDATION_FIELDS = frozenset({
     "schema_version", "validation_id", "evidence_class", "policy_source_sha256",
     "policy_config_sha256", "split", "policy_frozen_before_outcomes",
     "outcomes_unsealed_after_decisions", "independence_unit", "independence_note",
-    "decision_receipt_sha256", "target_prediction_manifest_sha256", "tasks",
+    "audit_contract_sha256", "decision_receipt_sha256", "target_prediction_manifest_sha256", "tasks",
 })
 VALIDATION_TASK_FIELDS = frozenset({"task_id", "stratum", "outcomes"})
 OUTCOME_FIELDS = frozenset({"candidate_id", "observed_margin"})
@@ -134,6 +134,7 @@ def _check_receipt_bindings(
     target_manifest: Any,
     validation: Any,
     *,
+    contract_manifest_sha256: str,
     decision_receipt_sha256: str,
     target_prediction_manifest_sha256: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -186,6 +187,8 @@ def _check_receipt_bindings(
     if validation["independence_unit"] != "task_id":
         raise ValueError("validation independence_unit must be task_id")
     _nonblank(validation["independence_note"], "validation.independence_note")
+    if _sha256(validation["audit_contract_sha256"], "validation.audit_contract_sha256") != contract_manifest_sha256.lower():
+        raise ValueError("validation outcomes are not bound to this exact frozen audit contract")
     if _sha256(validation["decision_receipt_sha256"], "validation.decision_receipt_sha256") != decision_receipt_sha256:
         raise ValueError("validation outcomes are not bound to this exact decision receipt")
     if _sha256(validation["target_prediction_manifest_sha256"], "validation.target_prediction_manifest_sha256") != target_prediction_manifest_sha256:
@@ -237,6 +240,7 @@ def evaluate(
     target_manifest: Any,
     validation_raw: Any,
     *,
+    contract_manifest_sha256: str,
     decision_receipt_sha256: str,
     target_prediction_manifest_sha256: str,
 ) -> dict[str, Any]:
@@ -244,6 +248,7 @@ def evaluate(
     validation = validation_raw
     decisions, validation_tasks = _check_receipt_bindings(
         contract, decision, target_manifest, validation,
+        contract_manifest_sha256=contract_manifest_sha256,
         decision_receipt_sha256=decision_receipt_sha256,
         target_prediction_manifest_sha256=target_prediction_manifest_sha256,
     )
@@ -412,15 +417,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         decision_bytes, decision = _load_json(args.decision_receipt)
         target_bytes, target_manifest = _load_json(args.target_predictions)
         validation_bytes, validation = _load_json(args.validation_outcomes)
+        contract_hash = hashlib.sha256(contract_bytes).hexdigest()
         decision_hash = hashlib.sha256(decision_bytes).hexdigest()
         target_hash = hashlib.sha256(target_bytes).hexdigest()
         result = evaluate(
             contract, decision, target_manifest, validation,
+            contract_manifest_sha256=contract_hash,
             decision_receipt_sha256=decision_hash,
             target_prediction_manifest_sha256=target_hash,
         )
         result["source_artifacts"] = {
-            "audit_contract_sha256": hashlib.sha256(contract_bytes).hexdigest(),
+            "audit_contract_sha256": contract_hash,
             "decision_receipt_sha256": decision_hash,
             "target_prediction_manifest_sha256": target_hash,
             "validation_outcome_manifest_sha256": hashlib.sha256(validation_bytes).hexdigest(),
