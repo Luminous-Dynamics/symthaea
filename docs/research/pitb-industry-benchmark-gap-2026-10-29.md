@@ -103,3 +103,25 @@ The targets above are proposed qualification gates, not achieved results. PITB c
 - TheoremBench, 2026 preprint: https://arxiv.org/abs/2606.09450
 - Faults in Our Formal Benchmarking, 2026 preprint: https://arxiv.org/abs/2606.29493
 - SorryDB snapshot: https://sorrydb.org/
+
+## Literature refresh: structure-aware retrieval, faithful proof decomposition, and repository transfer (2026-10-29)
+
+The latest relevant work strengthens the case for PITB's central hypothesis—but also raises the bar for its baselines. PITB should not compete only against lexical or embedding similarity when newer systems retrieve through dependency graphs or align natural-language and formal proofs.
+
+| Work | Relevant published result or scope | PITB implication and comparison boundary |
+|---|---|---|
+| [LeanGraphSearch (Oct. 15, 2026)](https://arxiv.org/abs/2610.22339) | Its project report shows MathlibQR Recall@100 rising from 82.7% for LeanSearch v2 Standard to 94.7% for LeanGraphSearch Standard (+12.0 points); MathlibMPR complete-route coverage rises from 39.1% to 42.8% (+3.7 points). The paper also reports downstream prover-loop gains in its own setup. | Include as a candidate for the strongest retrieval arm when PITB task format and source corpus are compatible. Its score is not a PITB result. Freeze one retriever for the complete arm; do not mix systems target-by-target. [Project results](https://pluslabnlp.github.io/LeanGraphSearch/). |
+| [ProofBridge (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/16f5b8d916f13534d11c50adf60914e4-Abstract-Conference.html) | Cross-modal joint embeddings, retrieval-augmented fine-tuning and iterative repair; reports up to 3.28× Recall@1 over an all-MiniLM-L6-v2 baseline and +31.14% semantic correctness / +1.64% type correctness at pass@32 versus Kimina-Prover-RL-1.7B in its curated miniF2F-Test-PF evaluation. | Strong related work for cross-modal retrieval and statement-faithfulness measurements. Its model, curated task set and pass@32 budget differ, so use it as a design precedent or separate formalization track, not a numeric PITB comparator. |
+| [ProofFlow (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/5fce5198dbf92d5ff45f74504431e2ff-Abstract-Conference.html) | Uses a proof-step dependency DAG and lemma-by-lemma formalization; reports ProofScore 0.545 versus 0.279 for full-proof formalization and 0.046 for step-proof formalization on its 184-problem annotated benchmark. | Treat the insight as an executable dependency-preserving proof transformation, not merely a paragraph. Where gold step graphs exist, report structural coverage/fidelity separately from the primary exact-target solve endpoint. These ProofScore values are not comparable to PITB's solve rate. |
+| [VeriSoftBench (2026)](https://arxiv.org/abs/2602.18307) | 500 Lean 4 proof obligations from real formal-methods repositories, preserving project-specific context and cross-file dependencies; Mathlib-tuned provers transfer poorly to this setting in the reported experiments. | A future independent-repository cohort is necessary to test whether insights transfer beyond one research-paper catalog and its local proof ecosystem. |
+| [ProofOptimizer (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) | Reports proof-length reductions of 87% on miniF2F, 57% on PutnamBench and 50% on Seed-Prover's IMO 2025 proofs in its own setup. | Add proof concision/check time as a secondary engineering outcome only after semantic success is held constant; shorter code is not automatically a stronger proof or a better transfer result. |
+
+### Revised benchmark decision
+
+1. **Primary:** paired, component-clustered change in exact-target semantic-gate success from typed insight versus the strongest validation-selected retrieval baseline, at identical budgets.
+2. **Selectivity:** compatible-insight recall, incompatible-insight false-accept rate, abstention, and calibration. A system that declines every transfer does not pass.
+3. **Mechanism:** proof-obligation transitions and dependency-preserving lemma structure; component ablations establish which contract fields cause gains.
+4. **Efficiency:** full verified-solve success–cost frontier, plus proof-check time and proof size where comparable.
+5. **Generalization:** sealed temporal challenges and an independently maintained repository cohort; never retroactively merge them into the frozen v0 denominator.
+
+**Qualification rule:** do not claim to beat SOTA because PITB's score is higher on a different task set. A defensible superiority claim needs a matched-task or clearly labelled task-specific comparison, same budgets and checker, independent target semantics, uncertainty intervals, a completed mutation gate, and independent replication. PITB remains a proposed benchmark with no measured transfer-utility results.
