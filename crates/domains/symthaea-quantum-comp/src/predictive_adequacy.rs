@@ -335,7 +335,10 @@ pub fn assess_predictive_adequacy(
         };
 
     let mut reasons = Vec::new();
-    let status = if n < policy.min_observations {
+    let status = if zero_event {
+        reasons.push("held-out data contains an outcome assigned probability zero by the model".into());
+        PredictiveAdequacyStatus::Reject
+    } else if n < policy.min_observations {
         reasons.push(format!("insufficient held-out observations: {} < {}", n, policy.min_observations));
         PredictiveAdequacyStatus::InsufficientEvidence
     } else if data.sampling_assumption != SamplingAssumption::IidCategorical {
@@ -344,9 +347,6 @@ pub fn assess_predictive_adequacy(
     } else if n == 0 {
         reasons.push("no held-out outcomes were observed".into());
         PredictiveAdequacyStatus::InsufficientEvidence
-    } else if zero_event {
-        reasons.push("held-out data contains an outcome assigned probability zero by the model".into());
-        PredictiveAdequacyStatus::Reject
     } else {
         let mut failed = false;
         if tv_upper_bound.unwrap_or(1.0) > policy.max_total_variation_upper_bound {
