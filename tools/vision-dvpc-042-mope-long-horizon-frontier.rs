@@ -344,9 +344,11 @@ fn median(values: &[usize]) -> Option<usize> {
     let mut values=values.to_vec(); values.sort_unstable(); Some(values[(values.len()-1)/2])
 }
 fn percentile90(values: &[usize]) -> Option<usize> {
-    if values.is_empty(){return None;}
-    let mut values=values.to_vec();values.sort_unstable();
-    Some(values[((values.len()-1)*9+9)/10].min(values.len()-1).min(values.len()-1).checked_sub(0).map(|i|values[i]).unwrap())
+    if values.is_empty() { return None; }
+    let mut sorted=values.to_vec();
+    sorted.sort_unstable();
+    let index=((sorted.len()*9+9)/10).saturating_sub(1).min(sorted.len()-1);
+    Some(sorted[index])
 }
 
 fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) {
@@ -390,6 +392,8 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
 fn benchmark(replicates: usize, horizons: &[usize]) -> Result<String,String> {
     let scenarios=[Scenario::healthy_null(),Scenario::weak_overlap_null(),Scenario::weak_overlap_alternative()];
     let mut out=String::from("record_type\tscenario\tmethod_or_field\thorizon\tmetric\testimate\tstandard_error\tci_low\tci_high\n");
+    let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t{BASE_SEED}\tformula\tBASE_SEED xor scenario*D6E8FEB86659FD93 xor replicate*A0761D6478BD642F");
+    let _=writeln!(out,"BENCHMARK_CONFIG\treplicates\t{replicates}\tmax_horizon\t{}",horizons.iter().max().unwrap_or(&0));
     for (idx,scenario) in scenarios.into_iter().enumerate() {
         let result=simulate_scenario(scenario,idx,replicates,horizons)?;
         emit_scenario(&mut out,&result,horizons);
@@ -397,11 +401,19 @@ fn benchmark(replicates: usize, horizons: &[usize]) -> Result<String,String> {
     Ok(out)
 }
 
+fn seed_smoke() -> String {
+    let mut rng=SplitMix64::new(BASE_SEED);
+    let mut out=String::from("VIS_DVPC_042_SEED_SMOKE\\n");
+    for _ in 0..64 { let _=writeln!(out,"{:016x}",rng.next_u64()); }
+    out
+}
+
 fn main() {
     let args:Vec<String>=env::args().collect();
     let result=match args.get(1).map(String::as_str) {
         Some("--benchmark")=>benchmark(REPLICATES,&HORIZONS),
         Some("--smoke")=>benchmark(8,&[8]),
+        Some("--seed-smoke")=>Ok(seed_smoke()),
         _=>Err("usage: vision-dvpc-042-mope-long-horizon-frontier --benchmark|--smoke".to_owned()),
     };
     match result {
