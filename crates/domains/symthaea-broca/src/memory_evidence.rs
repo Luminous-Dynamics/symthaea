@@ -167,6 +167,37 @@ pub struct AuditedMemoryResolution {
     pub floor: EvidenceFloorAudit,
 }
 
+/// One evidence item selected for a query-specific set-cover target.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QueryEvidenceSetMember {
+    pub hdc_id: u64,
+    /// Original retrieval score, retained as metadata rather than proof of support.
+    pub retrieval_score: f32,
+    /// Declared cost from a pinned tokenizer and context-item framing contract.
+    pub declared_token_cost: usize,
+    /// Required roles this member newly covers in the greedy selection step.
+    pub newly_covered_roles: Vec<String>,
+}
+
+/// Greedy query-specific evidence-set selection result.
+///
+/// The complete flag means all caller-declared roles have been covered by role
+/// annotations; it does not mean that evidence semantically entails an answer.
+/// Role extraction and query requirement planning must be independently source-
+/* grounded and evaluated. The final serialized context still needs a tokenizer
+budget check because token costs may not be additive across items. */
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QueryEvidenceSetSelection {
+    pub required_roles: Vec<String>,
+    pub covered_roles: Vec<String>,
+    pub missing_roles: Vec<String>,
+    pub members: Vec<QueryEvidenceSetMember>,
+    pub declared_token_cost: usize,
+    pub token_budget: usize,
+    pub complete: bool,
+}
+
+
 
 impl EvidenceRecord {
     /// Structural validation; image existence and bytes are checked at use time.
@@ -1550,6 +1581,183 @@ impl EvidenceIndex {
         })
     }
 
+    /// Select a query-specific evidence set using caller-supplied role annotations.
+    ///
+    /// This is a deterministic set-cover heuristic, not a semantic entailment engine.
+    /// required_roles is the query planner's explicit information contract and
+    /// candidate_roles must come from a separately evaluated, source-grounded
+    /// reification stage. Both are inputs, not truths established by retrieval.
+    ///
+    /// At each step the selector chooses the eligible text candidate with the most
+    /// newly-covered required roles per declared token cost. Ties prefer higher
+    /// retrieval score, then lower HDC ID. Retrieval score is a tie-break only; it is
+    /// not treated as calibrated evidence strength. Selection stops when all roles
+    /// are covered, the item limit is reached, or no fitting candidate covers a
+    /// remaining role. The result lists uncovered roles explicitly.
+    ///
+    /// Every unique ranked candidate must have a known evidence record, a positive
+    /// declared cost, and an explicit role-set entry (possibly empty). This prevents
+    /// missing annotations from silently behaving like semantic irrelevance. Eligible
+    /// text digests are verified before they can participate in the selection.
+    ///
+    /// The final prompt/context serializer must re-count the actual serialized token
+    /// total and fail closed if it exceeds token_budget; this method enforces only
+    /// the declared additive-cost budget.
+    pub(crate) fn select_query_evidence_set(
+        &self,
+        ranked_candidates: &[(u64, f32)],
+        candidate_token_costs: &BTreeMap<u64, usize>,
+        candidate_roles: &BTreeMap<u64, BTreeSet<String>>,
+        required_roles: &BTreeSet<String>,
+        scope_id: &str,
+        now_ms: u64,
+        token_budget: usize,
+        max_candidates: usize,
+    ) -> Result<QueryEvidenceSetSelection, String> {
+        if scope_id.trim().is_empty() {
+            return Err("scope_id must be non-empty".into());
+        }
+        if required_roles.is_empty() {
+            return Err("required_roles must not be empty".into());
+        }
+        for role in required_roles {
+            if role.trim().is_empty() || role.trim() != role {
+                return Err("required role labels must be non-empty and trimmed".into());
+            }
+        }
+
+        let mut ordered = ranked_candidates.to_vec();
+        if ordered.iter().any(|(_, score)| !score.is_finite() || *score < 0.0) {
+            return Err("candidate scores must be finite and non-negative".into());
+        }
+        ordered.sort_unstable_by(|left, right| {
+            right.1.total_cmp(&left.1).then_with(|| left.0.cmp(&right.0))
+        });
+
+        // Validate each unique candidate's metadata before eligibility/budget checks.
+        // Otherwise a malformed low-ranked item could be silently hidden by truncation.
+        let mut unique = Vec::new();
+        let mut seen = BTreeSet::new();
+        for (hdc_id, score) in ordered {
+            if !seen.insert(hdc_id) {
+                continue;
+            }
+            if !self.records.contains_key(&hdc_id) {
+                return Err(format!("ranked evidence candidate references unknown HDC ID {hdc_id}"));
+            }
+            let cost = candidate_token_costs.get(&hdc_id)
+                .ok_or_else(|| format!("missing token cost for HDC ID {hdc_id}"))?;
+            if *cost == 0 {
+                return Err(format!("token cost must be positive for HDC ID {hdc_id}"));
+            }
+            let roles = candidate_roles.get(&hdc_id)
+                .ok_or_else(|| format!("missing explicit evidence-role annotation for HDC ID {hdc_id}"))?;
+            for role in roles {
+                if role.trim().is_empty() || role.trim() != role {
+                    return Err(format!("evidence role labels must be non-empty and trimmed for HDC ID {hdc_id}"));
+                }
+            }
+            unique.push((hdc_id, score));
+        }
+
+        let role_keys: BTreeSet<u64> = candidate_roles.keys().copied().collect();
+        let candidate_keys: BTreeSet<u64> = unique.iter().map(|(id, _)| *id).collect();
+        if role_keys != candidate_keys {
+            return Err("candidate role annotations must exactly match the unique ranked candidate IDs".into());
+        }
+
+        let mut eligible = Vec::new();
+        for (hdc_id, score) in unique {
+            let record = self.records.get(&hdc_id)
+                .ok_or_else(|| format!("ranked evidence candidate disappeared: {hdc_id}"))?;
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            let EvidencePayload::Text { value } = &record.payload else {
+                continue;
+            };
+            if sha256_hex(value.as_bytes()) != record.content_sha256 {
+                return Err(format!("text content digest mismatch for eligible evidence HDC ID {hdc_id}"));
+            }
+            eligible.push((hdc_id, score));
+        }
+
+        let mut remaining_roles = required_roles.clone();
+        let mut members = Vec::new();
+        let mut used_ids = BTreeSet::new();
+        let mut used_cost = 0usize;
+
+        while !remaining_roles.is_empty() && members.len() < max_candidates {
+            let remaining_budget = token_budget.saturating_sub(used_cost);
+            let mut best: Option<(u64, f32, usize, BTreeSet<String>)> = None;
+
+            for (hdc_id, score) in &eligible {
+                if used_ids.contains(hdc_id) {
+                    continue;
+                }
+                let cost = *candidate_token_costs.get(hdc_id)
+                    .ok_or_else(|| format!("missing token cost for HDC ID {hdc_id}"))?;
+                if cost > remaining_budget {
+                    continue;
+                }
+                let roles = candidate_roles.get(hdc_id)
+                    .ok_or_else(|| format!("missing evidence-role annotation for HDC ID {hdc_id}"))?;
+                let newly_covered: BTreeSet<String> = roles
+                    .intersection(&remaining_roles)
+                    .cloned()
+                    .collect();
+                if newly_covered.is_empty() {
+                    continue;
+                }
+
+                let replace = match &best {
+                    None => true,
+                    Some((best_id, best_score, best_cost, best_roles)) => {
+                        let left = (newly_covered.len() as u128) * (*best_cost as u128);
+                        let right = (best_roles.len() as u128) * (cost as u128);
+                        left > right
+                            || (left == right
+                                && (score.total_cmp(best_score).is_gt()
+                                    || (score.total_cmp(best_score).is_eq() && *hdc_id < *best_id)))
+                    }
+                };
+                if replace {
+                    best = Some((*hdc_id, *score, cost, newly_covered));
+                }
+            }
+
+            let Some((hdc_id, score, cost, newly_covered)) = best else {
+                break;
+            };
+            used_ids.insert(hdc_id);
+            used_cost = used_cost.checked_add(cost)
+                .ok_or_else(|| "selected evidence token cost overflow".to_string())?;
+            for role in &newly_covered {
+                remaining_roles.remove(role);
+            }
+            members.push(QueryEvidenceSetMember {
+                hdc_id,
+                retrieval_score: score,
+                declared_token_cost: cost,
+                newly_covered_roles: newly_covered.into_iter().collect(),
+            });
+        }
+
+        let covered_roles: BTreeSet<String> = required_roles
+            .difference(&remaining_roles)
+            .cloned()
+            .collect();
+        Ok(QueryEvidenceSetSelection {
+            required_roles: required_roles.iter().cloned().collect(),
+            covered_roles: covered_roles.iter().cloned().collect(),
+            missing_roles: remaining_roles.iter().cloned().collect(),
+            members,
+            declared_token_cost: used_cost,
+            token_budget,
+            complete: remaining_roles.is_empty(),
+        })
+    }
+
     /// ABI projection for consumers that require only official `type/value`
     /// context items. Use `resolve_with_provenance` when an audit trail is needed.
     pub fn resolve(
@@ -2138,6 +2346,130 @@ mod tests {
         assert!(evidence.resolve_with_audit(
             &[7], "web", 150, Path::new("."), 1,
             EvidenceFloorPolicy { minimum_items: 1, minimum_distinct_trajectories: 0 },
+        ).is_err());
+    }
+
+    #[test]
+    fn query_evidence_set_covers_complementary_roles_within_budget() {
+        let mut evidence = EvidenceIndex::new();
+        for (id, evidence_id, trajectory_id, text) in [
+            (1, "ranked-high", "trajectory-a", "initially relevant observation"),
+            (2, "multi-role", "trajectory-b", "procedure and outcome evidence"),
+            (3, "procedure-only", "trajectory-c", "procedure context"),
+            (4, "outcome-only", "trajectory-d", "observed result"),
+        ] {
+            let (record, source_bytes) = text_record_for_trajectory(
+                id, evidence_id, "web", trajectory_id, text,
+            );
+            evidence.insert(record, &source_bytes).unwrap();
+        }
+
+        let ranked = [(1, 0.99), (2, 0.60), (3, 0.80), (4, 0.70)];
+        let costs = BTreeMap::from([(1, 2usize), (2, 3usize), (3, 2usize), (4, 2usize)]);
+        let roles = BTreeMap::from([
+            (1, BTreeSet::from(["context".to_string()])),
+            (2, BTreeSet::from(["procedure".to_string(), "outcome".to_string()])),
+            (3, BTreeSet::from(["procedure".to_string()])),
+            (4, BTreeSet::from(["outcome".to_string()])),
+        ]);
+        let required = BTreeSet::from(["procedure".to_string(), "outcome".to_string()]);
+        let selected = evidence.select_query_evidence_set(
+            &ranked, &costs, &roles, &required, "web", 150, 3, 2,
+        ).unwrap();
+
+        assert!(selected.complete);
+        assert_eq!(selected.members.iter().map(|member| member.hdc_id).collect::<Vec<_>>(), vec![2]);
+        assert_eq!(selected.covered_roles, vec!["outcome".to_string(), "procedure".to_string()]);
+        assert!(selected.missing_roles.is_empty());
+        assert_eq!(selected.declared_token_cost, 3);
+    }
+
+    #[test]
+    fn query_evidence_set_returns_uncovered_roles_instead_of_claiming_sufficiency() {
+        let mut evidence = EvidenceIndex::new();
+        let (record, source_bytes) = text_record_for_trajectory(
+            1, "single-role", "web", "trajectory-a", "only the first fact is present",
+        );
+        evidence.insert(record, &source_bytes).unwrap();
+        let ranked = [(1, 0.9)];
+        let costs = BTreeMap::from([(1, 2usize)]);
+        let roles = BTreeMap::from([(
+            1, BTreeSet::from(["identity".to_string()]),
+        )]);
+        let required = BTreeSet::from(["identity".to_string(), "date".to_string()]);
+
+        let selected = evidence.select_query_evidence_set(
+            &ranked, &costs, &roles, &required, "web", 150, 8, 4,
+        ).unwrap();
+        assert!(!selected.complete);
+        assert_eq!(selected.covered_roles, vec!["identity".to_string()]);
+        assert_eq!(selected.missing_roles, vec!["date".to_string()]);
+    }
+
+    #[test]
+    fn query_evidence_set_rejects_missing_roles_unknown_ids_and_malformed_costs() {
+        let mut evidence = EvidenceIndex::new();
+        evidence.insert(
+            text_record(1, "one", "web", "candidate"),
+            b"canonical trajectory bytes",
+        ).unwrap();
+        let ranked = [(1, 0.9)];
+        let required = BTreeSet::from(["claim".to_string()]);
+
+        assert!(evidence.select_query_evidence_set(
+            &ranked, &BTreeMap::from([(1, 1usize)]), &BTreeMap::new(),
+            &required, "web", 150, 4, 2,
+        ).is_err());
+        assert!(evidence.select_query_evidence_set(
+            &[(404, 0.9)], &BTreeMap::from([(404, 1usize)]),
+            &BTreeMap::from([(404, BTreeSet::from(["claim".to_string()]))]),
+            &required, "web", 150, 4, 2,
+        ).is_err());
+        assert!(evidence.select_query_evidence_set(
+            &ranked, &BTreeMap::from([(1, 0usize)]),
+            &BTreeMap::from([(1, BTreeSet::from(["claim".to_string()]))]),
+            &required, "web", 150, 4, 2,
+        ).is_err());
+        assert!(evidence.select_query_evidence_set(
+            &ranked, &BTreeMap::from([(1, 1usize)]),
+            &BTreeMap::from([(1, BTreeSet::from([" claim ".to_string()]))]),
+            &required, "web", 150, 4, 2,
+        ).is_err());
+    }
+
+    #[test]
+    fn query_evidence_set_never_uses_ineligible_or_corrupt_evidence() {
+        let mut evidence = EvidenceIndex::new();
+        let (active, active_source) = text_record_for_trajectory(
+            1, "active", "web", "trajectory-active", "current evidence",
+        );
+        evidence.insert(active, &active_source).unwrap();
+        let (private, private_source) = text_record_for_trajectory(
+            2, "private", "enterprise", "trajectory-private", "private evidence",
+        );
+        evidence.insert(private, &private_source).unwrap();
+        let (mut expired, expired_source) = text_record_for_trajectory(
+            3, "expired", "web", "trajectory-expired", "expired evidence",
+        );
+        expired.valid_until_unix_ms = Some(150);
+        evidence.insert(expired, &expired_source).unwrap();
+
+        let ranked = [(1, 0.9), (2, 0.99), (3, 0.95)];
+        let costs = BTreeMap::from([(1, 1usize), (2, 1usize), (3, 1usize)]);
+        let roles = BTreeMap::from([
+            (1, BTreeSet::from(["claim".to_string()])),
+            (2, BTreeSet::from(["claim".to_string()])),
+            (3, BTreeSet::from(["claim".to_string()])),
+        ]);
+        let required = BTreeSet::from(["claim".to_string()]);
+        let selected = evidence.select_query_evidence_set(
+            &ranked, &costs, &roles, &required, "web", 150, 2, 2,
+        ).unwrap();
+        assert_eq!(selected.members.iter().map(|member| member.hdc_id).collect::<Vec<_>>(), vec![1]);
+
+        evidence.records.get_mut(&1).unwrap().content_sha256 = hash(b"tampered");
+        assert!(evidence.select_query_evidence_set(
+            &ranked, &costs, &roles, &required, "web", 150, 2, 2,
         ).is_err());
     }
 
