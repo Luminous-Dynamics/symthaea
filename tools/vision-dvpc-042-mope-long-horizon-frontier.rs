@@ -470,18 +470,19 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
     let max_horizon=*horizons.iter().max().unwrap();
     if max_horizon > MAX_HORIZON || horizons.iter().any(|h| *h==0) { return Err("horizon outside [1,512]".to_owned()); }
     let start=Instant::now();
-    let mut aggregates=vec![vec![Aggregate::default();horizons.len()];5];
+    let mut aggregates=vec![vec![Aggregate::default();horizons.len()];6];
     let mut samples_processed=0usize;
 
     for replicate in 0..replicates {
         let mut rng=SplitMix64::new(seed_for(scenario_index,replicate));
         let mut mope=MopePair::new(scenario.max_weight,max_horizon)?;
+        let mut mope_bound_grid=MopeBoundGridPair::new(scenario.max_weight)?;
         let mut mope_grid=MopeGridPair::new(scenario.max_weight)?;
         let mut moments=OpeMoments::default();
-        let mut seq_covered=[true;5];
-        let mut promotion_time:[Option<usize>;5]=[None;5];
-        let mut previous_intervals=[Interval{lower:0.0,upper:1.0};5];
-        let mut method_elapsed_seconds=[0.0_f64;5];
+        let mut seq_covered=[true;6];
+        let mut promotion_time:[Option<usize>;6]=[None;6];
+        let mut previous_intervals=[Interval{lower:0.0,upper:1.0};6];
+        let mut method_elapsed_seconds=[0.0_f64;6];
         let mut look_index=0usize;
 
         for t in 1..=max_horizon {
@@ -495,26 +496,30 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
             let mope_start=Instant::now();
             let mope_interval=mope.update(w,reward)?;
             method_elapsed_seconds[0]+=mope_start.elapsed().as_secs_f64();
+            let bound_grid_start=Instant::now();
+            let bound_grid_interval=mope_bound_grid.update(w,reward)?;
+            method_elapsed_seconds[1]+=bound_grid_start.elapsed().as_secs_f64();
             let grid_start=Instant::now();
             let grid_interval=mope_grid.update(w,reward)?;
-            method_elapsed_seconds[1]+=grid_start.elapsed().as_secs_f64();
+            method_elapsed_seconds[2]+=grid_start.elapsed().as_secs_f64();
             moments.update(w*reward);
-            let mut intervals=[Interval{lower:0.0,upper:1.0};5];
+            let mut intervals=[Interval{lower:0.0,upper:1.0};6];
             intervals[0]=mope_interval;
-            intervals[1]=grid_interval;
+            intervals[1]=bound_grid_interval;
+            intervals[2]=grid_interval;
             // Reused Wald remains pointwise by design. Time-uniform methods use
             // the running intersection, matching the endpoint semantics of MOPE.
             let wald_start=Instant::now();
-            intervals[2]=baseline_interval(1,moments,scenario.max_weight);
-            method_elapsed_seconds[2]+=wald_start.elapsed().as_secs_f64();
-            for method in 3..5 {
+            intervals[3]=baseline_interval(1,moments,scenario.max_weight);
+            method_elapsed_seconds[3]+=wald_start.elapsed().as_secs_f64();
+            for method in 4..6 {
                 let method_start=Instant::now();
-                let raw=baseline_interval(method-1,moments,scenario.max_weight);
+                let raw=baseline_interval(method-2,moments,scenario.max_weight);
                 intervals[method]=running_intersection(previous_intervals[method],raw);
                 method_elapsed_seconds[method]+=method_start.elapsed().as_secs_f64();
             }
 
-            for method in 0..5 {
+            for method in 0..6 {
                 let interval=intervals[method];
                 let covers=interval.covers(scenario.true_value);
                 seq_covered[method] &= covers;
@@ -524,10 +529,14 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                 }
             }
             while look_index<horizons.len() && horizons[look_index]==t {
-                for method in 0..5 {
+                for method in 0..6 {
                     let interval=intervals[method];
                     let diag=if method==0 {mope.diagnostics} else {MopeDiagnostics::default()};
-                    let grid_advances=if method==1 {mope_grid.diagnostics.endpoint_advances} else {0};
+                    let grid_advances=match method {
+                        1 => mope_bound_grid.diagnostics.endpoint_advances,
+                        2 => mope_grid.diagnostics.endpoint_advances,
+                        _ => 0,
+                    };
                     aggregates[method][look_index].add(interval,interval.covers(scenario.true_value),
                         seq_covered[method],promotion_time[method],diag.root_checks,diag.root_failures,
                         diag.endpoint_collisions,grid_advances,method_elapsed_seconds[method]);
@@ -595,8 +604,8 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             if method_idx==0 {
                 let _=writeln!(out,"ROOT_METRIC\t{}\t{}\tchecks\t{}\tfailures\t{}\tcollisions\t{}",result.scenario,horizon,a.root_checks,a.root_failures,a.endpoint_collisions);
             }
-            if method_idx==1 {
-                let _=writeln!(out,"GRID_METRIC\t{}\t{}\tendpoint_advances\t{}",result.scenario,horizon,a.grid_endpoint_advances);
+            if method_idx==1 || method_idx==2 {
+                let _=writeln!(out,"GRID_METRIC\t{}\t{}\t{}\tendpoint_advances\t{}",result.scenario,horizon,method,a.grid_endpoint_advances);
             }
         }
     }
@@ -660,10 +669,15 @@ mod tests {
     #[test]
     fn upstream_grid_comparator_is_bounded_and_reports_advances() {
         let mut grid=MopeGridPair::new(1.0).unwrap();
+        let mut bound_grid=MopeBoundGridPair::new(1.0).unwrap();
         assert_eq!(grid.values.len(),GRID_SIZE);
+        assert_eq!(bound_grid.values.len(),GRID_SIZE);
         assert!(close(grid.values[0],0.0,1e-12));
         assert!(close(grid.values[GRID_SIZE-1],1.0,1e-12));
         let interval=grid.update(1.0,1.0).unwrap();
+        let bound_interval=bound_grid.update(1.0,1.0).unwrap();
+        assert!(bound_interval.lower>=0.0 && bound_interval.upper<=1.0);
+        assert!(!bound_interval.reversed());
         assert!(interval.lower>=0.0 && interval.upper<=1.0);
         assert!(!interval.reversed());
         assert_eq!(grid.diagnostics.endpoint_advances,0);
