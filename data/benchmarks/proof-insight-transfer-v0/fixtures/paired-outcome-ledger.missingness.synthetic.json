@@ -1,0 +1,64 @@
+{
+  "schema_version": "pitb.paired-outcome-ledger.v0",
+  "dataset_kind": "synthetic_fixture",
+  "expected_target_ids": [
+    "t01",
+    "t02",
+    "t03",
+    "t04",
+    "t05",
+    "t06",
+    "t07",
+    "t08"
+  ],
+  "rows": [
+    {
+      "target_id": "t01",
+      "component_id": "component-a",
+      "control_status": "success",
+      "treatment_status": "non_solve"
+    },
+    {
+      "target_id": "t02",
+      "component_id": "component-a",
+      "control_status": "success",
+      "treatment_status": "unknown"
+    },
+    {
+      "target_id": "t03",
+      "component_id": "component-b",
+      "control_status": "unknown",
+      "treatment_status": "success"
+    },
+    {
+      "target_id": "t04",
+      "component_id": "component-b",
+      "control_status": "non_solve",
+      "treatment_status": "unknown"
+    },
+    {
+      "target_id": "t05",
+      "component_id": "component-c",
+      "control_status": "unknown",
+      "treatment_status": "unknown"
+    },
+    {
+      "target_id": "t06",
+      "component_id": "component-c",
+      "control_status": "non_solve",
+      "treatment_status": "success"
+    },
+    {
+      "target_id": "t07",
+      "component_id": "component-d",
+      "control_status": "success",
+      "treatment_status": "success"
+    },
+    {
+      "target_id": "t08",
+      "component_id": "component-d",
+      "control_status": "unknown",
+      "treatment_status": "unknown"
+    }
+  ]
+}
