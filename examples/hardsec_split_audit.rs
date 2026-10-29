@@ -51,9 +51,13 @@ const DOMAINS: [&str; 2] = ["physical_hpc", "gem5_sim"];
 struct Sample {
     dataset_id: String,
     domain: String,
+    /// Immutable original dataset file/archive. May legitimately feed samples
+    /// in every split; it is provenance, not the split unit.
     source_corpus_id: String,
     source_corpus_path: String,
     source_corpus_sha256: String,
+    /// Deterministically materialized per-program/execution/counter-set shard.
+    /// These derived bytes and the associated grouping keys must not leak.
     artifact_id: String,
     source_path: String,
     source_sha256: String,
