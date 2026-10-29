@@ -5,7 +5,7 @@
 //! secure. Run with:
 //!
 //! cargo run --example hardsec_split_audit --features hardsec-audit -- \
-//!   --manifest /path/to/splits.tsv --root /path/to/dataset
+//!   --manifest /path/to/splits.tsv --root /path/to/dataset --receipt /path/to/new-receipt.json
 //!
 //! The TSV is deliberately strict and has one row per sample/window. Repeated
 //! rows may reference the same source artifact, but all rows from that artifact
@@ -144,7 +144,8 @@ fn parse_args() -> Result<Option<(PathBuf, PathBuf, Option<PathBuf>)>, String> {
             "--help" | "-h" => {
                 println!(
                     "HARDSEC-001 split-manifest audit\n\n\
-                     Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT\n\n\
+                     Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT [--receipt NEW_PATH]\n\n\
+                     Optional --receipt writes a new deterministic JSON metadata/split-integrity receipt (existing files are not overwritten).\n\\
                      Requires a strict 16-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."
                 );
                 return Ok(None);
