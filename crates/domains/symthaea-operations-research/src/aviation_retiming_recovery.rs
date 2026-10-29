@@ -357,6 +357,8 @@ pub enum RetimingSearchStatus {
 pub struct RetimingSearchStats {
     pub expanded_nodes: u64,
     pub generated_nodes: u64,
+    pub candidate_actions_considered: u64,
+    pub partial_feasibility_checks: u64,
     pub complete_assignments_examined: u64,
     pub verified_complete_assignments: u64,
     pub partial_feasibility_prunes: u64,
@@ -535,6 +537,8 @@ pub fn solve_retiming_branch_and_bound(
 
         for aircraft_index in 0..scenario.aircraft.len() {
             for delay_minutes in 0..=flight.max_delay_minutes {
+                stats.candidate_actions_considered =
+                    stats.candidate_actions_considered.saturating_add(1);
                 let delay_cost = flight
                     .delay_cost_per_minute
                     .checked_mul(u64::from(delay_minutes))
@@ -548,6 +552,8 @@ pub fn solve_retiming_branch_and_bound(
                     aircraft_index,
                     delay_minutes,
                 });
+                stats.partial_feasibility_checks =
+                    stats.partial_feasibility_checks.saturating_add(1);
                 if !partial_retiming_is_feasible(
                     scenario,
                     &choices,
@@ -573,6 +579,8 @@ pub fn solve_retiming_branch_and_bound(
             }
         }
 
+        stats.candidate_actions_considered =
+            stats.candidate_actions_considered.saturating_add(1);
         let cancellation_cost = node
             .committed_cost
             .checked_add(flight.cancellation_cost)
