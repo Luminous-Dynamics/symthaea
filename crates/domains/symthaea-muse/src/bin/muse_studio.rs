@@ -2681,6 +2681,16 @@ async fn midi(
 /// Render one candidate's PERFORMED MIDI through FluidSynth, when the
 /// environment provides it (see `symthaea_muse::fluid_render`). None →
 /// the caller serves the native render instead.
+fn fluidsynth_candidate_midi_path(seed: u64) -> PathBuf {
+    // Same-seed candidates can render concurrently. A process ID plus seed
+    // is not a unique temporary filename; include the monotonic per-process
+    // nonce used by import artifacts as well.
+    std::env::temp_dir().join(format!(
+        "muse_studio_fluid_{seed}_{}.mid",
+        unique_temp_suffix()
+    ))
+}
+
 fn fluidsynth_candidate_wav(
     score: &Score,
     spec: &symthaea_music_theory::CompositionSpec,
@@ -2688,10 +2698,7 @@ fn fluidsynth_candidate_wav(
     state: &symthaea_muse::MusicalState,
 ) -> Option<Vec<u8>> {
     symthaea_muse::fluid_render::available()?;
-    let path = std::env::temp_dir().join(format!(
-        "muse_studio_fluid_{}_{seed}.mid",
-        std::process::id()
-    ));
+    let path = fluidsynth_candidate_midi_path(seed);
     symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
     // The state sliders stay authoritative; the piece's performance dialect only
     // SHIFTS the room the way the tradition's recording practice would (wetter
@@ -2706,6 +2713,18 @@ fn fluidsynth_candidate_wav(
     let wav = symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color));
     let _ = std::fs::remove_file(&path);
     wav
+}
+
+#[cfg(test)]
+mod fluidsynth_temp_path_tests {
+    use super::fluidsynth_candidate_midi_path;
+
+    #[test]
+    fn same_seed_concurrent_render_paths_are_distinct() {
+        let first = fluidsynth_candidate_midi_path(42);
+        let second = fluidsynth_candidate_midi_path(42);
+        assert_ne!(first, second);
+    }
 }
 
 /// Construct a collision-resistant, path-safe keeper version identifier.
