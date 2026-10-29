@@ -70,3 +70,10 @@ The strongest plausible contribution is not another name for multi-fidelity BO. 
 ## Immutable MF-SCBO source lock
 
 The research lock is recorded in `tools/casting-benchmark/baselines/mf_scbo_lock_v1.json` and validated by `test_baseline_lock_manifest.py`. It pins upstream commit `ca42fd6c5ec8c841e3f1ff9642509e12d104b581`, the main optimizer source blob, the exact requirements-file blob, and the MIT license blob. It deliberately states `source_pinned_not_reproduced`. A pure-stdlib test protects those pins and the key API semantic: `eval_objectives` is a scalar callable per fidelity, not a native multi-objective Pareto interface. Thus the direct benchmark must pre-register a scalarization, flip the feasibility-margin sign to the optimizer's `c(x) <= 0` convention, and keep the upstream Python environment isolated.
+
+
+## Executable MF-SCBO comparison preflight
+
+`tools/casting-benchmark/mfscbo_comparison_contract.py` adds a strict-schema preflight before any future upstream run. It validates the pinned source commit; requires a fixed suite digest; freezes normalization and scalarization before holdout unseal; requires at least five unique two-objective scalarization weights including both single-objective endpoints; enforces the margin-to-`c(x) <= 0` sign convention; rejects tasks with fidelity-dependent constraints because the upstream API takes one shared constraint callable; ensures full-pool audit truth never enters the search loop; and checks that the total budget covers the initial point design. Its pure-standard-library tests cover these rules and bind the contract, source lock, and evaluator digests in a receipt. CI runs the tests.
+
+A passing preflight means **compatible contract validated, not run**. It does not install or execute MF-SCBO, reproduce the paper, or establish a performance result. Target-HF evaluations selected and paid for by MF-SCBO may occur inside its optimization loop; the full finite-pool audit truth remains reserved for post-run scoring. This distinction is essential when comparing it with methods such as OOL-MFBO that deliberately do not query target high fidelity during their active loop.
