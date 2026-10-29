@@ -51,6 +51,24 @@ Two complementary benchmarks matter because answer recall is not the whole job:
 - [MemoryAgentBench (ICLR 2026)](https://mlanthology.org/iclr/2026/hu2026iclr-evaluating/) measures accurate retrieval, test-time learning, long-range understanding and selective forgetting through incremental multi-turn interaction.
 - [Mem2ActBench (ACL 2026)](https://aclanthology.org/2026.acl-long.370/) evaluates active application of memory to tool selection and parameter grounding. Its released evaluation comprises 400 tool-use tasks built from 2,029 sessions, with human assessment indicating 91.3% are strongly memory-dependent.
 
+## Natural integration and reference-view calibration
+
+The latest memory-use literature suggests two evaluation settings beyond explicit question answering:
+
+- **Natural integration (MemUse):** [MemUse (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.804/) studies real user-cued moments across a four-month deployment with 40 users and 1,872 sessions. It reports that a system with 78.8% Direct QA performance referenced only 7.9% of the facts judged relevant in natural conversation in its study. Treat this as a paper-specific finding, not a general population estimate. The implication for Broca is to measure *appropriate unsolicited integration* as a distinct task: use a memory when it helps the current response, omit it when irrelevant, and avoid socially awkward or privacy-invasive resurfacing.
+- **Reference-view calibration (HiR):** [HiR, *Calibrating Hierarchical Memory Utilization for Long-Term Memory QA* (EMNLP 2026 Findings)](https://aclanthology.org/2026.findings-emnlp.1927/) compares full-hierarchy decoding with a coarse-only reference view, then uses the contrast to reduce over-reliance on broad summaries while preserving access to fine-grained evidence. This is a useful future comparator for Broca's multi-resolution memory, but it should be tested as its own arm rather than merged into atom-level ablation.
+
+### Proposed evaluation arms
+
+1. **Direct QA:** explicit questions about a memory, using the official task and reader.
+2. **Natural integration:** realistic response moments where memory use is optional; score relevant recall, irrelevant resurfacing, omission of useful memory, privacy violations, and user/task utility separately.
+3. **Atom ablation:** full context versus one evidence atom removed, with Ignore / Bound / Control target effects.
+4. **Reference-view contrast:** full hierarchical context versus a coarse-only reference view, with identical reader/prompt and logged context tokens; measure whether the broad summary improperly dominates precise evidence.
+5. **Derived-state / lifecycle traces:** keep the symbolic state oracle and operation sequence in [PR #8963](https://github.com/Luminous-Dynamics/symthaea/pull/8963), rather than duplicating it inside the reader-influence scorer.
+6. **End-task evaluation:** LongMemEval-V2 accuracy–latency frontier and tool/action correctness.
+
+Do not combine these into one headline percentage. Publish a multi-axis profile: **finds the right evidence, stores/updates state correctly, uses the evidence at the right influence level, integrates it naturally, and improves the task outcome**. A system can be strong on Direct QA and weak at natural integration; the two are different capabilities and need different test sets.
+
 ## Target scorecard
 
 All figures below are **goals**, not present results.
