@@ -132,13 +132,13 @@
     "digestSet": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$" },
+      "propertyNames": { "enum": ["sha256", "sha512", "blake3"] },
       "properties": {
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "sha512": { "type": "string", "pattern": "^[a-f0-9]{128}$" },
         "blake3": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
       },
-      "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]+$" }
+      "additionalProperties": false
     },
     "target": {
       "type": "object",
