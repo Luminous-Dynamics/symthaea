@@ -556,6 +556,22 @@ mod tests {
     }
 
     #[test]
+    fn v3_checksum_has_pinned_wire_layout_vector() {
+        let frames = fragment_v3(
+            0x0102_0304_0506_0708,
+            0x0a0b_0c0d,
+            &[0xaa, 0xbb],
+        )
+        .unwrap();
+        assert_eq!(frames[0].checksum, 0xd368);
+        let wire = frames[0].to_bytes();
+        assert_eq!(&wire[0..2], &V3_MAGIC);
+        assert_eq!(&wire[6..8], &[0x68, 0xd3]);
+        assert_eq!(&wire[8..16], &0x0102_0304_0506_0708u64.to_le_bytes());
+        assert_eq!(&wire[16..20], &0x0a0b_0c0du32.to_le_bytes());
+    }
+
+    #[test]
     fn v3_exact_length_and_single_erasure_recovery_for_boundary_profiles() {
         for len in [1usize, V3_AEAD_PAYLOAD_SIZE, V3_AEAD_PAYLOAD_SIZE + 1, 1800, 2048, 2105, V3_MAX_AEAD_ENCODED_LEN] {
             let original = sample(len, len as u64 + 0x9e37);
