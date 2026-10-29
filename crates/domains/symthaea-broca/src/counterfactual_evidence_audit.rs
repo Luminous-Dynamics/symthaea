@@ -279,7 +279,9 @@ fn diff_paths(left: &Value, right: &Value, path: &str, output: &mut Vec<String>)
                 } else {
                     format!("{path}.{key}")
                 };
-                diff_paths(&left_object[key], &right_object[key], &child, output);
+                let left_value = left_object.get(key).expect("matching object keys were checked");
+                let right_value = right_object.get(key).expect("matching object keys were checked");
+                diff_paths(left_value, right_value, &child, output);
             }
         }
         (Value::Array(left_array), Value::Array(right_array)) => {
@@ -302,7 +304,7 @@ fn reject_forbidden_runtime_keys(value: &Value) -> Result<(), String> {
                 let normalized: String = key
                     .chars()
                     .filter(|character| character.is_ascii_alphanumeric())
-                    .flat_map(char::to_lowercase)
+                    .flat_map(|character| character.to_lowercase())
                     .collect();
                 if FORBIDDEN_RUNTIME_KEYS.contains(&normalized.as_str()) {
                     return Err(format!("evaluator-only key {key:?} is forbidden in the input fixture"));
