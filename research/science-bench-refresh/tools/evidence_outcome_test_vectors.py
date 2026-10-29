@@ -183,6 +183,17 @@ def main() -> int:
     wrong_condition["records"][0]["condition"] = "source_contradiction"
     write_json(output / "wrong-condition-report.json", make_full(wrong_condition))
 
+    changed_evaluator = copy.deepcopy(fields)
+    changed_evaluator["evaluator_revision_sha256"] = sha256(b"post-hoc-evaluator-change")
+    write_json(
+        output / "changed-evaluator-report.json",
+        make_full(changed_evaluator),
+    )
+
+    changed_rules = copy.deepcopy(fields)
+    changed_rules["decision_rules_sha256"] = sha256(b"post-hoc-decision-rule-change")
+    write_json(output / "changed-rules-report.json", make_full(changed_rules))
+
     contaminated_scored = copy.deepcopy(fields)
     contaminated_scored["records"][0]["terminal_status"] = "contaminated"
     write_json(output / "contaminated-scored-report.json", make_full(contaminated_scored))
