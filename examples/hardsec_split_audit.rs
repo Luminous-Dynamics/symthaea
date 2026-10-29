@@ -336,6 +336,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     let mut sample_ids = BTreeSet::new();
     let mut groups: BTreeMap<String, String> = BTreeMap::new();
     let mut artifact_bindings: BTreeMap<String, ArtifactBinding> = BTreeMap::new();
+    let mut corpus_bindings: BTreeMap<String, CorpusBinding> = BTreeMap::new();
     let mut verified_source_hashes: BTreeMap<String, String> = BTreeMap::new();
     let mut digest_to_artifact: BTreeMap<String, (String, String, String, String)> = BTreeMap::new();
     let mut duplicate_content_aliases: BTreeSet<(String, String)> = BTreeSet::new();
@@ -365,6 +366,8 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             ));
         }
         for (name, value) in [
+            ("source_corpus_id", sample.source_corpus_id.as_str()),
+            ("source_corpus_path", sample.source_corpus_path.as_str()),
             ("source_artifact_id", sample.artifact_id.as_str()),
             ("source_path", sample.source_path.as_str()),
             ("sample_id", sample.sample_id.as_str()),
@@ -398,6 +401,11 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             return Err(format!(
                 "line {line_number}: duplicate sample_id {:?}",
                 sample.sample_id
+            ));
+        }
+        if !is_sha256(&sample.source_corpus_sha256) {
+            return Err(format!(
+                "line {line_number}: source_corpus_sha256 must be 64 lowercase hexadecimal characters"
             ));
         }
         if !is_sha256(&sample.source_sha256) {
@@ -438,6 +446,50 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             .get_mut(&sample.split)
             .expect("split was validated above")
             .insert(sample.label.clone());
+
+        let corpus_relative = Path::new(&sample.source_corpus_path);
+        if corpus_relative.is_absolute()
+            || corpus_relative.components().any(|component| {
+                !matches!(component, Component::Normal(_))
+            })
+        {
+            return Err(format!(
+                "line {line_number}: source_corpus_path must be a clean relative path without . or .. components"
+            ));
+        }
+        verify_regular_file_without_symlinks(&root, corpus_relative, line_number)?;
+        let corpus_resolved = root.join(corpus_relative);
+        let corpus_actual_digest =
+            if let Some(cached) = verified_source_hashes.get(&sample.source_corpus_path) {
+                cached.clone()
+            } else {
+                let digest = sha256_file(&corpus_resolved).map_err(|error| {
+                    format!("line {line_number}: cannot hash source corpus: {error}")
+                })?;
+                verified_source_hashes
+                    .insert(sample.source_corpus_path.clone(), digest.clone());
+                digest
+            };
+        if corpus_actual_digest != sample.source_corpus_sha256 {
+            return Err(format!(
+                "line {line_number}: source corpus SHA-256 mismatch for {}: expected {}, got {}",
+                sample.source_corpus_path, sample.source_corpus_sha256, corpus_actual_digest
+            ));
+        }
+        let corpus_binding = CorpusBinding {
+            source_path: sample.source_corpus_path.clone(),
+            source_sha256: sample.source_corpus_sha256.clone(),
+        };
+        if let Some(previous) = corpus_bindings.get(&sample.source_corpus_id) {
+            if previous != &corpus_binding {
+                return Err(format!(
+                    "line {line_number}: source corpus {:?} has inconsistent path or digest",
+                    sample.source_corpus_id
+                ));
+            }
+        } else {
+            corpus_bindings.insert(sample.source_corpus_id.clone(), corpus_binding);
+        }
 
         let relative = Path::new(&sample.source_path);
         if relative.is_absolute()
