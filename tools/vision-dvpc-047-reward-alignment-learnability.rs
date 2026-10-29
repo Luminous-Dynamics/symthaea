@@ -424,6 +424,7 @@ mod tests{
         let mut bounds=[Interval{lower:0.0,upper:1.0};ARMS*ARMS];
         let mut rng=SplitMix64::new(evaluation_seed_for(9));
         let mut log:Vec<LoggedObservation>=(0..512).map(|i|logged_observation(&mut rng,f,i+1)).collect();
+        log.retain(|o|o.mature_at<=512);
         log.sort_by_key(|o|o.mature_at);
         for (i,obs) in log.iter().enumerate(){
             let previous=bounds;
