@@ -810,10 +810,10 @@ jobs:
           Draft202012Validator.check_schema(json.loads(Path(sys.argv[1]).read_text()))
           PY
           cargo test --locked --bin build_family_component_manifest
-          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-a.json"
-          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" none none none none none "$RUNNER_TEMP/family-components-incomplete-a.json"
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-leakage-edges.synthetic.json" none none none none none "$RUNNER_TEMP/family-components-incomplete-b.json"
           cmp "$RUNNER_TEMP/family-components-incomplete-a.json" "$RUNNER_TEMP/family-components-incomplete-b.json"
-          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-component-edges-clean.synthetic.json" "$RUNNER_TEMP/family-components-clean-synthetic.json"
+          cargo run --locked --bin build_family_component_manifest -- "$root/splits.json" "$root/fixtures/family-component-edges-clean.synthetic.json" none none none none none "$RUNNER_TEMP/family-components-clean-synthetic.json"
           "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$root/family-component-manifest.schema.json" "$RUNNER_TEMP/family-components-incomplete-a.json" "$RUNNER_TEMP/family-components-clean-synthetic.json" <<'PY'
           import copy, json, sys
           from pathlib import Path
@@ -858,7 +858,23 @@ jobs:
               raise SystemExit("clean synthetic inventory must remain unqualified until receipt verification")
           if clean["total_component_count"] != 372 or clean["independent_component_count_by_split"] != {"train":260,"validation":56,"test":56}:
               raise SystemExit("clean synthetic inventory must retain isolated families")
-          bad = copy.deepcopy(incomplete); bad["qualification_status"] = "qualified_complete_same_split_components"; bad["qualified_for_confirmatory_resampling"] = True
+          # Shape-only positive control: this is a mutated synthetic report, not a
+          # signed receipt or actual qualification event.
+          qualified_shape = copy.deepcopy(clean)
+          qualified_shape["qualification_status"] = "qualified_coverage_verified_no_cross_split_hard_relationships"
+          qualified_shape["coverage_receipt_verification_status"] = "verified_signature_set"
+          qualified_shape["qualified_for_confirmatory_resampling"] = True
+          validator.validate(qualified_shape)
+          unsigned = copy.deepcopy(clean)
+          unsigned["qualified_for_confirmatory_resampling"] = True
+          try: validator.validate(unsigned)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted an unsigned manifest as qualified")
+          bad_qualified = copy.deepcopy(qualified_shape); bad_qualified["cross_split_component_count"] = 1
+          try: validator.validate(bad_qualified)
+          except ValidationError: pass
+          else: raise SystemExit("schema accepted a qualified manifest with cross-split components")
+          bad = copy.deepcopy(incomplete); bad["qualification_status"] = "qualified_coverage_verified_no_cross_split_hard_relationships"; bad["qualified_for_confirmatory_resampling"] = True
           try: validator.validate(bad)
           except ValidationError: pass
           else: raise SystemExit("schema accepted incomplete inventory as qualified")
