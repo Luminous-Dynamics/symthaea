@@ -94,6 +94,7 @@
       "additionalProperties": false,
       "required": [
         "family_id",
+        "eligibility_status",
         "candidate_target_ids",
         "eligibility_receipt_sha256"
       ],
@@ -112,6 +113,13 @@
         },
         "eligibility_receipt_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "eligibility_status": {
+          "enum": [
+            "eligible",
+            "excluded",
+            "unknown"
+          ]
         }
       }
     },
