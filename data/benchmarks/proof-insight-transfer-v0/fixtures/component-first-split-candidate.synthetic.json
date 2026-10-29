@@ -106,5 +106,7 @@
     "train": 4,
     "validation": 1,
     "test": 1
-  }
+  },
+  "dataset_kind": "synthetic_fixture",
+  "family_universe_sha256": "c6b39a37aa42bdd454f15806269ca1d0d417cd4823ec7a3db809908d6214f4dc"
 }
