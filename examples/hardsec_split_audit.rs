@@ -38,12 +38,9 @@ const HEADER: [&str; 16] = [
     "label",
 ];
 
-const DOMAINS: [&str; 4] = [
-    "physical_hpc",
-    "gem5_sim",
-    "rtl_netlist",
-    "physical_em",
-];
+// Phase A intentionally supports only telemetry manifests. RTL/netlist and
+// physical side-channel lanes require separate, modality-specific schemas.
+const DOMAINS: [&str; 2] = ["physical_hpc", "gem5_sim"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Sample {
@@ -88,6 +85,7 @@ struct AuditSummary {
     manifest_sha256: String,
     samples: usize,
     artifacts: usize,
+    duplicate_content_aliases: usize,
     train: usize,
     validation: usize,
     test: usize,
@@ -98,13 +96,14 @@ fn main() -> ExitCode {
         Ok(Some((manifest, root))) => match audit_manifest(&manifest, &root) {
             Ok(summary) => {
                 println!(
-                    "HARDSEC_AUDIT_PASS dataset_id={} domain={} protocol={} manifest_sha256={} samples={} artifacts={} train={} validation={} test={}",
+                    "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} train={} validation={} test={}",
                     summary.dataset_id,
                     summary.domain,
                     summary.split_protocol,
                     summary.manifest_sha256,
                     summary.samples,
                     summary.artifacts,
+                    summary.duplicate_content_aliases,
                     summary.train,
                     summary.validation,
                     summary.test
@@ -112,7 +111,7 @@ fn main() -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                eprintln!("HARDSEC_AUDIT_FAIL: {error}");
+                eprintln!("HARDSEC_SPLIT_AUDIT_ERROR: {error}");
                 ExitCode::from(2)
             }
         },
@@ -269,7 +268,8 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     let mut groups: BTreeMap<String, String> = BTreeMap::new();
     let mut artifact_bindings: BTreeMap<String, ArtifactBinding> = BTreeMap::new();
     let mut verified_source_hashes: BTreeMap<String, String> = BTreeMap::new();
-    let mut digest_to_artifact: BTreeMap<String, String> = BTreeMap::new();
+    let mut digest_to_artifact: BTreeMap<String, (String, String)> = BTreeMap::new();
+    let mut duplicate_content_aliases = 0usize;
     let mut split_counts = BTreeMap::from([
         ("train".to_owned(), 0usize),
         ("validation".to_owned(), 0usize),
@@ -280,6 +280,9 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         ("validation".to_owned(), BTreeSet::new()),
         ("test".to_owned(), BTreeSet::new()),
     ]);
+    // One execution may yield multiple counter-specific files; keep all files
+    // from that execution within the same split regardless of primary protocol.
+    let mut execution_splits: BTreeMap<String, String> = BTreeMap::new();
 
     for (index, sample) in samples.iter().enumerate() {
         let line_number = index + 2;
@@ -295,6 +298,19 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             ("source_artifact_id", sample.artifact_id.as_str()),
             ("source_path", sample.source_path.as_str()),
             ("sample_id", sample.sample_id.as_str()),
+            ("program_id", sample.program_id.as_str()),
+            ("execution_id", sample.execution_id.as_str()),
+            ("device_config_id", sample.device_config_id.as_str()),
+            ("capture_config_id", sample.capture_config_id.as_str()),
+            ("counter_set_id", sample.counter_set_id.as_str()),
+            (
+                "attack_family_id (for attack-labeled workload)",
+                if sample.label == "attack" {
+                    sample.attack_family_id.as_str()
+                } else {
+                    "benign-family-not-required"
+                },
+            ),
         ] {
             if is_missing(value) {
                 return Err(format!("line {line_number}: {name} is required"));
@@ -396,15 +412,36 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             artifact_bindings.insert(sample.artifact_id.clone(), binding);
         }
 
-        if let Some(previous_artifact) = digest_to_artifact.get(&sample.source_sha256) {
+        if let Some((previous_artifact, previous_split)) =
+            digest_to_artifact.get(&sample.source_sha256)
+        {
             if previous_artifact != &sample.artifact_id {
-                return Err(format!(
-                    "line {line_number}: exact duplicate artifact digest appears under distinct IDs {:?} and {:?}",
-                    previous_artifact, sample.artifact_id
-                ));
+                if previous_split != &sample.split {
+                    return Err(format!(
+                        "line {line_number}: identical source bytes appear under distinct artifact IDs across splits {:?} and {:?}",
+                        previous_split, sample.split
+                    ));
+                }
+                // Exact duplicates within a single split are not train/test
+                // leakage, but they are still non-independent source content.
+                duplicate_content_aliases += 1;
             }
         } else {
-            digest_to_artifact.insert(sample.source_sha256.clone(), sample.artifact_id.clone());
+            digest_to_artifact.insert(
+                sample.source_sha256.clone(),
+                (sample.artifact_id.clone(), sample.split.clone()),
+            );
+        }
+
+        if let Some(previous_split) =
+            execution_splits.insert(sample.execution_id.clone(), sample.split.clone())
+        {
+            if previous_split != sample.split {
+                return Err(format!(
+                    "line {line_number}: execution_id {:?} crosses splits ({previous_split} and {})",
+                    sample.execution_id, sample.split
+                ));
+            }
         }
 
         let group_id = held_out_group(sample, &split_protocol, line_number)?;
@@ -439,6 +476,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         manifest_sha256,
         samples: samples.len(),
         artifacts: artifact_bindings.len(),
+        duplicate_content_aliases,
         train: split_counts["train"],
         validation: split_counts["validation"],
         test: split_counts["test"],
