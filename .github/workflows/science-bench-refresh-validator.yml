@@ -521,3 +521,55 @@ jobs:
           set -e
           test "$mutated_exit" -eq 2
           grep -q 'does not bind the exact task-set bytes' /tmp/sbr-lineage-mutated.stderr
+
+
+      - name: Search exposure receipt integrity and policy controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          python3 research/science-bench-refresh/tools/search_receipt_test_vectors.py /tmp/sbr-search-receipts
+
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-receipt /tmp/sbr-search-receipts/valid-isolated.json \
+            > /tmp/sbr-search-valid-report.json
+          grep -q '"integrity_valid": true' /tmp/sbr-search-valid-report.json
+          grep -q '"policy_compliant": true' /tmp/sbr-search-valid-report.json
+          grep -q 'receipt_integrity_and_declared_policy_pass_external_anchor_required' /tmp/sbr-search-valid-report.json
+
+          # A correctly hashed allowed network action still violates isolation.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-receipt /tmp/sbr-search-receipts/isolated-policy-violation.json \
+            > /tmp/sbr-search-isolation-report.json
+          isolated_exit=$?
+          set -e
+          test "$isolated_exit" -eq 9
+          grep -q '"integrity_valid": true' /tmp/sbr-search-isolation-report.json
+          grep -q '"policy_compliant": false' /tmp/sbr-search-isolation-report.json
+
+          # A host outside the declared allowlist is a policy failure.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-receipt /tmp/sbr-search-receipts/allowlist-policy-violation.json \
+            > /tmp/sbr-search-allowlist-report.json
+          allowlist_exit=$?
+          set -e
+          test "$allowlist_exit" -eq 9
+          grep -q '"integrity_valid": true' /tmp/sbr-search-allowlist-report.json
+          grep -q '"policy_compliant": false' /tmp/sbr-search-allowlist-report.json
+
+          # Altered, missing, or reordered events invalidate the chain/denominator.
+          for case in mutated-event missing-event reordered-events; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              verify-search-receipt "/tmp/sbr-search-receipts/$case.json" \
+              > "/tmp/sbr-search-$case-report.json"
+            receipt_exit=$?
+            set -e
+            test "$receipt_exit" -eq 10
+            grep -q '"integrity_valid": false' "/tmp/sbr-search-$case-report.json"
+          done
+
+          # Reports contain digest-only traces, not raw query or response content.
+          ! grep -Eq 'query: example|observed-response|fetch: example' /tmp/sbr-search-valid-report.json
