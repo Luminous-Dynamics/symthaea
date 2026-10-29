@@ -541,7 +541,11 @@ impl FragmentAssembler {
             None
         };
 
-        let mut payload = Vec::with_capacity(self.expected_payload_size);
+        // Bound allocation by the maximum bytes representable by these shards,
+        // even if a caller supplied an invalidly large nominal payload size.
+        let max_payload_size = data_count.checked_mul(PAYLOAD_SIZE)?;
+        let mut payload =
+            Vec::with_capacity(self.expected_payload_size.min(max_payload_size));
         for i in 0..data_count {
             let frag_data: &[u8; PAYLOAD_SIZE] = if Some(i) == missing_idx {
                 recovered.as_ref()?
