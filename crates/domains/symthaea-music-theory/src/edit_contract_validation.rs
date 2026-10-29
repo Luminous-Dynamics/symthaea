@@ -378,14 +378,14 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
         }
 
         match operation_axis(change.operation) {
-            Some(axis) if axis != change.axis => push(
+            Some(axis) if axis != change.axis => add_issue!(
                 "OPERATION_AXIS_MISMATCH",
                 format!(
                     "operation {:?} changes {:?}, not {:?}",
                     change.operation, axis, change.axis
                 ),
             ),
-            None => push(
+            None => add_issue!(
                 "UNSUPPORTED_OPERATION",
                 format!("operation {:?} has no supported semantics", change.operation),
             ),
@@ -394,19 +394,19 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
 
         match validate_target(change.operation, &change.target) {
             TargetCheck::Ok => {}
-            TargetCheck::TypeMismatch => push(
+            TargetCheck::TypeMismatch => add_issue!(
                 "TARGET_TYPE_MISMATCH",
                 format!("target type is invalid for operation {:?}", change.operation),
             ),
-            TargetCheck::OutOfDomain => push(
+            TargetCheck::OutOfDomain => add_issue!(
                 "TARGET_OUT_OF_DOMAIN",
                 format!("target value is outside the supported domain for {:?}", change.operation),
             ),
-            TargetCheck::NoOp => push(
+            TargetCheck::NoOp => add_issue!(
                 "NOOP_REQUEST",
                 format!("operation {:?} requests a no-op", change.operation),
             ),
-            TargetCheck::Unsupported => push(
+            TargetCheck::Unsupported => add_issue!(
                 "UNSUPPORTED_OPERATION",
                 format!("operation {:?} is not implemented by this contract validator", change.operation),
             ),
