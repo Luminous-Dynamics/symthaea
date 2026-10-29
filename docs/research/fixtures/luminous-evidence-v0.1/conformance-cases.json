@@ -1,0 +1,38 @@
+{
+  "suite": "LEP-CONFORMANCE-0.1",
+  "status": "prototype-fixtures",
+  "cases": [
+    {
+      "id": "LEP-SCHEMA-001",
+      "file": "valid-passed.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "not_asserted",
+      "purpose": "Demonstrate a structurally valid in-toto statement with an LEP predicate."
+    },
+    {
+      "id": "LEP-SCHEMA-002",
+      "file": "invalid-queued-but-passed.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "not_run",
+      "expectedFailure": "EXECUTION_STATUS_RESULT_CONFLICT",
+      "purpose": "Queued execution cannot be passed."
+    },
+    {
+      "id": "LEP-SCHEMA-003",
+      "file": "invalid-missing-target.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "not_run",
+      "expectedFailure": "MISSING_TARGET",
+      "purpose": "Evidence claims must identify their source, configuration, and inputs."
+    },
+    {
+      "id": "LEP-SEMANTIC-001",
+      "file": "semantic-stale-target.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "semantic-verifier-not-yet-implemented",
+      "purpose": "Structural validation cannot compare target and checkedTarget; exact-target binding is a separate mandatory check."
+    }
+  ]
+}
