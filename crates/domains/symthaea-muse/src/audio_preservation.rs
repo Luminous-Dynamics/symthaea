@@ -105,6 +105,12 @@ pub struct ProtectedWindowMeasurement {
 pub struct AudioPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
+    pub sample_rate_hz: u32,
+    pub channels: usize,
+    pub total_frames: usize,
+    /// Full thresholds and window geometry used to produce this report.
+    pub config: PreservationConfig,
+    pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
     /// Count of unique time windows, not channel-window measurements.
@@ -276,6 +282,11 @@ pub fn audit_protected_audio(
     Ok(AudioPreservationReport {
         verifier_version: AUDIO_PRESERVATION_VERIFIER_VERSION.to_owned(),
         calibration_id: config.calibration_id.clone(),
+        sample_rate_hz: reference.sample_rate_hz,
+        channels: reference.channels,
+        total_frames,
+        config: config.clone(),
+        effective_boundary_guard_frames: config.boundary_guard_frames,
         reference_audio_sha256,
         candidate_audio_sha256,
         protected_windows: protected_starts.len(),
@@ -508,6 +519,13 @@ pub struct OnsetEvent {
 pub struct OnsetPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
+    pub sample_rate_hz: u32,
+    pub channels: usize,
+    pub total_frames: usize,
+    /// Full detector settings needed to reproduce event extraction.
+    pub config: OnsetPreservationConfig,
+    /// Explicit guard plus the spectral-flux analysis footprint.
+    pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
     pub protected_duration_frames: usize,
@@ -553,9 +571,16 @@ pub fn audit_onset_preservation(
             return Err(AudioAuditInputError::InvalidEditInterval);
         }
     }
+    // A novelty value depends on adjacent STFT windows. Automatically expand
+    // the edit mask by that analysis footprint, then add the user-declared
+    // guard for known effect spillover or alignment uncertainty.
+    let effective_boundary_guard_frames = config
+        .boundary_guard_frames
+        .saturating_add(config.frame_size / 2)
+        .saturating_add(config.hop_size);
     let masks = merged_guarded_masks(
         authorized_edits,
-        config.boundary_guard_frames,
+        effective_boundary_guard_frames,
         total_frames,
     );
     let protected_duration_frames = total_frames.saturating_sub(
@@ -669,6 +694,11 @@ pub fn audit_onset_preservation(
     Ok(OnsetPreservationReport {
         verifier_version: format!("{AUDIO_PRESERVATION_VERIFIER_VERSION}+spectral-flux-onset-v0.1"),
         calibration_id: config.calibration_id.clone(),
+        sample_rate_hz: reference.sample_rate_hz,
+        channels: reference.channels,
+        total_frames,
+        config: config.clone(),
+        effective_boundary_guard_frames,
         reference_audio_sha256: audio_digest(reference),
         candidate_audio_sha256: audio_digest(candidate),
         protected_duration_frames,
