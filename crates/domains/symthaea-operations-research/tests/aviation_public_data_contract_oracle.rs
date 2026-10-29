@@ -98,6 +98,14 @@ fn valid_manifest_has_stable_canonical_digest() {
 }
 
 #[test]
+fn canonical_manifest_digest_matches_independent_known_answer_vector() {
+    assert_eq!(
+        canonical_manifest_digest(&manifest()).unwrap(),
+        "sha256:83951fc7c040759120fb6509b0ddaecf2c637f700f3051d2f9e7348af1f4414e"
+    );
+}
+
+#[test]
 fn manifest_digest_changes_when_partition_content_changes() {
     let original = manifest();
     let mut changed = original.clone();
