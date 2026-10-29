@@ -20,6 +20,8 @@ From the repository root, validate the fixture:
 
 The validator checks the schema identifier, benchmark/version, public-development and synthetic-only labels, non-empty cases, unique IDs, allowed class/severity values, required behavior declarations, and consistency of declared attack/control counts. It prints the SHA-256 of the exact fixture bytes.
 
+The corresponding structural schema is `docs/research/fixtures/governance-capture-resistance-v0.1.schema.json` (JSON Schema Draft 2020-12). The Rust validator implements a focused set of semantic checks and does not claim full JSON Schema engine conformance. Use a separately pinned JSON Schema validator in conformance testing.
+
 A candidate report must contain the following fields. The fixture hash must be copied from the validate-fixture result.
 
     {
@@ -48,6 +50,14 @@ The report must include exactly one result for every fixture case. Candidate cas
 - evaluator_truth_leakage
 - appeal_controlled_only_by_challenged_authority
 
+Generate a deterministic stress fixture with 1,000 seeded benign controls:
+
+    cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- generate-controls docs/research/fixtures/governance-capture-resistance-v0.1.json 1000 20261029 /tmp/gcrb-stress-1000.json
+
+The generated fixture retains the 18 attack cases and replaces the eight template controls with 1,000 parameterized variants, for 1,018 total cases. The generator records its version, SplitMix64 algorithm, master seed, count, parameters and public-known-answer status. Counts from the generated fixture are repeatable for a fixed source fixture, generator version, count, and seed.
+
+**Important statistical limit:** these are correlated variants of eight declared negative-control families, not 1,000 independently sampled real-world cases. The resulting false-escalation metric is a synthetic stress result only, not an estimate of a real institution's false-positive rate. All expected dispositions remain public, so this still cannot qualify a model or system.
+
 Evaluate and save a report:
 
     cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- evaluate docs/research/fixtures/governance-capture-resistance-v0.1.json candidate-report.json evaluation-report.json
@@ -56,4 +66,4 @@ The report includes exact-disposition agreement, per-class and per-family agreem
 
 ## Why the claim ceiling is hard-coded
 
-The fixture is deliberately visible and the candidate output still reports much of its own behavior. Therefore, even a perfect score must return qualification_eligible = false. To advance beyond this prototype, add an independent action/event trace, seed-generating scenario families, an evaluator-only known-answer set, blinded run orchestration, a separately implemented verifier, and preregistered statistical analysis. Keep this public fixture as development data; do not relabel it as a holdout.
+The fixture is deliberately visible and the candidate output still reports much of its own behavior. Therefore, even a perfect score must return qualification_eligible = false. The parameterized generator expands synthetic stress coverage, but it does not create hidden labels or solve common-mode ground-truth dependence. To advance beyond this prototype, add an independently instrumented action/event trace, evaluator-only scenario specifications, a separately controlled qualification corpus, blinded run orchestration, an independently implemented verifier, and preregistered statistical analysis. Keep both public fixtures as development data; do not relabel them as holdouts.
