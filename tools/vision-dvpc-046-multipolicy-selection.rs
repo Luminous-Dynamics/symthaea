@@ -268,6 +268,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
             let context=observation.context;
             let action=observation.action;
             let reward=observation.reward;
+            let h=s.logger.h1[context];
             cell_counts[context][action]+=1;
             cell_reward_sums[context][action]+=reward;
             let cell_raw=cell_mean_cs(cell_reward_sums[context][action],cell_counts[context][action],ALPHA/4.0);
