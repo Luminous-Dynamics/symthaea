@@ -478,14 +478,18 @@ mod tests {
     const ZERO: &str =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
-    fn sealed_receipt() -> SearchExposureReceiptV1 {
+    fn sealed_receipt(response_present: bool) -> SearchExposureReceiptV1 {
         let mut event = SearchExposureEventV1 {
             sequence: 0,
-            event_kind: "network_request".to_owned(),
-            decision: "block".to_owned(),
+            event_kind: if response_present { "fetch" } else { "network_request" }.to_owned(),
+            decision: if response_present { "allow" } else { "block" }.to_owned(),
             request_sha256: sha256_hex(b"query"),
             host: "search.example.org".to_owned(),
-            response_sha256: None,
+            response_sha256: if response_present {
+                Some(sha256_hex(b"retrieved-content-digest"))
+            } else {
+                None
+            },
             previous_event_sha256: ZERO.to_owned(),
             event_sha256: ZERO.to_owned(),
         };
@@ -496,7 +500,12 @@ mod tests {
             generation_id: "match-test-generation".to_owned(),
             policy_revision_sha256: sha256_hex(b"policy"),
             task_ref_sha256: sha256_hex(b"task"),
-            network_policy: "isolated".to_owned(),
+            network_policy: if response_present {
+                "audited_open_web"
+            } else {
+                "isolated"
+            }
+            .to_owned(),
             allowed_hosts: vec![],
             expected_event_count: 1,
             final_event_sha256: event.event_sha256.clone(),
@@ -543,11 +552,11 @@ mod tests {
 
     #[test]
     fn complete_no_match_report_passes_with_full_event_coverage() {
-        let receipt = sealed_receipt();
+        let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
         let report = match_report(
             &receipt_bytes,
-            "not_evaluable",
+            "no_match",
             "none",
             0,
             0,
