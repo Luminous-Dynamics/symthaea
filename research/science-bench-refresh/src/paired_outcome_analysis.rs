@@ -61,6 +61,14 @@ pub enum DirectionalHypothesisV1 {
 pub enum MultiplicityPolicyV1 {
     HolmAcrossBinaryContrasts,
     UnadjustedExploratory,
+    DescriptiveNoPValues,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PairDependencePolicyV1 {
+    ExactConditionalIndependentPairs,
+    DescriptiveOnlyDependenceUnknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +104,9 @@ pub struct PairedAnalysisPlanV1 {
     pub analysis_implementation_revision: String,
     /// Corrected only when explicitly planned before trial outcomes are examined.
     pub multiplicity_policy: MultiplicityPolicyV1,
+    pub pair_dependence_policy: PairDependencePolicyV1,
+    /// Digest of the pre-run rationale for the declared dependence policy.
+    pub dependence_justification_sha256: String,
     pub contrasts: Vec<PlannedContrastV1>,
     /// Required exactly once for each planned pair/condition if any contrast
     /// uses expected_response. This artifact is evaluator-side, never policy-visible.
@@ -154,6 +165,8 @@ pub struct PairedAnalysisReportBodyV1 {
     pub analysis_plan_sha256: String,
     pub analysis_implementation_revision: String,
     pub multiplicity_policy: MultiplicityPolicyV1,
+    pub pair_dependence_policy: PairDependencePolicyV1,
+    pub dependence_justification_sha256: String,
     pub assigned_pair_count: u64,
     pub contrast_results: Vec<ContrastAnalysisResultV1>,
     pub fixed_benchmark_only: bool,
@@ -423,6 +436,7 @@ fn build_contrast(
     pairs: &[crate::counterfactual_evidence::EvidenceInterventionPairV1],
     outcomes: &BTreeMap<PairConditionKey, &crate::evidence_outcomes::EvidenceOutcomeRecordV1>,
     expected: &BTreeMap<PairConditionKey, ExpectedResponseV1>,
+    inferential_tests_allowed: bool,
 ) -> Result<ContrastAnalysisResultV1, String> {
     let mut eligible_pair_count = 0_u64;
     let mut incomplete_pair_count = 0_u64;
@@ -542,14 +556,18 @@ fn build_contrast(
             Some((wins as f64 - losses as f64) / eligible_pair_count as f64)
         };
         let discordant = wins.saturating_add(losses);
-        let interval = wilson_interval(wins, discordant);
+        let interval = if inferential_tests_allowed {
+            wilson_interval(wins, discordant)
+        } else {
+            None
+        };
         (
             difference,
             Some(discordant),
-            if eligible_pair_count == 0 {
-                None
-            } else {
+            if inferential_tests_allowed && eligible_pair_count > 0 {
                 Some(exact_mcnemar_p(wins, losses))
+            } else {
+                None
             },
             interval.map(|value| value.0),
             interval.map(|value| value.1),
@@ -623,6 +641,33 @@ fn validate_analysis_plan(
             "analysis implementation revision does not match the inspected build source revision"
                 .to_owned(),
         );
+    }
+    if !valid_digest(&analysis.dependence_justification_sha256) {
+        issues.push(
+            "dependence_justification_sha256 must be a nonzero lowercase SHA-256 digest"
+                .to_owned(),
+        );
+    }
+    match (
+        analysis.pair_dependence_policy,
+        analysis.multiplicity_policy,
+    ) {
+        (
+            PairDependencePolicyV1::ExactConditionalIndependentPairs,
+            MultiplicityPolicyV1::DescriptiveNoPValues,
+        ) => issues.push(
+            "exact pair inference requires Holm adjustment or an explicitly exploratory test policy"
+                .to_owned(),
+        ),
+        (
+            PairDependencePolicyV1::DescriptiveOnlyDependenceUnknown,
+            MultiplicityPolicyV1::HolmAcrossBinaryContrasts
+                | MultiplicityPolicyV1::UnadjustedExploratory,
+        ) => issues.push(
+            "unknown pair dependence requires descriptive_no_p_values multiplicity policy"
+                .to_owned(),
+        ),
+        _ => {}
     }
     if analysis.contrasts.is_empty() {
         issues.push("at least one contrast must be preregistered".to_owned());
@@ -749,10 +794,20 @@ pub fn analyze_paired_evidence_outcomes(
     let report = if valid {
         let outcomes = outcome_lookup(&outcome_report);
         let expected = expected_response_lookup(&analysis);
+        let inferential_tests_allowed = analysis.pair_dependence_policy
+            == PairDependencePolicyV1::ExactConditionalIndependentPairs;
         let mut contrasts = analysis
             .contrasts
             .iter()
-            .map(|contrast| build_contrast(contrast, &plan.pairs, &outcomes, &expected))
+            .map(|contrast| {
+                build_contrast(
+                    contrast,
+                    &plan.pairs,
+                    &outcomes,
+                    &expected,
+                    inferential_tests_allowed,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         if analysis.multiplicity_policy == MultiplicityPolicyV1::HolmAcrossBinaryContrasts {
             apply_holm(&mut contrasts);
@@ -766,6 +821,8 @@ pub fn analyze_paired_evidence_outcomes(
             analysis_plan_sha256,
             analysis_implementation_revision: analysis.analysis_implementation_revision.clone(),
             multiplicity_policy: analysis.multiplicity_policy,
+            pair_dependence_policy: analysis.pair_dependence_policy,
+            dependence_justification_sha256: analysis.dependence_justification_sha256.clone(),
             assigned_pair_count: u64::try_from(plan.pairs.len())
                 .map_err(|_| "assigned pair count exceeds u64".to_owned())?,
             contrast_results: contrasts,
@@ -773,10 +830,11 @@ pub fn analyze_paired_evidence_outcomes(
             generalized_accuracy_estimated: false,
             external_anchor_required: true,
             runner_execution_proven: false,
-            uncertainty_boundary: "exact conditional McNemar tests for binary matched endpoints; \
-                Wilson interval is for discordant-win probability only; resource deltas are \
-                descriptive; no generalized-performance interval"
-                .to_owned(),
+            uncertainty_boundary: if inferential_tests_allowed {
+                "Exact conditional McNemar tests assume independent matched pair blocks; the Wilson interval concerns discordant-win probability only; resource deltas are descriptive; no generalized-performance interval".to_owned()
+            } else {
+                "Pair dependence is unknown: paired point estimates and denominators only; no p-values, confidence intervals, or generalized-performance interval".to_owned()
+            },
             claim_boundary: "preregistered fixed-benchmark paired contrasts only; evaluator and \
                 runner truth remain unauthenticated; no SOTA or generalized-performance claim"
                 .to_owned(),
