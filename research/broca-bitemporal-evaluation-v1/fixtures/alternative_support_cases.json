@@ -472,18 +472,24 @@
         "known_at": "2026-02-01T00:00:00Z"
       },
       "expected": {
-        "supported_propositions": [
-          "P-owner-alice"
+        "query_view": {
+          "supported_propositions": [
+            "P-owner-alice"
+          ],
+          "ineligible_propositions": [
+            "P-owner-bob"
+          ],
+          "eligible_justifications": [
+            "J-alice"
+          ],
+          "note": "J-bob remains globally current if its evidence is accepted now; it is excluded from this query because E-late.recorded_at > known_at"
+        },
+        "globally_active_justifications": [
+          "J-alice",
+          "J-bob"
         ],
-        "unsupported_propositions": [
-          "P-owner-bob"
-        ],
-        "active_justifications": [
-          "J-alice"
-        ],
-        "invalidated_justifications": [],
         "conflicts": [],
-        "note": "E-late has an earlier valid time but arrives after known_at and is invisible to the as-known query"
+        "temporal_leakage": false
       }
     },
     {
@@ -638,11 +644,13 @@
         "active_justifications": [],
         "invalidated_justifications": [
           "J-a-leaf",
-          "J-a-from-b",
           "J-b-from-a"
         ],
+        "rejected_justifications": [
+          "J-a-from-b"
+        ],
         "conflicts": [],
-        "note": "this proposed finite-DAG prototype rejects the cycle instead of allowing circular support"
+        "note": "The finite-DAG prototype rejects J-a-from-b at insertion because it would form P-a <-> P-b; after E1 is retracted, J-a-leaf and the only valid P-b support are invalidated"
       }
     }
   ]
