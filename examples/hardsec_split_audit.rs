@@ -269,7 +269,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     let mut artifact_bindings: BTreeMap<String, ArtifactBinding> = BTreeMap::new();
     let mut verified_source_hashes: BTreeMap<String, String> = BTreeMap::new();
     let mut digest_to_artifact: BTreeMap<String, (String, String)> = BTreeMap::new();
-    let mut duplicate_content_aliases = 0usize;
+    let mut duplicate_content_aliases: BTreeSet<(String, String)> = BTreeSet::new();
     let mut split_counts = BTreeMap::from([
         ("train".to_owned(), 0usize),
         ("validation".to_owned(), 0usize),
@@ -424,7 +424,8 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
                 }
                 // Exact duplicates within a single split are not train/test
                 // leakage, but they are still non-independent source content.
-                duplicate_content_aliases += 1;
+                duplicate_content_aliases
+                    .insert((sample.source_sha256.clone(), sample.artifact_id.clone()));
             }
         } else {
             digest_to_artifact.insert(
@@ -476,7 +477,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         manifest_sha256,
         samples: samples.len(),
         artifacts: artifact_bindings.len(),
-        duplicate_content_aliases,
+        duplicate_content_aliases: duplicate_content_aliases.len(),
         train: split_counts["train"],
         validation: split_counts["validation"],
         test: split_counts["test"],
@@ -1066,6 +1067,45 @@ mod tests {
         text = text.replace("a.trace", "../a.trace");
         fs::write(&path, text).unwrap();
         assert!(fixture.audit().unwrap_err().contains("clean relative path"));
+    }
+
+    #[test]
+    fn same_execution_cannot_cross_splits_under_another_holdout_protocol() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[4][7] = fixture.rows[0][7].clone();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("execution_id"));
+    }
+
+    #[test]
+    fn identical_content_aliases_within_one_split_are_counted_not_rejected() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fs::write(fixture.root.join("b.trace"), fs::read(fixture.root.join("a.trace")).unwrap())
+            .unwrap();
+        let digest = sha256_file(&fixture.root.join("b.trace")).unwrap();
+        fixture.rows[1][4] = digest;
+        let summary = fixture.audit().expect("same-split alias is not leakage");
+        assert_eq!(summary.duplicate_content_aliases, 1);
+    }
+
+    #[test]
+    fn telemetry_domain_requires_capture_and_counter_metadata() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[0][10] = "NA".into();
+        assert!(fixture.audit().unwrap_err().contains("capture_config_id is required"));
+    }
+
+    #[test]
+    fn non_telemetry_domain_requires_a_dedicated_auditor() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[0][1] = "rtl_netlist".into();
+        assert!(fixture.audit().unwrap_err().contains("unsupported domain"));
     }
 
     #[test]
