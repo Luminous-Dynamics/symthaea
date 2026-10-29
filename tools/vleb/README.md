@@ -12,6 +12,9 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Admission-cohort rollup tool](summarize_admission_cohort.py)
 - [Admission-cohort adversarial tests](test_summarize_admission_cohort.py)
 - [Auditor guardrail mutation campaign](run_auditor_mutation_campaign.py)
+- [Two-sided oracle-control replay verifier](verify_oracle_controls.py)
+- [Two-sided oracle-control integration/adversarial tests](test_verify_oracle_controls.py)
+- [Two-sided oracle replay protocol](../../docs/research/VLEB_TWO_SIDED_ORACLE_REPLAY_2026-10-29.md)
 - [Paired task-cluster comparison analyzer](compare_paired_runs.py)
 - [Paired comparison analyzer adversarial tests](test_compare_paired_runs.py)
 - [Paired comparison and uncertainty protocol](../../docs/research/VLEB_PAIRED_COMPARISON_PROTOCOL_2026-10-29.md)
@@ -48,7 +51,7 @@ The latest completed baseline VLEB workflow before the run-manifest additions pa
 
 The run-manifest schema, verifier and its tests were added after that passing baseline; their CI must pass at the exact current head before the new provenance path is called validated. The current verifier additionally requires out-of-band digests for its own implementation, schema, permitted receipt-auditor source and receipt-verifier binary, checks the signed certificate's immutable repository/workflow/run claims, and audits only files extracted from the attested ZIP. These new controls remain unvalidated until the current-head workflow completes successfully.
 
-The paired comparison analyzer is a new analysis-only tool; its synthetic tests and bootstrap calculations are not benchmark results. Its exact-head workflow is required before the code path is described as CI-validated. The scorecard deliberately keeps the Legacy-Bench model score, AASSR, security correctness and cost per independently verified fix at **not measured**. The public ledger task is a development fixture only. Its 4/4 mutation result is an oracle smoke test, not the 90% broad mutation target, and is not evidence of production banking or mainframe equivalence.
+The paired comparison analyzer is a new analysis-only tool; its synthetic tests and bootstrap calculations are not benchmark results. The two-sided oracle-control replay is a separate tool that executes the pinned empty baseline and reference patch on isolated worktrees; it still requires a hardened runner for network/resource isolation and signed provenance. Its exact-head workflow is required before the code path is described as CI-validated. The scorecard deliberately keeps the Legacy-Bench model score, AASSR, security correctness and cost per independently verified fix at **not measured**. The public ledger task is a development fixture only. Its 4/4 mutation result is an oracle smoke test, not the 90% broad mutation target, and is not evidence of production banking or mainframe equivalence.
 
 When follow-on commits change files under `tools/vleb/`, check the VLEB workflow at the exact new PR head. A passed result on an ancestor commit does not automatically validate the current head.
 
