@@ -4,8 +4,8 @@
 //! Independent raw-input oracle for the delay-aware recovery search.
 
 use symthaea_operations_research::aviation_retiming_recovery::{
-    solve_retiming_branch_and_bound, verify_retiming_plan, RetimingAircraft,
-    RetimingAssignment, RetimingFlight, RetimingPlan, RetimingScenario,
+    solve_retiming_branch_and_bound, solve_retiming_greedy, verify_retiming_plan,
+    RetimingAircraft, RetimingAssignment, RetimingFlight, RetimingPlan, RetimingScenario,
     RetimingSearchOptions, RetimingSearchStatus, RetimingVerificationStatus,
 };
 
@@ -190,6 +190,9 @@ fn retiming_search_finds_the_minimum_delay_schedule() {
 fn branch_and_bound_matches_independent_raw_oracle_across_varied_scenarios() {
     for s in varied_scenarios() {
         let expected = oracle_best_cost(&s).expect("cancelling all flights is always feasible");
+        let greedy = solve_retiming_greedy(&s).unwrap_or_else(|error| panic!("greedy {}: {error}", s.id));
+        assert!(greedy.plan.total_cost >= expected, "greedy cost below oracle optimum for {}", s.id);
+        assert_eq!(verify_retiming_plan(&s, &greedy.plan).status, RetimingVerificationStatus::Verified);
         let report = solve_retiming_branch_and_bound(&s, options())
             .unwrap_or_else(|error| panic!("{}: {error}", s.id));
         assert_eq!(report.best_objective_cost, Some(expected), "scenario {}", s.id);
@@ -333,6 +336,35 @@ fn scenario_validation_rejects_duplicate_ids_and_time_overflow() {
     overflow.flights[0].scheduled_start_minutes = u32::MAX - 3;
     overflow.flights[0].duration_minutes = 10;
     assert!(overflow.validate().is_err());
+}
+
+#[test]
+fn greedy_baseline_prefers_cancellation_when_a_conflicting_delay_costs_more() {
+    let mut s = scenario();
+    s.flights[1].cancellation_cost = 0;
+    let greedy = solve_retiming_greedy(&s).unwrap();
+    assert_eq!(
+        verify_retiming_plan(&s, &greedy.plan).status,
+        RetimingVerificationStatus::Verified
+    );
+    assert_eq!(greedy.plan.total_cost, 0);
+    assert_eq!(greedy.stats.cancelled_flight_count, 1);
+    assert_eq!(greedy.stats.assigned_flight_count, 1);
+}
+
+#[test]
+fn greedy_baseline_is_deterministic_and_reports_work_counters() {
+    let s = scenario();
+    let first = solve_retiming_greedy(&s).unwrap();
+    let second = solve_retiming_greedy(&s).unwrap();
+    assert_eq!(first, second);
+    assert_eq!(first.stats.processed_flights, s.flights.len() as u64);
+    assert!(first.stats.candidate_actions_considered > 0);
+    assert!(first.stats.feasible_candidate_actions_considered > 0);
+    assert_eq!(
+        first.stats.assigned_flight_count + first.stats.cancelled_flight_count,
+        s.flights.len() as u64
+    );
 }
 
 #[test]
