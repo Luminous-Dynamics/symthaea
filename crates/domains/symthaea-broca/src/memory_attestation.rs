@@ -432,7 +432,7 @@ impl EvidenceTrustStore {
             .get(key_id)
             .ok_or_else(|| format!("untrusted signer key_id {key_id:?}"))?;
         if timestamp < signer.valid_from
-            || signer.valid_until.is_some_and(|until| timestamp >= until)
+            || signer.valid_until.as_ref().is_some_and(|until| &timestamp >= until)
         {
             return Err(format!("signer key {key_id:?} was not valid at signed time"));
         }
@@ -480,7 +480,7 @@ impl EvidenceTrustStore {
 
         // The source key must be authorized at trusted acceptance time, not at
         // a timestamp the source chose to put inside its own payload.
-        let source_signer = self.signer_at(&envelope.signer_key_id, accepted_time)?;
+        let source_signer = self.signer_at(&envelope.signer_key_id, accepted_time.clone())?;
         if !source_signer.can_sign_events {
             return Err(format!("key {:?} lacks event-signing role", envelope.signer_key_id));
         }
@@ -493,7 +493,7 @@ impl EvidenceTrustStore {
         }
         Self::verify_signature(source_signer, &envelope.signature_hex, &bytes)?;
 
-        let ingester = self.signer_at(&receipt.ingester_key_id, accepted_time)?;
+        let ingester = self.signer_at(&receipt.ingester_key_id, accepted_time.clone())?;
         if !ingester.can_sign_ingestion_receipts {
             return Err(format!(
                 "key {:?} lacks ingestion-receipt signing role",
