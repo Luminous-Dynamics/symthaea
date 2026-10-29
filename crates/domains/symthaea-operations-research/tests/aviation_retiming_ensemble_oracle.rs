@@ -139,6 +139,25 @@ fn ensemble_fails_closed_on_duplicate_ids_or_bad_probability_mass() {
 }
 
 #[test]
+fn ensemble_rejects_invalid_budgets_and_tv_radius_before_evaluation() {
+    let mut bad_budget = options();
+    bad_budget.max_expanded_nodes_per_scenario = 0;
+    assert_eq!(
+        evaluate_retiming_ensemble(&cases(), bad_budget),
+        Err(RetimingEnsembleError::InvalidSearchBudget)
+    );
+
+    let mut bad_radius = options();
+    bad_radius.tv_radius_ppm = 1_000_001;
+    assert_eq!(
+        evaluate_retiming_ensemble(&cases(), bad_radius),
+        Err(RetimingEnsembleError::InvalidTvRadius {
+            radius_ppm: 1_000_001,
+        })
+    );
+}
+
+#[test]
 fn ensemble_refuses_to_score_when_search_budget_finds_no_feasible_plan() {
     let mut constrained = options();
     constrained.max_generated_nodes_per_scenario = 1;
