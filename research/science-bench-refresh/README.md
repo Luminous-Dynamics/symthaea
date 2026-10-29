@@ -253,7 +253,7 @@ For privacy, the match report does not emit protected content or the protected c
 
 ## Counterfactual evidence intervention plans (v1)
 
-The schema `schema/counterfactual-evidence-intervention-plan.schema.json` and Rust module `src/counterfactual_evidence.rs` define a strict pre-run contract for paired evidence interventions. The CLI is:
+The full-plan schema is `schema/counterfactual-evidence-intervention-plan.schema.json`; the commitment-input schema (the same object without `plan_commitment_sha256`) is `schema/counterfactual-evidence-intervention-plan-fields.schema.json`. The Rust module `src/counterfactual_evidence.rs` defines a strict pre-run contract for paired evidence interventions. The CLI is:
 
 ```sh
 cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
