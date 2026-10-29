@@ -119,6 +119,9 @@ impl Strategy {
             Self::SupportGate(threshold) if threshold == 0.90 => "support_gate_090",
             Self::SupportGate(threshold) if threshold == 0.97 => "support_gate_097",
             Self::SupportGate(_) => "support_gate_unknown",
+            Self::ShuffledSupportGate(threshold) if threshold == 0.55 => "shuffled_support_gate_055",
+            Self::ShuffledSupportGate(threshold) if threshold == 0.97 => "shuffled_support_gate_097",
+            Self::ShuffledSupportGate(_) => "shuffled_support_gate_unknown",
             Self::Oracle => "oracle_upper_bound",
         }
     }
