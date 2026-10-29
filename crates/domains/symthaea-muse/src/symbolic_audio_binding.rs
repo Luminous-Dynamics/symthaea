@@ -23,7 +23,8 @@ use symthaea_music_theory::Score;
 
 use crate::audio_preservation::{
     AudioAuditInputError, AudioPreservationReport, AudioView, FrameInterval,
-    OnsetPreservationReport, PreservationVerdict, audio_content_sha256,
+    OnsetPreservationConfig, OnsetPreservationReport, PreservationConfig,
+    PreservationVerdict, audio_content_sha256,
     compose_audio_preservation_evidence,
     verify_audio_preservation_against_buffers, verify_onset_preservation_against_buffers,
 };
@@ -323,8 +324,63 @@ pub struct FullScoreRenderBinding {
     pub binding_version: String,
     pub source_score_content_sha256: String,
     pub target_score_content_sha256: String,
+    pub preservation_profile_sha256: String,
     pub projected_binding: SymbolicAudioRenderBinding,
     pub receipt_sha256: String,
+}
+
+/// Explicit frozen detector/calibration profile required by the full-Score gate.
+/// In production this must be loaded from a trusted allowlist/registry, not
+/// assembled from the child reports being checked.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioPreservationProfile {
+    pub profile_version: String,
+    pub profile_id: String,
+    pub acoustic_config: PreservationConfig,
+    pub onset_config: OnsetPreservationConfig,
+}
+
+
+/// Hash the canonical frozen profile. This identifies the profile bytes but
+/// does not establish approval by itself; callers must resolve the profile
+/// from their trusted calibration registry.
+pub fn audio_preservation_profile_sha256(
+    profile: &AudioPreservationProfile,
+) -> Result<String, SymbolicAudioBindingError> {
+    if profile.profile_version != "audio-preservation-profile-v0.1"
+        || profile.profile_id.trim().is_empty()
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "unsupported or unnamed audio preservation profile",
+        ));
+    }
+    if profile.acoustic_config.calibration_id.as_deref() != Some(profile.profile_id.as_str())
+        || profile.onset_config.calibration_id.as_deref() != Some(profile.profile_id.as_str())
+    {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "both child configurations must use the exact profile ID",
+        ));
+    }
+    let bytes = serde_json::to_vec(profile)
+        .map_err(|_| SymbolicAudioBindingError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-audio-preservation-profile-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn require_profile_matches_reports(
+    profile: &AudioPreservationProfile,
+    acoustic: &AudioPreservationReport,
+    onset: &OnsetPreservationReport,
+) -> Result<String, SymbolicAudioBindingError> {
+    let digest = audio_preservation_profile_sha256(profile)?;
+    if acoustic.config != profile.acoustic_config || onset.config != profile.onset_config {
+        return Err(SymbolicAudioBindingError::InvalidEvidence(
+            "audio detector settings do not match the selected frozen preservation profile",
+        ));
+    }
+    Ok(digest)
 }
 
 fn full_score_sha256(score: &Score) -> Result<String, SymbolicAudioBindingError> {
@@ -588,8 +644,11 @@ pub fn create_full_score_render_binding(
     acoustic_evidence: &AudioPreservationReport,
     onset_evidence: &OnsetPreservationReport,
     renderer_manifest: &RendererManifest,
+    preservation_profile: &AudioPreservationProfile,
 ) -> Result<FullScoreRenderBinding, SymbolicAudioBindingError> {
     require_only_locality_dimensions_changed(source_score, target_score)?;
+    let preservation_profile_sha256 =
+        require_profile_matches_reports(preservation_profile, acoustic_evidence, onset_evidence)?;
     let source_events = validate_score_projection(source_score)?;
     let target_events = validate_score_projection(target_score)?;
     if !verify_edit_locality_evidence(&source_events, &target_events, symbolic_evidence)? {
@@ -684,6 +743,7 @@ pub fn create_full_score_render_binding(
         binding_version: format!("{SYMBOLIC_AUDIO_BINDING_VERSION}+full-score-v0.1"),
         source_score_content_sha256: full_score_sha256(source_score)?,
         target_score_content_sha256: full_score_sha256(target_score)?,
+        preservation_profile_sha256,
         projected_binding,
         receipt_sha256: String::new(),
     };
@@ -702,6 +762,7 @@ pub fn verify_full_score_render_binding(
     acoustic_evidence: &AudioPreservationReport,
     onset_evidence: &OnsetPreservationReport,
     renderer_manifest: &RendererManifest,
+    preservation_profile: &AudioPreservationProfile,
     binding: &FullScoreRenderBinding,
 ) -> Result<bool, SymbolicAudioBindingError> {
     if binding.receipt_sha256.is_empty()
@@ -718,6 +779,7 @@ pub fn verify_full_score_render_binding(
         acoustic_evidence,
         onset_evidence,
         renderer_manifest,
+        preservation_profile,
     )?;
     Ok(expected == *binding)
 }
