@@ -10,6 +10,7 @@ const CALIBRATION_SEED: u64 = 0xCA11_BA7E_2026_1029;
 const QUALIFICATION_SEED: u64 = 0x0A11_F1ED_2026_1029;
 const RISK_THRESHOLDS: [f64; 6] = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01];
 const UNSUPPORTED_RISK_TARGET: f64 = 0.05;
+const FALLBACK_DOWNSIDE_RISK_TARGET: f64 = 0.05;
 const FAMILYWISE_ALPHA: f64 = 0.05;
 
 
@@ -314,6 +315,7 @@ fn summarize(
 struct RiskControlSummary {
     search_size: usize,
     target_unsupported_risk: f64,
+    target_fallback_downside_risk: f64,
     familywise_alpha: f64,
     alpha_per_bound: f64,
     threshold_count: usize,
@@ -459,7 +461,7 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
         let mut selected: Option<(usize, f64)> = None;
         for (index, _, _, unsupported_upper_bound, _, _, downside_upper_bound, coverage_rate) in &threshold_stats {
             if *unsupported_upper_bound > UNSUPPORTED_RISK_TARGET
-                || *downside_upper_bound > UNSUPPORTED_RISK_TARGET
+                || *downside_upper_bound > FALLBACK_DOWNSIDE_RISK_TARGET
             {
                 continue;
             }
@@ -527,6 +529,7 @@ fn risk_control_summaries() -> Vec<RiskControlSummary> {
         output.push(RiskControlSummary {
             search_size,
             target_unsupported_risk: UNSUPPORTED_RISK_TARGET,
+            target_fallback_downside_risk: FALLBACK_DOWNSIDE_RISK_TARGET,
             familywise_alpha: FAMILYWISE_ALPHA,
             alpha_per_bound,
             threshold_count: RISK_THRESHOLDS.len(),
@@ -597,6 +600,8 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
     output.push_str(&format!("  \"schema_version\": \"{REPORT_SCHEMA}\",\n"));
     output.push_str(&format!("  \"seed_count\": {EPISODES},\n"));
     output.push_str(&format!("  \"base_seed\": \"{BASE_SEED:016x}\",\n"));
+    output.push_str(&format!("  \"calibration_seed_root\": \"{CALIBRATION_SEED:016x}\",\n"));
+    output.push_str(&format!("  \"qualification_seed_root\": \"{QUALIFICATION_SEED:016x}\",\n"));
     output.push_str("  \"search_sizes\": [8, 32, 128, 512],\n");
     output.push_str("  \"summary\": [\n");
     for (index, row) in summaries.iter().enumerate() {
@@ -637,6 +642,7 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
             concat!(
                 "    {{\"search_size\": {}, ",
                 "\"target_unsupported_risk\": {:.6}, ",
+                "\"target_fallback_downside_risk\": {:.6}, ",
                 "\"familywise_alpha\": {:.6}, ",
                 "\"alpha_per_bound\": {:.8}, ",
                 "\"threshold_count\": {}, ",
@@ -661,6 +667,7 @@ fn render_report(summaries: &[Summary], risk_control: &[RiskControlSummary]) -> 
             ),
             row.search_size,
             row.target_unsupported_risk,
+            row.target_fallback_downside_risk,
             row.familywise_alpha,
             row.alpha_per_bound,
             row.threshold_count,
@@ -789,7 +796,7 @@ mod tests {
             assert_eq!(row.qualification_episode_count, EPISODES);
             assert!(RISK_THRESHOLDS.contains(&row.selected_threshold));
             assert!(row.calibration_unsupported_upper_bound <= UNSUPPORTED_RISK_TARGET);
-            assert!(row.calibration_downside_upper_bound <= UNSUPPORTED_RISK_TARGET);
+            assert!(row.calibration_downside_upper_bound <= FALLBACK_DOWNSIDE_RISK_TARGET);
             assert!((0.0..=1.0).contains(&row.qualification_unsupported_rate));
             assert!((0.0..=1.0).contains(&row.qualification_downside_rate));
             assert!((0.0..=1.0).contains(&row.qualification_coverage_rate));
