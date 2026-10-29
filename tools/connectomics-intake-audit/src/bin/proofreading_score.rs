@@ -142,6 +142,13 @@ struct Report {
 struct GroupEvaluation {
     classification: ClassificationMetrics,
     balanced_accuracy_cluster_bootstrap_95: ClusterBootstrap,
+    /// Local review yield at the same item-budget fractions used for the pooled report.
+    /// Counts are computed only within this group, never by borrowing other groups' cases.
+    item_budget_results: Vec<ReviewYield>,
+    /// Local review yield at the same minute budgets used for the pooled report.
+    review_time_budget_results: Vec<ReviewYield>,
+    /// Local selective-risk curve; pooled coverage must not mask a weak species/error family.
+    risk_coverage_results: Vec<RiskCoveragePoint>,
 }
 
 #[derive(Debug, Serialize)]
@@ -612,6 +619,13 @@ fn run() -> Result<i32, String> {
         by_group.entry(row.group.clone()).or_default().push(row);
     }
     let per_group = by_group.iter().map(|(group, rows)| {
+        let group_item_budget_results = item_fractions.iter().map(|fraction| {
+            let count = (*fraction * rows.len() as f64).ceil().max(1.0);
+            review_yield(rows, count, Some(*fraction), "items")
+        }).collect();
+        let group_review_time_budget_results = minute_budgets.iter().map(|minutes| {
+            review_yield(rows, *minutes, None, "minutes")
+        }).collect();
         (
             group.clone(),
             GroupEvaluation {
@@ -621,6 +635,9 @@ fn run() -> Result<i32, String> {
                     args.bootstrap_replicates,
                     &format!("{input_hash}:{group}"),
                 ),
+                item_budget_results: group_item_budget_results,
+                review_time_budget_results: group_review_time_budget_results,
+                risk_coverage_results: risk_coverage(rows, &coverage_targets),
             },
         )
     }).collect();
@@ -634,7 +651,7 @@ fn run() -> Result<i32, String> {
     let risk_coverage_results = risk_coverage(&refs, &coverage_targets);
 
     let report = Report {
-        schema_version: 1,
+        schema_version: 2,
         scorer: "proofreading-score",
         scorer_version: env!("CARGO_PKG_VERSION"),
         dataset_id: DATASET_ID,
