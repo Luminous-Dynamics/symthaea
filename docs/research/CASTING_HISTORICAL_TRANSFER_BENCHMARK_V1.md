@@ -41,7 +41,7 @@ The low-fidelity proxy has smooth task- and design-dependent discrepancies. That
 
 The receipt includes a canonical `policy_configuration` object and `policy_config_sha256`, binding the policy roster, KNN neighborhood size, abstention threshold, and decision-rule text. This digest is distinct from the task-suite digest: one locks the evaluated problems, the other locks the decision policy configuration.
 
-The kNN transfer is a transparent heuristic baseline, **not** an implementation of OOL-MFBO or RESCUE. These published methods should be reproduced from pinned source/dependencies before any SOTA claim.
+The kNN transfer is a transparent heuristic baseline, **not** an implementation of OOL-MFBO or RESCUE. The abstention control is excluded from full-coverage transfer-win comparisons; underlying all-point KNN errors are diagnostic-only, and accepted-set metrics always report coverage and denominators. These published methods should be reproduced from pinned source/dependencies before any SOTA claim.
 
 ## Metrics
 
