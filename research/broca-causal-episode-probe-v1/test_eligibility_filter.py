@@ -14,6 +14,7 @@ from eligibility_filter import (
     sha256_bytes,
     verify_input_manifest,
     infer_retrieval_intent,
+    validate_ledger_coverage,
 )
 
 
@@ -264,6 +265,31 @@ class EligibilityFilterTests(unittest.TestCase):
                 1,
                 intent_source="neural-oracle",
             )
+
+    def test_source_policy_coverage_accepts_exact_string_leaf_map(self) -> None:
+        trajectories = [{
+            "id": "t1",
+            "states": [{"action": "run", "text": "completed"}],
+        }]
+        policy = [
+            ledger("/id", "contextual"),
+            ledger("/states/0/action", "causal"),
+            ledger("/states/0/text", "causal"),
+        ]
+        validate_ledger_coverage(trajectories, policy)
+
+    def test_source_policy_coverage_rejects_missing_or_dangling_pointer(self) -> None:
+        trajectories = [{
+            "id": "t1",
+            "states": [{"action": "run", "text": "completed"}],
+        }]
+        policy = [
+            ledger("/id", "contextual"),
+            ledger("/states/0/action", "causal"),
+            ledger("/states/9/text", "causal"),
+        ]
+        with self.assertRaisesRegex(ValueError, "eligibility ledger omits source string pointers"):
+            validate_ledger_coverage(trajectories, policy)
 
     def _write_manifest_fixture(self, directory: Path) -> tuple[Path, Path, Path, Path]:
         questions_path = directory / "questions.jsonl"
