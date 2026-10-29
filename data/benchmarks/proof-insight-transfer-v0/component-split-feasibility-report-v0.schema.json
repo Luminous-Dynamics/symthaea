@@ -10,6 +10,7 @@
     "status",
     "candidate_dataset_kind",
     "candidate_split_sha256",
+    "source_component_manifest_sha256",
     "candidate_partition_digest_sha256",
     "eligibility_census_sha256",
     "family_universe_sha256",
@@ -112,6 +113,9 @@
         "candidate_only",
         "synthetic_fixture"
       ]
+    },
+    "source_component_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
