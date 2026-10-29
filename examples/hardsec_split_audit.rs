@@ -523,7 +523,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     }
 
     Ok(AuditSummary {
-        schema_version: "hardsec-split-audit-v1",
+        schema_version: "hardsec-split-audit-v2",
         result: "split_manifest_consistent",
         claim_scope: "metadata_and_split_integrity_only",
         dataset_id,
@@ -850,7 +850,7 @@ mod tests {
         write_receipt(&summary, &receipt_path).expect("write receipt");
         let receipt: serde_json::Value =
             serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
-        assert_eq!(receipt["schema_version"], "hardsec-split-audit-v1");
+        assert_eq!(receipt["schema_version"], "hardsec-split-audit-v2");
         assert_eq!(receipt["result"], "split_manifest_consistent");
         assert_eq!(receipt["claim_scope"], "metadata_and_split_integrity_only");
         assert_eq!(receipt["manifest_sha256"].as_str().unwrap().len(), 64);
