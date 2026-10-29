@@ -3,7 +3,7 @@
 **Status:** protocol v0.1 + executable smoke harness, draft  
 **Linked tracking issue:** [#8983](https://github.com/Luminous-Dynamics/symthaea/issues/8983)  
 **Evidence status:** Rust source and CI workflow added; no exact-head passing test result is yet confirmed  
-**Claim ceiling:** two synthetic lanes only; no SOTA, real-world safety, or production Symthaea claim
+**Claim ceiling:** three synthetic lanes only; no SOTA, real-world safety, or production Symthaea claim
 
 ## Executable first slice (v0.1)
 
@@ -13,7 +13,7 @@ The repository now includes a dependency-free Rust CLI at `src/main.rs`, pinned 
 - S1 abrupt shift at step 128 of a 256-step episode, after which action 1 is optimal;
 - S4 observation-only drift at step 128, where the causal reward law is unchanged but the observation channel independently flips 30% of feedback bits.
 
-The smoke harness evaluates a frozen policy and a sweep of seven one-sided CUSUM-like thresholds (`1.0` through `4.0`) over 128 paired deterministic seeds. The same uniform random draw is used for policy and oracle outcomes to reduce variance in regret comparisons. It reports stationary false alarms, abrupt-shift detection coverage and conditional delay quantiles, false causal-shift diagnoses under observation-only drift, mean reward rate, and mean regret per episode. It does **not** yet implement candidate/evaluator process isolation, signed event receipts, sensor-drift diagnosis, selective memory invalidation, an independent physical safety envelope, or live Symthaea integration.
+The smoke harness evaluates a frozen policy, seven one-sided CUSUM-like thresholds (`1.0` through `4.0`), and an active contrast diagnosis policy (`causal_contrast_h3_0`) over 128 paired deterministic seeds. The same reward-noise stream is used for policy and oracle outcomes to reduce variance in regret comparisons; a separate stream models observation-only sensor flips. It reports stationary false alarms, abrupt-shift detection coverage and conditional delay quantiles, false causal-shift diagnoses under observation-only drift, diagnostic-action overhead, mean reward rate, and mean regret per episode. The contrast policy alternates actions for 16 diagnostic steps after an alarm (8 observations per action) and confirms a regime change only if action 1 exceeds action 0's observed reward count by at least two. It does not yet implement candidate/evaluator process isolation, signed event receipts, selective memory invalidation, an independent physical safety envelope, or live Symthaea integration. It does **not** yet implement candidate/evaluator process isolation, signed event receipts, sensor-drift diagnosis, selective memory invalidation, an independent physical safety envelope, or live Symthaea integration.
 
 Run from this directory:
 
@@ -28,7 +28,7 @@ The focused workflow at `.github/workflows/cmaq-003.yml` checks the JSON schema 
 
 A separate Python mirror of the same fixed-seed equations produced the following values over 128 episodes per lane. These are useful to test whether the report and tests express the intended trade-off; they are **not a Rust run, statistical qualification, or external benchmark score**. The observation-only lane also exposes how often the naive policy treats sensor-channel drift as a causal-regime change.
 
-| CUSUM threshold | Stationary false-alarm episodes | Abrupt-shift detection rate | p90 delay among detected episodes | Observation-drift false causal diagnoses | Mean abrupt-shift regret / episode |
+| Policy | Stationary detector alarms | Abrupt-shift detection rate | p90 delay among confirmed episodes | Observation-drift false causal diagnoses | Mean abrupt-shift regret / episode |
 |---:|---:|---:|---:|---:|---:|
 | 1.5 | 109 / 128 | 34.4% | 7 steps | 128 / 128 | 29.98 |
 | 2.0 | 44 / 128 | 78.9% | 10 steps | 123 / 128 | 11.16 |
@@ -36,8 +36,9 @@ A separate Python mirror of the same fixed-seed equations produced the following
 | 3.0 | 2 / 128 | 100% | 14 steps | 74 / 128 | 5.52 |
 | 3.5 | 2 / 128 | 100% | 16 steps | 51 / 128 | 6.46 |
 | 4.0 | 2 / 128 | 100% | 18 steps | 30 / 128 | 7.34 |
+| Active contrast, h=3.0 | 2 / 128 | 98.4% | 30 steps | 3 / 128 | 11.20 |
 
-This toy panel exposes a valuable **false-alarm / detection-delay frontier**. Threshold 1.5 meets the proposed p90 target among detected episodes but has frequent stationary false alarms and misses most shifts because some episodes alarm before the change. Threshold 3.0 has far fewer stationary false alarms and detects all abrupt shifts on this tape, but conditional p90 delay is 14 steps and it falsely diagnoses observation-only drift in 74/128 episodes. Threshold 1.5 has p90 delay 7 steps among detected episodes but only 34.4% abrupt detection coverage, many stationary false alarms, and observation-drift misclassification in all 128 episodes. The combined targets—≥95% abrupt detection coverage, p90 delay ≤8, ≤1 false reset per 1,000 stationary steps, and ≤5% observation-drift false diagnosis—are not met by this simple detector sweep. This gives Symthaea a precise research problem: discriminate which process changed, not just raise an alarm. That is a benchmark result to investigate—not a reason to tune away the hard cases or weaken the gates.
+This toy panel exposes a valuable **false-alarm / detection-delay frontier**. Threshold 1.5 meets the proposed p90 target among detected episodes but has frequent stationary false alarms and misses most shifts because some episodes alarm before the change. Threshold 3.0 has far fewer stationary false alarms and detects all abrupt shifts on this tape, but conditional p90 delay is 14 steps and it falsely diagnoses observation-only drift in 74/128 episodes. The active contrast policy confirms an abrupt change in 126/128 episodes, with p90 delay 30 steps, but cuts observation-drift false causal diagnoses to 3/128 by spending 16 diagnostic actions after an alarm. Its mean regret is higher than direct CUSUM at h=3.0 because diagnosis delays return to exploitation. Threshold 1.5 has p90 delay 7 steps among detected episodes but only 34.4% abrupt detection coverage, many stationary false alarms, and observation-drift misclassification in all 128 episodes. The contrast baseline meets the 95% coverage and 5% observation-drift false-diagnosis targets on this fixed tape, but its p90 delay is 30 steps, above the ≤8-step target; direct CUSUM at h=3.0 is faster (p90 14) but misdiagnoses 74/128 observation-drift episodes. Neither approach meets all gates. The combined targets—≥95% abrupt detection coverage, p90 delay ≤8, ≤1 false reset per 1,000 stationary steps, and ≤5% observation-drift false diagnosis—remain unmet. This gives Symthaea a precise research problem: discriminate which process changed, not just raise an alarm. That is a benchmark result to investigate—not a reason to tune away the hard cases or weaken the gates.
 
 ## Why this benchmark exists
 
