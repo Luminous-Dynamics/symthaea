@@ -35,5 +35,5 @@ jobs:
           cargo run --quiet --locked -- --seed 4242 --factors 8 --radius 2 --out "$tmp/first"
           cargo run --quiet --locked -- --seed 4242 --factors 8 --radius 2 --out "$tmp/second"
           diff -ru "$tmp/first" "$tmp/second"
-          grep -F '"schema_version": "cmaq-causal-factor-generator-v1"' "$tmp/first/manifest.json"
+          grep -F '"schema_version": "cmaq-causal-factor-generator-v1"' "$tmp/first/evaluator/manifest.json"
           grep -F '"schema_version":"cmaq-causal-generator-report-v1"' <<< "$(cargo run --quiet --locked -- --seed 4242 --factors 8 --radius 2 --out "$tmp/third")"
