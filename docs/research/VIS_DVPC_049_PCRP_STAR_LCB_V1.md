@@ -6,7 +6,7 @@ Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8958
 
 ## Why this tranche
 
-Ryu, Kwon, Koppe and Jun, *Improved Offline Contextual Bandits with Second-Order Bounds: Betting and Freezing*, COLT 2025, Section 3 develops a variance-adaptive lower confidence bound for nonnegative random variables using universal portfolios. Their off-policy selection method applies that bound separately to each candidate policy's importance-weighted reward and selects the largest lower confidence bound.
+Ryu, Kwon, Koppe and Jun, *Improved Offline Contextual Bandits with Second-Order Bounds: Betting and Freezing*, COLT 2025, Section 3 develops a variance-adaptive lower confidence bound for nonnegative random variables using universal portfolios. Their off-policy selection method applies that bound separately to each candidate policy's importance-weighted reward and selects the largest lower confidence bound. To avoid a weak baseline comparison, this panel also includes the fixed-horizon Logarithmic Smoothing (LS) pessimistic OPE bound from Sakhi et al., NeurIPS 2024, Corollary 5 / equations (12)–(14).
 
 Reference: https://proceedings.mlr.press/v291/ryu25a.html  
 Full text: https://arxiv.org/abs/2502.10826
@@ -37,10 +37,11 @@ The code includes endpoint cases, zero rewards, non-finite / negative inputs, pr
 - Horizons 64, 256 and 512; 1,024 deterministic paired replicates per identified scenario. This remains synthetic and cannot establish external validity.
 
 Methods:
-1. Fixed-grid pCRP-star-LCB witness with `delta_tail = 0.05 / (2M)` for each policy and each tail. The UCB follows Appendix B.6 of the paper: build the nonnegative complement score `w(a)(1-r)` with expectation `1 - V(pi)` and use `U(pi) = 1 - LCB(w(1-r))`. This is the pCRP-star variant of PUB-style pessimistic selection, with a conservative fixed-bet-grid approximation that may widen the bound.
-2. A bounded-reward Hoeffding interval with the same two-sided familywise allocation and a known importance-score range (fixed-horizon comparator, not advertised as anytime-valid).
+1. Fixed-grid pCRP-star-LCB witness with `delta_tail = 0.05 / (2M)` for each policy and each tail. The UCB follows Appendix B.6 of Ryu et al.: build the nonnegative complement score `w(a)(1-r)` with expectation `1 - V(pi)` and use `U(pi) = 1 - LCB(w(1-r))`. Its fixed-bet-grid approximation is conservative but may widen the bound.
+2. Logarithmic Smoothing (LS) LCB from Sakhi et al. (NeurIPS 2024), applied by mapping reward `r` to cost `c=-r`. It uses `lambda = sqrt(2 ln(1/delta_tail)/(n W^2))`, with `W` the registered maximum importance-weight ceiling, and constructs the upper endpoint with the same LS bound applied to `w(1-r)`. This is a frozen, scale-aware parameter rule—not a test-set-tuned lambda.
+3. Fixed-horizon Hoeffding interval with the same two-sided familywise allocation and a known importance-score range. It is not advertised as anytime-valid.
 
-Metrics include familywise two-sided interval coverage, top-1 policy selection accuracy, winner-certificate rate, unconditional and conditional false-certificate probability, reversed-interval candidate rate, mean interval width, plausible-winner set size, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Wilson 95% intervals for empirical rates, and paired pCRP-star-minus-Hoeffding differences with standard errors for accuracy, regret, certification and width. Exact score-frequency compression makes the pCRP bet-grid evaluation much cheaper on this finite-support DGP without changing the sample stream or objective. Timing rows are excluded from deterministic replay comparisons.
+Metrics include familywise two-sided interval coverage, top-1 policy selection accuracy, winner-certificate rate, unconditional and conditional false-certificate probability, reversed-interval candidate rate, mean interval width, plausible-winner set size, simple regret, selected lower bound, lower-bound gap to the selected policy's known truth, Wilson 95% intervals for empirical rates, and paired pCRP-star-minus-Hoeffding and LS-minus-Hoeffding differences with standard errors for accuracy, regret, certification, interval width, and plausible-winner-set size. Exact score-frequency compression makes the pCRP bet-grid evaluation much cheaper on this finite-support DGP without changing the sample stream or objective. The LS lambda is selected by a preregistered scale-aware rule using only n, delta, and the known weight ceiling. Timing rows are excluded from deterministic replay comparisons.
 
 ## Acceptance and limits
 
@@ -52,7 +53,7 @@ Metrics include familywise two-sided interval coverage, top-1 policy selection a
 - Repeated smoke runs produce identical non-timing output; exact source/output digests are published.
 - The full workflow must compile and test the exact PR head. Queue status, skipped general benchmark jobs, or a passing syntax check alone do not qualify the Rust result.
 
-This implements a conservative fixed-grid pCRP-star variant of PUB-style finite-policy selection. It is not the exact continuous-supremum pCRP-star bound, not the full Cover universal-portfolio integral, and not the separate freezing-based off-policy learning experiment. The fixed-grid approximation is intentionally conservative and may be looser than the paper's method. Do not claim superiority until a faithful comparison on matched workloads and an external confirmation dataset have been completed.
+This implements a conservative fixed-grid pCRP-star variant of PUB-style finite-policy selection alongside the fixed-horizon LS bound. It is not the exact continuous-supremum pCRP-star bound, not the full Cover universal-portfolio integral, and not the 2026 sequential LS + online PAC-Bayes algorithm. The fixed-grid approximation is intentionally conservative and may be looser than the paper's method. The 2024 LS bound is fixed-horizon; it must not be described as time-uniform. Do not claim superiority until a faithful comparison on matched workloads and an external confirmation dataset have been completed.
 
 ## Reference
 
