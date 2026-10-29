@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const ATTESTATION_SCHEMA_V1: &str = "BROCA-ATTESTATION-V1";
 const POLICY_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/AUTHORITY-POLICY/V1";
 const EVENT_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/LEDGER-EVENT/V1";
+const INGESTION_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/INGESTION-RECEIPT/V1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -35,8 +36,22 @@ pub struct SignedAuthorityPolicy {
 #[serde(deny_unknown_fields)]
 pub struct SignedLedgerEvent {
     pub schema_version: String,
+    /// Event-source key; must be bound to event.source in the trusted registry.
     pub signer_key_id: String,
     pub event: LedgerEvent,
+    /// Signature over the source-authored event payload, including its claimed timestamp.
+    pub signature_hex: String,
+    /// Trusted-ingress receipt. Without this receipt the event cannot enter a verified batch.
+    pub ingestion_receipt: Option<IngestionReceipt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IngestionReceipt {
+    pub schema_version: String,
+    pub ingester_key_id: String,
+    /// Trusted receiver's transaction time, not supplied by the event source.
+    pub accepted_at: String,
     pub signature_hex: String,
 }
 
@@ -50,6 +65,7 @@ pub struct TrustedSignerConfig {
     pub source: Option<String>,
     pub can_sign_policies: bool,
     pub can_sign_events: bool,
+    pub can_sign_ingestion_receipts: bool,
     pub valid_from: String,
     /// Exclusive end; None means no scheduled end.
     pub valid_until: Option<String>,
@@ -60,6 +76,7 @@ struct TrustedSigner {
     source: Option<String>,
     can_sign_policies: bool,
     can_sign_events: bool,
+    can_sign_ingestion_receipts: bool,
     valid_from: DateTime<Utc>,
     valid_until: Option<DateTime<Utc>>,
     verifying_key: VerifyingKey,
@@ -117,6 +134,17 @@ struct EventSigningPayload {
     schema_version: &'static str,
     signer_key_id: String,
     event: LedgerEvent,
+}
+
+#[derive(Serialize)]
+struct IngestionSigningPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    ingester_key_id: String,
+    accepted_at: String,
+    event_id: String,
+    source_signer_key_id: String,
+    source_signature_sha256: String,
 }
 
 fn normalize_time(value: &str, field: &str) -> Result<String, String> {
@@ -293,7 +321,41 @@ impl SignedLedgerEvent {
             signer_key_id,
             event,
             signature_hex: hex::encode(signature.to_bytes()),
+            ingestion_receipt: None,
         })
+    }
+
+    /// Attach an ingress-signed receipt after the receiver accepts the signed source event.
+    /// accepted_at is assigned by the trusted ingest service, not copied from event.recorded_at.
+    pub fn with_ingestion_receipt(
+        mut self,
+        ingester_key_id: impl Into<String>,
+        accepted_at: impl Into<String>,
+        ingestion_signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let ingester_key_id = ingester_key_id.into();
+        let accepted_at = normalize_time(&accepted_at.into(), "receipt.accepted_at")?;
+        let source_signature = hex::decode(&self.signature_hex)
+            .map_err(|error| format!("invalid source signature hex: {error}"))?;
+        let receipt_payload = IngestionSigningPayload {
+            domain: INGESTION_DOMAIN,
+            schema_version: ATTESTATION_SCHEMA_V1,
+            ingester_key_id: ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            event_id: self.event.event_id().to_owned(),
+            source_signer_key_id: self.signer_key_id.clone(),
+            source_signature_sha256: format!("{:x}", Sha256::digest(source_signature)),
+        };
+        let payload_bytes = serde_json::to_vec(&receipt_payload)
+            .map_err(|error| format!("cannot canonicalize ingestion receipt: {error}"))?;
+        let signature = ingestion_signing_key.sign(&payload_bytes);
+        self.ingestion_receipt = Some(IngestionReceipt {
+            schema_version: ATTESTATION_SCHEMA_V1.to_owned(),
+            ingester_key_id,
+            accepted_at,
+            signature_hex: hex::encode(signature.to_bytes()),
+        });
+        Ok(self)
     }
 
     fn signing_bytes(&self) -> Result<Vec<u8>, String> {
@@ -337,7 +399,10 @@ impl EvidenceTrustStore {
             if valid_until.is_some_and(|until| until <= valid_from) {
                 return Err(format!("key {} has an empty validity window", config.key_id));
             }
-            if !config.can_sign_policies && !config.can_sign_events {
+            if !config.can_sign_policies
+                && !config.can_sign_events
+                && !config.can_sign_ingestion_receipts
+            {
                 return Err(format!("key {} has no signing role", config.key_id));
             }
             if config.can_sign_events
@@ -349,6 +414,7 @@ impl EvidenceTrustStore {
                 source: config.source,
                 can_sign_policies: config.can_sign_policies,
                 can_sign_events: config.can_sign_events,
+                can_sign_ingestion_receipts: config.can_sign_ingestion_receipts,
                 valid_from,
                 valid_until,
                 verifying_key,
@@ -401,20 +467,60 @@ impl EvidenceTrustStore {
 
     pub fn verify_event(&self, envelope: &SignedLedgerEvent) -> Result<LedgerEvent, String> {
         let bytes = envelope.signing_bytes()?;
-        let event = event_for_signing(&envelope.event)?;
-        let recorded_at = parse_utc(event.recorded_at(), "event recorded_at")?;
-        let signer = self.signer_at(&envelope.signer_key_id, recorded_at)?;
-        if !signer.can_sign_events {
+        let mut event = event_for_signing(&envelope.event)?;
+        let receipt = envelope
+            .ingestion_receipt
+            .as_ref()
+            .ok_or_else(|| "event lacks trusted-ingress receipt".to_string())?;
+        if receipt.schema_version != ATTESTATION_SCHEMA_V1 {
+            return Err("unsupported ingestion receipt schema".into());
+        }
+        let accepted_at = normalize_time(&receipt.accepted_at, "receipt.accepted_at")?;
+        let accepted_time = parse_utc(&accepted_at, "receipt.accepted_at")?;
+
+        // The source key must be authorized at trusted acceptance time, not at
+        // a timestamp the source chose to put inside its own payload.
+        let source_signer = self.signer_at(&envelope.signer_key_id, accepted_time)?;
+        if !source_signer.can_sign_events {
             return Err(format!("key {:?} lacks event-signing role", envelope.signer_key_id));
         }
-        if signer.source.as_deref() != Some(event.source()) {
+        if source_signer.source.as_deref() != Some(event.source()) {
             return Err(format!(
                 "signer {:?} is not authorized for source {:?}",
                 envelope.signer_key_id,
                 event.source()
             ));
         }
-        Self::verify_signature(signer, &envelope.signature_hex, &bytes)?;
+        Self::verify_signature(source_signer, &envelope.signature_hex, &bytes)?;
+
+        let ingester = self.signer_at(&receipt.ingester_key_id, accepted_time)?;
+        if !ingester.can_sign_ingestion_receipts {
+            return Err(format!(
+                "key {:?} lacks ingestion-receipt signing role",
+                receipt.ingester_key_id
+            ));
+        }
+        let source_signature = hex::decode(&envelope.signature_hex)
+            .map_err(|error| format!("invalid source signature hex: {error}"))?;
+        let receipt_payload = IngestionSigningPayload {
+            domain: INGESTION_DOMAIN,
+            schema_version: ATTESTATION_SCHEMA_V1,
+            ingester_key_id: receipt.ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            event_id: event.event_id().to_owned(),
+            source_signer_key_id: envelope.signer_key_id.clone(),
+            source_signature_sha256: format!("{:x}", Sha256::digest(source_signature)),
+        };
+        let receipt_bytes = serde_json::to_vec(&receipt_payload)
+            .map_err(|error| format!("cannot canonicalize ingestion receipt: {error}"))?;
+        Self::verify_signature(ingester, &receipt.signature_hex, &receipt_bytes)?;
+
+        // Replace the source-claimed timestamp with the timestamp authenticated
+        // by the trusted ingestion receipt before entering the policy ledger.
+        match &mut event {
+            LedgerEvent::Assert { recorded_at, .. }
+            | LedgerEvent::Retract { recorded_at, .. } => *recorded_at = accepted_at,
+        }
         Ok(event)
     }
 
