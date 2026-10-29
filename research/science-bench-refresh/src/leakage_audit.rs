@@ -317,24 +317,32 @@ fn build_near_groups(
 
         let right_exact_set: BTreeSet<&str> = right_exact_counts.keys().copied().collect();
         let left_exact_set: BTreeSet<&str> = left_exact_counts.keys().copied().collect();
-        let left_candidates: Vec<&IndexedTask> = left_tasks
-            .iter()
-            .copied()
-            .filter(|task| {
-                right_exact_set
-                    .iter()
-                    .any(|exact| *exact != task.exact_fingerprint.as_str())
-            })
-            .collect();
-        let right_candidates: Vec<&IndexedTask> = right_tasks
-            .iter()
-            .copied()
-            .filter(|task| {
-                left_exact_set
-                    .iter()
-                    .any(|exact| *exact != task.exact_fingerprint.as_str())
-            })
-            .collect();
+        let left_candidates: Vec<&IndexedTask> = if right_exact_set.len() > 1 {
+            left_tasks.iter().copied().collect()
+        } else {
+            let only_right_exact = right_exact_set
+                .iter()
+                .next()
+                .expect("a nonempty near-match group has at least one right task");
+            left_tasks
+                .iter()
+                .copied()
+                .filter(|task| task.exact_fingerprint.as_str() != *only_right_exact)
+                .collect()
+        };
+        let right_candidates: Vec<&IndexedTask> = if left_exact_set.len() > 1 {
+            right_tasks.iter().copied().collect()
+        } else {
+            let only_left_exact = left_exact_set
+                .iter()
+                .next()
+                .expect("a nonempty near-match group has at least one left task");
+            right_tasks
+                .iter()
+                .copied()
+                .filter(|task| task.exact_fingerprint.as_str() != *only_left_exact)
+                .collect()
+        };
 
         groups.push(OverlapGroupV1 {
             fingerprint_sha256: digest.clone(),
@@ -513,6 +521,12 @@ mod tests {
                 .unwrap()
                 .contains("not emitted by overlap auditor")
         );
+    }
+
+    #[test]
+    fn numeric_fingerprints_handle_subnormal_and_extreme_finite_values() {
+        assert!(fingerprint(&json!({"value": 1.0e-308}), true).is_ok());
+        assert!(fingerprint(&json!({"value": 1.7976931348623157e308}), true).is_ok());
     }
 
     #[test]
