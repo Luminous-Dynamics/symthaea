@@ -31,7 +31,7 @@
       "schemaExpected": "accept",
       "semanticExpected": "reject",
       "expectedFailure": "LEP_TARGET_MISMATCH",
-      "implementationStatus": "semantic-verifier-not-yet-implemented",
+      "implementationStatus": "Rust-semantic-checker-added; tests-not-run-locally",
       "purpose": "Structural validation cannot compare target and checkedTarget; exact-target binding is a separate mandatory check."
     }
   ]
