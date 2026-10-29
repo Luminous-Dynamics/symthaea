@@ -342,8 +342,8 @@ fn run() -> Vec<Summary> {
         for strategy in Strategy::ALL {
             for lane in [None, Some(Lane::Additive), Some(Lane::Interaction), Some(Lane::HoldoutShift)] {
                 let outcomes = families.iter().copied()
-                    .filter(|spec| lane.map(|selected| spec.lane == selected).unwrap_or(true))
                     .enumerate()
+                    .filter(|(_, spec)| lane.map(|selected| spec.lane == selected).unwrap_or(true))
                     .map(|(family_index, spec)| {
                         (spec, score_family(spec, SupportMeans::fit(spec, family_index), strategy, cost))
                     })
