@@ -259,12 +259,17 @@ struct Aggregate {
     promotion_times: Vec<usize>,
     root_checks: u64,
     root_failures: u64,
+    elapsed_seconds_sum: f64,
+    elapsed_seconds_sq_sum: f64,
     trials: usize,
 }
 impl Aggregate {
     fn add(&mut self, interval: Interval, point_cover: bool, sequence_cover: bool,
-           promotion_time: Option<usize>, root_checks: u64, root_failures: u64) {
+           promotion_time: Option<usize>, root_checks: u64, root_failures: u64,
+           elapsed_seconds: f64) {
         self.trials += 1;
+        self.elapsed_seconds_sum += elapsed_seconds;
+        self.elapsed_seconds_sq_sum += elapsed_seconds * elapsed_seconds;
         if point_cover { self.point_hits += 1; }
         if sequence_cover { self.sequence_hits += 1; }
         if interval.reversed() { self.reversed_hits += 1; }
@@ -308,6 +313,7 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
         let mut seq_covered=[true;4];
         let mut promotion_time:[Option<usize>;4]=[None;4];
         let mut previous_intervals=[Interval{lower:0.0,upper:1.0};4];
+        let mut method_elapsed_seconds=[0.0_f64;4];
         let mut look_index=0usize;
 
         for t in 1..=max_horizon {
@@ -318,16 +324,22 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
             let w=POLICY_ACTION_ONE / behavior_probability;
             if !w.is_finite() || w<0.0 || w>scenario.max_weight+1e-10 { return Err("generated importance ratio outside frozen support".to_owned()); }
 
+            let mope_start=Instant::now();
             let mope_interval=mope.update(w,reward)?;
+            method_elapsed_seconds[0]+=mope_start.elapsed().as_secs_f64();
             moments.update(w*reward);
             let mut intervals=[Interval{lower:0.0,upper:1.0};4];
             intervals[0]=mope_interval;
             // Reused Wald remains pointwise by design. Time-uniform methods use
             // the running intersection, matching the endpoint semantics of MOPE.
+            let wald_start=Instant::now();
             intervals[1]=baseline_interval(1,moments,scenario.max_weight);
+            method_elapsed_seconds[1]+=wald_start.elapsed().as_secs_f64();
             for method in 2..4 {
+                let method_start=Instant::now();
                 let raw=baseline_interval(method,moments,scenario.max_weight);
                 intervals[method]=running_intersection(previous_intervals[method],raw);
+                method_elapsed_seconds[method]+=method_start.elapsed().as_secs_f64();
             }
 
             for method in 0..4 {
@@ -344,7 +356,8 @@ fn simulate_scenario(scenario: Scenario, scenario_index: usize, replicates: usiz
                     let interval=intervals[method];
                     let diag=if method==0 {mope.diagnostics} else {MopeDiagnostics::default()};
                     aggregates[method][look_index].add(interval,interval.covers(scenario.true_value),
-                        seq_covered[method],promotion_time[method],diag.root_checks,diag.root_failures);
+                        seq_covered[method],promotion_time[method],diag.root_checks,diag.root_failures,
+                        method_elapsed_seconds[method]);
                 }
                 look_index+=1;
             }
@@ -384,6 +397,8 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             let (width,se_width)=mean_se(a.width_sum,a.width_sq_sum,a.trials);
             let (mean_lower,se_lower)=mean_se(a.lower_sum,a.lower_sq_sum,a.trials);
             let (mean_upper,se_upper)=mean_se(a.upper_sum,a.upper_sq_sum,a.trials);
+            let (mean_elapsed,se_elapsed)=mean_se(a.elapsed_seconds_sum,a.elapsed_seconds_sq_sum,a.trials);
+            let method_samples_per_second=(a.trials as f64*horizon as f64)/a.elapsed_seconds_sum.max(1e-12);
             let promotion_metric=if result.true_value < PROMOTION_THRESHOLD {"false_promotion_probability"} else {"promotion_power"};
             for (name,estimate,se,lo,hi) in [
                 ("pointwise_coverage",point,se_point,lo_point,hi_point),
@@ -397,6 +412,8 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_lower_endpoint\t{:.8}\t{:.8}\t-\t-",result.scenario,method,horizon,mean_lower,se_lower);
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_upper_endpoint\t{:.8}\t{:.8}\t-\t-",result.scenario,method,horizon,mean_upper,se_upper);
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tempty_or_reversed_probability\t{:.8}\t-\t-\t-",result.scenario,method,horizon,rev);
+            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_method_elapsed_seconds\t{:.8}\t{:.8}\t-\t-",result.scenario,method,horizon,mean_elapsed,se_elapsed);
+            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmethod_observations_per_second\t{:.3}\t-\t-\t-",result.scenario,method,horizon,method_samples_per_second);
             let times=&a.promotion_times;
             let med=median(times);
             let p90=percentile90(times);
