@@ -1,0 +1,255 @@
+# Clean Airline Systems Benchmark Protocol
+
+**Status:** Research protocol / synthetic-first; not a validated airline model.  
+**Owner:** CLEAN-AVIATION-001 (#8930).  
+**Scope:** Integrate aircraft mission feasibility, airline recovery, airport energy/fuel supply, lifecycle accounting and resilience without duplicating domain solvers.
+
+## 1. Research question
+
+Can an airline and its airport-energy system jointly select feasible aircraft/route assignments, charging and fueling schedules, electricity/fuel procurement, storage dispatch and disruption-recovery actions to reduce lifecycle climate impact and total system cost **without reducing the declared transport service or relaxing any hard safety/operational constraint**?
+
+The system boundary is the delivered transport service, not an aircraft or fuel in isolation:
+
+`energy source → conversion / production → airport infrastructure → aircraft and fuel assignment → passenger service → recovery and resilience → lifecycle accounting`
+
+A result is only comparable when candidates use the same route set, payload/service demand, reserve policy, safety/operational limits, weather and disruption scenarios, accounting boundary, input evidence rules and compute budget.
+
+## 2. Scope and ownership boundaries
+
+This is a cross-layer integration benchmark, not a new aircraft solver or dispatch authority.
+
+- **Aircraft and energy feasibility:** compose AIRCRAFT-ENERGY-001 (#7646), fixed-wing engineering (#6249) and mission-matched propulsor co-design (#7809). Those owners retain propulsion, installed mass, thermal, power and mission-model semantics.
+- **Flight retiming / recovery:** compose AVIATION-ENTERPRISE-016 (#8902), draft PR #8904, and rolling-horizon recourse/tail risk #8603. Preserve the exact target SHA and each solver's claim ceiling.
+- **Forecast inputs:** use #8862 for public-data forecast-to-decision evaluation. Keep forecast skill, decision value and causal impact separate.
+- **Energy-hub model:** own only cross-layer flow, capacity, timing, provenance and accounting. It must not pretend to be a qualified grid, battery, hydrogen process, reactor, fusion, fuel-production, aerodynamics or thermal solver.
+- **Digital twin and evidence:** Symtropy can host the synthetic/physical system model, Sol-Atlas can represent resource and infrastructure scenarios, and Mycelix can preserve provenance/currentness/approval references. Provenance records do not establish that their claims are true, physically valid or airworthy.
+
+Do not add subsystem logic merely because a field is available in a central schema. Refer to the source contract and surface missing or unsupported states.
+
+## 3. Candidate architecture families
+
+Each family is a *scenario candidate*, not an assumption of certification or commercial availability.
+
+1. **Incumbent reference:** existing aircraft and fossil Jet-A supply, using a frozen comparable schedule.
+2. **Existing aircraft plus approved lower-carbon fuel:** declare the exact fuel pathway, blend/compatibility basis, lifecycle boundary, delivered volume and price. “SAF” is not a single lifecycle intensity or supply guarantee.
+3. **Battery-electric regional:** include only routes that pass candidate-specific payload-range, power, reserve, temperature, end-of-life, turnaround, charger and certification-status gates.
+4. **Hydrogen-electric regional:** account for hydrogen production, compression/liquefaction where applicable, storage, boil-off/losses, distribution, conversion, onboard storage mass/volume and route feasibility.
+5. **Hybrid/turboelectric:** use mission- and configuration-specific aircraft/powertrain results; distinguish demonstration from commercial service and account for installed mass, conversion losses, heat rejection and fuel consumption.
+6. **Synthetic aviation fuel / e-SAF:** account for electricity, hydrogen, carbon source, process yield, compression, transport, storage and actual fuel delivery. Do not credit hypothetical supply.
+7. **Offboard nuclear- or fusion-supplied electricity:** treat as a declared source in the ground grid or energy hub. Require net delivered energy, lifecycle intensity, availability, price, grid connection and commissioning/contract evidence appropriate to the scenario.
+8. **SMR/fusion-backed hydrogen or e-SAF:** scenario-level industrial production pathway only, with all conversion stages and economics declared.
+9. **Onboard fission or fusion:** separate research-only feasibility screens, never operationally feasible by assumption. No aircraft-feasibility claim without credible complete-plant evidence for mass, volume, net electrical output, conversion, cooling/heat rejection, shielding/containment (as applicable), maintenance, safety, and an external approval pathway. If such evidence is absent, report `Unknown/ScenarioOnly`, not zero mass, zero emissions, zero cost or firm power.
+
+Do not compare energy-source fuel energy density alone. Compare **usable energy delivered to the mission or airport service boundary**, with the complete conversion chain and constraints.
+
+## 4. Frozen model contract
+
+Each scenario manifest must pin the following.
+
+### 4.1 Transport service and operations
+
+- route/flight IDs and stable identities;
+- time basis, airports, flight windows and declared weather/context;
+- passenger demand, required payload and service obligations;
+- aircraft family, exact configuration/generation and feasible mission envelope;
+- available fleet count and maintenance/crew/cycle constraints in scope;
+- departure/arrival windows, turnaround, connections, cancellations and recovery actions;
+- reserve/diversion policy and all energy/power/operational hard limits;
+- certification/evidence status of each aircraft candidate, as a constraint on scenario use rather than a prose footnote.
+
+### 4.2 Airport energy and fuel
+
+- interval length/time zone and chronology;
+- electricity demand and any measured/synthetic load split;
+- source-specific supply capacity, price, lifecycle intensity and evidence status;
+- renewable profile and curtailment policy, grid limits/import/export;
+- stationary storage energy and power limits, state-of-charge bounds, efficiencies, degradation and reserve;
+- charger count/power/occupancy and charging efficiency;
+- hydrogen/e-SAF/SAF delivery and storage inventory, conversion yield, loss, and replenishment lead time;
+- firm-supply contract/availability assumptions, outages and backup resources;
+- facility capital/maintenance cost and lifetime if included; construction must not disappear because the optimizer starts at commissioning.
+
+### 4.3 Lifecycle and cost boundary
+
+Keep explicit and non-overlapping:
+- well-to-wake GHG emissions by gas and declared CO2e method/time horizon;
+- direct aircraft combustion emissions;
+- upstream electricity generation, transmission, conversion and fuel-production emissions;
+- feedstock/carbon sourcing and transport;
+- infrastructure embodied emissions, only if included consistently across candidates;
+- non-CO2 aviation climate effects (including contrail-related effects) in a **separate reported axis** unless a declared and justified method supports a combined metric;
+- fuel, electricity, water/process resources where material, maintenance, infrastructure capex/opex and replacement reserves;
+- subsidies/tax credits as separate accounting views, not double-counted as physical efficiency gains.
+
+A lifecycle factor must carry source URL/identifier, version/date, unit, geography, pathway, validity range, and uncertainty. Missing factors remain missing/unknown; they are never silently imputed as zero.
+
+### 4.4 Evidence and currentness
+
+Every material input binds:
+- stable ID, units, source/provenance and content digest where available;
+- evidence class: measured, supplier-reported, literature-derived, calibrated model, uncalibrated model or synthetic assumption;
+- configuration and data generation;
+- applicability bounds, uncertainty and known omissions;
+- currentness/expiry conditions and the required independent check.
+
+Changing an aircraft, battery, fuel pathway, electricity source, model, time grid, or lifecycle factor must invalidate precisely the affected dependent conclusions. Do not let a traceability record promote a claim's evidence class.
+
+## 5. Objective: preserve the Pareto frontier
+
+Do not optimize one opaque "green airline score". Report a vector at minimum:
+
+- lifecycle kg CO2e per completed passenger-km;
+- total lifecycle CO2e in the planning horizon;
+- non-CO2 indicators separately, with their method and uncertainty;
+- total system cost and cost per completed passenger-km;
+- cost per available-seat-km (CASM) and/or revenue-independent operational cost under a declared formula;
+- completed passengers/trips, cancellations, delay distribution and connection failures;
+- payload/seat capacity actually delivered;
+- energy use by carrier and source, grid import, renewable curtailment, peak power, storage reserve and fuel inventory;
+- resilience under declared outages, including unmet critical airport load and time to recover;
+- maintenance burden, fleet utilization and candidate evidence maturity;
+- solve time, memory, time-to-first-feasible, work counters and known bound/gap.
+
+Hard requirements—safety, aircraft mission feasibility, minimum service, reserves, legal/certification status and declared operational limits—must be feasibility gates, not weighted preferences. For Pareto comparisons, publish the constraint set and stakeholder preference that selects a point from the frontier.
+
+## 6. Benchmark phases
+
+### P0 — independent accounting oracles
+
+Before optimization, create hand-checkable fixtures for:
+1. unit conversions and interval alignment;
+2. electricity and fuel inventory balances;
+3. charge/discharge efficiency and state-of-charge conservation;
+4. energy-to-hydrogen/e-SAF production yield and losses;
+5. grid import/export and capacity saturation;
+6. source-specific lifecycle emissions and non-overlapping upstream/downstream boundaries;
+7. cost roll-up and capital annualization;
+8. passenger-km, seat-km and completed-service denominators;
+9. reserve/end-of-life/temperature derating;
+10. time-zone and event-order edge cases;
+11. overflow, negative values, duplicate identities, missing factor and out-of-domain input;
+12. independent reproduction of every displayed aggregate from the manifest.
+
+Known answers should be computable by a second, simple implementation or explicit arithmetic. The main optimizer must not be its own oracle.
+
+### P1 — tiny synthetic whole-network oracle
+
+Freeze a small problem with a handful of flights, aircraft families, time slots, chargers, energy sources, and disruptions. Exhaustive enumeration should be tractable and become ground truth for the optimizer comparisons.
+
+Required synthetic controls:
+- nominal operations with a unique known optimum;
+- no-op energy hub where both policies are equivalent;
+- charging bottleneck / competing charging windows;
+- renewable surplus followed by low renewable availability;
+- storage efficiency loss and end-of-life derating;
+- grid import cap/outage;
+- fuel shortage or delayed delivery;
+- aircraft unavailable after a modeled maintenance event;
+- simultaneous schedule disruption and energy shortage;
+- hard constraint conflict for which the correct result is “no feasible plan”;
+- input permutation that should not change the canonical solution;
+- malformed/missing lifecycle factor;
+- hypothetical SMR/fusion plant without net-power/cost/lifecycle evidence, which must stay unresolved;
+- zero-severity/zero-disruption control.
+
+All invented parameters must be marked synthetic. Synthetic scenario frequencies are not real-world risk probabilities.
+
+### P2 — optimization bake-off
+
+Compare on the identical frozen manifest:
+- incumbent schedule and current policy;
+- deterministic greedy baseline;
+- exact exhaustive enumeration on tractable cases;
+- an exact MILP/CP-SAT or other independently defined reference where the problem formulation supports it;
+- bounded branch-and-bound / heuristic search;
+- robust or recourse policy under explicitly declared distributions/ambiguity sets.
+
+Every returned plan must be independently re-evaluated against source manifests and hard constraints. Record objective vectors—not just the solver's reported scalar—and distinguish:
+- optimality proven;
+- feasible but uncertified;
+- no feasible plan found within budget;
+- unsupported input / no evaluable result.
+
+Report P50/P95/P99 runtime on repeated matched trials, time-to-first-feasible, node/action/bound counters, memory, timeout/budget state, and optimality gap where a valid bound exists. `queued`, `skipped`, `not run`, or missing artifacts are not PASS.
+
+### P3 — matched historical replay
+
+Use time-ordered historical data and freeze training/calibration/test partitions before scoring. Prevent post-event features, label leakage, and event-cluster leakage. Keep these claims separate:
+1. forecast accuracy;
+2. improvement in the optimizer's chosen action;
+3. replayed operational value;
+4. causal savings after real-world confounding and policy effects.
+
+Report coverage, missingness, drift, calibration, prediction intervals, subgroup/airport/season stratification and out-of-support behavior. No retuning on final holdout. An offline replay is not an experiment or a causal estimate.
+
+### P4 — robustness and stress campaign
+
+Cross operational disruptions with energy disruptions:
+- aircraft grounding / maintenance spillover;
+- severe weather and connection-protection demand;
+- late inbound arrival, turnaround and cancellation;
+- peak electricity price or demand;
+- grid import limit and outage;
+- solar/wind underproduction and correlated weather;
+- charger outage and queueing;
+- battery degradation/temperature derating;
+- hydrogen/e-SAF delivery or process interruption;
+- simultaneous multi-flight and multi-asset failures.
+
+Use paired random seeds when comparing policies. Report full tails and loss exceedance/shortfall where defined, not only the mean. Robustness should be compared against its cost: conservative plans can waste capacity. Shift scenarios outside the supported set must raise an explicit alarm rather than silently extrapolate.
+
+### P5 — physical, procurement and deployment evidence
+
+Only after earlier gates: reconcile with meter/load data, actual supplier quotes, fuel-pathway certificates, contracts, airport permits, equipment capability, aircraft certification and local regulatory requirements. Establish physical metrology and independent review. A software benchmark never certifies an aircraft, a reactor, a fuel, a charging installation, or airport resilience.
+
+## 7. Target thresholds and falsification rules
+
+These are **proposed research targets**, not industry standards or demonstrated results.
+
+- 100% traceability for material inputs and emitted claims.
+- 100% independent arithmetic agreement on frozen P0 known-answer cases.
+- Zero hard-constraint violations in any result labelled feasible.
+- Zero silent defaults, extrapolation or unit substitutions for missing/unsupported inputs.
+- Deterministic byte-stable canonical outputs for pinned deterministic runs, including tie-breaking.
+- Exact-oracle agreement on every tractable P1 case.
+- Report improvements only against the matched baseline at equivalent delivered transport service and hard-constraint profile.
+- Stretch hypothesis: at least 10% lower lifecycle CO2e per completed passenger-km **and** at least 5% lower total operating/system cost on a held-out scenario set. Claim this only if the improvements exceed declared uncertainty, do not reduce completed service or payload, and do not shift emissions outside the chosen boundary.
+- For recovery/optimization, publish P50/P95/P99, time-to-first-feasible, feasibility rate, verified objective vector, valid bound/gap, and work counters. No runner status is implied by a test definition.
+
+Falsify or mark unresolved if: the solution relies on unsupported aircraft capability; a lifecycle pathway is missing; physical energy balances do not close; service demand changes between candidates; a hard constraint fails; robust improvement is smaller than uncertainty; results depend on post-event information; or an onboard nuclear/fusion concept lacks complete-plant evidence.
+
+## 8. Industry reality check (dated sources)
+
+1. **SAF scale / availability:** IATA's June 2026 estimate is around 2.4 million tonnes of SAF production in 2026, about 0.8% of jet-fuel use; it reports a gap between installed capacity and actual production/use. The implication is not “SAF cannot scale”; it is that installed nameplate capacity must not be confused with affordable, contractually deliverable volume.  
+   Source: https://www.iata.org/en/pressroom/2026-releases/06-06-saf-production-volumes-still-disappointing
+
+2. **Electric aircraft readiness:** the US Government Accountability Office reported on 27 May 2026 that the FAA had not certified a manned electric aircraft for commercial operations as of March 2026 and was evaluating designs case by case. This is US-specific and time-bounded; certification state must be rechecked for a specific aircraft and jurisdiction.  
+   Source: https://www.gao.gov/products/gao-26-107816
+
+3. **Hybrid-electric progress:** NASA reported on 20 July 2026 that the NASA/GE megawatt-class hybrid-electric system flew on a modified Saab 340B and above 30,000 ft. This is a flight-test milestone, not a commercially certified aircraft, a full-electric long-haul demonstration, or proof of route economics.  
+   Source: https://www.nasa.gov/directorates/rtmd/nasa-ge-hybrid-electric-flight/
+
+4. **Operational recovery optimization:** the 2026 INFORMS case study of Lufthansa Group / SWISS reports EUR 12 million and 14 kilotonnes CO2 saved to date, with EUR 30 million and 50 kilotonnes CO2 annual targets across the group. This is a deployed enterprise optimization reference. It is not a comparable score for our synthetic test and should motivate real operational measures alongside emissions, not be copied as an expected gain.  
+   Source: https://pubsonline.informs.org/doi/10.1287/inte.2025.0296
+
+5. **Fusion maturity:** the US DOE's 9 June 2026 roadmap targets commercial fusion power development in the mid-2030s but conditions delivery on unresolved science, engineering, infrastructure and funding progress. Treat it as a contingent future energy scenario—not assured baseload supply for an airline.  
+   Source: https://www.energy.gov/articles/energy-department-releases-finalized-fusion-science-and-technology-roadmap-accelerate
+
+Comparisons are contextual, because these references use different scope and evidence. No claim of outperforming industry is justified without a matched, independently reproducible benchmark.
+
+## 9. Recommended engineering sequence
+
+1. This protocol and source register.
+2. Frozen JSON scenario manifest and independent P0 accounting/oracle tests.
+3. Tiny P1 exact oracle plus greedy baseline.
+4. Adapter interfaces to aircraft energy (#7646/#7809) and retiming/recovery (#8603/#8902), preserving exact digests and input claims.
+5. Optimizer bake-off with independent verifier and budget/coverage semantics.
+6. Held-out historical replay and drift/out-of-support tests.
+7. Energy-hub and correlated disruption stress campaign.
+8. Physical input reconciliation / procurement and regulatory review, one bounded airport pilot at a time.
+
+Do not make a broad integration refactor before the manifest, quantity semantics, independent oracle and ownership interfaces are pinned.
+
+## 10. Nonclaims
+
+This protocol does not show that a clean airline exists, that electric/hydrogen aircraft are currently deployable for the chosen routes, that SMRs or fusion will be available on a specific schedule, that synthetic SAF is price-competitive, or that any policy beats the industry. A future PASS applies only to the exact frozen software contract and fixtures. Operational use requires independently validated models, qualified aircraft and equipment, legal approvals, human operational authority, and measured outcomes.
