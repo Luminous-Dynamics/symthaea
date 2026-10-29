@@ -63,3 +63,8 @@ The strongest plausible contribution is not another name for multi-fidelity BO. 
 - Casting AI/digital-twin review (2026): https://link.springer.com/article/10.1007/s43939-026-00685-5
 - COCO performance assessment: https://numbbo.github.io/coco-doc/perf-assessment/
 - NIST VVUQ / metrology harmonization report (Oct 2026): https://www.nist.gov/publications/methods-uncertainty-quantification-computational-modeling-and-simulation-harmonizing
+
+
+## Immutable MF-SCBO source lock
+
+The research lock is recorded in `tools/casting-benchmark/baselines/mf_scbo_lock_v1.json` and validated by `test_baseline_lock_manifest.py`. It pins upstream commit `ca42fd6c5ec8c841e3f1ff9642509e12d104b581`, the main optimizer source blob, the exact requirements-file blob, and the MIT license blob. It deliberately states `source_pinned_not_reproduced`. A pure-stdlib test protects those pins and the key API semantic: `eval_objectives` is a scalar callable per fidelity, not a native multi-objective Pareto interface. Thus the direct benchmark must pre-register a scalarization, flip the feasibility-margin sign to the optimizer's `c(x) <= 0` convention, and keep the upstream Python environment isolated.
