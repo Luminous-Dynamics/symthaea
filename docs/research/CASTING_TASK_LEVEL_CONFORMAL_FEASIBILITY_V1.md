@@ -58,7 +58,7 @@ A receipt reports recommendations and abstentions under a declared task-level ca
 
 ## Independent post-decision risk audit
 
-The companion tools/casting-benchmark/task_conformal_validation_audit.py accepts the frozen decision receipt, exact target prediction manifest, a predeclared risk contract, and held-out outcomes unsealed only after the decisions were frozen. It requires the contract to bind the raw decision-receipt and target-manifest digests, then joins candidate IDs and task IDs exactly.
+The companion tools/casting-benchmark/task_conformal_validation_audit.py accepts the frozen decision receipt, exact target prediction manifest, a predeclared risk contract, and held-out outcomes unsealed only after the decisions were frozen. It requires the contract to bind the raw decision-receipt and target-manifest digests, and requires the held-out outcome manifest itself to bind the exact raw-byte digest of the frozen audit contract. It then joins candidate IDs and task IDs exactly.
 
 Its primary independent unit is the target task, not the candidate: a task is a false-feasible failure when **any** candidate recommended feasible has an observed negative margin. The scorer computes exact one-sided Clopper–Pearson upper bounds for each declared critical stratum, counts only tasks with at least one feasible recommendation in the risk denominator, and reports candidate-level counts as descriptive secondary metrics.
 
