@@ -83,7 +83,7 @@ def paired_manifest(unit_count=30, evidence_class="synthetic", *, incomplete=Fal
     }
 
 
-def validation_manifest(count=100, evidence_class="synthetic", *, false_count=0, predicted_count=None):
+def validation_manifest(count=120, evidence_class="synthetic", *, false_count=0, predicted_count=None):
     if predicted_count is None:
         predicted_count = count
     records = []
@@ -119,8 +119,8 @@ def validation_manifest(count=100, evidence_class="synthetic", *, false_count=0,
 
 def contract(required_evidence="synthetic", minimum_units=30):
     return {
-        "schema_version": "1.0.0",
-        "contract_id": "casting-promotion-gate-v1",
+        "schema_version": "1.1.0",
+        "contract_id": "casting-promotion-gate-v1.1",
         "candidate_policy": "candidate",
         "baseline_policy": "baseline",
         "required_evidence_class": required_evidence,
@@ -128,7 +128,9 @@ def contract(required_evidence="synthetic", minimum_units=30):
         "validation_protocol_sha256": VALID_PROTOCOL,
         "minimum_independent_units": minimum_units,
         "minimum_units_per_critical_family": 5,
-        "minimum_validation_units": 60,
+        "minimum_validation_units": 100,
+        "minimum_validation_units_per_critical_family": 30,
+        "minimum_predicted_feasible_per_critical_family": 59,
         "minimum_cost_target_pairs": 20,
         "critical_task_families": ["alloy_a", "alloy_b"],
         "minimum_median_relative_auc_improvement": 0.05,
@@ -265,6 +267,44 @@ class PairedPromotionGateTests(unittest.TestCase):
         result = assess(val=validation_manifest(count=100, predicted_count=0))
         self.assertEqual(result["decision"], "inconclusive")
         self.assertIsNone(result["false_feasible_one_sided_upper_bound"])
+
+    def test_underpowered_critical_family_is_inconclusive_even_when_pooled_bound_passes(self):
+        result = assess(val=validation_manifest(count=100))
+        self.assertLessEqual(result["false_feasible_one_sided_upper_bound"], 0.05)
+        self.assertEqual(result["decision"], "inconclusive")
+        family = result["critical_family_false_feasible_risk"]["alloy_a"]
+        self.assertEqual(family["predicted_feasible_trials"], 50)
+        self.assertEqual(family["decision"], "inconclusive")
+
+    def test_critical_family_failure_cannot_be_hidden_by_pooled_risk(self):
+        val = validation_manifest(count=600)
+        for index, record in enumerate(val["records"]):
+            record["task_family"] = "alloy_a" if index < 300 else "alloy_b"
+            record["observed_feasible"] = not (index < 20)
+        result = assess(val=val)
+        pooled = next(check for check in result["checks"] if check["check"] == "false_feasible_risk")
+        self.assertTrue(pooled["passed"], pooled["detail"])
+        family = result["critical_family_false_feasible_risk"]["alloy_a"]
+        self.assertEqual(family["false_feasible_events"], 20)
+        self.assertEqual(family["decision"], "fail")
+        critical = next(
+            check for check in result["checks"]
+            if check["check"] == "critical_family_false_feasible_risk:alloy_a"
+        )
+        self.assertFalse(critical["passed"])
+        self.assertEqual(result["decision"], "not_promoted")
+
+    def test_each_critical_family_has_a_separate_validation_denominator(self):
+        val = validation_manifest(count=120)
+        for index, record in enumerate(val["records"]):
+            record["task_family"] = "alloy_a" if index < 90 else "alloy_b"
+        result = assess(val=val)
+        family_a = result["critical_family_false_feasible_risk"]["alloy_a"]
+        family_b = result["critical_family_false_feasible_risk"]["alloy_b"]
+        self.assertEqual(family_a["predicted_feasible_trials"], 90)
+        self.assertEqual(family_b["predicted_feasible_trials"], 30)
+        self.assertEqual(family_b["decision"], "inconclusive")
+        self.assertEqual(result["decision"], "inconclusive")
 
     def test_rejects_validation_policy_source_or_config_mismatch(self):
         val = validation_manifest()
