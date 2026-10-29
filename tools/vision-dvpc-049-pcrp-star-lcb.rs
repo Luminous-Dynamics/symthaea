@@ -148,6 +148,20 @@ fn policy_score_stream(
     Ok(scores)
 }
 
+fn complement_scores(values: &[f64], upper_bound: f64) -> Result<Vec<f64>, String> {
+    if !upper_bound.is_finite() || upper_bound < 0.0 {
+        return Err("score upper bound must be finite and nonnegative".into());
+    }
+    let mut out = Vec::with_capacity(values.len());
+    for &value in values {
+        if !value.is_finite() || value < -EPS || value > upper_bound + EPS {
+            return Err("score violates the declared [0, W] range".into());
+        }
+        out.push((upper_bound - value).clamp(0.0, upper_bound));
+    }
+    Ok(out)
+}
+
 fn log_add_exp(a: f64, b: f64) -> f64 {
     if a == f64::NEG_INFINITY {
         return b;
@@ -339,9 +353,15 @@ struct Aggregate {
     n: usize,
     familywise_covered: usize,
     top1: usize,
+    winner_certificates: usize,
+    false_certificates: usize,
+    reversed_intervals: usize,
+    interval_candidates: usize,
     regret: RunningMean,
     selected_lcb: RunningMean,
     selected_lcb_gap: RunningMean,
+    interval_width: RunningMean,
+    plausible_winner_set_size: RunningMean,
 }
 
 fn rate_se(successes: usize, n: usize) -> f64 {
@@ -408,7 +428,8 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
 
         let mut aggregates = vec![vec![Aggregate::default(); METHODS.len()]; horizons.len()];
         let mut elapsed_seconds = vec![vec![0.0_f64; METHODS.len()]; horizons.len()];
-        let delta_per_policy = ALPHA / POLICY_P1.len() as f64;
+        // Two tails across M policies: total familywise error budget is at most ALPHA.
+        let delta_per_tail = ALPHA / (2.0 * POLICY_P1.len() as f64);
         let true_values: Vec<f64> = POLICY_P1.iter().map(|&p| true_value(p)).collect();
         let oracle_value = true_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         let oracle_index = true_values
@@ -428,17 +449,25 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                 for (method_index, method) in METHODS.iter().enumerate() {
                     let started = Instant::now();
                     let mut lower_bounds = Vec::with_capacity(POLICY_P1.len());
+                    let mut upper_bounds = Vec::with_capacity(POLICY_P1.len());
                     for (policy_index, &target_p1) in POLICY_P1.iter().enumerate() {
                         let scores = &streams[policy_index][..horizon];
-                        let lower = match *method {
-                            "pCRP_star" => pcrp_star_lcb(scores, delta_per_policy)?,
-                            "Hoeffding_fixed_horizon" => {
-                                let upper = max_importance_weight(scenario.logger_p1, target_p1)?;
-                                hoeffding_lcb(scores, delta_per_policy, upper)?
-                            }
+                        let score_bound = max_importance_weight(scenario.logger_p1, target_p1)?;
+                        let complement = complement_scores(scores, score_bound)?;
+                        let (lower_lcb, complement_lcb) = match *method {
+                            "pCRP_star" => (
+                                pcrp_star_lcb(scores, delta_per_tail)?,
+                                pcrp_star_lcb(&complement, delta_per_tail)?,
+                            ),
+                            "Hoeffding_fixed_horizon" => (
+                                hoeffding_lcb(scores, delta_per_tail, score_bound)?,
+                                hoeffding_lcb(&complement, delta_per_tail, score_bound)?,
+                            ),
                             _ => return Err("unknown method".into()),
                         };
-                        lower_bounds.push(lower);
+                        // The target-policy reward value is known to lie in [0,1].
+                        lower_bounds.push(lower_lcb.clamp(0.0, 1.0));
+                        upper_bounds.push((score_bound - complement_lcb).clamp(0.0, 1.0));
                     }
                     elapsed_seconds[horizon_index][method_index] += started.elapsed().as_secs_f64();
 
@@ -447,8 +476,31 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     });
                     let familywise_covered = lower_bounds
                         .iter()
+                        .zip(upper_bounds.iter())
                         .zip(true_values.iter())
-                        .all(|(lower, truth)| *lower <= *truth + EPS);
+                        .all(|((lower, upper), truth)| {
+                            *lower <= *truth + EPS && *upper >= *truth - EPS && *lower <= *upper + EPS
+                        });
+                    let mut certified_winner = None;
+                    for i in 0..lower_bounds.len() {
+                        if (0..upper_bounds.len()).filter(|&j| j != i)
+                            .all(|j| lower_bounds[i] > upper_bounds[j] + EPS)
+                        {
+                            certified_winner = Some(i);
+                            break;
+                        }
+                    }
+                    let max_lower = lower_bounds.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                    let plausible_winner_set_size = upper_bounds
+                        .iter()
+                        .filter(|upper| **upper + EPS >= max_lower)
+                        .count() as f64;
+                    let reversed_count = lower_bounds
+                        .iter()
+                        .zip(upper_bounds.iter())
+                        .filter(|(lower, upper)| **lower > **upper + EPS)
+                        .count();
+
                     let ag = &mut aggregates[horizon_index][method_index];
                     ag.n += 1;
                     if familywise_covered {
@@ -457,6 +509,20 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     if chosen == oracle_index {
                         ag.top1 += 1;
                     }
+                    if let Some(winner) = certified_winner {
+                        ag.winner_certificates += 1;
+                        if winner != oracle_index {
+                            ag.false_certificates += 1;
+                        }
+                    }
+                    ag.reversed_intervals += reversed_count;
+                    ag.interval_candidates += lower_bounds.len();
+                    ag.interval_width.push(
+                        lower_bounds.iter().zip(upper_bounds.iter())
+                            .map(|(lower, upper)| (upper - lower).max(0.0))
+                            .sum::<f64>() / lower_bounds.len() as f64
+                    );
+                    ag.plausible_winner_set_size.push(plausible_winner_set_size);
                     let regret = oracle_value - true_values[chosen];
                     ag.regret.push(regret);
                     ag.selected_lcb.push(lower_bounds[chosen]);
@@ -474,8 +540,16 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                 }
                 let coverage = ag.familywise_covered as f64 / count;
                 let top1 = ag.top1 as f64 / count;
+                let winner_certificates = ag.winner_certificates as f64 / count;
+                let false_certificates = ag.false_certificates as f64 / count;
+                let conditional_false_certificates = if ag.winner_certificates == 0 {
+                    0.0
+                } else {
+                    ag.false_certificates as f64 / ag.winner_certificates as f64
+                };
+                let reversed = ag.reversed_intervals as f64 / ag.interval_candidates as f64;
                 metric_line(
-                    &mut out, scenario.name, horizon, method, "familywise_lcb_coverage",
+                    &mut out, scenario.name, horizon, method, "familywise_interval_coverage",
                     coverage, rate_se(ag.familywise_covered, ag.n),
                 );
                 metric_line(
@@ -485,6 +559,30 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                 metric_line(
                     &mut out, scenario.name, horizon, method, "mean_simple_regret",
                     ag.regret.mean, ag.regret.standard_error(),
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "winner_certificate_rate",
+                    winner_certificates, rate_se(ag.winner_certificates, ag.n),
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "false_certificate_probability",
+                    false_certificates, rate_se(ag.false_certificates, ag.n),
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "false_certificate_given_certificate",
+                    conditional_false_certificates, if ag.winner_certificates == 0 { 0.0 } else { rate_se(ag.false_certificates, ag.winner_certificates) },
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "reversed_interval_candidate_rate",
+                    reversed, rate_se(ag.reversed_intervals, ag.interval_candidates),
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "mean_interval_width",
+                    ag.interval_width.mean, ag.interval_width.standard_error(),
+                );
+                metric_line(
+                    &mut out, scenario.name, horizon, method, "mean_plausible_winner_set_size",
+                    ag.plausible_winner_set_size.mean, ag.plausible_winner_set_size.standard_error(),
                 );
                 metric_line(
                     &mut out, scenario.name, horizon, method, "mean_selected_lcb",
