@@ -52,7 +52,7 @@ struct IndexedTask {
     tolerant_fingerprint: String,
 }
 
-fn validate_split_label(label: &str) -> Result<(), String> {
+pub(crate) fn validate_split_label(label: &str) -> Result<(), String> {
     if label.is_empty()
         || label.len() > 128
         || !label.is_ascii()
@@ -157,6 +157,12 @@ fn fingerprint(value: &Value, numeric_tolerant: bool) -> Result<String, String> 
     let bytes = serde_json::to_vec(&canonical)
         .map_err(|error| format!("cannot serialize canonical policy input: {error}"))?;
     Ok(sha256_hex(&bytes))
+}
+
+/// Stable canonical digest for the exact policy-visible JSON structure.
+/// Numeric values are normalized only where JSON's integral spelling is equivalent.
+pub(crate) fn canonical_policy_input_sha256(value: &Value) -> Result<String, String> {
+    fingerprint(value, false)
 }
 
 fn load_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String> {
