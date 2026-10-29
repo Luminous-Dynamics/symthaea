@@ -157,7 +157,8 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
     })?;
     let mut lines = text.lines();
     let first = lines.next().ok_or("manifest is empty")?;
-    if first.trim_end_matches('\r').split('\t').collect::<Vec<_>>() != HEADER {
+    let actual_header: Vec<&str> = first.trim_end_matches('\r').split('\t').collect();
+    if actual_header.as_slice() != HEADER.as_slice() {
         return Err(format!(
             "header mismatch; expected exactly {} tab-separated columns in the documented order",
             HEADER.len()
