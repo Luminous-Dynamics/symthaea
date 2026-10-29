@@ -266,14 +266,17 @@ With that count and seed, the intended output contains 18 original attacks plus 
 
 **Statistical limitation:** 1,000 generated variants are not 1,000 independent real-world samples. They are correlated variations over eight authored families and can exercise parameter sensitivity, malformed-input handling, and benign/attack separation under a declared synthetic distribution. They cannot establish a real-world false-positive rate, external validity, or blind qualification.
 
-The current public schema and semantic validator check structure and declared counts; they do not create hidden labels, validate source truth, or provide an independent evaluator manifest. Next: pin a separate JSON Schema validator in reproducible tooling; add input/seed/config digests to a versioned report envelope; design an evaluator-owned event-trace oracle and hidden family templates; and keep candidate-visible public fixtures separate from held-out qualification material.
+A separate composed-scenario campaign is committed at `docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json`, with a Draft 2020-12 schema at `...combined-attacks-v0.1.schema.json`. It contains 11 multi-step attack chains and two benign composite controls. The Rust `validate-campaign` command verifies the exact source-fixture digest, unique case IDs, every component-case reference, ordered steps, actor roles, and declared hard-gate labels. A custom deterministic JavaScript preflight confirmed all 32 component references resolve to the original public fixture and all 13 scenarios have ordered steps; the Rust command/tests have not been run.
+
+The current public schemas and semantic validators check structure and declared counts; they do not create hidden labels, validate source truth, or provide an independent evaluator manifest. Next: pin a separate JSON Schema validator in reproducible tooling; add input/seed/config digests to a versioned report envelope; authenticate trace capture and build a truly evaluator-owned event-trace oracle; and keep candidate-visible public fixtures separate from held-out qualification material.
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, eighteen core evaluator unit tests, and seven trace-auditor unit tests (25 authored in total). The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, twenty-five core evaluator unit tests, and seven trace-auditor unit tests (32 authored in total). The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
+- validates a separate 13-scenario combined-attack campaign against the exact source fixture, with 11 composite attacks, two benign composite controls, and 32 resolved component references;
 - SHA-256 binds the candidate report to the exact fixture bytes, not a reserialized JSON object;
 - requires exactly one candidate result for each fixture case and rejects duplicate, missing, extra, malformed, repeated behavior labels, or mismatched records;
 - calculates public known-answer disposition agreement by case/class/family, required-behavior report coverage, candidate-reported forbidden behaviors, false high-severity escalations over benign controls, and candidate-reported hard-gate violation counts;
