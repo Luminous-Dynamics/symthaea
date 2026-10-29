@@ -38,7 +38,7 @@ The result includes the objective value, active constraints, constraint slacks, 
 
 ## Verification strategy
 
-Six/eight deterministic numeric fixtures exercise:
+Eight deterministic numeric fixtures exercise:
 - a known interior optimum;
 - mixed and singular positive-semidefinite matrices;
 - the lambda_2 = 0 edge;
