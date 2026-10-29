@@ -1,0 +1,7 @@
+[package]
+name = "cmaq-003-uncertainty-planning"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]

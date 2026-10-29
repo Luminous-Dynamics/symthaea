@@ -1,0 +1,35 @@
+name: CMAQ-003 uncertainty-aware planning
+
+on:
+  pull_request:
+    paths:
+      - 'research/cmaq-003/**'
+      - '.github/workflows/cmaq-003-uncertainty-planning.yml'
+  push:
+    paths:
+      - 'research/cmaq-003/**'
+      - '.github/workflows/cmaq-003-uncertainty-planning.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uncertainty-planning:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-003
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Rust unit tests
+        run: cargo test --locked
+      - name: Exact-model known-answer fixture
+        run: |
+          cargo run --locked -- --truth fixtures/truth.tsv --predictions fixtures/predictions-exact.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-003-exact.tsv
+          diff -u fixtures/expected-exact.tsv /tmp/cmaq-003-exact.tsv
+      - name: Optimizer-exploitation control
+        run: |
+          cargo run --locked -- --truth fixtures/truth.tsv --predictions fixtures/predictions-exploit.tsv --support fixtures/support.tsv --starts fixtures/starts.tsv > /tmp/cmaq-003-exploit.tsv
+          diff -u fixtures/expected-exploit.tsv /tmp/cmaq-003-exploit.tsv
