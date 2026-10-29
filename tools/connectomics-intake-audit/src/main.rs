@@ -605,6 +605,26 @@ mod tests {
     }
 
     #[test]
+    fn upstream_commit_drift_fails_closed() {
+        let mut manifest = base_manifest();
+        manifest.upstream_commit = "b".repeat(40);
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().any(|check| {
+            !check.passed && check.code == "pinned_upstream_commit"
+        }));
+    }
+
+    #[test]
+    fn dataset_revision_drift_fails_closed() {
+        let mut manifest = base_manifest();
+        manifest.dataset_revision = "main".into();
+        let checks = semantic_checks(&manifest);
+        assert!(checks.iter().any(|check| {
+            !check.passed && check.code == "pinned_dataset_revision"
+        }));
+    }
+
+    #[test]
     fn wrong_task_label_mapping_fails_closed() {
         let mut manifest = base_manifest();
         manifest.label_column = "false_split_correction_label".into();
