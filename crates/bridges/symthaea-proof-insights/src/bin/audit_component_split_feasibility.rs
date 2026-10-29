@@ -377,10 +377,11 @@ fn validate_component_manifest(bytes: &[u8], split: &CandidateSplit) -> Result<(
     {
         bail!("source component manifest declared counts do not match candidate counts");
     }
+    let candidate_family_ids: BTreeSet<String> =
+        split.family_to_split.keys().cloned().collect();
     if split.dataset_kind == "candidate_only"
         && (expected_family_count != 372
-            || family_universe_digest(&split.family_to_split.keys().cloned().collect())
-                != EXPECTED_FAMILY_UNIVERSE_SHA256)
+            || family_universe_digest(&candidate_family_ids) != EXPECTED_FAMILY_UNIVERSE_SHA256)
     {
         bail!("source component manifest validation requires the pinned real family universe");
     }
