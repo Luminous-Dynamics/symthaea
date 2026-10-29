@@ -1339,7 +1339,9 @@ mod tests {
 
         let changed_tpm = BinaryCausalModel::new(
             2,
-            vec![0.11, 0.2, 0.9, 0.2, 0.1, 0.8, 0.9, 0.8],
+            // Change A's self-transition across both values of B, preserving
+            // the declared absence of B -> A while changing model identity.
+            vec![0.11, 0.2, 0.9, 0.2, 0.11, 0.8, 0.9, 0.8],
             vec![true, true, false, true],
         ).unwrap();
         assert_ne!(model.model_sha256(), changed_tpm.model_sha256());
