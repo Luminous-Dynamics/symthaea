@@ -18,6 +18,7 @@ const MANIFEST_KEYS: &[&str] = &[
     "source_url",
     "source_version",
     "source_license_spdx",
+    "source_license_evidence_url",
     "source_sha256",
     "row_order_semantics",
     "feature_columns",
@@ -209,6 +210,14 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
         || ["UNKNOWN", "UNVERIFIED", "NOASSERTION"].contains(&license)
     {
         return Err(fail("source_license_spdx must be a verified SPDX identifier, not an unknown placeholder"));
+    }
+
+    let license_url = required(fields, "source_license_evidence_url")?;
+    if !license_url.starts_with("https://")
+        || license_url.contains(' ')
+        || license_url.contains('#')
+    {
+        return Err(fail("source_license_evidence_url must be an HTTPS evidence URL without a fragment or spaces"));
     }
 
     validate_sha256(required(fields, "source_sha256")?, "source_sha256")?;
@@ -469,6 +478,7 @@ mod tests {
             ("source_url", "https://example.org/datasets/electricity"),
             ("source_version", "2026-01"),
             ("source_license_spdx", "CC-BY-4.0"),
+            ("source_license_evidence_url", "https://example.org/fixture-license"),
             ("source_sha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             ("row_order_semantics", "temporal"),
             ("feature_columns", "demand,price,temperature"),
