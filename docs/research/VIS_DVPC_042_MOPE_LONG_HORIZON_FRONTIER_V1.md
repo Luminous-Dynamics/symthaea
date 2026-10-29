@@ -23,12 +23,15 @@ The target policy is P_pi(A=1)=0.5 for all scenarios. Each sample uses known-log
 
 ## Comparators
 
-- **MOPE:** two one-sided streaming confidence sequences, alpha_side=0.025, root updates gated by direct polynomial and product-wealth checks.
+- **MOPE analytic root:** two one-sided streaming confidence sequences, alpha_side=0.025. Endpoint advances use an analytic root of the quadratic log-wealth lower bound, gated by direct polynomial and product-wealth certificates.
+- **MOPE upstream-style grid:** evaluates the actual log-wealth process on 1,000 evenly spaced values in [0,1] and picks the first grid point whose half-initialized log wealth is below log(1/alpha_side). The value-grid calculation follows the endpoint lookup structure of the original public `n17s/mope/opebet.py` implementation; to keep the comparison focused, it uses this branch's same streaming optimizer rather than the original Python/Numba Cholesky optimizer. It is therefore a **grid-endpoint comparator**, not an exact port of the full published implementation.
 - **Reused Wald:** a conventional pointwise 95% normal interval re-evaluated at every look. It is explicitly an invalid anytime-valid comparator.
 - **Hoeffding alpha spending:** per-side delta_t = 0.05 / [2 t(t+1)], radius W sqrt(log(1/delta_t)/(2t)); each tail spends alpha/2 over all looks.
 - **Empirical-Bernstein alpha spending:** a two-sided interval with delta_t = 0.05 / [t(t+1)] and the SCOPE-RL documented finite-sample empirical-variance radius using W and sample variance; the two-sided per-look allocations sum to alpha.
 
-For both time-uniform baselines, raw intervals are combined with a running intersection at every observation: lower endpoints can only increase and upper endpoints can only decrease. This matches the sequential set semantics used for MOPE and avoids making the comparison artificially unfavorable by measuring a fresh non-nested bound at each look. The Wald comparator intentionally remains a reused pointwise interval. All intervals are clipped to the known target-value range [0,1]. Clipping alone does not make Wald anytime-valid.
+For both time-uniform baselines, raw intervals are combined with a running intersection at every observation: lower endpoints can only increase and upper endpoints can only decrease. This matches the sequential set semantics used for both MOPE variants and avoids making the comparison artificially unfavorable by measuring a fresh non-nested bound at each look. The Wald comparator intentionally remains a reused pointwise interval. All intervals are clipped to the known target-value range [0,1]. Clipping alone does not make Wald anytime-valid.
+
+The upstream repository is at https://github.com/n17s/mope. Its `wealth_lb_2d` uses a 1,000-value grid for actual wealth while choosing bets from the quadratic lower bound and an optimizer. This grid comparator isolates the value-grid-versus-analytic-root question while sharing our Rust optimizer across the two MOPE variants. Its output must not be described as a line-for-line reproduction.
 
 ## Metrics
 
@@ -40,7 +43,7 @@ At each horizon and for every method:
 - false promotion probability under each null DGP, where the lower endpoint ever exceeds tau=0.55;
 - promotion power under the true-value-0.65 alternative at the same threshold;
 - conditional median and 90th-percentile promotion time when promotion occurs;
-- MOPE root checks/failures, per-method elapsed seconds and method observations/second at each horizon, plus overall scenario wall time. The MOPE per-method timing includes direct root/wealth-certificate recomputation by the research harness, so it is conservative audit-path cost—not a pure production-kernel latency claim.
+- MOPE analytic-root direct-certificate checks/failures and endpoint collisions; grid endpoint advances; per-method elapsed seconds and observations/second at each horizon; overall scenario wall time. The analytic-root timing includes direct root/wealth-certificate recomputation by the research harness, so it is conservative audit-path cost—not a pure production-kernel latency claim. The grid method performs 1,000 value updates per observation, which makes the expected work contrast explicit.
 
 A 2,000-sequence simulation cannot prove coverage. Its purpose is to quantify approximate operating characteristics with uncertainty bars, while the confidence-sequence validity argument and exact-path controls remain separate.
 
