@@ -84,6 +84,7 @@ struct AuditSummary {
     dataset_id: String,
     domain: String,
     split_protocol: String,
+    manifest_sha256: String,
     samples: usize,
     artifacts: usize,
     train: usize,
@@ -96,10 +97,11 @@ fn main() -> ExitCode {
         Ok(Some((manifest, root))) => match audit_manifest(&manifest, &root) {
             Ok(summary) => {
                 println!(
-                    "HARDSEC_AUDIT_PASS dataset_id={} domain={} protocol={} samples={} artifacts={} train={} validation={} test={}",
+                    "HARDSEC_AUDIT_PASS dataset_id={} domain={} protocol={} manifest_sha256={} samples={} artifacts={} train={} validation={} test={}",
                     summary.dataset_id,
                     summary.domain,
                     summary.split_protocol,
+                    summary.manifest_sha256,
                     summary.samples,
                     summary.artifacts,
                     summary.train,
@@ -167,9 +169,16 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         return Err(format!("dataset root is not a directory: {}", root.display()));
     }
 
-    let text = fs::read_to_string(manifest_path).map_err(|error| {
+    let manifest_bytes = fs::read(manifest_path).map_err(|error| {
         format!(
-            "cannot read UTF-8 manifest {}: {error}",
+            "cannot read manifest bytes {}: {error}",
+            manifest_path.display()
+        )
+    })?;
+    let manifest_sha256 = sha256_bytes(&manifest_bytes);
+    let text = String::from_utf8(manifest_bytes).map_err(|error| {
+        format!(
+            "manifest is not valid UTF-8 {}: {error}",
             manifest_path.display()
         )
     })?;
@@ -425,6 +434,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         dataset_id,
         domain,
         split_protocol,
+        manifest_sha256,
         samples: samples.len(),
         artifacts: artifact_bindings.len(),
         train: split_counts["train"],
@@ -505,8 +515,7 @@ fn sha256_file(path: &Path) -> Result<String, std::io::Error> {
     Ok(hex::encode(digest.finalize()))
 }
 
-#[cfg(test)]
-fn sha256_hex(bytes: &[u8]) -> String {
+fn sha256_bytes(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
@@ -711,7 +720,7 @@ mod tests {
     #[test]
     fn sha256_uses_standard_sha256() {
         assert_eq!(
-            sha256_hex(b"abc"),
+            sha256_bytes(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
     }
