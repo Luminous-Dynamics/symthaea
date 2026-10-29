@@ -885,11 +885,13 @@ jobs:
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
           jq -e '.report.body.runner_execution_proven == false and .report.body.external_anchor_required == true' \
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
-          jq -e '.report.body.contrast_results | length == 4' \
+          jq -e '.report.body.contrast_results | length == 5' \
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
           jq -e '.report.body.contrast_results[] | select(.endpoint == "strict_correctness") | .assigned_pair_count == 1 and .eligible_pair_count == 1 and .ties == 1' \
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
           jq -e '.report.body.contrast_results[] | select(.endpoint == "expected_response") | .assigned_pair_count == 1 and .eligible_pair_count == 1 and .ties == 1' \
+            /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
+          jq -e '.report.body.contrast_results[] | select(.contrast_id == "source-contradiction-strict-correctness-vs-natural") | .eligible_pair_count == 1 and .treatment_losses == 1 and .paired_risk_difference == -1' \
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
           jq -e '.report.body.contrast_results[] | select(.endpoint == "cost_micro_usd") | .metric_complete_pair_count == 1 and .mean_resource_delta_treatment_minus_reference != null' \
             /tmp/sbr-paired-analysis/analysis-verification.json >/dev/null
