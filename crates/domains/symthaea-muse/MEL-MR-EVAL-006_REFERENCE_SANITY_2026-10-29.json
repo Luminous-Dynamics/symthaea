@@ -1,0 +1,267 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark": "MEL-MR-EVAL-006",
+  "artifact_kind": "independent_reference_sanity_check",
+  "generated_date": "2026-10-29",
+  "implementation_under_test": {
+    "source_path": "crates/domains/symthaea-muse/src/audio_preservation.rs",
+    "source_blob_sha": "771b75ee53dcb42f4ee594a2589a2e241e9a8257",
+    "runner_path": "crates/domains/symthaea-muse/examples/mel_mr_eval_006_conformance.rs",
+    "runner_blob_sha": "d43e960af838bd090187e1e8d66a285e4ec38dcf",
+    "claimed_execution_of_rust": false
+  },
+  "evaluator": {
+    "language": "Python 3",
+    "library": "NumPy FFT",
+    "sample_rate_hz": 16000,
+    "frames_per_case": 8192,
+    "channels": 1,
+    "acoustic": {
+      "window_frames": 256,
+      "hop_frames": 128,
+      "rms_delta_db_tolerance": 0.5,
+      "normalized_spectral_magnitude_distance_tolerance": 0.08,
+      "minimum_protected_windows": 4,
+      "edit_mask_semantics": "half-open [start_frame,end_frame); complete analysis windows intersecting guarded masks excluded"
+    },
+    "onset": {
+      "window_frames": 128,
+      "hop_frames": 32,
+      "spectral_flux_threshold": 0.12,
+      "minimum_separation_ms": 8,
+      "timing_tolerance_ms": 4,
+      "explicit_boundary_guard_frames": 0,
+      "automatic_analysis_guard_frames": 96,
+      "minimum_protected_duration_ms": 100
+    },
+    "limitations": [
+      "Independent reference implementation; it does not import or execute the Rust code.",
+      "Synthetic signals only; not a rendered MIDI test, real music corpus, human listening study, or editor head-to-head benchmark.",
+      "The thresholds are fixture settings, not production calibration.",
+      "Results only establish expected numerical behavior on these fixed cases."
+    ]
+  },
+  "summary": {
+    "cases_total": 11,
+    "expected_verdicts_reproduced": 11,
+    "mismatches": 0,
+    "critical_mutations_total": 6,
+    "critical_false_accepts": 0,
+    "critical_false_accept_rate": 0,
+    "critical_false_accept_rate_wilson_95_two_sided": {
+      "lower": 2.7755575615628914e-17,
+      "upper": 0.3903342879021653
+    },
+    "positive_controls_total": 3,
+    "false_rejections": 0,
+    "false_rejection_rate": 0,
+    "false_rejection_rate_wilson_95_two_sided": {
+      "lower": 5.551115123125783e-17,
+      "upper": 0.5614970317550454
+    },
+    "caveat": "The 0/6 false-accept panel has a two-sided 95% Wilson upper bound of about 39.0%; this is only a smoke test and does not support a reliability claim."
+  },
+  "per_family": {
+    "identity_control": {
+      "cases": 2,
+      "expected_outcomes_reproduced": 2,
+      "critical_mutations": 0,
+      "critical_false_accepts": 0
+    },
+    "acoustic_protected_mutation": {
+      "cases": 3,
+      "expected_outcomes_reproduced": 3,
+      "critical_mutations": 3,
+      "critical_false_accepts": 0,
+      "critical_false_accept_rate_wilson_95_two_sided": {
+        "lower": 5.551115123125783e-17,
+        "upper": 0.5614970317550454
+      }
+    },
+    "authorization_scope_control": {
+      "cases": 1,
+      "expected_outcomes_reproduced": 1,
+      "critical_mutations": 0,
+      "critical_false_accepts": 0
+    },
+    "onset_event_mutation": {
+      "cases": 3,
+      "expected_outcomes_reproduced": 3,
+      "critical_mutations": 3,
+      "critical_false_accepts": 0,
+      "critical_false_accept_rate_wilson_95_two_sided": {
+        "lower": 5.551115123125783e-17,
+        "upper": 0.5614970317550454
+      }
+    },
+    "evidence_coverage_control": {
+      "cases": 2,
+      "expected_outcomes_reproduced": 2,
+      "critical_mutations": 0,
+      "critical_false_accepts": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "AP-IDENTITY-001",
+      "family": "identity_control",
+      "critical_mutation": false,
+      "expected_verdict": "pass",
+      "actual_verdict": "pass",
+      "expected_outcome_reproduced": true,
+      "protected_windows": 54,
+      "violating_windows": 0,
+      "worst_rms_delta_db": 0,
+      "worst_spectral_distance": 0
+    },
+    {
+      "id": "AP-LOCAL-LEAK-001",
+      "family": "acoustic_protected_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "protected_windows": 54,
+      "violating_windows": 3,
+      "worst_rms_delta_db": 237.0018415550504,
+      "worst_spectral_distance": 1
+    },
+    {
+      "id": "AP-GAIN-DROP-001",
+      "family": "acoustic_protected_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "protected_windows": 54,
+      "violating_windows": 3,
+      "worst_rms_delta_db": 12.041199826559247,
+      "worst_spectral_distance": 0.5999999642372131
+    },
+    {
+      "id": "AP-FREQUENCY-SWAP-001",
+      "family": "acoustic_protected_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "protected_windows": 54,
+      "violating_windows": 3,
+      "worst_rms_delta_db": 0.004065963743411061,
+      "worst_spectral_distance": 0.9975086450576782
+    },
+    {
+      "id": "AP-AUTHORIZED-ONLY-001",
+      "family": "authorization_scope_control",
+      "critical_mutation": false,
+      "expected_verdict": "pass",
+      "actual_verdict": "pass",
+      "expected_outcome_reproduced": true,
+      "protected_windows": 54,
+      "violating_windows": 0,
+      "worst_rms_delta_db": 0,
+      "worst_spectral_distance": 0
+    },
+    {
+      "id": "ONSET-IDENTITY-001",
+      "family": "identity_control",
+      "critical_mutation": false,
+      "expected_verdict": "pass",
+      "actual_verdict": "pass",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [
+        992,
+        3072
+      ],
+      "candidate_onsets_frames": [
+        992,
+        3072
+      ],
+      "missing_onsets": 0,
+      "extra_onsets": 0,
+      "effective_boundary_guard_frames": 96
+    },
+    {
+      "id": "ONSET-DELAY-001",
+      "family": "onset_event_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [
+        992,
+        3072
+      ],
+      "candidate_onsets_frames": [
+        1504,
+        3552
+      ],
+      "missing_onsets": 2,
+      "extra_onsets": 2,
+      "effective_boundary_guard_frames": 96
+    },
+    {
+      "id": "ONSET-EXTRA-001",
+      "family": "onset_event_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [
+        992,
+        3072
+      ],
+      "candidate_onsets_frames": [
+        992,
+        3072,
+        5088,
+        6144
+      ],
+      "missing_onsets": 0,
+      "extra_onsets": 2,
+      "effective_boundary_guard_frames": 96
+    },
+    {
+      "id": "ONSET-MASK-001",
+      "family": "evidence_coverage_control",
+      "critical_mutation": false,
+      "expected_verdict": "abstain",
+      "actual_verdict": "abstain",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [],
+      "candidate_onsets_frames": [],
+      "missing_onsets": 0,
+      "extra_onsets": 0,
+      "effective_boundary_guard_frames": 96
+    },
+    {
+      "id": "ONSET-UNMEASURABLE-001",
+      "family": "evidence_coverage_control",
+      "critical_mutation": false,
+      "expected_verdict": "abstain",
+      "actual_verdict": "abstain",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [],
+      "candidate_onsets_frames": [],
+      "missing_onsets": 0,
+      "extra_onsets": 0,
+      "effective_boundary_guard_frames": 96
+    },
+    {
+      "id": "ONSET-MISSING-001",
+      "family": "onset_event_mutation",
+      "critical_mutation": true,
+      "expected_verdict": "fail",
+      "actual_verdict": "fail",
+      "expected_outcome_reproduced": true,
+      "reference_onsets_frames": [
+        992,
+        3072
+      ],
+      "candidate_onsets_frames": [],
+      "missing_onsets": 2,
+      "extra_onsets": 0,
+      "effective_boundary_guard_frames": 96
+    }
+  ]
+}
