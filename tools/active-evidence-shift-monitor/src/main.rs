@@ -1241,7 +1241,7 @@ fn print_anytime_mixture_probe_csv() {
     let alpha = PER_CELL_ALPHA;
     let log_threshold = -alpha.ln();
     println!(
-        "trace_id,scenario,scenario_class,horizon,change_after,pre_rate,post_rate,alpha,log_threshold,component_count,first_alarm_step,alarm_phase,final_log_e_value,upward_alternatives,downward_alternatives,change_hazards"
+        "trace_id,scenario,scenario_class,horizon,change_after,schedule_policy,pre_rate,post_rate,alpha,log_threshold,component_count,first_alarm_step,alarm_phase,final_log_e_value,upward_alternatives,downward_alternatives,change_hazards"
     );
 
     for (index, scenario) in ANYTIME_MIXTURE_PROBES.iter().enumerate() {
@@ -1276,6 +1276,26 @@ fn print_anytime_mixture_probe_csv() {
         }
 
         let alarm_step_text = first_alarm.map(|step| step.to_string()).unwrap_or_else(|| "NA".to_owned());
+        let schedule_policy = if scenario.name == "within_band_alternating" {
+            "alternating_band_endpoints"
+        } else if scenario.name == "within_band_feedback" {
+            "previsible_e_value_feedback"
+        } else if scenario.name.starts_with("step_") {
+            "single_step_after_100"
+        } else if scenario.name == "all_ones_adversarial" {
+            "all_ones_extreme_path"
+        } else if scenario.name == "all_zeros_adversarial" {
+            "all_zeros_extreme_path"
+        } else {
+            "constant_probability"
+        };
+        let pre_rate_text = if scenario.name == "within_band_alternating"
+            || scenario.name == "within_band_feedback"
+        {
+            "NA".to_owned()
+        } else {
+            format!("{:.12}", scenario.pre_p)
+        };
         let alarm_phase = match (scenario.post_p, first_alarm) {
             (Some(_), Some(step)) if step <= scenario.change_after => "pre_change",
             (Some(_), Some(_)) => "post_change",
@@ -1288,13 +1308,14 @@ fn print_anytime_mixture_probe_csv() {
         let down_text = DOWNWARD_ALTERNATIVES.iter().map(|p| format!("{p:.2}")).collect::<Vec<_>>().join(";");
         let hazard_text = CHANGE_HAZARDS.iter().map(|h| format!("{h:.4}")).collect::<Vec<_>>().join(";");
         println!(
-            "{},{},{},{},{},{:.12},{},{:.12},{:.12},{},{},{},{:.12e},{},{},{}",
+            "{},{},{},{},{},{},{},{},{:.12},{:.12},{},{},{},{:.12e},{},{},{}",
             index + 1,
             scenario.name,
             scenario.class,
             horizon,
             if scenario.post_p.is_some() { scenario.change_after.to_string() } else { "NA".to_owned() },
-            scenario.pre_p,
+            schedule_policy,
+            pre_rate_text,
             post_p_text,
             alpha,
             log_threshold,
