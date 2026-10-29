@@ -308,6 +308,14 @@ The public demo contains six seeded unsafe events intended to produce one findin
 
 The next substantive gate is trusted trace capture and evaluator/candidate separation: authenticate the trace collector, independently attest capture completeness, resolve referenced evidence/authority objects, then run hidden evaluator-owned scenarios without exposing expected outcomes to the candidate.
 
+### GCRB-3A — Sealed qualification protocol
+
+The machine-readable protocol is committed at `docs/research/fixtures/governance-capture-resistance-qualification-protocol-v0.1.json`. It separates four evaluation partitions: public development, sealed synthetic qualification, public retrospective records, and prospective field evaluation. It also defines role separation, attacker role-compromise budgets, paired baselines, family-level splits, statistical reporting, a reproducible run-receipt contract, and five release gates.
+
+This document is public; it contains **no hidden qualification data or labels**. The 1,018-case stress corpus remains public development data, and its 1,000 variants are correlated across eight authored families rather than independent real-world samples. The protocol requires distinct case episodes and an appropriate sampling frame before reporting false-high-severity escalation as an estimated rate.
+
+No sealed qualification, retrospective ground-truth evaluation, or prospective field study has occurred. The protocol is a design contract, not evidence that any gate has passed.
+
 ### GCRB-4 — Cross-system adapters
 
 - Mycelix: exact commitment/event/reference and appeal-history adapters.
