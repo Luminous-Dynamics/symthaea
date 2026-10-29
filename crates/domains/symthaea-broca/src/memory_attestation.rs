@@ -565,7 +565,7 @@ fn parse_utc(value: &str, field: &str) -> Result<DateTime<Utc>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory_governance::SourcePolicy;
+    use crate::memory_governance::{LedgerQuery, SourcePolicy};
 
     fn policy(version: u64, timestamp: &str) -> AuthorityPolicy {
         AuthorityPolicy {
@@ -588,7 +588,7 @@ mod tests {
         }
     }
 
-    fn assertion(id: &str, source: &str, value: &str) -> LedgerEvent {
+    fn assertion(id: &str, source: &str, value: &str, claimed_recorded_at: &str) -> LedgerEvent {
         LedgerEvent::Assert {
             event_id: id.into(),
             subject: "db-prod".into(),
@@ -596,7 +596,7 @@ mod tests {
             value: value.into(),
             valid_from: "2026-01-01".into(),
             valid_to: None,
-            recorded_at: "2026-01-02T00:00:00Z".into(),
+            recorded_at: claimed_recorded_at.into(),
             source: source.into(),
         }
     }
@@ -611,6 +611,7 @@ mod tests {
         key: &SigningKey,
         can_sign_policies: bool,
         can_sign_events: bool,
+        can_sign_ingestion_receipts: bool,
         from: &str,
         until: Option<&str>,
     ) -> TrustedSignerConfig {
@@ -620,89 +621,132 @@ mod tests {
             source: source.map(str::to_owned),
             can_sign_policies,
             can_sign_events,
+            can_sign_ingestion_receipts,
             valid_from: from.into(),
             valid_until: until.map(str::to_owned),
         }
     }
 
-    fn store() -> (EvidenceTrustStore, SigningKey, SigningKey) {
-        let policy_key = key(7);
-        let ops_key = key(9);
+    fn keys() -> (SigningKey, SigningKey, SigningKey) {
+        (key(7), key(9), key(11))
+    }
+
+    fn store() -> (EvidenceTrustStore, SigningKey, SigningKey, SigningKey) {
+        let (policy_key, ops_key, ingest_key) = keys();
         let store = EvidenceTrustStore::new(vec![
             trust_config(
-                "policy-root",
-                None,
-                &policy_key,
-                true,
-                false,
-                "2026-01-01T00:00:00Z",
-                None,
+                "policy-root", None, &policy_key, true, false, false,
+                "2026-01-01T00:00:00Z", None,
             ),
             trust_config(
-                "ops-key-1",
-                Some("operations"),
-                &ops_key,
-                false,
-                true,
-                "2026-01-01T00:00:00Z",
-                Some("2027-01-01T00:00:00Z"),
+                "ops-key-1", Some("operations"), &ops_key, false, true, false,
+                "2026-01-01T00:00:00Z", Some("2027-01-01T00:00:00Z"),
             ),
-        ])
-        .unwrap();
-        (store, policy_key, ops_key)
+            trust_config(
+                "ingest-root", None, &ingest_key, false, false, true,
+                "2026-01-01T00:00:00Z", Some("2027-01-01T00:00:00Z"),
+            ),
+        ]).unwrap();
+        (store, policy_key, ops_key, ingest_key)
+    }
+
+    fn sign_event(
+        signer_key_id: &str,
+        event: LedgerEvent,
+        source_key: &SigningKey,
+        accepted_at: &str,
+        ingestion_key: &SigningKey,
+    ) -> SignedLedgerEvent {
+        SignedLedgerEvent::sign(signer_key_id, event, source_key)
+            .unwrap()
+            .with_ingestion_receipt("ingest-root", accepted_at, ingestion_key)
+            .unwrap()
+    }
+
+    fn query(query_id: &str, known_at: &str) -> LedgerQuery {
+        LedgerQuery {
+            query_id: query_id.into(),
+            subject: "db-prod".into(),
+            attribute: "endpoint".into(),
+            valid_at: "2026-01-03".into(),
+            known_at: known_at.into(),
+        }
     }
 
     #[test]
     fn valid_policy_and_event_signatures_verify() {
-        let (store, policy_key, ops_key) = store();
+        let (store, policy_key, ops_key, ingest_key) = store();
         let signed_policy = SignedAuthorityPolicy::sign(
-            "policy-root",
-            policy(1, "2026-01-01T00:00:00Z"),
-            &policy_key,
-        )
-        .unwrap();
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+        ).unwrap();
         assert_eq!(store.verify_policy(&signed_policy).unwrap().policy_version, 1);
-        let signed_event =
-            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
-                .unwrap();
-        assert!(matches!(store.verify_event(&signed_event), Ok(LedgerEvent::Assert { .. })));
+        let signed_event = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
+        let verified = store.verify_event(&signed_event).unwrap();
+        assert!(matches!(verified, LedgerEvent::Assert { .. }));
+        assert_eq!(verified.recorded_at(), "2026-01-02T00:00:01Z");
     }
 
     #[test]
     fn signed_batches_produce_verified_ledger_constructor_input() {
-        let (store, policy_key, ops_key) = store();
-        let policy = SignedAuthorityPolicy::sign(
-            "policy-root",
-            policy(1, "2026-01-01T00:00:00Z"),
-            &policy_key,
+        let (store, policy_key, ops_key, ingest_key) = store();
+        let signed_policy = SignedAuthorityPolicy::sign(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
         ).unwrap();
-        let event = SignedLedgerEvent::sign(
+        let signed_event = sign_event(
             "ops-key-1",
-            assertion("E1", "operations", "A"),
-            &ops_key,
-        ).unwrap();
-        let batch = store.verify_batch(&[policy], &[event]).unwrap();
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
+        let batch = store.verify_batch(&[signed_policy], &[signed_event]).unwrap();
         assert_eq!(batch.policy_count(), 1);
         assert_eq!(batch.event_count(), 1);
         assert_eq!(batch.policy_chain_sha256().len(), 64);
         assert_eq!(batch.event_chain_sha256().len(), 64);
         let ledger = batch.into_ledger().unwrap();
-        let result = ledger.resolve(&crate::memory_governance::LedgerQuery {
-            query_id: "Q".into(),
-            subject: "db-prod".into(),
-            attribute: "endpoint".into(),
-            valid_at: "2026-01-03".into(),
-            known_at: "2026-01-03T00:00:00Z".into(),
-        }).unwrap();
+        let result = ledger.resolve(&query("Q", "2026-01-03T00:00:00Z")).unwrap();
         assert_eq!(result.value.as_deref(), Some("A"));
     }
 
     #[test]
-    fn payload_tampering_breaks_signature() {
-        let (store, _, ops_key) = store();
-        let mut signed =
-            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
-                .unwrap();
+    fn trusted_ingress_time_not_source_claim_controls_temporal_visibility() {
+        let (store, policy_key, ops_key, ingest_key) = store();
+        let signed_policy = SignedAuthorityPolicy::sign(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+        ).unwrap();
+        let signed_event = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-03-01T10:00:00Z", &ingest_key,
+        );
+        let batch = store.verify_batch(&[signed_policy], &[signed_event]).unwrap();
+        let ledger = batch.into_ledger().unwrap();
+        let before_receipt = ledger.resolve(&query("before", "2026-02-20T00:00:00Z")).unwrap();
+        let after_receipt = ledger.resolve(&query("after", "2026-03-02T00:00:00Z")).unwrap();
+        assert_eq!(before_receipt.state, crate::memory_governance::ResolutionState::Unknown);
+        assert_eq!(after_receipt.value.as_deref(), Some("A"));
+    }
+
+    #[test]
+    fn missing_ingestion_receipt_is_rejected() {
+        let (store, _, ops_key, _) = store();
+        let signed = SignedLedgerEvent::sign(
+            "ops-key-1", assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"), &ops_key,
+        ).unwrap();
+        assert!(store.verify_event(&signed).unwrap_err().contains("lacks trusted-ingress receipt"));
+    }
+
+    #[test]
+    fn source_payload_tampering_breaks_signature() {
+        let (store, _, ops_key, ingest_key) = store();
+        let mut signed = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         if let LedgerEvent::Assert { value, .. } = &mut signed.event {
             *value = "tampered".into();
         }
@@ -710,39 +754,55 @@ mod tests {
     }
 
     #[test]
+    fn receipt_time_tampering_breaks_ingestion_signature() {
+        let (store, _, ops_key, ingest_key) = store();
+        let mut signed = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
+        signed.ingestion_receipt.as_mut().unwrap().accepted_at = "2026-01-03T00:00:00Z".into();
+        assert!(store.verify_event(&signed).unwrap_err().contains("signature verification failed"));
+    }
+
+    #[test]
     fn signer_cannot_claim_another_source() {
-        let (store, _, ops_key) = store();
-        let signed =
-            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "incident-review", "A"), &ops_key)
-                .unwrap();
+        let (store, _, ops_key, ingest_key) = store();
+        let signed = sign_event(
+            "ops-key-1",
+            assertion("E1", "incident-review", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         assert!(store.verify_event(&signed).unwrap_err().contains("not authorized for source"));
     }
 
     #[test]
-    fn unknown_key_is_rejected() {
-        let (store, _, ops_key) = store();
-        let signed =
-            SignedLedgerEvent::sign("not-registered", assertion("E1", "operations", "A"), &ops_key)
-                .unwrap();
+    fn unknown_source_key_is_rejected() {
+        let (store, _, ops_key, ingest_key) = store();
+        let signed = sign_event(
+            "not-registered",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         assert!(store.verify_event(&signed).unwrap_err().contains("untrusted signer"));
     }
 
     #[test]
     fn key_role_must_match_operation() {
-        let (store, policy_key, _) = store();
-        let signed =
-            SignedLedgerEvent::sign("policy-root", assertion("E1", "operations", "A"), &policy_key)
-                .unwrap();
+        let (store, policy_key, _, ingest_key) = store();
+        let signed = sign_event(
+            "policy-root",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &policy_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         assert!(store.verify_event(&signed).unwrap_err().contains("lacks event-signing role"));
     }
 
     #[test]
     fn policy_payload_tampering_breaks_signature() {
-        let (store, policy_key, _) = store();
+        let (store, policy_key, _, _) = store();
         let mut signed = SignedAuthorityPolicy::sign(
-            "policy-root",
-            policy(1, "2026-01-01T00:00:00Z"),
-            &policy_key,
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
         ).unwrap();
         signed.policy.sources[0].authority_rank += 100;
         assert!(store.verify_policy(&signed).unwrap_err().contains("signature verification failed"));
@@ -750,11 +810,9 @@ mod tests {
 
     #[test]
     fn policy_signature_requires_recorded_time_match() {
-        let (store, policy_key, _) = store();
+        let (store, policy_key, _, _) = store();
         let mut signed = SignedAuthorityPolicy::sign(
-            "policy-root",
-            policy(1, "2026-01-01T00:00:00Z"),
-            &policy_key,
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
         ).unwrap();
         signed.signed_at = "2026-01-02T00:00:00Z".into();
         assert!(store.verify_policy(&signed).unwrap_err().contains("must equal policy.recorded_at"));
@@ -762,50 +820,71 @@ mod tests {
 
     #[test]
     fn policy_source_order_is_canonicalized_for_signatures() {
-        let (store, policy_key, _) = store();
-        let mut p = policy(1, "2026-01-01T00:00:00Z");
-        let signed = SignedAuthorityPolicy::sign("policy-root", p.clone(), &policy_key).unwrap();
-        p.sources.reverse();
+        let (store, policy_key, _, _) = store();
+        let mut policy = policy(1, "2026-01-01T00:00:00Z");
+        let signed = SignedAuthorityPolicy::sign("policy-root", policy.clone(), &policy_key).unwrap();
+        policy.sources.reverse();
         let mut reordered = signed.clone();
-        reordered.policy = p;
+        reordered.policy = policy;
         assert_eq!(store.verify_policy(&signed).unwrap(), store.verify_policy(&reordered).unwrap());
     }
 
     #[test]
-    fn event_key_validity_window_is_enforced() {
-        let policy_key = key(7);
+    fn event_key_validity_window_is_enforced_at_ingress_time() {
         let ops_key = key(9);
+        let ingest_key = key(11);
         let store = EvidenceTrustStore::new(vec![
-            trust_config("ops", Some("operations"), &ops_key, false, true,
+            trust_config("ops", Some("operations"), &ops_key, false, true, false,
                 "2026-02-01T00:00:00Z", Some("2026-03-01T00:00:00Z")),
+            trust_config("ingest-root", None, &ingest_key, false, false, true,
+                "2026-01-01T00:00:00Z", None),
         ]).unwrap();
-        let signed =
-            SignedLedgerEvent::sign("ops", assertion("E1", "operations", "A"), &ops_key).unwrap();
+        let signed = sign_event(
+            "ops", assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         assert!(store.verify_event(&signed).unwrap_err().contains("not valid at signed time"));
-        let _ = policy_key;
     }
 
     #[test]
     fn event_signature_cannot_be_replayed_with_another_signer_id() {
-        let (store, _, ops_key) = store();
-        let mut signed =
-            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
-                .unwrap();
+        let (store, _, ops_key, ingest_key) = store();
+        let mut signed = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
         signed.signer_key_id = "different-key-id".into();
         assert!(store.verify_event(&signed).is_err());
     }
 
     #[test]
-    fn exact_schema_rejects_unknown_envelope_fields() {
-        let input = r#"{"schema_version":"BROCA-ATTESTATION-V1","signer_key_id":"ops-key-1","event":{"kind":"assert","event_id":"E","subject":"x","attribute":"a","value":"v","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T00:00:00Z","source":"operations"},"signature_hex":"00","authority_rank":9999}"#;
-        assert!(serde_json::from_str::<SignedLedgerEvent>(input).is_err());
+    fn policy_root_cannot_sign_ingestion_receipts() {
+        let (store, _, ops_key, _) = store();
+        let mut signed = SignedLedgerEvent::sign(
+            "ops-key-1", assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"), &ops_key,
+        ).unwrap();
+        let mut receipt = signed.clone().with_ingestion_receipt(
+            "ops-key-1", "2026-01-02T00:00:01Z", &ops_key,
+        ).unwrap().ingestion_receipt.unwrap();
+        receipt.ingester_key_id = "policy-root".into();
+        signed.ingestion_receipt = Some(receipt);
+        assert!(store.verify_event(&signed).unwrap_err().contains("lacks ingestion-receipt signing role"));
+    }
+
+    #[test]
+    fn strict_envelopes_reject_unknown_fields() {
+        let event = r#"{"schema_version":"BROCA-ATTESTATION-V1","signer_key_id":"ops-key-1","event":{"kind":"assert","event_id":"E","subject":"x","attribute":"a","value":"v","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T00:00:00Z","source":"operations"},"signature_hex":"00","ingestion_receipt":null,"authority_rank":9999}"#;
+        assert!(serde_json::from_str::<SignedLedgerEvent>(event).is_err());
+        let receipt = r#"{"schema_version":"BROCA-ATTESTATION-V1","ingester_key_id":"root","accepted_at":"2026-01-01T00:00:00Z","signature_hex":"00","extra":true}"#;
+        assert!(serde_json::from_str::<IngestionReceipt>(receipt).is_err());
     }
 
     #[test]
     fn duplicate_trusted_key_id_is_rejected() {
-        let key = key(2);
-        let a = trust_config("same", Some("a"), &key, false, true, "2026-01-01T00:00:00Z", None);
-        let b = trust_config("same", Some("b"), &key, false, true, "2026-01-01T00:00:00Z", None);
+        let k = key(2);
+        let a = trust_config("same", Some("a"), &k, false, true, false, "2026-01-01T00:00:00Z", None);
+        let b = trust_config("same", Some("b"), &k, false, true, false, "2026-01-01T00:00:00Z", None);
         assert!(EvidenceTrustStore::new(vec![a, b]).unwrap_err().contains("duplicate trusted key_id"));
     }
 
@@ -817,6 +896,7 @@ mod tests {
             source: Some("operations".into()),
             can_sign_policies: false,
             can_sign_events: true,
+            can_sign_ingestion_receipts: false,
             valid_from: "2026-01-01T00:00:00Z".into(),
             valid_until: None,
         }]);
@@ -824,9 +904,11 @@ mod tests {
     }
 
     #[test]
-    fn missing_role_and_source_binding_are_rejected() {
+    fn missing_roles_and_source_binding_are_rejected() {
         let k = key(3);
-        let config = trust_config("none", None, &k, false, false, "2026-01-01T00:00:00Z", None);
+        let config = trust_config("none", None, &k, false, false, false, "2026-01-01T00:00:00Z", None);
         assert!(EvidenceTrustStore::new(vec![config]).unwrap_err().contains("no signing role"));
+        let no_source = trust_config("event", None, &k, false, true, false, "2026-01-01T00:00:00Z", None);
+        assert!(EvidenceTrustStore::new(vec![no_source]).unwrap_err().contains("must bind to a source"));
     }
 }
