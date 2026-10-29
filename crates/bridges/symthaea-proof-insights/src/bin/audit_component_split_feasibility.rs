@@ -79,7 +79,14 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 fn valid_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_identifier(value: &str) -> bool {
+    !value.trim().is_empty() && !value.chars().any(char::is_control)
 }
 
 fn validate_sha(value: &str, label: &str) -> Result<()> {
@@ -162,7 +169,7 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         let component_id = row["component_id"]
             .as_str()
             .context("candidate family row is missing component_id")?;
-        if family_id.trim().is_empty() || !SPLITS.contains(&split) || component_id.trim().is_empty() {
+        if !valid_identifier(family_id) || !SPLITS.contains(&split) || !valid_identifier(component_id) {
             bail!("candidate contains a blank ID or invalid split");
         }
         if family_to_split.insert(family_id.to_owned(), split.to_owned()).is_some()
@@ -184,7 +191,7 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         let members = row["family_ids"]
             .as_array()
             .context("candidate component family_ids must be an array")?;
-        if component_id.trim().is_empty() || !SPLITS.contains(&split) || members.is_empty() {
+        if !valid_identifier(component_id) || !SPLITS.contains(&split) || members.is_empty() {
             bail!("candidate contains a blank component, invalid split, or empty component");
         }
         let mut member_set = BTreeSet::new();
@@ -261,7 +268,7 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
         }
         let mut ids = BTreeSet::new();
         for id in &family.candidate_target_ids {
-            if id.trim().is_empty() || !ids.insert(id.clone()) {
+            if !valid_identifier(id) || !ids.insert(id.clone()) {
                 bail!("family target IDs must be unique and nonblank");
             }
         }
@@ -273,10 +280,10 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
     let mut observed_eligibility_counts: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
     let mut target_ids = BTreeSet::new();
     for target in &census.targets {
-        if target.target_id.trim().is_empty() || !target_ids.insert(target.target_id.clone()) {
+        if !valid_identifier(&target.target_id) || !target_ids.insert(target.target_id.clone()) {
             bail!("target IDs must be unique and nonblank");
         }
-        if !census_families.contains(&target.family_id) {
+        if !valid_identifier(&target.family_id) || !census_families.contains(&target.family_id) {
             bail!("target references a family outside the frozen universe");
         }
         if !matches!(target.status.as_str(), "eligible" | "excluded" | "unknown") {
@@ -367,21 +374,22 @@ fn execute() -> Result<()> {
         unknown_target_count.insert(split_name.to_owned(), 0);
     }
 
-    let mut unknown_family_count = 0usize;
+    let mut unknown_family_ids = BTreeSet::new();
     for (family_id, status_counts) in &family_status_by_id {
         let split_name = &split.family_to_split[family_id];
         *eligible_target_count.get_mut(split_name).expect("registered split") += status_counts.0;
         *excluded_target_count.get_mut(split_name).expect("registered split") += status_counts.1;
         *unknown_target_count.get_mut(split_name).expect("registered split") += status_counts.2;
         if status_counts.2 > 0 {
-            unknown_family_count += 1;
+            unknown_family_ids.insert(family_id.clone());
         }
     }
     for family in &census.families {
         if family.eligibility_status == "unknown" {
-            unknown_family_count += 1;
+            unknown_family_ids.insert(family.family_id.clone());
         }
     }
+    let unknown_family_count = unknown_family_ids.len();
     for component in split.components.values() {
         *all_components_by_split.get_mut(&component.split).expect("registered split") += 1;
         let has_eligible_target = component.family_ids.iter().any(|family_id| {
