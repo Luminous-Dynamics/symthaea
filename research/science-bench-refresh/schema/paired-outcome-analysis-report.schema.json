@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/paired-outcome-analysis-report.schema.json",
+  "title": "Symthaea Paired Evidence Outcome Analysis Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "valid",
+    "plan_binding_valid",
+    "outcome_report_valid",
+    "analysis_plan_hash_matches",
+    "analysis_revision_matches",
+    "issues",
+    "report"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_paired_analysis_verification.v1"
+    },
+    "valid": { "type": "boolean" },
+    "plan_binding_valid": { "type": "boolean" },
+    "outcome_report_valid": { "type": "boolean" },
+    "analysis_plan_hash_matches": { "type": "boolean" },
+    "analysis_revision_matches": { "type": "boolean" },
+    "issues": { "type": "array", "items": { "type": "string" } },
+    "report": {
+      "oneOf": [
+        { "$ref": "#/$defs/report" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "optional_number": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "null" }
+      ]
+    },
+    "optional_count": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "null" }
+      ]
+    },
+    "pair_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "reference_value",
+        "treatment_value",
+        "treatment_minus_reference",
+        "eligibility_reason"
+      ],
+      "properties": {
+        "pair_id": { "type": "string" },
+        "reference_value": { "$ref": "#/$defs/optional_number" },
+        "treatment_value": { "$ref": "#/$defs/optional_number" },
+        "treatment_minus_reference": { "$ref": "#/$defs/optional_number" },
+        "eligibility_reason": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contrast_id",
+        "treatment_condition",
+        "reference_condition",
+        "endpoint",
+        "directional_hypothesis",
+        "assigned_pair_count",
+        "eligible_pair_count",
+        "incomplete_pair_count",
+        "ineligible_reason_counts",
+        "treatment_wins",
+        "treatment_losses",
+        "ties",
+        "paired_risk_difference",
+        "discordant_pair_count",
+        "exact_mcnemar_two_sided_p",
+        "holm_adjusted_p",
+        "discordant_win_rate",
+        "discordant_win_rate_wilson_95_low",
+        "discordant_win_rate_wilson_95_high",
+        "mean_resource_delta_treatment_minus_reference",
+        "metric_complete_pair_count",
+        "metric_incomplete_pair_count",
+        "pair_results"
+      ],
+      "properties": {
+        "contrast_id": { "type": "string" },
+        "treatment_condition": { "type": "string" },
+        "reference_condition": { "type": "string" },
+        "endpoint": {
+          "enum": [
+            "strict_correctness",
+            "fully_supported_claim",
+            "relevant_evidence_use",
+            "expected_response",
+            "wall_clock_ms",
+            "tool_calls",
+            "experiment_count",
+            "input_tokens",
+            "output_tokens",
+            "cost_micro_usd"
+          ]
+        },
+        "directional_hypothesis": {
+          "enum": ["treatment_higher", "treatment_lower", "no_directional_claim"]
+        },
+        "assigned_pair_count": { "type": "integer", "minimum": 0 },
+        "eligible_pair_count": { "type": "integer", "minimum": 0 },
+        "incomplete_pair_count": { "type": "integer", "minimum": 0 },
+        "ineligible_reason_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "treatment_wins": { "$ref": "#/$defs/optional_count" },
+        "treatment_losses": { "$ref": "#/$defs/optional_count" },
+        "ties": { "$ref": "#/$defs/optional_count" },
+        "paired_risk_difference": { "$ref": "#/$defs/optional_number" },
+        "discordant_pair_count": { "$ref": "#/$defs/optional_count" },
+        "exact_mcnemar_two_sided_p": { "$ref": "#/$defs/optional_number" },
+        "holm_adjusted_p": { "$ref": "#/$defs/optional_number" },
+        "discordant_win_rate": { "$ref": "#/$defs/optional_number" },
+        "discordant_win_rate_wilson_95_low": { "$ref": "#/$defs/optional_number" },
+        "discordant_win_rate_wilson_95_high": { "$ref": "#/$defs/optional_number" },
+        "mean_resource_delta_treatment_minus_reference": {
+          "$ref": "#/$defs/optional_number"
+        },
+        "metric_complete_pair_count": { "$ref": "#/$defs/optional_count" },
+        "metric_incomplete_pair_count": { "$ref": "#/$defs/optional_count" },
+        "pair_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pair_result" }
+        }
+      }
+    },
+    "report_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "plan_sha256",
+        "plan_commitment_sha256",
+        "outcome_report_sha256",
+        "outcome_report_commitment_sha256",
+        "analysis_plan_sha256",
+        "analysis_implementation_revision",
+        "multiplicity_policy",
+        "assigned_pair_count",
+        "contrast_results",
+        "fixed_benchmark_only",
+        "generalized_accuracy_estimated",
+        "external_anchor_required",
+        "runner_execution_proven",
+        "uncertainty_boundary",
+        "claim_boundary"
+      ],
+      "properties": {
+        "schema": {
+          "const": "symthaea.science_bench_refresh_paired_analysis_report.v1"
+        },
+        "plan_sha256": { "$ref": "#/$defs/digest" },
+        "plan_commitment_sha256": { "$ref": "#/$defs/digest" },
+        "outcome_report_sha256": { "$ref": "#/$defs/digest" },
+        "outcome_report_commitment_sha256": { "$ref": "#/$defs/digest" },
+        "analysis_plan_sha256": { "$ref": "#/$defs/digest" },
+        "analysis_implementation_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "multiplicity_policy": {
+          "enum": ["holm_across_binary_contrasts", "unadjusted_exploratory"]
+        },
+        "assigned_pair_count": { "type": "integer", "minimum": 0 },
+        "contrast_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contrast" }
+        },
+        "fixed_benchmark_only": { "const": true },
+        "generalized_accuracy_estimated": { "const": false },
+        "external_anchor_required": { "const": true },
+        "runner_execution_proven": { "const": false },
+        "uncertainty_boundary": { "type": "string" },
+        "claim_boundary": { "type": "string" }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "report_commitment_sha256"],
+      "properties": {
+        "body": { "$ref": "#/$defs/report_body" },
+        "report_commitment_sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}
