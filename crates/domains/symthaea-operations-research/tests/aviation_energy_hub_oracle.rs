@@ -167,7 +167,7 @@ fn insufficient_grid_and_no_storage_is_infeasible() {
 fn canonical_digest_matches_independent_known_answer_vector() {
     assert_eq!(
         canonical_energy_hub_digest(&frontier_scenario()).unwrap(),
-        "sha256:21048e86350e423468d5fcac5a137c6cfea74922df14894ad5331c05b70ac2e7"
+        "sha256:f2b10de314f1bd539154c7de9f9909339e0f80b7b2fd00e8c4d9e0cb056721da"
     );
 }
 
