@@ -20,8 +20,15 @@ from mfscbo_comparison_contract import (
 UPSTREAM_SHA = "ca42fd6c5ec8c841e3f1ff9642509e12d104b581"
 HASH = "a" * 64
 ROOT = Path(__file__).resolve().parents[2]
-TASK_SUITE_PATH = "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+TASK_SUITE_PATH = "docs/research/CASTING_MFSCBO_COMPATIBILITY_CONTROL_V1.json"
+TASK_SUITE = json.loads((ROOT / TASK_SUITE_PATH).read_text(encoding="utf-8"))
 TASK_SUITE_SHA256 = hashlib.sha256((ROOT / TASK_SUITE_PATH).read_bytes()).hexdigest()
+CONSTRAINT_SHA256 = hashlib.sha256(
+    json.dumps(
+        TASK_SUITE["constraint_contract"], sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False, allow_nan=False,
+    ).encode("utf-8")
+).hexdigest()
 
 
 def valid_contract():
@@ -43,7 +50,7 @@ def valid_contract():
         ],
         "scalarization_frozen_before_unseal": True,
         "constraint_fidelity_invariant": True,
-        "constraint_definition_sha256": "c" * 64,
+        "constraint_definition_sha256": CONSTRAINT_SHA256,
         "constraint_margin_sign": "positive_means_feasible",
         "upstream_constraint_sign": "c(x) <= 0",
         "target_hf_queries_allowed_in_search": True,
@@ -130,6 +137,20 @@ class MfScboComparisonContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "without parent traversal"):
             validate_contract(value)
 
+    def test_rejects_compositional_casting_suite_incompatible_with_shared_constraint_api(self):
+        value = valid_contract()
+        value["task_suite_path"] = "docs/research/CASTING_COMPOSITIONAL_BAKEOFF_V1.json"
+        suite_path = ROOT / value["task_suite_path"]
+        value["task_suite_sha256"] = hashlib.sha256(suite_path.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ValueError, "not automatically MF-SCBO compatible"):
+            validate_contract(value)
+
+    def test_rejects_constraint_digest_mismatch(self):
+        value = valid_contract()
+        value["constraint_definition_sha256"] = "d" * 64
+        with self.assertRaisesRegex(ValueError, "does not match the suite"):
+            validate_contract(value)
+
     def test_rejects_budget_that_does_not_cover_initialization(self):
         value = valid_contract()
         value["cost_budget_units"] = 77
@@ -175,6 +196,7 @@ class MfScboComparisonContractTests(unittest.TestCase):
             self.assertEqual(len(receipt["source_artifacts"]["preflight_evaluator_sha256"]), 64)
             self.assertIn("not an MF-SCBO execution", receipt["claim_ceiling"])
         self.assertEqual(receipt["task_suite_path"], TASK_SUITE_PATH)
+        self.assertEqual(receipt["task_suite_benchmark_id"], TASK_SUITE["benchmark_id"])
         self.assertEqual(receipt["task_suite_sha256"], TASK_SUITE_SHA256)
         self.assertIn("cannot prove independence", receipt["holdout_truth_limit"])
 
