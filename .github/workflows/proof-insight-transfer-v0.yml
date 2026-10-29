@@ -478,11 +478,11 @@ jobs:
               raise SystemExit(f"negative control unexpectedly accepted: {label}")
           print("PITB_MISSINGNESS_PLAN_CONTRACT_PASS: frozen target estimand, all-row denominator, explicit non-solve semantics, connected-component floor, 13 scenario IDs, and 8 negative controls; design only, not a simulation result")
           PY
-      - name: Validate run-config v1 schema and split-aware exposure quarantine
+      - name: Validate run-config v3 schema and split-aware exposure quarantine
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/run-config-v2.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/run-config-v2.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" <<'PY'
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/run-config-v3.schema.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/fixtures/run-config-v3.synthetic.json" "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json" <<'PY'
           import copy
           import json
           import sys
@@ -500,6 +500,33 @@ jobs:
           frozen_config_with_receipt = copy.deepcopy(fixture)
           frozen_config_with_receipt["power_report_sha256"] = "d" * 64
           validator.validate(frozen_config_with_receipt)
+
+          # A qualified coverage run must pin all four byte-exact artifacts.
+          pinned_coverage = copy.deepcopy(fixture)
+          for field, value in {
+              "relationship_inventory_sha256": "1" * 64,
+              "coverage_receipt_sha256": "2" * 64,
+              "coverage_trust_store_sha256": "3" * 64,
+              "coverage_methodology_sha256": "4" * 64,
+          }.items():
+              pinned_coverage[field] = value
+          validator.validate(pinned_coverage)
+          partial_pin = copy.deepcopy(fixture)
+          partial_pin["coverage_receipt_sha256"] = "2" * 64
+          try:
+              validator.validate(partial_pin)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("negative control failed: partial coverage artifact pins were accepted")
+          unpinned = copy.deepcopy(pinned_coverage)
+          unpinned["coverage_methodology_sha256"] = None
+          try:
+              validator.validate(unpinned)
+          except ValidationError:
+              pass
+          else:
+              raise SystemExit("negative control failed: a missing methodology trust pin was accepted")
 
           bad_receipt = copy.deepcopy(frozen_config_with_receipt)
           bad_receipt["power_report_sha256"] = "not-a-sha256"
@@ -608,7 +635,7 @@ jobs:
           else:
               raise SystemExit("negative control failed: duplicate validation quarantine ID was accepted")
 
-          print("PITB_RUN_CONFIG_V2_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and eight malformed-config controls; fixture is synthetic and not a benchmark run")
+          print("PITB_RUN_CONFIG_V3_PASS: strict schema, Rust integer ranges, frozen partition digest, split-aware exposure IDs, disjoint quarantines and coverage-pin consistency negative controls; fixture is synthetic and diagnostic-only")
           PY
       - name: Validate deterministic cluster-power planning report and negative control
         shell: bash
