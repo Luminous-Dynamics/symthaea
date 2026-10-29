@@ -185,8 +185,8 @@ fn snapshot_metrics(f:Fixture, t:usize,
     counts:&[[usize;ARMS];CONTEXTS],proxy_sums:&[[f64;ARMS];CONTEXTS],
     ns_sum:f64,proxy_sum:f64,ns_regret:f64,proxy_regret:f64,
     matured_count:usize,matured_sum:f64,
-    ips_sum:&[f64;CONTEXTS*CONTEXTS*ARMS*ARMS],
-    ips_sq:&[f64;CONTEXTS*CONTEXTS*ARMS*ARMS]) -> [f64;12]
+    ips_sum:&[f64;ARMS*ARMS],
+    ips_sq:&[f64;ARMS*ARMS]) -> [f64;12]
 {
     let greedy=estimated_greedy_actions(counts,proxy_sums);
     let proxy_best=[best_action(f,0,true),best_action(f,1,true)];
@@ -233,13 +233,16 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
         let mut proxy_sums=[[0.0_f64;ARMS];CONTEXTS];
         let mut ns_sum=0.0;let mut proxy_sum=0.0;let mut ns_regret=0.0;let mut proxy_regret=0.0;
         let mut matured_count=0usize;let mut matured_sum=0.0;
-        let mut maturity_calendar:Vec<Vec<f64>>=vec![Vec::new();max_look+513];
-        let mut ips_sum=[0.0_f64;CONTEXTS*CONTEXTS*ARMS*ARMS];
-        let mut ips_sq=[0.0_f64;CONTEXTS*CONTEXTS*ARMS*ARMS];
+        // Store maturity counts/sums rather than one Vec allocation per
+        // decision. This keeps the 5x1,024x4,096 sweep allocation-light.
+        let mut maturity_count=vec![0usize;max_look+513];
+        let mut maturity_sum=vec![0.0_f64;max_look+513];
+        let mut ips_sum=[0.0_f64;ARMS*ARMS];
+        let mut ips_sq=[0.0_f64;ARMS*ARMS];
         let mut look_i=0usize;
         for t in 1..=max_look{
             let obs=eval_log[t-1];
-            for code in 0..CONTEXTS*CONTEXTS*ARMS*ARMS{
+            for code in 0..ARMS*ARMS{
                 let a0=code/ARMS;
                 let a1=code%ARMS;
                 let target=if obs.context==0{a0}else{a1};
@@ -257,16 +260,20 @@ fn simulate_fixture(f:Fixture,reps:usize,looks:&[usize])->Result<FixtureResult,S
             let delay_draw=rng.unit();
             let delay=delay_steps(f,delay_draw);
             let mature_at=t+delay;
-            if mature_at<maturity_calendar.len(){maturity_calendar[mature_at].push(ns_reward);}
-            for value in maturity_calendar[t].drain(..){matured_count+=1;matured_sum+=value;}
+            if mature_at<maturity_count.len(){
+                maturity_count[mature_at]+=1;
+                maturity_sum[mature_at]+=ns_reward;
+            }
+            matured_count+=maturity_count[t];
+            matured_sum+=maturity_sum[t];
 
             counts[context][action]+=1;
             proxy_sums[context][action]+=proxy_reward;
             ns_sum+=p_ns;proxy_sum+=p_proxy;
-            ns_regret+=oracle_contextual_value(f,false)-p_ns;
-            proxy_regret+=oracle_contextual_value(f,true)-p_proxy;
+            ns_regret+=f.north_star[context][best_action(f,context,false)]-p_ns;
+            proxy_regret+=proxy_mean(f,context,best_action(f,context,true))-p_proxy;
 
-            if t==LOOKS.get(look_i).copied().unwrap_or(usize::MAX){
+            if t==looks.get(look_i).copied().unwrap_or(usize::MAX){
                 let snapshot=snapshot_metrics(f,t,&counts,&proxy_sums,ns_sum,proxy_sum,ns_regret,proxy_regret,
                     matured_count,matured_sum,&ips_sum,&ips_sq);
                 for i in 0..METRIC_NAMES.len(){metrics[look_i][i].add(snapshot[i]);}
@@ -347,6 +354,16 @@ mod tests{
             }
         }
         assert!(close(policy_value(f,pol),0.5*(f.north_star[0][pol[0]]+f.north_star[1][pol[1]]),1e-12));
+    }
+    #[test]
+    fn zero_headroom_never_exceeds_best_global_value_in_expectation(){
+        let f=Fixture::zero_headroom();
+        let r=simulate_fixture(f,16,&[16,32]).unwrap();
+        for look in 0..2{
+            let online_value=r.metrics[look][0].mean();
+            assert!(online_value<=global_best_value(f)+1e-9);
+            assert!(close(r.headroom,0.0,1e-12));
+        }
     }
     #[test]
     fn deterministic_seed_replays(){
