@@ -1,0 +1,43 @@
+name: World Model Seeded Initialization
+
+on:
+  pull_request:
+    branches:
+      - main
+      - fix/workspace-orphan-core-symthaea-2026-10-29
+    paths:
+      - "src/dynamics/crate_world_model.rs"
+      - ".github/workflows/world-model-seeded-initialization.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  push:
+    branches:
+      - research/world-model-seeded-construction-2026-10-29
+    paths:
+      - "src/dynamics/crate_world_model.rs"
+      - ".github/workflows/world-model-seeded-initialization.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-model-seeded-init-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  seeded-initialization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Run exact seeded-initialization regression test
+        run: >-
+          cargo test --locked --lib
+          dynamics::crate_world_model::tests::seeded_initialization_replays_weights_and_predictions
