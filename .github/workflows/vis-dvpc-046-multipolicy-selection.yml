@@ -23,8 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out exact policy-selection benchmark
+      - name: Check out exact policy-selection benchmark head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -74,10 +76,13 @@ jobs:
           grep '^SEED_SCHEDULE' /tmp/vis-dvpc-046-results.tsv > /tmp/vis-dvpc-046-seeds.tsv
           grep '^DGP\|^POLICY\|^RESULT_METRIC\|^METHOD_STATUS\|^SYSTEM\|^BENCHMARK_CONFIG\|^SEED_SCHEDULE' /tmp/vis-dvpc-046-results.tsv > /tmp/vis-dvpc-046-summary.tsv
       - name: Create exact source and output SHA-256 receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           {
             printf 'VIS_DVPC_046_RECEIPT\tformat\tv1\n'
-            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
             printf 'rustc\t%s\n' "$(rustc --version)"
             sha256sum tools/vision-dvpc-046-multipolicy-selection.rs docs/research/VIS_DVPC_046_MULTIPOLICY_SELECTION_V1.md .github/workflows/vis-dvpc-046-multipolicy-selection.yml /tmp/vis-dvpc-046-results.tsv /tmp/vis-dvpc-046-summary.tsv /tmp/vis-dvpc-046-seeds.tsv
           } > /tmp/vis-dvpc-046-receipt.tsv
