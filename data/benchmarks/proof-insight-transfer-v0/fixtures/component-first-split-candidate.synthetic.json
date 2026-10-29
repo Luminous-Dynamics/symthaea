@@ -1,0 +1,91 @@
+{
+  "schema_version": "pitb.component-first-split-candidate.v0",
+  "status": "candidate_only",
+  "upstream_commit": "1581d4cbdd69a0faf34b2089614fe2a814316a6a",
+  "family_count": 6,
+  "component_count": 6,
+  "candidate_partition_digest_sha256": "4cd06fb142905a98258a35843e2a38bc53bcd390b1db6a2309597637be6ace9f",
+  "qualified_for_confirmatory_use": false,
+  "families": [
+    {
+      "family_id": "a",
+      "split": "train",
+      "component_id": "component-a"
+    },
+    {
+      "family_id": "b",
+      "split": "train",
+      "component_id": "component-b"
+    },
+    {
+      "family_id": "c",
+      "split": "train",
+      "component_id": "component-c"
+    },
+    {
+      "family_id": "d",
+      "split": "train",
+      "component_id": "component-d"
+    },
+    {
+      "family_id": "e",
+      "split": "validation",
+      "component_id": "component-e"
+    },
+    {
+      "family_id": "f",
+      "split": "test",
+      "component_id": "component-f"
+    }
+  ],
+  "components": [
+    {
+      "component_id": "component-a",
+      "split": "train",
+      "family_count": 1,
+      "family_ids": [
+        "a"
+      ]
+    },
+    {
+      "component_id": "component-b",
+      "split": "train",
+      "family_count": 1,
+      "family_ids": [
+        "b"
+      ]
+    },
+    {
+      "component_id": "component-c",
+      "split": "train",
+      "family_count": 1,
+      "family_ids": [
+        "c"
+      ]
+    },
+    {
+      "component_id": "component-d",
+      "split": "train",
+      "family_count": 1,
+      "family_ids": [
+        "d"
+      ]
+    },
+    {
+      "component_id": "component-e",
+      "split": "validation",
+      "family_count": 1,
+      "family_ids": [
+        "e"
+      ]
+    },
+    {
+      "component_id": "component-f",
+      "split": "test",
+      "family_count": 1,
+      "family_ids": [
+        "f"
+      ]
+    }
+  ]
+}
