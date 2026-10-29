@@ -52,6 +52,10 @@ jobs:
           assert 0.0 <= by_key[(size, "shuffled_support_gate_055")]["unsupported_selection_rate"] <= 1.0
           assert 0.0 <= by_key[(size, "shuffled_support_gate_097")]["unsupported_selection_rate"] <= 1.0
           assert by_key[(512, "predicted_greedy")]["unsupported_selection_rate"] > by_key[(8, "predicted_greedy")]["unsupported_selection_rate"]
+          # The support signal must earn its value over a deterministic shuffled-score control.
+          for size in [32, 128, 512]:
+              assert by_key[(size, "support_gate_097")]["mean_regret"] < by_key[(size, "shuffled_support_gate_097")]["mean_regret"]
+              assert by_key[(size, "support_gate_097")]["unsupported_selection_rate"] < by_key[(size, "shuffled_support_gate_097")]["unsupported_selection_rate"]
           print("CMAQ-007 report schema, paired panel, oracle, fallback, and risk-coverage invariants validated")
           print(json.dumps({
               size: {
