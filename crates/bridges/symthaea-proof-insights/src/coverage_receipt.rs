@@ -440,8 +440,9 @@ pub mod test_support {
 
     const TEST_SPLITS: &[u8] =
         include_bytes!("../../../../data/benchmarks/proof-insight-transfer-v0/splits.json");
-    const TEST_METHODOLOGY: &[u8] =
-        include_bytes!("../../../../data/benchmarks/proof-insight-transfer-v0/coverage-review-methodology.md");
+    const TEST_METHODOLOGY: &[u8] = include_bytes!(
+        "../../../../data/benchmarks/proof-insight-transfer-v0/coverage-review-methodology.md"
+    );
 
     pub struct FullPartitionFixture {
         pub split_bytes: Vec<u8>,
@@ -512,7 +513,10 @@ pub mod test_support {
                 .iter()
                 .enumerate()
                 .map(|(index, key)| ReviewerSignature {
-                    reviewer_id: format!("synthetic-auditor-{}", if index == 0 { "a" } else { "b" }),
+                    reviewer_id: format!(
+                        "synthetic-auditor-{}",
+                        if index == 0 { "a" } else { "b" }
+                    ),
                     key_id: format!("synthetic-key-{}", if index == 0 { "a" } else { "b" }),
                     signature_hex: hex::encode(key.sign(&message).to_bytes()),
                 })
