@@ -151,6 +151,8 @@ def validate_manifest(document: Any) -> dict[str, Any]:
         task_family = _nonblank(run["task_family"], f"runs[{index}].task_family")
         constraint_family = _nonblank(run["constraint_family"], f"runs[{index}].constraint_family")
         policy_id = _nonblank(run["policy_id"], f"runs[{index}].policy_id")
+        if unit_id in by_unit and policy_id in by_unit[unit_id]:
+            raise ValueError(f"duplicate run for unit_id={unit_id}, policy_id={policy_id}")
         for digest_field in ("run_receipt_sha256", "policy_source_sha256", "policy_config_sha256",
                              "environment_sha256", "suite_manifest_sha256"):
             _sha256(run[digest_field], f"runs[{index}].{digest_field}")
@@ -216,8 +218,6 @@ def validate_manifest(document: Any) -> dict[str, Any]:
             }
 
         meta = (task_family, constraint_family, dimension, severity, int(run["seed"]), budget)
-        if unit_id in by_unit and policy_id in by_unit[unit_id]:
-            raise ValueError(f"duplicate run for unit_id={unit_id}, policy_id={policy_id}")
         if unit_id in shared_meta and shared_meta[unit_id] != meta:
             raise ValueError(f"paired runs do not match scenario/budget metadata for unit {unit_id}")
         shared_meta[unit_id] = meta
