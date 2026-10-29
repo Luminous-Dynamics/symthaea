@@ -346,3 +346,38 @@ The 2026 INFORMS Lufthansa Group/SWISS case documents a deployed production syst
 - **Gate E — climate value:** report lifecycle CO2e per completed passenger-km, total CO2e and non-CO2 indicators separately. A lower cost alone is not a clean-airline result.
 
 If exact parity is impossible because the source material omits essential variables, preserve that limitation and move to a clearly labelled synthetic benchmark. Never reverse-engineer undocumented assumptions solely to reproduce a headline gain.
+
+
+## 13. P3 robustness slice — weighted stress replay versus perfect-information recourse (2026-10-29)
+
+The new aviation-energy-hub-robustness module compares a fixed nominal schedule against a declared, weighted set of time-indexed airport-energy scenarios.
+
+### Contract
+
+- Every scenario must have a valid canonical SHA-256 content digest.
+- The scenario set has a separate canonical digest over stable scenario IDs, exact integer weights and member digests. Scenario input ordering does not change this digest.
+- Integer scenario weights must be positive and sum to exactly 1,000,000 ppm. They are design weights, not real-world probabilities unless independently calibrated.
+- Scenarios must use the same currency, energy quantum, planning period, lifecycle boundary, delivered transport-service denominators, and ordered interval grid. Renewable generation, grid prices/capacities, and energy availability may differ.
+- The nominal plan is independently verified before it becomes the replay baseline.
+- **Static replay:** apply the same action sequence to each scenario, with only the scenario identity rebound. A plan that violates supply, demand, storage, or reserve constraints is recorded as infeasible for that scenario.
+- **Perfect-information recourse reference:** independently solve each scenario and select its least-cost feasible Pareto point, subject to the exact solver budget. Because it knows the entire realized scenario, this is an optimistic reference—not a causal, deployable policy.
+- Failed exact searches due to node budgets are recorded as **unresolved**, not as proof that no feasible plan exists. Actual infeasibility, unresolved weight, and feasible weight must sum back to the original 1,000,000 ppm.
+
+### Required reporting
+
+- static replay feasible / infeasible weight;
+- perfect-information recourse feasible / definitely infeasible / unresolved weight;
+- per-scenario failure reason and independently verified objective vector;
+- conditional cost and CO2e summaries with their feasible-weight denominator;
+- worst feasible cost, worst accounted lifecycle CO2e and storage-reserve outcome;
+- scenario-set digest, per-scenario digest, solver budget and exact run identity.
+
+Conditional metrics must never conceal an infeasible or unresolved fraction. Do not assign an invented zero cost to a failed schedule or average only successful cases without displaying the missing weight.
+
+### Falsifier
+
+The synthetic stress test freezes a two-interval nominal plan. One stress case reverses the relative grid prices; another reduces first-interval renewable availability. The nominal action sequence is still feasible in the price-reversal case but is invalid under the renewable shortfall. Perfect-information recourse finds a feasible plan in both cases under the test contract. The result is a synthetic demonstration of schedule brittleness and recourse headroom, not a measured real-world savings claim.
+
+### What remains before online robust dispatch
+
+This slice does not implement a nonanticipative policy, rolling-horizon replanning, online observations, probability calibration, confidence bounds, distributionally robust optimization, physical grid constraints, battery degradation or aircraft schedule recovery. Next work must define observation times and information available at each decision, then compare rolling-horizon recourse against this perfect-information reference and a frozen static baseline on identical paired stress sequences.
