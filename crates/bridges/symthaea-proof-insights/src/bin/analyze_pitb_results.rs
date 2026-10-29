@@ -4417,10 +4417,10 @@ mod tests {
     fn coverage_artifact_pins_are_all_or_none() {
         assert!(!validate_coverage_pin_set([None, None, None, None]).unwrap());
         assert!(validate_coverage_pin_set([
-            Some("a".repeat(64).leak()),
-            Some("b".repeat(64).leak()),
-            Some("c".repeat(64).leak()),
-            Some("d".repeat(64).leak()),
+            Some("inventory"),
+            Some("receipt"),
+            Some("trust-store"),
+            Some("methodology"),
         ]).unwrap());
         for pins in [
             [Some("a"), None, None, None],
