@@ -22,7 +22,7 @@ VLEB is a draft research harness for evaluating legacy-code repair, migration an
 - [Two-sided oracle replay protocol](../../docs/research/VLEB_TWO_SIDED_ORACLE_REPLAY_2026-10-29.md)
 - [Paired task-cluster comparison analyzer](compare_paired_runs.py)
 - [Paired comparison analyzer adversarial tests](test_compare_paired_runs.py)
-- [Paired comparison and uncertainty protocol](../../docs/research/VLEB_PAIRED_COMPARISON_PROTOCOL_2026-10-29.md)
+- [Paired comparison and task-family uncertainty protocol](../../docs/research/VLEB_PAIRED_COMPARISON_PROTOCOL_2026-10-29.md)
 - [Admission-cohort rollup protocol](../../docs/research/VLEB_ADMISSION_COHORT_ROLLUP_2026-10-29.md)
 - [Evidence receipt schema](evidence-receipt.schema.json)
 - [Trusted run-manifest schema](run-manifest.schema.json)
