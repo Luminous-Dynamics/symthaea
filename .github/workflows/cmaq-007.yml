@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-007-report.json").read_text())
-          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.1"
+          assert report["schema_version"] == "cmaq-007-exploitability-report-v0.2"
           assert report["seed_count"] == 256
           assert report["search_sizes"] == [8, 32, 128, 512]
           rows = report["summary"]
@@ -56,17 +56,48 @@ jobs:
           for size in [32, 128, 512]:
               assert by_key[(size, "support_gate_097")]["mean_regret"] < by_key[(size, "shuffled_support_gate_097")]["mean_regret"]
               assert by_key[(size, "support_gate_097")]["unsupported_selection_rate"] < by_key[(size, "shuffled_support_gate_097")]["unsupported_selection_rate"]
-          print("CMAQ-007 report schema, paired panel, oracle, fallback, and risk-coverage invariants validated")
+          risk_rows = report["risk_control"]
+          assert len(risk_rows) == 4
+          risk_by_size = {row["search_size"]: row for row in risk_rows}
+          assert set(risk_by_size) == set(report["search_sizes"])
+          expected_thresholds = [0.40, 0.55, 0.75, 0.90, 0.97, 1.01]
+          for size, row in risk_by_size.items():
+              assert row["target_unsupported_risk"] == 0.05
+              assert row["familywise_alpha"] == 0.05
+              assert row["threshold_count"] == 6
+              assert abs(row["alpha_per_threshold"] - (0.05 / 6)) < 1e-8
+              assert row["selected_threshold"] in expected_thresholds
+              assert row["calibration_episode_count"] == 256
+              assert row["qualification_episode_count"] == 256
+              assert row["calibration_upper_bound"] <= row["target_unsupported_risk"]
+              assert 0.0 <= row["calibration_coverage_rate"] <= 1.0
+              assert 0.0 <= row["qualification_unsupported_rate"] <= 1.0
+              assert 0.0 <= row["qualification_coverage_rate"] <= 1.0
+          print("CMAQ-007 v0.2 schema, planner-exploitability panel, shuffled-score control, and risk-control calibration validated")
           print(json.dumps({
-              size: {
-                  strategy: {
-                      "prediction_mae": by_key[(size, strategy)]["mean_prediction_mae"],
-                      "regret": by_key[(size, strategy)]["mean_regret"],
-                      "unsupported_rate": by_key[(size, strategy)]["unsupported_selection_rate"],
-                      "coverage": by_key[(size, strategy)]["coverage_rate"],
+              "planner_exploitability": {
+                  size: {
+                      strategy: {
+                          "prediction_mae": by_key[(size, strategy)]["mean_prediction_mae"],
+                          "regret": by_key[(size, strategy)]["mean_regret"],
+                          "unsupported_rate": by_key[(size, strategy)]["unsupported_selection_rate"],
+                          "coverage": by_key[(size, strategy)]["coverage_rate"],
+                      }
+                      for strategy in ["direct_fallback", "predicted_greedy", "uncertainty_penalty", "support_gate_055", "support_gate_097", "shuffled_support_gate_055", "shuffled_support_gate_097", "oracle_upper_bound"]
                   }
-                  for strategy in ["direct_fallback", "predicted_greedy", "uncertainty_penalty", "support_gate_055", "support_gate_097", "shuffled_support_gate_055", "shuffled_support_gate_097", "oracle_upper_bound"]
+                  for size in report["search_sizes"]
+              },
+              "risk_control": {
+                  size: {
+                      "selected_threshold": row["selected_threshold"],
+                      "calibration_upper_bound": row["calibration_upper_bound"],
+                      "calibration_coverage": row["calibration_coverage_rate"],
+                      "qualification_unsupported_rate": row["qualification_unsupported_rate"],
+                      "qualification_coverage": row["qualification_coverage_rate"],
+                      "qualification_regret": row["qualification_mean_regret"],
+                      "fallback_regret": row["direct_fallback_mean_regret"],
+                  }
+                  for size, row in risk_by_size.items()
               }
-              for size in report["search_sizes"]
           }, sort_keys=True))
           PY
