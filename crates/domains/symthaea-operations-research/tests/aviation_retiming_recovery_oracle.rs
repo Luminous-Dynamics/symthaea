@@ -283,6 +283,59 @@ fn verifier_rejects_over_delay_and_tampered_cost() {
 }
 
 #[test]
+fn verifier_rejects_overlapping_assignments_and_cancelled_delay() {
+    let mut s = scenario();
+    let mut invalid = RetimingPlan {
+        scenario_id: s.id.clone(),
+        configuration_revision: s.configuration_revision.clone(),
+        input_digest: s.input_digest.clone(),
+        assignments: vec![
+            RetimingAssignment {
+                flight_id: "F1".into(),
+                aircraft_id: Some("A1".into()),
+                delay_minutes: 0,
+            },
+            RetimingAssignment {
+                flight_id: "F2".into(),
+                aircraft_id: Some("A1".into()),
+                delay_minutes: 0,
+            },
+        ],
+        total_cost: 0,
+    };
+    assert_eq!(
+        verify_retiming_plan(&s, &invalid).status,
+        RetimingVerificationStatus::Rejected
+    );
+
+    invalid.assignments[1].aircraft_id = None;
+    invalid.assignments[1].delay_minutes = 1;
+    invalid.total_cost = 100;
+    assert_eq!(
+        verify_retiming_plan(&s, &invalid).status,
+        RetimingVerificationStatus::Rejected
+    );
+
+    s.configuration_revision = "r2".into();
+    assert_eq!(
+        verify_retiming_plan(&s, &invalid).status,
+        RetimingVerificationStatus::Rejected
+    );
+}
+
+#[test]
+fn scenario_validation_rejects_duplicate_ids_and_time_overflow() {
+    let mut duplicate = scenario();
+    duplicate.flights[1].id = duplicate.flights[0].id.clone();
+    assert!(duplicate.validate().is_err());
+
+    let mut overflow = scenario();
+    overflow.flights[0].scheduled_start_minutes = u32::MAX - 3;
+    overflow.flights[0].duration_minutes = 10;
+    assert!(overflow.validate().is_err());
+}
+
+#[test]
 fn deterministic_search_and_bad_budgets() {
     let s = scenario();
     assert_eq!(
