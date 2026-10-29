@@ -11,6 +11,7 @@
 //! an end-to-end editor benchmark, or evidence of perceptual equivalence.
 
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::process::ExitCode;
 use symthaea_muse::audio_preservation::{
     AudioView, FrameInterval, OnsetPreservationConfig, PreservationConfig,
@@ -87,6 +88,8 @@ fn verdict_name(verdict: PreservationVerdict) -> &'static str {
 
 fn acoustic_case(
     id: &str,
+    mutation_family: &str,
+    critical_mutation: bool,
     description: &str,
     reference: &[f32],
     candidate: &[f32],
@@ -103,6 +106,8 @@ fn acoustic_case(
             let actual = verdict_name(report.verdict);
             json!({
                 "id": id,
+                "mutation_family": mutation_family,
+                "critical_mutation": critical_mutation,
                 "description": description,
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
@@ -120,6 +125,8 @@ fn acoustic_case(
         }
         Err(error) => json!({
             "id": id,
+            "mutation_family": mutation_family,
+            "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
             "input_error": error.to_string(),
@@ -130,6 +137,8 @@ fn acoustic_case(
 
 fn onset_case(
     id: &str,
+    mutation_family: &str,
+    critical_mutation: bool,
     description: &str,
     reference: &[f32],
     candidate: &[f32],
@@ -146,6 +155,8 @@ fn onset_case(
             let actual = verdict_name(report.verdict);
             json!({
                 "id": id,
+                "mutation_family": mutation_family,
+                "critical_mutation": critical_mutation,
                 "description": description,
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
@@ -166,6 +177,8 @@ fn onset_case(
         }
         Err(error) => json!({
             "id": id,
+            "mutation_family": mutation_family,
+            "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
             "input_error": error.to_string(),
@@ -212,6 +225,8 @@ fn main() -> ExitCode {
     let cases = vec![
         acoustic_case(
             "AP-IDENTITY-001",
+            "identity",
+            false,
             "Identical audio in all protected windows",
             &reference_sine,
             &reference_sine,
@@ -220,6 +235,8 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-LOCAL-LEAK-001",
+            "localized_zeroing",
+            true,
             "A zeroed local window outside the authorized edit",
             &reference_sine,
             &local_damage,
@@ -228,6 +245,8 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-GAIN-DROP-001",
+            "gain_drop",
+            true,
             "A protected local window has a 12 dB-class gain drop",
             &reference_sine,
             &gain_drop,
@@ -236,6 +255,8 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-FREQUENCY-SWAP-001",
+            "frequency_substitution",
+            true,
             "A protected local window is changed from 440 Hz to 880 Hz",
             &reference_sine,
             &frequency_swap,
@@ -244,6 +265,8 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-AUTHORIZED-ONLY-001",
+            "authorized_only",
+            false,
             "A changed window fully contained by the authorized mask",
             &reference_sine,
             &authorized_damage,
@@ -252,6 +275,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-IDENTITY-001",
+            "onset_identity",
+            false,
             "Identical transient timing in protected content",
             &reference_burst,
             &reference_burst,
@@ -260,6 +285,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-DELAY-001",
+            "timing_shift",
+            true,
             "Protected transient is delayed by 512 frames",
             &reference_burst,
             &delayed_burst,
@@ -268,6 +295,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-EXTRA-001",
+            "spurious_transient",
+            true,
             "Candidate adds a transient in otherwise protected content",
             &reference_burst,
             &burst_with_extra_transient,
@@ -276,6 +305,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-MASK-001",
+            "masked_evidence",
+            false,
             "The edit mask and analysis guard hide all available onset evidence",
             &reference_burst,
             &delayed_burst,
@@ -284,6 +315,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-UNMEASURABLE-001",
+            "unmeasurable_reference",
+            false,
             "Both reference and candidate are silent",
             &silent,
             &silent,
@@ -292,6 +325,8 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-MISSING-001",
+            "missing_transient",
+            true,
             "Candidate removes the reference burst in protected content",
             &reference_burst,
             &silent,
@@ -306,9 +341,62 @@ fn main() -> ExitCode {
         .count();
     let failed = cases.len() - passed;
 
+    // Report failure modes rather than only a single fixture pass percentage.
+    // A critical false accept cannot be hidden by benign abstention or another
+    // mutation family with an easier fixture.
+    let mut family_counts: BTreeMap<String, (usize, usize, usize, usize)> = BTreeMap::new();
+    let mut critical_mutations_total = 0usize;
+    let mut critical_false_accepts = 0usize;
+    let mut false_rejections = 0usize;
+    let mut abstentions = 0usize;
+
+    for case in &cases {
+        let family = case["mutation_family"]
+            .as_str()
+            .unwrap_or("unclassified")
+            .to_owned();
+        let expected = case["expected_verdict"].as_str().unwrap_or("error");
+        let actual = case["actual_verdict"].as_str().unwrap_or("error");
+        let critical = case["critical_mutation"] == Value::Bool(true);
+        let reproduced = case["expected_outcome_reproduced"] == Value::Bool(true);
+        let counts = family_counts.entry(family).or_insert((0, 0, 0, 0));
+        counts.0 += 1;
+        if reproduced {
+            counts.1 += 1;
+        }
+        if critical && expected == "fail" {
+            counts.2 += 1;
+            critical_mutations_total += 1;
+            if actual == "pass" {
+                counts.3 += 1;
+                critical_false_accepts += 1;
+            }
+        }
+        if expected == "pass" && actual == "fail" {
+            false_rejections += 1;
+        }
+        if actual == "abstain" {
+            abstentions += 1;
+        }
+    }
+
+    let per_family_summary: Vec<Value> = family_counts
+        .into_iter()
+        .map(|(mutation_family, (cases_total, reproduced, critical_mutations, critical_false_accepts))| {
+            json!({
+                "mutation_family": mutation_family,
+                "cases_total": cases_total,
+                "expected_outcomes_reproduced": reproduced,
+                "expected_outcomes_not_reproduced": cases_total - reproduced,
+                "critical_mutations": critical_mutations,
+                "critical_false_accepts": critical_false_accepts,
+            })
+        })
+        .collect();
+
     let output = json!({
         "benchmark": "MEL-MR-EVAL-006",
-        "runner_version": "synthetic-conformance-v0.1",
+        "runner_version": "synthetic-conformance-v0.2",
         "fixture_only": true,
         "calibration_id_is_production_calibration": false,
         "sample_rate_hz": SAMPLE_RATE_HZ,
@@ -317,6 +405,11 @@ fn main() -> ExitCode {
         "cases_total": cases.len(),
         "cases_expected_outcome_reproduced": passed,
         "cases_expected_outcome_not_reproduced": failed,
+        "critical_mutations_total": critical_mutations_total,
+        "critical_false_accepts": critical_false_accepts,
+        "false_rejections": false_rejections,
+        "abstentions": abstentions,
+        "per_family_summary": per_family_summary,
         "status": if failed == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
         "limitations": [
             "synthetic fixtures only; not a human listening study",
