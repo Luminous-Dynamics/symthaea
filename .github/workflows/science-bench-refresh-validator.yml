@@ -573,3 +573,56 @@ jobs:
 
           # Reports contain digest-only traces, not raw query or response content.
           ! grep -Eq 'query: example|observed-response|fetch: example' /tmp/sbr-search-valid-report.json
+
+
+      - name: Evaluator-side search exposure match report controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          python3 research/science-bench-refresh/tools/search_match_test_vectors.py /tmp/sbr-search-matches
+
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-matches /tmp/sbr-search-matches/match-receipt.json \
+            /tmp/sbr-search-matches/no-match-report.json > /tmp/sbr-match-clean-report.json
+          grep -q '"integrity_valid": true' /tmp/sbr-match-clean-report.json
+          grep -q '"event_coverage_valid": true' /tmp/sbr-match-clean-report.json
+          grep -q 'no_detected_retrieval_contamination_under_declared_matcher' /tmp/sbr-match-clean-report.json
+
+          # Explicit answer exposure blocks even when the receipt itself is valid.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-matches /tmp/sbr-search-matches/match-receipt.json \
+            /tmp/sbr-search-matches/explicit-answer-report.json > /tmp/sbr-match-answer-report.json
+          answer_exit=$?
+          set -e
+          test "$answer_exit" -eq 12
+          grep -q '"contaminated_event_count": 1' /tmp/sbr-match-answer-report.json
+          grep -q 'blocked_explicit_answer_exposure' /tmp/sbr-match-answer-report.json
+
+          # Ambiguous semantic matches are review gates, not forced classifications.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-search-matches /tmp/sbr-search-matches/match-receipt.json \
+            /tmp/sbr-search-matches/review-required-report.json > /tmp/sbr-match-review-report.json
+          review_exit=$?
+          set -e
+          test "$review_exit" -eq 13
+          grep -q '"review_required_event_count": 1' /tmp/sbr-match-review-report.json
+          grep -q 'manual_review_required' /tmp/sbr-match-review-report.json
+
+          # Missing or edited evaluator records must fail closed.
+          for case in missing-match-record mutated-match-report; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              verify-search-matches /tmp/sbr-search-matches/match-receipt.json \
+              "/tmp/sbr-search-matches/$case.json" > "/tmp/sbr-match-$case-report.json"
+            match_exit=$?
+            set -e
+            test "$match_exit" -eq 11
+            grep -q '"integrity_valid": false' "/tmp/sbr-match-$case-report.json"
+          done
+
+          # Evaluator-side protected references and raw response content are not emitted.
+          ! grep -Eq 'protected-answer-item|retrieved response body|candidate-evidence-snippet' \
+            /tmp/sbr-match-answer-report.json
