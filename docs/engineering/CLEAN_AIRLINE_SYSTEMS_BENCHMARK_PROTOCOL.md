@@ -298,3 +298,51 @@ V1 is not an AC/DC power-flow solver and does not model voltage/frequency stabil
 - Do not claim a measured cost or CO2e improvement until inputs are calibrated, the model is independently tested and a matched held-out evaluation is available.
 
 This software slice does not establish actual airport resilience, renewable availability, a carbon factor, a physical storage rating, or operational authority.
+
+
+## 12. Literature-to-benchmark crosswalk (reviewed 2026-10-29)
+
+These studies define relevant comparators, but they do not share a common benchmark/data boundary. Their headline gains must not be compared as if they were the same experiment.
+
+### Flight-aware electric-aircraft charging under uncertainty
+
+A 2026 study on airport-specific time-of-use pricing and demand charges jointly models flight timetables, turnaround, energy-demand uncertainty, deterministic scheduling, sample-average approximation, and robust optimization. It uses flight data from six major airports in China's Greater Bay Area and reports up to 5.77% charging-cost savings for its robust model under high-demand uncertainty relative to its stated deterministic baseline. Source: https://www.sciencedirect.com/science/article/pii/S0967070X26002398
+
+**Reproduction target:** first reconstruct its deterministic comparator and its stated uncertainty/robustness experiment if the published details and compatible data permit. Record the exact cost boundary, tariffs, peak charges, allowed aircraft flexibility, charging constraints, uncertainty set and out-of-sample split. A result from our tiny synthetic fixture cannot be used to claim a 5.77% improvement or a better SOTA result.
+
+### Airport microgrid, aircraft-to-grid and fixed storage
+
+A 2026 IEEE paper models a solar-powered airport microgrid with aircraft-side batteries, fixed storage, grid imports/exports, EV parking demand, state-of-energy constraints, and time-varying tariffs. Its abstract reports a cost decrease from 83,508.30 to 74,867.88 in its stated currency units—about 10.35%—when coordinated aircraft-to-grid and fixed storage are added to its baseline. Source: https://ieeexplore.ieee.org/abstract/document/11578850
+
+**Reproduction target:** match its objective, units, tariff horizon, storage constraints, aircraft-to-grid assumptions and baseline before comparison. Our current V1 excludes aircraft-to-grid, grid-to-storage charging, grid-export revenue and AC/DC power-flow constraints, so it is not yet an implementation of that model.
+
+### Airport ground-equipment fleet and charging
+
+A July 2026 Transport Policy paper jointly optimizes electric ground service equipment fleet sizing, charging and scheduling with on-site photovoltaic generation using a two-stage framework, MILP and Benders decomposition. Source: https://www.sciencedirect.com/science/article/abs/pii/S0967070X26001332
+
+**Reproduction target:** treat ground-service-equipment electrification as a sibling subsystem, not automatically as aircraft charging. An eventual integrated energy hub can compose this demand only after its vehicle tasks, chargers, shift constraints and source data have their own verifier and model boundary.
+
+### Airline schedule recovery in production
+
+The 2026 INFORMS Lufthansa Group/SWISS case documents a deployed production system coordinating aircraft, passengers, and crew, and distinguishes fast disruption recovery from later schedule reoptimization. It reports operational savings under the authors' internal measurement procedure. Source: https://pubsonline.informs.org/doi/10.1287/inte.2025.0296
+
+**Integration hypothesis:** use the existing Symthaea recovery/retiming owner (#8603/#8902) plus the energy hub to ask whether energy-aware decisions improve the *same* operational recovery result after adding grid limits, storage, and energy-price/emissions uncertainty. Treat schedule-recovery savings and energy-scheduling savings as potentially overlapping; do not simply add them together.
+
+### Benchmark ladder required before a SOTA claim
+
+1. **Protocol parity:** reproduce each study's stated objective, boundary, assumptions and baseline. If the original dataset or exact formulation is unavailable, label the exercise "related synthetic comparison," not reproduction.
+2. **Independent oracle:** validate tiny cases against exhaustive enumeration and an independently implemented feasibility/accounting checker.
+3. **Baseline parity:** identical data, chronology, constraints, objective boundary, machine class, runtime budget and stopping rule.
+4. **Held-out comparison:** freeze tuning/calibration partitions; evaluate on untouched dates, airports or scenario families; use paired disruptions/seeds where applicable.
+5. **Integrated value:** compare the same base optimizer with and without airport-energy coupling, and separately with and without robust recourse. This estimates incremental replay value, not causal deployed savings.
+6. **Deployment evidence:** before operational claims, require metered energy data, supplier/fuel evidence, approved aircraft capabilities, lawful controls and a controlled field evaluation.
+
+### Proposed competitive thresholds
+
+- **Gate A — reproducibility:** 100% agreement with all published known-answer examples we can recover and every tractable internal exhaustive oracle case.
+- **Gate B — parity:** reproduce each target paper's reported metric within its stated rounding and disclosed uncertainty before tuning for superiority.
+- **Gate C — improvement:** seek at least one percentage point of additional relative cost reduction over a matched published baseline on a held-out benchmark, while preserving every hard constraint and reporting lifecycle CO2e and terminal energy reserve separately. This is a stretch hypothesis, not a prediction; a smaller gain may be the honest result.
+- **Gate D — robust value:** report mean, P95/P99 cost/regret, infeasibility and unmet-demand rates, worst declared scenario, reserve violations (required zero), runtime and memory. Show the cost of robustness rather than treating worst-case protection as free.
+- **Gate E — climate value:** report lifecycle CO2e per completed passenger-km, total CO2e and non-CO2 indicators separately. A lower cost alone is not a clean-airline result.
+
+If exact parity is impossible because the source material omits essential variables, preserve that limitation and move to a clearly labelled synthetic benchmark. Never reverse-engineer undocumented assumptions solely to reproduce a headline gain.
