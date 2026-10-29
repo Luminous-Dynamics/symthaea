@@ -75,3 +75,17 @@ A valid BinaryCausalModel proves only that the input satisfies this crate's shap
 and probability invariants. It does not establish IIT conformance, integration, or
 consciousness. The current crate is an input/data-contract milestone, not a PyPhi
 port and not yet an IIT engine.
+
+
+## Reference material
+
+- PyPhi TPM layout, little-endian state indexing, and connectivity validation:
+  https://pyphi.readthedocs.io/en/latest/conventions.html
+- PyPhi repertoire construction and computational costs:
+  https://pyphi.readthedocs.io/en/latest/theory/computational-complexity.html
+- Explicit formalism profiles and their quantity differences:
+  https://pyphi.readthedocs.io/en/latest/reference/configuration.html
+- IIT 4.0 (2023): Albantakis et al., PLOS Computational Biology (2023):
+  https://doi.org/10.1371/journal.pcbi.1011465
+
+These references define the implementation targets. They do not establish parity for this crate.
