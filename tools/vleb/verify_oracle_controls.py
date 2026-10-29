@@ -169,6 +169,8 @@ def _path_inside(root: Path, relative: str, *, allow_dot: bool = False) -> Path:
     resolved = cursor.resolve(strict=True)
     if not resolved.is_relative_to(root.resolve(strict=True)):
         raise ControlError(f"path escapes workspace: {relative!r}")
+    if not resolved.is_dir():
+        raise ControlError(f"working directory is not a directory: {relative!r}")
     return resolved
 
 
@@ -182,7 +184,12 @@ def extract_test_bundle(bundle_raw: bytes, workspace: Path) -> list[dict[str, An
     names: set[str] = set()
     try:
         with archive:
-            for info in archive.infolist():
+            members = archive.infolist()
+            if len(members) > 10000:
+                raise ControlError("test bundle contains more than 10000 ZIP entries")
+            if sum(info.file_size for info in members) > 128 * 1024 * 1024:
+                raise ControlError("test bundle expands beyond the 128 MiB safety limit")
+            for info in members:
                 name = info.filename
                 if name.endswith("/"):
                     relative_name = name[:-1]
@@ -201,6 +208,11 @@ def extract_test_bundle(bundle_raw: bytes, workspace: Path) -> list[dict[str, An
                 mode = info.external_attr >> 16
                 if stat.S_ISLNK(mode):
                     raise ControlError(f"symlink entry in test bundle rejected: {name!r}")
+                file_type = stat.S_IFMT(mode)
+                if not info.is_dir() and file_type not in (0, stat.S_IFREG):
+                    raise ControlError(f"non-regular file in test bundle rejected: {name!r}")
+                if info.file_size > 16 * 1024 * 1024:
+                    raise ControlError(f"test bundle file exceeds the 16 MiB per-file limit: {name!r}")
                 destination = workspace.joinpath(*rel.parts)
                 if info.is_dir():
                     if destination.is_symlink():
@@ -301,7 +313,7 @@ def _run_arm(
 
         command_dir = evidence_root / arm_name
         command_dir.mkdir(parents=True, exist_ok=True)
-        stdout_path = command_dir / f"{command_id}.stdout"
+        stdout_path = command_dir / f"{command_id}.combined.log"
         stdout_path.write_text(output, encoding="utf-8")
         record = {
             "command_id": command_id,
