@@ -160,6 +160,8 @@
         "analysis_plan_sha256",
         "analysis_implementation_revision",
         "multiplicity_policy",
+        "pair_dependence_policy",
+        "dependence_justification_sha256",
         "assigned_pair_count",
         "contrast_results",
         "fixed_benchmark_only",
@@ -183,7 +185,20 @@
           "pattern": "^[0-9a-f]{40}$"
         },
         "multiplicity_policy": {
-          "enum": ["holm_across_binary_contrasts", "unadjusted_exploratory"]
+          "enum": [
+            "holm_across_binary_contrasts",
+            "unadjusted_exploratory",
+            "descriptive_no_p_values"
+          ]
+        },
+        "pair_dependence_policy": {
+          "enum": [
+            "exact_conditional_independent_pairs",
+            "descriptive_only_dependence_unknown"
+          ]
+        },
+        "dependence_justification_sha256": {
+          "$ref": "#/$defs/digest"
         },
         "assigned_pair_count": { "type": "integer", "minimum": 0 },
         "contrast_results": {
