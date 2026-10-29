@@ -625,6 +625,14 @@ pub fn score_atom_ablation_jsonl(
             ));
         }
     }
+    let fixture_pair_ids: BTreeSet<_> = fixture_pair_cases.keys().cloned().collect();
+    if label_pairs != fixture_pair_ids {
+        let missing: Vec<_> = fixture_pair_ids.difference(&label_pairs).cloned().collect();
+        let extra: Vec<_> = label_pairs.difference(&fixture_pair_ids).cloned().collect();
+        return Err(format!(
+            "evaluator labels must cover the exact fixture pair set; missing={missing:?}, extra={extra:?}"
+        ));
+    }
     if targets.is_empty() {
         return Err("evaluator labels contain no atom-use targets".into());
     }
@@ -1131,6 +1139,13 @@ mod tests {
             r#""pair_id":"unknown-pair""#,
         );
         assert!(score_atom_ablation_jsonl(&observations, FIXTURES, &mismatched_pair_labels).is_err());
+
+        let missing_pair_labels = LABELS
+            .lines()
+            .filter(|line| !line.contains(r#""pair_id":"negation-0001""#))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, &missing_pair_labels).is_err());
     }
 
     #[test]
