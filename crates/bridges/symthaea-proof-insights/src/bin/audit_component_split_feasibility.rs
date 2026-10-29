@@ -505,12 +505,12 @@ mod tests {
       "sealed_before_evaluation":true,
       "outcomes_used":false,
       "families":[
-        {"family_id":"a","candidate_target_ids":["t-a"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-        {"family_id":"b","candidate_target_ids":["t-b"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-        {"family_id":"c","candidate_target_ids":["t-c"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-        {"family_id":"d","candidate_target_ids":["t-d"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-        {"family_id":"e","candidate_target_ids":["t-e"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
-        {"family_id":"f","candidate_target_ids":["t-f"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+        {"family_id":"a","eligibility_status":"eligible","candidate_target_ids":["t-a"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+        {"family_id":"b","eligibility_status":"eligible","candidate_target_ids":["t-b"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+        {"family_id":"c","eligibility_status":"eligible","candidate_target_ids":["t-c"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+        {"family_id":"d","eligibility_status":"excluded","candidate_target_ids":["t-d"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+        {"family_id":"e","eligibility_status":"eligible","candidate_target_ids":["t-e"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+        {"family_id":"f","eligibility_status":"unknown","candidate_target_ids":["t-f"],"eligibility_receipt_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
       ],
       "targets":[
         {"target_id":"t-a","family_id":"a","status":"eligible","artifact_path":"families/a.lean","artifact_sha256":"1111111111111111111111111111111111111111111111111111111111111111","statement_sha256":"2222222222222222222222222222222222222222222222222222222222222222","eligibility_receipt_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
@@ -538,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn feasibility_report_keeps_unknown_and_excluded_rows_visible() {
+    fn census_reconciliation_keeps_unknown_and_excluded_rows_visible() {
         let split_bytes = candidate_with_correct_digest();
         let split = parse_candidate_split(&split_bytes).expect("valid candidate split");
         let census: EligibilityCensus =
