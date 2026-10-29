@@ -4,7 +4,7 @@ use science_bench_refresh_validator::{
     generate_task_set_bytes, match_search_exposure_exact,
     sha256_hex, validate_manifest_bytes, verify_regeneration, verify_reveal,
     verify_search_exposure_exact_match_report, verify_search_exposure_match_report,
-    verify_search_exposure_receipt, ProtectedSearchArtifactIndexIndexInput,
+    verify_search_exposure_receipt, ProtectedSearchArtifactIndexCommitmentInput,
 };
 use serde_json::json;
 use std::env;
@@ -58,7 +58,7 @@ fn run(args: &[String]) -> ExitCode {
                 Ok(bytes) => bytes,
                 Err(code) => return code,
             };
-            let input: ProtectedSearchArtifactIndexIndexInput =
+            let input: ProtectedSearchArtifactIndexCommitmentInput =
                 match serde_json::from_slice(&input_bytes) {
                     Ok(input) => input,
                     Err(error) => {
