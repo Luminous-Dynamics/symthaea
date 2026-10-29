@@ -77,6 +77,9 @@ pub enum RetimingEnsembleError {
     EmptyScenarioId,
     DuplicateScenarioId { scenario_id: String },
     EmptyInputDigest { scenario_id: String },
+    InvalidScenario { scenario_id: String, reason: String },
+    InvalidSearchBudget,
+    InvalidTvRadius { radius_ppm: u32 },
     ProbabilityMassMismatch { actual_ppm: u64 },
     NoGreedyPlan { scenario_id: String, reason: String },
     NoSearchPlanWithinBudget { scenario_id: String },
@@ -123,6 +126,16 @@ pub fn evaluate_retiming_ensemble(
     if cases.is_empty() {
         return Err(RetimingEnsembleError::EmptyScenarioSet);
     }
+    if options.max_expanded_nodes_per_scenario == 0
+        || options.max_generated_nodes_per_scenario == 0
+    {
+        return Err(RetimingEnsembleError::InvalidSearchBudget);
+    }
+    if options.tv_radius_ppm > PROBABILITY_SCALE_PPM {
+        return Err(RetimingEnsembleError::InvalidTvRadius {
+            radius_ppm: options.tv_radius_ppm,
+        });
+    }
 
     let mut seen = std::collections::BTreeSet::<String>::new();
     let mut probability_sum = 0_u64;
@@ -140,7 +153,7 @@ pub fn evaluate_retiming_ensemble(
                 scenario_id: case.scenario.id.clone(),
             });
         }
-        case.scenario.validate().map_err(|reason| RetimingEnsembleError::NoGreedyPlan {
+        case.scenario.validate().map_err(|reason| RetimingEnsembleError::InvalidScenario {
             scenario_id: case.scenario.id.clone(),
             reason,
         })?;
