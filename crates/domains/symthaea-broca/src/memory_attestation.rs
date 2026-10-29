@@ -1,0 +1,726 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Ed25519 attestations for policy-pinned memory events.
+//!
+//! Signatures authenticate which registered key signed exact canonical bytes;
+//! they do not establish that a signed statement is factually true. Production
+//! ingestion must anchor recorded_at to a trusted append log and provision the
+//! trust registry securely. This module is not wired into the JSONL worker.
+
+use crate::memory_governance::{AuthorityPolicy, LedgerEvent, PolicyPinnedLedger};
+use chrono::{DateTime, SecondsFormat, Utc};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+
+pub const ATTESTATION_SCHEMA_V1: &str = "BROCA-ATTESTATION-V1";
+const POLICY_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/AUTHORITY-POLICY/V1";
+const EVENT_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/LEDGER-EVENT/V1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignedAuthorityPolicy {
+    pub schema_version: String,
+    pub signer_key_id: String,
+    /// Must equal policy.recorded_at after canonical timestamp normalization.
+    pub signed_at: String,
+    pub policy: AuthorityPolicy,
+    pub signature_hex: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignedLedgerEvent {
+    pub schema_version: String,
+    pub signer_key_id: String,
+    pub event: LedgerEvent,
+    pub signature_hex: String,
+}
+
+/// Explicitly provisioned trusted key. Do not populate this registry from
+/// untrusted event payloads or from the unsigned policy it is intended to verify.
+#[derive(Debug, Clone)]
+pub struct TrustedSignerConfig {
+    pub key_id: String,
+    pub verifying_key_hex: String,
+    /// Required for event signatures and must equal the event's source.
+    pub source: Option<String>,
+    pub can_sign_policies: bool,
+    pub can_sign_events: bool,
+    pub valid_from: String,
+    /// Exclusive end; None means no scheduled end.
+    pub valid_until: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct TrustedSigner {
+    source: Option<String>,
+    can_sign_policies: bool,
+    can_sign_events: bool,
+    valid_from: DateTime<Utc>,
+    valid_until: Option<DateTime<Utc>>,
+    verifying_key: VerifyingKey,
+}
+
+/// A batch that has passed signature, signer-role, key-window and identity
+/// checks. Its fields are private so external callers cannot forge this type.
+#[derive(Debug, Clone)]
+pub struct VerifiedLedgerBatch {
+    pub(crate) policies: Vec<AuthorityPolicy>,
+    pub(crate) events: Vec<LedgerEvent>,
+    pub(crate) policies_sha256: String,
+    pub(crate) events_sha256: String,
+}
+
+impl VerifiedLedgerBatch {
+    pub fn policy_chain_sha256(&self) -> &str {
+        &self.policies_sha256
+    }
+
+    pub fn event_chain_sha256(&self) -> &str {
+        &self.events_sha256
+    }
+
+    pub fn policy_count(&self) -> usize {
+        self.policies.len()
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    pub fn into_ledger(self) -> Result<PolicyPinnedLedger, String> {
+        PolicyPinnedLedger::from_verified(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvidenceTrustStore {
+    signers: BTreeMap<String, TrustedSigner>,
+}
+
+#[derive(Serialize)]
+struct PolicySigningPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    signer_key_id: String,
+    signed_at: String,
+    policy: AuthorityPolicy,
+}
+
+#[derive(Serialize)]
+struct EventSigningPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    signer_key_id: String,
+    event: LedgerEvent,
+}
+
+fn normalize_time(value: &str, field: &str) -> Result<String, String> {
+    let parsed = DateTime::parse_from_rfc3339(value)
+        .map_err(|error| format!("{field} must be RFC3339 with UTC offset: {error}"))?
+        .with_timezone(&Utc);
+    Ok(parsed.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+}
+
+fn policy_for_signing(policy: &AuthorityPolicy) -> Result<AuthorityPolicy, String> {
+    let mut normalized = policy.clone();
+    normalized.recorded_at = normalize_time(&normalized.recorded_at, "policy.recorded_at")?;
+    normalized.sources.sort_by(|left, right| left.source.cmp(&right.source));
+    for source in &normalized.sources {
+        if source.source.trim().is_empty() {
+            return Err("policy source must not be empty".into());
+        }
+        if source.attributes.is_empty()
+            || source.attributes.iter().any(|attribute| attribute.trim().is_empty())
+        {
+            return Err(format!("source {} has invalid attribute scope", source.source));
+        }
+    }
+    Ok(normalized)
+}
+
+fn event_for_signing(event: &LedgerEvent) -> Result<LedgerEvent, String> {
+    let mut normalized = event.clone();
+    match &mut normalized {
+        LedgerEvent::Assert {
+            event_id,
+            subject,
+            attribute,
+            value,
+            valid_from,
+            valid_to,
+            recorded_at,
+            source,
+        } => {
+            for (field, value) in [
+                ("event_id", event_id),
+                ("subject", subject),
+                ("attribute", attribute),
+                ("value", value),
+                ("source", source),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(format!("event {field} must not be empty"));
+                }
+            }
+            chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
+                .map_err(|error| format!("event valid_from must be YYYY-MM-DD: {error}"))?;
+            if let Some(end) = valid_to {
+                let end_date = chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                    .map_err(|error| format!("event valid_to must be YYYY-MM-DD: {error}"))?;
+                let start_date = chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
+                    .map_err(|error| format!("event valid_from must be YYYY-MM-DD: {error}"))?;
+                if end_date <= start_date {
+                    return Err("event valid_to must be after valid_from".into());
+                }
+            }
+            *recorded_at = normalize_time(recorded_at, "event.recorded_at")?;
+        }
+        LedgerEvent::Retract {
+            event_id,
+            target_event_id,
+            recorded_at,
+            source,
+        } => {
+            for (field, value) in [
+                ("event_id", event_id),
+                ("target_event_id", target_event_id),
+                ("source", source),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(format!("retraction {field} must not be empty"));
+                }
+            }
+            *recorded_at = normalize_time(recorded_at, "event.recorded_at")?;
+        }
+    }
+    Ok(normalized)
+}
+
+fn policy_payload_bytes(
+    schema_version: &str,
+    signer_key_id: &str,
+    signed_at: &str,
+    policy: &AuthorityPolicy,
+) -> Result<Vec<u8>, String> {
+    if schema_version != ATTESTATION_SCHEMA_V1 {
+        return Err("unsupported policy attestation schema".into());
+    }
+    let signed_at = normalize_time(signed_at, "signed_at")?;
+    let policy = policy_for_signing(policy)?;
+    if signed_at != policy.recorded_at {
+        return Err("policy signed_at must equal policy.recorded_at".into());
+    }
+    serde_json::to_vec(&PolicySigningPayload {
+        domain: POLICY_DOMAIN,
+        schema_version: ATTESTATION_SCHEMA_V1,
+        signer_key_id: signer_key_id.to_owned(),
+        signed_at,
+        policy,
+    })
+    .map_err(|error| format!("cannot canonicalize policy payload: {error}"))
+}
+
+fn event_payload_bytes(
+    schema_version: &str,
+    signer_key_id: &str,
+    event: &LedgerEvent,
+) -> Result<Vec<u8>, String> {
+    if schema_version != ATTESTATION_SCHEMA_V1 {
+        return Err("unsupported event attestation schema".into());
+    }
+    let event = event_for_signing(event)?;
+    serde_json::to_vec(&EventSigningPayload {
+        domain: EVENT_DOMAIN,
+        schema_version: ATTESTATION_SCHEMA_V1,
+        signer_key_id: signer_key_id.to_owned(),
+        event,
+    })
+    .map_err(|error| format!("cannot canonicalize event payload: {error}"))
+}
+
+impl SignedAuthorityPolicy {
+    pub fn sign(
+        signer_key_id: impl Into<String>,
+        policy: AuthorityPolicy,
+        signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let signer_key_id = signer_key_id.into();
+        let signed_at = normalize_time(&policy.recorded_at, "policy.recorded_at")?;
+        let schema_version = ATTESTATION_SCHEMA_V1.to_owned();
+        let bytes = policy_payload_bytes(
+            &schema_version,
+            &signer_key_id,
+            &signed_at,
+            &policy,
+        )?;
+        let signature = signing_key.sign(&bytes);
+        Ok(Self {
+            schema_version,
+            signer_key_id,
+            signed_at,
+            policy,
+            signature_hex: hex::encode(signature.to_bytes()),
+        })
+    }
+
+    fn signing_bytes(&self) -> Result<Vec<u8>, String> {
+        policy_payload_bytes(
+            &self.schema_version,
+            &self.signer_key_id,
+            &self.signed_at,
+            &self.policy,
+        )
+    }
+}
+
+impl SignedLedgerEvent {
+    pub fn sign(
+        signer_key_id: impl Into<String>,
+        event: LedgerEvent,
+        signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let signer_key_id = signer_key_id.into();
+        let schema_version = ATTESTATION_SCHEMA_V1.to_owned();
+        let bytes = event_payload_bytes(&schema_version, &signer_key_id, &event)?;
+        let signature = signing_key.sign(&bytes);
+        Ok(Self {
+            schema_version,
+            signer_key_id,
+            event,
+            signature_hex: hex::encode(signature.to_bytes()),
+        })
+    }
+
+    fn signing_bytes(&self) -> Result<Vec<u8>, String> {
+        event_payload_bytes(&self.schema_version, &self.signer_key_id, &self.event)
+    }
+}
+
+impl EvidenceTrustStore {
+    pub fn new(configs: Vec<TrustedSignerConfig>) -> Result<Self, String> {
+        if configs.is_empty() {
+            return Err("trusted signer registry must not be empty".into());
+        }
+        let mut signers = BTreeMap::new();
+        for config in configs {
+            if config.key_id.trim().is_empty() {
+                return Err("trusted key_id must not be empty".into());
+            }
+            let key_bytes = hex::decode(&config.verifying_key_hex)
+                .map_err(|error| format!("invalid public key hex for {}: {error}", config.key_id))?;
+            let key_array: [u8; 32] = key_bytes.try_into().map_err(|bytes: Vec<u8>| {
+                format!(
+                    "public key for {} must be 32 bytes, got {}",
+                    config.key_id,
+                    bytes.len()
+                )
+            })?;
+            let verifying_key = VerifyingKey::from_bytes(&key_array)
+                .map_err(|error| format!("invalid public key for {}: {error}", config.key_id))?;
+            let valid_from = DateTime::parse_from_rfc3339(&config.valid_from)
+                .map_err(|error| format!("valid_from must be RFC3339 with UTC offset: {error}"))?
+                .with_timezone(&Utc);
+            let valid_until = config
+                .valid_until
+                .as_deref()
+                .map(|value| {
+                    DateTime::parse_from_rfc3339(value)
+                        .map(|parsed| parsed.with_timezone(&Utc))
+                        .map_err(|error| format!("valid_until must be RFC3339: {error}"))
+                })
+                .transpose()?;
+            if valid_until.is_some_and(|until| until <= valid_from) {
+                return Err(format!("key {} has an empty validity window", config.key_id));
+            }
+            if !config.can_sign_policies && !config.can_sign_events {
+                return Err(format!("key {} has no signing role", config.key_id));
+            }
+            if config.can_sign_events
+                && config.source.as_deref().is_none_or(str::is_empty)
+            {
+                return Err(format!("event-signing key {} must bind to a source", config.key_id));
+            }
+            let signer = TrustedSigner {
+                source: config.source,
+                can_sign_policies: config.can_sign_policies,
+                can_sign_events: config.can_sign_events,
+                valid_from,
+                valid_until,
+                verifying_key,
+            };
+            if signers.insert(config.key_id.clone(), signer).is_some() {
+                return Err(format!("duplicate trusted key_id {:?}", config.key_id));
+            }
+        }
+        Ok(Self { signers })
+    }
+
+    fn signer_at(&self, key_id: &str, timestamp: DateTime<Utc>) -> Result<&TrustedSigner, String> {
+        let signer = self
+            .signers
+            .get(key_id)
+            .ok_or_else(|| format!("untrusted signer key_id {key_id:?}"))?;
+        if timestamp < signer.valid_from
+            || signer.valid_until.is_some_and(|until| timestamp >= until)
+        {
+            return Err(format!("signer key {key_id:?} was not valid at signed time"));
+        }
+        Ok(signer)
+    }
+
+    fn verify_signature(
+        signer: &TrustedSigner,
+        signature_hex: &str,
+        message: &[u8],
+    ) -> Result<(), String> {
+        let signature_bytes = hex::decode(signature_hex)
+            .map_err(|error| format!("invalid signature hex: {error}"))?;
+        let signature = Signature::from_slice(&signature_bytes)
+            .map_err(|error| format!("invalid Ed25519 signature encoding: {error}"))?;
+        signer
+            .verifying_key
+            .verify(message, &signature)
+            .map_err(|_| "Ed25519 signature verification failed".into())
+    }
+
+    pub fn verify_policy(&self, envelope: &SignedAuthorityPolicy) -> Result<AuthorityPolicy, String> {
+        let bytes = envelope.signing_bytes()?;
+        let signed_at = parse_utc(&envelope.signed_at, "policy signed_at")?;
+        let signer = self.signer_at(&envelope.signer_key_id, signed_at)?;
+        if !signer.can_sign_policies {
+            return Err(format!("key {:?} lacks policy-signing role", envelope.signer_key_id));
+        }
+        Self::verify_signature(signer, &envelope.signature_hex, &bytes)?;
+        Ok(policy_for_signing(&envelope.policy)?)
+    }
+
+    pub fn verify_event(&self, envelope: &SignedLedgerEvent) -> Result<LedgerEvent, String> {
+        let bytes = envelope.signing_bytes()?;
+        let event = event_for_signing(&envelope.event)?;
+        let recorded_at = parse_utc(event.recorded_at(), "event recorded_at")?;
+        let signer = self.signer_at(&envelope.signer_key_id, recorded_at)?;
+        if !signer.can_sign_events {
+            return Err(format!("key {:?} lacks event-signing role", envelope.signer_key_id));
+        }
+        if signer.source.as_deref() != Some(event.source()) {
+            return Err(format!(
+                "signer {:?} is not authorized for source {:?}",
+                envelope.signer_key_id,
+                event.source()
+            ));
+        }
+        Self::verify_signature(signer, &envelope.signature_hex, &bytes)?;
+        Ok(event)
+    }
+
+    pub fn verify_batch(
+        &self,
+        signed_policies: &[SignedAuthorityPolicy],
+        signed_events: &[SignedLedgerEvent],
+    ) -> Result<VerifiedLedgerBatch, String> {
+        if signed_policies.is_empty() {
+            return Err("signed policy chain must not be empty".into());
+        }
+        if signed_events.is_empty() {
+            return Err("signed event batch must not be empty".into());
+        }
+        let policies: Vec<AuthorityPolicy> = signed_policies
+            .iter()
+            .map(|envelope| self.verify_policy(envelope))
+            .collect::<Result<_, _>>()?;
+        let events: Vec<LedgerEvent> = signed_events
+            .iter()
+            .map(|envelope| self.verify_event(envelope))
+            .collect::<Result<_, _>>()?;
+        let policy_bytes = serde_json::to_vec(&policies)
+            .map_err(|error| format!("cannot serialize verified policy chain: {error}"))?;
+        let event_bytes = serde_json::to_vec(&events)
+            .map_err(|error| format!("cannot serialize verified event batch: {error}"))?;
+        Ok(VerifiedLedgerBatch {
+            policies,
+            events,
+            policies_sha256: format!("{:x}", Sha256::digest(policy_bytes)),
+            events_sha256: format!("{:x}", Sha256::digest(event_bytes)),
+        })
+    }
+}
+
+fn parse_utc(value: &str, field: &str) -> Result<DateTime<Utc>, String> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|parsed| parsed.with_timezone(&Utc))
+        .map_err(|error| format!("{field} must be RFC3339 with UTC offset: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory_governance::SourcePolicy;
+
+    fn policy(version: u64, timestamp: &str) -> AuthorityPolicy {
+        AuthorityPolicy {
+            policy_version: version,
+            recorded_at: timestamp.into(),
+            sources: vec![
+                SourcePolicy {
+                    source: "operations".into(),
+                    authority_rank: 10,
+                    attributes: ["endpoint".to_owned(), "notes".to_owned()].into_iter().collect(),
+                    can_retract: true,
+                },
+                SourcePolicy {
+                    source: "incident-review".into(),
+                    authority_rank: 12,
+                    attributes: ["endpoint".to_owned()].into_iter().collect(),
+                    can_retract: false,
+                },
+            ],
+        }
+    }
+
+    fn assertion(id: &str, source: &str, value: &str) -> LedgerEvent {
+        LedgerEvent::Assert {
+            event_id: id.into(),
+            subject: "db-prod".into(),
+            attribute: "endpoint".into(),
+            value: value.into(),
+            valid_from: "2026-01-01".into(),
+            valid_to: None,
+            recorded_at: "2026-01-02T00:00:00Z".into(),
+            source: source.into(),
+        }
+    }
+
+    fn key(byte: u8) -> SigningKey {
+        SigningKey::from_bytes(&[byte; 32])
+    }
+
+    fn trust_config(
+        key_id: &str,
+        source: Option<&str>,
+        key: &SigningKey,
+        can_sign_policies: bool,
+        can_sign_events: bool,
+        from: &str,
+        until: Option<&str>,
+    ) -> TrustedSignerConfig {
+        TrustedSignerConfig {
+            key_id: key_id.into(),
+            verifying_key_hex: hex::encode(key.verifying_key().to_bytes()),
+            source: source.map(str::to_owned),
+            can_sign_policies,
+            can_sign_events,
+            valid_from: from.into(),
+            valid_until: until.map(str::to_owned),
+        }
+    }
+
+    fn store() -> (EvidenceTrustStore, SigningKey, SigningKey) {
+        let policy_key = key(7);
+        let ops_key = key(9);
+        let store = EvidenceTrustStore::new(vec![
+            trust_config(
+                "policy-root",
+                None,
+                &policy_key,
+                true,
+                false,
+                "2026-01-01T00:00:00Z",
+                None,
+            ),
+            trust_config(
+                "ops-key-1",
+                Some("operations"),
+                &ops_key,
+                false,
+                true,
+                "2026-01-01T00:00:00Z",
+                Some("2027-01-01T00:00:00Z"),
+            ),
+        ])
+        .unwrap();
+        (store, policy_key, ops_key)
+    }
+
+    #[test]
+    fn valid_policy_and_event_signatures_verify() {
+        let (store, policy_key, ops_key) = store();
+        let signed_policy = SignedAuthorityPolicy::sign(
+            "policy-root",
+            policy(1, "2026-01-01T00:00:00Z"),
+            &policy_key,
+        )
+        .unwrap();
+        assert_eq!(store.verify_policy(&signed_policy).unwrap().policy_version, 1);
+        let signed_event =
+            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
+                .unwrap();
+        assert!(matches!(store.verify_event(&signed_event), Ok(LedgerEvent::Assert { .. })));
+    }
+
+    #[test]
+    fn signed_batches_produce_verified_ledger_constructor_input() {
+        let (store, policy_key, ops_key) = store();
+        let policy = SignedAuthorityPolicy::sign(
+            "policy-root",
+            policy(1, "2026-01-01T00:00:00Z"),
+            &policy_key,
+        ).unwrap();
+        let event = SignedLedgerEvent::sign(
+            "ops-key-1",
+            assertion("E1", "operations", "A"),
+            &ops_key,
+        ).unwrap();
+        let batch = store.verify_batch(&[policy], &[event]).unwrap();
+        assert_eq!(batch.policy_count(), 1);
+        assert_eq!(batch.event_count(), 1);
+        assert_eq!(batch.policy_chain_sha256().len(), 64);
+        assert_eq!(batch.event_chain_sha256().len(), 64);
+        let ledger = batch.into_ledger().unwrap();
+        let result = ledger.resolve(&crate::memory_governance::LedgerQuery {
+            query_id: "Q".into(),
+            subject: "db-prod".into(),
+            attribute: "endpoint".into(),
+            valid_at: "2026-01-03".into(),
+            known_at: "2026-01-03T00:00:00Z".into(),
+        }).unwrap();
+        assert_eq!(result.value.as_deref(), Some("A"));
+    }
+
+    #[test]
+    fn payload_tampering_breaks_signature() {
+        let (store, _, ops_key) = store();
+        let mut signed =
+            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
+                .unwrap();
+        if let LedgerEvent::Assert { value, .. } = &mut signed.event {
+            *value = "tampered".into();
+        }
+        assert!(store.verify_event(&signed).unwrap_err().contains("signature verification failed"));
+    }
+
+    #[test]
+    fn signer_cannot_claim_another_source() {
+        let (store, _, ops_key) = store();
+        let signed =
+            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "incident-review", "A"), &ops_key)
+                .unwrap();
+        assert!(store.verify_event(&signed).unwrap_err().contains("not authorized for source"));
+    }
+
+    #[test]
+    fn unknown_key_is_rejected() {
+        let (store, _, ops_key) = store();
+        let signed =
+            SignedLedgerEvent::sign("not-registered", assertion("E1", "operations", "A"), &ops_key)
+                .unwrap();
+        assert!(store.verify_event(&signed).unwrap_err().contains("untrusted signer"));
+    }
+
+    #[test]
+    fn key_role_must_match_operation() {
+        let (store, policy_key, _) = store();
+        let signed =
+            SignedLedgerEvent::sign("policy-root", assertion("E1", "operations", "A"), &policy_key)
+                .unwrap();
+        assert!(store.verify_event(&signed).unwrap_err().contains("lacks event-signing role"));
+    }
+
+    #[test]
+    fn policy_payload_tampering_breaks_signature() {
+        let (store, policy_key, _) = store();
+        let mut signed = SignedAuthorityPolicy::sign(
+            "policy-root",
+            policy(1, "2026-01-01T00:00:00Z"),
+            &policy_key,
+        ).unwrap();
+        signed.policy.sources[0].authority_rank += 100;
+        assert!(store.verify_policy(&signed).unwrap_err().contains("signature verification failed"));
+    }
+
+    #[test]
+    fn policy_signature_requires_recorded_time_match() {
+        let (store, policy_key, _) = store();
+        let mut signed = SignedAuthorityPolicy::sign(
+            "policy-root",
+            policy(1, "2026-01-01T00:00:00Z"),
+            &policy_key,
+        ).unwrap();
+        signed.signed_at = "2026-01-02T00:00:00Z".into();
+        assert!(store.verify_policy(&signed).unwrap_err().contains("must equal policy.recorded_at"));
+    }
+
+    #[test]
+    fn policy_source_order_is_canonicalized_for_signatures() {
+        let (store, policy_key, _) = store();
+        let mut p = policy(1, "2026-01-01T00:00:00Z");
+        let signed = SignedAuthorityPolicy::sign("policy-root", p.clone(), &policy_key).unwrap();
+        p.sources.reverse();
+        let mut reordered = signed.clone();
+        reordered.policy = p;
+        assert_eq!(store.verify_policy(&signed).unwrap(), store.verify_policy(&reordered).unwrap());
+    }
+
+    #[test]
+    fn event_key_validity_window_is_enforced() {
+        let policy_key = key(7);
+        let ops_key = key(9);
+        let store = EvidenceTrustStore::new(vec![
+            trust_config("ops", Some("operations"), &ops_key, false, true,
+                "2026-02-01T00:00:00Z", Some("2026-03-01T00:00:00Z")),
+        ]).unwrap();
+        let signed =
+            SignedLedgerEvent::sign("ops", assertion("E1", "operations", "A"), &ops_key).unwrap();
+        assert!(store.verify_event(&signed).unwrap_err().contains("not valid at signed time"));
+        let _ = policy_key;
+    }
+
+    #[test]
+    fn event_signature_cannot_be_replayed_with_another_signer_id() {
+        let (store, _, ops_key) = store();
+        let mut signed =
+            SignedLedgerEvent::sign("ops-key-1", assertion("E1", "operations", "A"), &ops_key)
+                .unwrap();
+        signed.signer_key_id = "different-key-id".into();
+        assert!(store.verify_event(&signed).is_err());
+    }
+
+    #[test]
+    fn exact_schema_rejects_unknown_envelope_fields() {
+        let input = r#"{"schema_version":"BROCA-ATTESTATION-V1","signer_key_id":"ops-key-1","event":{"kind":"assert","event_id":"E","subject":"x","attribute":"a","value":"v","valid_from":"2026-01-01","valid_to":null,"recorded_at":"2026-01-01T00:00:00Z","source":"operations"},"signature_hex":"00","authority_rank":9999}"#;
+        assert!(serde_json::from_str::<SignedLedgerEvent>(input).is_err());
+    }
+
+    #[test]
+    fn duplicate_trusted_key_id_is_rejected() {
+        let key = key(2);
+        let a = trust_config("same", Some("a"), &key, false, true, "2026-01-01T00:00:00Z", None);
+        let b = trust_config("same", Some("b"), &key, false, true, "2026-01-01T00:00:00Z", None);
+        assert!(EvidenceTrustStore::new(vec![a, b]).unwrap_err().contains("duplicate trusted key_id"));
+    }
+
+    #[test]
+    fn malformed_public_key_length_is_rejected() {
+        let result = EvidenceTrustStore::new(vec![TrustedSignerConfig {
+            key_id: "bad".into(),
+            verifying_key_hex: "00".into(),
+            source: Some("operations".into()),
+            can_sign_policies: false,
+            can_sign_events: true,
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_until: None,
+        }]);
+        assert!(result.unwrap_err().contains("must be 32 bytes"));
+    }
+
+    #[test]
+    fn missing_role_and_source_binding_are_rejected() {
+        let k = key(3);
+        let config = trust_config("none", None, &k, false, false, "2026-01-01T00:00:00Z", None);
+        assert!(EvidenceTrustStore::new(vec![config]).unwrap_err().contains("no signing role"));
+    }
+}
