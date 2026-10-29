@@ -563,7 +563,10 @@ impl FragmentAssembler {
             payload.extend_from_slice(&frag_data[..len]);
         }
 
-        (payload.len() == self.expected_payload_size).then_some(payload)
+        // When every data shard arrives (or only a non-final shard is recovered),
+        // the observed final-shard length is authoritative. Legacy envelopes may
+        // be compressed, so their encoded size need not equal the nominal size.
+        Some(payload)
     }
 }
 
@@ -876,16 +879,29 @@ mod tests {
     }
 
     #[test]
-    fn assembler_invalid_expected_layout_fails_closed_without_panicking() {
+    fn invalid_final_length_inference_fails_closed_without_panicking() {
         let data = vec![0x8d; 2048];
         let frags = fragment(10, &data);
 
-        let mut wrong_size = FragmentAssembler::new(10, frags.len() as u8, 100);
+        // If every data fragment arrives, observed fragment lengths suffice
+        // even when the caller's nominal length is stale (e.g. compression).
+        let mut all_data = FragmentAssembler::new(10, frags.len() as u8, 100);
         for frag in &frags {
-            assert!(!wrong_size.feed(frag));
+            all_data.feed(frag);
         }
-        assert!(!wrong_size.is_complete());
-        assert!(wrong_size.assemble().is_none());
+        assert!(all_data.is_complete());
+        assert_eq!(all_data.assemble().as_deref(), Some(data.as_slice()));
+
+        // If the final data shard is missing, an inconsistent nominal length
+        // cannot safely determine how much of the recovered shard is valid.
+        let mut missing_final = FragmentAssembler::new(10, frags.len() as u8, 100);
+        for (index, frag) in frags.iter().enumerate() {
+            if index != frags.len() - 2 {
+                missing_final.feed(frag);
+            }
+        }
+        assert!(!missing_final.is_complete());
+        assert!(missing_final.assemble().is_none());
 
         let zero_data_count = FragmentAssembler::new(10, 1, 2048);
         assert!(!zero_data_count.is_complete());
