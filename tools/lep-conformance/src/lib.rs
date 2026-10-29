@@ -13,8 +13,8 @@
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Number, Value};
-use std::fmt;
 use std::collections::BTreeSet;
+use std::fmt;
 
 pub const STATEMENT_TYPE: &str = "https://in-toto.io/Statement/v1";
 pub const PREDICATE_TYPE: &str = "https://luminousdynamics.io/attestations/evidence/v0.1";
@@ -144,7 +144,8 @@ pub fn parse_json_unique_keys(input: &[u8]) -> Result<Value, String> {
     Ok(value)
 }
 
-const LEP_SCHEMA_JSON: &str = include_str!("../../../docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json");
+const LEP_SCHEMA_JSON: &str =
+    include_str!("../../../docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Violation {
@@ -291,7 +292,8 @@ pub fn verify_statement(statement: &Value) -> ValidationReport {
     };
 
     validate_predicate_schema(
-        root.get("predicate").expect("predicate object was just checked"),
+        root.get("predicate")
+            .expect("predicate object was just checked"),
         &mut violations,
     );
 
@@ -318,7 +320,12 @@ pub fn verify_statement(statement: &Value) -> ValidationReport {
     }
 
     validate_execution(predicate.get("execution"), &mut violations);
-    validate_artifacts(predicate.get("evidence"), "$.predicate.evidence", true, &mut violations);
+    validate_artifacts(
+        predicate.get("evidence"),
+        "$.predicate.evidence",
+        true,
+        &mut violations,
+    );
     validate_limitations(predicate.get("limitations"), &mut violations);
     validate_extensions(predicate.get("extensions"), &mut violations);
 
@@ -332,31 +339,45 @@ pub fn verify_statement(statement: &Value) -> ValidationReport {
     ValidationReport::from_violations(violations)
 }
 
-fn push(
-    out: &mut Vec<Violation>,
-    code: &str,
-    path: impl Into<String>,
-    message: impl Into<String>,
-) {
+fn push(out: &mut Vec<Violation>, code: &str, path: impl Into<String>, message: impl Into<String>) {
     out.push(Violation::new(code, path, message));
 }
 
 fn validate_subjects(value: Option<&Value>, out: &mut Vec<Violation>) {
     let Some(subjects) = value.and_then(Value::as_array) else {
-        push(out, "INVALID_SUBJECTS", "$.subject", "subject must be an array.");
+        push(
+            out,
+            "INVALID_SUBJECTS",
+            "$.subject",
+            "subject must be an array.",
+        );
         return;
     };
     if subjects.is_empty() {
-        push(out, "EMPTY_SUBJECTS", "$.subject", "At least one subject is required.");
+        push(
+            out,
+            "EMPTY_SUBJECTS",
+            "$.subject",
+            "At least one subject is required.",
+        );
     }
 
     for (index, subject) in subjects.iter().enumerate() {
         let path = format!("$.subject[{index}]");
         let Some(object) = subject.as_object() else {
-            push(out, "INVALID_SUBJECT", path, "Each subject must be an object.");
+            push(
+                out,
+                "INVALID_SUBJECT",
+                path,
+                "Each subject must be an object.",
+            );
             continue;
         };
-        if object.get("name").and_then(Value::as_str).is_none_or(str::is_empty) {
+        if object
+            .get("name")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
             push(
                 out,
                 "INVALID_SUBJECT_NAME",
@@ -379,8 +400,17 @@ fn validate_claim(value: Option<&Value>, out: &mut Vec<Violation>) {
         ("id", "INVALID_CLAIM_ID"),
         ("statement", "INVALID_CLAIM_STATEMENT"),
     ] {
-        if claim.get(field).and_then(Value::as_str).is_none_or(str::is_empty) {
-            push(out, code, format!("{path}.{field}"), "Required string must be non-empty.");
+        if claim
+            .get(field)
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            push(
+                out,
+                code,
+                format!("{path}.{field}"),
+                "Required string must be non-empty.",
+            );
         }
     }
 
@@ -394,7 +424,11 @@ fn validate_claim(value: Option<&Value>, out: &mut Vec<Violation>) {
         "hypothesis",
         "aspiration",
     ];
-    if !claim.get("kind").and_then(Value::as_str).is_some_and(|kind| kinds.contains(&kind)) {
+    if !claim
+        .get("kind")
+        .and_then(Value::as_str)
+        .is_some_and(|kind| kinds.contains(&kind))
+    {
         push(
             out,
             "INVALID_CLAIM_KIND",
@@ -479,13 +513,20 @@ fn validate_target(value: &Value, path: &str, out: &mut Vec<Violation>) {
 
 fn is_pinned_revision(value: &str) -> bool {
     matches!(value.len(), 40 | 64)
-        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn validate_execution(value: Option<&Value>, out: &mut Vec<Violation>) {
     let path = "$.predicate.execution";
     let Some(execution) = value.and_then(Value::as_object) else {
-        push(out, "MISSING_EXECUTION", path, "The execution object is required.");
+        push(
+            out,
+            "MISSING_EXECUTION",
+            path,
+            "The execution object is required.",
+        );
         return;
     };
     let status = execution.get("status").and_then(Value::as_str);
@@ -498,8 +539,16 @@ fn validate_execution(value: Option<&Value>, out: &mut Vec<Violation>) {
             format!("{path}.runId"),
             "runId is required; use null when no run occurred.",
         );
-    } else if execution.get("runId").is_some_and(|v| !v.is_null() && v.as_str().is_none()) {
-        push(out, "INVALID_RUN_ID", format!("{path}.runId"), "runId must be a string or null.");
+    } else if execution
+        .get("runId")
+        .is_some_and(|v| !v.is_null() && v.as_str().is_none())
+    {
+        push(
+            out,
+            "INVALID_RUN_ID",
+            format!("{path}.runId"),
+            "runId must be a string or null.",
+        );
     }
 
     match (status, result) {
@@ -545,7 +594,12 @@ fn validate_verification(
 ) {
     let path = "$.predicate.verification";
     let Some(verification) = value.and_then(Value::as_object) else {
-        push(out, "MISSING_VERIFICATION", path, "The verification object is required.");
+        push(
+            out,
+            "MISSING_VERIFICATION",
+            path,
+            "The verification object is required.",
+        );
         return;
     };
 
@@ -554,7 +608,10 @@ fn validate_verification(
     let checked_target = verification.get("checkedTarget");
     let checks = verification.get("checks").and_then(Value::as_array);
 
-    if !matches!(outcome, Some("not_run" | "passed" | "failed" | "inconclusive")) {
+    if !matches!(
+        outcome,
+        Some("not_run" | "passed" | "failed" | "inconclusive")
+    ) {
         push(
             out,
             "INVALID_VERIFICATION_OUTCOME",
@@ -601,7 +658,11 @@ fn validate_verification(
         return;
     };
     for field in ["id", "version"] {
-        if verifier_obj.get(field).and_then(Value::as_str).is_none_or(str::is_empty) {
+        if verifier_obj
+            .get(field)
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
             push(
                 out,
                 "VERIFIER_IDENTITY_REQUIRED",
@@ -659,7 +720,12 @@ fn validate_verification(
     for (index, check) in entries.iter().enumerate() {
         let check_path = format!("{path}.checks[{index}]");
         let Some(check_obj) = check.as_object() else {
-            push(out, "INVALID_CHECK", check_path, "Each check must be an object.");
+            push(
+                out,
+                "INVALID_CHECK",
+                check_path,
+                "Each check must be an object.",
+            );
             continue;
         };
         let id = check_obj.get("id").and_then(Value::as_str);
@@ -679,7 +745,10 @@ fn validate_verification(
             );
         }
         let check_outcome = check_obj.get("outcome").and_then(Value::as_str);
-        if !matches!(check_outcome, Some("passed" | "failed" | "inconclusive" | "not_run")) {
+        if !matches!(
+            check_outcome,
+            Some("passed" | "failed" | "inconclusive" | "not_run")
+        ) {
             push(
                 out,
                 "INVALID_CHECK_OUTCOME",
@@ -697,9 +766,9 @@ fn validate_verification(
         }
     }
 
-    let has_failed_check = entries.iter().any(|check| {
-        check.get("outcome").and_then(Value::as_str) == Some("failed")
-    });
+    let has_failed_check = entries
+        .iter()
+        .any(|check| check.get("outcome").and_then(Value::as_str) == Some("failed"));
     let has_uncertain_check = entries.iter().any(|check| {
         matches!(
             check.get("outcome").and_then(Value::as_str),
@@ -725,8 +794,14 @@ fn validate_verification(
 
     if outcome == Some("passed") {
         let execution_obj = execution.and_then(Value::as_object);
-        if execution_obj.and_then(|v| v.get("status")).and_then(Value::as_str) != Some("completed")
-            || execution_obj.and_then(|v| v.get("result")).and_then(Value::as_str) != Some("passed")
+        if execution_obj
+            .and_then(|v| v.get("status"))
+            .and_then(Value::as_str)
+            != Some("completed")
+            || execution_obj
+                .and_then(|v| v.get("result"))
+                .and_then(Value::as_str)
+                != Some("passed")
         {
             push(
                 out,
@@ -738,16 +813,15 @@ fn validate_verification(
     }
 }
 
-fn validate_artifacts(
-    value: Option<&Value>,
-    path: &str,
-    required: bool,
-    out: &mut Vec<Violation>,
-) {
+fn validate_artifacts(value: Option<&Value>, path: &str, required: bool, out: &mut Vec<Violation>) {
     let Some(artifacts) = value.and_then(Value::as_array) else {
         push(
             out,
-            if required { "INVALID_EVIDENCE_ARTIFACTS" } else { "INVALID_TARGET_INPUTS" },
+            if required {
+                "INVALID_EVIDENCE_ARTIFACTS"
+            } else {
+                "INVALID_TARGET_INPUTS"
+            },
             path,
             "Artifact collections must be arrays.",
         );
@@ -757,10 +831,19 @@ fn validate_artifacts(
     for (index, artifact) in artifacts.iter().enumerate() {
         let artifact_path = format!("{path}[{index}]");
         let Some(object) = artifact.as_object() else {
-            push(out, "INVALID_ARTIFACT", artifact_path, "Each artifact must be an object.");
+            push(
+                out,
+                "INVALID_ARTIFACT",
+                artifact_path,
+                "Each artifact must be an object.",
+            );
             continue;
         };
-        if object.get("name").and_then(Value::as_str).is_none_or(str::is_empty) {
+        if object
+            .get("name")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
             push(
                 out,
                 "INVALID_ARTIFACT_NAME",
@@ -780,7 +863,11 @@ fn validate_artifacts(
             "certificate",
             "other",
         ];
-        if !object.get("kind").and_then(Value::as_str).is_some_and(|kind| kinds.contains(&kind)) {
+        if !object
+            .get("kind")
+            .and_then(Value::as_str)
+            .is_some_and(|kind| kinds.contains(&kind))
+        {
             push(
                 out,
                 "INVALID_ARTIFACT_KIND",
@@ -788,17 +875,31 @@ fn validate_artifacts(
                 "Unsupported or missing artifact kind.",
             );
         }
-        validate_digest_set(object.get("digest"), &format!("{artifact_path}.digest"), out);
+        validate_digest_set(
+            object.get("digest"),
+            &format!("{artifact_path}.digest"),
+            out,
+        );
     }
 }
 
 fn validate_digest_set(value: Option<&Value>, path: &str, out: &mut Vec<Violation>) {
     let Some(digests) = value.and_then(Value::as_object) else {
-        push(out, "INVALID_DIGEST_SET", path, "A digest set object is required.");
+        push(
+            out,
+            "INVALID_DIGEST_SET",
+            path,
+            "A digest set object is required.",
+        );
         return;
     };
     if digests.is_empty() {
-        push(out, "EMPTY_DIGEST_SET", path, "At least one supported digest is required.");
+        push(
+            out,
+            "EMPTY_DIGEST_SET",
+            path,
+            "At least one supported digest is required.",
+        );
         return;
     }
 
@@ -826,10 +927,10 @@ fn validate_digest_set(value: Option<&Value>, path: &str, out: &mut Vec<Violatio
             continue;
         };
         if hex.len() != expected_length
-        || !hex
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
+            || !hex
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
             push(
                 out,
                 "INVALID_DIGEST_VALUE",
@@ -850,7 +951,10 @@ fn validate_limitations(value: Option<&Value>, out: &mut Vec<Violation>) {
         );
         return;
     };
-    if limitations.iter().any(|v| v.as_str().is_none_or(str::is_empty)) {
+    if limitations
+        .iter()
+        .any(|v| v.as_str().is_none_or(str::is_empty))
+    {
         push(
             out,
             "INVALID_LIMITATIONS",
@@ -865,7 +969,12 @@ fn validate_extensions(value: Option<&Value>, out: &mut Vec<Violation>) {
         return;
     };
     let Some(object) = extensions.as_object() else {
-        push(out, "INVALID_EXTENSIONS", "$.predicate.extensions", "extensions must be an object.");
+        push(
+            out,
+            "INVALID_EXTENSIONS",
+            "$.predicate.extensions",
+            "extensions must be an object.",
+        );
         return;
     };
     for key in object.keys() {
@@ -933,7 +1042,10 @@ mod tests {
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
-        report.violations.iter().any(|violation| violation.code == code)
+        report
+            .violations
+            .iter()
+            .any(|violation| violation.code == code)
     }
 
     #[test]
@@ -969,14 +1081,17 @@ mod tests {
         let report = verify_statement(&statement);
         assert!(!report.conforms);
         assert!(has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"));
-        assert!(has_code(&report, "PASSED_VERIFICATION_WITHOUT_PASSED_EXECUTION"));
+        assert!(has_code(
+            &report,
+            "PASSED_VERIFICATION_WITHOUT_PASSED_EXECUTION"
+        ));
     }
 
     #[test]
     fn stale_checked_target_is_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
-            json!("deadbeef1234567");
+            json!("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
         let report = verify_statement(&statement);
         assert!(!report.conforms);
         assert!(has_code(&report, "LEP_TARGET_MISMATCH"));
@@ -1025,17 +1140,23 @@ mod tests {
     fn repository_stale_target_fixture_is_rejected() {
         let statement: Value = serde_json::from_str(include_str!(
             "../../../docs/research/fixtures/luminous-evidence-v0.1/semantic-stale-target.json"
-        )).expect("stale-target fixture must be valid JSON");
+        ))
+        .expect("stale-target fixture must be valid JSON");
         let report = verify_statement(&statement);
         assert!(!report.conforms);
-        assert!(has_code(&report, "LEP_TARGET_MISMATCH"), "{:?}", report.violations);
+        assert!(
+            has_code(&report, "LEP_TARGET_MISMATCH"),
+            "{:?}",
+            report.violations
+        );
     }
 
     #[test]
     fn repository_valid_fixture_is_accepted() {
         let statement: Value = serde_json::from_str(include_str!(
             "../../../docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json"
-        )).expect("valid fixture must be valid JSON");
+        ))
+        .expect("valid fixture must be valid JSON");
         let report = verify_statement(&statement);
         assert!(report.conforms, "{:?}", report.violations);
     }
@@ -1044,20 +1165,30 @@ mod tests {
     fn repository_queued_but_passed_fixture_is_rejected() {
         let statement: Value = serde_json::from_str(include_str!(
             "../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json"
-        )).expect("queued-but-passed fixture must be valid JSON");
+        ))
+        .expect("queued-but-passed fixture must be valid JSON");
         let report = verify_statement(&statement);
         assert!(!report.conforms);
-        assert!(has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"), "{:?}", report.violations);
+        assert!(
+            has_code(&report, "EXECUTION_STATUS_RESULT_CONFLICT"),
+            "{:?}",
+            report.violations
+        );
     }
 
     #[test]
     fn repository_missing_target_fixture_is_rejected() {
         let statement: Value = serde_json::from_str(include_str!(
             "../../../docs/research/fixtures/luminous-evidence-v0.1/invalid-missing-target.json"
-        )).expect("missing-target fixture must be valid JSON");
+        ))
+        .expect("missing-target fixture must be valid JSON");
         let report = verify_statement(&statement);
         assert!(!report.conforms);
-        assert!(has_code(&report, "MISSING_TARGET"), "{:?}", report.violations);
+        assert!(
+            has_code(&report, "MISSING_TARGET"),
+            "{:?}",
+            report.violations
+        );
     }
 
     #[test]
@@ -1086,7 +1217,10 @@ mod tests {
         statement["predicate"]["verification"]["outcome"] = json!("failed");
         let report = verify_statement(&statement);
         assert!(!report.conforms);
-        assert!(has_code(&report, "FAILED_VERIFICATION_WITHOUT_FAILED_CHECK"));
+        assert!(has_code(
+            &report,
+            "FAILED_VERIFICATION_WITHOUT_FAILED_CHECK"
+        ));
     }
 
     #[test]
@@ -1098,7 +1232,10 @@ mod tests {
         ]);
         let report = verify_statement(&statement);
         assert!(!report.conforms);
-        assert!(has_code(&report, "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT"));
+        assert!(has_code(
+            &report,
+            "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT"
+        ));
     }
 
     #[test]
