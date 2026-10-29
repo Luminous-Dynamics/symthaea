@@ -28,6 +28,8 @@ The new diagnostic `audit_component_split_feasibility` checks this gap before a 
 
 The synthetic fixture is deliberately inadequate: it contains three eligible train components, one eligible validation component, zero eligible test components, one excluded target, and one unknown target. The correct output must retain those rows, detect the held-out floor failure, report not-ready for power planning, and remain unqualified.
 
+The diagnostic distinguishes the synthetic fixture from a real candidate. A real candidate must contain exactly the pinned 372-family universe whose canonical sorted-ID digest is `c8ee398840443fb0693e50baa1dfda9982cd8bfebe1f81d9de3050e3b15cb048`. A reviewed census is required to use that same universe and is rejected if it only repeats the old partition-digest string while supplying different family IDs. Synthetic fixtures are explicitly labelled and cannot masquerade as a reviewed real census.
+
 The diagnostic reconciles:
 
 1. the exact candidate family universe and partition digest;
