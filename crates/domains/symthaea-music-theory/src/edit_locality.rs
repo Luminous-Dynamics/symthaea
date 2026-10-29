@@ -11,6 +11,7 @@
 //! does not claim instrumentation, polyphonic, or rendered-audio preservation.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Version of the requested-change / protected-property contract.
 pub const EDIT_LOCALITY_CONTRACT_VERSION: &str = "edit-locality-v1.0";
@@ -75,6 +76,7 @@ impl Default for EditLocalityConfig {
 pub enum EditLocalityError {
     InvalidInput(&'static str),
     UnsupportedEdit(&'static str),
+    SerializationFailure,
 }
 
 /// Independent, inspectable property evidence.
@@ -93,6 +95,13 @@ pub struct PropertyCheck {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EditLocalityEvidence {
     pub contract_version: String,
+    /// Domain-separated digest of the exact source event sequence.
+    pub source_score_sha256: String,
+    /// Domain-separated digest of the exact target event sequence.
+    pub target_score_sha256: String,
+    /// Integrity digest over this report with receipt_sha256 blank.
+    /// This detects accidental/tampered evidence; it does not identify a signer.
+    pub receipt_sha256: String,
     pub request: EditRequest,
     pub config: EditLocalityConfig,
     pub source_event_count: usize,
@@ -319,8 +328,11 @@ pub fn verify_edit_locality_with_config(
         }
     }
     let passed = requested_passed && protected_properties_passed;
-    Ok(EditLocalityEvidence {
+    let mut evidence = EditLocalityEvidence {
         contract_version: EDIT_LOCALITY_CONTRACT_VERSION.to_owned(),
+        source_score_sha256: score_content_sha256(source)?,
+        target_score_sha256: score_content_sha256(target)?,
+        receipt_sha256: String::new(),
         request: request.clone(),
         config: *config,
         source_event_count: source.len(),
@@ -332,7 +344,59 @@ pub fn verify_edit_locality_with_config(
         protected_properties_passed,
         passed,
         failure_reasons,
-    })
+    };
+    evidence.receipt_sha256 = edit_locality_receipt_sha256(&evidence)?;
+    Ok(evidence)
+}
+
+
+
+/// Hash the exact symbolic event sequence under a domain-separated tag.
+/// serde_json serializes the named event fields in declaration order; this
+/// digest is an integrity binding for this contract version, not a signature.
+fn score_content_sha256(events: &[LocalityEvent]) -> Result<String, EditLocalityError> {
+    let bytes = serde_json::to_vec(events).map_err(|_| EditLocalityError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-symbolic-score-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Hash all evidence fields except the receipt itself.
+fn edit_locality_receipt_sha256(
+    evidence: &EditLocalityEvidence,
+) -> Result<String, EditLocalityError> {
+    let mut unsealed = evidence.clone();
+    unsealed.receipt_sha256.clear();
+    let bytes =
+        serde_json::to_vec(&unsealed).map_err(|_| EditLocalityError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-edit-locality-receipt-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Verify symbolic evidence against the exact source/target sequences and
+/// recompute the requested/protected-property decision from its recorded
+/// request and configuration. This catches input substitution and report
+/// tampering, but the unkeyed hashes do not authenticate who made the receipt.
+pub fn verify_edit_locality_evidence(
+    source: &[LocalityEvent],
+    target: &[LocalityEvent],
+    evidence: &EditLocalityEvidence,
+) -> Result<bool, EditLocalityError> {
+    if evidence.receipt_sha256.is_empty()
+        || edit_locality_receipt_sha256(evidence)? != evidence.receipt_sha256
+    {
+        return Ok(false);
+    }
+    if score_content_sha256(source)? != evidence.source_score_sha256
+        || score_content_sha256(target)? != evidence.target_score_sha256
+    {
+        return Ok(false);
+    }
+    let replay = verify_edit_locality_with_config(source, target, &evidence.request, &evidence.config)?;
+    Ok(replay == *evidence)
 }
 
 fn validate_config(config: &EditLocalityConfig) -> Result<(), EditLocalityError> {
@@ -624,6 +688,15 @@ mod tests {
                     let receipt = serde_json::to_string(&evidence).expect("serialize receipt");
                     let replay: EditLocalityEvidence = serde_json::from_str(&receipt).expect("receipt round-trip");
                     assert_eq!(replay, evidence);
+                    assert!(
+                        verify_edit_locality_evidence(
+                            &fixture.source_events,
+                            &fixture.target_events,
+                            &evidence,
+                        ).expect("evidence verification should be deterministic"),
+                        "{} evidence failed replay verification",
+                        fixture.case_id
+                    );
                     assert_eq!(evidence.requested_property_passed, fixture.expected_requested_property_passed,
                         "{} requested-property mismatch: {evidence:?}", fixture.case_id);
                     assert_eq!(evidence.protected_properties_passed, fixture.expected_protected_properties_passed,
@@ -644,4 +717,62 @@ mod tests {
         assert_eq!(accepted, 84);
         assert_eq!(rejected, 132);
     }
+
+    #[test]
+    fn symbolic_receipt_binds_source_target_and_verdict() {
+        let source = simple_source();
+        let target: Vec<_> = source.iter().map(|event| LocalityEvent {
+            pitch_midi: event.pitch_midi + 5,
+            ..*event
+        }).collect();
+        let request = EditRequest {
+            operation: EditOperation::Transpose { semitones: 5 },
+        };
+        let evidence = verify_edit_locality(&source, &target, &request).expect("valid edit");
+        assert!(verify_edit_locality_evidence(&source, &target, &evidence).unwrap());
+        assert_eq!(evidence.source_score_sha256, score_content_sha256(&source).unwrap());
+        assert_eq!(evidence.target_score_sha256, score_content_sha256(&target).unwrap());
+
+        let mut changed_source = source.clone();
+        changed_source[0].pitch_midi += 1;
+        assert!(!verify_edit_locality_evidence(&changed_source, &target, &evidence).unwrap());
+
+        let mut changed_target = target.clone();
+        changed_target[0].pitch_midi += 1;
+        assert!(!verify_edit_locality_evidence(&source, &changed_target, &evidence).unwrap());
+
+        let mut tampered = evidence.clone();
+        tampered.passed = false;
+        assert!(!verify_edit_locality_evidence(&source, &target, &tampered).unwrap());
+
+        let mut tampered = evidence.clone();
+        tampered.config.pitch_tolerance_semitones = 0.0;
+        assert!(!verify_edit_locality_evidence(&source, &target, &tampered).unwrap());
+
+        let mut tampered = evidence.clone();
+        tampered.protected_properties[0].passed = false;
+        assert!(!verify_edit_locality_evidence(&source, &target, &tampered).unwrap());
+    }
+
+    #[test]
+    fn symbolic_receipt_round_trips_and_rejects_modified_receipt_digest() {
+        let source = simple_source();
+        let target: Vec<_> = source.iter().map(|event| LocalityEvent {
+            pitch_midi: event.pitch_midi + 3,
+            ..*event
+        }).collect();
+        let request = EditRequest {
+            operation: EditOperation::Transpose { semitones: 3 },
+        };
+        let evidence = verify_edit_locality(&source, &target, &request).unwrap();
+        let encoded = serde_json::to_string(&evidence).unwrap();
+        let decoded: EditLocalityEvidence = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, evidence);
+        assert!(verify_edit_locality_evidence(&source, &target, &decoded).unwrap());
+
+        let mut changed_digest = decoded;
+        changed_digest.receipt_sha256.replace_range(0..1, "0");
+        assert!(!verify_edit_locality_evidence(&source, &target, &changed_digest).unwrap());
+    }
+
 }
