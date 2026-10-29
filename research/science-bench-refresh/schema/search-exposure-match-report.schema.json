@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/search-exposure-match-report.schema.json",
+  "title": "Symthaea Evaluator-Side Search Exposure Match Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "generation_id",
+    "receipt_sha256",
+    "receipt_commitment_sha256",
+    "matcher_revision_sha256",
+    "decision_rules_sha256",
+    "expected_event_count",
+    "records",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_search_exposure_match_report.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "receipt_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "matcher_revision_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_rules_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "expected_event_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 250000
+    },
+    "records": {
+      "type": "array",
+      "maxItems": 250000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_sha256",
+          "classification",
+          "match_method",
+          "match_score_micros",
+          "decision_threshold_micros",
+          "protected_reference_sha256",
+          "evidence_artifact_sha256"
+        ],
+        "properties": {
+          "event_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "classification": {
+            "enum": [
+              "no_match",
+              "benign_related",
+              "benchmark_metadata",
+              "question_context",
+              "explicit_answer",
+              "review_required",
+              "not_evaluable"
+            ]
+          },
+          "match_method": {
+            "enum": [
+              "none",
+              "exact_digest",
+              "lexical_overlap",
+              "semantic_model",
+              "manual_review"
+            ]
+          },
+          "match_score_micros": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "decision_threshold_micros": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "protected_reference_sha256": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_artifact_sha256": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "report_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "description": "Post-run evaluator-side classification of every event in a verified retrieval receipt. Never send this report to the evaluated policy during a scored run. The match report is tied to the exact receipt bytes, run commitment, matcher revision and decision-rule digest; its classifications still depend on independently reviewing/qualifying the matcher."
+}
