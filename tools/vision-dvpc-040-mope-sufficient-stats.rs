@@ -190,8 +190,6 @@ struct StepReport {
     lambda_used: optimizer::Vec2,
     polynomial: PolynomialStats,
     level_roots: Vec<f64>,
-    selected_value_for_next_bet: Option<f64>,
-    next_lambda: Option<optimizer::Vec2>,
 }
 
 impl StreamState {
@@ -235,8 +233,6 @@ impl StreamState {
             lambda_used,
             polynomial: self.polynomial,
             level_roots: roots,
-            selected_value_for_next_bet: None,
-            next_lambda: None,
         })
     }
 
@@ -313,12 +309,29 @@ fn sweep() -> Result<String, String> {
         for (index, &(w,r)) in samples.iter().enumerate() {
             let lambda=stream.current_lambda();
             let report=stream.observe(w,r)?;
+            if report.lambda_used.x != lambda.x || report.lambda_used.y != lambda.y {
+                return Err(format!("{sequence_id} prefix {}: observation used a non-current bet", index+1));
+            }
             direct_samples.push((w,r));
             direct_bets.push(((w,r),lambda));
+            let level=(2.0/stream.alpha).ln();
+            for (name,value) in [
+                ("C",report.polynomial.c),
+                ("S",report.polynomial.s),
+                ("Q",report.polynomial.q),
+                ("T",report.polynomial.t),
+                ("U",report.polynomial.u),
+            ] {
+                let _=writeln!(output,"POLYNOMIAL\\t{sequence_id}\\t{}\\t-\\t{name}\\t{value:.12}\\t-",index+1);
+            }
+            for (root_index,root) in report.level_roots.iter().enumerate() {
+                if !close(report.polynomial.value(*root),level,IDENTITY_TOL) {
+                    return Err(format!("{sequence_id} prefix {}: root residual too large",index+1));
+                }
+                let _=writeln!(output,"ROOT_DIAGNOSTIC\\t{sequence_id}\\t{}\\t{root_index}\\troot\\t{root:.12}\\t-",index+1);
+            }
             for &value in &TEST_VALUES {
                 let (a,b)=direct_observed(&direct_samples,value);
-                let actual_a=report.count as f64;
-                let _=actual_a;
                 let stored_a=stream.observed().matrix_at(value);
                 let stored_b=stream.observed().vector_at(value);
                 if !close(stored_a.a00,a.a00,IDENTITY_TOL) || !close(stored_a.a01,a.a01,IDENTITY_TOL)
@@ -338,7 +351,6 @@ fn sweep() -> Result<String, String> {
             let next=stream.choose_next_bet(candidate_value)?;
             let _=writeln!(output,"BET\t{sequence_id}\t{}\t{candidate_value:.2}\tlambda1\t{:.12}\t-",index+1,next.x);
             let _=writeln!(output,"BET\t{sequence_id}\t{}\t{candidate_value:.2}\tlambda2\t{:.12}\t-",index+1,next.y);
-            let report=StepReport { next_lambda:Some(next),selected_value_for_next_bet:Some(candidate_value),..report };
             if report.count != (index+1) as u64 { return Err("stream count drift".into()); }
         }
         let _=writeln!(output,"SEQUENCE\t{sequence_id}\t{}\t-\tprobability_or_coverage_claim\tNOT_EVALUATED\tNOT_EVALUATED",samples.len());
@@ -396,6 +408,21 @@ mod tests {
                 stream.choose_next_bet(0.5).unwrap();
             }
         }
+    }
+
+    #[test]
+    fn observation_uses_previous_bet_then_optimizer_sets_next_bet() {
+        let mut stream=StreamState::new(10.0,0.05).unwrap();
+        let initial=stream.current_lambda();
+        let report=stream.observe(2.0,0.75).unwrap();
+        assert_eq!(report.lambda_used.x,initial.x);
+        assert_eq!(report.lambda_used.y,initial.y);
+        assert_eq!(stream.current_lambda().x,initial.x);
+        assert_eq!(stream.current_lambda().y,initial.y);
+        let next=stream.choose_next_bet(0.5).unwrap();
+        assert!(lambda_feasible(next,10.0));
+        assert_eq!(stream.current_lambda().x,next.x);
+        assert_eq!(stream.current_lambda().y,next.y);
     }
 
     #[test]
