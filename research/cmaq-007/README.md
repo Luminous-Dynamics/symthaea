@@ -1,6 +1,6 @@
 # CMAQ-007: Planner-Induced World-Model Exploitability
 
-**Status:** protocol v0.1 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.2 + executable synthetic smoke harness; draft  
 **Tracking issue:** [#9035](https://github.com/Luminous-Dynamics/symthaea/issues/9035)  
 **Claim ceiling:** deterministic finite synthetic benchmark only; no SOTA, physical safety, trained-model, or production Symthaea claim
 
@@ -23,7 +23,7 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The program prints one machine-readable JSON report. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, and a search-pressure / risk-coverage relation. A passing smoke test establishes only that the code and declared synthetic invariants work.
+The program prints one machine-readable JSON report with 44 planner-policy rows and four risk-control rows. The focused workflow validates schema, fixed seed/action-set protocol, oracle regret, fallback accounting, a prediction-error bound for this synthetic construction, the shuffled-score negative control, and the calibrated risk-control contract. A passing smoke test establishes only that the code and declared synthetic invariants work.
 
 ## Candidate and evaluator boundary
 
@@ -80,6 +80,18 @@ The follow-up control passed at current source commit `22ce169ab360be31bc19f1cda
 | 512 | 0.0646 | 15.2% | 0.0919 | 20.3% | 100% | 100% |
 
 At size 8, the random score happens to have lower regret because it abstains more often; this is a useful reminder that one seed panel and one threshold do not prove superiority. From sizes 32 to 512, the informative score outperforms the shuffled score on both regret and unsupported-selection rate. But it still leaves substantial unsupported selection at 512 candidates, so support scoring is evidence—not a safety certificate. The workflow now encodes the large-search contrast as a regression assertion rather than a narrative-only observation.
+
+## Calibration-selected risk control (v0.2)
+
+CMAQ-007 v0.2 adds a *risk-controlled selector* to make the support-gate threshold an output of a preregistered calibration procedure, not an after-the-fact tuning choice.
+
+For each search size (8, 32, 128 and 512), the procedure uses **256 calibration episodes** from a deterministic seed stream distinct from both the descriptive benchmark panel and **256 held-out qualification episodes**. It examines a fixed six-threshold grid: 0.40, 0.55, 0.75, 0.90, 0.97 and 1.01. The last threshold forces direct fallback because generated support scores are below 1.01. Calibration episodes provide evaluator-observed supported/unsupported labels retrospectively; the candidate selector still receives only the declared candidate-facing score. This is an offline synthetic-calibration assumption, not a claim that live Symthaea can know support labels before execution.
+
+For each threshold, it computes a **one-sided Clopper–Pearson upper confidence bound** on the episode-level unsupported-selection rate. It applies Bonferroni correction across all six preregistered thresholds (α = 0.05/6) and sets the target bound at **5% unsupported selections**. Among thresholds whose adjusted upper bound is at or below 5%, it selects the one with the greatest calibration coverage; exact coverage ties prefer the stricter threshold. The forced-fallback threshold guarantees a feasible choice, even if the data cannot support any nonzero-coverage model gate.
+
+The report separately records selected threshold, calibration event count/rate/upper bound/coverage, and qualification event rate/coverage/regret; it also includes direct-fallback regret on the same qualification seeds. The qualification metrics are descriptive held-out checks, not part of threshold selection. A calibration bound under 5% does not automatically guarantee the observed qualification rate is under 5%, especially with finite and synthetic samples; such a mismatch is a result to report.
+
+This is a more defensible pattern than picking 0.97 because it looked good on a single panel, but it is not yet a distribution-free deployment guarantee. The stated confidence interpretation assumes calibration episodes are independent draws from the target episode distribution and labels correctly identify the chosen action's support status. It does not cover arbitrary shift after calibration, adaptive adversaries, misspecified support labels, or dependence among episodes. The next experiments must include calibration/qualification family shifts, delayed/noisy labels, score corruption, more independent scenarios, and explicit abstention-cost analysis. If the risk bound forces fallback at larger search sizes, the correct interpretation is that this support estimator has not earned higher-coverage authority—not that the bound should be weakened.
 
 ## Falsifiable research questions
 
