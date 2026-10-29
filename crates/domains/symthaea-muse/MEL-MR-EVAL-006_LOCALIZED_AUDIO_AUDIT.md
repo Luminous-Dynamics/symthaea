@@ -63,6 +63,21 @@ The runner labels its threshold ID as synthetic-only. It is a quick regression/c
 
 An independent NumPy/FFT reference simulation was executed for the same eleven scenarios in the development environment and reproduced all eleven predeclared verdicts, including the gain-drop, frequency-swap, and extra-transient mutations. The fixture definitions contain six critical negative controls and three expected-pass controls. Even if this tiny fixture panel observes zero false accepts, the two-sided 95% Wilson upper bound for the false-accept rate is about 39.0% (0/6); that is far too weak for a reliability claim. Zero false accepts in 300 independent critical negatives would lower that same bound to about 1.26%, still not proof of zero population risk. These are statistical properties of the sample sizes, not measured performance of the Rust implementation. This remains independent reference evidence—not execution of the Rust runner, whose compile and test status remains unknown until a Rust toolchain is available.
 
+## Independent reference oracle
+
+A language-independent NumPy oracle is included as research/test tooling at `research/mel_mr_eval_006_reference.py`. It mirrors the documented synthetic signal definitions and metric semantics without importing or executing the Rust implementation. Its output includes per-case diagnostics, grouped mutation-family results, Wilson intervals, its own script hash, and the exact Rust source/runner blob identities supplied on the command line.
+
+Reproduce the reference run with:
+
+```bash
+python3 crates/domains/symthaea-muse/research/mel_mr_eval_006_reference.py \
+  --source-blob-sha 771b75ee53dcb42f4ee594a2589a2e241e9a8257 \
+  --runner-blob-sha d43e960af838bd090187e1e8d66a285e4ec38dcf \
+  --output /tmp/mel-mr-eval-006-reference.json
+```
+
+The source/runner SHAs above identify the code snapshot used by the preserved sanity artifact. They will need to be updated when rerunning against later blobs. The oracle source is committed for reproducibility, but **the committed script itself has not been executed in this environment**; the earlier equivalent reference simulation ran independently, and the Rust implementation remains unexecuted.
+
 ## Preserved reference artifact
 
 The independently executed synthetic reference check is committed as `MEL-MR-EVAL-006_REFERENCE_SANITY_2026-10-29.json`. It pins the acoustic source and conformance-runner file blob hashes and records every case's verdict, representative measurements, onset frames, mutation family, and uncertainty intervals. It explicitly records that this was a Python/NumPy reference simulation—not execution of Rust.
