@@ -422,6 +422,19 @@ mod tests {
     }
 
     #[test]
+    fn first_rejection_mass_equals_final_ever_rejection_mass() {
+        for scenario in parse_fixture(FIXTURE).unwrap() {
+            let result = evaluate(&scenario).unwrap();
+            for candidate in 0..GRID_SIZE {
+                let summed_first = (1..=HORIZON)
+                    .map(|look| result.first_rejection[look][candidate])
+                    .sum::<f64>();
+                close(summed_first, result.ever_rejection[HORIZON][candidate], MASS_TOLERANCE);
+            }
+        }
+    }
+
+    #[test]
     fn output_does_not_claim_continuous_coverage_or_full_mope() {
         let output = sweep(FIXTURE).unwrap();
         assert!(output.contains("TRUE_VALUE_ON_FROZEN_GRID_ONLY"));
