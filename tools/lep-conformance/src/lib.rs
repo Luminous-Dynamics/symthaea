@@ -41,15 +41,24 @@ impl<'de> Deserialize<'de> for StrictJsonValue {
                 formatter.write_str("a JSON value with no duplicate object keys")
             }
 
-            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::Bool(value)))
             }
 
-            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::Number(Number::from(value))))
             }
 
-            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::Number(Number::from(value))))
             }
 
@@ -62,19 +71,31 @@ impl<'de> Deserialize<'de> for StrictJsonValue {
                     .ok_or_else(|| E::custom("JSON numbers must be finite"))
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::String(value.to_owned())))
             }
 
-            fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::String(value)))
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E> {
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::Null))
             }
 
-            fn visit_none<E>(self) -> Result<Self::Value, E> {
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
                 Ok(StrictJsonValue(Value::Null))
             }
 
