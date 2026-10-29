@@ -651,6 +651,49 @@ mod tests{
     use super::*;
 
     #[test]
+    fn compressed_scores_match_observation_level_crp_wealth() {
+        let values=[0.0,0.0,0.2,0.2,0.8,1.5,1.5];
+        let mut profile=ScoreProfile::default();
+        for value in values { profile.push(value).unwrap(); }
+        for nu in [0.1_f64,0.4,0.9] {
+            for i in 0..=PCRP_BET_STEPS {
+                let bet=i as f64/PCRP_BET_STEPS as f64;
+                let direct=if bet>=1.0 && values.iter().any(|v|*v==0.0) {
+                    f64::NEG_INFINITY
+                } else {
+                    values.iter().map(|y| (1.0-bet+bet**y/nu).ln()).sum::<f64>()
+                };
+                let compressed=log_crp_wealth_profile(&profile,nu,bet);
+                if direct==f64::NEG_INFINITY {
+                    assert_eq!(compressed,f64::NEG_INFINITY);
+                } else {
+                    assert!((compressed-direct).abs()<1e-12,"nu={nu} bet={bet} direct={direct} compressed={compressed}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn importance_weighted_reward_complement_has_value_one_minus_policy_value() {
+        for logger in [Logger::healthy(),Logger::weak()] {
+            for policy in make_policies(8,logger) {
+                let mut complement_value=0.0_f64;
+                for context in 0..2 {
+                    let p1=policy.pi1[context];
+                    let h1=logger.h1[context];
+                    let p0=1.0-p1;
+                    let h0=1.0-h1;
+                    let r0=reward_mean(context,0);
+                    let r1=reward_mean(context,1);
+                    complement_value+=0.5*(h0*(p0/h0)*(1.0-r0)+h1*(p1/h1)*(1.0-r1));
+                }
+                assert!((complement_value-(1.0-policy.value)).abs()<1e-12,
+                    "complement={complement_value} policy_value={}",policy.value);
+            }
+        }
+    }
+
+    #[test]
     fn pcrp_star_profile_constant_stream_matches_analytic_root() {
         let mut profile=ScoreProfile::default();
         for _ in 0..32 { profile.push(0.6).unwrap(); }
@@ -697,6 +740,19 @@ mod tests{
         assert!(pcrp_star_lcb_profile(&zeros,1.0).is_err());
         assert!(logarithmic_smoothing_lcb_profile(&zeros,0.05,0.0).is_err());
     }
+    #[test]
+    fn fixed_horizon_methods_are_explicitly_not_anytime_valid() {
+        let output=benchmark(2,&[8,16]).unwrap();
+        assert_eq!(output.lines().filter(|line|line.starts_with("METHOD_STATUS\t")).count(),24);
+        assert!(output.contains("\tFIXED_HORIZON_ONLY"));
+        assert!(!output.lines().any(|line|
+            line.starts_with("RESULT_METRIC\t")
+            && (line.contains("pCRP_star_fixed_horizon_grid33")
+                || line.contains("Logarithmic_Smoothing_fixed_horizon"))
+            && line.contains("\tfamilywise_sequence_coverage\t")
+        ));
+    }
+
     #[test]
     fn fixed_horizon_methods_are_not_updated_between_registered_looks() {
         let looks=[8,16];
