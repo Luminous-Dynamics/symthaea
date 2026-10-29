@@ -305,6 +305,9 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
     ) {
         return Err(fail(format!("unsupported scenario_class: {scenario_class}")));
     }
+    let transition = required(fields, "transition_shape")?;
+    let start = required(fields, "change_start")?;
+    let end = required(fields, "change_end")?;
 
     // Target-population intervention and sample-selection intervention are separate
     // channels. This prevents selected-stream changes from being mislabeled target drift.
@@ -701,8 +704,12 @@ mod tests {
     #[test]
     fn sham_requires_explicit_zero_transform_and_no_change_interval() {
         let mut fields = valid_fields();
+        set(&mut fields, "scenario_class", "zero_shift_control");
         set(&mut fields, "transform_family", "none");
         set(&mut fields, "transform_severity", "0.000000");
+        set(&mut fields, "selection_transform_family", "none");
+        set(&mut fields, "selection_transform_severity", "0.000000");
+        set(&mut fields, "rng_algorithm", "none");
         set(&mut fields, "transition_shape", "none");
         set(&mut fields, "change_start", "NA");
         set(&mut fields, "change_end", "NA");
@@ -782,4 +789,42 @@ mod tests {
         let text = format!("{}unknown=x\n", valid_manifest());
         assert!(parse_fields(&text, MANIFEST_KEYS).unwrap_err().contains("unknown key"));
     }
+    #[test]
+    fn target_selection_and_joint_drift_are_distinct_scenarios() {
+        let mut fields = valid_fields();
+        set(&mut fields, "scenario_class", "selection_only_shift");
+        set(&mut fields, "transform_family", "none");
+        set(&mut fields, "transform_severity", "0.000000");
+        set(&mut fields, "selection_transform_family", "selection_label_bias");
+        set(&mut fields, "selection_transform_severity", "0.500000");
+        validate_manifest(&fields).unwrap();
+
+        set(&mut fields, "transform_family", "feature_permutation");
+        set(&mut fields, "transform_severity", "0.250000");
+        assert!(validate_manifest(&fields).unwrap_err().contains("selection_only_shift requires"));
+
+        set(&mut fields, "scenario_class", "joint_target_selection_shift");
+        validate_manifest(&fields).unwrap();
+
+        set(&mut fields, "scenario_class", "target_distribution_shift");
+        assert!(validate_manifest(&fields).unwrap_err().contains("target_distribution_shift requires"));
+
+        set(&mut fields, "selection_transform_family", "none");
+        set(&mut fields, "selection_transform_severity", "0.000000");
+        validate_manifest(&fields).unwrap();
+    }
+
+    #[test]
+    fn intervention_digest_and_rng_are_required_and_semantically_bound() {
+        let mut fields = valid_fields();
+        set(&mut fields, "intervention_config_sha256", "short");
+        assert!(validate_manifest(&fields).unwrap_err().contains("intervention_config_sha256"));
+        set(&mut fields, "intervention_config_sha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        set(&mut fields, "rng_algorithm", "none");
+        assert!(validate_manifest(&fields).unwrap_err().contains("active target intervention requires"));
+        set(&mut fields, "rng_algorithm", "chacha20_v1");
+        set(&mut fields, "scenario_class", "arbitrary_claim");
+        assert!(validate_manifest(&fields).unwrap_err().contains("unsupported scenario_class"));
+    }
+
 }
