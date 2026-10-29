@@ -1,6 +1,6 @@
 # Broca Memory Benchmark and Research Plan
 
-**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, query-specific evidence-set selector, and source-span-witness verifier are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
+**Status:** proposed evaluation protocol and targets; no LongMemEval-V2, MemoryAgentBench, or Mem2ActBench score has been produced by this branch. The code provides exact-HDC retrieval from an encoded `BinaryHV` and a deterministic BM25 query path over committed text evidence. A strict Rust trajectory-to-text-evidence ingestion primitive, opt-in trajectory-diversity selector, token-budget packer, adjacent-state expander, audited evidence-floor resolver, query-specific evidence-set selector, source-span-witness verifier, counterfactual fixture validator, and input/runtime projection test seam are authored but have not been compiled or evaluated; they are not yet wired into the official worker. Important blocker: typed commits currently require a live HDC vector for every active evidence record, so the system cannot yet publish a scientifically clean lexical-only corpus without an encoder. Do not add synthetic vectors for that purpose; see [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786). A pinned, validated text-to-HDC encoder is still required for semantic HDC retrieval.
 
 ## Research thesis
 
@@ -269,6 +269,21 @@ Separate three claims: logical ineligibility, visible-file pruning, and physical
 Track answer/task quality against end-to-end latency, memory footprint, context tokens and inference cost. Use adaptive retrieval depth only behind deterministic safety filters, and compare its decisions to exact HDC results. Cache only with a versioned key that includes generation, scope, time policy and encoder identity; invalidate it on every relevant state transition.
 
 **Research question:** can the system return better-supported answers and actions at lower latency/cost by spending retrieval effort only where additional evidence changes the decision?
+
+## Counterfactual fixture validator (new executable structural seam)
+
+The Rust module `crates/domains/symthaea-broca/src/counterfactual_evidence_audit.rs` and CLI `broca-counterfactual-audit` define a deterministic input-fixture validator. The current synthetic corpus contains 9 pairs / 18 cases across polarity, temporal validity, entity binding, scope, source dependence, missing requirements, ordered transitions, correction updates, and qualifier context. The evaluator-only labels are stored separately under `tests/fixtures/evaluator-only/`.
+
+The validator checks the pinned schema, unique IDs, explicit scopes/entities/source families, RFC3339 timestamps, allowed mutation families/relations, forbidden evaluator-only keys, and exact agreement between declared and observed evidence diffs. It also exposes a runtime projection containing only query, as-of timestamp, and evidence, excluding pair/mutation metadata. Tests link each gold-label pair back to its exact input pair and require every case to have one label.
+
+Run from the workspace root:
+
+```sh
+cargo run -p symthaea-broca --bin broca-counterfactual-audit -- crates/domains/symthaea-broca/tests/fixtures/counterfactual-evidence-audit-v1.jsonl
+cargo test -p symthaea-broca counterfactual_evidence_audit
+```
+
+**Validation boundary:** the Rust source and fixtures are authored but not compiled or executed here. A successful structural check is not semantic support evaluation, and the fixture suite is not a benchmark result. The CLI intentionally prints `semantic_support=NOT_EVALUATED`; it does not read the evaluator-only label file. Exact-head compilation and test execution remain required.
 
 ## Implementation prerequisites and next sequence
 
