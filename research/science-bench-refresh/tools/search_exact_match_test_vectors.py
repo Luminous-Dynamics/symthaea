@@ -95,8 +95,6 @@ def make_receipt(
     receipt = reseal(policy, [], actions)
     receipt["generation_id"] = generation
     # reseal the receipt commitment after binding the requested generation ID.
-    payload = {key: value for key, value in receipt.items()
-               if key not in ("events", "receipt_commitment_sha256")}
     # Use the exact v1 receipt hash profile from the receipt generator.
     receipt_payload = {
         "schema": receipt["schema"],
