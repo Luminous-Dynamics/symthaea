@@ -21,24 +21,36 @@ fn main() -> ExitCode {
         .and_then(|arg| arg.into_string().ok())
         .unwrap_or_else(|| "broca-memory-influence-score".to_string());
     let Some(observations_path) = args.next() else {
-        eprintln!("usage: {program} <observations.jsonl> <evaluator-only-labels.jsonl>");
+        eprintln!("usage: {program} <observations.jsonl> <input-fixture.jsonl> <evaluator-only-labels.jsonl>");
+        return ExitCode::from(2);
+    };
+    let Some(input_fixture_path) = args.next() else {
+        eprintln!("usage: {program} <observations.jsonl> <input-fixture.jsonl> <evaluator-only-labels.jsonl>");
         return ExitCode::from(2);
     };
     let Some(labels_path) = args.next() else {
-        eprintln!("usage: {program} <observations.jsonl> <evaluator-only-labels.jsonl>");
+        eprintln!("usage: {program} <observations.jsonl> <input-fixture.jsonl> <evaluator-only-labels.jsonl>");
         return ExitCode::from(2);
     };
     if args.next().is_some() {
-        eprintln!("usage: {program} <observations.jsonl> <evaluator-only-labels.jsonl>");
+        eprintln!("usage: {program} <observations.jsonl> <input-fixture.jsonl> <evaluator-only-labels.jsonl>");
         return ExitCode::from(2);
     }
 
     let observations_path = std::path::PathBuf::from(observations_path);
+    let input_fixture_path = std::path::PathBuf::from(input_fixture_path);
     let labels_path = std::path::PathBuf::from(labels_path);
     let observations = match fs::read_to_string(&observations_path) {
         Ok(contents) => contents,
         Err(error) => {
             eprintln!("cannot read observations {}: {error}", observations_path.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let input_fixture = match fs::read_to_string(&input_fixture_path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            eprintln!("cannot read input fixture {}: {error}", input_fixture_path.display());
             return ExitCode::FAILURE;
         }
     };
@@ -49,7 +61,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let score = match score_atom_ablation_jsonl(&observations, &labels) {
+    let score = match score_atom_ablation_jsonl(&observations, &input_fixture, &labels) {
         Ok(score) => score,
         Err(error) => {
             eprintln!("atom-ablation evaluation rejected: {error}");
