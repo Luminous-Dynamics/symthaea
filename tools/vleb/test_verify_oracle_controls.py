@@ -43,6 +43,8 @@ def zip_bytes(entries: list[tuple[str, bytes]]) -> bytes:
 
 class OracleControlReplayTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.ambient_env_before = os.environ.get("VLEB_AMBIENT_SENTINEL")
+        os.environ["VLEB_AMBIENT_SENTINEL"] = "must-not-leak-into-test-commands"
         self.temporary = tempfile.TemporaryDirectory(prefix="vleb-oracle-replay-test-")
         self.root = Path(self.temporary.name)
         self.repo = self.root / "source"
@@ -61,11 +63,14 @@ class OracleControlReplayTests(unittest.TestCase):
         self.run_git(self.repo, "checkout", "--", "app.py")
 
         self.bundle_raw = zip_bytes([
-            ("test_contract.py", b"""import unittest
+            ("test_contract.py", b"""import os
+import unittest
 import app
 
 class ContractTest(unittest.TestCase):
     def test_expected_behavior(self):
+        self.assertEqual(os.environ.get("VLEB_ONLY_DECLARED"), "yes")
+        self.assertIsNone(os.environ.get("VLEB_AMBIENT_SENTINEL"))
         self.assertEqual(app.VALUE, 1)
 
 if __name__ == "__main__":
@@ -81,6 +86,7 @@ if __name__ == "__main__":
                     "PATH": os.environ.get("PATH", ""),
                     "HOME": os.environ.get("HOME", str(Path.home())),
                     "PYTHONDONTWRITEBYTECODE": "1",
+                    "VLEB_ONLY_DECLARED": "yes",
                 },
                 "working_directory": ".",
                 "timeout_seconds": 10,
@@ -94,6 +100,10 @@ if __name__ == "__main__":
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+        if self.ambient_env_before is None:
+            os.environ.pop("VLEB_AMBIENT_SENTINEL", None)
+        else:
+            os.environ["VLEB_AMBIENT_SENTINEL"] = self.ambient_env_before
 
     @staticmethod
     def run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -150,6 +160,8 @@ if __name__ == "__main__":
         self.assertFalse(result["score_eligible"])
         self.assertTrue(result["runner_attestation_required"])
         self.assertFalse(result["network_isolation_independently_verified"])
+        self.assertIn("VLEB_ONLY_DECLARED", result["baseline_results"][0]["environment_names"])
+        self.assertNotIn("VLEB_AMBIENT_SENTINEL", result["baseline_results"][0]["environment_names"])
         for arm in ("baseline", "reference"):
             checkout = result["isolated_checkout_metadata"][arm]
             self.assertEqual(checkout["head_sha"], self.revision)
