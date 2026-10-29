@@ -881,6 +881,32 @@ mod tests {
 
     fn synthetic_ablation_rows() -> Vec<Value> {
         use serde_json::json;
+
+        fn observation(
+            case_id: &str,
+            evidence_id: &str,
+            full_fields: Value,
+            ablated_fields: Value,
+            full_context_tokens: usize,
+            ablated_context_tokens: usize,
+        ) -> Value {
+            serde_json::json!({
+                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
+                "run_id": "synthetic-scorer-test-v1",
+                "case_id": case_id,
+                "evidence_id": evidence_id,
+                "reader_revision": "synthetic-reader-v1",
+                "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+                "full_context_tokens": full_context_tokens,
+                "ablated_context_tokens": ablated_context_tokens,
+                "full_fields": full_fields,
+                "ablated_fields": ablated_fields
+            })
+        }
+
         let full = json!({
             "claim.retry_limit.value": "4",
             "claim.retry_limit.scope": "transient_network_errors"
@@ -893,89 +919,11 @@ mod tests {
             "claim.retry_limit.scope": "transient_network_errors"
         });
         vec![
-            json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
-                "case_id": "memory-influence-0001-a",
-                "evidence_id": "retry-config-1",
-                "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "full_context_tokens": 50,
-                "ablated_context_tokens": 40,
-                "full_fields": full,
-                "ablated_fields": no_value
-            }),
-            json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
-                "case_id": "memory-influence-0001-a",
-                "evidence_id": "retry-applicability-2",
-                "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "full_context_tokens": 50,
-                "ablated_context_tokens": 42,
-                "full_fields": full,
-                "ablated_fields": scope_bounded
-            }),
-            json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
-                "case_id": "memory-influence-0001-b",
-                "evidence_id": "retry-config-1",
-                "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "full_context_tokens": 60,
-                "ablated_context_tokens": 50,
-                "full_fields": full,
-                "ablated_fields": no_value
-            }),
-            json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
-                "case_id": "memory-influence-0001-b",
-                "evidence_id": "retry-applicability-2",
-                "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "full_context_tokens": 60,
-                "ablated_context_tokens": 52,
-                "full_fields": full,
-                "ablated_fields": scope_bounded
-            }),
-            json!({
-                "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
-                "run_id": "synthetic-scorer-test-v1",
-                "case_id": "memory-influence-0001-b",
-                "evidence_id": "notification-note-2",
-                "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-            "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
-                "full_context_tokens": 60,
-                "ablated_context_tokens": 55,
-                "full_fields": full,
-                "ablated_fields": full
-            })
+            observation("memory-influence-0001-a", "retry-config-1", full.clone(), no_value.clone(), 50, 40),
+            observation("memory-influence-0001-a", "retry-applicability-2", full.clone(), scope_bounded.clone(), 50, 42),
+            observation("memory-influence-0001-b", "retry-config-1", full.clone(), no_value, 60, 50),
+            observation("memory-influence-0001-b", "retry-applicability-2", full.clone(), scope_bounded, 60, 52),
+            observation("memory-influence-0001-b", "notification-note-2", full.clone(), full, 60, 55),
         ]
     }
 
