@@ -68,7 +68,7 @@ Existing assets include:
 
 | Priority | DSL/specification | Home | What it describes | Why it matters |
 | --- | --- | --- | --- | --- |
-| P0 | **Luminous Evidence Profile (LEP)** — a data contract, not a language | Shared contract package/repository after placement review | Claim status, inputs, code revision, configuration/data digests, environment, validation runs, artifacts, limitations | Prevents incompatible and overstated evidence across projects |
+| P0 | **Luminous Evidence Profile (LEP)** — a versioned predicate profile over in-toto Statement v1, not a custom envelope | Shared contract package/repository after placement review | Claim status, inputs, code revision, configuration/data digests, environment, validation runs, artifacts, limitations | Prevents incompatible and overstated evidence across projects |
 | P0 | **Mycelix Policy / Authority DSL** | Authoritative Mycelix governance and integrity code | Principal, action, resource, scope, quorum/approvals, expiry, revocation, appeal, deny rules, explanation | Makes authority explicit and enables adversarial conformance testing |
 | P1 | **Symtropy Scenario / Physical Model DSL** | Symtropy | Model selection, quantities/units, initial and boundary conditions, solver, timestep, tolerances, parameter provenance, validation tier, uncertainty | Makes simulations reproducible and physically checkable |
 | P1 | **Symthaea Experiment DSL** | Symthaea | Hypotheses, tasks, baselines, datasets/splits, seeds, metrics, ablations, budgets, statistical plan | Prevents apples-to-oranges benchmark comparisons |
