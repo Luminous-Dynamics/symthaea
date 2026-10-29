@@ -189,6 +189,9 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
     if !valid_render_id(inputs.render_id) {
         return Err(RendererReceiptError::InvalidRenderId);
     }
+    if inputs.score_bytes.is_empty() || inputs.render_config_bytes.is_empty() {
+        return Err(RendererReceiptError::InvalidInputArtifacts);
+    }
     optional_digest_is_valid(inputs.renderer_executable_sha256, "renderer_executable_sha256")?;
     optional_digest_is_valid(inputs.soundfont_sha256, "soundfont_sha256")?;
     optional_digest_is_valid(
@@ -198,18 +201,22 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
 
     match inputs.backend {
         RendererBackend::FluidSynth => {
-            if inputs.input_midi_bytes.is_none()
+            if inputs.input_midi_bytes.is_none_or(|bytes| bytes.is_empty())
                 || inputs.performed_schedule_bytes.is_some()
                 || inputs.renderer_executable_sha256.is_none()
                 || inputs.soundfont_sha256.is_none()
-                || inputs.process_exit_code != Some(0)
             {
                 return Err(RendererReceiptError::InvalidInputArtifacts);
+            }
+            if inputs.process_exit_code != Some(0) {
+                return Err(RendererReceiptError::InvalidExecutionStatus);
             }
         }
         RendererBackend::NativeMuse => {
             if inputs.input_midi_bytes.is_some()
-                || inputs.performed_schedule_bytes.is_none()
+                || inputs
+                    .performed_schedule_bytes
+                    .is_none_or(|bytes| bytes.is_empty())
                 || inputs.soundfont_sha256.is_some()
                 || inputs.process_exit_code.is_some()
             {
@@ -479,7 +486,7 @@ mod tests {
         failed.process_exit_code = Some(1);
         assert_eq!(
             RendererExecutionReceipt::from_successful_render(failed).unwrap_err(),
-            RendererReceiptError::InvalidInputArtifacts
+            RendererReceiptError::InvalidExecutionStatus
         );
     }
 
