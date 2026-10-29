@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-014 — Performed Event Map
 
-**Status:** draft implementation primitive; not yet connected to the live renderer or MIDI exporter. No build, test, perceptual, or SOTA gain is claimed.  
+**Status:** draft implementation; score-event sidecar is carried through primary in-memory performance transformations and the Listen evidence bundle, but the MIDI-level map is not yet connected to the renderer/exporter. No build, test, perceptual, or SOTA gain is claimed.  
 **Tracking:** [MEL-MR-EVAL-013 render receipts](https://github.com/Luminous-Dynamics/symthaea/blob/research/mel-mr-eval-013-render-execution-receipt-20261029/crates/domains/symthaea-muse/MEL-MR-EVAL-013_RENDER_EXECUTION_RECEIPT.md)  
 **Research anchors:** [SMEBench (Oct. 27, 2026)](https://arxiv.org/abs/2610.36715), [MuseCPBench](https://arxiv.org/abs/2512.14629), [MMAE / Audio Editing Challenge](https://audio-editing-challenge.github.io/leaderboard/).
 
@@ -18,25 +18,26 @@ Implemented in this draft:
 - Exact binding fields for target Score digest, performed MIDI byte digest, sample rate and frame count.
 - Fail-closed checks for malformed source IDs, unknown/missing score events, unresolved mappings, duplicate MIDI note-on identities, invalid MIDI channel/pitch, invalid event intervals, frame/time disagreement, duplicate or non-contiguous descendant ordinals, receipt tampering and primary-pitch mismatch.
 - A combined public acceptance method that checks receipt/context/coverage before exact primary pitch agreement.
-- Eight deterministic unit-test functions covering acceptance and negative cases.
+- Eight deterministic unit-test functions for the map verifier, plus three focused performance-lineage regression tests are authored; none has been run in this environment.
+- Primary in-memory performance voices carry global Score::events() indices through note-level transformations, chord sorting, and de-overlap removal. Generated Doubling/Return Color voices are explicitly unmapped rather than assigned guessed ancestry.
+- Studio's Listen performance bundle converts those carried global indices to its existing role-local symbolic IDs and reports exact global event indices whose primary performed note is missing.
 
 Not implemented yet:
 
 - The MIDI parser/adapter that constructs these rows directly from the exact MIDI bytes.
-- Source IDs carried through every transformation in theory_realize.rs (strum, humanization, de-overlap, doubling/color layers).
+- Strict 1:n ancestry for generated doubling/color layers; these remain explicitly unmapped.
 - Binding the verified map into a real RendererExecutionReceipt.
 - Deriving the audio-preservation mask from performed timing and independently checking the actual rendered PCM.
 - Renderer attestation. Hashes and local execution records do not defeat a malicious host or prove a backend used its declared input.
 
-Until those pieces land, this module is a verifiable data contract—not evidence that current production renders already have event lineage.
+This is still not evidence that current WAV renders have verified MIDI-level ancestry. The in-memory Listen lineage is a necessary integration seam, not the performed-MIDI receipt itself.
 
 ## Integration sequence
 
-1. Add lineage to the performed-note representation at the point source Score events are converted. Carry the identity sidecar through every transform; when an event is dropped or cannot be followed, record unresolved lineage instead of recomputing identity from audio.
-2. Parse the serialized MIDI bytes just before renderer invocation. Independently reconstruct track/note-on identities and compare their timing/pitch/lineage against the proposed map. Hash the exact MIDI bytes after serialization.
-3. Bind the accepted map, renderer invocation, exact executable/assets/config, WAV bytes and decoded PCM into the execution receipt.
-4. Compute edit and protected-region windows from performed event intervals, not only nominal score beats plus a constant latency. A mismatch between symbolic and audio evidence is a hard failure.
-5. Keep the external FluidSynth MIDI path and the native Muse render path as distinct adapters with their own execution/config evidence.
+1. Parse the serialized MIDI bytes just before renderer invocation. Independently reconstruct track/note-on identities and compare their timing/pitch/lineage against the proposed map. Hash the exact MIDI bytes after serialization.
+2. Bind the accepted map, renderer invocation, exact executable/assets/config, WAV bytes and decoded PCM into the execution receipt.
+3. Compute edit and protected-region windows from performed event intervals, not only nominal score beats plus a constant latency. A mismatch between symbolic and audio evidence is a hard failure.
+4. Keep the external FluidSynth MIDI path and the native Muse render path as distinct adapters with their own execution/config evidence.
 
 ## Benchmark plan
 
