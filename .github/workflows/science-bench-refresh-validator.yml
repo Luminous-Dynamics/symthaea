@@ -313,3 +313,211 @@ jobs:
           set -e
           test "$task_regen_exit" -eq 5
           grep -q '"byte_exact_match": false' /tmp/sbr-task-regeneration-report.json
+
+
+      - name: Cross-set overlap audit positive and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          cat > /tmp/sbr-overlap-left.json <<'JSON'
+          {
+            "schema": "symthaea.science_bench_refresh_task_set.v1",
+            "generation_id": "development-fixture",
+            "tasks": [{
+              "task_id": "dev-1",
+              "family_id": "semantic_invariance",
+              "policy_input": {
+                "instruction": "Recover the relationship.",
+                "observations": [{"x": 1.0, "y": 2.0}, {"x": 2.0, "y": 4.0}]
+              },
+              "evaluator_only": {"expected_law": "secret-fixture-label"}
+            }]
+          }
+          JSON
+
+          # Exact policy inputs block, even when task IDs/targets differ.
+          jq '.generation_id = "refresh-exact" |
+              .tasks[0].task_id = "refresh-1" |
+              .tasks[0].evaluator_only.expected_law = "different-secret"' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-exact.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:exact /tmp/sbr-overlap-exact.json > /tmp/sbr-overlap-exact-report.json
+          exact_exit=$?
+          set -e
+          test "$exact_exit" -eq 6
+          grep -q '"exact_overlap_pair_count": 1' /tmp/sbr-overlap-exact-report.json
+          ! grep -Eq 'secret-fixture-label|different-secret' /tmp/sbr-overlap-exact-report.json
+
+          # Reusing a task ID across splits blocks even when the policy input differs.
+          jq '.generation_id = "refresh-shared-id" |
+              .tasks[0].policy_input.observations[0].x = 9.0 |
+              .tasks[0].policy_input.observations[0].y = 18.0 |
+              .tasks[0].policy_input.observations[1].x = 10.0 |
+              .tasks[0].policy_input.observations[1].y = 20.0' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-shared-id.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:shared-id /tmp/sbr-overlap-shared-id.json > /tmp/sbr-overlap-shared-id-report.json
+          shared_id_exit=$?
+          set -e
+          test "$shared_id_exit" -eq 6
+          grep -q '"shared_task_id_count": 1' /tmp/sbr-overlap-shared-id-report.json
+          grep -q '"exact_overlap_pair_count": 0' /tmp/sbr-overlap-shared-id-report.json
+
+          # A coarse numerical match pauses for review; it is not classified as a leak.
+          jq '.generation_id = "refresh-near" |
+              .tasks[0].task_id = "near-1" |
+              .tasks[0].policy_input.observations[0].x = 1.0001 |
+              .tasks[0].policy_input.observations[0].y = 2.0001 |
+              .tasks[0].policy_input.observations[1].x = 2.0001 |
+              .tasks[0].policy_input.observations[1].y = 4.0001' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-near.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:near /tmp/sbr-overlap-near.json > /tmp/sbr-overlap-near-report.json
+          near_exit=$?
+          set -e
+          test "$near_exit" -eq 7
+          grep -q '"near_duplicate_candidate_pair_count": 1' /tmp/sbr-overlap-near-report.json
+          grep -q 'manual_review_required_for_numeric_near_duplicates' /tmp/sbr-overlap-near-report.json
+
+          # Same structure but numerically distant observations are a negative control.
+          jq '.generation_id = "refresh-distant" |
+              .tasks[0].task_id = "distant-1" |
+              .tasks[0].policy_input.observations[0].x = 100.0 |
+              .tasks[0].policy_input.observations[0].y = 200.0 |
+              .tasks[0].policy_input.observations[1].x = 101.0 |
+              .tasks[0].policy_input.observations[1].y = 400.0' \
+            /tmp/sbr-overlap-left.json > /tmp/sbr-overlap-distant.json
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-overlap development /tmp/sbr-overlap-left.json \
+            refresh:distant /tmp/sbr-overlap-distant.json > /tmp/sbr-overlap-distant-report.json
+          grep -q '"exact_overlap_pair_count": 0' /tmp/sbr-overlap-distant-report.json
+          grep -q '"near_duplicate_candidate_pair_count": 0' /tmp/sbr-overlap-distant-report.json
+          grep -q 'no_detected_exact_or_numeric_tolerant_overlap' /tmp/sbr-overlap-distant-report.json
+
+
+      - name: Cross-split lineage audit positive and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+
+          # Build evaluator-side ledgers bound to the exact fixture bytes.
+          # The ledger uses task ancestry commitments, not family/schema labels.
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          def normalize(value):
+              if isinstance(value, dict):
+                  return {key: normalize(child) for key, child in value.items()}
+              if isinstance(value, list):
+                  return [normalize(child) for child in value]
+              if isinstance(value, float) and value.is_integer() and abs(value) <= 9007199254740991:
+                  return int(value)
+              return value
+
+          def digest(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def make_ledger(task_path, ledger_path, split_label, lineage, exposure):
+              task_bytes = Path(task_path).read_bytes()
+              task_set = json.loads(task_bytes)
+              records = []
+              for task in task_set["tasks"]:
+                  policy = normalize(task["policy_input"])
+                  canonical = json.dumps(
+                      policy, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":"), allow_nan=False
+                  ).encode()
+                  records.append({
+                      "task_id": task["task_id"],
+                      "policy_input_sha256": digest(canonical),
+                      "exposure_state": exposure,
+                      "lineage_commitments": [{
+                          "kind": "parent_world",
+                          "commitment_sha256": digest(lineage.encode())
+                      }]
+                  })
+              ledger = {
+                  "schema": "symthaea.science_bench_refresh_lineage_ledger.v1",
+                  "generation_id": task_set["generation_id"],
+                  "split_label": split_label,
+                  "task_set_sha256": digest(task_bytes),
+                  "records": records
+              }
+              Path(ledger_path).write_text(
+                  json.dumps(ledger, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+                  encoding="utf-8"
+              )
+
+          make_ledger(
+              "/tmp/sbr-overlap-left.json", "/tmp/sbr-lineage-left.json",
+              "development:fixture", "parent-world-shared", "public_development"
+          )
+          make_ledger(
+              "/tmp/sbr-overlap-distant.json", "/tmp/sbr-lineage-right-shared.json",
+              "refresh:fixture", "parent-world-shared", "never_exposed"
+          )
+          make_ledger(
+              "/tmp/sbr-overlap-distant.json", "/tmp/sbr-lineage-right-disjoint.json",
+              "refresh:fixture", "parent-world-distinct", "never_exposed"
+          )
+          make_ledger(
+              "/tmp/sbr-overlap-distant.json", "/tmp/sbr-lineage-right-exposed.json",
+              "refresh:fixture", "parent-world-distinct", "public_development"
+          )
+          PY
+
+          # Same parent world, different policy inputs: block.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-lineage /tmp/sbr-overlap-left.json /tmp/sbr-lineage-left.json \
+            /tmp/sbr-overlap-distant.json /tmp/sbr-lineage-right-shared.json \
+            > /tmp/sbr-lineage-shared-report.json
+          shared_lineage_exit=$?
+          set -e
+          test "$shared_lineage_exit" -eq 8
+          grep -q '"shared_lineage_root_count": 1' /tmp/sbr-lineage-shared-report.json
+          grep -q 'blocked_shared_cross_split_lineage' /tmp/sbr-lineage-shared-report.json
+          ! grep -q 'secret-fixture-label' /tmp/sbr-lineage-shared-report.json
+
+          # Same schema but a disjoint parent world and never-exposed refresh: pass.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-lineage /tmp/sbr-overlap-left.json /tmp/sbr-lineage-left.json \
+            /tmp/sbr-overlap-distant.json /tmp/sbr-lineage-right-disjoint.json \
+            > /tmp/sbr-lineage-disjoint-report.json
+          grep -q '"shared_lineage_root_count": 0' /tmp/sbr-lineage-disjoint-report.json
+          grep -q 'no_detected_shared_lineage_or_exposed_refresh' /tmp/sbr-lineage-disjoint-report.json
+
+          # A refresh task marked exposed blocks even without shared lineage.
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-lineage /tmp/sbr-overlap-left.json /tmp/sbr-lineage-left.json \
+            /tmp/sbr-overlap-distant.json /tmp/sbr-lineage-right-exposed.json \
+            > /tmp/sbr-lineage-exposed-report.json
+          exposed_exit=$?
+          set -e
+          test "$exposed_exit" -eq 8
+          grep -q '"right_exposed_refresh_task_count": 1' /tmp/sbr-lineage-exposed-report.json
+          grep -q 'blocked_exposed_refresh_tasks' /tmp/sbr-lineage-exposed-report.json
+
+          # The sidecar cannot be reused after task-set bytes mutate.
+          cp /tmp/sbr-overlap-distant.json /tmp/sbr-lineage-mutated-task-set.json
+          printf ' ' >> /tmp/sbr-lineage-mutated-task-set.json
+          set +e
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-lineage /tmp/sbr-overlap-left.json /tmp/sbr-lineage-left.json \
+            /tmp/sbr-lineage-mutated-task-set.json /tmp/sbr-lineage-right-disjoint.json \
+            > /tmp/sbr-lineage-mutated-report.json 2> /tmp/sbr-lineage-mutated.stderr
+          mutated_exit=$?
+          set -e
+          test "$mutated_exit" -eq 2
+          grep -q 'does not bind the exact task-set bytes' /tmp/sbr-lineage-mutated.stderr

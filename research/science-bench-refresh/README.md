@@ -94,3 +94,55 @@ The task constructors are **synthetic protocol fixtures**, not a qualified physi
 The Rust validator checks strict manifest shape and unknown-field rejection, digest/revision syntax, protocol-context integrity, domain-separated seed/task commitments, exact-byte reveal verification, exact deterministic regeneration from seed/config bytes, task-set generation/denominator/family integrity, constructor-specific semantic consistency, duplicate task IDs/families, oracle/family-label canaries in policy-visible inputs, an ASCII letters/digits/underscore/hyphen key grammar enforced by both schema and Rust, and separator-/case-insensitive normalization, denominator and family-weight closure, lane/reveal-policy consistency, and separate manifest-declared profile fields. The independent Python tests also check the transformed-law equations, declared noise bounds, common-cause null, and the identifiability witness.
 
 At the current draft stage, 58 Rust unit tests are authored across manifest/reveal validation, task-set contract checks, constructor-specific semantic checks, deterministic generation/replay, generator-instruction leakage controls, compiled-source pinning, and CLI argument handling. Eleven additional standard-library Python tests exercise the independent replay oracle, including its own 64-seed sweep and prompt-leakage rejection. They must not be described as passing until current-head exact CI completes. This authoring environment does not include a Rust toolchain, so no local compile/test/Clippy result is claimed.
+
+## Cross-set policy-input overlap audit
+
+The overlap auditor is a conservative preflight for two task-set artifacts. It compares only each task's policy-visible input; it does not read evaluator targets to compute overlap.
+
+Example:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  audit-overlap development development-task-set.json refresh:generation-002 refreshed-task-set.json
+```
+
+Split labels must use a known role: `development`, `anchor`, or `refresh`; an optional colon suffix distinguishes versions/generations. The labels are caller-supplied metadata, not proof of runner isolation.
+
+The report separates:
+- **Shared task ID / exact overlap:** reused task IDs across the compared sets or deterministic canonical policy-input equality (ignores object-key order, JSON whitespace, task IDs, evaluator-only fields, and equivalent integral spellings such as 1 and 1.0). Either condition exits with code 6 and blocks admission.
+- **Numeric near-duplicate candidates:** a conservative fingerprint that rounds numbers to three significant digits while preserving the remaining input structure/text. These are triage candidates, not proof of leakage; they exit with code 7 so a qualification pipeline pauses for review.
+- **No detected overlap:** exits 0 when neither tier finds candidates.
+- **Invalid inputs:** exits 2 for invalid labels, duplicate IDs, malformed task sets, or unsupported schema.
+
+The report binds the raw input artifacts by SHA-256, reports deterministic digest groups and bounded task-ID samples, and never emits evaluator-only labels or target values. Candidate groups are bounded to a sample of 20 task IDs per side while preserving total pair counts.
+
+This is intentionally a first, limited layer. It does not yet prove lineage independence, detect all semantic/unit-equivalent tasks, establish pretraining contamination status, or prove that a runner physically withheld evaluator-only data. Those remain separate gates in [SCI-BENCH-LEAKAGE-001 / #8842](https://github.com/Luminous-Dynamics/symthaea/issues/8842). Numeric candidate hits must be reviewed rather than silently counted as confirmed leakage.
+
+
+**Ordering requirement:** this command accepts raw task-set JSON bytes and does not itself verify the associated manifest, seed commitment, or regenerated task bytes. First require the existing `verify-reveal` and `verify-regeneration` gates to pass independently for each set; then run `audit-overlap` across the relevant splits. A report saying no overlap is detected is not a standalone scoring authorization.
+
+
+## Cross-split lineage ledger and ancestry audit
+
+The lineage audit complements overlap fingerprints with explicit evaluator-side ancestry metadata. See `schema/lineage-ledger.schema.json` for the v1 sidecar format. Each ledger:
+- binds the exact task-set bytes with `task_set_sha256`;
+- covers every task ID exactly once, with no orphan or duplicate records;
+- binds each row to the canonical digest of that task's policy-visible input;
+- declares one or more typed lineage commitments for a parent world, source task, source item, or transform ancestor;
+- records whether the task has never been exposed, was public development material, appeared in a prior scored refresh, or has unknown exposure.
+
+A lineage commitment must describe a specific ancestry/world/source item. Do **not** use generic family names, schema IDs, template IDs, or corpus-version identifiers as lineage commitments; sharing those does not establish task leakage. Lineage digests are commitments, not independently authenticated facts. The ledger must remain evaluator-side, and a hash alone does not prove that the runner enforced this boundary.
+
+After each task set has independently passed `verify-reveal` and `verify-regeneration`, compare the set and its matching ledger:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  audit-lineage development-tasks.json development-lineage.json \
+  refresh-tasks.json refresh-lineage.json
+```
+
+The command validates the ledger against the exact artifact bytes and task IDs, then compares typed ancestry commitments across split boundaries. Shared parent-world/source ancestry blocks admission even when task IDs and policy-visible inputs differ. A refresh record marked as anything other than `never_exposed` also blocks admission. Exit code 8 means shared declared lineage or exposed refresh tasks; exit 2 means invalid task-set/ledger evidence. Exit 0 means no conflict was detected under the supplied lineage records—it is not a general scoring authorization.
+
+The deterministic report includes task-set and ledger digests, shared lineage commitment digests, bounded task-ID samples, and exposed-refresh counts. It does not include evaluator-only target values.
+
+The ledger cannot independently prove the truthfulness of lineage declarations, full ancestry coverage, absence of unrecorded source overlap, pretraining contamination status, or runtime isolation. Those require independent generator/evaluator audits, controlled exposure logs, and evidence that the evaluated policy cannot read evaluator-side artifacts.

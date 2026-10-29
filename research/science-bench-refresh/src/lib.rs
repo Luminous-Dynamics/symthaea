@@ -16,6 +16,8 @@ pub const BUILT_GENERATOR_SOURCE_REVISION: &str = env!("SBR_GENERATOR_SOURCE_REV
 pub const BUILT_GENERATOR_WORKTREE_CLEAN: &str = env!("SBR_GENERATOR_WORKTREE_CLEAN");
 
 pub mod generator;
+pub mod leakage_audit;
+pub mod lineage_audit;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
 
