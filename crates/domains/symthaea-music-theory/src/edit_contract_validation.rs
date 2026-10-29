@@ -458,8 +458,8 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
     }
 
     for invariant in &contract.protected_invariants {
-        if invariant.region_ids.as_ref().is_some_and(Vec::is_empty)
-            || invariant.track_ids.as_ref().is_some_and(Vec::is_empty)
+        if invariant.region_ids.as_ref().is_some_and(|ids| ids.is_empty())
+            || invariant.track_ids.as_ref().is_some_and(|ids| ids.is_empty())
         {
             add_issue!(
                 "SCHEMA_REJECT",
