@@ -6,7 +6,7 @@
     "schemaVersion": "0.1.0",
     "claim": { "id": "NEG-001", "kind": "test_result", "statement": "Queued work cannot be reported as passed.", "scope": ["status-consistency"] },
     "target": {
-      "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeef1234567" },
+      "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" },
       "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
       "inputs": []
     },
@@ -15,11 +15,13 @@
       "outcome": "passed",
       "verifier": { "id": "must-not-pass", "version": "0.1.0" },
       "checkedTarget": {
-        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeef1234567" },
+        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" },
         "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
         "inputs": []
       },
-      "checks": []
+      "checks": [
+        { "id": "queued-status-control", "outcome": "passed", "details": "Synthetic control; the execution status/result contradiction is the intended fault." }
+      ]
     },
     "evidence": [],
     "limitations": []
