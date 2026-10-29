@@ -144,6 +144,12 @@ if __name__ == "__main__":
         self.assertFalse(result["score_eligible"])
         self.assertTrue(result["runner_attestation_required"])
         self.assertFalse(result["network_isolation_independently_verified"])
+        for arm in ("baseline", "reference"):
+            checkout = result["isolated_checkout_metadata"][arm]
+            self.assertEqual(checkout["head_sha"], self.revision)
+            self.assertEqual(checkout["ref_names"], [])
+            self.assertEqual(checkout["reachable_commit_count"], 1)
+            self.assertFalse(checkout["uses_shared_object_alternates"])
         self.assertEqual(
             self.run_git(self.repo, "status", "--porcelain=v1", "--untracked-files=all").stdout,
             "",
