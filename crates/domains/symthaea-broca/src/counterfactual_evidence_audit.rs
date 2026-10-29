@@ -902,10 +902,11 @@ mod tests {
         assert_eq!(distractor.target_level, "ignore");
     }
 
-    fn synthetic_ablation_rows() -> Vec<Value> {
+    fn synthetic_ablation_rows(fixture_sha256: &str) -> Vec<Value> {
         use serde_json::json;
 
         fn observation(
+            fixture_sha256: &str,
             case_id: &str,
             evidence_id: &str,
             full_fields: Value,
@@ -919,7 +920,7 @@ mod tests {
                 "case_id": case_id,
                 "evidence_id": evidence_id,
                 "reader_revision": "synthetic-reader-v1",
-                "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "fixture_sha256": fixture_sha256,
                 "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
                 "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
@@ -942,17 +943,18 @@ mod tests {
             "claim.retry_limit.scope": "transient_network_errors"
         });
         vec![
-            observation("memory-influence-0001-a", "retry-config-1", full.clone(), no_value.clone(), 50, 40),
-            observation("memory-influence-0001-a", "retry-applicability-2", full.clone(), scope_bounded.clone(), 50, 42),
-            observation("memory-influence-0001-b", "retry-config-1", full.clone(), no_value, 60, 50),
-            observation("memory-influence-0001-b", "retry-applicability-2", full.clone(), scope_bounded, 60, 52),
-            observation("memory-influence-0001-b", "notification-note-2", full.clone(), full, 60, 55),
+            observation(fixture_sha256, "memory-influence-0001-a", "retry-config-1", full.clone(), no_value.clone(), 50, 40),
+            observation(fixture_sha256, "memory-influence-0001-a", "retry-applicability-2", full.clone(), scope_bounded.clone(), 50, 42),
+            observation(fixture_sha256, "memory-influence-0001-b", "retry-config-1", full.clone(), no_value, 60, 50),
+            observation(fixture_sha256, "memory-influence-0001-b", "retry-applicability-2", full.clone(), scope_bounded, 60, 52),
+            observation(fixture_sha256, "memory-influence-0001-b", "notification-note-2", full.clone(), full, 60, 55),
         ]
     }
 
     #[test]
     fn atom_ablation_scorer_reports_ignore_bound_and_control_separately() {
-        let rows = synthetic_ablation_rows();
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let rows = synthetic_ablation_rows(&fixture_sha256);
         let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
         let result = score_atom_ablation_jsonl(&observations, FIXTURES, LABELS)
             .expect("well-formed synthetic ablation run must score");
@@ -972,7 +974,8 @@ mod tests {
 
     #[test]
     fn atom_ablation_scorer_detects_overuse_and_underuse() {
-        let mut rows = synthetic_ablation_rows();
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
         // The Ignore atom now appears to change a material claim: over-use.
         rows[4]["ablated_fields"] = serde_json::json!({
             "claim.retry_limit.value": "5",
@@ -990,7 +993,8 @@ mod tests {
 
     #[test]
     fn atom_ablation_scorer_rejects_missing_or_unlabelled_observations() {
-        let rows = synthetic_ablation_rows();
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let rows = synthetic_ablation_rows(&fixture_sha256);
         let observations = rows.iter().take(4).map(Value::to_string).collect::<Vec<_>>().join("\n");
         assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
 
@@ -1001,7 +1005,7 @@ mod tests {
             "case_id": "memory-influence-0001-b",
             "evidence_id": "unlabelled-atom",
             "reader_revision": "synthetic-reader-v1",
-            "fixture_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "fixture_sha256": fixture_sha256,
             "prompt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "tokenizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "system_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
