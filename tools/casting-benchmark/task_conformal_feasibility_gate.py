@@ -31,13 +31,13 @@ CALIBRATION_FIELDS = frozenset({
     "independence_unit", "independence_note", "tasks",
 })
 CALIBRATION_TASK_FIELDS = frozenset({"task_id", "task_family", "stratum", "descriptor", "rows"})
-CALIBRATION_ROW_FIELDS = frozenset({"candidate_id", "predicted_margin", "observed_margin"})
+CALIBRATION_ROW_FIELDS = frozenset({"candidate_id", "design", "predicted_margin", "observed_margin"})
 TARGET_FIELDS = frozenset({
     "schema_version", "target_manifest_id", "evidence_class", "policy_source_sha256",
     "policy_config_sha256", "split", "candidate_pool_frozen_before_outcomes", "tasks",
 })
 TARGET_TASK_FIELDS = frozenset({"task_id", "task_family", "stratum", "descriptor", "predictions"})
-TARGET_PREDICTION_FIELDS = frozenset({"candidate_id", "predicted_margin"})
+TARGET_PREDICTION_FIELDS = frozenset({"candidate_id", "design", "predicted_margin"})
 
 
 def _strict_object(value: Any, expected: frozenset[str], label: str) -> dict[str, Any]:
@@ -96,8 +96,12 @@ def _unit_distance(left: Sequence[float], right: Sequence[float]) -> float:
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)) / len(left))
 
 
-def _candidate_pool_digest(candidate_ids: Sequence[str]) -> str:
-    encoded = json.dumps(list(candidate_ids), separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+def _candidate_pool_digest(candidate_pool: Sequence[dict[str, Any]]) -> str:
+    # Bind candidate IDs *and exact normalized designs*, not just labels.
+    encoded = json.dumps(
+        list(candidate_pool), sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False, allow_nan=False,
+    ).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -161,7 +165,7 @@ def validate_calibration(raw: Any, config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("calibration tasks must be a non-empty array")
     task_ids: set[str] = set()
     descriptor_size: int | None = None
-    candidate_pool_roster: list[str] | None = None
+    candidate_pool_roster: list[dict[str, Any]] | None = None
     for ti, item in enumerate(tasks):
         task = _strict_object(item, CALIBRATION_TASK_FIELDS, f"calibration.tasks[{ti}]")
         task_id = _nonblank(task["task_id"], f"calibration.tasks[{ti}].task_id")
@@ -179,14 +183,15 @@ def validate_calibration(raw: Any, config: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(rows, list) or not rows:
             raise ValueError(f"calibration.tasks[{ti}].rows must be non-empty")
         row_ids: set[str] = set()
-        task_roster: list[str] = []
+        task_roster: list[dict[str, Any]] = []
         for ri, raw_row in enumerate(rows):
             row = _strict_object(raw_row, CALIBRATION_ROW_FIELDS, f"calibration.tasks[{ti}].rows[{ri}]")
             cid = _nonblank(row["candidate_id"], f"calibration.tasks[{ti}].rows[{ri}].candidate_id")
             if cid in row_ids:
                 raise ValueError(f"duplicate candidate_id within calibration task {task_id}: {cid}")
             row_ids.add(cid)
-            task_roster.append(cid)
+            design = _descriptor(row["design"], f"calibration.tasks[{ti}].rows[{ri}].design")
+            task_roster.append({"candidate_id": cid, "design": list(design)})
             _finite(row["predicted_margin"], f"calibration.tasks[{ti}].rows[{ri}].predicted_margin")
             _finite(row["observed_margin"], f"calibration.tasks[{ti}].rows[{ri}].observed_margin")
         if candidate_pool_roster is None:
@@ -217,7 +222,10 @@ def validate_targets(raw: Any, config: dict[str, Any], calibration: dict[str, An
         raise ValueError("target prediction tasks must be a non-empty array")
     calibration_ids = {task["task_id"] for task in calibration["tasks"]}
     target_ids: set[str] = set()
-    calibration_roster = [row["candidate_id"] for row in calibration["tasks"][0]["rows"]]
+    calibration_roster = [
+        {"candidate_id": row["candidate_id"], "design": list(_descriptor(row["design"], "calibration candidate design"))}
+        for row in calibration["tasks"][0]["rows"]
+    ]
     descriptor_size = len(calibration["tasks"][0]["descriptor"])
     for ti, item in enumerate(tasks):
         task = _strict_object(item, TARGET_TASK_FIELDS, f"target.tasks[{ti}]")
@@ -236,14 +244,15 @@ def validate_targets(raw: Any, config: dict[str, Any], calibration: dict[str, An
         if not isinstance(predictions, list) or not predictions:
             raise ValueError(f"target.tasks[{ti}].predictions must be a non-empty array")
         candidate_ids: set[str] = set()
-        target_roster: list[str] = []
+        target_roster: list[dict[str, Any]] = []
         for pi, prediction in enumerate(predictions):
             row = _strict_object(prediction, TARGET_PREDICTION_FIELDS, f"target.tasks[{ti}].predictions[{pi}]")
             cid = _nonblank(row["candidate_id"], f"target.tasks[{ti}].predictions[{pi}].candidate_id")
             if cid in candidate_ids:
                 raise ValueError(f"duplicate target candidate_id in task {task_id}: {cid}")
             candidate_ids.add(cid)
-            target_roster.append(cid)
+            design = _descriptor(row["design"], f"target.tasks[{ti}].predictions[{pi}].design")
+            target_roster.append({"candidate_id": cid, "design": list(design)})
             _finite(row["predicted_margin"], f"target.tasks[{ti}].predictions[{pi}].predicted_margin")
         if target_roster != calibration_roster:
             raise ValueError("target task must use the exact frozen calibration candidate-pool roster")
