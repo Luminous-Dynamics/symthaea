@@ -44,12 +44,14 @@ class PairedComparisonFixture:
                 "model_id": "baseline-model",
                 "model_version": "v1",
                 "scaffold_sha256": sha(b"reference-scaffold"),
+                "execution_profile_sha256": sha(b"reference-execution-profile"),
             },
             {
                 "arm_id": "candidate",
                 "model_id": "candidate-model",
                 "model_version": "v2",
                 "scaffold_sha256": sha(b"candidate-scaffold"),
+                "execution_profile_sha256": sha(b"candidate-execution-profile"),
             },
         ]
         task_pins = {task_id: sha(("task-contract:" + task_id).encode()) for task_id in self.task_ids}
@@ -218,6 +220,12 @@ class PairedComparisonTests(unittest.TestCase):
         row = next(r for r in manifest["results"] if r["task_id"] == "task-001" and r["seed"] == 101 and r["arm_id"] == "candidate")
         row["image_id"] = "sha256:" + "d" * 64
         with self.assertRaisesRegex(ValueError, "paired arms disagree"):
+            self.fixture.analyze(manifest)
+
+    def test_each_arm_must_pin_the_complete_execution_profile(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        del manifest["arms"][0]["execution_profile_sha256"]
+        with self.assertRaisesRegex(ValueError, "execution_profile_sha256"):
             self.fixture.analyze(manifest)
 
     def test_task_contract_must_match_locked_digest(self) -> None:
