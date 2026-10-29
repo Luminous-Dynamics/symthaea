@@ -261,7 +261,7 @@ fn main() -> ExitCode {
     let cases = vec![
         acoustic_case(
             "AP-IDENTITY-001",
-            "identity",
+            "identity_control",
             false,
             "Identical audio in all protected windows",
             &reference_sine,
@@ -271,7 +271,7 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-LOCAL-LEAK-001",
-            "localized_zeroing",
+            "acoustic_protected_mutation",
             true,
             "A zeroed local window outside the authorized edit",
             &reference_sine,
@@ -281,7 +281,7 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-GAIN-DROP-001",
-            "gain_drop",
+            "acoustic_protected_mutation",
             true,
             "A protected local window has a 12 dB-class gain drop",
             &reference_sine,
@@ -291,7 +291,7 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-FREQUENCY-SWAP-001",
-            "frequency_substitution",
+            "acoustic_protected_mutation",
             true,
             "A protected local window is changed from 440 Hz to 880 Hz",
             &reference_sine,
@@ -301,7 +301,7 @@ fn main() -> ExitCode {
         ),
         acoustic_case(
             "AP-AUTHORIZED-ONLY-001",
-            "authorized_only",
+            "authorization_scope_control",
             false,
             "A changed window fully contained by the authorized mask",
             &reference_sine,
@@ -311,7 +311,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-IDENTITY-001",
-            "onset_identity",
+            "identity_control",
             false,
             "Identical transient timing in protected content",
             &reference_burst,
@@ -321,7 +321,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-DELAY-001",
-            "timing_shift",
+            "onset_event_mutation",
             true,
             "Protected transient is delayed by 512 frames",
             &reference_burst,
@@ -331,7 +331,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-EXTRA-001",
-            "spurious_transient",
+            "onset_event_mutation",
             true,
             "Candidate adds a transient in otherwise protected content",
             &reference_burst,
@@ -341,7 +341,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-MASK-001",
-            "masked_evidence",
+            "evidence_coverage_control",
             false,
             "The edit mask and analysis guard hide all available onset evidence",
             &reference_burst,
@@ -351,7 +351,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-UNMEASURABLE-001",
-            "unmeasurable_reference",
+            "evidence_coverage_control",
             false,
             "Both reference and candidate are silent",
             &silent,
@@ -361,7 +361,7 @@ fn main() -> ExitCode {
         ),
         onset_case(
             "ONSET-MISSING-001",
-            "missing_transient",
+            "onset_event_mutation",
             true,
             "Candidate removes the reference burst in protected content",
             &reference_burst,
