@@ -543,10 +543,28 @@ impl EvidenceTrustStore {
             .iter()
             .map(|envelope| self.verify_event(envelope))
             .collect::<Result<_, _>>()?;
-        let policy_bytes = serde_json::to_vec(&policies)
-            .map_err(|error| format!("cannot serialize verified policy chain: {error}"))?;
-        let event_bytes = serde_json::to_vec(&events)
-            .map_err(|error| format!("cannot serialize verified event batch: {error}"))?;
+        // Hash the verified signed envelopes (not just unsigned decoded
+        // fields), in stable order, so the receipt digest binds signature and
+        // trusted-ingress metadata as well as the accepted event contents.
+        let mut canonical_signed_policies = signed_policies.to_vec();
+        for envelope in &mut canonical_signed_policies {
+            envelope.policy = policy_for_signing(&envelope.policy)?;
+            envelope.signed_at = normalize_time(&envelope.signed_at, "policy signed_at")?;
+        }
+        canonical_signed_policies.sort_by_key(|envelope| envelope.policy.policy_version);
+        let policy_bytes = serde_json::to_vec(&canonical_signed_policies)
+            .map_err(|error| format!("cannot serialize verified policy envelopes: {error}"))?;
+
+        let mut canonical_signed_events = signed_events.to_vec();
+        for envelope in &mut canonical_signed_events {
+            envelope.event = event_for_signing(&envelope.event)?;
+            if let Some(receipt) = envelope.ingestion_receipt.as_mut() {
+                receipt.accepted_at = normalize_time(&receipt.accepted_at, "receipt.accepted_at")?;
+            }
+        }
+        canonical_signed_events.sort_by(|left, right| left.event.event_id().cmp(right.event.event_id()));
+        let event_bytes = serde_json::to_vec(&canonical_signed_events)
+            .map_err(|error| format!("cannot serialize verified signed events: {error}"))?;
         Ok(VerifiedLedgerBatch {
             policies,
             events,
