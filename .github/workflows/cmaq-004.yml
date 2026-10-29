@@ -1,0 +1,76 @@
+name: CMAQ-004 world-model value-add smoke harness
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-004/**"
+      - ".github/workflows/cmaq-004.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-004/**"
+      - ".github/workflows/cmaq-004.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  value-add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-004
+        run: cargo test --locked
+      - name: Generate report and validate model value-add
+        working-directory: research/cmaq-004
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-004-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-004-report.json").read_text())
+          assert report["schema_version"] == "cmaq-004-value-add-report-v0.1"
+          assert report["support_contexts"] == [0, 1, 2]
+          assert report["heldout_context"] == 3
+          assert report["support_samples_per_context_action"] == 1024
+          assert report["evaluation_episodes"] == 4096
+          families = {item["world_family"]: item for item in report["families"]}
+          assert set(families) == {"additive_positive", "interaction_only", "additive_reversed"}
+          for family in families.values():
+              rows = {row["strategy"]: row for row in family["results"]}
+              assert set(rows) == {
+                  "direct_tabular_fallback", "learned_additive_model", "shuffled_model_control",
+                  "stale_model_control", "oracle_evaluator_only"
+              }
+              assert rows["oracle_evaluator_only"]["mean_net_utility"] >= max(
+                  row["mean_net_utility"] for key, row in rows.items() if key != "oracle_evaluator_only"
+              )
+          additive = {row["strategy"]: row for row in families["additive_positive"]["results"]}
+          assert additive["learned_additive_model"]["net_lift_vs_direct"] > 0.10
+          assert additive["learned_additive_model"]["model_prediction_mae"] < 0.05
+          interaction = {row["strategy"]: row for row in families["interaction_only"]["results"]}
+          assert interaction["learned_additive_model"]["net_lift_vs_direct"] < -0.05
+          assert interaction["learned_additive_model"]["model_prediction_mae"] > 0.20
+          reversed_world = {row["strategy"]: row for row in families["additive_reversed"]["results"]}
+          assert reversed_world["stale_model_control"]["net_lift_vs_direct"] < -0.30
+          print("CMAQ-004 schema, held-out value-add, model misspecification and stale-model controls validated")
+          print(json.dumps({
+              family_name: {
+                  row["strategy"]: {
+                      "action": row["chosen_action"],
+                      "net_utility": row["mean_net_utility"],
+                      "net_lift": row["net_lift_vs_direct"],
+                      "prediction_mae": row["model_prediction_mae"],
+                  }
+                  for row in family["results"]
+              }
+              for family_name, family in families.items()
+          }, sort_keys=True))
+          PY
