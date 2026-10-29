@@ -535,6 +535,7 @@ mod tests {
             generation_id: receipt.generation_id,
             receipt_sha256: sha256_hex(receipt_bytes),
             receipt_commitment_sha256: receipt.receipt_commitment_sha256,
+            protected_index_sha256: sha256_hex(b"fixture-protected-index"),
             matcher_revision_sha256: sha256_hex(b"matcher"),
             decision_rules_sha256: sha256_hex(b"frozen-decisions"),
             expected_event_count: 1,

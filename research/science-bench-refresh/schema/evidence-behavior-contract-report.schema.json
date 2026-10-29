@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/evidence-behavior-contract-report.schema.json",
+  "title": "Symthaea Evidence Behavior Contract Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "evaluator_source_revision",
+    "decision_rules_sha256",
+    "adjudication_mode",
+    "blind_to_system_identity",
+    "records",
+    "report_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_evidence_behavior_contract_report.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluator_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_rules_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "adjudication_mode": {
+      "enum": [
+        "deterministic_synthetic_oracle",
+        "blinded_human",
+        "dual_human_resolved",
+        "automated_judge_blinded_audit"
+      ]
+    },
+    "blind_to_system_identity": {
+      "type": "boolean"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 digest; zero digests are reserved for non-scoring examples and must be rejected for qualified runs."
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "status",
+        "baseline_response_artifact_sha256",
+        "intervention_response_artifact_sha256",
+        "adjudication_record_sha256",
+        "violation_codes",
+        "not_evaluable_reason"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "violation",
+            "not_evaluable"
+          ]
+        },
+        "baseline_response_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intervention_response_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "adjudication_record_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "violation_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "not_evaluable_reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "violation_codes": {
+                "maxItems": 0
+              },
+              "not_evaluable_reason": {
+                "type": "null"
+              },
+              "baseline_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              },
+              "intervention_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "violation"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "violation_codes": {
+                "minItems": 1
+              },
+              "not_evaluable_reason": {
+                "type": "null"
+              },
+              "baseline_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              },
+              "intervention_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_evaluable"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "violation_codes": {
+                "maxItems": 0
+              },
+              "not_evaluable_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "evaluator_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "decision_rules_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "report_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "records": {
+            "items": {
+              "properties": {
+                "adjudication_record_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_response_artifact_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/digest"
+                        },
+                        {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "intervention_response_artifact_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/digest"
+                        },
+                        {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
