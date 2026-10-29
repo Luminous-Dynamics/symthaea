@@ -287,12 +287,7 @@ pub fn verify_energy_hub_plan(
     let mut battery_discharge_loss_quanta = 0_u32;
     let mut records = Vec::new();
 
-    for (index, (interval, action)) in scenario
-        .intervals
-        .iter()
-        .zip(plan.actions.iter())
-        .enumerate()
-    {
+    for (interval, action) in scenario.intervals.iter().zip(plan.actions.iter()) {
         if action.interval_id != interval.id {
             return Err(EnergyHubError::IntervalOrderMismatch);
         }
@@ -428,7 +423,6 @@ pub fn verify_energy_hub_plan(
                 non_co2: NonCo2Evidence::NotAssessed,
             });
         }
-        let _ = index;
     }
 
     if soc < scenario.storage.minimum_terminal_soc_quanta {
@@ -731,7 +725,6 @@ fn validate_scenario(
     if storage.capacity_quanta > MAX_QUANTA_PER_INTERVAL
         || storage.max_charge_input_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
         || storage.max_discharge_output_quanta_per_interval > MAX_QUANTA_PER_INTERVAL
-        || storage.max_charge_input_quanta_per_interval > storage.capacity_quanta
         || storage.minimum_terminal_soc_quanta > storage.capacity_quanta
     {
         return Err(EnergyHubError::InvalidStorage);
