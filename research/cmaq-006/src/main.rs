@@ -4,7 +4,9 @@ use std::fs;
 use std::process;
 
 const REPORT_SCHEMA: &str = "cmaq-006-decision-gate-v0.1";
-const INPUT_HEADER: [&str; 12] = [
+// Reviewed policy constant: untrusted episode input cannot lower the model-use bar.
+const MINIMUM_NET_LIFT: f64 = 0.02;
+const INPUT_HEADER: [&str; 11] = [
     "case_id",
     "model_digest",
     "adequacy_model_digest",
@@ -14,7 +16,6 @@ const INPUT_HEADER: [&str; 12] = [
     "shift_detected",
     "adequacy_status",
     "net_lift_ci95_low",
-    "minimum_net_lift",
     "model_action_authorized",
     "direct_action_authorized",
 ];
@@ -73,7 +74,6 @@ struct GateInput {
     shift_detected: bool,
     adequacy_status: AdequacyStatus,
     net_lift_ci95_low: f64,
-    minimum_net_lift: f64,
     model_action_authorized: bool,
     direct_action_authorized: bool,
 }
@@ -134,7 +134,6 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
     let utility_model_digest = token(fields[3], "utility_model_digest")?;
     let adequacy_status = AdequacyStatus::parse(fields[7])?;
     let net_lift_ci95_low = parse_finite(fields[8], "net_lift_ci95_low")?;
-    let minimum_net_lift = parse_finite(fields[9], "minimum_net_lift")?;
 
     Ok(GateInput {
         case_id,
@@ -147,8 +146,8 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
         adequacy_status,
         net_lift_ci95_low,
         minimum_net_lift,
-        model_action_authorized: parse_bool(fields[10], "model_action_authorized")?,
-        direct_action_authorized: parse_bool(fields[11], "direct_action_authorized")?,
+        model_action_authorized: parse_bool(fields[9], "model_action_authorized")?,
+        direct_action_authorized: parse_bool(fields[10], "direct_action_authorized")?,
     })
 }
 
@@ -156,7 +155,7 @@ fn parse_input(input: &str) -> Result<Vec<GateInput>, String> {
     let mut lines = input.lines().enumerate().filter(|(_, line)| !line.trim().is_empty());
     let (_, header) = lines.next().ok_or("empty decision-gate input")?;
     let observed_header = header.split('\t').collect::<Vec<_>>();
-    if observed_header.as_slice() != INPUT_HEADER {
+    if observed_header.as_slice() != INPUT_HEADER.as_slice() {
         return Err(format!(
             "input header mismatch; expected {}",
             INPUT_HEADER.join("\t")
@@ -233,7 +232,7 @@ fn assess(input: &GateInput) -> GateResult {
     if input.adequacy_status != AdequacyStatus::Pass {
         return direct_fallback_or_block(input, "predictive_adequacy_not_pass");
     }
-    if input.net_lift_ci95_low <= input.minimum_net_lift {
+    if input.net_lift_ci95_low <= MINIMUM_NET_LIFT {
         return direct_fallback_or_block(input, "insufficient_net_lift_lower_bound");
     }
 
@@ -258,7 +257,7 @@ fn render(input: &GateInput, result: &GateResult) -> String {
         input.adequacy_status.as_str(),
         result.decision.as_str(),
         input.net_lift_ci95_low,
-        input.minimum_net_lift,
+        MINIMUM_NET_LIFT,
         input.model_action_authorized,
         input.direct_action_authorized,
         result.reason
@@ -320,7 +319,6 @@ mod tests {
             shift_detected: false,
             adequacy_status: AdequacyStatus::Pass,
             net_lift_ci95_low: 0.12,
-            minimum_net_lift: 0.02,
             model_action_authorized: true,
             direct_action_authorized: true,
         }
@@ -423,9 +421,9 @@ mod tests {
     fn parser_rejects_nonfinite_net_lift_and_unrecognized_boolean() {
         let header = INPUT_HEADER.join("\t");
         let prefix = "episode_001\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t7\t7\tfalse\tPASS";
-        let nonfinite = format!("{header}\n{prefix}\tNaN\t0.02\ttrue\ttrue\n");
+        let nonfinite = format!("{header}\n{prefix}\tNaN\ttrue\ttrue\n");
         assert!(parse_input(&nonfinite).unwrap_err().contains("finite number"));
-        let malformed_bool = format!("{header}\n{prefix}\t0.12\t0.02\tyes\ttrue\n");
+        let malformed_bool = format!("{header}\n{prefix}\t0.12\tyes\ttrue\n");
         assert!(parse_input(&malformed_bool).unwrap_err().contains("exactly true or false"));
     }
 
