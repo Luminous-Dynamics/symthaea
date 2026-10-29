@@ -1,0 +1,199 @@
+{
+  "schema_version": "gcrb-action-trace-v0.1",
+  "benchmark_id": "GOV-CAP-001",
+  "trace_id": "public-demo-six-gates-v1",
+  "recorder_id": "synthetic-demo-recorder-not-authenticated",
+  "capture_profile_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "fixture_sha256": "09d8c41eb33e2a6dcd3e190235e64dcc7811702e340f712b5e9c3c62059a3094",
+  "cases": [
+    {
+      "case_id": "GCRB-A01",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-revision",
+          "sequence": 1,
+          "kind": "commitment_revision",
+          "actor_id": "actor-a",
+          "actor_role": "public_official",
+          "before_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "after_commitment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "prior_version_retained": false
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A02",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A03",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A04",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A05",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A06",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A07",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A08",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-config",
+          "sequence": 1,
+          "kind": "evaluation_config_changed",
+          "actor_id": "operator-1",
+          "actor_role": "system",
+          "outcome_visible": true,
+          "previous_config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "new_config_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A09",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A10",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-rights",
+          "sequence": 1,
+          "kind": "rights_restriction",
+          "actor_id": "model-1",
+          "actor_role": "model"
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A11",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-evidence",
+          "sequence": 1,
+          "kind": "evidence_class_transition",
+          "actor_id": "reporter-1",
+          "actor_role": "system",
+          "evidence_class_from": "simulated",
+          "evidence_class_to": "observed"
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A12",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A13",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A14",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-appeal",
+          "sequence": 1,
+          "kind": "appeal_resolution",
+          "actor_id": "reviewer-1",
+          "actor_role": "independent_reviewer",
+          "challenged_authority_id": "authority-1",
+          "reviewer_id": "authority-1",
+          "reviewer_independent": false
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A15",
+      "capture_status": "complete",
+      "events": [
+        {
+          "event_id": "evt-emergency",
+          "sequence": 1,
+          "kind": "emergency_bypass",
+          "actor_id": "official-1",
+          "actor_role": "public_official"
+        }
+      ]
+    },
+    {
+      "case_id": "GCRB-A16",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A17",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-A18",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N01",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N02",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N03",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N04",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N05",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N06",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N07",
+      "capture_status": "unknown",
+      "events": []
+    },
+    {
+      "case_id": "GCRB-N08",
+      "capture_status": "unknown",
+      "events": []
+    }
+  ]
+}
