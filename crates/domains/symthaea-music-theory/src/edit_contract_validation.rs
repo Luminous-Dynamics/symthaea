@@ -406,10 +406,16 @@ pub fn validate_edit_contract(contract: &EditContract) -> ContractValidationRepo
             _ => {}
         }
 
-        if let Some(tolerance) = &change.tolerance {
-            for (code, message) in tolerance_issues(change.axis, tolerance) {
-                add_issue!(code, message);
+        match &change.tolerance {
+            Some(tolerance) => {
+                for (code, message) in tolerance_issues(change.axis, tolerance) {
+                    add_issue!(code, message);
+                }
             }
+            None => add_issue!(
+                "SCHEMA_REJECT",
+                "every requested change must declare an explicit tolerance".to_owned(),
+            ),
         }
 
         match validate_target(change.operation, &change.target) {
@@ -703,6 +709,12 @@ fn compatible_unit(axis: PropertyAxis, metric: ToleranceMetric, unit: Option<&st
     let Some(unit) = unit else {
         return false;
     };
+    match metric {
+        ToleranceMetric::Relative => return unit == "relative",
+        ToleranceMetric::FeatureDistance => return unit == "normalized-feature-distance",
+        ToleranceMetric::AnnotatorCalibrated => return unit == "calibrated-score",
+        _ => {}
+    }
     if metric == ToleranceMetric::LogRatio {
         return axis == PropertyAxis::Duration && unit == "log-ratio";
     }
