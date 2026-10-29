@@ -68,14 +68,50 @@ def canonical_model_bytes(
 
 
 def _model_unit_count(model_bytes: bytes) -> int:
-    if not model_bytes.startswith(MODEL_MAGIC) or len(model_bytes) < len(MODEL_MAGIC) + 4:
+    """Validate canonical bytes with the same invariants as the Rust model."""
+    header_end = len(MODEL_MAGIC) + 4
+    if not model_bytes.startswith(MODEL_MAGIC) or len(model_bytes) < header_end:
         raise ValueError("model bytes do not match the Rust v0.1 encoding")
-    n_units = struct.unpack("<I", model_bytes[len(MODEL_MAGIC):len(MODEL_MAGIC) + 4])[0]
+    n_units = struct.unpack("<I", model_bytes[len(MODEL_MAGIC):header_end])[0]
     if not 1 <= n_units <= MAX_DENSE_UNITS:
         raise ValueError("encoded model has an unsupported unit count")
-    expected_len = len(MODEL_MAGIC) + 4 + (1 << n_units) * n_units * 8 + n_units * n_units
+
+    state_count = 1 << n_units
+    probability_count = state_count * n_units
+    tpm_start = header_end
+    tpm_end = tpm_start + probability_count * 8
+    expected_len = tpm_end + n_units * n_units
     if len(model_bytes) != expected_len:
         raise ValueError("encoded model length does not match the Rust v0.1 dimensions")
+
+    tpm = struct.unpack(f"<{probability_count}d", model_bytes[tpm_start:tpm_end])
+    if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in tpm):
+        raise ValueError("encoded model contains an invalid TPM probability")
+    # The Rust encoder canonicalizes -0.0 to +0.0. Reject non-canonical bytes.
+    for offset in range(tpm_start, tpm_end, 8):
+        if struct.unpack("<Q", model_bytes[offset:offset + 8])[0] == (1 << 63):
+            raise ValueError("encoded model contains non-canonical negative zero")
+
+    connectivity = model_bytes[tpm_end:]
+    if any(edge not in (0, 1) for edge in connectivity):
+        raise ValueError("encoded model connectivity is not binary")
+
+    # Refuse a graph that omits a dependency present in the TPM; extra declared
+    # edges are permitted. Unit zero is the least-significant state-index bit.
+    for source in range(n_units):
+        for target in range(n_units):
+            if connectivity[source * n_units + target]:
+                continue
+            for state_without_source in range(state_count):
+                if (state_without_source >> source) & 1:
+                    continue
+                state_with_source = state_without_source | (1 << source)
+                p_without = tpm[state_without_source * n_units + target]
+                p_with = tpm[state_with_source * n_units + target]
+                if p_without != p_with:
+                    raise ValueError(
+                        f"encoded connectivity omits TPM influence {source}->{target}"
+                    )
     return n_units
 
 
