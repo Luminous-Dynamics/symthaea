@@ -6,7 +6,7 @@
 
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-004-family-transfer-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-004-family-transfer-v0.2";
 const FAMILY_COUNT: usize = 256;
 const SUPPORT_SAMPLES: usize = 256;
 const BASE_SEED: u64 = 0xC0A4_F411_1E5E_2026;
@@ -227,6 +227,7 @@ impl Strategy {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct FamilyOutcome {
     absolute_net_utility: f64,
+    gross_lift_vs_direct: f64,
     net_lift_vs_direct: f64,
     action: usize,
     model_abs_error: f64,
@@ -250,7 +251,9 @@ fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, que
         0.0
     };
     let direct_reward = expected_action_reward(spec, direct);
-    let net_utility = expected_action_reward(spec, action) - cost;
+    let candidate_reward = expected_action_reward(spec, action);
+    let gross_lift = candidate_reward - direct_reward;
+    let net_utility = candidate_reward - cost;
     let model_abs_error = match strategy {
         Strategy::AdditiveModel | Strategy::ShuffledModel => {
             let truth = [0.5, spec.heldout_action_one_probability()];
@@ -263,7 +266,8 @@ fn score_family(spec: FamilySpec, support: SupportMeans, strategy: Strategy, que
     };
     FamilyOutcome {
         absolute_net_utility: net_utility,
-        net_lift_vs_direct: net_utility - direct_reward,
+        gross_lift_vs_direct: gross_lift,
+        net_lift_vs_direct: gross_lift - cost,
         action,
         model_abs_error,
     }
@@ -297,6 +301,9 @@ struct Summary {
     query_cost_per_query: f64,
     family_count: usize,
     mean_net_utility: f64,
+    mean_gross_lift_vs_direct: f64,
+    mean_break_even_query_cost: f64,
+    beneficial_family_rate_before_cost: f64,
     mean_net_lift_vs_direct: f64,
     lift_ci95_low: f64,
     lift_ci95_high: f64,
@@ -314,6 +321,7 @@ fn summarize(
     outcomes: &[(FamilySpec, FamilyOutcome)],
 ) -> Summary {
     let lifts = outcomes.iter().map(|(_, outcome)| outcome.net_lift_vs_direct).collect::<Vec<_>>();
+    let gross_lifts = outcomes.iter().map(|(_, outcome)| outcome.gross_lift_vs_direct).collect::<Vec<_>>();
     let utilities = outcomes.iter().map(|(_, outcome)| outcome.absolute_net_utility).collect::<Vec<_>>();
     let errors = outcomes.iter().map(|(_, outcome)| outcome.model_abs_error).collect::<Vec<_>>();
     let actions = outcomes.iter().map(|(_, outcome)| outcome.action as f64).collect::<Vec<_>>();
@@ -324,6 +332,9 @@ fn summarize(
         query_cost_per_query: query_cost,
         family_count: outcomes.len(),
         mean_net_utility: mean(&utilities),
+        mean_gross_lift_vs_direct: mean(&gross_lifts),
+        mean_break_even_query_cost: if strategy.uses_model() { mean(&gross_lifts) / MODEL_QUERIES_PER_DECISION as f64 } else { 0.0 },
+        beneficial_family_rate_before_cost: if gross_lifts.is_empty() { 0.0 } else { gross_lifts.iter().filter(|value| **value > 1e-12).count() as f64 / gross_lifts.len() as f64 },
         mean_net_lift_vs_direct: avg,
         lift_ci95_low: low,
         lift_ci95_high: high,
@@ -379,6 +390,9 @@ fn render(rows: &[Summary]) -> String {
                 "\"query_cost_per_query\":{:.4},",
                 "\"family_count\":{},",
                 "\"mean_net_utility\":{:.8},",
+                "\"mean_gross_lift_vs_direct\":{:.8},",
+                "\"mean_break_even_query_cost\":{:.8},",
+                "\"beneficial_family_rate_before_cost\":{:.8},",
                 "\"mean_net_lift_vs_direct\":{:.8},",
                 "\"lift_ci95_low\":{:.8},",
                 "\"lift_ci95_high\":{:.8},",
@@ -390,7 +404,8 @@ fn render(rows: &[Summary]) -> String {
                 "}}"
             ),
             row.lane, row.strategy, row.query_cost_per_query, row.family_count,
-            row.mean_net_utility, row.mean_net_lift_vs_direct, row.lift_ci95_low,
+            row.mean_net_utility, row.mean_gross_lift_vs_direct, row.mean_break_even_query_cost,
+            row.beneficial_family_rate_before_cost, row.mean_net_lift_vs_direct, row.lift_ci95_low,
             row.lift_ci95_high, row.lower_cvar05_net_lift, row.minimum_family_net_lift,
             row.harmed_family_rate, row.mean_additive_prediction_mae, row.action_one_rate
         ));
@@ -491,6 +506,16 @@ mod tests {
         assert_eq!(model.action, 1);
         assert_eq!(oracle.action, 0);
         assert!(model.net_lift_vs_direct < 0.0);
+    }
+
+    #[test]
+    fn gross_lift_and_query_price_frontier_are_separated() {
+        let spec = FamilySpec::draw(0);
+        let support = SupportMeans::fit(spec, 0);
+        let free = score_family(spec, support, Strategy::AdditiveModel, 0.0);
+        let priced = score_family(spec, support, Strategy::AdditiveModel, 0.04);
+        assert!((free.net_lift_vs_direct - free.gross_lift_vs_direct).abs() < 1e-12);
+        assert!((priced.net_lift_vs_direct - priced.gross_lift_vs_direct + 0.08).abs() < 1e-12);
     }
 
     #[test]
