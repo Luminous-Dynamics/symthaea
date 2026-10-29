@@ -61,6 +61,8 @@ pub struct EvidenceInterventionPlanV1 {
     pub tool_manifest_sha256: String,
     pub budget_sha256: String,
     pub analysis_plan_sha256: String,
+    pub evaluator_revision_sha256: String,
+    pub decision_rules_sha256: String,
     pub randomization_commitment_sha256: String,
     pub required_conditions: Vec<String>,
     pub pairs: Vec<EvidenceInterventionPairV1>,
@@ -439,7 +441,7 @@ mod tests {
             required_conditions,
             pairs: vec![EvidenceInterventionPairV1 {
                 pair_id: "pair-1".to_owned(),
-                task_ref_sha256: digest('8'),
+                task_ref_sha256: digest('b'),
                 task_family_id: "causal-science".to_owned(),
                 trials,
             }],
