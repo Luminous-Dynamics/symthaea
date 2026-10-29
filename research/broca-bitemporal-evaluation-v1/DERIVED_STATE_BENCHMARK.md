@@ -10,7 +10,7 @@ A long-term memory system is not merely a search index or a collection of summar
 
 A change to one upstream event can invalidate several downstream conclusions without any new record explicitly stating those conclusions. Therefore every derived claim should be treated as a versioned computation with an inspectable dependency set, not as an independent fact. Retrieval, state maintenance, and answer synthesis must be scored separately.
 
-This follows a recent diagnostic result. **MemDerive** defines symbolic ground truth and derivation DAGs over 10 scenarios, 4,692 events and 1,503 queries. Its authors report that all evaluated memory systems lagged a simple BM25 baseline on derived-state tasks, while the same answer model reached 96.01% when given the gold supporting events. That separates an evidence-gathering failure from a reasoning failure and motivates measuring intermediate state directly. This result is specific to the tested systems and protocol, not a universal ranking.
+This follows a recent diagnostic result. **MemDerive** defines symbolic ground truth and derivation DAGs over 10 scenarios, 4,692 events and 1,503 queries. In its reported protocol, evaluated memory systems scored 30.41–48.30% on derived-state queries versus 58.28% for BM25; using the whole history yielded 79.84%, and supplying the gold supporting events yielded 96.01%. Systems refreshed 82.4% of explicit changes but only 41.1% of implicit dependency changes. This separates evidence-acquisition failure from state-maintenance and reasoning failure. These values are specific to the paper's system/model/protocol configuration, not universal rankings.
 
 ## 2. Protocol architecture
 
@@ -116,11 +116,11 @@ Use each benchmark for the question it actually measures:
 - **LongMemEval-V2 / AgentRunbook-C V2** — long-history end-to-end QA and accuracy-latency frontier: https://github.com/xiaowu0162/LongMemEval-V2 and https://xiaowu0162.github.io/longmemeval-v2/
 - **Agent Memory Leaderboard** — broader textual, coding, multimodal, governance and safety comparisons: https://agentmemories.ai/evaluation
 
-The LongMemEval-V2 project page currently lists AgentRunbook-C at 74.9% overall accuracy on Small (108.3-second reported latency) and 70.1% on Medium (139.9 seconds). These are useful public comparison points, but are not yet Broca baselines and must be reproduced under the same harness before a claim of superiority. TrustMem reports a 12.14-point HaluMem extraction F1 gain over its strongest evaluated baseline, and TAME reports a 14.6-percentage-point gain on GPT-5.2 AIME versus its evaluated strongest method; these results address different tasks and must not be compared numerically to LongMemEval-V2.
+The LongMemEval-V2 published baseline table lists AgentRunbook-C at 74.9% overall accuracy on Small (108.3-second reported latency) and 70.1% on Medium (139.9 seconds). The official page's separate leaderboard section currently says leaderboard entries are coming soon; do not mistake the baseline table for a Broca submission or for an independently verified leaderboard result. Reproduce the baseline under the same harness before claiming superiority. TrustMem reports a 12.14-point HaluMem extraction F1 gain over its strongest evaluated baseline, and TAME reports a 14.6-percentage-point gain on GPT-5.2 AIME versus its evaluated strongest method; these results address different tasks and must not be compared numerically to LongMemEval-V2.
 
 ## 9. Implementation sequence
 
-1. Build a Rust symbolic oracle and state/derivation output schema behind a feature gate.
+1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
 2. Make B0–B5 run against the same deterministic event prefixes; log intermediate states and evidence IDs.
 3. Add seeded trajectory generation and mutation/property tests for every invariant.
 4. Add atomic update, crash/restart, replay and reindex tests before connecting the implementation to the worker.
