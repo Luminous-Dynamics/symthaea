@@ -91,6 +91,19 @@ These targets are intentionally falsifiable. They must be revised *before* a qua
 - Before connecting to production code, add a seeded causal-intervention task generator, blind mechanism split, replay-receipt binding, and an independent outcome recorder. The live cognitive loop should not be changed by this research harness.
 
 
+## Factor-composition task generator
+
+A second isolated Rust crate at `research/cmaq-001/generator/` generates deterministic sparse-parity causal-transfer cases. It keeps agent-visible event histories separate from evaluator-only active-factor masks and targets; the generator manifest SHA-256-binds both exact output files. This is synthetic benchmark infrastructure, not a score or evidence of model capability.
+
+```bash
+cd research/cmaq-001/generator
+cargo test --locked
+cargo run --quiet --locked -- --seed 4242 --factors 8 --radius 2 --out /tmp/cmaq-factor-pilot
+```
+
+The generator has its own focused workflow. Its tests and smoke run must pass on the exact PR head before the generator is treated as qualified. Extend its task families before drawing conclusions about general causal competence.
+
+
 ## Run the scorer
 
 From the repository root:
