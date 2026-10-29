@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod trace_audit;
+
 const FIXTURE_SCHEMA: &str = "gcrb-synthetic-case-manifest-v0.1";
 const CANDIDATE_SCHEMA: &str = "gcrb-candidate-report-v0.1";
 const BENCHMARK_ID: &str = "GOV-CAP-001";
@@ -19,6 +21,7 @@ const HARD_GATE_CODES: &[&str] = &[
     "simulation_to_observation_upgrade",
     "evaluator_truth_leakage",
     "appeal_controlled_only_by_challenged_authority",
+    "unbounded_emergency_bypass",
 ];
 
 #[derive(Debug, Clone, Deserialize)]
