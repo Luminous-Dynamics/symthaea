@@ -113,6 +113,8 @@ pub struct AudioPreservationReport {
     pub total_frames: usize,
     /// Full thresholds and window geometry used to produce this report.
     pub config: PreservationConfig,
+    /// Exact half-open edit mask used for this report; required for metric replay.
+    pub authorized_edits: Vec<FrameInterval>,
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
@@ -318,6 +320,7 @@ pub fn audit_protected_audio(
         channels: reference.channels,
         total_frames,
         config: config.clone(),
+        authorized_edits: authorized_edits.to_vec(),
         effective_boundary_guard_frames: config.boundary_guard_frames,
         reference_audio_sha256,
         candidate_audio_sha256,
@@ -335,6 +338,47 @@ pub fn audit_protected_audio(
     Ok(report)
 }
 
+
+
+/// Recompute the full acoustic report against the supplied audio buffers and
+/// the exact authorization mask recorded in that report. A valid receipt alone
+/// is insufficient: a caller could re-seal a modified metric, so the measured
+/// values and verdict must match a fresh run as well.
+pub fn verify_audio_preservation_against_buffers(
+    reference: AudioView<'_>,
+    candidate: AudioView<'_>,
+    report: &AudioPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    if !verify_audio_preservation_receipt(report)? {
+        return Ok(false);
+    }
+    let replay = audit_protected_audio(
+        reference,
+        candidate,
+        &report.authorized_edits,
+        &report.config,
+    )?;
+    Ok(replay == *report)
+}
+
+/// Recompute spectral-flux onset events and the final verdict from the supplied
+/// buffers and the exact authorization mask recorded in that report.
+pub fn verify_onset_preservation_against_buffers(
+    reference: AudioView<'_>,
+    candidate: AudioView<'_>,
+    report: &OnsetPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    if !verify_onset_preservation_receipt(report)? {
+        return Ok(false);
+    }
+    let replay = audit_onset_preservation(
+        reference,
+        candidate,
+        &report.authorized_edits,
+        &report.config,
+    )?;
+    Ok(replay == *report)
+}
 
 /// Hash a fully serialized report with its receipt field cleared. Struct field
 /// order is explicit in the derived Serialize shape; the domain tag prevents
@@ -701,6 +745,8 @@ pub struct OnsetPreservationReport {
     pub total_frames: usize,
     /// Full detector settings needed to reproduce event extraction.
     pub config: OnsetPreservationConfig,
+    /// Exact half-open edit mask used for this report; required for metric replay.
+    pub authorized_edits: Vec<FrameInterval>,
     /// Explicit guard plus the spectral-flux analysis footprint.
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
@@ -877,6 +923,7 @@ pub fn audit_onset_preservation(
         channels: reference.channels,
         total_frames,
         config: config.clone(),
+        authorized_edits: authorized_edits.to_vec(),
         effective_boundary_guard_frames,
         reference_audio_sha256: audio_digest(reference),
         candidate_audio_sha256: audio_digest(candidate),
@@ -1480,6 +1527,39 @@ mod tests {
             .expect("valid abstaining reports compose conservatively");
         assert_eq!(composite.verdict, PreservationVerdict::Abstain);
         assert!(composite.reasons.iter().any(|reason| reason.contains("abstained")));
+    }
+
+    #[test]
+    fn acoustic_report_replay_recomputes_metrics_even_if_a_modified_report_is_resealed() {
+        let reference = sine(4096, 16_000, 440.0);
+        let mut candidate = reference.clone();
+        candidate[1024..1152].fill(0.0);
+        let mask = [FrameInterval { start_frame: 3072, end_frame: 3200 }];
+        let report = audit_protected_audio(
+            view(&reference), view(&candidate), &mask, &calibrated_config(),
+        ).expect("base report");
+        assert!(verify_audio_preservation_against_buffers(
+            view(&reference), view(&candidate), &report
+        ).expect("base report replays"));
+
+        let mut forged = report.clone();
+        forged.worst_spectral_distance = 0.0;
+        forged.receipt_sha256 = receipt_sha256(&forged).expect("forged receipt can be serialized");
+        assert!(!verify_audio_preservation_against_buffers(
+            view(&reference), view(&candidate), &forged
+        ).expect("sealed but incorrect metric should be rejected"));
+    }
+
+    #[test]
+    fn onset_report_replay_rejects_audio_substitution_even_with_an_intact_receipt() {
+        let reference = sine(4096, 16_000, 440.0);
+        let candidate = sine(4096, 16_000, 880.0);
+        let report = audit_onset_preservation(
+            view(&reference), view(&reference), &[], &onset_config(),
+        ).expect("base report");
+        assert!(!verify_onset_preservation_against_buffers(
+            view(&reference), view(&candidate), &report
+        ).expect("matched format but wrong content replays to a different report"));
     }
 
 }
