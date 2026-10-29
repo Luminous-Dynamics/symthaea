@@ -15,7 +15,7 @@ from pathlib import Path
 import sys
 from typing import Any, Sequence
 
-from paired_benchmark_audit import canonical_json
+from paired_benchmark_audit import analyze_manifest, canonical_json
 from promotion_risk_gate import clopper_pearson_upper_bound
 
 SCHEMA_VERSION = "1.0.0"
@@ -199,10 +199,12 @@ def _check(label: str, passed: bool, detail: str, failures: list[dict[str, str]]
 
 def assess_promotion(
     paired_receipt: Any,
+    paired_run_manifest: Any,
     contract_raw: Any,
     validation_raw: Any,
     *,
-    paired_manifest_sha256: str,
+    paired_receipt_file_sha256: str,
+    paired_run_manifest_sha256: str,
     contract_manifest_sha256: str,
     validation_manifest_sha256: str,
     evaluator_sha256: str,
@@ -210,12 +212,22 @@ def assess_promotion(
     contract = validate_contract(contract_raw)
     validation = validate_validation_manifest(validation_raw)
     for name, digest in (
-        ("paired_manifest_sha256", paired_manifest_sha256),
+        ("paired_receipt_file_sha256", paired_receipt_file_sha256),
+        ("paired_run_manifest_sha256", paired_run_manifest_sha256),
         ("contract_manifest_sha256", contract_manifest_sha256),
         ("validation_manifest_sha256", validation_manifest_sha256),
         ("evaluator_sha256", evaluator_sha256),
     ):
         _sha256(digest, name)
+
+    # Recompute from the frozen run manifest. Hashes on an unchecked JSON receipt
+    # alone do not make caller-supplied metrics trustworthy.
+    expected_paired = analyze_manifest(paired_run_manifest)
+    expected_paired["source_artifacts"]["raw_manifest_sha256"] = paired_run_manifest_sha256
+    audit_source = Path(__file__).with_name("paired_benchmark_audit.py").read_bytes()
+    expected_paired["evaluator_sha256"] = hashlib.sha256(audit_source).hexdigest()
+    if not isinstance(paired_receipt, dict) or canonical_json(paired_receipt) != canonical_json(expected_paired):
+        raise ValueError("paired receipt does not match recomputation from the supplied run manifest")
 
     if not isinstance(paired_receipt, dict):
         raise ValueError("paired receipt must be an object")
@@ -471,7 +483,8 @@ def assess_promotion(
         "failed_checks": failures,
         "inconclusive_checks": inconclusive,
         "source_artifacts": {
-            "paired_receipt_manifest_sha256": paired_manifest_sha256,
+            "paired_receipt_file_sha256": paired_receipt_file_sha256,
+            "paired_run_manifest_sha256": paired_run_manifest_sha256,
             "promotion_contract_sha256": contract_manifest_sha256,
             "validation_manifest_sha256": validation_manifest_sha256,
         },
@@ -513,23 +526,29 @@ def _load_json(path: Path, label: str) -> tuple[bytes, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paired_receipt", type=Path)
+    parser.add_argument("paired_run_manifest", type=Path, help="frozen run manifest used to produce the paired receipt")
     parser.add_argument("contract", type=Path)
     parser.add_argument("validation_manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        input_paths = {args.paired_receipt.resolve(), args.contract.resolve(), args.validation_manifest.resolve()}
-        if len(input_paths) != 3:
-            raise ValueError("paired receipt, contract, and validation manifest must be distinct paths")
+        input_paths = {
+            args.paired_receipt.resolve(), args.paired_run_manifest.resolve(),
+            args.contract.resolve(), args.validation_manifest.resolve(),
+        }
+        if len(input_paths) != 4:
+            raise ValueError("paired receipt, run manifest, contract, and validation manifest must be distinct paths")
         output_path = args.output.resolve()
         if output_path in input_paths:
             raise ValueError("output must not overwrite any input")
         paired_raw, paired = _load_json(args.paired_receipt, "paired receipt")
+        paired_manifest_raw, paired_manifest = _load_json(args.paired_run_manifest, "paired run manifest")
         contract_raw, contract = _load_json(args.contract, "promotion contract")
         validation_raw, validation = _load_json(args.validation_manifest, "validation manifest")
         receipt = assess_promotion(
-            paired, contract, validation,
-            paired_manifest_sha256=hashlib.sha256(paired_raw).hexdigest(),
+            paired, paired_manifest, contract, validation,
+            paired_receipt_file_sha256=hashlib.sha256(paired_raw).hexdigest(),
+            paired_run_manifest_sha256=hashlib.sha256(paired_manifest_raw).hexdigest(),
             contract_manifest_sha256=hashlib.sha256(contract_raw).hexdigest(),
             validation_manifest_sha256=hashlib.sha256(validation_raw).hexdigest(),
             evaluator_sha256=hashlib.sha256(Path(__file__).resolve().read_bytes()).hexdigest(),
