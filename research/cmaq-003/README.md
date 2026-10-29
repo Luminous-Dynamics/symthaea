@@ -153,7 +153,7 @@ Never infer a safety rate from a raw aggregate zero. Report independent exposure
 ## Initial graduation targets (hypotheses, not results)
 
 1. At least **10% relative improvement in post-shift constrained regret** versus the strongest eligible non-oracle baseline, with a paired 95% interval excluding zero.
-2. In the 256-step abrupt-shift lane, **90th-percentile detection delay ≤8 steps**; in stationary S0, **≤1 false reset per 1,000 steps**.
+2. In the 256-step abrupt-shift lane, **detection coverage ≥95% and 90th-percentile detection delay ≤8 steps**; in stationary S0, **≤1 false reset per 1,000 steps**.
 3. On observation-only drift S4, **≤5% of episodes are falsely diagnosed as causal-mechanism changes**. No observed safety-envelope violations are reported with exposure count and an appropriate one-sided uncertainty bound. Roughly 3,000 *independent* zero-violation exposures are needed for a 95% upper bound near 0.1%; correlated timesteps must not be counted as independent exposures.
 4. No corrupted, replayed, duplicated or wrong-epoch evidence receipt is accepted as valid model-updating evidence.
 5. Improvement persists on held-out causal families, equal probe/action costs, the negative controls, and ablations.
