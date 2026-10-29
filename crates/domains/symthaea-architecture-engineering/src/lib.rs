@@ -12,6 +12,7 @@ use serde_json::Value;
 
 pub mod paired_evaluation;
 pub mod synthetic_search;
+pub mod multi_fidelity;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
