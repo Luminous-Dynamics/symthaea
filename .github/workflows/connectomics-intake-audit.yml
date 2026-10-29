@@ -5,6 +5,9 @@ on:
     paths:
       - "tools/connectomics-intake-audit/**"
       - "docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json"
+      - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
+      - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
       - ".github/workflows/connectomics-intake-audit.yml"
   push:
     branches: [main]
