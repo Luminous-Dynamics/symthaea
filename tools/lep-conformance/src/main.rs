@@ -47,9 +47,9 @@ fn main() -> ExitCode {
     };
 
     let report = verify_statement(&statement);
-    let valid = report.valid;
+    let conforms = report.conforms;
     emit(&report);
-    if valid {
+    if conforms {
         ExitCode::SUCCESS
     } else {
         ExitCode::from(1)
