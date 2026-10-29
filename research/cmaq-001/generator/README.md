@@ -20,24 +20,24 @@ Run from this directory:
     cargo test --locked
     cargo run --locked -- --seed 4242 --factors 8 --radius 2 --out /tmp/cmaq-dataset
 
-The output directory must not already contain any of the generated filenames. This prevents accidentally overwriting a qualification bundle. Options:
+The output root must not already contain generated files; the generator refuses to overwrite either bundle. This prevents accidentally overwriting a qualification bundle. Options:
 
 - --seed N: deterministic 64-bit seed. If omitted, CMAQ_SEED is read; otherwise the public development default is 7.
 - --factors N: number of reusable factors, from 4 through 24; default 8.
 - --radius N: feature values span the integer interval -N..=N, with N from 1 through 10; default 2.
 - --out DIR: output directory; required.
 
-The dataset contains:
+The output root contains two physically separate bundles under candidate/ and evaluator/. Hand only the candidate/ directory to the system under test. The dataset contains:
 
 | File | Candidate-visible? | Purpose |
 |---|---:|---|
-| support-observations.tsv | Yes | One observed intervention per row: factors, context, chosen action, reward and observed safety/outcome. Unchosen counterfactuals are absent. |
-| qualification-cases.tsv | Yes | Held-out factor compositions and context features, allowed actions, the evidence ID required by the scorer, and whether explicit approval is required. |
-| policy-evidence.tsv | Yes | The stable evidence record referenced by the qualification cases. |
-| answer-key.tsv | **Evaluator only** | Counterfactual reward/safety/outcome for every action. Never pass this file to the candidate. |
-| manifest.json | Evaluator only by default | Schema, split rule, seed commitment, row counts, and SHA-256 digests of the exact generated files. |
+| candidate/support-observations.tsv | Yes | One observed intervention per row: factors, context, chosen action, reward and observed safety/outcome. Unchosen counterfactuals are absent. |
+| candidate/qualification-cases.tsv | Yes | Held-out factor compositions and context features, allowed actions, the evidence ID required by the scorer, and whether explicit approval is required. |
+| candidate/policy-evidence.tsv | Yes | The stable evidence record referenced by the qualification cases. |
+| evaluator/answer-key.tsv | **Evaluator only** | Counterfactual reward/safety/outcome for every action. Never pass this file to the candidate. |
+| evaluator/manifest.json | Evaluator only | Schema, split rule, seed commitment, row counts, and SHA-256 digests of the exact generated files. |
 
-The qualification cases have the same case_id values as the answer key and can be joined by that ID. The answer key columns are compatible with the parent CMAQ-001 trace scorer. The visible cases deliberately do not contain mechanism IDs, reward labels, safety labels, or action outcomes.
+The qualification cases in candidate/ have the same case_id values as the answer key in evaluator/ and can be joined by that ID. The generator writes no answer key or manifest into candidate/. The answer key columns are compatible with the parent CMAQ-001 trace scorer. The visible cases deliberately do not contain mechanism IDs, reward labels, safety labels, or action outcomes.
 
 ## Split semantics
 
