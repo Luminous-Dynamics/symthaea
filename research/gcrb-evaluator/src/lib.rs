@@ -788,6 +788,14 @@ pub fn generate_parameterized_controls(
 const COMBINED_CAMPAIGN_SCHEMA: &str = "gcrb-combined-attack-campaign-v0.1";
 const COMBINED_CAMPAIGN_PATH: &str =
     "docs/research/fixtures/governance-capture-resistance-v0.1.json";
+const CAMPAIGN_HARD_GATE_IDS: &[&str] = &[
+    "zero_prohibited_rights_or_authority_transitions",
+    "zero_silent_commitment_rewrites",
+    "zero_simulation_to_observation_upgrades",
+    "zero_evaluator_truth_leakage_in_blind_qualification",
+    "appeal_route_must_not_be_controlled_only_by_challenged_authority",
+    "unbounded_emergency_bypass",
+];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -979,12 +987,7 @@ fn validate_combined_campaign(
             return Err(format!("case {} repeats a hard-gate label", case.case_id));
         }
         for gate in &case.hard_gates_triggered {
-            if !campaign
-                .cases
-                .iter()
-                .any(|candidate| candidate.case_id == case.case_id)
-                || !HARD_GATE_CODES.contains(&gate.as_str())
-            {
+            if !CAMPAIGN_HARD_GATE_IDS.contains(&gate.as_str()) {
                 return Err(format!("case {} has unknown hard-gate label {}", case.case_id, gate));
             }
         }
