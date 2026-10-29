@@ -363,6 +363,7 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             let a=&result.aggregates[method_idx][hidx];
             let (point,se_point,lo_point,hi_point)=wilson(a.point_hits,a.trials);
             let (seq,se_seq,lo_seq,hi_seq)=wilson(a.sequence_hits,a.trials);
+            let (false_exclusion,se_false_exclusion,lo_false_exclusion,hi_false_exclusion)=wilson(a.trials-a.sequence_hits,a.trials);
             let (prom,se_prom,lo_prom,hi_prom)=wilson(a.promotion_hits,a.trials);
             let (rev,_,_,_)=wilson(a.reversed_hits,a.trials);
             let (width,se_width)=mean_se(a.width_sum,a.width_sq_sum,a.trials);
@@ -372,6 +373,7 @@ fn emit_scenario(out: &mut String, result: &ScenarioOutput, horizons: &[usize]) 
             for (name,estimate,se,lo,hi) in [
                 ("pointwise_coverage",point,se_point,lo_point,hi_point),
                 ("sequence_coverage",seq,se_seq,lo_seq,hi_seq),
+                ("sequence_false_exclusion_probability",false_exclusion,se_false_exclusion,lo_false_exclusion,hi_false_exclusion),
                 (promotion_metric,prom,se_prom,lo_prom,hi_prom),
             ] {
                 let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",result.scenario,method,horizon,name,estimate,se,lo,hi);
