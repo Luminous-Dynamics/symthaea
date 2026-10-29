@@ -494,7 +494,6 @@ pub fn score_atom_ablation_jsonl(
     let fixtures = validate_counterfactual_fixture_jsonl(input_fixture_jsonl)?;
     let expected_fixture_sha256 = hex::encode(Sha256::digest(input_fixture_jsonl.as_bytes()));
     let mut fixture_evidence_keys = BTreeSet::<(String, String)>::new();
-    let mut fixture_case_ids = BTreeSet::<String>::new();
     let mut fixture_case_evidence = BTreeMap::<String, BTreeSet<String>>::new();
     let mut fixture_pair_cases = BTreeMap::<String, BTreeSet<String>>::new();
     for pair in &fixtures {
@@ -503,7 +502,6 @@ pub fn score_atom_ablation_jsonl(
             pair.cases.iter().map(|case| case.case_id.clone()).collect(),
         );
         for case in &pair.cases {
-            fixture_case_ids.insert(case.case_id.clone());
             let case_evidence_ids: BTreeSet<_> = case
                 .evidence
                 .iter()
@@ -650,6 +648,25 @@ pub fn score_atom_ablation_jsonl(
             || item.system_commit_sha != system_commit_sha
     }) {
         return Err("all observations in one score run must pin identical run, reader, fixture, prompt, tokenizer, and code revisions".into());
+    }
+
+    let mut full_baseline_by_case =
+        BTreeMap::<String, (BTreeMap<String, String>, usize)>::new();
+    for observation in &observations {
+        let candidate = (&observation.full_fields, observation.full_context_tokens);
+        if let Some((fields, token_count)) = full_baseline_by_case.get(&observation.case_id) {
+            if fields != candidate.0 || *token_count != candidate.1 {
+                return Err(format!(
+                    "full-context baseline changed across atom ablations for case {:?}",
+                    observation.case_id
+                ));
+            }
+        } else {
+            full_baseline_by_case.insert(
+                observation.case_id.clone(),
+                (observation.full_fields.clone(), observation.full_context_tokens),
+            );
+        }
     }
 
     let mut judgments = Vec::with_capacity(observations.len());
@@ -1039,6 +1056,15 @@ mod tests {
         assert_eq!(result.ignore_overuse_count, 1);
         assert_eq!(result.control_underuse_count, 1);
         assert_eq!(result.bound_underuse_count, 1);
+    }
+
+    #[test]
+    fn atom_ablation_scorer_requires_a_shared_full_context_baseline_per_case() {
+        let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
+        let mut rows = synthetic_ablation_rows(&fixture_sha256);
+        rows[1]["full_fields"]["claim.retry_limit.value"] = serde_json::json!("7");
+        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
     }
 
     #[test]
