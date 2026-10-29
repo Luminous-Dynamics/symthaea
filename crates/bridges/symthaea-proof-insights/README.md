@@ -60,6 +60,7 @@ Before a future successor protocol uses solver budget, reconcile the candidate s
 cargo run -p symthaea-proof-insights --bin audit_component_split_feasibility -- \
   ./component-first-candidate.json \
   ./data/benchmarks/proof-insight-transfer-v0/target-eligibility-census.json \
+  ./source-family-component-manifest.json \
   ./component-split-feasibility-report.json
 ```
 
