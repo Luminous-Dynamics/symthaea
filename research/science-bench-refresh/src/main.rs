@@ -1,6 +1,7 @@
 use science_bench_refresh_validator::{
-    compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
-    validate_manifest_bytes, verify_regeneration, verify_reveal,
+    audit_policy_input_overlap, compute_artifact_commitment, compute_protocol_commitment,
+    generate_task_set_bytes, sha256_hex, validate_manifest_bytes, verify_regeneration,
+    verify_reveal,
 };
 use serde_json::json;
 use std::env;
@@ -12,6 +13,7 @@ fn usage(program: &str) {
         concat!(
             "usage:\n",
             "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
+            "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
             "  {program} protocol-commit MANIFEST.json\n",
             "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
             "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
@@ -36,6 +38,46 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "audit-overlap" => {
+            if args.len() != 5 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let left_bytes = match read(&args[2], "left task set") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let right_bytes = match read(&args[4], "right task set") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match audit_policy_input_overlap(
+                &args[1],
+                &left_bytes,
+                &args[3],
+                &right_bytes,
+            ) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("overlap audit report serializes")
+            );
+            if report.exact_overlap_pair_count > 0 {
+                ExitCode::from(6)
+            } else if report.near_duplicate_candidate_pair_count > 0 {
+                // Similarity is not a confirmed leak, but qualification must
+                // pause until a reviewer resolves all numeric-near candidates.
+                ExitCode::from(7)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
         "protocol-commit" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");
