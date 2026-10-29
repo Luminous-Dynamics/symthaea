@@ -631,6 +631,14 @@ fn rms_db(samples: &[f32]) -> f32 {
 /// SHA-256 over domain-separated, canonical little-endian f32 sample bits and
 /// sample-format metadata. This detects input substitution; it does not prove
 /// authorship or trusted capture.
+/// Public content commitment for a validated audio buffer. The digest binds
+/// the sample rate, channel count, frame count, and exact f32 sample bits.
+/// It is an integrity value, not evidence of authorship or causal rendering.
+pub fn audio_content_sha256(view: AudioView<'_>) -> Result<String, AudioAuditInputError> {
+    validate_view(view)?;
+    Ok(audio_digest(view))
+}
+
 fn audio_digest(view: AudioView<'_>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous-dynamics-audio-preservation-buffer-v1\0");
