@@ -319,14 +319,29 @@ This document is public; it contains **no hidden qualification data or labels**.
 
 No sealed qualification, retrospective ground-truth evaluation, or prospective field study has occurred. The protocol is a design contract, not evidence that any gate has passed.
 
-### GCRB-4 — Cross-system adapters
+### GCRB-4 — Cross-system adapters and exact source boundaries
 
-- Mycelix: exact commitment/event/reference and appeal-history adapters.
-- Symthaea: evidence graph, counterclaim, uncertainty, and forecast adapters.
-- Symtropy: forecast/scenario adapter with an explicit simulated-evidence type.
-- Independent evaluator: separately implemented manifest/verifier path, fixed known-answer vectors, and candidate/evaluator separation.
+The current public source review is recorded in `docs/research/fixtures/governance-capture-resistance-adapter-map-v0.1.json`. It pins inspected source paths and blob SHAs, identifies the owning types, and labels each adapter as **not implemented** unless explicitly stated otherwise.
 
-Use typed references into existing owners; do not duplicate ledger, governance, policy, or simulation state machines.
+**Mycelix Justice Cases — reuse the existing dispute lifecycle.** The inspected `mycelix-workspace/mycelix-civic/zomes/justice-cases/integrity/src/lib.rs` defines typed `Case`, `Evidence`, `Decision`, and `Appeal` records. A future GCRB adapter should package an anomaly and supporting evidence as a reviewable, non-adjudicatory referral; an authorized human or institution can then use the relevant Mycelix path. GCRB must not open punitive cases automatically, turn an anomaly into guilt, or maintain a competing case/appeal ledger. Exact source reviewed: blob `041b56c7d21ab1cfc92d3a72363c8d3c817ee2f6`.
+
+**Mycelix DeSci — reuse the integrity pattern, not the credential-specific payloads.** The inspected `mycelix-workspace/mycelix-desci/src/core/src/scientific_credential_governance.rs` has a versioned `CredentialGovernanceEnvelope` with actor, sequence, previous hash, idempotency key, and typed payload; a `RecordedCredentialGovernanceEvent` adds receipt time and an acceptance-service signature; and `CredentialTransparencyCheckpoint` records event heads and Merkle roots. This is a useful reference for a future civic-event profile, but credential-governance payload semantics must not be repurposed for civic allegations. A GCRB-specific profile would need its own event types, actor roles, authorization rules, privacy policy, and verifier. Exact source reviewed: blob `ddaa73a037925de327c46063cc36b331d951d22b`.
+
+**Symtropy world simulation — preserve the simulation/observation boundary.** The inspected `crates/domains/symtropy-world/src/snapshot.rs` exposes `SimSnapshot`, `GovernanceSummary`, `EconomySummary`, `SimEvent`, and `PlayerAction`; `crates/domains/symtropy-world/src/bridge.rs` exposes the threaded `WorldBridge`. These are simulation/transport structures, not themselves durable, authenticated evidence receipts. Any future adapter must persist an explicit simulated-evidence record binding the exact simulator commit/build, scenario and configuration hashes, random seed, tick/horizon, input manifest digest, output digest, uncertainty, and limitations. Only a separate measurement source can establish an observed service outcome. Source blobs: snapshot `aff46e12bfcc1a131984b70be87d7916716debf5`; bridge `e7f65dde85bb812d402ebc531443307536cc3fba`.
+
+**Symtropy–Mycelix simulation bridge — source present is not runtime integration.** The inspected `crates/bridges/symtropy-sim-bridge/` imports `mycelix-multiworld-sim` governance/economy state, but the standalone Symtropy `Cargo.toml` explicitly notes that this bridge is not wired into the default dependency graph because dependencies were stripped/unpublished in the standalone repository. GCRB therefore does **not** claim live three-way integration. Resolve and verify that build boundary independently before implementing or advertising such an adapter. Source blobs: bridge `055fe063c4a8389fae8a283823d7bc7933bc136c`; bridge manifest `3f9f096ad52e9d87f63e5da734d6e8ab88b33b4b`; Symtropy root manifest `274720e256ba9067fad3d06f71e1b18590b046bd`.
+
+**Symthaea and evaluator boundary.** Symthaea may produce claim/evidence analysis, uncertainty estimates, counterclaims, forecasts, and abstentions. It cannot supply the independent ground truth or self-qualify its own output. The trace auditor must consume independently captured records and report gaps explicitly; it cannot treat its own trace input as proof of completeness.
+
+Proposed adapter sequence:
+
+1. Define the GCRB civic event/receipt schema and test canonicalization, versioning, authorization, replay, and rollback behavior in isolation.
+2. Build a read-only adapter from Mycelix Justice Cases records into GCRB evaluation inputs. Keep case-opening, adjudication, remedies, and appeals under their existing human-authorized owner.
+3. Build a Symtropy output adapter that emits a versioned `simulated` evidence object, never an observed-outcome assertion.
+4. Define separate observation adapters and provenance requirements for real-world outcomes.
+5. Only after exact dependency paths and schemas are verified, run a reproducible cross-system contract test with pinned commit/build digests and explicit negative controls.
+
+Use typed references into existing owners; do not duplicate ledger, governance, policy, or simulation state machines. The adapter map is a source-audited design artifact; no runtime adapter, cross-repository contract test, or production interoperability is claimed.
 
 ### GCRB-5 — Public retrospective corpus
 
