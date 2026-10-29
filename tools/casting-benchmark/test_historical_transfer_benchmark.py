@@ -20,6 +20,7 @@ from historical_transfer_benchmark import (
     TASK_SUITE_SHA256,
     _descriptor,
     _validate_task_registry,
+    _bootstrap_mean_interval,
     _f1,
     _metrics,
     design_point,
@@ -129,6 +130,11 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         for policy, comparison in receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"].items():
             self.assertEqual(comparison["held_out_family_units"], 8)
             self.assertEqual(len(comparison["by_family"]), 8)
+            interval = comparison["bootstrap_95pct_ci_macro_mean_relative_objective_mae_reduction"]
+            self.assertEqual(len(interval), 2)
+            self.assertLessEqual(interval[0], interval[1])
+            self.assertEqual(comparison["bootstrap_replicates"], 2000)
+            self.assertEqual(comparison["bootstrap_seed"], 17)
 
     def test_source_archive_cannot_contain_target_task_ids(self):
         receipt = run_benchmark(history_points=2, test_points=8, nearest_k=3, reuse_count=1)
@@ -153,6 +159,15 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         self.assertEqual(_f1(set(), set()), 1.0)
         self.assertEqual(_f1({1}, set()), 0.0)
         self.assertEqual(_f1({1, 2}, {2, 3}), 0.5)
+
+    def test_family_bootstrap_interval_is_deterministic_and_ordered(self):
+        values = [0.1, 0.2, -0.05, 0.3, 0.25, 0.0, 0.18, -0.1]
+        first = _bootstrap_mean_interval(values, replicates=500, seed=19)
+        second = _bootstrap_mean_interval(values, replicates=500, seed=19)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 2)
+        self.assertLessEqual(first[0], first[1])
+        self.assertIsNone(_bootstrap_mean_interval([]))
 
     def test_repeat_run_is_byte_stable_except_source_digest_not_affected_by_output(self):
         first = run_benchmark(history_points=2, test_points=8, nearest_k=3, reuse_count=10)
