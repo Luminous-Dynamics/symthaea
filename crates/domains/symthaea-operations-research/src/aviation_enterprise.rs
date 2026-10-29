@@ -1182,7 +1182,7 @@ pub fn solve_branch_and_bound(
                     depth: flight_index + 1,
                     choices,
                     lower_bound: node.lower_bound,
-                    serial,
+                    serial: 0,
                 },
             );
             serial = serial.saturating_add(1);
@@ -1204,7 +1204,7 @@ pub fn solve_branch_and_bound(
                 depth: flight_index + 1,
                 choices: cancelled_choices,
                 lower_bound: cancellation_bound,
-                serial,
+                serial: 0,
             },
         );
         serial = serial.saturating_add(1);
