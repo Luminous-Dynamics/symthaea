@@ -20,6 +20,8 @@ use sha2::{Digest, Sha256};
 
 const UPSTREAM: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const V0_PARTITION: &str = "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
+const EXPECTED_FAMILY_UNIVERSE_SHA256: &str =
+    "c8ee398840443fb0693e50baa1dfda9982cd8bfebe1f81d9de3050e3b15cb048";
 const CENSUS_SCHEMA: &str = "pitb.pre-split-target-eligibility-census.v0";
 const MIN_HELDOUT_COMPONENTS: usize = 20;
 const SPLITS: [&str; 3] = ["train", "validation", "test"];
@@ -62,6 +64,7 @@ struct CensusTarget {
 
 #[derive(Debug)]
 struct CandidateSplit {
+    dataset_kind: String,
     bytes_sha256: String,
     partition_digest_sha256: String,
     family_to_split: BTreeMap<String, String>,
@@ -117,6 +120,15 @@ fn partition_digest(assignments: &BTreeMap<String, String>) -> String {
     sha256(material.as_bytes())
 }
 
+fn family_universe_digest(families: &BTreeSet<String>) -> String {
+    let mut material = String::new();
+    for family_id in families {
+        material.push_str(family_id);
+        material.push('\n');
+    }
+    sha256(material.as_bytes())
+}
+
 fn component_quotas(component_count: usize) -> [usize; 3] {
     let train_end = component_count * 70 / 100;
     let validation_end = component_count * 85 / 100;
@@ -148,7 +160,11 @@ fn safe_repo_path(value: &str) -> bool {
 fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     let doc: Value = serde_json::from_slice(bytes)
         .context("parse component-first candidate split")?;
-    if doc["schema_version"].as_str() != Some("pitb.component-first-split-candidate.v0")
+    let dataset_kind = doc["dataset_kind"]
+        .as_str()
+        .context("candidate dataset_kind is missing")?;
+    if !matches!(dataset_kind, "candidate_only" | "synthetic_fixture")
+        || doc["schema_version"].as_str() != Some("pitb.component-first-split-candidate.v0")
         || doc["status"].as_str() != Some("candidate_only")
         || doc["upstream_commit"].as_str() != Some(UPSTREAM)
         || doc["source_v0_partition_digest_sha256"].as_str() != Some(V0_PARTITION)
@@ -176,6 +192,10 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
         .as_str()
         .context("candidate partition digest is missing")?;
     validate_sha(expected_partition_digest, "candidate partition digest")?;
+    let declared_universe_digest = doc["family_universe_sha256"]
+        .as_str()
+        .context("candidate family-universe digest is missing")?;
+    validate_sha(declared_universe_digest, "candidate family-universe digest")?;
 
     let family_rows = doc["families"]
         .as_array()
@@ -259,6 +279,18 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     if seen_component_families != all_families || components.len() != expected_component_count {
         bail!("component table does not cover each candidate family exactly once");
     }
+    if family_universe_digest(&all_families) != declared_universe_digest {
+        bail!("candidate family-universe digest does not match its exact sorted family IDs");
+    }
+    if dataset_kind == "candidate_only"
+        && (all_families.len() != 372
+            || declared_universe_digest != EXPECTED_FAMILY_UNIVERSE_SHA256)
+    {
+        bail!("real candidate must use the exact pinned 372-family PITB universe");
+    }
+    if dataset_kind == "synthetic_fixture" && all_families.len() >= 372 {
+        bail!("synthetic fixture candidate must not masquerade as the reviewed real universe");
+    }
     if partition_digest(&family_to_split) != expected_partition_digest {
         bail!("candidate partition digest does not match its family assignments");
     }
@@ -300,6 +332,7 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     }
 
     Ok(CandidateSplit {
+        dataset_kind: dataset_kind.to_owned(),
         bytes_sha256: sha256(bytes),
         partition_digest_sha256: expected_partition_digest.to_owned(),
         family_to_split,
@@ -309,9 +342,14 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
 }
 
 fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result<()> {
+    let dataset_kinds_match = matches!(
+        (split.dataset_kind.as_str(), census.dataset_kind.as_str()),
+        ("candidate_only", "reviewed_census") | ("synthetic_fixture", "synthetic_fixture")
+    );
     if census.schema_version != CENSUS_SCHEMA
         || census.upstream_commit != UPSTREAM
         || !matches!(census.dataset_kind.as_str(), "synthetic_fixture" | "reviewed_census")
+        || !dataset_kinds_match
         || !census.sealed_before_evaluation
         || census.outcomes_used
     {
@@ -332,6 +370,12 @@ fn validate_census(census: &EligibilityCensus, split: &CandidateSplit) -> Result
     }
     if family_universe_digest(&census_families) != census.family_universe_sha256 {
         bail!("census family-universe digest does not match its exact sorted family IDs");
+    }
+    if census.dataset_kind == "reviewed_census"
+        && (census_families.len() != 372
+            || census.family_universe_sha256 != EXPECTED_FAMILY_UNIVERSE_SHA256)
+    {
+        bail!("reviewed census must use the exact pinned 372-family PITB universe");
     }
 
     let mut declared_targets_by_family: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -512,6 +556,7 @@ fn execute() -> Result<()> {
     let report = json!({
         "schema_version": "pitb.component-split-feasibility-report.v0",
         "status": "diagnostic_only",
+        "candidate_dataset_kind": split.dataset_kind,
         "candidate_split_sha256": split.bytes_sha256,
         "candidate_partition_digest_sha256": split.partition_digest_sha256,
         "eligibility_census_sha256": sha256(&census_bytes),
