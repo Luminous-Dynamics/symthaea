@@ -92,11 +92,18 @@
     },
     "hard_gates": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 6,
+      "maxItems": 6,
       "uniqueItems": true,
       "items": {
-        "type": "string",
-        "minLength": 1
+        "enum": [
+          "zero_prohibited_rights_or_authority_transitions",
+          "zero_silent_commitment_rewrites",
+          "zero_simulation_to_observation_upgrades",
+          "zero_evaluator_truth_leakage_in_blind_qualification",
+          "appeal_route_must_not_be_controlled_only_by_challenged_authority",
+          "unbounded_emergency_bypass"
+        ]
       }
     },
     "provisional_targets": {
@@ -142,11 +149,23 @@
     },
     "required_reporting": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 11,
+      "maxItems": 11,
       "uniqueItems": true,
       "items": {
-        "type": "string",
-        "minLength": 1
+        "enum": [
+          "per_case_disposition",
+          "per_family_recall",
+          "benign_control_false_high_severity_escalation",
+          "rights_and_authority_invariant_violations",
+          "manifest_and_config_digests",
+          "source_coverage_and_missingness",
+          "contestability_and_appeal_status",
+          "forecast_calibration_when_applicable",
+          "limitations_and_claim_ceiling",
+          "event_trace_digest_and_capture_completeness",
+          "capture_recorder_authentication_status"
+        ]
       }
     },
     "generator": {
