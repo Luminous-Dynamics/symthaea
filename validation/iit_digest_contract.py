@@ -17,6 +17,15 @@ MODEL_MAGIC = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0"
 EVALUATION_MAGIC = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0"
 ANALYSIS_REQUEST_MAGIC = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0"
 MAX_DENSE_UNITS = 16
+FORMALISM_IDS = {"IIT_3_0", "IIT_4_0_2023", "IIT_4_0_2026"}
+IIT3_QUANTITIES = {"iit3_system_phi"}
+IIT4_QUANTITIES = {
+    "iit4_system_phi_s",
+    "iit4_cause_phi_c",
+    "iit4_effect_phi_e",
+    "iit4_cause_effect_structure",
+    "iit4_structure_big_phi",
+}
 
 
 def canonical_model_bytes(
@@ -44,8 +53,8 @@ def canonical_model_bytes(
 
     for row in connectivity:
         for edge in row:
-            if edge not in (0, 1, False, True):
-                raise ValueError("connectivity matrix must contain only binary entries")
+            if not isinstance(edge, (int, bool)) or int(edge) not in (0, 1):
+                raise ValueError("connectivity matrix must contain only integer/bool binary entries")
             encoded.append(int(edge))
 
     # Match Rust's fail-closed consistency rule: extra declared edges are allowed,
@@ -122,8 +131,10 @@ def model_digest(model_bytes: bytes) -> str:
 
 def evaluation_digest(model_bytes: bytes, state: Sequence[int | bool]) -> str:
     n_units = _model_unit_count(model_bytes)
-    if len(state) != n_units or any(bit not in (0, 1, False, True) for bit in state):
-        raise ValueError("evaluation state must be n_units binary bits")
+    if len(state) != n_units or any(
+        not isinstance(bit, (int, bool)) or int(bit) not in (0, 1) for bit in state
+    ):
+        raise ValueError("evaluation state must be n_units integer/bool binary bits")
     return hashlib.sha256(EVALUATION_MAGIC + model_bytes + bytes(map(int, state))).hexdigest()
 
 
@@ -140,6 +151,14 @@ def analysis_request_digest(
         raise ValueError("evaluation state must be n_units binary bits")
     if not subset or len(set(subset)) != len(subset):
         raise ValueError("candidate subsystem must be non-empty and contain unique unit indices")
+    if formalism not in FORMALISM_IDS:
+        raise ValueError(f"unsupported formalism identifier: {formalism!r}")
+    if quantity_id not in IIT3_QUANTITIES | IIT4_QUANTITIES:
+        raise ValueError(f"unsupported IIT quantity identifier: {quantity_id!r}")
+    if formalism == "IIT_3_0" and quantity_id not in IIT3_QUANTITIES:
+        raise ValueError("IIT 4.0 quantity cannot be requested under IIT_3_0")
+    if formalism in {"IIT_4_0_2023", "IIT_4_0_2026"} and quantity_id not in IIT4_QUANTITIES:
+        raise ValueError("IIT 3.0 quantity cannot be requested under an IIT 4.0 profile")
     if any(not isinstance(unit, int) or isinstance(unit, bool) for unit in subset):
         raise ValueError("candidate subsystem indices must be integers")
     if any(unit < 0 or unit >= n_units for unit in subset):
