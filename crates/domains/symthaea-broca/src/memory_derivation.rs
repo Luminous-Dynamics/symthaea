@@ -42,6 +42,7 @@ pub struct DerivedFactInput {
 pub enum InvalidationTrigger {
     SourceRetraction { event_id: String },
     DerivedFactInvalidation { fact_id: String },
+    RuleVersionInvalidation { rule_id: String, rule_version: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,6 +284,79 @@ impl DerivationGraph {
         candidate.verify_consistency()?;
         *self = candidate;
         Ok(affected.into_iter().collect())
+    }
+
+    /// Invalidate every current derivation produced by one rule version and
+    /// every transitive dependent. This is the atomic rule-migration primitive:
+    /// callers do not need to enumerate facts or risk leaving an old derivation
+    /// current because it was omitted from a caller-maintained list.
+    ///
+    /// Invalidated records remain in the audit history. Repeating the operation
+    /// is idempotent and returns an empty list once no matching current roots remain.
+    pub fn invalidate_rule_version(
+        &mut self,
+        rule_id: &str,
+        rule_version: &str,
+        reason: &str,
+    ) -> Result<Vec<String>, String> {
+        non_empty(rule_id, "rule ID")?;
+        non_empty(rule_version, "rule version")?;
+        non_empty(reason, "invalidation reason")?;
+        self.verify_consistency()?;
+
+        let roots: Vec<String> = self
+            .facts
+            .iter()
+            .filter(|(_, record)| {
+                record.status == DerivedStatus::Current
+                    && record.fact.rule_id == rule_id
+                    && record.fact.rule_version == rule_version
+            })
+            .map(|(fact_id, _)| fact_id.clone())
+            .collect();
+
+        if roots.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let trigger = InvalidationTrigger::RuleVersionInvalidation {
+            rule_id: rule_id.to_owned(),
+            rule_version: rule_version.to_owned(),
+        };
+        let mut candidate = self.clone();
+        let mut affected: BTreeSet<String> = roots.iter().cloned().collect();
+
+        // Mark every root first. A matching old-version fact can itself depend
+        // on another matching old-version fact; it must still be recorded as a
+        // root of the migration, while its own descendants are walked below.
+        for fact_id in &roots {
+            let record = candidate
+                .facts
+                .get_mut(fact_id)
+                .expect("validated rule-version root must exist");
+            record.status = DerivedStatus::Invalidated {
+                trigger: trigger.clone(),
+                because: None,
+                reason: reason.to_owned(),
+            };
+        }
+
+        // Starting a walk at each root ensures nested matching roots are also
+        // traversed even if an earlier root walk encounters them already marked.
+        for fact_id in &roots {
+            let descendants = invalidate_dependents(
+                &mut candidate,
+                DependencyRef::DerivedFact(fact_id.clone()),
+                trigger.clone(),
+                reason,
+            )?;
+            affected.extend(descendants);
+        }
+
+        candidate.verify_consistency()?;
+        let result = affected.into_iter().collect();
+        *self = candidate;
+        Ok(result)
     }
 
     pub fn source_is_retracted(&self, event_id: &str) -> bool {
@@ -676,6 +750,94 @@ mod tests {
         assert_eq!(left.invalidate_source_event("E1", "retraction").unwrap(),
                    right.invalidate_source_event("E1", "retraction").unwrap());
         assert_eq!(left.state_sha256().unwrap(), right.state_sha256().unwrap());
+    }
+
+    #[test]
+    fn rule_version_invalidation_covers_all_roots_and_transitive_dependents() {
+        let mut graph = DerivationGraph::default();
+        for event_id in ["E1", "E2", "E3"] {
+            graph.register_source_event(event_id).unwrap();
+        }
+
+        let mut d1 = fact("D1", [DependencyRef::SourceEvent("E1".into())]);
+        d1.rule_id = "release-policy".into();
+        d1.rule_version = "v1".into();
+        graph.derive(d1).unwrap();
+
+        let mut d2 = fact("D2", [DependencyRef::SourceEvent("E2".into())]);
+        d2.rule_id = "release-policy".into();
+        d2.rule_version = "v1".into();
+        graph.derive(d2).unwrap();
+
+        let mut d3 = fact(
+            "D3",
+            [
+                DependencyRef::DerivedFact("D1".into()),
+                DependencyRef::DerivedFact("D2".into()),
+            ],
+        );
+        d3.rule_id = "release-decision".into();
+        d3.rule_version = "v7".into();
+        graph.derive(d3).unwrap();
+        graph
+            .derive(fact("D7", [DependencyRef::DerivedFact("D3".into())]))
+            .unwrap();
+
+        let mut d4 = fact("D4", [DependencyRef::SourceEvent("E3".into())]);
+        d4.rule_id = "release-policy".into();
+        d4.rule_version = "v2".into();
+        graph.derive(d4).unwrap();
+        graph
+            .derive(fact("D6", [DependencyRef::DerivedFact("D4".into())]))
+            .unwrap();
+
+        let mut d5 = fact("D5", [DependencyRef::SourceEvent("E3".into())]);
+        d5.rule_id = "other-policy".into();
+        d5.rule_version = "v1".into();
+        graph.derive(d5).unwrap();
+
+        let before = graph.state_sha256().unwrap();
+        assert_eq!(
+            graph
+                .invalidate_rule_version("release-policy", "v1", "policy superseded")
+                .unwrap(),
+            vec!["D1", "D2", "D3", "D7"]
+        );
+        assert_ne!(graph.state_sha256().unwrap(), before);
+        assert_eq!(graph.current_fact_count(), 3);
+        assert_eq!(graph.invalidated_fact_count(), 4);
+        for id in ["D1", "D2", "D3", "D7"] {
+            assert!(graph.current_fact(id).is_none(), "{id} must be invalidated");
+        }
+        for id in ["D4", "D5", "D6"] {
+            assert!(graph.current_fact(id).is_some(), "{id} must remain current");
+        }
+        assert!(matches!(
+            &graph.fact("D1").unwrap().status,
+            DerivedStatus::Invalidated {
+                trigger: InvalidationTrigger::RuleVersionInvalidation {
+                    rule_id,
+                    rule_version,
+                },
+                ..
+            } if rule_id == "release-policy" && rule_version == "v1"
+        ));
+        graph.verify_consistency().unwrap();
+
+        let after = graph.state_sha256().unwrap();
+        assert!(
+            graph
+                .invalidate_rule_version("release-policy", "v1", "replayed migration")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            graph
+                .invalidate_rule_version("missing-policy", "v1", "no matching rule")
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(graph.state_sha256().unwrap(), after);
     }
 
     #[test]
