@@ -33,6 +33,24 @@ References and scope notes:
 - NEURD: https://www.nature.com/articles/s41586-025-08660-5
 - H01 release: https://h01-release.storage.googleapis.com/landing.html
 - Google Neural Mapping datasets: https://sites.research.google/gr/neural-mapping/datasets/
+- ConnectomeBench source code (MIT): https://github.com/jffbrwn2/ConnectomeBench
+- ConnectomeBench dataset card/files (MIT): https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench/tree/main
+
+### Concrete dataset-audit finding
+
+The published Hugging Face dataset is listed as approximately 2.82 GB and includes a 688 kB `connectomebench_unified.parquet`, separate FlyWire/MICrONS task Parquet files, and JSONL annotation files. This is enough to start an offline format/label audit without downloading raw microscopy volumes or requiring CAVE authentication.
+
+**Integrity warning:** as inspected on 2026-10-29, the dataset card's configuration table appears to associate `Split Error Correction` with filenames named `*_merge_errors.parquet` and `Merge Error Identification` with `*_split_errors.parquet` for both FlyWire and MICrONS. This may be a metadata typo, but must be resolved against the upstream ConnectomeBench scripts, Parquet schemas, and annotation JSONL before scoring. Never infer task/label semantics from filenames or the dataset card alone.
+
+Required intake manifest before an experiment:
+- source URL, repository commit or dataset revision, and exact file SHA-256;
+- Parquet schema, row count, unique sample IDs, class distribution, null counts, and duplicate IDs;
+- task-name / filename / label mapping cross-checked against the upstream evaluation code;
+- label agreement between the task Parquet and corresponding annotation JSONL where a reliable join key exists;
+- license and provenance snapshot;
+- declared train/development/hidden partitions and leakage grouping keys.
+
+Do not treat the compact unified Parquet as sufficient until its columns and row coverage have been compared with the task-specific tables.
 
 ## Paradigm shifts worth testing
 
@@ -123,7 +141,7 @@ Do not compare an end-to-end system against a post-processing component as if th
 
 ### Datasets and split policy
 
-**Phase A — reproduce a public task.** Start with the published ConnectomeBench split/merge/segment-type tasks and verify the exact dataset versions, annotations, license, and data access before coding the adapter. Record task definitions and source revisions.
+**Phase A — audit, then reproduce a public task.** First obtain the published ConnectomeBench task tables and annotations, verify checksums/schema/row counts/class labels, and resolve the task-name/filename mismatch noted above against the upstream scripts. Pin the exact code commit and dataset revision. Only after this intake gate passes should the first offline scorer be written; no raw-EM download or large GPU run is needed for this stage.
 
 **Phase B — test structural generalization.** Add an eligible MICrONS subset with expert-verified cases and NEURD-compatible morphology when data access permits. Use H01 as a human-tissue transfer case only where independent reference annotations support the metric. Do not treat automated labels or sparse proofreads as universal ground truth.
 
