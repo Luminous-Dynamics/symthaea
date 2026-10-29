@@ -158,6 +158,41 @@ if __name__ == "__main__":
         self.assertIn("FAILED", (self.evidence / result["baseline_results"][0]["combined_output_artifact"]).read_text())
         self.assertIn("OK", (self.evidence / result["reference_results"][0]["combined_output_artifact"]).read_text())
 
+
+    def test_tracked_source_mutation_during_reference_tests_invalidates_gate(self) -> None:
+        bundle = zip_bytes([
+            ("test_contract.py", b"""import pathlib
+import unittest
+import app
+
+class ContractTest(unittest.TestCase):
+    def test_expected_behavior(self):
+        self.assertEqual(app.VALUE, 1)
+        pathlib.Path("app.py").write_text("VALUE = 2\\n", encoding="utf-8")
+""")
+        ])
+        result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "mutated-source-evidence")
+        self.assertFalse(result["two_sided_gate_passed"])
+        self.assertFalse(result["reference_tree_integrity"]["valid"])
+        self.assertTrue(any("tracked source tree changed" in issue for issue in result["issues"]))
+
+    def test_test_bundle_mutation_during_execution_invalidates_gate(self) -> None:
+        bundle = zip_bytes([
+            ("test_contract.py", b"""import pathlib
+import unittest
+import app
+
+class ContractTest(unittest.TestCase):
+    def test_expected_behavior(self):
+        self.assertEqual(app.VALUE, 1)
+        pathlib.Path("test_contract.py").write_text("BROKEN = True\\n", encoding="utf-8")
+""")
+        ])
+        result = self.run_controls(bundle_raw=bundle, evidence_root=self.root / "mutated-tests-evidence")
+        self.assertFalse(result["two_sided_gate_passed"])
+        self.assertFalse(result["reference_tree_integrity"]["valid"])
+        self.assertTrue(any("test bundle file changed" in issue for issue in result["issues"]))
+
     def test_reference_that_does_not_fix_behavior_fails_gate(self) -> None:
         wrong_patch = self.patch_raw.replace(b"VALUE = 1", b"VALUE = 2")
         result = self.run_controls(
