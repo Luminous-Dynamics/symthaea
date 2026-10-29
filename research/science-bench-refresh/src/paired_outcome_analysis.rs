@@ -644,7 +644,17 @@ fn apply_holm(results: &mut [ContrastAnalysisResultV1]) {
         })
         .collect::<Vec<_>>();
     indexes.sort_by(|left, right| left.1.total_cmp(&right.1));
-    let m = indexes.len();
+    // The family size is preregistered, not the number of contrasts that
+    // happened to yield a p-value. Unestimable binary contrasts remain in the
+    // family denominator; otherwise missingness could make adjusted p-values
+    // spuriously small. Resource endpoints are not in this binary family.
+    let m = results
+        .iter()
+        .filter(|result| !result.endpoint.is_resource())
+        .count();
+    if m == 0 {
+        return;
+    }
     let mut previous = 0.0_f64;
     for (rank, (index, p)) in indexes.into_iter().enumerate() {
         let adjusted = ((m - rank) as f64 * p).min(1.0).max(previous);
@@ -923,6 +933,69 @@ mod tests {
         assert!(low < rate && high > rate);
         assert!((low + high - 1.0).abs() < 1.0e-12);
         assert!(wilson_interval(0, 0).is_none());
+    }
+
+    #[test]
+    fn holm_adjustment_keeps_unestimable_binary_contrasts_in_family_size() {
+        let mut results = vec![
+            ContrastAnalysisResultV1 {
+                contrast_id: "observed".to_owned(),
+                treatment_condition: "t".to_owned(),
+                reference_condition: "r".to_owned(),
+                endpoint: AnalysisEndpointV1::StrictCorrectness,
+                directional_hypothesis: DirectionalHypothesisV1::TreatmentHigher,
+                assigned_pair_count: 10,
+                eligible_pair_count: 10,
+                incomplete_pair_count: 0,
+                ineligible_reason_counts: BTreeMap::new(),
+                treatment_wins: Some(5),
+                treatment_losses: Some(0),
+                ties: Some(5),
+                paired_risk_difference: Some(0.5),
+                discordant_pair_count: Some(5),
+                exact_mcnemar_two_sided_p: Some(0.0625),
+                exact_mcnemar_log10_p: Some(0.0625_f64.log10()),
+                mcnemar_p_value_numerically_floored: Some(false),
+                holm_adjusted_p: None,
+                discordant_win_rate: Some(1.0),
+                discordant_win_rate_wilson_95_low: Some(0.565),
+                discordant_win_rate_wilson_95_high: Some(1.0),
+                mean_resource_delta_treatment_minus_reference: None,
+                metric_complete_pair_count: None,
+                metric_incomplete_pair_count: None,
+                pair_results: Vec::new(),
+            },
+            ContrastAnalysisResultV1 {
+                contrast_id: "unestimable".to_owned(),
+                treatment_condition: "t2".to_owned(),
+                reference_condition: "r2".to_owned(),
+                endpoint: AnalysisEndpointV1::ExpectedResponse,
+                directional_hypothesis: DirectionalHypothesisV1::TreatmentHigher,
+                assigned_pair_count: 10,
+                eligible_pair_count: 0,
+                incomplete_pair_count: 10,
+                ineligible_reason_counts: BTreeMap::new(),
+                treatment_wins: Some(0),
+                treatment_losses: Some(0),
+                ties: Some(0),
+                paired_risk_difference: None,
+                discordant_pair_count: Some(0),
+                exact_mcnemar_two_sided_p: None,
+                exact_mcnemar_log10_p: None,
+                mcnemar_p_value_numerically_floored: None,
+                holm_adjusted_p: None,
+                discordant_win_rate: None,
+                discordant_win_rate_wilson_95_low: None,
+                discordant_win_rate_wilson_95_high: None,
+                mean_resource_delta_treatment_minus_reference: None,
+                metric_complete_pair_count: None,
+                metric_incomplete_pair_count: None,
+                pair_results: Vec::new(),
+            },
+        ];
+        apply_holm(&mut results);
+        assert!((results[0].holm_adjusted_p.unwrap() - 0.125).abs() < 1.0e-12);
+        assert!(results[1].holm_adjusted_p.is_none());
     }
 
     #[test]
