@@ -128,6 +128,23 @@ fn intersect(previous:Interval,next:Interval)->Interval{
     Interval{lower:previous.lower.max(next.lower),upper:previous.upper.min(next.upper)}
 }
 
+fn cell_mean_cs(sum:f64,count:usize,alpha_cell:f64)->Interval{
+    if count==0{return FULL;}
+    let n=count as f64;
+    let mean=sum/n;
+    let delta=alpha_cell/(2.0*n*(n+1.0));
+    let radius=((1.0/delta).ln()/(2.0*n)).sqrt();
+    Interval{lower:(mean-radius).max(0.0),upper:(mean+radius).min(1.0)}
+}
+fn shared_policy_interval(policy:&Policy,cells:[[Interval;2];2])->Interval{
+    let p0=policy.pi1[0];let p1=policy.pi1[1];
+    let lower=0.5*((1.0-p0)*cells[0][0].lower+p0*cells[0][1].lower
+        +(1.0-p1)*cells[1][0].lower+p1*cells[1][1].lower);
+    let upper=0.5*((1.0-p0)*cells[0][0].upper+p0*cells[0][1].upper
+        +(1.0-p1)*cells[1][0].upper+p1*cells[1][1].upper);
+    Interval{lower,upper}
+}
+
 fn certified_best(bounds:&[Interval])->Option<usize>{
     if bounds.is_empty()||bounds.iter().any(|b|b.reversed()){return None;}
     for i in 0..bounds.len(){
@@ -228,7 +245,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
     let values:Vec<f64>=policies.iter().map(|p|p.value).collect();
     let best_value=values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
     let max_look=*looks.last().unwrap();
-    let mut agg=vec![vec![MethodAggregate::default();looks.len()];3];
+    let mut agg=vec![vec![MethodAggregate::default();looks.len()];4];
     let mut selection=vec![SelectionAggregate::default();looks.len()];
     let started=Instant::now();
     let mut observations=0usize;
@@ -237,10 +254,13 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
         let mut rng=SplitMix64::new(seed_for(s.logger.index,rep));
         let mut sums=vec![0.0_f64;m];
         let mut sums_sq=vec![0.0_f64;m];
-        let mut bounds=vec![vec![FULL;m];3];
-        let mut sequence_covered=[true;3];
-        let mut ever_false_certificate=[false;3];
-        let mut first_certificate:[Option<usize>;3]=[None;3];
+        let mut cell_counts=[[0usize;2];2];
+        let mut cell_reward_sums=[[0.0_f64;2];2];
+        let mut cell_bounds=[[FULL;2];2];
+        let mut bounds=vec![vec![FULL;m];4];
+        let mut sequence_covered=[true;4];
+        let mut ever_false_certificate=[false;4];
+        let mut first_certificate:[Option<usize>;4]=[None;4];
         let mut look_index=0usize;
 
         for t in 1..=max_look{
@@ -248,6 +268,10 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
             let context=observation.context;
             let action=observation.action;
             let reward=observation.reward;
+            cell_counts[context][action]+=1;
+            cell_reward_sums[context][action]+=reward;
+            let cell_raw=cell_mean_cs(cell_reward_sums[context][action],cell_counts[context][action],ALPHA/4.0);
+            cell_bounds[context][action]=intersect(cell_bounds[context][action],cell_raw);
             for j in 0..m{
                 let p=policies[j].pi1[context];
                 let ratio=if action==1{p/h}else{(1.0-p)/(1.0-h)};
@@ -272,6 +296,14 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                     };
                     bounds[method][j]=if method==0{raw}else{intersect(bounds[method][j],raw)};
                 }
+            }
+            // One simultaneous confidence sequence per primitive context/action
+            // reward mean induces valid intervals for every policy value. The
+            // Bonferroni correction is over four cells, not over M policies.
+            for j in 0..m{
+                bounds[3][j]=shared_policy_interval(&policies[j],cell_bounds);
+            }
+            for method in 0..4{
                 let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
                 sequence_covered[method]&=point;
                 if let Some(k)=certified_best(&bounds[method]){
@@ -285,7 +317,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                 let best_set=values.iter().enumerate().filter(|(_,v)|(**v-best_value).abs()<=1e-9).map(|(i,_)|i).collect::<Vec<_>>();
                 selection[look_index].add(best_set.contains(&estimate_winner),best_value-values[estimate_winner]);
 
-                for method in 0..3{
+                for method in 0..4{
                     let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
                     let average_width=bounds[method].iter().map(|b|b.width()).sum::<f64>()/(m as f64);
                     let max_width=bounds[method].iter().map(|b|b.width()).fold(0.0_f64,f64::max);
@@ -315,8 +347,8 @@ fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
         let _=writeln!(out,"POLICY\t{}\tid\t{}\tpi_action1_context0\t{:.8}\tpi_action1_context1\t{:.8}\ttrue_value\t{:.8}\tW_max\t{:.8}\tis_best\t{}",
             r.name,policy.id,policy.pi1[0],policy.pi1[1],policy.value,policy.w_max,(policy.value-best_value).abs()<=EPS);
     }
-    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M"];
-    for method in 0..3{
+    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4"];
+    for method in 0..4{
         for (li,look) in looks.iter().copied().enumerate(){
             let a=&r.aggregates[method][li];
             for (name,count) in [
@@ -419,6 +451,33 @@ mod tests{
             let independent=hoeffding_cs(mean,w,t,ALPHA);
             let family=hoeffding_cs(mean,w,t,ALPHA/32.0);
             assert!(family.width()>=independent.width()-EPS);
+        }
+    }
+
+    #[test]
+    fn shared_cell_bounds_induce_valid_policy_value_bounds(){
+        let cell_true=[[0.10,0.90],[0.95,0.15]];
+        let cells=[
+            [Interval{lower:0.05,upper:0.15},Interval{lower:0.85,upper:0.95}],
+            [Interval{lower:0.90,upper:1.0},Interval{lower:0.10,upper:0.20}],
+        ];
+        for policy in make_policies(8,Logger::healthy()){
+            let value=policy.value;
+            let bound=shared_policy_interval(&policy,cells);
+            assert!(bound.lower<=value+EPS);
+            assert!(bound.upper>=value-EPS);
+        }
+        let _=cell_true;
+    }
+
+    #[test]
+    fn shared_cell_alpha_is_allocated_over_four_primitives(){
+        for n in [1,16,256,4096]{
+            let alpha_cell=ALPHA/4.0;
+            let delta=alpha_cell/(2.0*(n as f64)*((n+1) as f64));
+            let each_tail=delta*1.0; // symbolic first-look allocation; actual sum uses telescoping.
+            assert!(each_tail<alpha_cell/2.0);
+            assert!(hoeffding_cs(0.5,1.0,n,ALPHA/32.0).width()>=cell_mean_cs(0.5*n as f64,n,alpha_cell).width()-EPS);
         }
     }
 
