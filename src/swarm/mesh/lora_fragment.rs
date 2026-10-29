@@ -905,6 +905,14 @@ mod tests {
         assert!(all_data.is_complete());
         assert_eq!(all_data.assemble().as_deref(), Some(data.as_slice()));
 
+        // Even a nonsensical local capacity hint cannot trigger an unbounded
+        // allocation; output storage is capped by the number of shards.
+        let mut huge_nominal = FragmentAssembler::new(10, frags.len() as u8, usize::MAX);
+        for frag in &frags {
+            huge_nominal.feed(frag);
+        }
+        assert_eq!(huge_nominal.assemble().as_deref(), Some(data.as_slice()));
+
         // If the final data shard is missing, an inconsistent nominal length
         // cannot safely determine how much of the recovered shard is valid.
         let mut missing_final = FragmentAssembler::new(10, frags.len() as u8, 100);
