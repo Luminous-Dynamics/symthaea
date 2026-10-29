@@ -211,8 +211,11 @@ fn baseline_interval(method: usize, moments: OpeMoments, w_max: f64) -> Interval
         3 => {
             if moments.n < 2 { return Interval { lower: 0.0, upper: 1.0 }; }
             let t = n;
-            let delta_side = ALPHA / (2.0*t*(t+1.0));
-            let logterm = (2.0/delta_side).ln();
+            // The empirical-Bernstein formula is a two-sided interval. Spend
+            // alpha_t = alpha/[t(t+1)] per look (sum_t alpha_t = alpha);
+            // unlike Hoeffding above, do not split this allocation between tails.
+            let delta_interval = ALPHA / (t*(t+1.0));
+            let logterm = (2.0/delta_interval).ln();
             let variance = moments.unbiased_variance();
             let radius = (2.0*variance*logterm/(t-1.0)).sqrt()
                 + 7.0*w_max*logterm/(3.0*(t-1.0));
@@ -470,8 +473,10 @@ mod tests {
             assert!((0.0..=1.0).contains(&ci.lower));
             assert!((0.0..=1.0).contains(&ci.upper));
         }
-        let allocations:f64=(1..100_000).map(|t|ALPHA/(2.0*(t as f64)*((t+1) as f64))).sum();
-        assert!(allocations<=ALPHA/2.0+1e-5);
+        let one_sided_allocations:f64=(1..100_000).map(|t|ALPHA/(2.0*(t as f64)*((t+1) as f64))).sum();
+        let two_sided_interval_allocations:f64=(1..100_000).map(|t|ALPHA/((t as f64)*((t+1) as f64))).sum();
+        assert!(one_sided_allocations<=ALPHA/2.0+1e-5);
+        assert!(two_sided_interval_allocations<=ALPHA+1e-5);
     }
 
     #[test]
