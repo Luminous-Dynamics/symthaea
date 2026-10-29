@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-003-regime-shift"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic synthetic smoke harness for sequential causal regime-shift detection"
+
+[dependencies]
+
+[workspace]

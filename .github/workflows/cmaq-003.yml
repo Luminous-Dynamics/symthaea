@@ -1,0 +1,78 @@
+name: CMAQ-003 sequential regime-shift smoke harness
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-003/**"
+      - ".github/workflows/cmaq-003.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-003/**"
+      - ".github/workflows/cmaq-003.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regime-shift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-003
+        run: cargo test --locked
+      - name: Generate report and validate schema
+        working-directory: research/cmaq-003
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-003-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-003-report.json").read_text())
+          assert report["schema_version"] == "cmaq-003-regime-shift-report-v0.3"
+          assert report["horizon"] == 256
+          assert report["change_at"] == 128
+          assert report["seed_count"] == 128
+          strategies = {row["strategy"]: row for row in report["strategies"]}
+          assert len(strategies) == 9
+          assert "frozen" in strategies
+          assert "cusum_h1_5" in strategies
+          assert "cusum_h3_0" in strategies
+          assert "causal_contrast_h3_0" in strategies
+          assert strategies["frozen"]["stationary"]["mean_regret_per_episode"] == 0
+          assert strategies["frozen"]["abrupt_shift"]["mean_regret_per_episode"] > 0
+          assert "observation_only_drift" in strategies["frozen"]
+          assert strategies["frozen"]["observation_only_drift"]["false_causal_diagnosis_episodes"] == 0
+          assert strategies["cusum_h1_5"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"]
+          assert strategies["cusum_h3_0"]["observation_only_drift"]["false_causal_diagnosis_episodes"] > 0
+          low = strategies["cusum_h1_5"]
+          high = strategies["cusum_h3_0"]
+          contrast = strategies["causal_contrast_h3_0"]
+          assert contrast["observation_only_drift"]["false_causal_diagnosis_episodes"] <= 6
+          assert contrast["observation_only_drift"]["false_causal_diagnosis_episodes"] < high["observation_only_drift"]["false_causal_diagnosis_episodes"]
+          assert contrast["abrupt_shift"]["detection_rate"] >= 0.95
+          assert contrast["abrupt_shift"]["p90_detection_delay_steps"] > 8
+          assert contrast["abrupt_shift"]["mean_diagnostic_steps_per_episode"] > 0
+          assert low["stationary"]["false_alarm_episodes"] > high["stationary"]["false_alarm_episodes"]
+          assert low["abrupt_shift"]["detection_rate"] < high["abrupt_shift"]["detection_rate"]
+          assert low["abrupt_shift"]["p90_detection_delay_steps"] < high["abrupt_shift"]["p90_detection_delay_steps"]
+          print("CMAQ-003 report schema and detector tradeoff validated")
+          print(json.dumps({
+              key: {
+                  "stationary_false_alarms": value["stationary"]["false_alarm_episodes"],
+                  "abrupt_detection_rate": value["abrupt_shift"]["detection_rate"],
+                  "abrupt_p90_delay": value["abrupt_shift"]["p90_detection_delay_steps"],
+                  "abrupt_regret": value["abrupt_shift"]["mean_regret_per_episode"],
+                  "observation_only_false_causal_diagnoses": value["observation_only_drift"]["false_causal_diagnosis_episodes"],
+                  "mean_diagnostic_steps": value["abrupt_shift"]["mean_diagnostic_steps_per_episode"],
+              }
+              for key, value in strategies.items()
+          }, sort_keys=True))
+          PY
