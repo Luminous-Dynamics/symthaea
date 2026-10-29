@@ -34,6 +34,23 @@ pub enum LicenseStatus {
     Unknown,
 }
 
+/// Declared permission scope for the intended benchmark activity. This is a sourced
+/// metadata field, not a legal conclusion inferred from public accessibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DatasetUseScope {
+    NonCommercialOnly,
+    ResearchOnly,
+    CommercialAllowed,
+    Unknown,
+    Restricted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BenchmarkUse {
+    NonCommercialResearch,
+    CommercialDevelopment,
+}
+
 /// One declared public or licensed dataset/table release.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetSource {
@@ -51,6 +68,7 @@ pub struct DatasetSource {
     pub dataset_downloaded_at_epoch: Option<i64>,
     pub acquisition_status: AcquisitionStatus,
     pub license_status: LicenseStatus,
+    pub use_scope: DatasetUseScope,
 }
 
 /// One immutable file or partition in a retrieved source, with exact digest and byte
@@ -91,6 +109,7 @@ pub enum DataContractError {
     PartitionSourceNotRetrieved { source_id: String },
     SourceNotScoringReady { source_id: String },
     LicenseNotCleared { source_id: String },
+    UseScopeNotAuthorized { source_id: String, requested_use: BenchmarkUse },
     MissingRetrievedPartition { source_id: String },
     UnexpectedPartitionForUnretrievedSource { source_id: String },
     PartitionOutOfSourceCoverage { partition_id: String },
@@ -140,6 +159,9 @@ impl fmt::Display for DataContractError {
             }
             Self::LicenseNotCleared { source_id } => {
                 write!(f, "source {source_id} has unresolved or restricted use terms")
+            }
+            Self::UseScopeNotAuthorized { source_id, requested_use } => {
+                write!(f, "source {source_id} is not authorized for benchmark use {requested_use:?}")
             }
             Self::MissingRetrievedPartition { source_id } => {
                 write!(f, "retrieved source {source_id} has no partition")
@@ -230,6 +252,7 @@ pub fn canonical_manifest_digest(
         }
         bytes.push(encode_acquisition_status(source.acquisition_status));
         bytes.push(encode_license_status(source.license_status));
+        bytes.push(encode_dataset_use_scope(source.use_scope));
     }
 
     let mut partitions = manifest.partitions.iter().collect::<Vec<_>>();
@@ -401,6 +424,7 @@ pub fn validate_manifest(manifest: &PublicDataManifest) -> Result<(), DataContra
 /// before any benchmark score is produced. Cataloguing alone is intentionally insufficient.
 pub fn validate_scoring_ready_manifest(
     manifest: &PublicDataManifest,
+    requested_use: BenchmarkUse,
 ) -> Result<(), DataContractError> {
     validate_manifest(manifest)?;
     for source in &manifest.sources {
@@ -412,6 +436,23 @@ pub fn validate_scoring_ready_manifest(
         if matches!(source.license_status, LicenseStatus::Unknown | LicenseStatus::Restricted) {
             return Err(DataContractError::LicenseNotCleared {
                 source_id: source.source_id.clone(),
+            });
+        }
+        let authorized = match requested_use {
+            BenchmarkUse::NonCommercialResearch => matches!(
+                source.use_scope,
+                DatasetUseScope::NonCommercialOnly
+                    | DatasetUseScope::ResearchOnly
+                    | DatasetUseScope::CommercialAllowed
+            ),
+            BenchmarkUse::CommercialDevelopment => {
+                source.use_scope == DatasetUseScope::CommercialAllowed
+            }
+        };
+        if !authorized {
+            return Err(DataContractError::UseScopeNotAuthorized {
+                source_id: source.source_id.clone(),
+                requested_use,
             });
         }
     }
@@ -619,6 +660,16 @@ fn encode_license_status(status: LicenseStatus) -> u8 {
         LicenseStatus::TermsReviewed => 1,
         LicenseStatus::Restricted => 2,
         LicenseStatus::Unknown => 3,
+    }
+}
+
+fn encode_dataset_use_scope(scope: DatasetUseScope) -> u8 {
+    match scope {
+        DatasetUseScope::NonCommercialOnly => 0,
+        DatasetUseScope::ResearchOnly => 1,
+        DatasetUseScope::CommercialAllowed => 2,
+        DatasetUseScope::Unknown => 3,
+        DatasetUseScope::Restricted => 4,
     }
 }
 
