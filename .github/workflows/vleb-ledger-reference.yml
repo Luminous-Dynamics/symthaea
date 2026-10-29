@@ -85,6 +85,8 @@ jobs:
         run: python tools/vleb/run_auditor_mutation_campaign.py
       - name: Test paired task-cluster comparison analyzer
         run: python tools/vleb/test_compare_paired_runs.py
+      - name: Test reproducible two-sided oracle-control replay
+        run: python tools/vleb/test_verify_oracle_controls.py
       - name: Validate trusted run manifest schema and controls
         run: python tools/vleb/test_run_manifest.py
       - name: Test run manifest integrity and provenance checker

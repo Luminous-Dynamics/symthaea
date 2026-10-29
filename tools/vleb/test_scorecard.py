@@ -92,6 +92,18 @@ def validate_scorecard(data: dict[str, Any]) -> list[str]:
     last_secure = data.get("industry_comparators", {}).get("last_secure_code_benchmark", {})
     if last_secure.get("task_count") != 450 or last_secure.get("reported_best_joint_functional_security_success_pct") != 25.1:
         errors.append("last_secure_benchmark_reference_drift")
+    oracle_replay_target = data.get("proposed_targets", {}).get("two_sided_oracle_control_replay_coverage_pct", {})
+    oracle_replay_current = data.get("current_measurements", {}).get("two_sided_oracle_control_replay_coverage_pct", {})
+    oracle_replay_definition = data.get("metric_definitions", {}).get("two_sided_oracle_control_replay_coverage", {})
+    if oracle_replay_target.get("target") != 100 or oracle_replay_target.get("status") != "target_not_measured":
+        errors.append("two_sided_oracle_replay_target_drift")
+    if oracle_replay_current.get("value") is not None or oracle_replay_current.get("eligible") is not False:
+        errors.append("two_sided_oracle_replay_score_fabricated")
+    if oracle_replay_definition.get("composite_weighted_score") is not False:
+        errors.append("two_sided_oracle_replay_must_not_use_weighted_score")
+    if not any("cannot be omitted" in rule for rule in oracle_replay_definition.get("denominator_rules", [])):
+        errors.append("two_sided_oracle_replay_denominator_drift")
+
     trace_target = data.get("proposed_targets", {}).get("requirement_to_test_traceability_coverage_pct", {})
     if trace_target.get("target") != 100 or trace_target.get("status") != "target_not_measured":
         errors.append("requirement_to_test_traceability_target_drift")
@@ -160,6 +172,16 @@ class ScorecardTests(unittest.TestCase):
 
     def test_current_scorecard_is_valid(self) -> None:
         self.assertEqual(validate_scorecard(self.scorecard), [])
+
+    def test_two_sided_oracle_replay_is_a_target_not_an_achieved_score(self) -> None:
+        target = self.scorecard["proposed_targets"]["two_sided_oracle_control_replay_coverage_pct"]
+        current = self.scorecard["current_measurements"]["two_sided_oracle_control_replay_coverage_pct"]
+        definition = self.scorecard["metric_definitions"]["two_sided_oracle_control_replay_coverage"]
+        self.assertEqual(target["target"], 100)
+        self.assertEqual(target["status"], "target_not_measured")
+        self.assertIsNone(current["value"])
+        self.assertFalse(current["eligible"])
+        self.assertFalse(definition["composite_weighted_score"])
 
     def test_aassr_denominator_keeps_unresolved_and_abstentions(self) -> None:
         definition = self.scorecard["metric_definitions"]["assurance_adjusted_semantic_success_rate"]
