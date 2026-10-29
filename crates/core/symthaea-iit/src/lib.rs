@@ -355,7 +355,8 @@ pub enum RepertoireError {
 ///
 /// If either forward or partitioned probability is exactly zero, the pointwise
 /// ratio is undefined and PyPhi defines that term to be zero. This function
-/// validates all inputs as normalized distributions; it does not infer a formal
+/// validates the forward/partitioned entries as finite probabilities and the
+/// selectivity input as a normalized distribution; it does not infer a formal
 /// IIT quantity, choose a partition, or compute system phi_s.
 pub fn generalized_intrinsic_difference_at_state(
     forward_repertoire: &[f64],
@@ -380,8 +381,10 @@ pub fn generalized_intrinsic_difference_at_state(
         });
     }
 
-    validate_probability_distribution(forward_repertoire, "forward")?;
-    validate_probability_distribution(partitioned_forward_repertoire, "partitioned")?;
+    // Cause-side forward repertoires are likelihood arrays, not normalized
+    // distributions; only selectivity is required to sum to one.
+    validate_probability_values(forward_repertoire, "forward")?;
+    validate_probability_values(partitioned_forward_repertoire, "partitioned")?;
     validate_probability_distribution(selectivity_repertoire, "selectivity")?;
 
     let forward = forward_repertoire[state_index];
@@ -392,11 +395,10 @@ pub fn generalized_intrinsic_difference_at_state(
     Ok(selectivity_repertoire[state_index] * (forward / partitioned).log2())
 }
 
-fn validate_probability_distribution(
+fn validate_probability_values(
     distribution: &[f64],
     name: &'static str,
 ) -> Result<(), RepertoireError> {
-    let mut sum = 0.0;
     for (index, value) in distribution.iter().copied().enumerate() {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
             return Err(RepertoireError::InvalidDistributionProbability {
@@ -405,8 +407,16 @@ fn validate_probability_distribution(
                 value,
             });
         }
-        sum += value;
     }
+    Ok(())
+}
+
+fn validate_probability_distribution(
+    distribution: &[f64],
+    name: &'static str,
+) -> Result<(), RepertoireError> {
+    validate_probability_values(distribution, name)?;
+    let sum: f64 = distribution.iter().sum();
     if (sum - 1.0).abs() > 1e-10 {
         return Err(RepertoireError::DistributionNotNormalized { name, sum });
     }
@@ -1514,14 +1524,15 @@ mod tests {
     }
 
     #[test]
-    fn generalized_intrinsic_difference_matches_published_gid_formula() {
+    fn generalized_intrinsic_difference_matches_published_gid_formula_with_unnormalized_likelihoods() {
+        // Forward cause repertoires are likelihoods and need not sum to one.
         let gid = generalized_intrinsic_difference_at_state(
-            &[0.1, 0.4, 0.5],
-            &[0.2, 0.2, 0.6],
-            &[0.25, 0.5, 0.25],
+            &[0.1, 0.8],
+            &[0.2, 0.4],
+            &[1.0 / 3.0, 2.0 / 3.0],
             1,
         ).unwrap();
-        assert!((gid - 0.5).abs() < 1e-12); // 0.5 * log2(0.4 / 0.2)
+        assert!((gid - 2.0 / 3.0).abs() < 1e-12); // (2/3) * log2(0.8 / 0.4)
     }
 
     #[test]
@@ -1568,8 +1579,8 @@ mod tests {
             Err(RepertoireError::DistributionStateOutOfRange { index: 2, length: 2 })
         ));
         assert!(matches!(
-            generalized_intrinsic_difference_at_state(&[0.6, 0.6], &[0.5, 0.5], &[0.5, 0.5], 0),
-            Err(RepertoireError::DistributionNotNormalized { name: "forward", .. })
+            generalized_intrinsic_difference_at_state(&[0.5, 0.5], &[0.5, 0.5], &[0.6, 0.6], 0),
+            Err(RepertoireError::DistributionNotNormalized { name: "selectivity", .. })
         ));
         assert!(matches!(
             generalized_intrinsic_difference_at_state(&[f64::NAN, 1.0], &[0.0, 1.0], &[0.0, 1.0], 0),
