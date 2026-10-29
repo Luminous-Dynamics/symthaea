@@ -127,7 +127,14 @@ fn is_token(value: &str) -> bool {
 }
 
 fn is_spdx_token(value: &str) -> bool {
-    is_token(value)
+    let bytes = value.as_bytes();
+    !bytes.is_empty()
+        && bytes[0].is_ascii_alphanumeric()
+        && (bytes[bytes.len() - 1].is_ascii_alphanumeric()
+            || bytes[bytes.len() - 1] == b'+')
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b".-_:+".contains(byte))
 }
 
 fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
@@ -217,16 +224,11 @@ fn validate_manifest(fields: &Fields) -> Result<(), String> {
     if !matches!(intended_use, "research_only" | "commercial_compatible") {
         return Err(fail("intended_use must be research_only or commercial_compatible"));
     }
-    let license_terms: Vec<String> = license
+    let restricts_commercial_use = license
         .split('-')
-        .map(|part| part.to_ascii_lowercase())
-        .collect();
-    let restricts_commercial_use = license_terms
-        .iter()
-        .any(|part| matches!(part.as_str(), "nc" | "noncommercial"));
+        .any(|part| part.eq_ignore_ascii_case("nc") || part.eq_ignore_ascii_case("noncommercial"));
     if intended_use == "commercial_compatible"
-        && (restricts_commercial_use
-            || license.to_ascii_lowercase().starts_with("licenseref-"))
+        && (restricts_commercial_use || license.to_ascii_lowercase().starts_with("licenseref-"))
     {
         return Err(fail("commercial_compatible use is not allowed by a known non-commercial or unreviewed LicenseRef identifier"));
     }
@@ -649,6 +651,8 @@ mod tests {
         assert!(validate_manifest(&fields).unwrap_err().contains("target_column"));
         set(&mut fields, "feature_columns", "demand,price,temperature");
         set(&mut fields, "source_license_spdx", "CC BY 4.0");
+        assert!(validate_manifest(&fields).unwrap_err().contains("SPDX-style"));
+        set(&mut fields, "source_license_spdx", "-----");
         assert!(validate_manifest(&fields).unwrap_err().contains("SPDX-style"));
     }
 
