@@ -13,6 +13,7 @@ from eligibility_filter import (
     filter_dataset,
     sha256_bytes,
     verify_input_manifest,
+    infer_retrieval_intent,
 )
 
 
@@ -191,6 +192,78 @@ class EligibilityFilterTests(unittest.TestCase):
     def test_invalid_budget_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "k must be"):
             filter_dataset([question()], [{"question_id": "Q1", "audit": []}], [], True)
+
+    def test_keyword_classifier_gives_proposal_rule_priority_over_approved_words(self) -> None:
+        self.assertEqual(
+            infer_retrieval_intent("Which region was proposed but never approved?")[0],
+            "proposal_history",
+        )
+        self.assertEqual(
+            infer_retrieval_intent("Which region is currently approved and deployed?")[0],
+            "approved_state",
+        )
+
+    def test_keyword_classifier_distinguishes_revocation_from_generic_currentness(self) -> None:
+        self.assertEqual(
+            infer_retrieval_intent("Can credential stage-key-17 still be used?")[0],
+            "revocation_status",
+        )
+        self.assertEqual(
+            infer_retrieval_intent("What is the current support office address?")[0],
+            "current_state",
+        )
+
+    def test_keyword_classifier_detects_historical_and_causal_queries(self) -> None:
+        self.assertEqual(
+            infer_retrieval_intent("What address did the team use before the update?")[0],
+            "historical_state",
+        )
+        self.assertEqual(
+            infer_retrieval_intent("Which release preceded the spike, and which action preceded recovery?")[0],
+            "causal_chain",
+        )
+
+    def test_keyword_classifier_abstains_when_no_rule_matches(self) -> None:
+        self.assertEqual(infer_retrieval_intent("Tell me something interesting." )[0], None)
+        self.assertEqual(infer_retrieval_intent("   ")[0], None)
+
+    def test_heuristic_mode_uses_prediction_not_annotated_intent(self) -> None:
+        q = question(intent="current_state")
+        q["query"] = "What address did the team use before the update?"
+        predictions = [{
+            "question_id": "Q1",
+            "audit": [candidate("/current"), candidate("/old")],
+        }]
+        policy = [ledger("/current", "current"), ledger("/old", "historical")]
+        result, metrics = filter_dataset(q_list := [q], predictions, policy, 2, intent_source="heuristic")
+        self.assertEqual([row["source_pointer"] for row in result[0]["audit"]], ["/old"])
+        self.assertEqual(metrics["intent_source"], "heuristic")
+        self.assertEqual(metrics["intent_evaluation"]["accuracy"], 0.0)
+        self.assertEqual(metrics["intent_evaluation"]["rows"][0]["predicted_intent"], "historical_state")
+
+    def test_heuristic_unknown_intent_abstains_with_empty_context(self) -> None:
+        q = question(intent="current_state")
+        q["query"] = "Tell me something interesting."
+        result, metrics = filter_dataset(
+            [q],
+            [{"question_id": "Q1", "audit": [candidate("/current")]}],
+            [ledger("/current", "current")],
+            1,
+            intent_source="heuristic",
+        )
+        self.assertEqual(result[0]["audit"], [])
+        self.assertEqual(metrics["intent_evaluation"]["unknown"], 1)
+        self.assertEqual(metrics["per_intent"]["abstain"]["output"], 0)
+
+    def test_unknown_intent_mode_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "intent_source must be"):
+            filter_dataset(
+                [question()],
+                [{"question_id": "Q1", "audit": []}],
+                [],
+                1,
+                intent_source="neural-oracle",
+            )
 
     def _write_manifest_fixture(self, directory: Path) -> tuple[Path, Path, Path, Path]:
         questions_path = directory / "questions.jsonl"
