@@ -57,6 +57,9 @@ jobs:
       - name: Validate combined attack campaign and component references
         run: cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-campaign docs/research/fixtures/governance-capture-resistance-v0.1.json docs/research/fixtures/governance-capture-resistance-combined-attacks-v0.1.json
 
+      - name: Validate cross-system evidence classes and dependency graph
+        run: cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- validate-evidence-bundle docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json
+
       - name: Generate deterministic 1,000-control stress fixture
         shell: bash
         run: |
