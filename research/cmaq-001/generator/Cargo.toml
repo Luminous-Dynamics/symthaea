@@ -7,3 +7,5 @@ license = "AGPL-3.0-or-later"
 description = "Deterministic factor-composition intervention generator for CMAQ-001"
 
 [dependencies]
+
+[workspace]
