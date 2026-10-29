@@ -5,10 +5,11 @@ research engine.
 
 ## Current scope: v0.1 causal-model substrate
 
-This crate currently provides a validated dense binary factored TPM and stable
-model/evaluation digests. It does not compute IIT system integrated
-information (phi_s), mechanism-level phi, a cause-effect structure, structure-level
-Phi, or any consciousness result.
+This crate currently provides a validated dense binary factored TPM, cause/effect
+repertoire primitives, typed formalism/quantity identities, and stable model,
+evaluation, and analysis-request digests. It does not yet compute IIT system
+integrated information (phi_s), mechanism-level phi, a complete cause-effect
+structure, structure-level Phi, or any consciousness result.
 
 The intentional first step is to agree on the input contract before implementing
 the combinatorial algorithms. A mathematically correct engine cannot compare with
@@ -31,18 +32,22 @@ evaluation state, time grain, or formalism.
 - Evaluation digest: SHA-256 binding the same model encoding to the requested state.
 - A digest establishes byte-level identity only. It does not certify that the model,
   causal interpretation, or scientific theory is correct.
+- An analysis request binds the evaluation state, explicit formalism profile, and
+  requested quantity so semantically incompatible requests are rejected.
 
 ## Development gates
 
-1. Pin the TPM/state/connectivity semantics against a documented PyPhi fixture.
-2. Implement small-system probability repertoires and compare each intermediate
-   distribution with PyPhi on the same model digest.
+1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
+   against a documented PyPhi fixture.
+2. Compare cause/effect repertoire distributions against the reference on identical
+   model and state inputs, including deterministic, independent, and zero-likelihood
+   negative controls.
 3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile and exhaustive
    partition search for the first tiny systems.
-4. Keep IIT 4.0 (2026) as a distinct profile because the intrinsic-information
+4. Keep IIT 4.0 (2026) as a distinct profile because its intrinsic-information
    requirement changes the system quantity.
-5. Add certified lower/upper bounds only when they are mathematically valid for the
-   named quantity; do not label heuristic estimates as bounds.
+5. Add certified lower/upper bounds only when mathematically valid for the named
+   quantity; do not label heuristic estimates as bounds.
 6. Add mechanism distinctions, relations, and structure-level Phi only after system
    phi_s parity is independently established.
 7. Add property-based tests for state/unit relabeling, invalid TPMs, boundary
@@ -57,9 +62,12 @@ against exact for identical formalism/input/configuration. If a search mode chan
 the partition family, report it as a different formalism/profile rather than a speed
 optimization.
 
-Required fail-closed behavior: invalid model, unsupported formalism, timeout,
-incomplete exact search, missing reference output, or mismatched input digest must
-never produce a qualified scalar result.
+Required fail-closed behavior: invalid model, unsupported quantity/formalism pair,
+undefined cause-repertoire mass, timeout, incomplete exact search, missing reference
+output, or mismatched input digest must never produce a qualified scalar result.
+Current cause/effect routines are probability-repertoire primitives under explicit
+uniform-prior/background assumptions; they are not by themselves proof of PyPhi
+conformance.
 
 ## Claim ceiling
 
