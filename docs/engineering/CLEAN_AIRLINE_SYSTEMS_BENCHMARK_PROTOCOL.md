@@ -567,3 +567,23 @@ The paired benchmark digest binds the baseline scenario digest and actions, sort
 The paired fixture contains a regular low-future-price scenario and a first-interval grid-capacity outage. One frozen schedule is feasible in the regular case but fails the outage; rolling recourse succeeds in both. The clairvoyant exact policy is the cost floor, and rolling regret reflects the information available when each action was committed. These figures are synthetic and are a falsifier demonstration, not an airport savings estimate.
 
 The evaluator does not prove SOTA. A credible superiority claim still requires protocol parity, identical input/data/compute budgets, chronological holdout, exact-oracle parity on tractable cases, and independent physical/lifecycle data where the claim requires them.
+
+
+## 19. Multi-energy airport benchmark target — electricity, hydrogen and heat (research update 2026-10-29)
+
+A January 2026 study formulates an integrated electricity-thermal-hydrogen airport microgrid for electric, hybrid hydrogen-electric and hydrogen-powered aircraft. It combines PV, hydrogen fuel cells, electrolysers, battery/hydrogen/thermal storage and flight-schedule-linked demand. Its Manchester Airport case study reports a 29.4% increase in grid flexibility and a 63.2% reduction in the study's operational-risk measure under its proposed coordinated-dispatch strategy. The article says its underlying data are available on request, so exact reproduction depends on obtaining the data and complete formulation. Source: https://www.sciencedirect.com/science/article/pii/S259011682500092X (DOI 10.1016/j.etran.2025.100485).
+
+**Benchmark rule:** these percentages are literature claims under that paper's particular model and scenarios, not Symthaea performance. Before comparison, recover its operational-risk definition, flexibility metric, baseline scenario, energy-conversion assumptions, flight-schedule dataset, storage/fuel constraints and uncertainty treatment. If the original data/formulation is unavailable, label the test a related synthetic comparison, not a reproduction.
+
+This strengthens the next multi-energy extension target: preserve separate electricity, hydrogen and thermal balances, conversion efficiencies/losses, storage provenance, firm supply, and flight/fuel service requirements. Do not treat hydrogen as a free energy source: electrolyser input electricity and heat, compression/liquefaction, storage/boil-off, transport and fuel-cell/combustion conversion must be represented at consistent lifecycle boundaries. An SMR or future fusion plant can enter as a declared ground-side source scenario, with availability/cost/emissions evidence explicitly marked; onboard reactor assumptions are not needed to test the airport energy system.
+
+A related September 2026 ground-equipment demonstration at Exeter Airport tested a hydrogen/diesel dual-fuel ground power unit for 15 tests over almost six hours across eight operational days; it used 7.41 kg hydrogen, displaced an estimated 24.23 litres diesel and avoided an estimated 63.9 kg CO2. Source: https://www.cranfield.ac.uk/press/news-2026/winter-hydrogen-trial-at-exeter-airport-strengthens-case-for-lower-carbon-ground-operations. This is useful field evidence for a particular ground-support application, not evidence that hydrogen aircraft or a complete zero-carbon airline are commercially ready.
+
+### Multi-energy acceptance gates
+
+- One energy-and-material ledger per carrier with explicit conversion and lifecycle boundaries; avoid double-counting electrolyser electricity as both delivered electricity and hydrogen upstream input.
+- Supply, conversion, storage and demand balances independently reverified per interval.
+- Hydrogen inventory traceability includes source, production pathway, compression/transport losses and usable lower-heating-value convention.
+- Grid flexibility and operational-risk definitions are formalized before scoring; reproduce published metrics exactly or report why they differ.
+- Benchmark electricity-only, electricity + storage, electricity + hydrogen, and full multi-energy variants on paired flight schedules and stress scenarios.
+- Report cost, lifecycle CO2e, unmet-energy/flight service, peak import, flexibility and operational risk separately. A weighted score cannot hide an energy-service failure.
