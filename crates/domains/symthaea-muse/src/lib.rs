@@ -43,6 +43,8 @@ pub mod analyst;
 pub mod audio_analyzer;
 pub mod audio_preservation;
 #[cfg(feature = "theory")]
+pub mod symbolic_audio_binding;
+#[cfg(feature = "theory")]
 pub mod blinded_study;
 pub mod choreography;
 #[cfg(feature = "clap-fad")]

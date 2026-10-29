@@ -47,7 +47,7 @@ pub struct FrameInterval {
 /// The identifier must resolve externally to a frozen calibration report
 /// containing held-out composition/renderer results. Supplying an arbitrary
 /// string does not itself make the thresholds valid.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreservationConfig {
     /// Analysis window length, in audio frames; must be >= 16.
     pub frame_size: usize,
@@ -93,7 +93,7 @@ pub enum PreservationVerdict {
 }
 
 /// One protected time-window/channel measurement.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtectedWindowMeasurement {
     pub start_frame: usize,
     pub end_frame: usize,
@@ -103,8 +103,21 @@ pub struct ProtectedWindowMeasurement {
     pub exceeded_threshold: bool,
 }
 
+/// RMS-envelope measurement inside a declared edit region. Spectral content may
+/// change here, but operations such as pitch edits should not silently delete
+/// or radically attenuate the edited event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuthorizedRegionRmsMeasurement {
+    pub start_frame: usize,
+    pub end_frame: usize,
+    pub channel: usize,
+    pub reference_rms_db: f32,
+    pub candidate_rms_db: f32,
+    pub rms_delta_db: f32,
+}
+
 /// Content-bound evidence from this deterministic measurement primitive.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AudioPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
@@ -113,6 +126,8 @@ pub struct AudioPreservationReport {
     pub total_frames: usize,
     /// Full thresholds and window geometry used to produce this report.
     pub config: PreservationConfig,
+    /// Exact half-open edit mask used for this report; required for metric replay.
+    pub authorized_edits: Vec<FrameInterval>,
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
     pub candidate_audio_sha256: String,
@@ -128,12 +143,16 @@ pub struct AudioPreservationReport {
     pub verdict: PreservationVerdict,
     pub reasons: Vec<String>,
     pub measurements: Vec<ProtectedWindowMeasurement>,
+    /// Per-channel RMS envelope measurements inside every declared edit region.
+    /// They do not affect the generic verdict; operation-specific gates decide
+    /// whether energy preservation is required for the requested edit.
+    pub authorized_region_rms: Vec<AuthorizedRegionRmsMeasurement>,
 }
 
 /// Audio-only composition of the independent acoustic and onset channels.
 /// This is deliberately not a whole-edit verdict: symbolic contract evidence
 /// must be checked by its own verifier before an edit is accepted.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositeAudioPreservationReport {
     pub verifier_version: String,
     pub sample_rate_hz: u32,
@@ -246,6 +265,25 @@ pub fn audit_protected_audio(
 
     let reference_audio_sha256 = audio_digest(reference);
     let candidate_audio_sha256 = audio_digest(candidate);
+    let mut authorized_region_rms =
+        Vec::with_capacity(authorized_edits.len().saturating_mul(reference.channels));
+    for interval in authorized_edits {
+        let region_frames = interval.end_frame - interval.start_frame;
+        for channel in 0..reference.channels {
+            let reference_region = channel_window(reference, interval.start_frame, region_frames, channel);
+            let candidate_region = channel_window(candidate, interval.start_frame, region_frames, channel);
+            let reference_rms_db = rms_db(&reference_region);
+            let candidate_rms_db = rms_db(&candidate_region);
+            authorized_region_rms.push(AuthorizedRegionRmsMeasurement {
+                start_frame: interval.start_frame,
+                end_frame: interval.end_frame,
+                channel,
+                reference_rms_db,
+                candidate_rms_db,
+                rms_delta_db: (reference_rms_db - candidate_rms_db).abs(),
+            });
+        }
+    }
     let mut measurements = Vec::with_capacity(protected_starts.len() * reference.channels);
     let mut worst_rms_delta_db = 0.0f32;
     let mut worst_spectral_distance = 0.0f32;
@@ -318,6 +356,7 @@ pub fn audit_protected_audio(
         channels: reference.channels,
         total_frames,
         config: config.clone(),
+        authorized_edits: authorized_edits.to_vec(),
         effective_boundary_guard_frames: config.boundary_guard_frames,
         reference_audio_sha256,
         candidate_audio_sha256,
@@ -330,11 +369,53 @@ pub fn audit_protected_audio(
         verdict,
         reasons,
         measurements,
+        authorized_region_rms,
     };
     report.receipt_sha256 = receipt_sha256(&report)?;
     Ok(report)
 }
 
+
+
+/// Recompute the full acoustic report against the supplied audio buffers and
+/// the exact authorization mask recorded in that report. A valid receipt alone
+/// is insufficient: a caller could re-seal a modified metric, so the measured
+/// values and verdict must match a fresh run as well.
+pub fn verify_audio_preservation_against_buffers(
+    reference: AudioView<'_>,
+    candidate: AudioView<'_>,
+    report: &AudioPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    if !verify_audio_preservation_receipt(report)? {
+        return Ok(false);
+    }
+    let replay = audit_protected_audio(
+        reference,
+        candidate,
+        &report.authorized_edits,
+        &report.config,
+    )?;
+    Ok(replay == *report)
+}
+
+/// Recompute spectral-flux onset events and the final verdict from the supplied
+/// buffers and the exact authorization mask recorded in that report.
+pub fn verify_onset_preservation_against_buffers(
+    reference: AudioView<'_>,
+    candidate: AudioView<'_>,
+    report: &OnsetPreservationReport,
+) -> Result<bool, AudioAuditInputError> {
+    if !verify_onset_preservation_receipt(report)? {
+        return Ok(false);
+    }
+    let replay = audit_onset_preservation(
+        reference,
+        candidate,
+        &report.authorized_edits,
+        &report.config,
+    )?;
+    Ok(replay == *report)
+}
 
 /// Hash a fully serialized report with its receipt field cleared. Struct field
 /// order is explicit in the derived Serialize shape; the domain tag prevents
@@ -631,6 +712,14 @@ fn rms_db(samples: &[f32]) -> f32 {
 /// SHA-256 over domain-separated, canonical little-endian f32 sample bits and
 /// sample-format metadata. This detects input substitution; it does not prove
 /// authorship or trusted capture.
+/// Public content commitment for a validated audio buffer. The digest binds
+/// the sample rate, channel count, frame count, and exact f32 sample bits.
+/// It is an integrity value, not evidence of authorship or causal rendering.
+pub fn audio_content_sha256(view: AudioView<'_>) -> Result<String, AudioAuditInputError> {
+    validate_view(view)?;
+    Ok(audio_digest(view))
+}
+
 fn audio_digest(view: AudioView<'_>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous-dynamics-audio-preservation-buffer-v1\0");
@@ -648,7 +737,7 @@ fn audio_digest(view: AudioView<'_>) -> String {
 ///
 /// Time tolerances are milliseconds and are converted using the input sample
 /// rate. Thresholds require calibration on the intended renderer/domain.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetPreservationConfig {
     pub frame_size: usize,
     pub hop_size: usize,
@@ -676,7 +765,7 @@ impl Default for OnsetPreservationConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetEvent {
     pub channel: usize,
     /// Approximate onset time in audio-frame coordinates.
@@ -684,7 +773,7 @@ pub struct OnsetEvent {
     pub novelty: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
@@ -693,6 +782,8 @@ pub struct OnsetPreservationReport {
     pub total_frames: usize,
     /// Full detector settings needed to reproduce event extraction.
     pub config: OnsetPreservationConfig,
+    /// Exact half-open edit mask used for this report; required for metric replay.
+    pub authorized_edits: Vec<FrameInterval>,
     /// Explicit guard plus the spectral-flux analysis footprint.
     pub effective_boundary_guard_frames: usize,
     pub reference_audio_sha256: String,
@@ -869,6 +960,7 @@ pub fn audit_onset_preservation(
         channels: reference.channels,
         total_frames,
         config: config.clone(),
+        authorized_edits: authorized_edits.to_vec(),
         effective_boundary_guard_frames,
         reference_audio_sha256: audio_digest(reference),
         candidate_audio_sha256: audio_digest(candidate),
@@ -1472,6 +1564,39 @@ mod tests {
             .expect("valid abstaining reports compose conservatively");
         assert_eq!(composite.verdict, PreservationVerdict::Abstain);
         assert!(composite.reasons.iter().any(|reason| reason.contains("abstained")));
+    }
+
+    #[test]
+    fn acoustic_report_replay_recomputes_metrics_even_if_a_modified_report_is_resealed() {
+        let reference = sine(4096, 16_000, 440.0);
+        let mut candidate = reference.clone();
+        candidate[1024..1152].fill(0.0);
+        let mask = [FrameInterval { start_frame: 3072, end_frame: 3200 }];
+        let report = audit_protected_audio(
+            view(&reference), view(&candidate), &mask, &calibrated_config(),
+        ).expect("base report");
+        assert!(verify_audio_preservation_against_buffers(
+            view(&reference), view(&candidate), &report
+        ).expect("base report replays"));
+
+        let mut forged = report.clone();
+        forged.worst_spectral_distance = 0.0;
+        forged.receipt_sha256 = receipt_sha256(&forged).expect("forged receipt can be serialized");
+        assert!(!verify_audio_preservation_against_buffers(
+            view(&reference), view(&candidate), &forged
+        ).expect("sealed but incorrect metric should be rejected"));
+    }
+
+    #[test]
+    fn onset_report_replay_rejects_audio_substitution_even_with_an_intact_receipt() {
+        let reference = sine(4096, 16_000, 440.0);
+        let candidate = sine(4096, 16_000, 880.0);
+        let report = audit_onset_preservation(
+            view(&reference), view(&reference), &[], &onset_config(),
+        ).expect("base report");
+        assert!(!verify_onset_preservation_against_buffers(
+            view(&reference), view(&candidate), &report
+        ).expect("matched format but wrong content replays to a different report"));
     }
 
 }

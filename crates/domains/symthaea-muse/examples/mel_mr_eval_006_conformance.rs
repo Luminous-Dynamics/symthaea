@@ -16,7 +16,7 @@ use std::process::ExitCode;
 use symthaea_muse::audio_preservation::{
     AudioView, FrameInterval, OnsetPreservationConfig, PreservationConfig,
     PreservationVerdict, audit_onset_preservation, audit_protected_audio,
-    verify_audio_preservation_receipt, verify_onset_preservation_receipt,
+    verify_audio_preservation_against_buffers, verify_onset_preservation_against_buffers,
 };
 
 const SAMPLE_RATE_HZ: u32 = 16_000;
@@ -154,7 +154,9 @@ fn acoustic_case(
     ) {
         Ok(report) => {
             let actual = verdict_name(report.verdict);
-            let receipt_verified = verify_audio_preservation_receipt(&report).unwrap_or(false);
+            let evidence_replayed = verify_audio_preservation_against_buffers(
+                view(reference), view(candidate), &report
+            ).unwrap_or(false);
             json!({
                 "id": id,
                 "mutation_family": mutation_family,
@@ -163,13 +165,14 @@ fn acoustic_case(
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
                 "receipt_sha256": report.receipt_sha256,
-                "receipt_verified": receipt_verified,
-                "expected_outcome_reproduced": report.verdict == expected && receipt_verified,
+                "evidence_replayed": evidence_replayed,
+                "expected_outcome_reproduced": report.verdict == expected && evidence_replayed,
                 "protected_windows": report.protected_windows,
                 "audited_channel_windows": report.audited_channel_windows,
                 "violating_channel_windows": report.violating_channel_windows,
                 "worst_rms_delta_db": report.worst_rms_delta_db,
                 "worst_spectral_distance": report.worst_spectral_distance,
+                "authorized_region_rms": report.authorized_region_rms,
                 "calibration_id": report.calibration_id,
                 "reference_audio_sha256": report.reference_audio_sha256,
                 "candidate_audio_sha256": report.candidate_audio_sha256,
@@ -182,7 +185,7 @@ fn acoustic_case(
             "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
-            "receipt_verified": false,
+            "evidence_replayed": false,
             "input_error": error.to_string(),
             "expected_outcome_reproduced": false,
         }),
@@ -207,7 +210,9 @@ fn onset_case(
     ) {
         Ok(report) => {
             let actual = verdict_name(report.verdict);
-            let receipt_verified = verify_onset_preservation_receipt(&report).unwrap_or(false);
+            let evidence_replayed = verify_onset_preservation_against_buffers(
+                view(reference), view(candidate), &report
+            ).unwrap_or(false);
             json!({
                 "id": id,
                 "mutation_family": mutation_family,
@@ -216,8 +221,8 @@ fn onset_case(
                 "expected_verdict": verdict_name(expected),
                 "actual_verdict": actual,
                 "receipt_sha256": report.receipt_sha256,
-                "receipt_verified": receipt_verified,
-                "expected_outcome_reproduced": report.verdict == expected && receipt_verified,
+                "evidence_replayed": evidence_replayed,
+                "expected_outcome_reproduced": report.verdict == expected && evidence_replayed,
                 "reference_onset_count": report.reference_onsets.len(),
                 "candidate_onset_count": report.candidate_onsets.len(),
                 "matched_events": report.matched_events,
@@ -238,7 +243,7 @@ fn onset_case(
             "critical_mutation": critical_mutation,
             "description": description,
             "expected_verdict": verdict_name(expected),
-            "receipt_verified": false,
+            "evidence_replayed": false,
             "input_error": error.to_string(),
             "expected_outcome_reproduced": false,
         }),
@@ -398,9 +403,9 @@ fn main() -> ExitCode {
         .filter(|case| case["expected_outcome_reproduced"] == Value::Bool(true))
         .count();
     let failed = cases.len() - passed;
-    let receipt_failures = cases
+    let evidence_replay_failures = cases
         .iter()
-        .filter(|case| case["receipt_verified"] != Value::Bool(true))
+        .filter(|case| case["evidence_replayed"] != Value::Bool(true))
         .count();
 
     // Report failure modes rather than only a single fixture pass percentage.
@@ -468,7 +473,7 @@ fn main() -> ExitCode {
 
     let output = json!({
         "benchmark": "MEL-MR-EVAL-006",
-        "runner_version": "synthetic-conformance-v0.2",
+        "runner_version": "synthetic-conformance-v0.3",
         "fixture_only": true,
         "calibration_id_is_production_calibration": false,
         "sample_rate_hz": SAMPLE_RATE_HZ,
@@ -477,7 +482,7 @@ fn main() -> ExitCode {
         "cases_total": cases.len(),
         "cases_expected_outcome_reproduced": passed,
         "cases_expected_outcome_not_reproduced": failed,
-        "receipt_failures": receipt_failures,
+        "evidence_replay_failures": evidence_replay_failures,
         "critical_mutations_total": critical_mutations_total,
         "critical_false_accepts": critical_false_accepts,
         "critical_false_accept_metrics": critical_false_accept_metrics,
@@ -486,7 +491,7 @@ fn main() -> ExitCode {
         "false_rejection_metrics": rate_interval_json(false_rejections, positive_controls_total),
         "abstentions": abstentions,
         "per_family_summary": per_family_summary,
-        "status": if failed == 0 && receipt_failures == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
+        "status": if failed == 0 && evidence_replay_failures == 0 { "conformance-fixtures-reproduced" } else { "conformance-fixtures-failed" },
         "limitations": [
             "synthetic fixtures only; not a human listening study",
             "thresholds are fixture settings and are not production-calibrated",
