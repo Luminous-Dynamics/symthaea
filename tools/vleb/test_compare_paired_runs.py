@@ -55,6 +55,10 @@ class PairedComparisonFixture:
             },
         ]
         task_pins = {task_id: sha(("task-contract:" + task_id).encode()) for task_id in self.task_ids}
+        self.task_family_by_task = {
+            task_id: ("parsing" if index <= 2 else "ledger" if index <= 4 else "transaction" if index <= 6 else "runtime")
+            for index, task_id in enumerate(self.task_ids, start=1)
+        }
         rows = []
         sequence = 0
         for task_index, task_id in enumerate(self.task_ids):
@@ -87,11 +91,12 @@ class PairedComparisonFixture:
                         "duration_ms": 1000 + task_index * 10 + seed_index * 20 + arm_index * 75,
                     })
         self.manifest = {
-            "schema_version": "vleb-paired-comparison-v1",
+            "schema_version": "vleb-paired-comparison-v2",
             "protocol_sha256": self.PROTOCOL,
             "cohort_id": "vleb-paired-pilot-001",
             "task_ids": self.task_ids,
             "task_contract_sha256_by_task": task_pins,
+            "task_family_by_task": self.task_family_by_task,
             "seeds": self.seeds,
             "reference_arm": "reference",
             "arms": self.arms,
@@ -122,6 +127,15 @@ class PairedComparisonTests(unittest.TestCase):
             self.fixture.arms[1]["execution_profile_sha256"],
         )
         self.assertEqual(result["task_cluster_count"], 8)
+        self.assertEqual(result["task_family_distribution"], {"ledger": 2, "parsing": 2, "runtime": 2, "transaction": 2})
+        self.assertEqual(set(result["task_family_summaries"]), set(self.fixture.task_family_by_task.values()))
+        for family, family_result in result["task_family_summaries"].items():
+            self.assertEqual(family_result["task_cluster_count"], 2)
+            self.assertEqual(family_result["scheduled_trial_count_per_arm"], 4)
+            self.assertEqual(set(family_result["arm_summaries"]), {"reference", "candidate"})
+            self.assertEqual(len(family_result["pairwise_comparisons"]), 1)
+            self.assertIn("task_cluster_bootstrap_95ci_pp", family_result["arm_summaries"]["candidate"])
+        self.assertIn("task_family_stratified_bootstrap_95ci_pp", result["arm_summaries"]["candidate"])
         self.assertEqual(result["seed_count_per_task"], 2)
         self.assertEqual(result["expected_trial_count_per_arm"], 16)
         self.assertEqual(result["observed_trial_count"], 32)
@@ -137,6 +151,10 @@ class PairedComparisonTests(unittest.TestCase):
         task_rows = result["pairwise_comparisons"][0]["task_level_comparisons"]
         self.assertEqual([row["task_cluster_ordinal"] for row in task_rows], list(range(1, 9)))
         self.assertTrue(all("task_id" not in row for row in task_rows))
+        self.assertEqual(
+            [row["task_family"] for row in task_rows],
+            [self.fixture.task_family_by_task[task_id] for task_id in self.fixture.task_ids],
+        )
         self.assertEqual(
             sum(row["direction"] == "comparison_win" for row in task_rows),
             result["pairwise_comparisons"][0]["task_clusters_won"],
@@ -259,6 +277,62 @@ class PairedComparisonTests(unittest.TestCase):
         self.assertEqual(adjusted, {"arm-a": 0.03, "arm-c": 0.06, "arm-b": 0.06})
         capped = analyzer.holm_adjust_pvalues({"arm-a": 0.8, "arm-b": 0.9})
         self.assertEqual(capped, {"arm-a": 1.0, "arm-b": 1.0})
+
+    def test_missing_task_family_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        del manifest["task_family_by_task"]["task-001"]
+        with self.assertRaisesRegex(ValueError, "task-family map must match"):
+            self.fixture.analyze(manifest)
+
+    def test_extra_task_family_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        manifest["task_family_by_task"]["unassigned-task"] = "other"
+        with self.assertRaisesRegex(ValueError, "task-family map must match"):
+            self.fixture.analyze(manifest)
+
+    def test_invalid_task_family_label_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        manifest["task_family_by_task"]["task-001"] = "../transaction"
+        with self.assertRaisesRegex(ValueError, "task-family label"):
+            self.fixture.analyze(manifest)
+
+    def test_legacy_v1_manifest_is_rejected_after_contract_version_bump(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        manifest["schema_version"] = "vleb-paired-comparison-v1"
+        with self.assertRaisesRegex(ValueError, "unsupported comparison manifest schema_version"):
+            self.fixture.analyze(manifest)
+
+    def test_stratified_bootstrap_holds_task_family_mix_fixed(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        manifest["task_family_by_task"] = {
+            task_id: ("routine" if index <= 6 else "edge")
+            for index, task_id in enumerate(self.fixture.task_ids, start=1)
+        }
+        for row in manifest["results"]:
+            row["outcome"] = (
+                "pass" if row["arm_id"] == "candidate"
+                and manifest["task_family_by_task"][row["task_id"]] == "routine"
+                else "fail"
+            )
+        result = self.fixture.analyze(manifest)
+        self.assertAlmostEqual(result["arm_summaries"]["candidate"]["success_rate_pct"], 75.0)
+        # The unstratified bootstrap lets the sample's family mix fluctuate.
+        self.assertGreater(
+            result["arm_summaries"]["candidate"]["task_cluster_bootstrap_95ci_pp"]["upper_pp"],
+            result["arm_summaries"]["candidate"]["task_cluster_bootstrap_95ci_pp"]["lower_pp"],
+        )
+        # Stratification preserves the six/two family mix; within each family,
+        # all synthetic task clusters share the same outcome.
+        self.assertEqual(
+            result["arm_summaries"]["candidate"]["task_family_stratified_bootstrap_95ci_pp"],
+            {"lower_pp": 75.0, "upper_pp": 75.0},
+        )
+        self.assertEqual(
+            result["pairwise_comparisons"][0]["task_family_stratified_bootstrap_95ci_pp"],
+            {"lower_pp": 75.0, "upper_pp": 75.0},
+        )
+        self.assertEqual(result["task_family_summaries"]["routine"]["arm_summaries"]["candidate"]["success_rate_pct"], 100.0)
+        self.assertEqual(result["task_family_summaries"]["edge"]["arm_summaries"]["candidate"]["success_rate_pct"], 0.0)
 
     def test_missing_cartesian_cell_is_rejected(self) -> None:
         manifest = copy.deepcopy(self.fixture.manifest)
