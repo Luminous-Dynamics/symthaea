@@ -564,6 +564,13 @@ mod tests {
       "upstream_commit":"1581d4cbdd69a0faf34b2089614fe2a814316a6a",
       "family_count":6,
       "component_count":6,
+      "source_v0_partition_digest_sha256":"e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970",
+      "source_split_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_component_manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "relationship_inventory_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "family_count_by_split":{"train":4,"validation":1,"test":1},
+      "component_count_by_split":{"train":4,"validation":1,"test":1},
+      "target_component_count_by_split":{"train":4,"validation":1,"test":1},
       "candidate_partition_digest_sha256":"PLACEHOLDER",
       "qualified_for_confirmatory_use":false,
       "families":[
