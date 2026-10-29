@@ -81,11 +81,16 @@ jobs:
             exit 1
           fi
 
-          target_manifest="$temp_dir/valid-target-shift.manifest"
+          target_dir="$temp_dir/target-shift"
+          mkdir -p "$target_dir"
+          target_manifest="$target_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/target-shift-intervention.conf "$target_dir/target-shift-intervention.conf"
           sed \
             -e 's/^scenario_class=zero_shift_control$/scenario_class=target_distribution_shift/' \
             -e 's/^transform_family=none$/transform_family=feature_permutation/' \
             -e 's/^transform_severity=0.000000$/transform_severity=0.500000/' \
+            -e 's/^intervention_config_path=zero-shift-intervention.conf$/intervention_config_path=target-shift-intervention.conf/' \
+            -e 's/^intervention_config_sha256=94bd34abce35b380f901ca711ce9d83a4ec01ac367e41c2a57bca849982b7426$/intervention_config_sha256=8a41df021348ee87e2b70a85af606634ebb9edd96fe73028490888d628502f1f/' \
             -e 's/^rng_algorithm=none$/rng_algorithm=chacha20_v1/' \
             -e 's/^transition_shape=none$/transition_shape=abrupt/' \
             -e 's/^change_start=NA$/change_start=100/' \
@@ -93,10 +98,21 @@ jobs:
             "$manifest" > "$target_manifest"
           cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$target_manifest"
 
-          selection_mislabeled="$temp_dir/target-as-selection-only.manifest"
+          selection_mislabeled="$target_dir/target-as-selection-only.manifest"
           sed 's/^scenario_class=target_distribution_shift$/scenario_class=selection_only_shift/' "$target_manifest" > "$selection_mislabeled"
           if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$selection_mislabeled"; then
             echo "validator accepted target-population drift mislabeled as selection-only drift" >&2
+            exit 1
+          fi
+
+          config_mutation_dir="$temp_dir/config-mutation"
+          mkdir -p "$config_mutation_dir"
+          cp "$manifest" "$config_mutation_dir/manifest"
+          cp tools/source-derived-drift-manifest/fixtures/zero-shift-intervention.conf "$config_mutation_dir/zero-shift-intervention.conf"
+          sed 's/^scenario_class=zero_shift_control$/scenario_class=target_distribution_shift/' "$config_mutation_dir/zero-shift-intervention.conf" > "$config_mutation_dir/changed-intervention.conf"
+          mv "$config_mutation_dir/changed-intervention.conf" "$config_mutation_dir/zero-shift-intervention.conf"
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate "$config_mutation_dir/manifest"; then
+            echo "validator accepted mutated intervention config bytes" >&2
             exit 1
           fi
 
