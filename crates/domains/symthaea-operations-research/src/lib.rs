@@ -6,8 +6,9 @@
 //! Operations research for Symthaea: inventory optimization, queueing, and
 //! shortest paths. A practical decision-science layer the workspace lacked.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form results
-//! and an exact Dijkstra, checked against known values.
+//! Small operations-research crate with no `symthaea-core` link. Existing closed-form
+//! and graph algorithms are dependency-light; aviation manifest identity uses the
+//! workspace SHA-256 implementation for domain-separated canonical input digests.
 //!
 //! ## Scope
 //!
