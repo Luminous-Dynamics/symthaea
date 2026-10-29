@@ -65,7 +65,7 @@ jobs:
           output_sha256=$output_sha256
           artifact_path=artifacts/example_run/results.csv
           EOF
-          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$receipt" "$output"
+          cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$receipt" "$temp_dir"
 
           bad_manifest="$temp_dir/leaked.manifest"
           sed 's/^calibration_sources=.*/calibration_sources=dataset_a_v1,example_stream_v1/' "$manifest" > "$bad_manifest"
@@ -76,7 +76,7 @@ jobs:
 
           bad_receipt="$temp_dir/bad.receipt"
           sed 's/^output_sha256=.*/output_sha256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/' "$receipt" > "$bad_receipt"
-          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$bad_receipt" "$output"; then
+          if cargo run --locked --quiet --manifest-path tools/source-derived-drift-manifest/Cargo.toml -- validate-receipt "$manifest" "$bad_receipt" "$temp_dir"; then
             echo "validator accepted a mismatched output digest" >&2
             exit 1
           fi
