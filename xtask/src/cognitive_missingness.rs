@@ -75,11 +75,23 @@ pub struct SensitivityPoint {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+pub struct SensitivityTippingPoint {
+    pub candidate_delta: f64,
+    pub reference_delta: f64,
+    pub candidate_minus_reference_loss: f64,
+    /// L-infinity departure from the no-selection-difference point (delta_candidate, delta_reference)=(0,0).
+    pub max_abs_sensitivity_delta: f64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct SensitivityGridSummary {
     pub grid_point_count: usize,
     pub candidate_favoring_point_count: usize,
     pub reference_favoring_point_count: usize,
     pub tie_point_count: usize,
+    pub minimum_candidate_minus_reference_loss: Option<f64>,
+    pub maximum_candidate_minus_reference_loss: Option<f64>,
     /// True only when every registered point favors candidate; not a statistical claim.
     pub candidate_favoring_at_every_registered_point: bool,
     /// True when the registered grid contains points favoring both arms.
@@ -104,8 +116,12 @@ pub struct MissingnessScore {
     pub candidate_minus_reference_loss_upper_bound: f64,
     /// True only when the identification interval alone lies wholly in the candidate-favoring direction.
     pub identification_interval_excludes_zero_in_candidate_favor: bool,
+    /// Observed-case candidate-minus-reference loss; selected-data statistic, not full-data value.
+    pub observed_case_candidate_minus_reference_loss: Option<f64>,
     pub sensitivity_surface: Vec<SensitivityPoint>,
     pub sensitivity_grid_summary: SensitivityGridSummary,
+    /// Nearest registered sensitivity-grid point that ties or reverses the observed-case sign.
+    pub sensitivity_tipping_point: Option<SensitivityTippingPoint>,
     pub sensitivity_status: String,
     pub interpretation_guard: String,
 }
@@ -207,6 +223,12 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
     }
 
     let sensitivity_grid_summary = summarize_sensitivity_grid(&sensitivity_surface);
+    let observed_case_difference = candidate
+        .observed_mean_loss
+        .zip(reference.observed_mean_loss)
+        .map(|(candidate_mean, reference_mean)| candidate_mean - reference_mean);
+    let sensitivity_tipping_point =
+        find_sensitivity_tipping_point(&sensitivity_surface, observed_case_difference);
     let mut result = MissingnessScore {
         metric_version: "informative-missingness-partial-identification-v1".to_string(),
         source_input_sha256: sha256_hex(source_bytes),
@@ -220,8 +242,10 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
         candidate_minus_reference_loss_lower_bound: delta_lower,
         candidate_minus_reference_loss_upper_bound: delta_upper,
         identification_interval_excludes_zero_in_candidate_favor: delta_upper < 0.0,
+        observed_case_candidate_minus_reference_loss: observed_case_difference,
         sensitivity_surface,
         sensitivity_grid_summary,
+        sensitivity_tipping_point,
         sensitivity_status,
         interpretation_guard: "Partial-identification statistic only; not a confidence interval, proof of measurement authenticity, causal identification, or SOTA claim.".to_string(),
     };
@@ -230,6 +254,37 @@ pub fn score(input: MissingnessInput, source_bytes: &[u8]) -> anyhow::Result<Mis
     let canonical = serde_json::to_vec(&result)?;
     result.result_sha256 = Some(sha256_hex(&canonical));
     Ok(result)
+}
+
+fn find_sensitivity_tipping_point(
+    points: &[SensitivityPoint],
+    observed_case_difference: Option<f64>,
+) -> Option<SensitivityTippingPoint> {
+    let baseline = observed_case_difference?;
+    // A baseline tie has no observed ranking whose sign can be tipped.
+    if baseline.abs() <= 1e-12 {
+        return None;
+    }
+    points
+        .iter()
+        .filter(|point| {
+            point.candidate_minus_reference_loss.abs() <= 1e-12
+                || point.candidate_minus_reference_loss.is_sign_negative() != baseline.is_sign_negative()
+        })
+        .min_by(|left, right| {
+            let left_radius = left.candidate_delta.abs().max(left.reference_delta.abs());
+            let right_radius = right.candidate_delta.abs().max(right.reference_delta.abs());
+            left_radius
+                .total_cmp(&right_radius)
+                .then_with(|| left.candidate_delta.total_cmp(&right.candidate_delta))
+                .then_with(|| left.reference_delta.total_cmp(&right.reference_delta))
+        })
+        .map(|point| SensitivityTippingPoint {
+            candidate_delta: point.candidate_delta,
+            reference_delta: point.reference_delta,
+            candidate_minus_reference_loss: point.candidate_minus_reference_loss,
+            max_abs_sensitivity_delta: point.candidate_delta.abs().max(point.reference_delta.abs()),
+        })
 }
 
 fn summarize_sensitivity_grid(points: &[SensitivityPoint]) -> SensitivityGridSummary {
@@ -249,6 +304,14 @@ fn summarize_sensitivity_grid(points: &[SensitivityPoint]) -> SensitivityGridSum
         candidate_favoring_point_count,
         reference_favoring_point_count,
         tie_point_count,
+        minimum_candidate_minus_reference_loss: points
+            .iter()
+            .map(|point| point.candidate_minus_reference_loss)
+            .min_by(f64::total_cmp),
+        maximum_candidate_minus_reference_loss: points
+            .iter()
+            .map(|point| point.candidate_minus_reference_loss)
+            .max_by(f64::total_cmp),
         candidate_favoring_at_every_registered_point: !points.is_empty()
             && candidate_favoring_point_count == points.len(),
         ranking_reverses_within_registered_grid: candidate_favoring_point_count > 0
@@ -397,6 +460,11 @@ mod tests {
         assert!(!scored.sensitivity_grid_summary.candidate_favoring_at_every_registered_point);
         assert!(scored.sensitivity_grid_summary.candidate_favoring_point_count > 0);
         assert!(scored.sensitivity_grid_summary.reference_favoring_point_count > 0);
+        assert!(scored.sensitivity_tipping_point.is_some());
+        let tipping = scored.sensitivity_tipping_point.as_ref().unwrap();
+        assert!((tipping.max_abs_sensitivity_delta - 0.25).abs() < 1e-12);
+        assert!(tipping.candidate_minus_reference_loss.abs() < 1e-12);
+        assert!(scored.observed_case_candidate_minus_reference_loss.unwrap() < 0.0);
     }
 
     #[test]
@@ -406,6 +474,7 @@ mod tests {
         let scored = score(input(candidate, reference), b"grid-stable-win").unwrap();
         assert!(scored.sensitivity_grid_summary.candidate_favoring_at_every_registered_point);
         assert!(!scored.sensitivity_grid_summary.ranking_reverses_within_registered_grid);
+        assert!(scored.sensitivity_tipping_point.is_none());
         assert_eq!(scored.sensitivity_grid_summary.grid_point_count, 16);
         assert_eq!(scored.sensitivity_grid_summary.candidate_favoring_point_count, 16);
     }
