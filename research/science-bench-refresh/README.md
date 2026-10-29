@@ -213,6 +213,22 @@ The evaluator-only protected index is defined by `schema/search-protected-artifa
 
 The index records must be sorted by `(content_sha256, classification, reference_id_sha256)` and carry a domain-separated index commitment. The index, protected content, reference map, and report must never be mounted into the evaluated policy environment. Anchor the index commitment before the scored run through the frozen protocol/analysis-plan receipt or an independent append-only channel; a self-consistent hash generated after evaluation does not establish immutability.
 
+To compute the typed commitment, create an `index-fields.json` containing only `generation_id`, `matcher_revision_sha256`, `decision_rules_sha256`, and the sorted `artifacts` array, then run:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-protected-index index-fields.json > index-commitment.json
+commit="$(jq -r '.index_commitment_sha256' index-commitment.json)"
+jq --arg commitment "$commit" '
+  . + {
+    schema: "symthaea.science_bench_refresh_protected_search_artifact_index.v1",
+    index_commitment_sha256: $commitment
+  }
+' index-fields.json > protected-index.json
+```
+
+The exact matcher performs strict shape, digest, ordering, generation, and commitment checks on the final index. The commitment command computes the deterministic commitment; it does not independently certify that the protected artifact list is complete or authenticate when it was frozen.
+
 Generate an exact-match report:
 
 ```sh
