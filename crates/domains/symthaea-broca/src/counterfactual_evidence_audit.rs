@@ -1112,10 +1112,10 @@ mod tests {
     fn atom_ablation_scorer_rejects_missing_or_unlabelled_observations() {
         let fixture_sha256 = hex::encode(Sha256::digest(FIXTURES.as_bytes()));
         let rows = synthetic_ablation_rows(&fixture_sha256);
-        let observations = rows.iter().take(4).map(Value::to_string).collect::<Vec<_>>().join("\n");
-        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
+        let base_observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
+        let incomplete_observations = rows.iter().take(4).map(Value::to_string).collect::<Vec<_>>().join("\n");
+        assert!(score_atom_ablation_jsonl(&incomplete_observations, FIXTURES, LABELS).is_err());
 
-        let observations = rows.iter().map(Value::to_string).collect::<Vec<_>>().join("\n");
         let extra = serde_json::json!({
             "schema_version": "BROCA-MEMORY-ATOM-ABLATION-OBSERVATIONS-V1",
             "run_id": "synthetic-scorer-test-v1",
@@ -1131,21 +1131,22 @@ mod tests {
             "full_fields": {"claim.retry_limit.value": "4"},
             "ablated_fields": {}
         });
-        let observations = format!("{}\n{}", observations, extra);
-        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, LABELS).is_err());
+        let with_extra = format!("{}\n{}", base_observations, extra);
+        assert!(score_atom_ablation_jsonl(&with_extra, FIXTURES, LABELS).is_err());
 
         let mismatched_pair_labels = LABELS.replace(
             r#""pair_id":"memory-influence-0001""#,
             r#""pair_id":"unknown-pair""#,
         );
-        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, &mismatched_pair_labels).is_err());
+        assert_ne!(mismatched_pair_labels, LABELS, "fixture label mutation must actually apply");
+        assert!(score_atom_ablation_jsonl(&base_observations, FIXTURES, &mismatched_pair_labels).is_err());
 
         let missing_pair_labels = LABELS
             .lines()
             .filter(|line| !line.contains(r#""pair_id":"negation-0001""#))
             .collect::<Vec<_>>()
             .join("\n");
-        assert!(score_atom_ablation_jsonl(&observations, FIXTURES, &missing_pair_labels).is_err());
+        assert!(score_atom_ablation_jsonl(&base_observations, FIXTURES, &missing_pair_labels).is_err());
     }
 
     #[test]
