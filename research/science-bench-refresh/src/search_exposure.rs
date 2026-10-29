@@ -253,7 +253,7 @@ fn validate_receipt_shape(receipt: &SearchExposureReceiptV1) -> Result<(), Strin
     Ok(())
 }
 
-fn event_hash(event: &SearchExposureEventV1) -> Result<String, String> {
+pub(crate) fn event_hash(event: &SearchExposureEventV1) -> Result<String, String> {
     let payload = EventHashPayloadV1 {
         sequence: event.sequence,
         event_kind: &event.event_kind,
@@ -268,7 +268,7 @@ fn event_hash(event: &SearchExposureEventV1) -> Result<String, String> {
     digest_domain_framed(b"event.v1", &encoded)
 }
 
-fn receipt_hash(receipt: &SearchExposureReceiptV1) -> Result<String, String> {
+pub(crate) fn receipt_hash(receipt: &SearchExposureReceiptV1) -> Result<String, String> {
     let payload = ReceiptHashPayloadV1 {
         schema: &receipt.schema,
         run_id: &receipt.run_id,
