@@ -113,6 +113,10 @@ class HistoricalTransferBenchmarkTests(unittest.TestCase):
         self.assertIn("eight synthetic families", receipt["claim_ceiling"])
         self.assertIn(ABSTENTION_POLICY_ID, POLICY_IDS)
         self.assertEqual(ABSTENTION_DISTANCE_THRESHOLD, 0.9)
+        self.assertEqual(len(receipt["policy_config_sha256"]), 64)
+        self.assertRegex(receipt["policy_config_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["policy_configuration"]["policy_ids"], list(POLICY_IDS))
+        self.assertEqual(receipt["policy_configuration"]["nearest_k"], 4)
         guarded = receipt["aggregate_metrics_macro_averaged_over_target_tasks"][ABSTENTION_POLICY_ID]["selective_prediction"]
         self.assertEqual(guarded["nearest_distance_threshold"], ABSTENTION_DISTANCE_THRESHOLD)
         self.assertGreaterEqual(guarded["macro_coverage_over_target_tasks"], 0.0)
