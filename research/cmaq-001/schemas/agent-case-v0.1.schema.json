@@ -8,10 +8,8 @@
     "schema_version",
     "case_id",
     "suite",
-    "mechanism_family",
     "episode_id",
     "step_id",
-    "regime_id",
     "observation",
     "event_history",
     "allowed_actions",
@@ -36,11 +34,6 @@
         "failed-action-recovery"
       ]
     },
-    "mechanism_family": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Visible grouping only if the task protocol explicitly grants this information; qualification mechanism labels may be withheld."
-    },
     "episode_id": {
       "type": "string",
       "minLength": 1
@@ -48,11 +41,6 @@
     "step_id": {
       "type": "integer",
       "minimum": 0
-    },
-    "regime_id": {
-      "type": "string",
-      "minLength": 1,
-      "description": "May be hidden in qualification cases; never assume the agent sees the evaluator's canonical label."
     },
     "observation": {
       "type": "object",
@@ -145,5 +133,6 @@
         }
       }
     }
-  }
+  },
+  "description": "Agent-visible case contract. Hidden mechanism family, regime labels, counterfactual labels, and answer keys belong only in evaluator-side artifacts. Include regime metadata only in a separate explicitly public experimental lane."
 }
