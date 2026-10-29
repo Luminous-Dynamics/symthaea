@@ -65,7 +65,7 @@
         "trial_id": { "type": "string", "minLength": 1, "maxLength": 160 },
         "condition": { "type": "string", "minLength": 1, "maxLength": 128 },
         "terminal_status": {
-          "enum": ["completed", "contaminated", "timeout", "blocked", "invalid_receipt", "runner_error", "not_started"]
+          "enum": ["completed", "contaminated", "budget_violation", "timeout", "blocked", "invalid_receipt", "runner_error", "not_started"]
         },
         "response_status": {
           "enum": ["answered", "abstained", "no_response"]
