@@ -23,8 +23,10 @@
 //! CRC is not authentication. The caller MUST allocate non-repeating session generations through
 //! the reviewed clone-safe key/session lifecycle, must not reuse message_sequence in one generation,
 //! and must authenticate the complete identity/header as associated data (or an equivalent reviewed
-//! authenticated context) before trusting payload bytes. A generation field alone cannot make a
-//! rolled-back sender safe. This module is experimental and is not wired into production paths.
+//! authenticated context) before trusting payload bytes. Reassembly is also scoped to a 32-byte
+//! authenticated peer context supplied by the caller; never pass an unauthenticated source-ID field.
+//! A generation field alone cannot make a rolled-back sender safe. This module is experimental and
+//! is not wired into production paths.
 
 use super::lora_fragment::crc16_ccitt;
 
@@ -397,8 +399,9 @@ fn fragment_v3_with_capacity(
     Ok(frames)
 }
 
-/// Reassembler that refuses fragments unless their generation AND message sequence match exactly.
+/// Reassembler scoped to an authenticated peer context and exact stream identity.
 pub struct FragmentAssemblerV3 {
+    authenticated_peer_context: [u8; 32],
     session_generation: u64,
     message_sequence: u32,
     total_fragments: u8,
@@ -413,9 +416,12 @@ pub struct FragmentAssemblerV3 {
 }
 
 impl FragmentAssemblerV3 {
-    /// Configure the identity from a validated first frame. The first frame is not yet received;
-    /// feed every frame, including that one, to the assembler.
-    pub fn new(first: &LoRaFragmentV3) -> Option<Self> {
+    /// Configure from a validated first frame and the peer context produced by successful
+    /// authentication. The first frame is not yet received; feed it with that same context.
+    pub fn new(
+        authenticated_peer_context: [u8; 32],
+        first: &LoRaFragmentV3,
+    ) -> Option<Self> {
         if !first.is_well_formed() {
             return None;
         }
@@ -423,6 +429,7 @@ impl FragmentAssemblerV3 {
         let encoded_len = first.encoded_len();
         let data_count = LoRaFragmentV3::data_count_for_len(encoded_len, capacity)?;
         Some(Self {
+            authenticated_peer_context,
             session_generation: first.session_generation,
             message_sequence: first.message_sequence,
             total_fragments: first.total_fragments,
@@ -437,10 +444,15 @@ impl FragmentAssemblerV3 {
         })
     }
 
-    /// Accept a validated fragment only if every message identity and profile field agrees.
-    /// A conflicting duplicate poisons the assembly instead of keeping ambiguous state.
-    pub fn feed(&mut self, frame: &LoRaFragmentV3) -> bool {
+    /// Accept only after the caller authenticates the frame and derives the peer context.
+    /// All stream identity and profile fields must agree. Conflicting duplicates poison the stream.
+    pub fn feed(
+        &mut self,
+        authenticated_peer_context: &[u8; 32],
+        frame: &LoRaFragmentV3,
+    ) -> bool {
         if self.poisoned
+            || authenticated_peer_context != &self.authenticated_peer_context
             || !frame.is_well_formed()
             || frame.session_generation != self.session_generation
             || frame.message_sequence != self.message_sequence
@@ -579,11 +591,12 @@ mod tests {
             assert!(frames.iter().all(|frame| frame.to_bytes().len() + V3_AEAD_OVERHEAD <= V3_MTU));
             for lost in 0..frames.len() - 1 {
                 let first = frames.iter().enumerate().find_map(|(i, f)| (i != lost).then_some(f)).unwrap();
-                let mut assembler = FragmentAssemblerV3::new(first).unwrap();
+                let peer_context = [0x11; 32];
+                let mut assembler = FragmentAssemblerV3::new(peer_context, first).unwrap();
                 for (index, frame) in frames.iter().enumerate() {
                     if index != lost {
                         let wire = frame.to_bytes();
-                        assembler.feed(&LoRaFragmentV3::from_bytes(&wire).unwrap());
+                        assembler.feed(&peer_context, &LoRaFragmentV3::from_bytes(&wire).unwrap());
                     }
                 }
                 assert!(assembler.is_complete(), "len={len}, lost={lost}");
@@ -596,12 +609,13 @@ mod tests {
     fn same_shape_fragments_from_different_generations_are_rejected() {
         let a = fragment_v3(10, 4, &sample(2048, 1)).unwrap();
         let b = fragment_v3(11, 4, &sample(2048, 2)).unwrap();
-        let mut assembler = FragmentAssemblerV3::new(&a[0]).unwrap();
+        let peer_context = [0x11; 32];
+        let mut assembler = FragmentAssemblerV3::new(peer_context, &a[0]).unwrap();
         for frame in &a[..6] {
-            assembler.feed(frame);
+            assembler.feed(&peer_context, frame);
         }
         for frame in &b[6..b.len() - 1] {
-            assert!(!assembler.feed(frame));
+            assert!(!assembler.feed(&peer_context, frame));
         }
         assert!(!assembler.is_complete());
         assert!(assembler.assemble().is_none());
@@ -622,13 +636,29 @@ mod tests {
     }
 
     #[test]
+    fn same_numeric_stream_identity_from_different_authenticated_peers_is_rejected() {
+        let a = fragment_v3(10, 4, &sample(2048, 1)).unwrap();
+        let b = fragment_v3(10, 4, &sample(2048, 2)).unwrap();
+        let peer_a = [0x11; 32];
+        let peer_b = [0x22; 32];
+        let mut assembler = FragmentAssemblerV3::new(peer_a, &a[0]).unwrap();
+        for frame in &a[..6] {
+            assembler.feed(&peer_a, frame);
+        }
+        assert!(!assembler.feed(&peer_b, &b[6]));
+        assert!(!assembler.is_complete());
+        assert!(assembler.assemble().is_none());
+    }
+
+    #[test]
     fn conflicting_duplicate_poisons_assembly() {
         let payload = sample(2048, 1);
         let a = fragment_v3(10, 4, &payload).unwrap();
         let b = fragment_v3(10, 4, &sample(2048, 2)).unwrap();
-        let mut assembler = FragmentAssemblerV3::new(&a[0]).unwrap();
-        assembler.feed(&a[0]);
-        assert!(!assembler.feed(&b[0]));
+        let peer_context = [0x11; 32];
+        let mut assembler = FragmentAssemblerV3::new(peer_context, &a[0]).unwrap();
+        assembler.feed(&peer_context, &a[0]);
+        assert!(!assembler.feed(&peer_context, &b[0]));
         assert!(!assembler.is_complete());
         assert!(assembler.assemble().is_none());
     }
