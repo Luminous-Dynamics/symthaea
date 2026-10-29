@@ -170,7 +170,6 @@ def make_case(counts=None, *, false_a=0, false_b=0, no_recommendations=False,
     result = audit_evaluate(
         contract, decision, target_manifest, validation,
         contract_manifest_sha256=hashlib.sha256(contract_bytes).hexdigest(),
-        contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
 
         decision_receipt_sha256=decision_hash,
         target_prediction_manifest_sha256=target_hash,
@@ -280,6 +279,17 @@ class TaskConformalValidationAuditTests(unittest.TestCase):
                 case["contract"], case["decision"], case["target"], case["validation"],
                 contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
 
+                decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
+                target_prediction_manifest_sha256=case["contract"]["target_prediction_manifest_sha256"],
+            )
+
+    def test_validation_manifest_must_bind_exact_frozen_audit_contract(self):
+        case = make_case()
+        case["validation"]["audit_contract_sha256"] = "f" * 64
+        with self.assertRaisesRegex(ValueError, "not bound to this exact frozen audit contract"):
+            audit_evaluate(
+                case["contract"], case["decision"], case["target"], case["validation"],
+                contract_manifest_sha256=hashlib.sha256(case["bytes"]["contract"]).hexdigest(),
                 decision_receipt_sha256=case["contract"]["decision_receipt_sha256"],
                 target_prediction_manifest_sha256=case["contract"]["target_prediction_manifest_sha256"],
             )
