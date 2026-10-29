@@ -272,7 +272,7 @@ The current public schemas and semantic validators check structure and declared 
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, twenty-five core evaluator unit tests, and seven trace-auditor unit tests (32 authored in total). The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, thirty-four core evaluator unit tests, and seven trace-auditor unit tests (41 authored in total). The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
@@ -345,7 +345,7 @@ Use typed references into existing owners; do not duplicate ledger, governance, 
 
 A machine-readable evidence-class contract is also committed at `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-v0.1.schema.json`, with a synthetic example at `docs/research/fixtures/governance-capture-resistance-cross-system-evidence-demo-v0.1.json`. The isolated Rust evaluator now has `validate_cross_system_evidence_bundle_bytes` and a `validate-evidence-bundle` CLI command.
 
-The contract distinguishes five assertion classes: `observed`, `reported`, `inferred`, `simulated`, and `unknown`. In the current prototype, `simulated` must originate from a Symtropy-world record and carry simulator build/scenario/config/seed/horizon/output metadata; `observed` must originate from an independent-measurement record with method, time/location scope, quality limits, and a corroboration reference; `inferred` must declare a derivation method and exactly the same input IDs as its dependency list. The validator also checks source-system/type compatibility, source-reference scope, unresolved dependencies, and cycles.
+The contract distinguishes five assertion classes: `observed`, `reported`, `inferred`, `simulated`, and `unknown`. In the current prototype, `simulated` must originate from a Symtropy-world record and carry simulator build/scenario/config/seed/horizon/output metadata; `observed` must originate from an independent-measurement record with method, time/location scope, quality limits, and a corroboration reference; `inferred` must declare a derivation method and exactly the same input IDs as its dependency list. The validator also checks source-system/type compatibility, source-reference scope, unresolved dependencies, and cycles. It rejects duplicate derivation input IDs so a dependent claim cannot make its lineage appear broader than it is.
 
 The five-record demo is explicitly synthetic. Its observed-class row is a hypothetical measurement-shaped example, not an actual water-service observation; all record refs begin with `synthetic:`, and simulation digests are illustrative placeholders. This validator establishes type-boundary and lineage checks on the provided bytes, not authenticity, measurement quality, source truth, real-world interoperability, or qualification. A custom JavaScript structural preflight matched the JSON Schema for this fixture; Rust compilation and execution remain pending.
 
