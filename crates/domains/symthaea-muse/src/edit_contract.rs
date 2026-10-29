@@ -399,7 +399,7 @@ mod tests {
             requirement: ObligationRequirement::ChangeTo {
                 expected: AttributeValue::Numeric {
                     value_microunits: 600_000_000,
-                    unit: "micro_semitone".to_string(),
+                    unit: "micro_cent".to_string(),
                 },
             },
             critical: true,
