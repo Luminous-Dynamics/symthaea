@@ -110,7 +110,14 @@ fn recourse_restores_feasibility_when_nominal_plan_fails_under_shortfall() {
     assert_eq!(report.static_replay_summary.infeasible_weight_ppm, 500_000);
     assert_eq!(report.perfect_information_recourse_summary.feasible_weight_ppm, 1_000_000);
     assert_eq!(report.perfect_information_recourse_summary.infeasible_weight_ppm, 0);
-    assert!(report.static_replay_covers_all_cases == false);
+    assert_eq!(report.perfect_information_recourse_summary.unresolved_weight_ppm, 0);
+    assert_eq!(report.static_replay_summary.mean_cost_given_feasible, Some(3.0));
+    assert_eq!(report.perfect_information_recourse_summary.mean_cost_given_feasible, Some(4.75));
+    assert_eq!(
+        report.perfect_information_recourse_summary.mean_accounted_co2e_kg_given_feasible,
+        Some(13.0)
+    );
+    assert!(!report.static_replay_covers_all_cases);
     assert!(report.perfect_information_recourse_covers_all_cases);
 
     let shortage = report
@@ -267,4 +274,7 @@ fn search_budget_failure_remains_unresolved_not_a_free_success() {
         Some(EnergyHubError::SearchBudgetExceeded { nodes_visited: 1 })
     );
     assert!(!report.perfect_information_recourse_covers_all_cases);
+    assert_eq!(report.perfect_information_recourse_summary.feasible_weight_ppm, 0);
+    assert_eq!(report.perfect_information_recourse_summary.infeasible_weight_ppm, 0);
+    assert_eq!(report.perfect_information_recourse_summary.unresolved_weight_ppm, 1_000_000);
 }
