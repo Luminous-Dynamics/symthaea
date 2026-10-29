@@ -704,7 +704,10 @@ mod tests {
 
     #[test]
     fn component_first_allocation_is_deterministic_after_swaps() {
-        let source = units(&[120, 70, 30, 20, 18, 16, 14, 12, 10, 8, 8, 7, 6, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 1, 1]);
+        let source = units(&[
+            120, 70, 30, 20, 18, 16, 14, 12, 10, 8, 8, 7, 6, 5, 4, 4, 3, 3, 2, 2, 1, 1, 1, 1,
+            1, 1,
+        ]);
         let first = assign_components(&source).expect("valid components allocate");
         let mut reversed = source.clone();
         reversed.reverse();
