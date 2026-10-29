@@ -14,6 +14,8 @@
     "tool_manifest_sha256",
     "budget_sha256",
     "analysis_plan_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
     "randomization_commitment_sha256",
     "required_conditions",
     "pairs",
@@ -50,6 +52,14 @@
     },
     "analysis_plan_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "evaluator_revision_sha256": {
+      "$ref": "#/$defs/digest",
+      "description": "Digest of the exact evaluator implementation frozen before any trial outcome is observed."
+    },
+    "decision_rules_sha256": {
+      "$ref": "#/$defs/digest",
+      "description": "Digest of the outcome-label rubric, severity rules and thresholds frozen before any trial outcome is observed."
     },
     "randomization_commitment_sha256": {
       "$ref": "#/$defs/digest",
