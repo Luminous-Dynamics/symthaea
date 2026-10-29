@@ -25,7 +25,7 @@ The `connectome-stopping-audit` binary validates a JSONL series against the init
 
 ```sh
 cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
-cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-stopping-audit -- \
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit -- \
   --input snapshot-series.jsonl \
   --tail-window 3 \
   --relative-tolerance 0.01 \
