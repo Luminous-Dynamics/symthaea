@@ -2034,9 +2034,6 @@ fn validate_component_manifest(
     {
         bail!("manifest's receipt-verification status is not supported by independently supplied inputs");
     }
-    if manifest.coverage_receipt_verification_status == "verified_signature_set" && !receipt_verified {
-        bail!("manifest claims verified coverage, but this analyzer did not independently verify receipt inputs");
-    }
     if receipt_verified && manifest.coverage_receipt_verification_status != "verified_signature_set" {
         bail!("receipt inputs verified, but component manifest does not record the verified signature set");
     }
