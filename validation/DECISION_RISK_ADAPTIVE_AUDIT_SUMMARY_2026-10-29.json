@@ -22,7 +22,7 @@
     },
     "safe_offset_error_0.02": {
       "uniform": {"admission_rate": 0.92, "mean_total_observations": 36925.44, "p95_total_observations": 65536.0},
-      "adaptive": {"admission_rate": 0.92, "mean_total_observations": 11556.48, "p95_total_observations": 14854.4},
+      "adaptive": {"admission_rate": 0.92, "mean_total_observations": 11554.56, "p95_total_observations": 14854.4},
       "mean_observation_reduction_percent": 68.71
     },
     "near_over_budget_error_0.051": {
