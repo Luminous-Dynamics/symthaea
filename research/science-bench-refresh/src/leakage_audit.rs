@@ -89,10 +89,9 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
             if !value.is_finite() {
                 return Err("numeric fingerprint encountered a non-finite value".to_owned());
             }
-            let rounded = round_three_significant_digits(value)?;
-            let rounded_number = Number::from_f64(rounded)
-                .ok_or_else(|| "numeric fingerprint produced a non-finite value".to_owned())?;
-            Ok(Value::Number(rounded_number))
+            // Store the rounded number as a tagged string so subnormal values
+            // and values near f64::MAX remain representable in the fingerprint.
+            Ok(Value::String(bucket_three_significant_digits(value)?))
         }
         Value::Array(items) => items
             .iter()
@@ -132,20 +131,15 @@ fn canonical_exact_number(number: &Number) -> Result<Number, String> {
     Ok(number.clone())
 }
 
-fn round_three_significant_digits(value: f64) -> Result<f64, String> {
+fn bucket_three_significant_digits(value: f64) -> Result<String, String> {
     if value == 0.0 {
-        return Ok(0.0);
+        return Ok("number:0e0".to_owned());
     }
-    let exponent = value.abs().log10().floor();
-    let scale = 10.0_f64.powf(2.0 - exponent);
-    if !scale.is_finite() || scale == 0.0 {
-        return Err("numeric fingerprint exponent is outside the supported range".to_owned());
+    let rounded = format!("number:{value:.2e}");
+    if rounded.contains("NaN") || rounded.contains("inf") {
+        return Err("numeric fingerprint produced a non-finite bucket".to_owned());
     }
-    let rounded = (value * scale).round() / scale;
-    if !rounded.is_finite() {
-        return Err("numeric fingerprint rounding produced a non-finite value".to_owned());
-    }
-    Ok(if rounded == 0.0 { 0.0 } else { rounded })
+    Ok(rounded)
 }
 
 fn fingerprint(value: &Value, numeric_tolerant: bool) -> Result<String, String> {
