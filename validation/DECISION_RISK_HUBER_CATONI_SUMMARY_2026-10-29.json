@@ -1,0 +1,76 @@
+{
+  "schema": "symthaea-huber-catoni-matched-benchmark-summary-v1",
+  "status": "SYNTHETIC_RESEARCH_ONLY_NOT_OFFICIAL_IMPLEMENTATION",
+  "date": "2026-10-29",
+  "sequential_panel": {
+    "repeats_per_condition": 50,
+    "sample_counts_per_cell": [512, 1024, 2048, 4096],
+    "familywise_delta": 0.1,
+    "per_cell_alpha": 0.025,
+    "error_tolerance": 0.05,
+    "clean_model_max_error": 0.07,
+    "unsafe_admissions": {
+      "actual_rho_0.12": {
+        "nominal_eps0": 12,
+        "sensitivity_eps0": 12,
+        "catoni_eps0": 4,
+        "sensitivity_eps0.025": 0,
+        "catoni_eps0.025": 0,
+        "sensitivity_eps0.12": 0,
+        "catoni_eps0.12": 0
+      },
+      "actual_rho_0.18": {
+        "nominal_eps0": 48,
+        "sensitivity_eps0": 48,
+        "catoni_eps0": 38,
+        "sensitivity_eps0.025": 14,
+        "catoni_eps0.025": 0,
+        "sensitivity_eps0.05": 0,
+        "catoni_eps0.05": 0,
+        "sensitivity_eps0.18": 0,
+        "catoni_eps0.18": 0
+      }
+    },
+    "note": "Every sequential-panel outcome was admit or unresolved; none rejected. All models in this panel are unsafe. The valid-bound robust methods had zero observed unsafe admissions but all runs unresolved at the cap."
+  },
+  "fixed_time_coverage_panel": {
+    "repeats": 300,
+    "n": 1024,
+    "true_clean_mean": 0.37,
+    "contamination": 0.12,
+    "nominal_beta_coverage": 248,
+    "nominal_beta_coverage_rate": 0.8266666667,
+    "nominal_beta_mean_width": 0.112,
+    "catoni_eps0_coverage": 237,
+    "catoni_eps0_coverage_rate": 0.79,
+    "catoni_eps0_mean_width": 0.123,
+    "sensitivity_beta_eps0.12_coverage": 300,
+    "sensitivity_beta_eps0.12_coverage_rate": 1.0,
+    "sensitivity_beta_eps0.12_mean_width": 0.264,
+    "catoni_eps0.12_coverage": 300,
+    "catoni_eps0.12_coverage_rate": 1.0,
+    "catoni_eps0.12_mean_width": 0.864,
+    "limitations": "Empirical coverage with 300 trials is not proof of validity."
+  },
+  "reproducibility": {
+    "bundle_sha256": "020ef07bcb8a8b3b711f110596b879b8a8a474ef638b0d0f6be8fe5a80bfa614",
+    "sequential_raw_sha256": "baffa504abeaef7d18996a03a45aca2d6ef47a5ac5fcb9fa118cb93550ed2cce",
+    "coverage_raw_sha256": "a6da9c488c12fbd1c296f414b85e6e9c6f24640c7a3527be8bc15d57bb0b3ec6",
+    "paper_equation_reimplementation_source_sha256": "4b531ca92167ae1ca918573b9eb984f4bd6aec26f0cfda901288c4867bda15c6",
+    "current_benchmark_source_sha256": "554e043068e0ed4f589a5880424c47de5fbdd753f535feecac0fc542e633d2f4",
+    "run_source_sha256": "18a301e40398d526985e5f6b5b99b06620c4cd1e3dc2c28ecafb7be4b47863c3"
+  },
+  "literature": [
+    "https://proceedings.mlr.press/v206/wang23p.html",
+    "https://github.com/HJ-Wg/catoni-confseq",
+    "https://ojs.aaai.org/index.php/AAAI/article/view/40148",
+    "https://academic.oup.com/biomet/advance-article-abstract/doi/10.1093/biomet/asag058/8842600"
+  ],
+  "limitations": [
+    "50-repeat sequential benchmark only",
+    "300-repeat fixed-time empirical coverage only",
+    "independent equation implementation, not official authors code",
+    "IID Bernoulli one-cell R=0 contamination only",
+    "no production Rust integration or SOTA superiority claim"
+  ]
+}
