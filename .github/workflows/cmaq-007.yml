@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked > /tmp/cmaq-007-report.json
+          cargo run --quiet --locked --bin cmaq-007-planner-exploitability > /tmp/cmaq-007-report.json
           python3 - <<'PY'
           import json
           from pathlib import Path
