@@ -876,6 +876,13 @@ jobs:
           else: raise SystemExit("schema accepted incomplete family mapping")
           print("PITB_COMPONENT_MANIFEST_CONTRACT_PASS: 372-family mapping, isolated families, deterministic membership, hard/unresolved vs soft/dismissed relations, cross-split fail-closed status, negative controls; clean graph is structurally eligible but receipt-unverified, therefore unqualified")
           PY
+      - name: Run component-aware PITB analyzer unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo test --locked --bin analyze_pitb_results
+
       - name: Validate counterfactual mutation qualification schema and controls
         shell: bash
         run: |
