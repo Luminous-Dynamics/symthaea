@@ -96,6 +96,8 @@
         "paired_risk_difference",
         "discordant_pair_count",
         "exact_mcnemar_two_sided_p",
+        "exact_mcnemar_log10_p",
+        "mcnemar_p_value_numerically_floored",
         "holm_adjusted_p",
         "discordant_win_rate",
         "discordant_win_rate_wilson_95_low",
@@ -139,6 +141,14 @@
         "paired_risk_difference": { "$ref": "#/$defs/optional_number" },
         "discordant_pair_count": { "$ref": "#/$defs/optional_count" },
         "exact_mcnemar_two_sided_p": { "$ref": "#/$defs/optional_number" },
+        "exact_mcnemar_log10_p": { "$ref": "#/$defs/optional_number" },
+        "mcnemar_p_value_numerically_floored": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "null" }
+          ],
+          "description": "True when the exact p-value is smaller than the smallest positive floating-point value. The reported p-value is then a conservative numerical upper bound; log10 preserves the magnitude."
+        },
         "holm_adjusted_p": { "$ref": "#/$defs/optional_number" },
         "discordant_win_rate": { "$ref": "#/$defs/optional_number" },
         "discordant_win_rate_wilson_95_low": { "$ref": "#/$defs/optional_number" },
