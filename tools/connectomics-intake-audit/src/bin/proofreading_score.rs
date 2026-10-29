@@ -24,6 +24,14 @@ enum ReviewTimeBasis {
     SyntheticProxy,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum EvaluationPartition {
+    Development,
+    Confirmatory,
+    Lockbox,
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "proofreading-score",
@@ -38,6 +46,22 @@ struct Args {
     /// Citation/path to the reviewed task/label normalization contract.
     #[arg(long)]
     mapping_reference: String,
+
+    /// Exact dataset revision commit SHA used for this run.
+    #[arg(long)]
+    dataset_revision_commit_sha: String,
+
+    /// Stable identifier for the frozen model/policy baseline being scored.
+    #[arg(long)]
+    policy_id: String,
+
+    /// SHA-256 of the frozen model/policy configuration and preprocessing profile.
+    #[arg(long)]
+    prediction_profile_sha256: String,
+
+    /// Data partition used for this scoring report.
+    #[arg(long, value_enum)]
+    evaluation_partition: EvaluationPartition,
 
     /// State whether review minutes were prospectively measured or are only synthetic proxies.
     #[arg(long, value_enum)]
@@ -86,8 +110,12 @@ struct Report {
     scorer_version: &'static str,
     dataset_id: &'static str,
     dataset_revision: &'static str,
+    dataset_revision_commit_sha: String,
     pinned_upstream_commit: &'static str,
     mapping_reference: String,
+    policy_id: String,
+    prediction_profile_sha256: String,
+    evaluation_partition: EvaluationPartition,
     review_time_basis: ReviewTimeBasis,
     input_sha256: String,
     n_candidates: usize,
@@ -122,6 +150,7 @@ struct ClassificationMetrics {
 struct ReviewYield {
     budget_kind: &'static str,
     requested_budget: f64,
+    requested_item_fraction: Option<f64>,
     selected_count: usize,
     actual_review_minutes: f64,
     true_errors_found: usize,
@@ -140,13 +169,20 @@ struct RiskCoveragePoint {
     achieved_coverage: f64,
     confidence_threshold: Option<f64>,
     accepted_count: usize,
-    accepted_errors: usize,
+    incorrect_accepted_predictions: usize,
     accepted_case_risk: Option<f64>,
     accepted_case_accuracy: Option<f64>,
 }
 
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
+}
+
+fn is_lower_hex(value: &str, exact_len: usize) -> bool {
+    value.len() == exact_len
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn parse_f64_list(raw: &str, name: &str, min: f64, max: f64) -> Result<Vec<f64>, String> {
@@ -335,6 +371,7 @@ fn ranked<'a>(rows: &[&'a Prediction]) -> Vec<&'a Prediction> {
 fn review_yield(
     rows: &[&Prediction],
     requested_budget: f64,
+    requested_item_fraction: Option<f64>,
     budget_kind: &'static str,
 ) -> ReviewYield {
     let ordered = ranked(rows);
@@ -363,6 +400,7 @@ fn review_yield(
     ReviewYield {
         budget_kind,
         requested_budget,
+        requested_item_fraction,
         selected_count: selected.len(),
         actual_review_minutes: used_minutes,
         true_errors_found: found,
@@ -411,7 +449,7 @@ fn risk_coverage(rows: &[&Prediction], targets: &[f64]) -> Vec<RiskCoveragePoint
             achieved_coverage: accepted as f64 / n as f64,
             confidence_threshold: last_threshold,
             accepted_count: accepted,
-            accepted_errors: incorrect,
+            incorrect_accepted_predictions: incorrect,
             accepted_case_risk: ratio(incorrect, accepted),
             accepted_case_accuracy: ratio(accepted - incorrect, accepted),
         }
@@ -422,6 +460,15 @@ fn run() -> Result<i32, String> {
     let args = Args::parse();
     if args.mapping_reference.trim().is_empty() {
         return Err("--mapping-reference must identify the reviewed label normalization contract".into());
+    }
+    if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
+        return Err("--dataset-revision-commit-sha must be a lowercase 40-character Git SHA".into());
+    }
+    if !is_lower_hex(&args.prediction_profile_sha256, 64) {
+        return Err("--prediction-profile-sha256 must be a lowercase 64-character SHA-256 digest".into());
+    }
+    if args.policy_id.trim().is_empty() {
+        return Err("--policy-id must be a non-empty stable identifier".into());
     }
     let item_fractions = parse_f64_list(&args.item_budget_fractions, "item_budget_fractions", f64::MIN_POSITIVE, 1.0)?;
     let minute_budgets = parse_f64_list(&args.review_budgets_minutes, "review_budgets_minutes", f64::MIN_POSITIVE, f64::MAX)?;
@@ -441,10 +488,10 @@ fn run() -> Result<i32, String> {
     }).collect();
     let item_budget_results = item_fractions.iter().map(|fraction| {
         let count = (*fraction * records.len() as f64).ceil().max(1.0);
-        review_yield(&refs, count, "items")
+        review_yield(&refs, count, Some(*fraction), "items")
     }).collect();
     let review_time_budget_results = minute_budgets.iter().map(|minutes| {
-        review_yield(&refs, *minutes, "minutes")
+        review_yield(&refs, *minutes, None, "minutes")
     }).collect();
     let risk_coverage_results = risk_coverage(&refs, &coverage_targets);
 
@@ -454,8 +501,12 @@ fn run() -> Result<i32, String> {
         scorer_version: env!("CARGO_PKG_VERSION"),
         dataset_id: DATASET_ID,
         dataset_revision: DATASET_REVISION,
+        dataset_revision_commit_sha: args.dataset_revision_commit_sha,
         pinned_upstream_commit: UPSTREAM_COMMIT,
         mapping_reference: args.mapping_reference,
+        policy_id: args.policy_id,
+        prediction_profile_sha256: args.prediction_profile_sha256,
+        evaluation_partition: args.evaluation_partition,
         review_time_basis: args.review_time_basis,
         input_sha256: input_hash,
         n_candidates: overall.n,
@@ -554,7 +605,7 @@ mod tests {
         let a = row("a", true, 0.6, 0.9, 2.0, 3.0, "mouse:merge");
         let b = row("b", false, 0.1, 0.7, 1.0, 0.0, "mouse:merge");
         let c = row("c", true, 0.8, 0.3, 1.0, 2.0, "mouse:merge");
-        let out = review_yield(&[&a, &b, &c], 3.0, "minutes");
+        let out = review_yield(&[&a, &b, &c], 3.0, None, "minutes");
         assert_eq!(out.selected_count, 2);
         assert_eq!(out.true_errors_found, 1);
         assert_eq!(out.actual_review_minutes, 3.0);
