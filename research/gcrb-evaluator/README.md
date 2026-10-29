@@ -6,7 +6,7 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 ## Status
 
-- The isolated Rust CLI/library and unit tests are authored.
+- The isolated Rust CLI/library is authored with 18 core evaluator tests and six trace-auditor tests (24 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
 - Candidate behavior observations and hard-gate violation fields are currently supplied by the candidate report. An independently instrumented event-trace oracle is not implemented.
 - No Rust compile, formatter, or unit-test run is claimed in this environment.
@@ -68,9 +68,10 @@ The report includes exact-disposition agreement, per-class and per-family agreem
 
 A second, rule-based path derives six hard-gate findings from typed event fields rather than accepting a candidate's self-reported violation list. The trace contract and demo are:
 
-- `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json`
-- `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`
-- `research/gcrb-evaluator/src/trace_audit.rs`
+- `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json` — input event-trace schema
+- `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json` — audit-report schema
+- `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json` — six synthetic unsafe events, 20 cases with unknown capture status
+- `research/gcrb-evaluator/src/trace_audit.rs` — rule-based event-trace auditor
 
 Run the demo from the repository root:
 
