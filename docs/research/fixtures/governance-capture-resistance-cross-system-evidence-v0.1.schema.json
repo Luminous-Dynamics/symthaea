@@ -484,14 +484,25 @@
             "then": {
               "required": [
                 "derivation"
-              ]
+              ],
+              "properties": {
+                "observation_basis": {
+                  "not": {}
+                },
+                "simulation_context": {
+                  "not": {}
+                }
+              }
             }
           },
           {
             "if": {
               "properties": {
                 "assertion_class": {
-                  "const": "unknown"
+                  "enum": [
+                    "reported",
+                    "unknown"
+                  ]
                 }
               },
               "required": [
@@ -500,8 +511,14 @@
             },
             "then": {
               "properties": {
-                "limitations": {
-                  "minItems": 1
+                "observation_basis": {
+                  "not": {}
+                },
+                "simulation_context": {
+                  "not": {}
+                },
+                "derivation": {
+                  "not": {}
                 }
               }
             }
