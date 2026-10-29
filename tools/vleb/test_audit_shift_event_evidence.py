@@ -290,6 +290,48 @@ class ShiftEventEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "clean/shifted pair does not share"):
             auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
 
+    def test_protocol_pin_mismatch_fails_closed(self) -> None:
+        with self.assertRaisesRegex(ValueError, "manifest protocol differs"):
+            auditor.validate_manifest(self.fixture.manifest, "f" * 64)
+
+    def test_cli_wrong_verifier_pin_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="vleb-shift-evidence-verifier-pin-") as temporary:
+            source = Path(temporary) / "manifest.json"
+            source.write_bytes(jbytes(self.fixture.manifest))
+            completed = subprocess.run(
+                [sys.executable, str(MODULE_PATH), "--input", str(source),
+                 "--expected-input-sha256", sha(source.read_bytes()),
+                 "--expected-protocol-sha256", self.fixture.PROTOCOL,
+                 "--expected-verifier-sha256", "f" * 64],
+                capture_output=True, text=True, check=False, timeout=30,
+            )
+            self.assertEqual(completed.returncode, 1)
+            self.assertFalse(json.loads(completed.stdout)["valid"])
+
+    def test_scenario_hash_mismatch_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+        shifted["scenario_sha256"] = "f" * 64
+        self.refresh_payload(shifted)
+        with self.assertRaisesRegex(ValueError, "canonical locked scenario"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_task_contract_digest_mismatch_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        shifted = next(row for row in manifest["receipts"] if row["condition"] == "shifted")
+        shifted["task_contract_sha256"] = "f" * 64
+        self.refresh_payload(shifted)
+        with self.assertRaisesRegex(ValueError, "task-contract digest is inconsistent"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
+    def test_retry_substitution_is_rejected(self) -> None:
+        manifest = copy.deepcopy(self.fixture.manifest)
+        row = manifest["receipts"][0]
+        row["attempt_number"] = 2
+        self.refresh_payload(row)
+        with self.assertRaisesRegex(ValueError, "retry substitution"):
+            auditor.validate_manifest(manifest, self.fixture.PROTOCOL)
+
     def test_duplicate_json_keys_and_nonfinite_numbers_fail_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
             auditor.strict_json_loads(b'{"cohort_id":"a","cohort_id":"b"}')
