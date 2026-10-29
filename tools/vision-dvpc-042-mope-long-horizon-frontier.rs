@@ -30,7 +30,14 @@ const WEALTH_TOL: f64 = 2e-8;
 const ENDPOINT_TOL: f64 = 1e-10;
 const Z_975: f64 = 1.959_963_984_540_054;
 
-const METHOD_NAMES: [&str; 4] = ["MOPE", "Wald_pointwise_reused", "Hoeffding_alpha_spending_intersection", "Empirical_Bernstein_alpha_spending_intersection"];
+const GRID_SIZE: usize = 1000;
+const METHOD_NAMES: [&str; 5] = [
+    "MOPE_analytic_root_audited",
+    "MOPE_upstream_style_grid_1000",
+    "Wald_pointwise_reused",
+    "Hoeffding_alpha_spending_intersection",
+    "Empirical_Bernstein_alpha_spending_intersection",
+];
 
 #[derive(Clone, Copy, Debug)]
 struct Scenario {
@@ -93,7 +100,13 @@ impl Interval {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct MopeDiagnostics { root_checks: u64, root_failures: u64 }
+struct MopeDiagnostics {
+    root_checks: u64,
+    root_failures: u64,
+    endpoint_collisions: u64,
+}
+#[derive(Clone, Copy, Debug, Default)]
+struct GridDiagnostics { endpoint_advances: u64 }
 
 struct MopePair {
     lower_stream: stream::StreamState,
@@ -129,7 +142,11 @@ impl MopePair {
             if root > self.lower_endpoint + ENDPOINT_TOL {
                 self.diagnostics.root_checks += 1;
                 if certify_root(&self.lower_history, root, level) {
-                    self.lower_endpoint = root;
+                    let endpoint_cap = 1.0 - self.complement_endpoint;
+                    if root > endpoint_cap + ENDPOINT_TOL {
+                        self.diagnostics.endpoint_collisions += 1;
+                    }
+                    self.lower_endpoint = self.lower_endpoint.max(root).min(endpoint_cap);
                 } else {
                     self.diagnostics.root_failures += 1;
                 }
@@ -139,7 +156,11 @@ impl MopePair {
             if root > self.complement_endpoint + ENDPOINT_TOL {
                 self.diagnostics.root_checks += 1;
                 if certify_root(&self.complement_history, root, level) {
-                    self.complement_endpoint = root;
+                    let endpoint_cap = 1.0 - self.lower_endpoint;
+                    if root > endpoint_cap + ENDPOINT_TOL {
+                        self.diagnostics.endpoint_collisions += 1;
+                    }
+                    self.complement_endpoint = self.complement_endpoint.max(root).min(endpoint_cap);
                 } else {
                     self.diagnostics.root_failures += 1;
                 }
@@ -148,6 +169,84 @@ impl MopePair {
         self.lower_stream.choose_next_bet(self.lower_endpoint)?;
         self.complement_stream.choose_next_bet(self.complement_endpoint)?;
         Ok(Interval { lower: self.lower_endpoint, upper: 1.0 - self.complement_endpoint })
+    }
+}
+
+/// Upstream-style MOPE root lookup: maintain log wealth on 1,000 values in [0,1]
+/// and select the first grid value whose half-initialized log wealth is below
+/// log(1/alpha). Uses the same streaming bet optimizer as the analytic-root method.
+struct MopeGridPair {
+    lower_stream: stream::StreamState,
+    complement_stream: stream::StreamState,
+    values: Vec<f64>,
+    lower_log_wealth: Vec<f64>,
+    complement_log_wealth: Vec<f64>,
+    lower_endpoint: f64,
+    complement_endpoint: f64,
+    diagnostics: GridDiagnostics,
+}
+
+impl MopeGridPair {
+    fn new(max_weight: f64) -> Result<Self, String> {
+        let values: Vec<f64> = (0..GRID_SIZE)
+            .map(|i| i as f64 / (GRID_SIZE - 1) as f64)
+            .collect();
+        Ok(Self {
+            lower_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
+            complement_stream: stream::StreamState::new(max_weight, ALPHA_SIDE)?,
+            lower_log_wealth: vec![0.5_f64.ln(); GRID_SIZE],
+            complement_log_wealth: vec![0.5_f64.ln(); GRID_SIZE],
+            values,
+            lower_endpoint: 0.0,
+            complement_endpoint: 0.0,
+            diagnostics: GridDiagnostics::default(),
+        })
+    }
+
+    fn update(&mut self, w: f64, r: f64) -> Result<Interval, String> {
+        let lo_lambda = self.lower_stream.current_lambda();
+        let hi_lambda = self.complement_stream.current_lambda();
+        let _ = self.lower_stream.observe(w, r)?;
+        let _ = self.complement_stream.observe(w, 1.0-r)?;
+
+        for i in 0..GRID_SIZE {
+            let value = self.values[i];
+            let factor_lo = 1.0 + lo_lambda.x * (w-1.0) + lo_lambda.y * (w*r-value);
+            let factor_hi = 1.0 + hi_lambda.x * (w-1.0) + hi_lambda.y * (w*(1.0-r)-value);
+            if !factor_lo.is_finite() || factor_lo < 0.5-WEALTH_TOL
+                || !factor_hi.is_finite() || factor_hi < 0.5-WEALTH_TOL {
+                return Err("grid MOPE bet violated the half-wealth constraint".to_owned());
+            }
+            self.lower_log_wealth[i] += factor_lo.ln();
+            self.complement_log_wealth[i] += factor_hi.ln();
+        }
+
+        let log_threshold = (1.0/ALPHA_SIDE).ln();
+        let grid_lower = self.lower_log_wealth.iter()
+            .position(|wealth| *wealth < log_threshold)
+            .unwrap_or(0);
+        let grid_complement = self.complement_log_wealth.iter()
+            .position(|wealth| *wealth < log_threshold)
+            .unwrap_or(0);
+        let proposed_lower = self.lower_endpoint.max(self.values[grid_lower]);
+        let endpoint_cap = 1.0-self.complement_endpoint;
+        let updated_lower = proposed_lower.min(endpoint_cap);
+        if updated_lower > self.lower_endpoint + ENDPOINT_TOL {
+            self.diagnostics.endpoint_advances += 1;
+        }
+        self.lower_endpoint = updated_lower;
+
+        let proposed_complement = self.complement_endpoint.max(self.values[grid_complement]);
+        let complement_cap = 1.0-self.lower_endpoint;
+        let updated_complement = proposed_complement.min(complement_cap);
+        if updated_complement > self.complement_endpoint + ENDPOINT_TOL {
+            self.diagnostics.endpoint_advances += 1;
+        }
+        self.complement_endpoint = updated_complement;
+
+        self.lower_stream.choose_next_bet(self.lower_endpoint)?;
+        self.complement_stream.choose_next_bet(self.complement_endpoint)?;
+        Ok(Interval { lower: self.lower_endpoint, upper: 1.0-self.complement_endpoint })
     }
 }
 
