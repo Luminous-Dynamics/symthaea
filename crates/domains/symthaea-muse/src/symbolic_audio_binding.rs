@@ -700,12 +700,12 @@ mod tests {
             120.0,
             4,
         );
-        for (index, midi) in [60u8, 62, 64].into_iter().enumerate() {
+        for (onset_num, midi) in [(0i64, 60u8), (64, 62), (96, 64)] {
             score.push(symthaea_music_theory::ScoreNote {
                 part: symthaea_music_theory::PartId(0),
                 pitch: symthaea_music_theory::Pitch::from_midi(midi),
-                onset: symthaea_music_theory::Duration::new(index as i64, 1),
-                duration: symthaea_music_theory::Duration::new(1, 2),
+                onset: symthaea_music_theory::Duration::new(onset_num, 125),
+                duration: symthaea_music_theory::Duration::new(16, 125),
                 velocity: 0.7,
                 role: symthaea_music_theory::VoiceRole::Melody,
                 emphasis: symthaea_music_theory::Emphasis::Normal,
@@ -719,6 +719,25 @@ mod tests {
         let mut target = full_score_source();
         target.notes[1].pitch = symthaea_music_theory::Pitch::from_midi(67);
         target
+    }
+
+    fn full_score_symbolic_evidence(
+        source: &Score,
+        target: &Score,
+    ) -> EditLocalityEvidence {
+        let source_events = validate_score_projection(source).expect("source score projection");
+        let target_events = validate_score_projection(target).expect("target score projection");
+        let request = symthaea_music_theory::edit_locality::EditRequest {
+            operation: symthaea_music_theory::edit_locality::EditOperation::PitchAt {
+                index: 1,
+                semitones: 5,
+            },
+        };
+        symthaea_music_theory::edit_locality::verify_edit_locality(
+            &source_events,
+            &target_events,
+            &request,
+        ).expect("full-score pitch edit should produce symbolic evidence")
     }
 
     fn audio_pair() -> (Vec<f32>, Vec<f32>) {
@@ -914,10 +933,11 @@ mod tests {
 
     #[test]
     fn full_score_binding_verifies_full_serialized_scores() {
-        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+        let (_source_events, _target_events, _symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let source_score = full_score_source();
         let target_score = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
         let binding = create_full_score_render_binding(
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
@@ -945,10 +965,11 @@ mod tests {
 
     #[test]
     fn full_score_adapter_rejects_unverified_note_metadata_changes() {
-        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+        let (_source_events, _target_events, _symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let source_score = full_score_source();
         let mut target_score = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
         target_score.notes[0].velocity = 0.9;
         let result = create_full_score_render_binding(
             &source_score, &target_score, &symbolic,
@@ -963,7 +984,7 @@ mod tests {
 
     #[test]
     fn full_score_adapter_rejects_simultaneous_polyphonic_events() {
-        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+        let (_source_events, _target_events, _symbolic, source_audio, target_audio, acoustic, onset, manifest) =
             build_fixture();
         let mut source_score = full_score_source();
         let mut extra_note = source_score.notes[0];
@@ -973,6 +994,7 @@ mod tests {
         let mut target_extra = target_score.notes[0];
         target_extra.pitch = symthaea_music_theory::Pitch::from_midi(67);
         target_score.push(target_extra);
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
         let result = create_full_score_render_binding(
             &source_score, &target_score, &symbolic,
             audio_view(&source_audio), audio_view(&target_audio),
@@ -981,6 +1003,53 @@ mod tests {
         assert!(matches!(
             result,
             Err(SymbolicAudioBindingError::UnsupportedScore(_))
+        ));
+    }
+
+    #[test]
+    fn full_score_adapter_rejects_broadened_audio_authorization_mask() {
+        let (_source_events, _target_events, _symbolic, source_audio, target_audio, _acoustic, _onset, manifest) =
+            build_fixture();
+        let source_score = full_score_source();
+        let target_score = full_score_target();
+        let symbolic = full_score_symbolic_evidence(&source_score, &target_score);
+        let overbroad_mask = [
+            FrameInterval { start_frame: 0, end_frame: 1024 },
+            FrameInterval { start_frame: 4096, end_frame: 5120 },
+        ];
+        let acoustic = audit_protected_audio(
+            audio_view(&source_audio), audio_view(&target_audio), &overbroad_mask,
+            &PreservationConfig {
+                frame_size: 128,
+                hop_size: 64,
+                boundary_guard_frames: 0,
+                rms_delta_db_tolerance: 0.5,
+                spectral_distance_tolerance: 0.08,
+                minimum_protected_windows: 4,
+                calibration_id: Some("overbroad-mask-fixture".to_owned()),
+            },
+        ).expect("overbroad acoustic report is internally valid");
+        let onset = audit_onset_preservation(
+            audio_view(&source_audio), audio_view(&target_audio), &overbroad_mask,
+            &OnsetPreservationConfig {
+                frame_size: 128,
+                hop_size: 32,
+                novelty_threshold: 0.12,
+                minimum_separation_ms: 8,
+                onset_time_tolerance_ms: 4,
+                boundary_guard_frames: 0,
+                minimum_protected_duration_ms: 100,
+                calibration_id: Some("overbroad-mask-fixture".to_owned()),
+            },
+        ).expect("overbroad onset report is internally valid");
+        let result = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        );
+        assert!(matches!(
+            result,
+            Err(SymbolicAudioBindingError::InvalidEvidence(_))
         ));
     }
 
