@@ -2,7 +2,7 @@
 
 **Status:** executable synthetic smoke harness, v0.4 companion adds family-level held-out transfer and lower-tail risk  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
-**Evidence status:** original value-add binary passed exact-head Rust workflow at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324). The new family-transfer companion and integrated workflow have been committed but await exact-head CI. Both panels are synthetic smoke evidence, not blind qualification.  
+**Evidence status:** original value-add binary passed exact-head Rust workflow at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324); family-transfer companion and the integrated workflow passed exact-head run [#19 at `0a51bd2`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960013206): 7 original tests, 6 family-panel tests, and both report validators passed. Both panels remain synthetic smoke evidence, not blind qualification.  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
 
 ## Research question
@@ -105,6 +105,19 @@ The companion crosses five strategies—direct nearest-context, additive model, 
 The most important new question is not just whether the *average* family benefits, but whether the model's average advantage masks a bad tail or fails under interaction/held-out-shift lanes. The cost sweep charges two model queries per decision; this is declared synthetic utility accounting, **not** measured wall-clock latency, energy, or hardware cost.
 
 The support-sample RNG is keyed by the family slot and observed context/action cell, not by hidden interaction or held-out-shift parameters. A regression test ensures that mechanisms with identical support laws produce identical support tapes under the same sample seed, even when their held-out laws differ. This prevents a subtle side-channel where held-out parameters could change observed sampling noise.
+
+### Exact-head family-panel result at 0.04 utility/query
+
+At 0.04 utility units per query (two model queries, 0.08 total cost per decision), the **additive-model policy has negative family-level net lift vs direct in all four reporting groups** on this deterministic 256-family sample:
+
+| Lane | Families | Mean net lift | Approx. family-level 95% interval | Lower-tail CVaR05 | Families harmed |
+|---|---:|---:|---:|---:|---:|
+| All | 256 | -0.0927 | [-0.1056, -0.0797] | -0.4535 | 95.3% |
+| Near-additive | 86 | -0.0770 | [-0.0839, -0.0701] | -0.1435 | 96.5% |
+| Interaction | 85 | -0.0655 | [-0.0890, -0.0420] | -0.3218 | 89.4% |
+| Held-out shift | 85 | -0.1357 | [-0.1640, -0.1073] | -0.5383 | 100.0% |
+
+These numbers are the exact Rust output printed by the integrated workflow at run [40960013206](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40960013206). The interval unit is generated family, not a repeated reward timestep. This is a meaningful negative result: under this mixed family distribution and declared cost, the direct baseline is better on average, even on the near-additive lane. The correct response is **not** to retune the family mix until the model wins; it is to inspect the zero-cost frontier, report failure regions, and improve the decision-value gate or model. The generator is still a public synthetic stress panel, so these numbers are not external qualification or SOTA evidence.
 
 **Evidence boundary:** candidate and evaluator are still in one synthetic process; the generator and its public specification are visible. The report is a development/smoke study, not sealed qualification. The normal intervals are approximate over this finite generated family sample and do not establish population-wide transfer. The next gate is separate candidate/evaluator execution with frozen candidate artifacts, blinded mechanism keys, and an independently maintained environment.
 
