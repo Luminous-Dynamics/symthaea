@@ -606,7 +606,7 @@ mod tests {
         }
         assert!(
             witness <= grid_best + 1.0e-8,
-            "feasible witness {upper} exceeded dense-grid supremum {grid_best}"
+            "feasible witness {witness} exceeded dense-grid supremum {grid_best}"
         );
     }
 
