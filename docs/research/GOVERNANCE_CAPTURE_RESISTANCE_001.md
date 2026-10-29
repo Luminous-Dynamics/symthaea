@@ -270,7 +270,7 @@ The current public schema and semantic validator check structure and declared co
 
 ### GCRB-2 — Isolated Rust reference evaluator (prototype authored; not compiled)
 
-An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, eighteen core evaluator unit tests, and six trace-auditor unit tests (24 authored in total). The prototype:
+An isolated research crate has been added at `research/gcrb-evaluator/` with a CLI, library, README, eighteen core evaluator unit tests, and seven trace-auditor unit tests (25 authored in total). The prototype:
 
 - validates the current public fixture's schema/version labels, synthetic/public partition, case IDs, attack/control counts, severity values, and required/forbidden behavior declarations;
 - generates deterministic seeded parameterized controls while preserving the attack cases and recording generator metadata;
@@ -285,7 +285,7 @@ Next: run formatting/compilation/tests at an environment with the toolchain, fix
 
 ### GCRB-3 — Trace-derived hard-gate audit (prototype authored; not executed)
 
-An initial structured trace auditor is committed at `research/gcrb-evaluator/src/trace_audit.rs`, with its input schema at `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json`, report schema at `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json`, and a synthetic demo at `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`.
+An initial structured trace auditor is committed at `research/gcrb-evaluator/src/trace_audit.rs`, with its input schema at `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json`, report schema at `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json`, a synthetic demo at `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json`, and its expected output at `docs/research/fixtures/governance-capture-resistance-trace-demo-report-v0.1.json`.
 
 The CLI accepts:
 
@@ -302,7 +302,7 @@ The rule-based audit checks exact fixture-byte binding; exact case-set coverage;
 - `unbounded_emergency_bypass`;
 - `evaluator_truth_leakage`.
 
-The public demo contains six seeded unsafe events intended to produce one finding per rule. Twenty of its 26 case traces are marked capture status unknown. The module has six authored unit tests for detection, incomplete coverage, digest mismatch, missing case traces, sequence rollback, unknown event kinds, and duplicate event IDs.
+The public demo contains six seeded unsafe events intended to produce one finding per rule. Twenty of its 26 case traces are marked capture status unknown. The module has seven authored unit tests for detection, incomplete coverage, digest mismatch, missing case traces, sequence rollback, unknown event kinds, duplicate event IDs, and semantic equality against the committed golden report at `docs/research/fixtures/governance-capture-resistance-trace-demo-report-v0.1.json`.
 
 **Critical limitation:** this is rule derivation over the supplied trace, not authenticated observation. The trace bundle does not yet authenticate the recorder, prove complete capture, resolve authority/adjudication/measurement references, validate emergency expiry against trusted time, or establish legal validity. Capture status is producer-asserted. Therefore a report always returns `qualification_eligible = false` and `absence_of_findings_proven = false`, even if no event-level findings are produced. The prototype can demonstrate that specified bad events are detectable when present; it cannot prove no bad event occurred when the trace is missing, incomplete, or untrusted.
 
