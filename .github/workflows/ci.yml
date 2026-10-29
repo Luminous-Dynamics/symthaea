@@ -67,6 +67,7 @@ jobs:
           python3 tools/casting-benchmark/test_paired_benchmark_promotion_gate.py
           python3 tools/casting-benchmark/test_historical_transfer_benchmark.py
           python3 tools/casting-benchmark/test_baseline_lock_manifest.py
+          python3 tools/casting-benchmark/test_mfscbo_comparison_contract.py
 
           # Synthetic leave-task-family-out historical transfer smoke. The
           # transfer receipt is predictive diagnostics, not optimizer/SOTA evidence.
