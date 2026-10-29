@@ -100,6 +100,8 @@ fn main()->Result<()>{
  let doc:Value=serde_json::from_slice(&sb).context("invalid split JSON")?;
  let inv:Inventory=serde_json::from_slice(&eb).context("invalid relationship JSON")?;
  let (partition_digest,families)=validate_splits(&doc)?;
+ let independently_validated=coverage_receipt::validate_frozen_partition(&sb)?;
+ if independently_validated!=families{bail!("shared receipt verifier and component builder disagree on frozen family assignments")}
  let all_none=a[2..7].iter().all(|value|value=="none");
  let all_supplied=a[2..7].iter().all(|value|value!="none");
  if !all_none && !all_supplied{bail!("receipt, trust store, methodology, and both expected digests must be supplied together or all be none")}
@@ -109,7 +111,21 @@ fn main()->Result<()>{
   let tb=fs::read(&a[3]).with_context(||format!("cannot read {}",a[3]))?;
   let mb=fs::read(&a[4]).with_context(||format!("cannot read {}",a[4]))?;
   let report=verify_receipt(&eb,&rb,&tb,&mb,&a[5],&a[6],&partition_digest,&families)?;
-  if !report.cryptographically_verified {bail!("coverage receipt verifier did not verify signatures")}
+  if report.schema_version!="pitb.coverage-receipt-verification.v1"
+      || report.verification_status!="verified_signature_set"
+      || !report.cryptographically_verified
+      || report.resampling_qualification!="requires_component_and_analyzer_validation"
+      || report.upstream_commit!=UPSTREAM
+      || report.source_partition_digest_sha256!=partition_digest
+      || !digest_ok(&report.relationship_inventory_edges_sha256)
+      || report.relationship_inventory_sha256!=sha(&eb)
+      || report.coverage_receipt_sha256!=sha(&rb)
+      || report.review_methodology_sha256!=sha(&mb)
+      || report.trust_store_sha256!=sha(&tb)
+      || report.verified_reviewer_ids.len()<2
+      || report.distinct_reviewer_organization_count<2
+      || report.limitation.trim().is_empty()
+  {bail!("coverage receipt verification report failed internal provenance reconciliation")}
   true
  } else {false};
  let m=build(&doc,&inv,&eb,receipt_verified)?;
