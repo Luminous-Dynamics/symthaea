@@ -26,7 +26,7 @@ The causal scenario contract separates four cases: `zero_shift_control`, `target
 
 Change interval indices are one-based observation indices. Transform severities are normalized to the inclusive range [0, 1] with six decimal places. A zero-shift sham must explicitly declare both transform families as `none`, both severities as `0.000000`, `rng_algorithm=none`, `transition_shape=none`, and `NA` change bounds. Active interventions require a named versioned RNG algorithm (`chacha20_v1` or `splitmix64_v1`) and a valid intervention-config SHA-256. For a non-sham, abrupt intervals have the same positive start/end index; gradual intervals have `0 < change_start < change_end`.
 
-The receipt binds the run ID, SHA-256 of the canonical manifest, source SHA-256, output SHA-256, and a safe relative artifact path. `validate-receipt` recomputes the manifest and output hashes using the host `sha256sum` executable. The source hash is cross-checked against the manifest; source acquisition must separately verify the downloaded payload against that digest.
+The intervention plan is an actual canonical file named by `intervention_config_path`, resolved relative to the manifest's directory and confined beneath that directory even when symlinks are present. The validator recomputes its SHA-256, parses its canonical fields, and requires those fields to match the manifest's scenario, target/selection transforms, severity, interval, seed, and RNG algorithm. Thus the config digest is bound to real bytes, not just a 64-character string. The separate result receipt binds run ID, SHA-256 of the canonical manifest, source SHA-256, output SHA-256, and a safe relative output path. `validate-receipt` recomputes the manifest, intervention-config, and output hashes using the host `sha256sum` executable. The source hash is cross-checked against the manifest; source acquisition must separately verify the downloaded payload against that digest.
 
 ## Audit boundaries
 
@@ -36,4 +36,4 @@ Feature and source identifiers use canonical ASCII tokens with comma-separated s
 
 ## Qualification
 
-The accompanying workflow runs `cargo fmt --check`, locked tests, Clippy with warnings denied, CLI manifest validation, canonicalization parity, receipt hash verification, and negative controls. No Rust pass is claimed until the workflow reports an exact-head success.
+The accompanying workflow runs `cargo fmt --check`, locked tests, Clippy with warnings denied, CLI manifest and intervention-byte validation, canonicalization parity, receipt hash verification, and negative controls for held-out leakage, output digest mutation, target/selection scenario misclassification, and intervention-config byte/digest mutation. No Rust pass is claimed until the workflow reports an exact-head success.
