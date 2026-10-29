@@ -1185,7 +1185,6 @@ pub fn solve_branch_and_bound(
                     serial: 0,
                 },
             );
-            serial = serial.saturating_add(1);
         }
 
         let mut cancelled_choices = node.choices.clone();
@@ -1207,7 +1206,6 @@ pub fn solve_branch_and_bound(
                 serial: 0,
             },
         );
-        serial = serial.saturating_add(1);
         stats.peak_frontier_nodes = stats.peak_frontier_nodes.max(frontier.len());
     }
 
