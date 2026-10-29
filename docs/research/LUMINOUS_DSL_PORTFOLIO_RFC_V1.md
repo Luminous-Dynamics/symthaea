@@ -268,7 +268,7 @@ This amendment sharpens the original proposal after comparing the repository's e
 
 Use the **in-toto Statement v1** as the outer statement shape: `_type`, immutable `subject` digest(s), `predicateType`, and a versioned `predicate`. LEP defines only the predicate semantics that existing projects do not already share. Reuse the established in-toto envelope for signing/authentication rather than inventing a Luminous signature envelope.
 
-Use **SLSA Provenance v1** for software build provenance where it fits. Do not force it to represent a physical simulation result or a governance decision; those require domain-specific predicate types. The evidence profile must distinguish:
+Use **SLSA Provenance v1.2** for software build provenance where it fits; the current official SLSA specification index identifies v1.2 as current. Pin the actual provenance specification version in build metadata and records. Do not force it to represent a physical simulation result or a governance decision; those require domain-specific predicate types. The evidence profile must distinguish:
 - an authentic statement;
 - a claim about an event;
 - a test or verification outcome against an exact target;
