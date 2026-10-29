@@ -141,7 +141,7 @@ After the synthetic gate:
 
 ### Industry references
 
-The 2026 paper [MF-NAS](https://doi.org/10.1145/3774940) studies proxy-guided local search followed by higher-fidelity evaluation on NAS-Bench-201. Its results motivate pinned multi-fidelity comparisons; they are not transferable performance evidence for Symthaea. The broader [multi-fidelity optimization benchmark methodology](https://link.springer.com/article/10.1007/s11831-025-10392-8) highlights the need to specify fidelity cost, initialization, and stopping rules.
+The 2026 paper [MF-NAS](https://doi.org/10.1145/3774940) studies proxy-guided local search followed by higher-fidelity evaluation on NAS-Bench-201. Its results motivate pinned multi-fidelity comparisons; they are not transferable performance evidence for Symthaea. The broader [multi-fidelity optimization benchmark methodology](https://link.springer.com/article/10.1007/s11831-025-10392-8) highlights the need to specify fidelity cost, initialization, and stopping rules. Its proposed analytical suite includes Forrester (continuous/discontinuous), Rosenbrock, shifted/rotated Rastrigin, heterogeneous and noisy functions, and coupled physical systems. The current Symthaea pilot is an architecture-shaped discrete synthetic surface, so a future claim of broad multi-fidelity optimization competence must include an independent canonical suite of this kind rather than only custom oracle surfaces.
 
 For deployed serving, [MLPerf Endpoints v1.0](https://mlcommons.org/2026/10/open-submissions-endpoints-v1-0/) provides a separate whole-system performance frontier and power-reporting conventions. Pin its evolving rules and keep serving-system claims distinct from search-policy claims.
 
@@ -175,7 +175,8 @@ This pilot compares the cost-aware scheduler to full-fidelity random search only
 
 - Promotion primitive tests compile and pass at the exact source revision.
 - Unit/property tests validate fidelity identity, uncertainty handling, deterministic selection, exploration boundaries and exact cost arithmetic.
-- Synthetic rank-reversal sweeps compare all pinned policies under equal total cost budgets.
+- Synthetic rank-reversal and uncertainty-miscalibration sweeps compare all pinned policies under equal total cost budgets.
+- Add a separate canonical analytical multi-fidelity suite (e.g., Forrester, Rosenbrock, shifted/rotated Rastrigin, noisy functions) before claiming general optimization competence.
 - A prospective holdout demonstrates results with raw per-seed data, uncertainty estimates and reproducible receipts.
 - Failed/invalid evaluations and retries are accounted for.
 - A reviewer accepts the claim boundary.
