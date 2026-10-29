@@ -980,7 +980,11 @@ mod tests {
         assert_eq!(summary.negative_control_count, 1_000);
         assert_eq!(value["generator"]["algorithm"], "splitmix64-v1");
         assert_eq!(value["generator"]["known_answers_public"], true);
-        assert_eq!(value["generator"]["source_fixture_sha256"], sha256_hex(fixture));
+        let source_sha = sha256_hex(fixture);
+        assert_eq!(
+            value["generator"]["source_fixture_sha256"].as_str(),
+            Some(source_sha.as_str())
+        );
         let ids = value["cases"].as_array().unwrap().iter()
             .map(|case| case["case_id"].as_str().unwrap())
             .collect::<BTreeSet<_>>();
