@@ -102,7 +102,20 @@ fn wilson_95_interval(successes: usize, trials: usize) -> Option<(f64, f64)> {
     let half_width = z
         * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
         / denominator;
-    Some(((center - half_width).max(0.0), (center + half_width).min(1.0)))
+    // Avoid tiny positive/negative floating-point residue at the exact
+    // binomial boundaries: Wilson's lower limit is exactly zero for k=0,
+    // and its upper limit is exactly one for k=n.
+    let lower = if successes == 0 {
+        0.0
+    } else {
+        (center - half_width).max(0.0)
+    };
+    let upper = if successes == trials {
+        1.0
+    } else {
+        (center + half_width).min(1.0)
+    };
+    Some((lower, upper))
 }
 
 fn rate_interval_json(events: usize, trials: usize) -> Value {
