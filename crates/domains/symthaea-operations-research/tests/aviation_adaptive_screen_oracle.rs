@@ -74,7 +74,7 @@ fn bounds_are_admissible_under_oracle(
     truth: &[(&str, Option<u64>)],
 ) -> bool {
     candidates.iter().all(|candidate| {
-        match truth.iter().find(|(id, _)| *id == candidate.candidate_id) {
+        match truth.iter().find(|(id, _)| *id == candidate.candidate_id.as_str()) {
             Some((_, Some(exact_cost))) => {
                 candidate.admissible_lower_bound_cost <= *exact_cost
             }
