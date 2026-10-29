@@ -1,6 +1,6 @@
 # CMAQ-004: World-Model Value-Add Under Matched Budgets
 
-**Status:** executable synthetic smoke harness, v0.1  
+**Status:** executable synthetic smoke harness, v0.2 with model-query cost frontier  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
 **Evidence status:** exact-seed Python mirror available; Rust source and focused Actions workflow added, but Rust execution is not yet confirmed  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
@@ -30,7 +30,7 @@ The additive world-model predictor uses the three support means to extrapolate:
 
 `p(1,1) = p(0,1) + p(1,0) - p(0,0)`
 
-It predicts both actions, chooses the action with higher predicted reward, and pays 0.04 utility units per model query (two queries per decision, total cost 0.08). The direct policy pays no model-query fee. This cost is a transparent synthetic bookkeeping assumption, not a measured hardware latency/energy estimate.
+It predicts both actions, chooses the action with higher predicted reward, and reports a query-cost frontier from 0.00 to 0.16 utility units per model query (two model queries per decision). The direct policy pays no model-query fee. These are transparent synthetic bookkeeping costs, not measured hardware latency or energy estimates. The table below shows the mid-point (0.04/query); the CLI report covers all six cost levels.
 
 ## Families and controls
 
@@ -58,6 +58,21 @@ The following numbers were reproduced with a Python mirror of the exact SplitMix
 | Additive reversed | Direct nearest-context | 0 | 0.5090 | 0.0000 | 0.5090 | 0.0000 | — |
 | Additive reversed | Learned additive model | 0 | 0.5090 | 0.0800 | 0.4290 | -0.0800 | 0.0480 |
 | Additive reversed | Stale model control | 1 | 0.1541 | 0.0800 | 0.0741 | **-0.4350** | 0.3000 |
+
+### Query-cost frontier (independent Python mirror, not Rust execution)
+
+For the additive-positive family, the gross reward lift before model-query costs is approximately 0.2625. With two predictions per decision, the world model crosses break-even near 0.1312 utility units per query on this fixed panel.
+
+| Cost per model query | Total model cost | Net lift vs direct |
+|---:|---:|---:|
+| 0.00 | 0.00 | +0.2625 |
+| 0.02 | 0.04 | +0.2225 |
+| 0.04 | 0.08 | +0.1825 |
+| 0.08 | 0.16 | +0.1025 |
+| 0.12 | 0.24 | +0.0225 |
+| 0.16 | 0.32 | −0.0575 |
+
+The code now emits all six cost levels and the focused workflow checks the cost frontier and break-even behaviour. These values remain exact-seed Python-mirror results, not Rust output or measured real-world latency/energy.
 
 ## What this says—and does not say
 
