@@ -12,7 +12,7 @@ Run tests with:
 
     cargo test --manifest-path tools/lep-conformance/Cargo.toml
 
-The CLI prints a JSON report. Exit code 0 means schema and semantic checks passed, 1 means validation failed, and 2 means the input could not be read or parsed.
+The CLI prints a JSON report with `conforms` and `scope: LEP_SCHEMA_AND_SEMANTIC_CHECKS_ONLY`. Exit code 0 means the supplied record conformed to this schema and these implemented semantic checks; 1 means validation failed; 2 means the input could not be read or parsed. `conforms: true` is not an authenticated evidence verdict and does not mean the claim is true.
 
 ## Validation performed
 
