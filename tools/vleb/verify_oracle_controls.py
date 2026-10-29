@@ -384,6 +384,7 @@ def _run_arm(
             completed = subprocess.run(
                 command["argv"],
                 cwd=cwd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 check=False,
