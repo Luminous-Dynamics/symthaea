@@ -369,7 +369,7 @@ fn message_key(message: &PolicyVisibleMessage) -> (u64, u8, String) {
 
 fn opaque_policy_event_id(seed: u64, source_event_id: &str) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"symthaea-policy-event-id-v1\\0");
+    digest.update(b"symthaea-policy-event-id-v1\0");
     digest.update(seed.to_le_bytes());
     digest.update([0]);
     digest.update(source_event_id.as_bytes());
@@ -379,7 +379,7 @@ fn opaque_policy_event_id(seed: u64, source_event_id: &str) -> String {
 
 fn deterministic_u64(seed: u64, event_id: &str, domain: &str) -> u64 {
     let mut digest = Sha256::new();
-    digest.update(b"symthaea-cognitive-missingness-schedule-v1\\0");
+    digest.update(b"symthaea-cognitive-missingness-schedule-v1\0");
     digest.update(seed.to_le_bytes());
     digest.update(domain.as_bytes());
     digest.update([0]);
@@ -403,7 +403,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::cognitive_missingness_schedule::{self, DelayPattern, HiddenOutcomeEvent, MissingnessScheduleConfig, ScheduleInput};
-    use serde_json::json;
 
     fn fixture() -> (ScheduleInput, Vec<u8>) {
         let events = (0..64)
@@ -434,7 +433,7 @@ mod tests {
             events,
         };
         let mut input_bytes = serde_json::to_vec_pretty(&input).unwrap();
-        input_bytes.push(b'\\n');
+        input_bytes.push(b'\n');
         (input, input_bytes)
     }
 
@@ -442,9 +441,9 @@ mod tests {
         let (input, input_bytes) = fixture();
         let generated = cognitive_missingness_schedule::generate(&input, &input_bytes).unwrap();
         let mut policy = serde_json::to_vec_pretty(&generated.policy_tick_input(tick)).unwrap();
-        policy.push(b'\\n');
+        policy.push(b'\n');
         let mut evaluator = serde_json::to_vec_pretty(&generated.evaluator_schedule).unwrap();
-        evaluator.push(b'\\n');
+        evaluator.push(b'\n');
         (input_bytes, policy, evaluator)
     }
 
