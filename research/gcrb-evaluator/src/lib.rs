@@ -1147,7 +1147,13 @@ fn validate_cross_system_record(
     known_ids: &BTreeSet<String>,
 ) -> Result<(String, String, Vec<String>), String> {
     let evidence_id = required_string(record, "evidence_id", "<unknown>")?.to_owned();
-    if !valid_case_id(&evidence_id, "", evidence_id.len()) || evidence_id.len() < 3 {
+    let id_bytes = evidence_id.as_bytes();
+    if !(3..=96).contains(&id_bytes.len())
+        || !id_bytes[0].is_ascii_uppercase()
+        || !id_bytes.iter().all(|byte| {
+            byte.is_ascii_uppercase() || byte.is_ascii_digit() || *byte == b'_' || *byte == b'-'
+        })
+    {
         return Err(format!("record has invalid evidence_id {evidence_id}"));
     }
     let source_system = required_string(record, "source_system", &evidence_id)?;
