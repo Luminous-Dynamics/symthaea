@@ -154,7 +154,7 @@ Usage: hardsec_split_audit --manifest PATH --root DATASET_ROOT [--receipt NEW_PA
 
 Optional --receipt writes a new deterministic JSON metadata/split-integrity receipt.
 Existing files are not overwritten. The receipt is not a security verdict.
-Requires a strict 16-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."#
+Requires a strict 17-column TSV; see docs/research/HARDSEC_001_HARDWARE_ASSURANCE_BENCHMARK.md."#
                 );
                 return Ok(None);
             }
@@ -1232,6 +1232,31 @@ mod tests {
             "capture-c", "counter-test", "counter_set_holdout", "test", "benign",
         );
         assert!(fixture.audit().unwrap_err().contains("counter_set"));
+    }
+
+    #[test]
+    fn gem5_instruction_mnemonic_run_is_kept_separate_from_hpc() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        for row in &mut fixture.rows {
+            row[1] = "gem5_sim".into();
+            row[11] = "NA".into();
+            row[12] = "instruction_mnemonics".into();
+        }
+        let summary = fixture.audit().expect("valid instruction-only simulator manifest");
+        assert_eq!(summary.domain, "gem5_sim");
+        assert_eq!(summary.feature_modality_id, "instruction_mnemonics");
+    }
+
+    #[test]
+    fn mixed_feature_modalities_cannot_share_one_manifest() {
+        let mut fixture = Fixture::new();
+        add_balanced_program_holdout(&mut fixture);
+        fixture.rows[5][12] = "instruction_mnemonics".into();
+        assert!(fixture
+            .audit()
+            .unwrap_err()
+            .contains("feature modality"));
     }
 
     #[test]
