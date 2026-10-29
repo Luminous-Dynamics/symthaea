@@ -278,10 +278,16 @@ fn enumerate_set_partitions_recursive(
         if blocks.len() <= 1 {
             return Ok(()); // PyPhi's set-partition path omits the trivial block.
         }
+        let mut block_by_local_unit = vec![0usize; n];
+        for (block_index, block) in blocks.iter().enumerate() {
+            for local_unit in block {
+                block_by_local_unit[*local_unit] = block_index;
+            }
+        }
         let mut directions = Vec::with_capacity(blocks.len());
         return enumerate_block_directions_recursive(
-            0, candidate_system, blocks, &mut directions, output, seen_cuts,
-            visited_combinations, max_combinations,
+            0, candidate_system, blocks, &block_by_local_unit, &mut directions,
+            output, seen_cuts, visited_combinations, max_combinations,
         );
     }
 
@@ -310,6 +316,7 @@ fn enumerate_block_directions_recursive(
     block_index: usize,
     candidate_system: &[usize],
     blocks: &[Vec<usize>],
+    block_by_local_unit: &[usize],
     directions: &mut Vec<PartitionDirection>,
     output: &mut Vec<DirectedSystemPartition>,
     seen_cuts: &mut std::collections::HashSet<Vec<bool>>,
@@ -323,20 +330,31 @@ fn enumerate_block_directions_recursive(
         *visited_combinations += 1;
 
         let n = candidate_system.len();
+        let mut cuts_outgoing = Vec::with_capacity(directions.len());
+        let mut cuts_incoming = Vec::with_capacity(directions.len());
+        for direction in directions.iter().copied() {
+            cuts_outgoing.push(matches!(
+                direction,
+                PartitionDirection::Effect | PartitionDirection::Bidirectional
+            ));
+            cuts_incoming.push(matches!(
+                direction,
+                PartitionDirection::Cause | PartitionDirection::Bidirectional
+            ));
+        }
+
+        // For source block S and target block T, each block's direction determines
+        // whether outgoing/incoming links are cut. Two flag lookups replace repeated
+        // block membership scans during cut-matrix construction.
         let mut cut_matrix = vec![false; n * n];
-        for (block, direction) in blocks.iter().zip(directions.iter().copied()) {
-            for source in 0..n {
-                for target in 0..n {
-                    let source_inside = block.contains(&source);
-                    let target_inside = block.contains(&target);
-                    let cut = match direction {
-                        PartitionDirection::Cause => !source_inside && target_inside,
-                        PartitionDirection::Effect => source_inside && !target_inside,
-                        PartitionDirection::Bidirectional => source_inside != target_inside,
-                    };
-                    if cut {
-                        cut_matrix[source * n + target] = true;
-                    }
+        for source in 0..n {
+            let source_block = block_by_local_unit[source];
+            for target in 0..n {
+                let target_block = block_by_local_unit[target];
+                if source_block != target_block
+                    && (cuts_outgoing[source_block] || cuts_incoming[target_block])
+                {
+                    cut_matrix[source * n + target] = true;
                 }
             }
         }
