@@ -380,6 +380,7 @@ def analyze_manifest(
 
     return {
         "schema_version": "vleb-paired-comparison-report-v1",
+        "valid": True,
         "cohort_id": manifest["cohort_id"],
         "input_manifest_sha256": input_sha256,
         "protocol_sha256": manifest["protocol_sha256"],
