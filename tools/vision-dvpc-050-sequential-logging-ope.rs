@@ -419,7 +419,7 @@ impl Aggregate {
             format!("{:.6}", self.top1 as f64 / self.selected as f64)
         };
         println!(
-            "METRIC\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "METRIC\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             scenario.name(),
             m,
             method.name(),
@@ -432,18 +432,8 @@ impl Aggregate {
             self.field_mean(self.current_abs_error_sum),
             self.field_mean(self.pooled_abs_error_sum),
             self.field_mean(self.recent_abs_error_sum),
-            self.field_mean(self.max_weight_sum) + "\t".to_owned().as_str()
-        );
-        // Emit ESS as a separate stable record so unsupported rows stay explicitly NA.
-        let ess = self.field_mean(self.ess_fraction_sum);
-        println!(
-            "ESS\t{}\t{}\t{}\t{}\t{}\t{}",
-            scenario.name(),
-            m,
-            method.name(),
-            round,
-            reps,
-            ess
+            self.field_mean(self.max_weight_sum),
+            self.field_mean(self.ess_fraction_sum)
         );
     }
 }
@@ -549,7 +539,7 @@ fn run_benchmark(replicates: usize, batch_size: usize) {
     println!("BENCHMARK_CONFIG\tstale_propensity_method_role\tnegative_control_only");
     println!("BENCHMARK_CONFIG\tconfidence_claims\tnone; estimation/regret harness only");
     println!(
-        "METRIC_HEADER\tscenario\tM\tmethod\tround\treplicates\tselection_rate\tabstention_rate\ttop1_rate_given_selection\tmean_regret\tmean_abs_error_current\tmean_abs_error_pooled\tmean_abs_error_recent\tmean_max_importance_weight"
+        "METRIC_HEADER\tscenario\tM\tmethod\tround\treplicates\tselection_rate\tabstention_rate\ttop1_rate_given_selection\tmean_regret\tmean_abs_error_current\tmean_abs_error_pooled\tmean_abs_error_recent\tmean_max_importance_weight\tmean_ess_fraction"
     );
     for (scenario_id, scenario) in Scenario::ALL.iter().copied().enumerate() {
         for m in POLICY_COUNTS {
