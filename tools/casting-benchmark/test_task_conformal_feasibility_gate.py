@@ -21,9 +21,19 @@ POLICY = "b" * 64
 ENV = "c" * 64
 
 
+def pool_points(count=2):
+    return [
+        {"candidate_id": f"candidate-{index:03d}",
+         "design": [index / (count - 1) if count > 1 else 0.5, 0.5]}
+        for index in range(count)
+    ]
+
+
 def pool_digest(count=2):
-    roster = [f"candidate-{index:03d}" for index in range(count)]
-    return hashlib.sha256(json.dumps(roster, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    raw = json.dumps(
+        pool_points(count), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    return hashlib.sha256(raw).hexdigest()
 
 
 def config(**overrides):
@@ -53,6 +63,7 @@ def calibration(count=20, *, rows_per_task=1, stratum="known_process"):
             score = i / 100.0
             rows.append({
                 "candidate_id": f"candidate-{j:03d}",
+                "design": [j / (rows_per_task - 1) if rows_per_task > 1 else 0.5, 0.5],
                 "predicted_margin": score,
                 "observed_margin": 0.0,
             })
@@ -85,8 +96,8 @@ def target(*, stratum="known_process", descriptor=None, task_id="target-task-001
         descriptor = [0.50, 0.50]
     if predictions is None:
         predictions = [
-            {"candidate_id": "candidate-000", "predicted_margin": 0.25},
-            {"candidate_id": "candidate-001", "predicted_margin": 0.18},
+            {"candidate_id": "candidate-000", "design": [0.0, 0.5], "predicted_margin": 0.25},
+            {"candidate_id": "candidate-001", "design": [1.0, 0.5], "predicted_margin": 0.18},
         ]
     return {
         "schema_version": "1.0.0",
@@ -129,6 +140,7 @@ class TaskConformalFeasibilityGateTests(unittest.TestCase):
         cfg = config(candidate_pool_sha256=pool_digest(100))
         predictions = [
             {"candidate_id": f"candidate-{index:03d}",
+             "design": [index / 99.0, 0.5],
              "predicted_margin": 0.25 if index == 0 else 0.18}
             for index in range(100)
         ]
@@ -249,11 +261,12 @@ class TaskConformalFeasibilityGateTests(unittest.TestCase):
     def test_task_score_is_one_sided_overprediction_not_absolute_error(self):
         cal = calibration(count=20)
         for task in cal["tasks"]:
-            task["rows"] = [{
-                "candidate_id": "c",
-                "predicted_margin": -0.5,
-                "observed_margin": 0.5,
-            }]
+            task["rows"] = [
+                {"candidate_id": "candidate-000", "design": [0.0, 0.5],
+                 "predicted_margin": -0.5, "observed_margin": 0.5},
+                {"candidate_id": "candidate-001", "design": [1.0, 0.5],
+                 "predicted_margin": -0.5, "observed_margin": 0.5},
+            ]
         result = evaluate(config(), cal, target())
         self.assertEqual(result["strata"]["known_process"]["overprediction_quantile"], 0.0)
         self.assertEqual(result["recommended_feasible_count"], 2)
