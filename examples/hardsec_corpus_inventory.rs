@@ -298,13 +298,34 @@ fn visit_directory(root: &Path, directory: &Path, output: &mut Vec<FileRecord>) 
             return Err(format!("source changed while hashing: {}", absolute.display()));
         }
 
+        let normalized_path = normalized_relative_path(relative)?;
         output.push(FileRecord {
-            path: relative.to_string_lossy().replace('\\', "/"),
+            path: normalized_path,
             size_bytes: size_before,
             sha256: digest,
         });
     }
     Ok(())
+}
+
+fn normalized_relative_path(relative: &Path) -> Result<String, String> {
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        let Component::Normal(part) = component else {
+            return Err(format!("unsafe relative path {}", relative.display()));
+        };
+        let part = part.to_str().ok_or_else(|| {
+            format!(
+                "non-UTF-8 path component is unsupported for deterministic inventory: {}",
+                relative.display()
+            )
+        })?;
+        parts.push(part);
+    }
+    if parts.is_empty() {
+        return Err("empty relative path is not a file".into());
+    }
+    Ok(parts.join("/"))
 }
 
 fn sha256_file(path: &Path) -> Result<String, std::io::Error> {
