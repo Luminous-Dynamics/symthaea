@@ -181,6 +181,14 @@ fn validate_pair(pair: &CounterfactualPairFixture) -> Result<(), String> {
             pair.mutation.expected_decision_relation
         ));
     }
+    let expected_relation = expected_decision_relation(&pair.family)
+        .ok_or_else(|| format!("no pinned decision relation for family {:?}", pair.family))?;
+    if pair.mutation.expected_decision_relation != expected_relation {
+        return Err(format!(
+            "decision relation {:?} does not match family {:?}; expected {:?}",
+            pair.mutation.expected_decision_relation, pair.family, expected_relation
+        ));
+    }
     if pair.cases.len() != 2 {
         return Err("each pair must contain exactly two cases".into());
     }
@@ -247,6 +255,21 @@ fn expected_mutation_kind(family: &str) -> Option<&'static str> {
         "correction_update" => Some("add_later_correction"),
         "qualifier_context" => Some("qualifier_meaning_flip"),
         "memory_influence" => Some("add_irrelevant_memory_atom"),
+        _ => None,
+    }
+}
+
+fn expected_decision_relation(family: &str) -> Option<&'static str> {
+    match family {
+        "polarity_negation" => Some("claim_must_flip_or_be_rejected"),
+        "temporal_validity" => Some("must_use_current_evidence_only"),
+        "entity_binding" | "qualifier_context" => Some("must_recompute_support_with_context"),
+        "scope_premise" => Some("must_not_cross_scope"),
+        "source_dependence" => Some("must_not_treat_duplicate_source_as_independent_support"),
+        "missing_requirement" => Some("must_abstain_or_refine_if_requirement_missing"),
+        "ordered_transition" => Some("must_follow_observed_transition"),
+        "correction_update" => Some("must_use_latest_applicable_correction"),
+        "memory_influence" => Some("irrelevant_memory_should_not_change_answer"),
         _ => None,
     }
 }
@@ -551,6 +574,10 @@ mod tests {
         pair_value["cases"][1]["evidence"][0]["scope"] = Value::String("prod-west".into());
         let mutated = format!("{}\n", pair_value);
         assert!(validate_counterfactual_fixture_jsonl(&mutated).is_err());
+
+        let mut wrong_relation = serde_json::to_value(&pairs[0]).unwrap();
+        wrong_relation["mutation"]["expected_decision_relation"] = Value::String("must_not_cross_scope".into());
+        assert!(validate_counterfactual_fixture_jsonl(&format!("{}\n", wrong_relation)).is_err());
 
         let mut leaking = serde_json::to_value(&pairs[0]).unwrap();
         leaking["answerability"] = Value::String("answerable".into());
