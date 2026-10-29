@@ -203,12 +203,16 @@ impl BinaryCausalModel {
     }
 
 
-    /// Compute an effect repertoire under a uniform maximum-entropy background.
+    /// Compute an effect repertoire using a product of per-purview-unit marginals.
     ///
-    /// Mechanism units are fixed to their values in the complete current state.
-    /// All other current units are averaged uniformly. The result indexes future
-    /// purview states with the first listed purview unit as the least-significant
-    /// bit. This is a repertoire primitive only; it does not compute mechanism phi.
+    /// For each target unit, fix mechanism values and marginalize the non-mechanism
+    /// units over a uniform maximum-entropy background. The full purview distribution
+    /// is the product of these per-unit distributions, following PyPhi's factored
+    /// repertoire convention. This deliberately does not preserve correlations induced
+    /// solely by mixing over the same unconstrained hidden state.
+    ///
+    /// The result indexes future purview states with the first listed purview unit as
+    /// the least-significant bit. This primitive does not compute mechanism phi.
     pub fn effect_repertoire(
         &self,
         mechanism: &[usize],
@@ -219,41 +223,46 @@ impl BinaryCausalModel {
         self.validate_subset(mechanism, "mechanism")?;
         self.validate_subset(purview, "purview")?;
 
-        let purview_state_count = 1usize << purview.len();
         let unconstrained_count = 1usize << (self.n_units - mechanism.len());
         let background_weight = 1.0 / unconstrained_count as f64;
-        let mut repertoire = vec![0.0; purview_state_count];
+        let mut per_unit_p_on = Vec::with_capacity(purview.len());
 
-        for past_index in 0..self.n_states() {
-            let mechanism_matches = mechanism.iter().all(|unit| {
-                (((past_index >> *unit) & 1) != 0) == current_state[*unit]
-            });
-            if !mechanism_matches {
-                continue;
-            }
-
-            for future_purview_state in 0..purview_state_count {
-                let mut probability = 1.0;
-                for (slot, unit) in purview.iter().copied().enumerate() {
-                    let p_on = self.transition_probabilities[past_index * self.n_units + unit];
-                    let next_on = ((future_purview_state >> slot) & 1) != 0;
-                    probability *= if next_on { p_on } else { 1.0 - p_on };
+        for target_unit in purview.iter().copied() {
+            let mut p_on = 0.0;
+            for past_index in 0..self.n_states() {
+                let mechanism_matches = mechanism.iter().all(|unit| {
+                    (((past_index >> *unit) & 1) != 0) == current_state[*unit]
+                });
+                if mechanism_matches {
+                    p_on += background_weight
+                        * self.transition_probabilities[past_index * self.n_units + target_unit];
                 }
-                repertoire[future_purview_state] += background_weight * probability;
             }
+            per_unit_p_on.push(p_on);
         }
 
+        let purview_state_count = 1usize << purview.len();
+        let mut repertoire = vec![1.0; purview_state_count];
+        for future_state in 0..purview_state_count {
+            for (slot, p_on) in per_unit_p_on.iter().copied().enumerate() {
+                let target_on = ((future_state >> slot) & 1) != 0;
+                repertoire[future_state] *= if target_on { p_on } else { 1.0 - p_on };
+            }
+        }
         Ok(repertoire)
     }
 
-    /// Compute a cause repertoire using a uniform prior over full past states.
+    /// Compute a cause repertoire as a normalized product of single-unit cause repertoires.
     ///
-    /// For each candidate past state of the purview, sum the likelihood that the
-    /// observed current mechanism state would follow from all compatible full past
-    /// states. Normalize those likelihood masses across the purview. If the observed
-    /// mechanism state has zero total likelihood, return an error rather than NaN.
-    /// The result indexes past purview states with the first listed purview unit as
-    /// the least-significant bit.
+    /// Each mechanism unit contributes a distribution over past purview states:
+    /// likelihoods are obtained from the unit's TPM column under a uniform prior
+    /// over full past states, marginalized to the requested purview, then normalized.
+    /// The per-mechanism-unit distributions are combined by pointwise multiplication
+    /// and normalized again. If a mechanism unit's observed state has zero likelihood
+    /// under every past state, this returns an error rather than NaN.
+    ///
+    /// This uses the factored multi-unit cause-repertoire convention described in
+    /// PyPhi's repertoire documentation; it is a primitive, not a full IIT calculation.
     pub fn cause_repertoire(
         &self,
         mechanism: &[usize],
@@ -265,28 +274,44 @@ impl BinaryCausalModel {
         self.validate_subset(purview, "purview")?;
 
         let purview_state_count = 1usize << purview.len();
-        let mut repertoire = vec![0.0; purview_state_count];
+        if mechanism.is_empty() {
+            return Ok(vec![1.0 / purview_state_count as f64; purview_state_count]);
+        }
 
-        for past_index in 0..self.n_states() {
-            let purview_state = purview.iter().copied().enumerate().fold(
-                0usize,
-                |state_index, (slot, unit)| {
-                    if ((past_index >> unit) & 1) != 0 {
-                        state_index | (1usize << slot)
-                    } else {
-                        state_index
-                    }
-                },
-            );
+        let mut repertoire = vec![1.0; purview_state_count];
+        for mechanism_unit in mechanism.iter().copied() {
+            let mut single_unit = vec![0.0; purview_state_count];
+            for past_index in 0..self.n_states() {
+                let purview_state = purview.iter().copied().enumerate().fold(
+                    0usize,
+                    |state_index, (slot, unit)| {
+                        if ((past_index >> unit) & 1) != 0 {
+                            state_index | (1usize << slot)
+                        } else {
+                            state_index
+                        }
+                    },
+                );
+                let p_on = self.transition_probabilities
+                    [past_index * self.n_units + mechanism_unit];
+                let likelihood = if current_state[mechanism_unit] {
+                    p_on
+                } else {
+                    1.0 - p_on
+                };
+                single_unit[purview_state] += likelihood;
+            }
 
-            let mechanism_likelihood = mechanism.iter().copied().fold(
-                1.0,
-                |likelihood, unit| {
-                    let p_on = self.transition_probabilities[past_index * self.n_units + unit];
-                    likelihood * if current_state[unit] { p_on } else { 1.0 - p_on }
-                },
-            );
-            repertoire[purview_state] += mechanism_likelihood;
+            let single_mass: f64 = single_unit.iter().sum();
+            if !single_mass.is_finite() || single_mass <= 0.0 {
+                return Err(RepertoireError::UndefinedCauseRepertoire);
+            }
+            for probability in &mut single_unit {
+                *probability /= single_mass;
+            }
+            for (joint, single) in repertoire.iter_mut().zip(single_unit) {
+                *joint *= single;
+            }
         }
 
         let mass: f64 = repertoire.iter().sum();
@@ -705,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    fn effect_repertoire_averages_unconstrained_units_uniformly() {
+    fn effect_repertoire_averages_each_target_over_unconstrained_units() {
         // Unit B's next-state probability is 0.3 for every past state, independently of A.
         let model = BinaryCausalModel::new(
             2,
@@ -716,6 +741,21 @@ mod tests {
         assert!((repertoire[0] - 0.7).abs() < 1e-12);
         assert!((repertoire[1] - 0.3).abs() < 1e-12);
         assert!((repertoire.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn effect_repertoire_factorizes_per_unit_instead_of_mixing_hidden_state_correlations() {
+        // Given A=ON, B is unconstrained. Both next-unit marginals average to 0.5,
+        // so the declared factored repertoire is uniform, not a 50/50 mixture of 00 and 11.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+            vec![false; 4],
+        ).unwrap();
+        let repertoire = model.effect_repertoire(&[0], &[true, false], &[0, 1]).unwrap();
+        for probability in repertoire {
+            assert!((probability - 0.25).abs() < 1e-12);
+        }
     }
 
     #[test]
