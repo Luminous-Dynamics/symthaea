@@ -505,10 +505,40 @@ mod tests {
             split: &str,
             label: &str,
         ) {
+            self.add_row_with_capture(
+                sample_id,
+                artifact_name,
+                program_id,
+                execution_id,
+                attack_family_id,
+                device_config_id,
+                "capture-config-default",
+                "single-counter",
+                split_protocol,
+                split,
+                label,
+            );
+        }
+
+        fn add_row_with_capture(
+            &mut self,
+            sample_id: &str,
+            artifact_name: &str,
+            program_id: &str,
+            execution_id: &str,
+            attack_family_id: &str,
+            device_config_id: &str,
+            capture_config_id: &str,
+            counter_set_id: &str,
+            split_protocol: &str,
+            split: &str,
+            label: &str,
+        ) {
             let source_path = format!("{artifact_name}.trace");
             fs::write(self.root.join(&source_path), format!("fixture:{artifact_name}"))
                 .expect("write source fixture");
-            let source_sha256 = sha256_file(&self.root.join(&source_path)).expect("hash fixture");
+            let source_sha256 =
+                sha256_file(&self.root.join(&source_path)).expect("hash fixture");
             self.rows.push(vec![
                 "dataset-test".into(),
                 "physical_hpc".into(),
@@ -520,8 +550,8 @@ mod tests {
                 execution_id.into(),
                 attack_family_id.into(),
                 device_config_id.into(),
-                "capture-config-default".into(),
-                "single-counter".into(),
+                capture_config_id.into(),
+                counter_set_id.into(),
                 split_protocol.into(),
                 split.into(),
                 label.into(),
@@ -589,6 +619,68 @@ mod tests {
         fixture.add_row("s-val-benign", "e", "benign-b", "run-e", "NA", "board-a", "attack_family_holdout", "validation", "benign");
         fixture.add_row("s-test-benign", "f", "benign-c", "run-f", "NA", "board-a", "attack_family_holdout", "test", "benign");
         assert_eq!(fixture.audit().expect("valid family holdout").samples, 6);
+    }
+
+    #[test]
+    fn capture_configuration_holdout_rejects_reuse_across_splits() {
+        let mut fixture = Fixture::new();
+        fixture.add_row_with_capture(
+            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
+            "capture-a", "counter-set-a", "capture_config_holdout", "train", "attack",
+        );
+        fixture.add_row_with_capture(
+            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
+            "capture-b", "counter-set-a", "capture_config_holdout", "validation", "benign",
+        );
+        fixture.add_row_with_capture(
+            "s-test", "c", "program-c", "run-c", "family-c", "board-a",
+            "capture-a", "counter-set-a", "capture_config_holdout", "test", "attack",
+        );
+        assert!(fixture.audit().unwrap_err().contains("crosses splits"));
+    }
+
+    #[test]
+    fn one_source_artifact_cannot_be_assigned_to_two_splits() {
+        let mut fixture = Fixture::new();
+        fixture.add_row(
+            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
+            "program_holdout", "train", "attack",
+        );
+        fixture.add_row(
+            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
+            "program_holdout", "validation", "benign",
+        );
+        fixture.add_row(
+            "s-test", "a", "program-a", "run-a", "family-a", "board-a",
+            "program_holdout", "test", "attack",
+        );
+        assert!(fixture.audit().unwrap_err().contains("inconsistent path, digest, or split"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn source_symlinks_are_rejected() {
+        let mut fixture = Fixture::new();
+        fixture.add_row(
+            "s-train", "a", "program-a", "run-a", "family-a", "board-a",
+            "program_holdout", "train", "attack",
+        );
+        fixture.add_row(
+            "s-val", "b", "program-b", "run-b", "family-b", "board-a",
+            "program_holdout", "validation", "benign",
+        );
+        fixture.add_row(
+            "s-test", "c", "program-c", "run-c", "family-c", "board-a",
+            "program_holdout", "test", "attack",
+        );
+        let manifest = fixture.write_manifest();
+        let target = fixture.root.join("target.trace");
+        fs::write(&target, "fixture:a").unwrap();
+        fs::remove_file(fixture.root.join("a.trace")).unwrap();
+        std::os::unix::fs::symlink(&target, fixture.root.join("a.trace")).unwrap();
+        assert!(audit_manifest(&manifest, &fixture.root)
+            .unwrap_err()
+            .contains("symlinks are not allowed"));
     }
 
     #[test]
