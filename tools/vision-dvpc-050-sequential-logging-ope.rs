@@ -671,6 +671,64 @@ mod tests {
     }
 
     #[test]
+    fn cumulative_estimator_uses_each_rows_recorded_propensity() {
+        let policy = Policy {
+            id: 3,
+            p1: [0.8, 0.4],
+        };
+        let logs = vec![
+            Observation {
+                context: 0,
+                action: 1,
+                reward: 1.0,
+                behavior_p1: [0.2, 0.7],
+                round: 0,
+                behavior_policy_id: 0,
+            },
+            Observation {
+                context: 0,
+                action: 0,
+                reward: 1.0,
+                behavior_p1: [0.8, 0.7],
+                round: 1,
+                behavior_policy_id: 2,
+            },
+        ];
+        let rowwise = estimate_policy_value(
+            policy,
+            &logs,
+            logs[0].behavior_p1,
+            EstimatorMethod::CumulativeRowWise,
+            1,
+        )
+        .unwrap();
+        let stale = estimate_policy_value(
+            policy,
+            &logs,
+            logs[0].behavior_p1,
+            EstimatorMethod::StalePropensityNegativeControl,
+            1,
+        )
+        .unwrap();
+        assert!((rowwise - 2.5).abs() < EPS, "rowwise={rowwise}");
+        assert!((stale - 1.0).abs() < EPS, "stale={stale}");
+        assert!((rowwise - stale).abs() > 1.0);
+    }
+
+    #[test]
+    fn pooled_and_current_estimands_are_distinct_under_reward_drift() {
+        let policy = Policy {
+            id: 0,
+            p1: [0.1, 0.9],
+        };
+        let current = true_policy_value(policy, Scenario::RewardDrift, ROUNDS - 1);
+        let pooled = pooled_truth(policy, Scenario::RewardDrift, ROUNDS - 1);
+        let recent = recent_truth(policy, Scenario::RewardDrift, ROUNDS - 1);
+        assert!((current - pooled).abs() > 0.05);
+        assert!((current - recent).abs() > EPS);
+    }
+
+    #[test]
     fn row_records_keep_version_and_logger_probability() {
         let obs = Observation {
             context: 1,
