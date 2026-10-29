@@ -145,7 +145,6 @@ fn parse_row(fields: &[&str]) -> Result<GateInput, String> {
         shift_detected: parse_bool(fields[6], "shift_detected")?,
         adequacy_status,
         net_lift_ci95_low,
-        minimum_net_lift,
         model_action_authorized: parse_bool(fields[9], "model_action_authorized")?,
         direct_action_authorized: parse_bool(fields[10], "direct_action_authorized")?,
     })
