@@ -17,6 +17,9 @@ This makes memory quality a multi-objective systems problem:
 
 ## Public comparison points
 
+Budgeted Flat Reconstruction (BFR) is a direct method-level comparator: it decomposes questions into requirements, selects a complementary evidence set, then iteratively retrieves missing evidence via text or entity/session views. It reports 82.2% judged accuracy and 91.4% Turn Hit on LongMemEval-S using its own evaluator and setup. These are **not LongMemEval-V2 results**. Treat BFR as an algorithmic arm only if a compatible reproduction can be run on the original dataset or a carefully matched memory store; otherwise cite it only as related work, never as a measured Symthaea baseline.
+
+
 The official [LongMemEval-V2 repository](https://github.com/xiaowu0162/LongMemEval-V2/) reports 451 curated questions, five memory abilities, web and enterprise domains, histories up to 500 trajectories / 115M tokens, and small/medium leaderboard tiers. Its published baseline page ([results](https://xiaowu0162.github.io/longmemeval-v2/)) currently lists:
 
 | Method | Small accuracy | Small latency | Medium accuracy | Medium latency |
@@ -232,11 +235,12 @@ Freeze and compare these as separate arms. Do not conflate them into one adverti
 
 1. **No-memory control:** same reader/model without retrieved history.
 2. **Official simple RAG controls:** official query-to-slice and query-to-slice-plus-notes implementations.
-3. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
-4. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
-5. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
-6. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
-7. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
+3. **Direct evidence-reconstruction comparator:** Budgeted Flat Reconstruction (BFR), which decomposes queries into requirements, selects complementary evidence, then iteratively discovers additional records through text or multi-view access. Its paper reports 82.2% judged accuracy / 91.4% Turn Hit on LongMemEval-S under that paper's protocol, not LongMemEval-V2; reproduce on its original setup separately. See [arXiv:2610.09348](https://arxiv.org/abs/2610.09348).
+4. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
+5. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
+6. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
+7. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
+8. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
 
 All arms must receive the same allowed history and query. No benchmark question ID, gold answer, question type, evaluator metadata or future trajectory information may enter the memory write path, ranking features, or prompt. Pin dataset revisions, model/tokenizer hashes, code commits, prompt templates, context budget, seeds and evaluator versions.
 
