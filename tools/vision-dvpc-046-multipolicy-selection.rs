@@ -118,11 +118,17 @@ fn wald_interval(sum:f64,sum_sq:f64,n:usize)->Interval{
     let radius=Z_975*(var/n as f64).sqrt();
     Interval{lower:(mean-radius).max(0.0),upper:(mean+radius).min(1.0)}
 }
-fn hoeffding_cs(mean:f64,w_max:f64,n:usize,alpha_policy:f64)->Interval{
+fn hoeffding_radius_factor(n:usize,alpha_policy:f64)->f64{
     let t=n as f64;
     let delta=alpha_policy/(2.0*t*(t+1.0));
-    let radius=w_max*((1.0/delta).ln()/(2.0*t)).sqrt();
+    ((1.0/delta).ln()/(2.0*t)).sqrt()
+}
+fn hoeffding_cs_factor(mean:f64,w_max:f64,radius_factor:f64)->Interval{
+    let radius=w_max*radius_factor;
     Interval{lower:(mean-radius).max(0.0),upper:(mean+radius).min(1.0)}
+}
+fn hoeffding_cs(mean:f64,w_max:f64,n:usize,alpha_policy:f64)->Interval{
+    hoeffding_cs_factor(mean,w_max,hoeffding_radius_factor(n,alpha_policy))
 }
 fn intersect(previous:Interval,next:Interval)->Interval{
     Interval{lower:previous.lower.max(next.lower),upper:previous.upper.min(next.upper)}
@@ -147,12 +153,21 @@ fn shared_policy_interval(policy:&Policy,cells:[[Interval;2];2])->Interval{
 
 fn certified_best(bounds:&[Interval])->Option<usize>{
     if bounds.is_empty()||bounds.iter().any(|b|b.reversed()){return None;}
-    for i in 0..bounds.len(){
-        if (0..bounds.len()).filter(|j|*j!=i).all(|j|bounds[i].lower>bounds[j].upper+EPS){
-            return Some(i);
+    let mut best=0usize;
+    let mut best_lower=f64::NEG_INFINITY;
+    let mut tied=false;
+    for (i,b) in bounds.iter().enumerate(){
+        if b.lower>best_lower+EPS{
+            best=i;best_lower=b.lower;tied=false;
+        }else if (b.lower-best_lower).abs()<=EPS{
+            tied=true;
         }
     }
-    None
+    if tied{return None;}
+    let max_other_upper=bounds.iter().enumerate()
+        .filter(|(i,_)|*i!=best).map(|(_,b)|b.upper)
+        .fold(f64::NEG_INFINITY,f64::max);
+    (bounds[best].lower>max_other_upper+EPS).then_some(best)
 }
 
 #[derive(Clone,Debug,Default)]
@@ -286,14 +301,20 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                 sums[j]+=x;sums_sq[j]+=x*x;
             }
 
+            // Radius factors depend only on the look and alpha allocation, not
+            // on the policy. Compute logarithms once per method/look rather than
+            // once per candidate policy.
+            let independent_radius_factor=hoeffding_radius_factor(t,ALPHA);
+            let familywise_radius_factor=hoeffding_radius_factor(t,ALPHA/(m as f64));
             for method in 0..3{
                 for j in 0..m{
                     let mean=sums[j]/t as f64;
                     let raw=if method==0{
                         wald_interval(sums[j],sums_sq[j],t)
+                    }else if method==1{
+                        hoeffding_cs_factor(mean,policies[j].w_max,independent_radius_factor)
                     }else{
-                        let alpha_policy=if method==1{ALPHA}else{ALPHA/(m as f64)};
-                        hoeffding_cs(mean,policies[j].w_max,t,alpha_policy)
+                        hoeffding_cs_factor(mean,policies[j].w_max,familywise_radius_factor)
                     };
                     bounds[method][j]=if method==0{raw}else{intersect(bounds[method][j],raw)};
                 }
