@@ -47,7 +47,7 @@ pub struct FrameInterval {
 /// The identifier must resolve externally to a frozen calibration report
 /// containing held-out composition/renderer results. Supplying an arbitrary
 /// string does not itself make the thresholds valid.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PreservationConfig {
     /// Analysis window length, in audio frames; must be >= 16.
     pub frame_size: usize,
@@ -93,7 +93,7 @@ pub enum PreservationVerdict {
 }
 
 /// One protected time-window/channel measurement.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtectedWindowMeasurement {
     pub start_frame: usize,
     pub end_frame: usize,
@@ -117,7 +117,7 @@ pub struct AuthorizedRegionRmsMeasurement {
 }
 
 /// Content-bound evidence from this deterministic measurement primitive.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AudioPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
@@ -152,7 +152,7 @@ pub struct AudioPreservationReport {
 /// Audio-only composition of the independent acoustic and onset channels.
 /// This is deliberately not a whole-edit verdict: symbolic contract evidence
 /// must be checked by its own verifier before an edit is accepted.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositeAudioPreservationReport {
     pub verifier_version: String,
     pub sample_rate_hz: u32,
@@ -737,7 +737,7 @@ fn audio_digest(view: AudioView<'_>) -> String {
 ///
 /// Time tolerances are milliseconds and are converted using the input sample
 /// rate. Thresholds require calibration on the intended renderer/domain.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetPreservationConfig {
     pub frame_size: usize,
     pub hop_size: usize,
@@ -765,7 +765,7 @@ impl Default for OnsetPreservationConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetEvent {
     pub channel: usize,
     /// Approximate onset time in audio-frame coordinates.
@@ -773,7 +773,7 @@ pub struct OnsetEvent {
     pub novelty: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OnsetPreservationReport {
     pub verifier_version: String,
     pub calibration_id: Option<String>,
