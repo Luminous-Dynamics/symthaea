@@ -7,3 +7,5 @@ license = "AGPL-3.0-or-later"
 description = "Fail-closed policy gate for evidence-backed world-model use"
 
 [dependencies]
+
+[workspace]
