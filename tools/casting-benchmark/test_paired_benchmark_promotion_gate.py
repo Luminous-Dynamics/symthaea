@@ -142,11 +142,18 @@ def contract(required_evidence="synthetic", minimum_units=30):
     }
 
 
+def scored_receipt(doc):
+    receipt = analyze_manifest(doc)
+    receipt["source_artifacts"]["raw_manifest_sha256"] = _sha("raw paired manifest")
+    receipt["evaluator_sha256"] = _sha("paired evaluator source")
+    return receipt
+
+
 def assess(doc=None, ct=None, val=None):
     doc = paired_manifest() if doc is None else doc
     ct = contract() if ct is None else ct
     val = validation_manifest() if val is None else val
-    receipt = analyze_manifest(doc)
+    receipt = scored_receipt(doc)
     return assess_promotion(
         receipt, ct, val,
         paired_manifest_sha256=_sha("paired receipt raw bytes"),
@@ -235,7 +242,7 @@ class PairedPromotionGateTests(unittest.TestCase):
             assess(val=val)
 
     def test_missing_critical_family_is_inconclusive(self):
-        receipt = analyze_manifest(paired_manifest())
+        receipt = scored_receipt(paired_manifest())
         receipt["comparisons_vs_baseline"]["candidate"]["by_task_family"].pop("alloy_a")
         result = assess_promotion(
             receipt, contract(), validation_manifest(),
@@ -266,7 +273,7 @@ class PairedPromotionGateTests(unittest.TestCase):
 
     def test_cli_binds_input_manifest_bytes_and_evaluator(self):
         doc = paired_manifest()
-        receipt = analyze_manifest(doc)
+        receipt = scored_receipt(doc)
         val = validation_manifest()
         ct = contract()
         with tempfile.TemporaryDirectory() as tmp:
