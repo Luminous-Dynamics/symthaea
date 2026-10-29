@@ -469,7 +469,8 @@ Observed data and forecast data remain separate. A future forecast is usable onl
 - The initial state of charge and a non-empty opening-inventory ledger reference are explicit and bound into the energy-hub scenario digest. Positive opening SOC cannot use the no-opening-inventory sentinel.
 - State of charge carried from the previous committed interval becomes the initial state of the next suffix optimization. Its inventory-ledger reference becomes a canonical digest over the verified committed prefix, actions, and realized source-cost/emissions summaries.
 - At each stage, the exact solver returns a Pareto frontier and the reference policy selects its first cost-ordered point; this is one deterministic baseline policy, not a proof that cost is the only objective.
-- The first action is independently verified against the current actual interval and carried SOC before the trace advances.
+- The selected action is the first action from a complete plan independently verified by the exact solver against the current observation and forecast suffix. A separate whole-horizon service ledger is not constructed for the one-step check, because a zero-load interval may validly generate/charge energy without delivering load until later.
+- Per-stage reporting uses a distinct interval-local flow ledger (current generation/import cost and CO2e, primary source energy, and load-delivered energy), rather than dividing one interval's values by the entire episode passenger-km denominator.
 - Every committed action remains immutable; later observations only affect later actions.
 - After all stages, the assembled plan is independently verified against the complete realized scenario.
 - Search-budget exhaustion, definite no-plan and other solver failures produce different run statuses and never a completed run with a fabricated zero cost.
