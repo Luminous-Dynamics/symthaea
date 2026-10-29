@@ -17,6 +17,9 @@ This makes memory quality a multi-objective systems problem:
 
 ## Public comparison points
 
+Budgeted Flat Reconstruction (BFR) is a direct method-level comparator: it decomposes questions into requirements, selects a complementary evidence set, then iteratively retrieves missing evidence via text or entity/session views. It reports 82.2% judged accuracy and 91.4% Turn Hit on LongMemEval-S using its own evaluator and setup. These are **not LongMemEval-V2 results**. Treat BFR as an algorithmic arm only if a compatible reproduction can be run on the original dataset or a carefully matched memory store; otherwise cite it only as related work, never as a measured Symthaea baseline.
+
+
 The official [LongMemEval-V2 repository](https://github.com/xiaowu0162/LongMemEval-V2/) reports 451 curated questions, five memory abilities, web and enterprise domains, histories up to 500 trajectories / 115M tokens, and small/medium leaderboard tiers. Its published baseline page ([results](https://xiaowu0162.github.io/longmemeval-v2/)) currently lists:
 
 | Method | Small accuracy | Small latency | Medium accuracy | Medium latency |
@@ -232,11 +235,12 @@ Freeze and compare these as separate arms. Do not conflate them into one adverti
 
 1. **No-memory control:** same reader/model without retrieved history.
 2. **Official simple RAG controls:** official query-to-slice and query-to-slice-plus-notes implementations.
-3. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
-4. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
-5. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
-6. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
-7. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
+3. **Direct evidence-reconstruction comparator:** Budgeted Flat Reconstruction (BFR), which decomposes queries into requirements, selects complementary evidence, then iteratively discovers additional records through text or multi-view access. Its paper reports 82.2% judged accuracy / 91.4% Turn Hit on LongMemEval-S under that paper's protocol, not LongMemEval-V2; reproduce on its original setup separately. See [arXiv:2610.09348](https://arxiv.org/abs/2610.09348).
+4. **Official strong reference:** the AgentRunbook-C baseline as packaged by the benchmark, wherever the official evaluation setup permits a reproduction.
+5. **Broca BM25 lexical baseline:** the deterministic `query_committed_text_context` path over the committed evidence snapshot. Tokenizer and BM25 parameters are pinned and dependency-free; this arm must be labeled lexical, not semantic HDC. A clean lexical-only persistence path is still blocked by the HDC-ID parity coupling in [issue #8786](https://github.com/Luminous-Dynamics/symthaea/issues/8786); do not make this arm appear runnable with synthetic HDC vectors.
+6. **Broca exact HDC:** a pinned text/query encoder feeding exact search; exact search is the oracle for later ANN comparisons.
+7. **Broca hybrid candidate generation:** lexical + HDC, with deduplication and bounded evidence context, only after each component has its own baseline.
+8. **Ablations:** remove temporal state tracking, lifecycle filtering, provenance checks, notes, or HDC retrieval one at a time to show which component actually produces each gain.
 
 All arms must receive the same allowed history and query. No benchmark question ID, gold answer, question type, evaluator metadata or future trajectory information may enter the memory write path, ranking features, or prompt. Pin dataset revisions, model/tokenizer hashes, code commits, prompt templates, context budget, seeds and evaluator versions.
 
@@ -271,18 +275,18 @@ Track answer/task quality against end-to-end latency, memory footprint, context 
 **Research question:** can the system return better-supported answers and actions at lower latency/cost by spending retrieval effort only where additional evidence changes the decision?
 
 ## Counterfactual fixture validator (new executable structural seam)
-Recent adjacent work changes the experimental target in a useful way. [MemCalib (arXiv:2609.24259)](https://arxiv.org/abs/2609.24259) labels each memory atom's target influence as Ignore, Bound or Control and measures over-use separately from under-use; its authors report that optimization can improve one direction while worsening the other. [DynamicMem (arXiv:2606.22877)](https://arxiv.org/abs/2606.22877) adds multi-timescale profile changes, causally grounded cross-application behavior and quarterly checkpoints; it reports that more than 93% of its observed failures traced to memory retrieval rather than answer generation. These are published claims for their own evaluation settings, not results for Symthaea. [MemOps (arXiv:2607.12893)](https://arxiv.org/abs/2607.12893) provides a complementary lifecycle-operation benchmark: each event records trigger, target, scope, state transition, and supporting evidence, with probes for remembering, forgetting, updating, reflecting, and operation sequences. Its main contribution for Broca is a diagnostic path beyond final-answer accuracy: evaluate whether the memory state transition was correct before measuring answer quality. The paper reports ordered memory-state trajectory failures across evaluated systems; its results are not Symthaea measurements.
+Recent adjacent work changes the experimental target in a useful way. [MemCalib (arXiv:2609.24259)](https://arxiv.org/abs/2609.24259) labels each memory atom's target influence as Ignore, Bound or Control and measures over-use separately from under-use; its authors report that optimization can improve one direction while worsening the other. [DynamicMem (arXiv:2606.22877)](https://arxiv.org/abs/2606.22877) adds multi-timescale profile changes, causally grounded cross-application behavior and quarterly checkpoints; it reports that more than 93% of its observed failures traced to memory retrieval rather than answer generation. These are published claims for their own evaluation settings, not results for Symthaea.
 
 The next memory-use experiment should pair evidence sufficiency with an atom-ablation audit: for each labeled atom, compare the same frozen query/prompt with and without that atom. Test whether Ignore atoms have no material answer-specific footprint, Bound atoms contribute only locally, and Control atoms actually affect required claims/constraints. Report over-use, under-use, answerability/coverage and retrieval failures separately. This is a new evaluation arm, not a current model capability or a performance claim.
 
 
 The Rust module `crates/domains/symthaea-broca/src/counterfactual_evidence_audit.rs` and CLI `broca-counterfactual-audit` define a deterministic input-fixture validator. The current synthetic corpus contains 10 pairs / 20 cases across polarity, temporal validity, entity binding, scope, source dependence, missing requirements, ordered transitions, correction updates, qualifier context, and memory influence (Ignore/Bound/Control target levels). The evaluator-only labels are stored separately under `tests/fixtures/evaluator-only/`.
 
-The validator checks the pinned schema, unique IDs, explicit scopes/entities/source families, RFC3339 timestamps, allowed mutation families/relations, family-specific mutation kinds/paths, forbidden evaluator-only keys, and exact agreement between declared and observed evidence diffs. The memory-influence pair supplies a positive atom-level Ignore/Control label fixture inspired by MemCalib; label validation only checks schema and evidence identity, not actual model behavior. It also exposes a runtime projection containing only query, as-of timestamp, and evidence, excluding pair/mutation metadata. Tests link each gold-label pair back to its exact input pair and require every case to have one label.
+The validator checks the pinned schema, unique IDs, explicit scopes/entities/source families, RFC3339 timestamps, allowed mutation families/relations, family-specific mutation kinds/paths, forbidden evaluator-only keys, and exact agreement between declared and observed evidence diffs. It also exposes a runtime projection containing only query, as-of timestamp, and evidence, excluding pair/mutation metadata. The memory-influence pair labels a decisive configuration fact Control, an applicability constraint Bound, and an inserted high-overlap non-decisive notification Ignore; the expected material claim stays stable. These labels establish test contracts, not measured model behavior.
 
-The offline scorer is now exposed as `broca-memory-influence-score`. It consumes three distinct inputs: actual reader ablation observations, the exact input fixture corpus, and evaluator-only labels. Every observation pins the input fixture SHA-256, prompt SHA-256, tokenizer SHA-256, reader revision, and system commit SHA; the scorer recomputes the fixture digest and validates case/evidence identity before scoring. It compares structured material fields (stable claim/action/decision paths) and emits separate over-use and under-use rates for Ignore, Bound, and Control. It does not use free-form answer-string similarity and does not claim semantic entailment.
+The offline scorer is exposed as `broca-memory-influence-score`. It consumes three distinct inputs: actual reader-ablation observations, the exact input fixture corpus, and evaluator-only labels. Every observation pins the input fixture SHA-256, prompt SHA-256, tokenizer SHA-256, reader revision, and system commit SHA. The scorer recomputes the fixture digest, verifies case/evidence identity, requires an exact one-to-one match between labelled atom targets and observations, then compares structured material output fields (stable paths under `claim.`, `action.`, or `decision.`). It reports Ignore over-use, Bound over-use/under-use, and Control over-use/under-use separately. It does not infer semantic equivalence from free-form answer strings.
 
-Run from the workspace root once an adapter has emitted real observations:
+Use the scorer only after a frozen reader adapter has emitted real observations:
 
 ```sh
 cargo run -p symthaea-broca --bin broca-memory-influence-score -- \
@@ -292,7 +296,9 @@ cargo run -p symthaea-broca --bin broca-memory-influence-score -- \
 cargo test -p symthaea-broca counterfactual_evidence_audit
 ```
 
-The Rust scoring tests construct synthetic outputs to validate the metric mechanics (including deliberate over-use and under-use cases); those synthetic rates are not model measurements. The reader adapter and actual ablation run remain to be implemented.
+The Rust scorer tests use synthetic observations to exercise metric mechanics, including deliberate over-use and under-use. Those synthetic rates are not model measurements. The actual reader adapter, real ablation output capture, and held-out evaluation remain unimplemented. The CLI is an offline evaluator and must not be called in the production inference path.
+
+[MemOps (arXiv:2607.12893)](https://arxiv.org/abs/2607.12893) provides a complementary operation-level evaluation direction: trace trigger, target, scope, state transition and supporting evidence for remembering, forgetting, updating and reflecting. A future MemOps-style extension should score the memory state transition separately from answer correctness, so a lucky answer cannot conceal a broken update or forgetting operation.
 
 Run from the workspace root:
 
