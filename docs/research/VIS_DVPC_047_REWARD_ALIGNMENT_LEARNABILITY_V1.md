@@ -42,9 +42,12 @@ All outcome means, proxy means, action rankings, alignment, global-best value, c
 
 A tabular contextual UCB learner receives the proxy reward immediately and chooses actions separately for each context. Every decision also produces a north-star outcome that matures according to the fixture’s delay schedule. The reported learner value and regret are calculated from the **true expected north-star mean of the chosen action**, so they do not need to infer business performance from proxy outcomes.
 
-Separately, an independent uniform-randomized action log is used to evaluate the learner’s currently estimated greedy proxy policy. The target policy is fixed conditional on the online training stream, and the evaluation data use a separate seed. The known logger assigns probability 1/4 to each action, so the IPS score is 4R when the logged action matches the target policy and 0 otherwise; its score is bounded by 4.
+Separately, an independent uniform-randomized action log is used to evaluate the learner’s currently estimated greedy proxy policy. The target policy is fixed conditional on the online training stream, and the evaluation data use a separate seed. The known logger assigns probability 1/4 to each action, so for each of the 16 deterministic context-to-action policies the IPS score is 4R when the logged action matches that policy and 0 otherwise; every score lies in [0,4].
 
-The independent IPS interval is an ordinary pointwise 95% Wald interval over the **north-star rewards that have matured by that look**. It is explicitly a diagnostic baseline, not an anytime-valid confidence sequence. Its error, coverage and width are reported with the number/fraction of evaluation outcomes that have matured. Reusing these Wald intervals across looks must not be treated as a sequential guarantee.
+Two interval tracks are reported over the **north-star outcomes that have matured by that look**:
+
+- The pointwise 95% Wald interval is a conventional variance-based diagnostic baseline. Reusing it across looks or selecting the currently learned policy does not give a time-uniform guarantee.
+- The familywise Hoeffding confidence sequence maintains one nested sequence for each of the 16 deterministic policies, with alpha/16 allocated per policy and two-sided telescoping alpha spending over the count of matured observations. Every policy score is bounded by 4. The learner’s greedy policy may change over wall-clock time because of its independent training stream, but the simultaneous event that all 16 CSs cover their values at all maturity counts also covers whichever policy it selects. The evaluation log is processed in maturity order; this construction relies on the frozen fixture’s outcome-independent delays, known uniform action propensities and stationary reward means.
 
 ## Measurements
 
@@ -71,7 +74,7 @@ These are Monte Carlo means over 1,024 seeded trajectories; standard errors are 
 - The delayed evaluation estimator only uses north-star rewards matured by the registered look; its denominator is the number matured, not the total log length.
 - The zero-headroom fixture asserts its exact personalization headroom is zero, and its expected online north-star value cannot exceed the best global action value.
 - The deliberately misaligned proxy fixture must have pairwise alignment accuracy below 0.01; aligned dense and sparse fixtures preserve the same action ordering.
-- The workflow checks exact row counts, rate ranges, nonnegative regret/error/width, deterministic replay and source/output SHA-256 receipts.
+- The workflow checks exact row counts, rate ranges, nonnegative regret/error/width, empirical familywise-CS coverage, deterministic replay and source/output SHA-256 receipts.
 
 ## Evidence boundary and industry comparison
 
