@@ -32,8 +32,8 @@ evaluation state, time grain, or formalism.
 - Evaluation digest: SHA-256 binding the same model encoding to the requested state.
 - A digest establishes byte-level identity only. It does not certify that the model,
   causal interpretation, or scientific theory is correct.
-- An analysis request binds the evaluation state, explicit formalism profile, and
-  requested quantity so semantically incompatible requests are rejected.
+- An analysis request binds the evaluation state, candidate subsystem, explicit
+  formalism profile, and requested quantity so incompatible requests are rejected.
 
 ## Development gates
 
@@ -89,3 +89,14 @@ port and not yet an IIT engine.
   https://doi.org/10.1371/journal.pcbi.1011465
 
 These references define the implementation targets. They do not establish parity for this crate.
+
+
+### Cross-language identity contract
+
+The canonical model digest deliberately excludes display labels, evaluation state,
+formalism, and requested quantity. The evaluation digest adds the selected state.
+An analysis request digest additionally binds the candidate subsystem, formalism id,
+and quantity id. The Python oracle runner must use the same byte encoding, not a
+separately canonicalized JSON hash, before it can be used to verify Rust request
+identity. Golden digest vectors are a release gate before claiming cross-language
+parity.
