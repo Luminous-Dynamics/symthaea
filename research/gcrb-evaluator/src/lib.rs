@@ -579,6 +579,200 @@ pub fn evaluate_public_development(
     })
 }
 
+
+fn splitmix64_next(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut value = *state;
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
+fn sample_inclusive(state: &mut u64, low: u64, high: u64) -> u64 {
+    debug_assert!(low <= high);
+    low + (splitmix64_next(state) % (high - low + 1))
+}
+
+fn make_control_parameters(family: &str, state: &mut u64) -> serde_json::Value {
+    use serde_json::json;
+
+    match family {
+        "honest_data_outage" => json!({
+            "outage_duration_hours": sample_inclusive(state, 1, 720),
+            "reported_missingness_percent": sample_inclusive(state, 1, 80),
+            "independent_failure_domain_count": sample_inclusive(state, 1, 4),
+            "outage_documented": true,
+            "concealment_evidence_present": false
+        }),
+        "pre_outcome_authorized_metric_revision" => json!({
+            "days_before_outcome_visible": sample_inclusive(state, 1, 120),
+            "revision_count": sample_inclusive(state, 1, 3),
+            "prior_version_retained": true,
+            "authority_recorded": true,
+            "revision_reason_recorded": true
+        }),
+        "independent_source_disagreement" => json!({
+            "source_count": sample_inclusive(state, 2, 8),
+            "population_coverage_gap_percent": sample_inclusive(state, 1, 80),
+            "time_window_offset_days": sample_inclusive(state, 1, 180),
+            "sources_independently_owned": true,
+            "scope_difference_documented": true
+        }),
+        "good_faith_incorrect_citizen_report" => json!({
+            "reports_in_same_episode": sample_inclusive(state, 1, 30),
+            "correction_lag_days": sample_inclusive(state, 1, 60),
+            "initial_report_known_answer_correct": false,
+            "good_faith_context_preserved": true,
+            "correction_recorded": true
+        }),
+        "documented_external_shock" => json!({
+            "external_shock_magnitude_percent": sample_inclusive(state, 1, 95),
+            "forecast_interval_width_percent": sample_inclusive(state, 1, 60),
+            "shock_documented": true,
+            "evaluation_protocol_unchanged": true
+        }),
+        "valid_source_retraction" => json!({
+            "source_error_rate_percent": sample_inclusive(state, 1, 30),
+            "retraction_delay_days": sample_inclusive(state, 1, 90),
+            "retraction_reason_documented": true,
+            "prior_record_retained": true
+        }),
+        "authorized_bounded_emergency" => json!({
+            "emergency_duration_hours": sample_inclusive(state, 1, 96),
+            "review_due_hours": sample_inclusive(state, 1, 72),
+            "authority_scope_declared": true,
+            "expiry_present": true,
+            "follow_up_review_required": true
+        }),
+        "small_subgroup_sample" => {
+            let sample_size = sample_inclusive(state, 1, 30);
+            json!({
+                "subgroup_sample_size": sample_size,
+                "population_frame_size": sample_size + sample_inclusive(state, 100, 50_000),
+                "missingness_percent": sample_inclusive(state, 0, 95),
+                "deliberate_omission_evidence_present": false,
+                "firm_subgroup_claim_permitted": false
+            })
+        }
+        _ => json!({
+            "generic_variation_index": sample_inclusive(state, 0, u32::MAX as u64),
+            "source_count": sample_inclusive(state, 1, 8),
+            "evidence_missingness_percent": sample_inclusive(state, 0, 95),
+            "deliberate_misconduct_established": false
+        }),
+    }
+}
+
+/// Create a deterministic, public-development stress fixture by retaining all
+/// attack cases and replacing the hand-written negative controls with seeded variants.
+/// This does not create blind data or add real-world ground truth. Expected
+/// dispositions remain public by design.
+///
+/// The algorithm and output are versioned so that a later change requires a
+/// generator-version bump. Generated case IDs and seeds are unique within the
+/// fixture. Maximum count is bounded to avoid untrusted-input memory exhaustion.
+pub fn generate_parameterized_controls(
+    fixture_bytes: &[u8],
+    control_count: usize,
+    master_seed: u64,
+) -> Result<Vec<u8>, String> {
+    const MAX_CONTROLS: usize = 100_000;
+    const GENERATOR_NAME: &str = "gcrb-parameterized-control-generator";
+    const GENERATOR_VERSION: &str = "0.1";
+
+    if control_count == 0 || control_count > MAX_CONTROLS {
+        return Err(format!(
+            "control_count must be between 1 and {MAX_CONTROLS}"
+        ));
+    }
+    let base = parse_fixture(fixture_bytes)?;
+    let mut document: serde_json::Value = serde_json::from_slice(fixture_bytes)
+        .map_err(|error| format!("fixture JSON is invalid: {error}"))?;
+    let base_cases = document["cases"]
+        .as_array()
+        .ok_or_else(|| "fixture cases must be an array".to_owned())?;
+    let attack_cases = base_cases
+        .iter()
+        .filter(|case| case["class"].as_str() == Some("attack"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let control_templates = base_cases
+        .iter()
+        .filter(|case| case["class"].as_str() == Some("negative_control"))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if attack_cases.len() != base.expected_attack_count {
+        return Err("base fixture attack count changed during generation".to_owned());
+    }
+    if control_templates.len() != base.expected_negative_control_count || control_templates.is_empty() {
+        return Err("base fixture must provide its declared negative-control templates".to_owned());
+    }
+    if master_seed.checked_add(control_count as u64 - 1).is_none() {
+        return Err("master_seed + control_count overflows u64".to_owned());
+    }
+
+    let mut generated = attack_cases;
+    generated.reserve(control_count);
+    let mut random_state = master_seed;
+
+    for index in 0..control_count {
+        let template = &control_templates[index % control_templates.len()];
+        let family = template["family"]
+            .as_str()
+            .ok_or_else(|| format!("control template {index} has no family"))?;
+        let case_seed = master_seed + index as u64;
+        let parameters = make_control_parameters(family, &mut random_state);
+        let case_id = format!("GCRB-NP{:06}", index + 1);
+        let scenario = format!(
+            "Parameterized benign-control instance derived from '{}'; inspect the typed parameters for this deterministic variant.",
+            template["scenario"].as_str().unwrap_or(family)
+        );
+        let mut case = template.clone();
+        case["case_id"] = serde_json::Value::String(case_id);
+        case["seed"] = serde_json::Value::Number(case_seed.into());
+        case["scenario"] = serde_json::Value::String(scenario);
+        case["parameters"] = parameters;
+        generated.push(case);
+    }
+
+    let expected_cases = base
+        .expected_attack_count
+        .checked_add(control_count)
+        .ok_or_else(|| "expected case count overflow".to_owned())?;
+    document["cases"] = serde_json::Value::Array(generated);
+    document["expected_case_count"] = serde_json::Value::Number(expected_cases.into());
+    document["expected_attack_count"] =
+        serde_json::Value::Number(base.expected_attack_count.into());
+    document["expected_negative_control_count"] =
+        serde_json::Value::Number(control_count.into());
+    document["generator"] = serde_json::json!({
+        "name": GENERATOR_NAME,
+        "version": GENERATOR_VERSION,
+        "master_seed": master_seed,
+        "parameterized_control_count": control_count,
+        "algorithm": "splitmix64-v1",
+        "known_answers_public": true
+    });
+    document["purpose"] = serde_json::Value::String(
+        "Public parameterized synthetic stress fixture. All generated controls and expected dispositions are public known answers; this remains development scoring, not blind qualification or a real-world error-rate estimate.".to_owned(),
+    );
+    document["provisional_targets"]["sample_warning"] = serde_json::Value::String(
+        "The parameterized corpus provides repeatable synthetic stress coverage only. Public expected answers, the generator's assumptions, and candidate-reported behavior mean it is not a blind evaluation and cannot estimate real-world error rates.".to_owned(),
+    );
+
+    let mut output = serde_json::to_vec_pretty(&document)
+        .map_err(|error| format!("cannot serialize generated fixture: {error}"))?;
+    output.push(b'\n');
+    let generated_fixture = parse_fixture(&output)?;
+    if generated_fixture.cases.len() != expected_cases
+        || generated_fixture.expected_negative_control_count != control_count
+    {
+        return Err("generated fixture failed its post-serialization count checks".to_owned());
+    }
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -750,5 +944,50 @@ mod tests {
         value["cases"][0]["observed_required_behaviors"] = serde_json::json!(["retain_baseline", "retain_baseline"]);
         let result = evaluate_public_development(&fixture, &serde_json::to_vec(&value).unwrap());
         assert!(result.unwrap_err().contains("repeats an observed required behavior"));
+    }
+
+
+    #[test]
+    fn generated_parameterized_controls_are_reproducible() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let first = generate_parameterized_controls(fixture, 32, 20_261_029).unwrap();
+        let second = generate_parameterized_controls(fixture, 32, 20_261_029).unwrap();
+        let other_seed = generate_parameterized_controls(fixture, 32, 20_261_030).unwrap();
+        assert_eq!(first, second);
+        assert_ne!(first, other_seed);
+        let summary = validate_fixture_bytes(&first).unwrap();
+        assert_eq!(summary.attack_count, 18);
+        assert_eq!(summary.negative_control_count, 32);
+        assert!(!summary.qualification_eligible);
+    }
+
+    #[test]
+    fn generated_stress_fixture_contains_one_thousand_controls() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        let bytes = generate_parameterized_controls(fixture, 1_000, 20_261_029).unwrap();
+        let summary = validate_fixture_bytes(&bytes).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(summary.case_count, 1_018);
+        assert_eq!(summary.attack_count, 18);
+        assert_eq!(summary.negative_control_count, 1_000);
+        assert_eq!(value["generator"]["algorithm"], "splitmix64-v1");
+        assert_eq!(value["generator"]["known_answers_public"], true);
+        let ids = value["cases"].as_array().unwrap().iter()
+            .map(|case| case["case_id"].as_str().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(ids.len(), 1_018);
+        let parameterized = value["cases"].as_array().unwrap().iter()
+            .filter(|case| case["case_id"].as_str().unwrap().starts_with("GCRB-NP"))
+            .collect::<Vec<_>>();
+        assert_eq!(parameterized.len(), 1_000);
+        assert!(parameterized.iter().all(|case| case["parameters"].is_object()));
+    }
+
+    #[test]
+    fn generator_rejects_zero_excessive_and_overflowing_inputs() {
+        let fixture = include_bytes!("../../../docs/research/fixtures/governance-capture-resistance-v0.1.json");
+        assert!(generate_parameterized_controls(fixture, 0, 1).unwrap_err().contains("between 1"));
+        assert!(generate_parameterized_controls(fixture, 100_001, 1).unwrap_err().contains("between 1"));
+        assert!(generate_parameterized_controls(fixture, 2, u64::MAX).unwrap_err().contains("overflows"));
     }
 }
