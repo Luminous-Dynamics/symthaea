@@ -32,10 +32,10 @@ jobs:
           /tmp/vis-dvpc-041 --audit > /tmp/vis-dvpc-041-results.tsv
           test "$(grep -c '^SCENARIO' /tmp/vis-dvpc-041-results.tsv)" = "2"
           test "$(grep -c '^LOOK_METRIC' /tmp/vis-dvpc-041-results.tsv)" = "16"
-          test "$(grep -c '^ROOT_CERTIFICATE' /tmp/vis-dvpc-041-results.tsv)" -gt "0"
+          test "$(grep -c '^ROOT_CERTIFICATE' /tmp/vis-dvpc-041-results.tsv)" = "2"
           awk -F '\t' '$1=="LOOK_METRIC" && $4=="probability_mass" { if ($5 < 0.99999999 || $5 > 1.00000001) exit 1; n++ } END { if (n != 16) exit 1 }' /tmp/vis-dvpc-041-results.tsv
           awk -F '\t' '$1=="SCENARIO" && ($2=="healthy" || $2=="weak_overlap") && $4=="sequence_coverage" { if ($5 < 0.95 || $5 > 1.00000001) exit 1; n++ } END { if (n != 2) exit 1 }' /tmp/vis-dvpc-041-results.tsv
-          awk -F '\t' '$1=="SCENARIO" && $4=="root_certificate_failures" { if ($5 != 0) exit 1; n++ } END { if (n != 2) exit 1 }' /tmp/vis-dvpc-041-results.tsv
+          awk -F '\t' '$1=="SCENARIO_METRIC" && $4=="root_certificate_failures" { if ($5 != 0) exit 1; n++ } END { if (n != 2) exit 1 }' /tmp/vis-dvpc-041-results.tsv
           grep '^SCENARIO' /tmp/vis-dvpc-041-results.tsv > /tmp/vis-dvpc-041-summaries.tsv
       - name: Create exact source and output receipt
         run: |
