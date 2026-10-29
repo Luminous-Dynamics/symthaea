@@ -1,12 +1,14 @@
 //! VIS-DVPC-046: multiplicity-aware, anytime-valid multi-policy selection.
 //!
-//! Three comparators share the exact same logged trajectories:
-//!   1. reused pointwise Wald intervals;
-//!   2. per-policy Hoeffding confidence sequences (no portfolio correction);
-//!   3. Bonferroni familywise Hoeffding confidence sequences.
+//! Nine comparators share exact logged trajectories:
+//!   0..5: pointwise/anytime-valid confidence-sequence baselines;
+//!   6: fixed-horizon pCRP-star LCBs (conservative fixed-bet-grid approximation);
+//!   7: fixed-horizon Logarithmic Smoothing LCBs;
+//!   8: fixed-horizon safe LS lambda-grid selection with a union-bound correction.
 //!
-//! A best-policy certificate requires one lower confidence bound to exceed
-//! every competing upper bound. Empty/reversed intervals fail closed.
+//! Methods 6..8 are evaluated only at registered looks and are NOT anytime-valid.
+//! A best-policy certificate requires one lower bound to exceed every competitor's upper
+//! bound; empty/reversed intervals fail closed.
 #![deny(unsafe_code)]
 
 use std::env;
@@ -19,6 +21,11 @@ const LOOKS: [usize;3] = [256,1024,4096];
 const POLICY_COUNTS: [usize;3] = [4,8,32];
 const Z_975: f64 = 1.959_963_984_540_054;
 const EPS: f64 = 1e-10;
+const PCRP_BET_STEPS: usize = 32;
+const PCRP_ROOT_ITERS: usize = 20;
+const ANYTIME_METHODS: usize = 6;
+const METHOD_COUNT: usize = 9;
+const LS_LAMBDA_SCALES: [f64; 3] = [0.5, 1.0, 2.0];
 
 #[derive(Clone,Copy,Debug)]
 struct SplitMix64{state:u64}
@@ -166,6 +173,182 @@ fn shared_policy_interval(policy:&Policy,cells:[[Interval;2];2])->Interval{
     Interval{lower,upper}
 }
 
+#[derive(Clone,Debug,Default)]
+struct ScoreProfile {
+    bins: Vec<(f64, usize)>,
+    n: usize,
+    sum: f64,
+}
+impl ScoreProfile {
+    fn push(&mut self, value: f64) -> Result<(), String> {
+        if !value.is_finite() || value < 0.0 {
+            return Err("importance score must be finite and nonnegative".into());
+        }
+        let next_sum = self.sum + value;
+        if !next_sum.is_finite() {
+            return Err("importance-score sum overflowed".into());
+        }
+        self.n += 1;
+        self.sum = next_sum;
+        if let Some(index) = self.bins.iter().position(|(v, _)| *v == value) {
+            self.bins[index].1 += 1;
+        } else {
+            self.bins.push((value, 1));
+            self.bins.sort_by(|a, b| a.0.total_cmp(&b.0));
+        }
+        Ok(())
+    }
+    fn mean(&self) -> f64 {
+        if self.n == 0 { 0.0 } else { self.sum / self.n as f64 }
+    }
+}
+fn log_add_exp(a: f64, b: f64) -> f64 {
+    if a == f64::NEG_INFINITY { return b; }
+    if b == f64::NEG_INFINITY { return a; }
+    let hi = a.max(b);
+    let lo = a.min(b);
+    hi + (lo - hi).exp().ln_1p()
+}
+fn log_crp_wealth_profile(profile: &ScoreProfile, candidate_mean: f64, bet: f64) -> f64 {
+    if bet <= 0.0 { return 0.0; }
+    if bet >= 1.0 {
+        if profile.bins.iter().any(|(y, _)| *y == 0.0) {
+            return f64::NEG_INFINITY;
+        }
+        return profile.bins.iter()
+            .map(|(y, n)| *n as f64 * (y.ln() - candidate_mean.ln()))
+            .sum();
+    }
+    let log_cash = (-bet).ln_1p();
+    let log_bet = bet.ln();
+    let log_mean = candidate_mean.ln();
+    let mut total = 0.0;
+    for (y, count) in &profile.bins {
+        let log_risky = if *y == 0.0 { f64::NEG_INFINITY }
+            else { log_bet + y.ln() - log_mean };
+        let term = log_add_exp(log_cash, log_risky);
+        if !term.is_finite() { return term; }
+        total += *count as f64 * term;
+    }
+    total
+}
+fn log_sup_crp_wealth_lower(profile: &ScoreProfile, candidate_mean: f64) -> Result<f64, String> {
+    if profile.n == 0 || !candidate_mean.is_finite() || candidate_mean <= 0.0 {
+        return Err("pCRP requires a nonempty profile and positive finite candidate mean".into());
+    }
+    if candidate_mean >= profile.mean() {
+        return Ok(0.0);
+    }
+    // Fixed feasible bet grid: its maximum is no larger than the continuous
+    // supremum, and is monotone in candidate_mean. This is intentionally a
+    // conservative approximation, not the exact continuous-bet pCRP-star method.
+    let mut best = 0.0_f64;
+    for i in 1..=PCRP_BET_STEPS {
+        let bet = i as f64 / PCRP_BET_STEPS as f64;
+        best = best.max(log_crp_wealth_profile(profile, candidate_mean, bet));
+    }
+    let shrink = (1.0 - 64.0 * f64::EPSILON * (profile.n as f64 + 1.0)).max(0.0);
+    Ok(best * shrink)
+}
+fn pcrp_star_lcb_profile(profile: &ScoreProfile, delta: f64) -> Result<f64, String> {
+    if profile.n == 0 || !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
+        return Err("invalid pCRP confidence-bound input".into());
+    }
+    let mean = profile.mean();
+    if mean <= 0.0 { return Ok(0.0); }
+    let threshold = (1.0 / delta).ln()
+        + 0.5 * (std::f64::consts::PI * (profile.n as f64 + 1.0)).ln();
+    let mut hi = mean;
+    let mut probe = mean * 0.5;
+    let mut low = None;
+    for _ in 0..1075 {
+        if probe <= 0.0 { break; }
+        if log_sup_crp_wealth_lower(profile, probe)? > threshold {
+            low = Some(probe);
+            break;
+        }
+        hi = probe;
+        probe *= 0.5;
+    }
+    let Some(mut lo) = low else { return Ok(0.0); };
+    for _ in 0..PCRP_ROOT_ITERS {
+        let mid = lo + (hi - lo) * 0.5;
+        if mid == lo || mid == hi { break; }
+        if log_sup_crp_wealth_lower(profile, mid)? > threshold {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(hi.max(0.0).min(mean).min(1.0))
+}
+fn logarithmic_smoothing_lcb_profile_scaled(
+    profile: &ScoreProfile,
+    delta: f64,
+    w_max: f64,
+    lambda_scale: f64,
+) -> Result<f64, String> {
+    if profile.n == 0 || !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
+        return Err("invalid logarithmic-smoothing input".into());
+    }
+    if !w_max.is_finite() || w_max <= 0.0 {
+        return Err("logarithmic smoothing requires positive finite W_max".into());
+    }
+    if !lambda_scale.is_finite() || lambda_scale <= 0.0 {
+        return Err("logarithmic-smoothing lambda scale must be positive and finite".into());
+    }
+    let n = profile.n as f64;
+    // Base scale depends only on n, delta and the known score ceiling. A multiplier
+    // from the preregistered grid is allowed only with an alpha split across grid points.
+    let lambda = lambda_scale * (2.0 * (1.0 / delta).ln() / (n * w_max * w_max)).sqrt();
+    if !lambda.is_finite() || lambda <= 0.0 {
+        return Err("logarithmic-smoothing lambda is invalid".into());
+    }
+    let log_sum: f64 = profile.bins.iter()
+        .map(|(y, count)| *count as f64 * (lambda * *y).ln_1p())
+        .sum();
+    let smoothed_mean = log_sum / (lambda * n);
+    let log_lower_factor = lambda * smoothed_mean - (1.0 / delta).ln() / n;
+    if !log_lower_factor.is_finite() {
+        return Err("logarithmic-smoothing log factor is non-finite".into());
+    }
+    let lower = log_lower_factor.exp_m1() / lambda;
+    if !lower.is_finite() {
+        return Err("logarithmic-smoothing lower bound is non-finite".into());
+    }
+    Ok(lower.clamp(0.0, profile.mean().min(1.0)))
+}
+
+fn logarithmic_smoothing_lcb_profile(
+    profile: &ScoreProfile,
+    delta: f64,
+    w_max: f64,
+) -> Result<f64, String> {
+    logarithmic_smoothing_lcb_profile_scaled(profile, delta, w_max, 1.0)
+}
+
+/// Selects the strongest LCB from a fixed lambda grid. The per-grid confidence
+/// budget is divided by K, so a union bound makes the max of K lower bounds valid
+/// at total delta. The same wrapper is applied independently to reward and its
+/// complement; no held-out-data lambda tuning is needed.
+fn logarithmic_smoothing_safe_grid_lcb_profile(
+    profile: &ScoreProfile,
+    delta_total: f64,
+    w_max: f64,
+) -> Result<f64, String> {
+    if LS_LAMBDA_SCALES.is_empty() {
+        return Err("lambda grid must be nonempty".into());
+    }
+    let delta_per_lambda = delta_total / LS_LAMBDA_SCALES.len() as f64;
+    let mut best = 0.0_f64;
+    for scale in LS_LAMBDA_SCALES {
+        best = best.max(logarithmic_smoothing_lcb_profile_scaled(
+            profile, delta_per_lambda, w_max, scale
+        )?);
+    }
+    Ok(best)
+}
+
 fn certified_best(bounds:&[Interval])->Option<usize>{
     if bounds.is_empty()||bounds.iter().any(|b|b.reversed()){return None;}
     let mut best=0usize;
@@ -275,7 +458,7 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
     let values:Vec<f64>=policies.iter().map(|p|p.value).collect();
     let best_value=values.iter().copied().fold(f64::NEG_INFINITY,f64::max);
     let max_look=*looks.last().unwrap();
-    let mut agg=vec![vec![MethodAggregate::default();looks.len()];6];
+    let mut agg=vec![vec![MethodAggregate::default();looks.len()];METHOD_COUNT];
     let mut selection=vec![SelectionAggregate::default();looks.len()];
     let started=Instant::now();
     let mut observations=0usize;
@@ -287,10 +470,14 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
         let mut cell_counts=[[0usize;2];2];
         let mut cell_reward_sums=[[0.0_f64;2];2];
         let mut cell_bounds=[[FULL;2];2];
-        let mut bounds=vec![vec![FULL;m];6];
-        let mut sequence_covered=[true;6];
-        let mut ever_false_certificate=[false;6];
-        let mut first_certificate:[Option<usize>;6]=[None;6];
+        let mut bounds=vec![vec![FULL;m];METHOD_COUNT];
+        let mut sequence_covered=[true;METHOD_COUNT];
+        let mut ever_false_certificate=[false;METHOD_COUNT];
+        let mut first_certificate:[Option<usize>;METHOD_COUNT]=[None;METHOD_COUNT];
+        let mut point_certificate=[false;METHOD_COUNT];
+        let mut point_false_certificate=[false;METHOD_COUNT];
+        let mut score_profiles=vec![ScoreProfile::default();m];
+        let mut complement_profiles=vec![ScoreProfile::default();m];
         let mut look_index=0usize;
 
         for t in 1..=max_look{
@@ -310,10 +497,14 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                     return Err(format!("{} policy {} exceeded computed W",s.name,j));
                 }
                 let x=ratio*reward;
-                if !x.is_finite()||x<0.0||x>policies[j].w_max+1e-9{
+                let complement=ratio*(1.0-reward);
+                if !x.is_finite()||x<0.0||x>policies[j].w_max+1e-9
+                    || !complement.is_finite()||complement<0.0||complement>policies[j].w_max+1e-9{
                     return Err(format!("{} policy {} score outside [0,W]",s.name,j));
                 }
                 sums[j]+=x;sums_sq[j]+=x*x;
+                score_profiles[j].push(x)?;
+                complement_profiles[j].push(complement)?;
             }
 
             // Cache look/alpha-dependent logs once per method/look, not once
@@ -342,12 +533,44 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
             for j in 0..m{
                 bounds[5][j]=shared_policy_interval(&policies[j],cell_bounds);
             }
-            for method in 0..6{
+            let is_registered_look=looks.contains(&t);
+            if is_registered_look {
+                // Fixed-horizon pCRP-star and LS comparisons. Alpha is allocated over
+                // two tails and M policies for THIS registered look. These methods are
+                // intentionally not updated between looks and make no sequence claim.
+                let delta_tail=ALPHA/(2.0*m as f64);
+                for j in 0..m {
+                    let lower_p=pcrp_star_lcb_profile(&score_profiles[j],delta_tail)?;
+                    let lower_complement_p=pcrp_star_lcb_profile(&complement_profiles[j],delta_tail)?;
+                    bounds[6][j]=Interval{lower:lower_p.clamp(0.0,1.0),upper:(1.0-lower_complement_p).clamp(0.0,1.0)};
+                    let lower_ls=logarithmic_smoothing_lcb_profile(&score_profiles[j],delta_tail,policies[j].w_max)?;
+                    let lower_complement_ls=logarithmic_smoothing_lcb_profile(&complement_profiles[j],delta_tail,policies[j].w_max)?;
+                    bounds[7][j]=Interval{lower:lower_ls.clamp(0.0,1.0),upper:(1.0-lower_complement_ls).clamp(0.0,1.0)};
+                    let lower_ls_grid=logarithmic_smoothing_safe_grid_lcb_profile(
+                        &score_profiles[j],delta_tail,policies[j].w_max
+                    )?;
+                    let lower_complement_ls_grid=logarithmic_smoothing_safe_grid_lcb_profile(
+                        &complement_profiles[j],delta_tail,policies[j].w_max
+                    )?;
+                    bounds[8][j]=Interval{
+                        lower:lower_ls_grid.clamp(0.0,1.0),
+                        upper:(1.0-lower_complement_ls_grid).clamp(0.0,1.0)
+                    };
+                }
+            }
+            for method in 0..METHOD_COUNT{
+                if method>=ANYTIME_METHODS && !is_registered_look { continue; }
                 let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
-                sequence_covered[method]&=point;
-                if let Some(k)=certified_best(&bounds[method]){
-                    if first_certificate[method].is_none(){first_certificate[method]=Some(t);}
-                    if values[k]+1e-9<best_value{ever_false_certificate[method]=true;}
+                if method<ANYTIME_METHODS {
+                    sequence_covered[method]&=point;
+                    if let Some(k)=certified_best(&bounds[method]){
+                        if first_certificate[method].is_none(){first_certificate[method]=Some(t);}
+                        if values[k]+1e-9<best_value{ever_false_certificate[method]=true;}
+                    }
+                } else {
+                    point_certificate[method]=certified_best(&bounds[method]).is_some();
+                    point_false_certificate[method]=certified_best(&bounds[method])
+                        .map(|k| values[k]+1e-9<best_value).unwrap_or(false);
                 }
             }
 
@@ -356,16 +579,23 @@ fn simulate(s:Scenario,reps:usize,looks:&[usize])->Result<SimResult,String>{
                 let best_set=values.iter().enumerate().filter(|(_,v)|(**v-best_value).abs()<=1e-9).map(|(i,_)|i).collect::<Vec<_>>();
                 selection[look_index].add(best_set.contains(&estimate_winner),best_value-values[estimate_winner]);
 
-                for method in 0..6{
+                for method in 0..METHOD_COUNT{
                     let point=bounds[method].iter().enumerate().all(|(j,b)|b.covers(values[j]));
                     let average_width=bounds[method].iter().map(|b|b.width()).sum::<f64>()/(m as f64);
                     let max_width=bounds[method].iter().map(|b|b.width()).fold(0.0_f64,f64::max);
                     let empty=bounds[method].iter().any(|b|b.reversed());
-                    agg[method][look_index].add(
-                        point,sequence_covered[method],ever_false_certificate[method],
-                        first_certificate[method].is_some(),empty,average_width,max_width,
-                        first_certificate[method].filter(|t0|*t0<=looks[look_index]),
-                    );
+                    if method<ANYTIME_METHODS {
+                        agg[method][look_index].add(
+                            point,sequence_covered[method],ever_false_certificate[method],
+                            first_certificate[method].is_some(),empty,average_width,max_width,
+                            first_certificate[method].filter(|t0|*t0<=looks[look_index]),
+                        );
+                    } else {
+                        agg[method][look_index].add(
+                            point,point,point_false_certificate[method],
+                            point_certificate[method],empty,average_width,max_width,None,
+                        );
+                    }
                 }
                 look_index+=1;
             }
@@ -386,26 +616,41 @@ fn emit(out:&mut String,r:&SimResult,looks:&[usize]){
         let _=writeln!(out,"POLICY\t{}\tid\t{}\tpi_action1_context0\t{:.8}\tpi_action1_context1\t{:.8}\ttrue_value\t{:.8}\tW_max\t{:.8}\tis_best\t{}",
             r.name,policy.id,policy.pi1[0],policy.pi1[1],policy.value,policy.w_max,(policy.value-best_value).abs()<=EPS);
     }
-    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Empirical_Bernstein_CS_per_policy_alpha_0.05","Empirical_Bernstein_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4"];
-    for method in 0..6{
+    let methods=["Wald_pointwise_reused","Hoeffding_CS_per_policy_alpha_0.05","Hoeffding_CS_familywise_alpha_over_M","Empirical_Bernstein_CS_per_policy_alpha_0.05","Empirical_Bernstein_CS_familywise_alpha_over_M","Shared_cell_mean_Hoeffding_CS_alpha_over_4","pCRP_star_fixed_horizon_grid33","Logarithmic_Smoothing_fixed_horizon","Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon"];
+    for method in 0..METHOD_COUNT{
         for (li,look) in looks.iter().copied().enumerate(){
             let a=&r.aggregates[method][li];
-            for (name,count) in [
-                ("familywise_point_coverage",a.point_cover),
-                ("familywise_sequence_coverage",a.sequence_cover),
-                ("any_false_certificate_probability",a.false_certificates),
-                ("ever_best_certificate_rate",a.ever_certified),
-                ("portfolio_empty_interval_probability",a.empty_portfolio),
-            ]{
-                let (v,se,lo,hi)=wilson(count,a.trials);
-                let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,methods[method],look,name,v,se,lo,hi);
+            let (v,se,lo,hi)=wilson(a.point_cover,a.trials);
+            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tfamilywise_point_coverage\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,methods[method],look,v,se,lo,hi);
+            if method<ANYTIME_METHODS {
+                for (name,count) in [
+                    ("familywise_sequence_coverage",a.sequence_cover),
+                    ("any_false_certificate_probability",a.false_certificates),
+                    ("ever_best_certificate_rate",a.ever_certified),
+                ]{
+                    let (v,se,lo,hi)=wilson(count,a.trials);
+                    let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,methods[method],look,name,v,se,lo,hi);
+                }
+            } else {
+                for (name,count) in [
+                    ("point_false_certificate_probability",a.false_certificates),
+                    ("point_best_certificate_rate",a.ever_certified),
+                ]{
+                    let (v,se,lo,hi)=wilson(count,a.trials);
+                    let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,methods[method],look,name,v,se,lo,hi);
+                }
+                let _=writeln!(out,"METHOD_STATUS\t{}\t{}\tguarantee\tFIXED_HORIZON_ONLY",r.name,methods[method]);
             }
+            let (v,se,lo,hi)=wilson(a.empty_portfolio,a.trials);
+            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tportfolio_empty_interval_probability\t{:.8}\t{:.8}\t{:.8}\t{:.8}",r.name,methods[method],look,v,se,lo,hi);
             let (avg,avg_se)=mean_se(a.average_width_sum,a.average_width_sq_sum,a.trials);
             let (mx,mx_se)=mean_se(a.max_width_sum,a.max_width_sq_sum,a.trials);
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_average_policy_interval_width\t{:.8}\t{:.8}\t-\t-",r.name,methods[method],look,avg,avg_se);
             let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tmean_max_policy_interval_width\t{:.8}\t{:.8}\t-\t-",r.name,methods[method],look,mx,mx_se);
-            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tconditional_certificate_time_median\t{}\t-\t-\t-",r.name,methods[method],look,median(&a.certificate_times).map(|v|v.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
-            let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tconditional_certificate_time_p90\t{}\t-\t-\t-",r.name,methods[method],look,p90(&a.certificate_times).map(|v|v.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
+            if method<ANYTIME_METHODS {
+                let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tconditional_certificate_time_median\t{}\t-\t-\t-",r.name,methods[method],look,median(&a.certificate_times).map(|v|v.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
+                let _=writeln!(out,"RESULT_METRIC\t{}\t{}\t{}\tconditional_certificate_time_p90\t{}\t-\t-\t-",r.name,methods[method],look,p90(&a.certificate_times).map(|v|v.to_string()).unwrap_or_else(||"NOT_REACHED".into()));
+            }
         }
     }
     for (li,look) in looks.iter().copied().enumerate(){
@@ -422,6 +667,10 @@ fn benchmark(reps:usize,looks:&[usize])->Result<String,String>{
     let mut out=String::from("record_type\tscenario\tmethod\tlook\tmetric\testimate\tstandard_error\tci_low\tci_high\n");
     let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t0x8b8b8b8b04600046\tformula\tBASE xor LOGGER_INDEX*D6E8FEB86659FD93 xor REPLICATE*A0761D6478BD642F");
     let _=writeln!(out,"BENCHMARK_CONFIG\treplicates\t{}\tmax_horizon\t{}",reps,looks.iter().max().unwrap_or(&0));
+    let _=writeln!(out,"BENCHMARK_CONFIG\tpcrp_bet_grid_points\t{}",PCRP_BET_STEPS+1);
+    let _=writeln!(out,"BENCHMARK_CONFIG\tls_lambda_scales\t0.5,1.0,2.0");
+    let _=writeln!(out,"BENCHMARK_CONFIG\tls_safe_grid_size\t{}",LS_LAMBDA_SCALES.len());
+    let _=writeln!(out,"BENCHMARK_CONFIG\tfixed_horizon_tail_budget\tALPHA/(2*M); safe_grid divides each tail by K");
     for s in scenarios{
         let result=simulate(s,reps,looks)?;
         emit(&mut out,&result,looks);
@@ -451,6 +700,145 @@ fn main(){
 #[cfg(test)]
 mod tests{
     use super::*;
+
+    #[test]
+    fn compressed_scores_match_observation_level_crp_wealth() {
+        let values=[0.0,0.0,0.2,0.2,0.8,1.5,1.5];
+        let mut profile=ScoreProfile::default();
+        for value in values { profile.push(value).unwrap(); }
+        for nu in [0.1_f64,0.4,0.9] {
+            for i in 0..=PCRP_BET_STEPS {
+                let bet=i as f64/PCRP_BET_STEPS as f64;
+                let direct=if bet>=1.0 && values.iter().any(|v|*v==0.0) {
+                    f64::NEG_INFINITY
+                } else {
+                    values.iter().map(|y| (1.0-bet+bet * *y / nu).ln()).sum::<f64>()
+                };
+                let compressed=log_crp_wealth_profile(&profile,nu,bet);
+                if direct==f64::NEG_INFINITY {
+                    assert_eq!(compressed,f64::NEG_INFINITY);
+                } else {
+                    assert!((compressed-direct).abs()<1e-12,"nu={nu} bet={bet} direct={direct} compressed={compressed}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn importance_weighted_reward_complement_has_value_one_minus_policy_value() {
+        for logger in [Logger::healthy(),Logger::weak()] {
+            for policy in make_policies(8,logger) {
+                let mut complement_value=0.0_f64;
+                for context in 0..2 {
+                    let p1=policy.pi1[context];
+                    let h1=logger.h1[context];
+                    let p0=1.0-p1;
+                    let h0=1.0-h1;
+                    let r0=reward_mean(context,0);
+                    let r1=reward_mean(context,1);
+                    complement_value+=0.5*(h0*(p0/h0)*(1.0-r0)+h1*(p1/h1)*(1.0-r1));
+                }
+                assert!((complement_value-(1.0-policy.value)).abs()<1e-12,
+                    "complement={complement_value} policy_value={}",policy.value);
+            }
+        }
+    }
+
+    #[test]
+    fn pcrp_star_profile_constant_stream_matches_analytic_root() {
+        let mut profile=ScoreProfile::default();
+        for _ in 0..32 { profile.push(0.6).unwrap(); }
+        let delta=0.05;
+        let expected=0.6*(delta/(std::f64::consts::PI*(profile.n as f64+1.0)).sqrt()).powf(1.0/profile.n as f64);
+        let got=pcrp_star_lcb_profile(&profile,delta).unwrap();
+        assert!((got-expected).abs()<2e-5,"got={got} expected={expected}");
+    }
+    #[test]
+    fn pcrp_grid_wealth_witness_is_monotone_in_candidate_mean() {
+        let mut profile=ScoreProfile::default();
+        for value in [0.0,0.0,0.2,0.2,0.4,0.8,1.2,1.2] {
+            profile.push(value).unwrap();
+        }
+        let mut previous=f64::INFINITY;
+        for i in 1..=1000 {
+            let nu=i as f64/1000.0;
+            let current=log_sup_crp_wealth_lower(&profile,nu).unwrap();
+            assert!(current<=previous+1e-9,"nu={nu} previous={previous} current={current}");
+            previous=current;
+        }
+    }
+    #[test]
+    fn ls_constant_profile_matches_closed_form() {
+        let mut profile=ScoreProfile::default();
+        for _ in 0..64 { profile.push(0.4).unwrap(); }
+        let delta: f64 = 0.01;
+        let w_max: f64 = 1.5;
+        let n=profile.n as f64;
+        let lambda=(2.0*(1.0/delta).ln()/(n*w_max*w_max)).sqrt();
+        let expected=(((lambda*0.4).ln_1p() - (1.0/delta).ln()/n).exp_m1()/lambda)
+            .clamp(0.0,0.4);
+        let got=logarithmic_smoothing_lcb_profile(&profile,delta,w_max).unwrap();
+        assert!((got-expected).abs()<1e-12,"got={got} expected={expected}");
+        assert!(got >= 0.0 && got <= 0.4);
+    }
+
+    #[test]
+    fn safe_lambda_grid_is_at_least_as_strong_as_each_adjusted_grid_member() {
+        let mut profile=ScoreProfile::default();
+        for value in [0.0,0.1,0.1,0.4,0.8,0.8,1.2,1.2] {
+            profile.push(value).unwrap();
+        }
+        let delta=0.05;
+        let w_max=2.0;
+        let delta_per_lambda=delta/LS_LAMBDA_SCALES.len() as f64;
+        let expected=LS_LAMBDA_SCALES.iter()
+            .map(|scale| logarithmic_smoothing_lcb_profile_scaled(
+                &profile,delta_per_lambda,w_max,*scale
+            ).unwrap())
+            .fold(0.0_f64,f64::max);
+        let got=logarithmic_smoothing_safe_grid_lcb_profile(&profile,delta,w_max).unwrap();
+        assert!((got-expected).abs()<1e-12);
+        assert!(got>=0.0 && got<=profile.mean().min(1.0));
+    }
+
+    #[test]
+    fn pcrp_and_ls_bounds_fail_closed_and_handle_zero_rewards() {
+        let mut zeros=ScoreProfile::default();
+        for _ in 0..16 { zeros.push(0.0).unwrap(); }
+        assert_eq!(pcrp_star_lcb_profile(&zeros,0.05).unwrap(),0.0);
+        assert_eq!(logarithmic_smoothing_lcb_profile(&zeros,0.05,1.0).unwrap(),0.0);
+        assert!(pcrp_star_lcb_profile(&zeros,1.0).is_err());
+        assert!(logarithmic_smoothing_lcb_profile(&zeros,0.05,0.0).is_err());
+    }
+    #[test]
+    fn benchmark_receipt_config_names_both_numerical_search_spaces() {
+        let output=benchmark(2,&[8,16]).unwrap();
+        assert!(output.contains("pcrp_bet_grid_points\t33"));
+        assert!(output.contains("ls_lambda_scales\t0.5,1.0,2.0"));
+        assert!(output.contains("ls_safe_grid_size\t3"));
+        assert!(output.contains("fixed_horizon_tail_budget"));
+    }
+
+    #[test]
+    fn fixed_horizon_methods_are_explicitly_not_anytime_valid() {
+        let output=benchmark(2,&[8,16]).unwrap();
+        assert_eq!(output.lines().filter(|line|line.starts_with("METHOD_STATUS\t")).count(),36);
+        assert!(output.contains("\tFIXED_HORIZON_ONLY"));
+        assert!(!output.lines().any(|line|
+            line.starts_with("RESULT_METRIC\t")
+            && (line.contains("pCRP_star_fixed_horizon_grid33")
+                || line.contains("Logarithmic_Smoothing_fixed_horizon")
+                || line.contains("Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon"))
+            && line.contains("\tfamilywise_sequence_coverage\t")
+        ));
+    }
+
+    #[test]
+    fn fixed_horizon_methods_are_not_updated_between_registered_looks() {
+        let looks=[8,16];
+        assert!(!looks.contains(&7));
+        assert!(looks.contains(&8));
+    }
 
     #[test]
     fn every_policy_value_and_weight_bound_is_exactly_well_formed(){

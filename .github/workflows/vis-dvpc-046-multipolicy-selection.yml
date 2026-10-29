@@ -1,26 +1,32 @@
-name: VIS-DVPC-046 multiplicity-aware multi-policy selection
+name: VIS-DVPC-046 multi-policy selection with fixed-horizon pCRP-star and LS
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "tools/vision-dvpc-046-multipolicy-selection.rs"
       - "docs/research/VIS_DVPC_046_MULTIPOLICY_SELECTION_V1.md"
+      - ".github/workflows/vis-dvpc-046-multipolicy-selection.yml"
   push:
     branches: ["main"]
     paths:
       - "tools/vision-dvpc-046-multipolicy-selection.rs"
       - "docs/research/VIS_DVPC_046_MULTIPOLICY_SELECTION_V1.md"
+      - ".github/workflows/vis-dvpc-046-multipolicy-selection.yml"
 
 permissions:
   contents: read
 
 jobs:
   qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out exact policy-selection benchmark
+      - name: Check out exact policy-selection benchmark head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -42,13 +48,21 @@ jobs:
           grep -v '^SYSTEM' /tmp/vis-dvpc-046-smoke-a.tsv > /tmp/vis-dvpc-046-smoke-a-stable.tsv
           grep -v '^SYSTEM' /tmp/vis-dvpc-046-smoke-b.tsv > /tmp/vis-dvpc-046-smoke-b-stable.tsv
           cmp /tmp/vis-dvpc-046-smoke-a-stable.tsv /tmp/vis-dvpc-046-smoke-b-stable.tsv
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-046-smoke-a-stable.tsv)" = "672"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-046-smoke-a-stable.tsv)" = "888"
+          test "$(grep -c '^METHOD_STATUS' /tmp/vis-dvpc-046-smoke-a.tsv)" = "36"
+          ! grep '^RESULT_METRIC.*pCRP_star_fixed_horizon_grid33.*familywise_sequence_coverage' /tmp/vis-dvpc-046-smoke-a.tsv
+          ! grep '^RESULT_METRIC.*Logarithmic_Smoothing_fixed_horizon.*familywise_sequence_coverage' /tmp/vis-dvpc-046-smoke-a.tsv
+          ! grep '^RESULT_METRIC.*Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon.*familywise_sequence_coverage' /tmp/vis-dvpc-046-smoke-a.tsv
       - name: Run 1,024 paired portfolios through horizon 4,096
         run: |
           /tmp/vis-dvpc-046 --benchmark > /tmp/vis-dvpc-046-results.tsv
           test "$(grep -c '^DGP' /tmp/vis-dvpc-046-results.tsv)" = "6"
           test "$(grep -c '^POLICY' /tmp/vis-dvpc-046-results.tsv)" = "88"
-          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-046-results.tsv)" = "1008"
+          test "$(grep -c '^RESULT_METRIC' /tmp/vis-dvpc-046-results.tsv)" = "1332"
+          test "$(grep -c '^METHOD_STATUS' /tmp/vis-dvpc-046-results.tsv)" = "54"
+          ! grep '^RESULT_METRIC.*pCRP_star_fixed_horizon_grid33.*familywise_sequence_coverage' /tmp/vis-dvpc-046-results.tsv
+          ! grep '^RESULT_METRIC.*Logarithmic_Smoothing_fixed_horizon.*familywise_sequence_coverage' /tmp/vis-dvpc-046-results.tsv
+          ! grep '^RESULT_METRIC.*Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon.*familywise_sequence_coverage' /tmp/vis-dvpc-046-results.tsv
           test "$(grep -c '^SYSTEM' /tmp/vis-dvpc-046-results.tsv)" = "6"
           awk -F '\t' '$1=="RESULT_METRIC" && $3=="Hoeffding_CS_familywise_alpha_over_M" && $5=="familywise_sequence_coverage" { n++; if ($8 < 0.90) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $3=="Empirical_Bernstein_CS_familywise_alpha_over_M" && $5=="familywise_sequence_coverage" { n++; if ($8 < 0.90) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
@@ -56,16 +70,28 @@ jobs:
           awk -F '\t' '$1=="RESULT_METRIC" && $3=="Hoeffding_CS_familywise_alpha_over_M" && $5=="any_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $3=="Empirical_Bernstein_CS_familywise_alpha_over_M" && $5=="any_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && $3=="Shared_cell_mean_Hoeffding_CS_alpha_over_4" && $5=="any_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="pCRP_star_fixed_horizon_grid33" && $5=="familywise_point_coverage" { n++; if ($8 < 0.90) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="Logarithmic_Smoothing_fixed_horizon" && $5=="familywise_point_coverage" { n++; if ($8 < 0.90) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="pCRP_star_fixed_horizon_grid33" && $5=="point_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="Logarithmic_Smoothing_fixed_horizon" && $5=="point_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon" && $5=="familywise_point_coverage" { n++; if ($8 < 0.90) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
+          awk -F '\t' '$1=="RESULT_METRIC" && $3=="Logarithmic_Smoothing_safe_lambda_grid_fixed_horizon" && $5=="point_false_certificate_probability" { n++; if ($9 > 0.10) bad=1 } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           awk -F '\t' '$1=="RESULT_METRIC" && ($5=="familywise_point_coverage" || $5=="familywise_sequence_coverage" || $5=="any_false_certificate_probability" || $5=="ever_best_certificate_rate" || $5=="portfolio_empty_interval_probability" || $5=="IPS_argmax_top1_accuracy") { if ($6 < -0.000001 || $6 > 1.000001) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-046-results.tsv
           grep '^SEED_SCHEDULE' /tmp/vis-dvpc-046-results.tsv > /tmp/vis-dvpc-046-seeds.tsv
-          grep '^DGP\|^POLICY\|^RESULT_METRIC\|^SYSTEM\|^BENCHMARK_CONFIG' /tmp/vis-dvpc-046-results.tsv > /tmp/vis-dvpc-046-summary.tsv
+          test "$(grep -c '^METHOD_STATUS' /tmp/vis-dvpc-046-results.tsv)" = "54"
+          # Summary is a derived, explicitly filtered view of the exact full output.
+          { head -n 1 /tmp/vis-dvpc-046-results.tsv; awk -F '\t' '$1 == "RESULT_METRIC" && ($5 == "familywise_point_coverage" || $5 == "familywise_sequence_coverage" || $5 == "any_false_certificate_probability" || $5 == "point_false_certificate_probability" || $5 == "mean_average_policy_interval_width" || $5 == "IPS_argmax_top1_accuracy" || $5 == "IPS_argmax_simple_regret") { print }' /tmp/vis-dvpc-046-results.tsv; } > /tmp/vis-dvpc-046-summary.tsv
+          test "$(wc -l < /tmp/vis-dvpc-046-summary.tsv)" -gt 1
       - name: Create exact source and output SHA-256 receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           {
             printf 'VIS_DVPC_046_RECEIPT\tformat\tv1\n'
-            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-046-multipolicy-selection.rs /tmp/vis-dvpc-046-results.tsv /tmp/vis-dvpc-046-summary.tsv /tmp/vis-dvpc-046-seeds.tsv
+            sha256sum tools/vision-dvpc-046-multipolicy-selection.rs docs/research/VIS_DVPC_046_MULTIPOLICY_SELECTION_V1.md .github/workflows/vis-dvpc-046-multipolicy-selection.yml /tmp/vis-dvpc-046-results.tsv /tmp/vis-dvpc-046-summary.tsv /tmp/vis-dvpc-046-seeds.tsv
           } > /tmp/vis-dvpc-046-receipt.tsv
           cat /tmp/vis-dvpc-046-receipt.tsv
       - name: Publish results and receipt

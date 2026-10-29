@@ -1,6 +1,6 @@
 # VIS-DVPC-046 — Multiplicity-aware anytime-valid multi-policy selection
 
-**Status:** deterministic Rust benchmark awaiting exact-head qualification. Simulation estimates are not a confidence-sequence proof.
+**Status:** deterministic Rust benchmark with six anytime/pointwise methods plus two fixed-horizon research comparators; exact-head qualification pending. Simulation estimates are not a theorem proof or an industry-superiority claim.
 
 Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8909
 
@@ -11,7 +11,7 @@ A valid confidence sequence for one fixed target policy does not automatically j
 1. optional stopping over observation time;
 2. multiplicity / winner's curse over the selected policy.
 
-The benchmark separates these. It compares a reused pointwise Wald baseline, individually anytime-valid Hoeffding confidence sequences that each receive alpha=0.05, familywise Hoeffding sequences with alpha/M per policy, independent and familywise empirical-Bernstein sequences, and a **shared cell-mean Hoeffding sequence** over the four primitive context/action reward means. All methods see the same logged actions and rewards. The shared method spends its error budget across four outcome cells rather than M policy estimates; if all four simultaneous mean bounds hold, every policy value formed as a nonnegative weighted sum is covered at once.
+The benchmark separates these. It compares a reused pointwise Wald baseline, individually anytime-valid Hoeffding confidence sequences that each receive alpha=0.05, familywise Hoeffding sequences with alpha/M per policy, independent and familywise empirical-Bernstein sequences, a **shared cell-mean Hoeffding sequence** over the four primitive context/action reward means, and two fixed-horizon comparators: a conservative fixed-grid pCRP-star LCB and Logarithmic Smoothing (LS). All methods see the same logged actions and rewards. The shared method spends its error budget across four outcome cells rather than M policy estimates; if all four simultaneous mean bounds hold, every policy value formed as a nonnegative weighted sum is covered at once.
 
 A policy is **certified best** only when its lower bound strictly exceeds every other policy's upper bound. An empty or reversed interval makes the portfolio ineligible for certification. This is a selection contract, not just an estimation metric.
 
@@ -52,6 +52,22 @@ where `delta_{j,t} = alpha_policy / [2 t(t+1)]`. Because ∑_{t>=1} 1/[t(t+1)] =
 
 The portfolio certificate is conservative by design: even if one policy looks promising, the system abstains unless the entire interval family separates a unique best candidate.
 
+## Fixed-horizon COLT and LS baselines
+
+At the three preregistered looks, the benchmark also evaluates three fixed-horizon methods on the same logged prefix:
+
+- **pCRP-star fixed-grid LCB.** This is based on the penalized best constant-rebalanced-portfolio LCB in Ryu et al., *Improved Offline Contextual Bandits with Second-Order Bounds: Betting and Freezing* (COLT 2025). It uses a fixed set of 33 feasible bets and monotone root bisection. A finite grid's maximum wealth is no larger than the continuous-bet supremum, so the induced LCB is conservative relative to the exact pCRP-star bound, potentially at a cost in width. This is *not* an exact reproduction of the paper's continuous optimization or its separate freezing-based learning algorithm. Reference: https://proceedings.mlr.press/v291/ryu25a.html
+
+- **Logarithmic Smoothing (LS) fixed-horizon LCB.** This is based on Sakhi et al., *Logarithmic Smoothing for Pessimistic Off-Policy Evaluation, Selection and Learning* (NeurIPS 2024), Corollary 5 / equations (12)–(14). With nonnegative reward scores `Y=wR` and their complement `Yc=w(1-R)`, it computes `L(Y)` and `U(V)=1-L(Yc)`. The registered, scale-aware parameter is `lambda = sqrt(2 ln(1/delta_tail)/(n W_j^2))`; it is fixed by n, the error allocation and the known policy-specific weight ceiling, never tuned on test outcomes. The 2024 bound applies for fixed-horizon inputs; this implementation does not call it a confidence sequence. Reference: https://proceedings.neurips.cc/paper_files/paper/2024/hash/9379ea6ba7a61a402c7750833848b99f-Abstract-Conference.html
+
+- **Safe lambda-grid LS.** This is a familywise-safe parameter-selection variant of the 2024 LS lower bound. It evaluates the preregistered scales `s ∈ {0.5, 1, 2}` with `lambda_s = s * sqrt(2 ln(1/delta_tail_lambda)/(n W_j^2))` and `delta_tail_lambda = 0.05/(2 M K)`, where `K=3`. It selects the maximum of the K reward LCBs and, separately, the maximum of the K reward-complement LCBs for the reflected upper bound. Since each of the K bounds receives `delta_tail/K`, a union bound preserves the tail error budget while allowing the smoothing parameter to be selected from the same logged sample. The multiplier grid is frozen in source and is not tuned from observed test outcomes. This is still a fixed-horizon method.
+
+The single-lambda pCRP-star and LS bounds use `delta_tail = 0.05/(2M)` for that registered horizon. For safe lambda-grid LS, the tail budget is divided by K=3 in addition to dividing across the M policies. At each horizon the total allocation is 0.05 across lower/upper tails and the finite policy set. Because there are multiple registered horizons, this is a per-look fixed-horizon claim—not a simultaneous guarantee across all three horizons and not an optional-stopping guarantee. A future sequential LS implementation must use the theorem and protocol of the separate 2026 sequential LS + online PAC-Bayes work: https://proceedings.mlr.press/v300/haddouche26a.html.
+
+To keep the new methods computationally tractable for 1,024 replicates through n=4,096, the Rust harness compresses exactly repeated nonnegative IPS scores into (score, multiplicity) bins as data arrive. This leaves the logged stream and mathematical objective unchanged. Tests compare the compressed log wealth against an observation-level calculation, check the analytical pCRP constant-stream root, verify LS's constant-stream formula, and verify the identity `E[w(1-R)] = 1 - V(pi)` under both registered loggers.
+
+Fixed-horizon methods intentionally emit a `FIXED_HORIZON_ONLY` status at the registered looks. They do not emit `familywise_sequence_coverage` or certificate-time metrics.
+
 ## Paired experiment
 
 Each logger/replicate has a fixed SplitMix64 seed. Candidate counts M=4,8,32 re-use the same logged context/action/reward prefix within a logger condition. At every look n in {256,1024,4096}, the benchmark records:
@@ -70,7 +86,7 @@ A false certificate means some certified candidate is suboptimal relative to the
 ## Hard gates
 
 The exact-head workflow checks:
-- expected output row counts (1,008 full metric rows; 672 smoke metric rows) and deterministic replay (wall-time rows excluded), including 88 explicit policy definitions;
+- expected output row counts (1,332 full metric rows; 888 smoke metric rows), 54/36 fixed-horizon guarantee-status rows and deterministic replay (wall-time rows excluded), including 88 explicit policy definitions;
 - every importance ratio stays below its computed policy-specific W_j;
 - the familywise CS has a sequence-coverage Wilson lower bound above 0.90 for every portfolio;
 - its false-certificate probability has a Wilson upper bound below 0.10;
@@ -83,7 +99,14 @@ These are statistical regression controls for the synthetic DGPs, not proofs of 
 
 Do not rank methods only by how often they choose a policy. Report the trade-off between false-certification risk, familywise sequence coverage, regret and decision latency. If familywise validity makes the system defer on 32-policy weak-support portfolios, that is a meaningful limit of the current bounded nonparametric method—not permission to relax alpha.
 
-The next research step is to add a modern variance-adaptive or betting-and-freezing comparator under the **same familywise contract**, then test support-misspecification, behavior-policy estimation error, policy-drift and context-distribution shift.
+The fixed-horizon comparison now includes two published baselines, with strict separation from sequential claims:
+
+- **pCRP-star:** fixed grid of 33 feasible bets and a monotone root inversion, using the COLT 2025 penalized best-CRP construction. Because it maximizes over a fixed feasible subset of bets, the computed wealth witness cannot exceed the continuous supremum; the resulting LCB is conservative but can be wider than the exact method. It is *not* the paper's exact continuous-bet reproduction.
+- **Logarithmic Smoothing (LS):** the NeurIPS 2024 Corollary 5 / equations (12)–(14) reward transformation, with the preregistered scale-aware choice `lambda = sqrt(2 ln(1/delta)/(n W_j^2))` and the reward-complement bound for the upper endpoint. The theorem allows fixed positive lambda; this declared rule is a reproducible comparator, not a test-set-tuned optimum. It is *fixed-horizon only* here.
+
+Both new methods use `delta_tail = 0.05/(2M)` at each preregistered look, and must not report sequence coverage or time-to-certificate as though they were anytime-valid. The workflow checks that these claims are absent and includes empirical point-coverage / false-certificate Wilson gates in the synthetic panel.
+
+Next: finish exact-head qualification; compare a preregistered lambda grid with safe multiplicity adjustment or a valid mixture over lambda; reproduce the continuous-supremum pCRP-star method faithfully; and separately evaluate the 2026 sequential LS + online PAC-Bayes method under its own assumptions. Then test support misspecification, estimated logging propensities, policy drift and context-distribution shift. Performance improvements must be measured at equal familywise risk and all-in compute, not asserted from a single synthetic DGP.
 
 Useful baseline resource: SCOPE-RL's off-policy evaluation and high-confidence interval documentation, including Type-I/II error, regret and safety metrics:
 https://scope-rl.readthedocs.io/en/latest/documentation/evaluation_implementation.html
