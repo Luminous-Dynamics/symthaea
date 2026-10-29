@@ -47,7 +47,7 @@ struct RunRecord {
     systems: Vec<System>,
     task_records: Vec<TaskRecord>,
     #[serde(default)]
-    notes: Option<String>,
+    notes: OptionalNonNull<String>,
 }
 
 
@@ -255,6 +255,30 @@ where
     }
 }
 
+#[derive(Debug)]
+struct OptionalNonNull<T> {
+    present: bool,
+    value: Option<T>,
+}
+
+impl<T> Default for OptionalNonNull<T> {
+    fn default() -> Self {
+        Self { present: false, value: None }
+    }
+}
+
+impl<'de, T> Deserialize<'de> for OptionalNonNull<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(|value| Self { present: true, value: Some(value) })
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Verifier {
@@ -283,7 +307,7 @@ struct Check {
     blocking: bool,
     status: CheckStatus,
     #[serde(default)]
-    evidence_digest: Option<String>,
+    evidence_digest: OptionalNonNull<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -644,7 +668,7 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
     }
 
     // Read the optional note so the field is not silently treated as authoritative metadata.
-    if let Some(note) = &run.notes {
+    if let Some(note) = &run.notes.value {
         if note.len() > 16_384 {
             error(report, "E_NOTES_LIMIT", "notes", "notes exceed 16384 bytes");
         }
@@ -781,13 +805,13 @@ fn validate_trial(
         if !matches!(check.kind.as_str(), "build" | "test" | "typecheck" | "lint" | "security" | "scope" | "regression" | "oracle" | "other") {
             error(report, "E_CHECK_KIND", format!("{check_path}.kind"), "unknown verifier check kind");
         }
-        if let Some(digest) = &check.evidence_digest {
+        if let Some(digest) = &check.evidence_digest.value {
             validate_digest(report, &format!("{check_path}.evidence_digest"), digest);
         }
         if check.blocking {
             blocking_count += 1;
         }
-        if check.status != CheckStatus::NotRun && check.evidence_digest.is_none() {
+        if check.status != CheckStatus::NotRun && check.evidence_digest.value.is_none() {
             error(report, "E_CHECK_EVIDENCE_MISSING", format!("{check_path}.evidence_digest"), "an executed check requires a content digest for its evidence");
         }
         if trial.verifier.status == VerifierStatus::Pass && check.blocking && check.status != CheckStatus::Pass {
@@ -1194,6 +1218,24 @@ mod tests {
         });
         assert!(!report.valid);
         assert!(has_code(&report, "E_CHECK_EVIDENCE_MISSING"));
+    }
+
+    #[test]
+    fn null_is_rejected_for_optional_non_nullable_evidence_digest() {
+        let report = validate_value(|v| {
+            v["task_records"][0]["trials"][1]["verifier"]["checks"][0]["evidence_digest"] = Value::Null;
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
+    }
+
+    #[test]
+    fn null_is_rejected_for_optional_non_nullable_run_notes() {
+        let report = validate_value(|v| {
+            v["notes"] = Value::Null;
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_JSON_OR_SHAPE"));
     }
 
     #[test]
