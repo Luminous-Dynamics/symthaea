@@ -191,7 +191,7 @@ fn validate_pair(pair: &CounterfactualPairFixture) -> Result<(), String> {
     let right_value = serde_json::to_value(&right.evidence)
         .map_err(|error| format!("cannot serialize right evidence set: {error}"))?;
     let mut actual_changes = Vec::new();
-    diff_paths(&left_value, &right_value, "", &mut actual_changes);
+    diff_paths(&left_value, &right_value, "evidence", &mut actual_changes);
     actual_changes.sort();
     actual_changes.dedup();
 
