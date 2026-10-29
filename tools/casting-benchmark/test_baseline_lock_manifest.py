@@ -11,8 +11,8 @@ LOCK_PATH = Path(__file__).with_name("baselines") / "mf_scbo_lock_v1.json"
 EXPECTED_FIELDS = {
     "schema_version", "baseline_id", "status", "upstream_repository",
     "upstream_commit_sha", "upstream_commit_url", "license", "source_artifacts",
-    "dependency_requirements_exact", "algorithm_semantics",
-    "comparison_requirements", "related_publication_url", "claim_ceiling",
+    "dependency_requirements_exact", "algorithm_semantics", "randomness_notes",
+    "source_review_findings", "comparison_requirements", "related_publication_url", "claim_ceiling",
 }
 
 
@@ -63,9 +63,17 @@ class BaselineLockTests(unittest.TestCase):
         self.assertEqual(semantics["constraint_sign"], "c(x) <= 0")
         self.assertIs(semantics["native_multiobjective"], False)
         self.assertIs(semantics["native_historical_task_descriptor_transfer"], False)
+        self.assertIn("without a fidelity argument", semantics["constraint_fidelity_api"])
         requirements = " ".join(self.lock["comparison_requirements"])
         self.assertIn("preregistered scalarization", requirements)
         self.assertIn("full environment/source digests", requirements)
+
+    def test_upstream_constraint_and_rng_limitations_are_not_hidden(self):
+        findings = " ".join(self.lock["source_review_findings"])
+        randomness = " ".join(self.lock["randomness_notes"])
+        self.assertIn("cannot faithfully model different low- and high-fidelity constraint margins", findings)
+        self.assertIn("excludes the last coordinate", findings)
+        self.assertIn("verify repeatability", randomness)
 
     def test_lock_is_not_a_performance_claim(self):
         self.assertIn("not mean MF-SCBO has been installed", self.lock["claim_ceiling"])
