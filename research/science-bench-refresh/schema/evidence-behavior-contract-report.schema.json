@@ -152,6 +152,12 @@
               },
               "not_evaluable_reason": {
                 "type": "null"
+              },
+              "baseline_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              },
+              "intervention_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
               }
             }
           }
@@ -174,6 +180,12 @@
               },
               "not_evaluable_reason": {
                 "type": "null"
+              },
+              "baseline_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
+              },
+              "intervention_response_artifact_sha256": {
+                "$ref": "#/$defs/digest"
               }
             }
           }
@@ -248,6 +260,55 @@
           "report_commitment_sha256": {
             "not": {
               "pattern": "^0{64}$"
+            }
+          },
+          "records": {
+            "items": {
+              "properties": {
+                "adjudication_record_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_response_artifact_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/digest"
+                        },
+                        {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "intervention_response_artifact_sha256": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/digest"
+                        },
+                        {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
             }
           }
         }
