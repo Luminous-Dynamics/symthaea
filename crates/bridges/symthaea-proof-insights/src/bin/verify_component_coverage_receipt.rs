@@ -21,8 +21,10 @@ const UPSTREAM_COMMIT: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
 const EXPECTED_PARTITION_DIGEST: &str =
     "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
 const SPLIT_SEED: &str = "pitb-v0-openai-math-2026-10-19";
-const SPLIT_ALGORITHM: &str =
-    "sha256(seed || NUL || family_id), sort by digest then family ID, floor 70% train and floor 85% train+validation";
+const SPLIT_ALGORITHM: &str = concat!(
+    "sha256(seed || NUL || family_id), sort by digest then family ID, ",
+    "floor 70% train and floor 85% train+validation"
+);
 const RECEIPT_SCHEMA: &str = "pitb.component-coverage-receipt.v1";
 const TRUST_SCHEMA: &str = "pitb.coverage-reviewer-trust-store.v1";
 const DOMAIN: &str = "PITB_COMPONENT_COVERAGE_RECEIPT_V1";
@@ -260,7 +262,18 @@ fn signing_message(
     trust_store_digest: &str,
 ) -> Vec<u8> {
     format!(
-        "{DOMAIN}\n{RECEIPT_SCHEMA}\n{upstream_commit}\n{partition_digest}\n{edges_digest}\n{methodology_digest}\n{trust_store_digest}\ncomplete_relationship_inventory\n"
+        concat!(
+            "{0}\n{1}\n{2}\n{3}\n",
+            "{4}\n{5}\n{6}\n",
+            "complete_relationship_inventory\n"
+        ),
+        DOMAIN,
+        RECEIPT_SCHEMA,
+        upstream_commit,
+        partition_digest,
+        edges_digest,
+        methodology_digest,
+        trust_store_digest
     )
     .into_bytes()
 }
@@ -271,6 +284,7 @@ fn verify_receipt(
     trust_store_bytes: &[u8],
     methodology_bytes: &[u8],
     expected_trust_store_digest: &str,
+    expected_methodology_digest: &str,
     expected_partition_digest: &str,
     families: &BTreeMap<String, String>,
 ) -> Result<VerificationReport> {
@@ -310,7 +324,9 @@ fn verify_receipt(
         bail!("signed relationship-edge payload digest mismatch");
     }
     let methodology_digest = sha256_hex(methodology_bytes);
-    if !is_sha256(&receipt.review_methodology_sha256)
+    if !is_sha256(expected_methodology_digest)
+        || expected_methodology_digest != methodology_digest
+        || !is_sha256(&receipt.review_methodology_sha256)
         || receipt.review_methodology_sha256 != methodology_digest
     {
         bail!("signed review-methodology digest mismatch");
@@ -414,14 +430,21 @@ fn verify_receipt(
         trust_store_sha256: trust_store_digest,
         verified_reviewer_ids: signer_ids.into_iter().map(str::to_owned).collect(),
         distinct_reviewer_organization_count: organizations.len(),
-        limitation: "Signature verification authenticates endorsements under the pinned trust store; it does not independently prove that the review was competent or exhaustive.",
+        limitation: concat!(
+            "Signature verification authenticates endorsements under the pinned trust store; ",
+            "it does not independently prove that the review was competent or exhaustive."
+        ),
     })
 }
 
 fn run(args: &[String]) -> Result<()> {
-    if args.len() != 7 {
+    if args.len() != 8 {
         bail!(
-            "usage: verify_component_coverage_receipt <splits.json> <edges.json> <receipt.json> <trust-store.json> <review-methodology.md> <expected-trust-store-sha256> <report.json>"
+            concat!(
+                "usage: verify_component_coverage_receipt <splits.json> <edges.json> ",
+                "<receipt.json> <trust-store.json> <review-methodology.md> ",
+                "<expected-trust-store-sha256> <expected-methodology-sha256> <report.json>"
+            )
         );
     }
     let split_bytes = fs::read(&args[0]).with_context(|| format!("read {}", args[0]))?;
@@ -436,10 +459,11 @@ fn run(args: &[String]) -> Result<()> {
         &trust_bytes,
         &methodology_bytes,
         &args[5],
+        &args[6],
         EXPECTED_PARTITION_DIGEST,
         &families,
     )?;
-    fs::write(&args[6], serde_json::to_vec_pretty(&report)?)
+    fs::write(&args[7], serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("write {}", args[6]))?;
     println!(
         "PITB_COVERAGE_RECEIPT_VERIFIED: signers={} organizations={} trust_store_sha256={}",
@@ -565,7 +589,7 @@ mod tests {
         let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["research-lab-a", "research-lab-b"]);
         let report = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
         )
         .unwrap();
         assert!(report.cryptographically_verified);
@@ -582,7 +606,7 @@ mod tests {
         let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["same-org", "same-org"]);
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("distinct organizations"));
@@ -596,7 +620,14 @@ mod tests {
         inventory["edges"][0]["target_family_id"] = Value::String("003".to_owned());
         let mutated_inventory = serde_json::to_vec_pretty(&inventory).unwrap();
         let error = verify_receipt(
-            &mutated_inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
+            &mutated_inventory,
+            &receipt,
+            &trust,
+            &method,
+            &trust_digest,
+            &sha256_hex(&method),
+            &partition_digest,
+            &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("signed relationship-edge payload digest"));
@@ -608,10 +639,31 @@ mod tests {
             signed_fixture(["org-a", "org-b"]);
         trust.push(b' ');
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &sha256_hex(&method), &partition_digest, &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("trust store does not match"));
+    }
+
+    #[test]
+    fn changed_methodology_is_rejected_even_when_old_receipt_is_used() {
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
+            signed_fixture(["org-a", "org-b"]);
+        let expected_methodology_digest = sha256_hex(&method);
+        let mut changed_methodology = method.clone();
+        changed_methodology.push(b' ');
+        let error = verify_receipt(
+            &inventory,
+            &receipt,
+            &trust,
+            &changed_methodology,
+            &trust_digest,
+            &expected_methodology_digest,
+            &partition_digest,
+            &families,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("signed review-methodology digest mismatch"));
     }
 
     #[test]
