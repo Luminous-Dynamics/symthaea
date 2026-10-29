@@ -91,6 +91,15 @@ pub struct ExpectedSourceIdentity<'a> {
     pub tree_sha256: &'a str,
 }
 
+/// Freshness limits must come from the caller's explicit policy, not the manifest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvidenceVerificationPolicy {
+    /// Maximum age of the manifest itself at verification time.
+    pub max_manifest_age_seconds: u64,
+    /// Maximum age of the represented decision snapshot at verification time.
+    pub max_decision_age_seconds: u64,
+}
+
 /// Signed role-specific verifier evidence. The signature covers every field
 /// except signature_hex; see canonical_receipt_signing_bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -140,6 +149,10 @@ pub enum EvidenceBundleBlocker {
     InvalidManifestField { field: String },
     SourceIdentityMismatch { field: String },
     InvalidManifestTimestamp { field: String },
+    InvalidFreshnessPolicy { field: String },
+    ManifestCreatedAfterDecision,
+    StaleManifest { age_seconds: u64, max_age_seconds: u64 },
+    StaleDecisionSnapshot { age_seconds: u64, max_age_seconds: u64 },
     FutureManifestTimestamp { field: String },
     UnsupportedReceiptSchema { receipt_id: String, actual: u32 },
     UnknownReceiptRole { receipt_id: String, role: String },
@@ -239,12 +252,17 @@ pub fn subject_digest_for_role(manifest: &EvidenceManifest, role: EvidenceRole) 
 pub fn verify_evidence_bundle(
     manifest: &EvidenceManifest,
     expected_source: &ExpectedSourceIdentity<'_>,
+    freshness_policy: &EvidenceVerificationPolicy,
     receipts: &[VerifierReceipt],
     trust_anchors: &[TrustAnchor],
     verification_time_epoch_seconds: i64,
 ) -> EvidenceBundleReport {
     let manifest_digest = sha256_hex(&canonical_manifest_bytes(manifest));
-    let mut blockers = validate_manifest(manifest, verification_time_epoch_seconds);
+    let mut blockers = validate_manifest(
+        manifest,
+        freshness_policy,
+        verification_time_epoch_seconds,
+    );
     if !is_lower_hex_length(expected_source.commit_sha, &[40, 64]) {
         blockers.push(EvidenceBundleBlocker::InvalidManifestField { field: "expected_source_commit_sha".into() });
     }
@@ -355,10 +373,24 @@ pub fn verify_evidence_bundle(
     }
 }
 
-fn validate_manifest(manifest: &EvidenceManifest, now: i64) -> Vec<EvidenceBundleBlocker> {
+fn validate_manifest(
+    manifest: &EvidenceManifest,
+    policy: &EvidenceVerificationPolicy,
+    now: i64,
+) -> Vec<EvidenceBundleBlocker> {
     let mut blockers = Vec::new();
     if manifest.schema_version != EVIDENCE_MANIFEST_SCHEMA_VERSION {
         blockers.push(EvidenceBundleBlocker::UnsupportedManifestSchema { actual: manifest.schema_version });
+    }
+    if policy.max_manifest_age_seconds == 0 {
+        blockers.push(EvidenceBundleBlocker::InvalidFreshnessPolicy {
+            field: "max_manifest_age_seconds".into(),
+        });
+    }
+    if policy.max_decision_age_seconds == 0 {
+        blockers.push(EvidenceBundleBlocker::InvalidFreshnessPolicy {
+            field: "max_decision_age_seconds".into(),
+        });
     }
     if manifest.run_id.trim().is_empty() {
         blockers.push(EvidenceBundleBlocker::InvalidManifestField { field: "run_id".into() });
@@ -392,6 +424,38 @@ fn validate_manifest(manifest: &EvidenceManifest, now: i64) -> Vec<EvidenceBundl
             blockers.push(EvidenceBundleBlocker::InvalidManifestTimestamp { field: name.into() });
         } else if now >= 0 && timestamp > now {
             blockers.push(EvidenceBundleBlocker::FutureManifestTimestamp { field: name.into() });
+        }
+    }
+    if manifest.created_at_epoch_seconds >= 0
+        && manifest.decision_time_epoch_seconds >= 0
+        && manifest.created_at_epoch_seconds > manifest.decision_time_epoch_seconds
+    {
+        blockers.push(EvidenceBundleBlocker::ManifestCreatedAfterDecision);
+    }
+    if now >= 0 {
+        if manifest.created_at_epoch_seconds >= 0
+            && now >= manifest.created_at_epoch_seconds
+            && policy.max_manifest_age_seconds > 0
+        {
+            let age = (now - manifest.created_at_epoch_seconds) as u64;
+            if age > policy.max_manifest_age_seconds {
+                blockers.push(EvidenceBundleBlocker::StaleManifest {
+                    age_seconds: age,
+                    max_age_seconds: policy.max_manifest_age_seconds,
+                });
+            }
+        }
+        if manifest.decision_time_epoch_seconds >= 0
+            && now >= manifest.decision_time_epoch_seconds
+            && policy.max_decision_age_seconds > 0
+        {
+            let age = (now - manifest.decision_time_epoch_seconds) as u64;
+            if age > policy.max_decision_age_seconds {
+                blockers.push(EvidenceBundleBlocker::StaleDecisionSnapshot {
+                    age_seconds: age,
+                    max_age_seconds: policy.max_decision_age_seconds,
+                });
+            }
         }
     }
     blockers
@@ -667,6 +731,27 @@ mod tests {
     }
 
 
+    fn default_policy() -> EvidenceVerificationPolicy {
+        EvidenceVerificationPolicy {
+            max_manifest_age_seconds: 3_600,
+            max_decision_age_seconds: 900,
+        }
+    }
+
+    fn verify_fixture_with_policy(
+        manifest: &EvidenceManifest,
+        receipts: &[VerifierReceipt],
+        anchors: &[TrustAnchor],
+        policy: &EvidenceVerificationPolicy,
+        now: i64,
+    ) -> EvidenceBundleReport {
+        let expected = ExpectedSourceIdentity {
+            commit_sha: &manifest.source_commit_sha,
+            tree_sha256: &manifest.source_tree_sha256,
+        };
+        verify_evidence_bundle(manifest, &expected, policy, receipts, anchors, now)
+    }
+
     fn verify_fixture(
         manifest: &EvidenceManifest,
         receipts: &[VerifierReceipt],
@@ -677,7 +762,8 @@ mod tests {
             commit_sha: &manifest.source_commit_sha,
             tree_sha256: &manifest.source_tree_sha256,
         };
-        verify_evidence_bundle(manifest, &expected, receipts, anchors, now)
+        let policy = default_policy();
+        verify_evidence_bundle(manifest, &expected, &policy, receipts, anchors, now)
     }
 
     fn has(report: &EvidenceBundleReport, predicate: impl Fn(&EvidenceBundleBlocker) -> bool) -> bool {
@@ -801,12 +887,50 @@ mod tests {
     }
 
     #[test]
+    fn stale_manifest_and_decision_snapshot_block_promotion() {
+        let manifest = manifest();
+        let (receipts, anchors) = signed_receipts(&manifest);
+        let policy = EvidenceVerificationPolicy {
+            max_manifest_age_seconds: 10,
+            max_decision_age_seconds: 5,
+        };
+        let report = verify_fixture_with_policy(&manifest, &receipts, &anchors, &policy, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::StaleManifest { .. })));
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::StaleDecisionSnapshot { .. })));
+    }
+
+    #[test]
+    fn zero_freshness_limits_block_promotion() {
+        let manifest = manifest();
+        let (receipts, anchors) = signed_receipts(&manifest);
+        let policy = EvidenceVerificationPolicy {
+            max_manifest_age_seconds: 0,
+            max_decision_age_seconds: 900,
+        };
+        let report = verify_fixture_with_policy(&manifest, &receipts, &anchors, &policy, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::InvalidFreshnessPolicy { field } if field == "max_manifest_age_seconds")));
+    }
+
+    #[test]
+    fn manifest_created_after_decision_is_invalid() {
+        let mut manifest = manifest();
+        manifest.created_at_epoch_seconds = manifest.decision_time_epoch_seconds + 1;
+        let (receipts, anchors) = signed_receipts(&manifest);
+        let report = verify_fixture(&manifest, &receipts, &anchors, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::ManifestCreatedAfterDecision)));
+    }
+
+    #[test]
     fn source_identity_must_match_external_build_metadata() {
         let manifest = manifest();
         let (receipts, anchors) = signed_receipts(&manifest);
         let wrong_commit = "c".repeat(40);
         let expected = ExpectedSourceIdentity { commit_sha: &wrong_commit, tree_sha256: &manifest.source_tree_sha256 };
-        let report = verify_evidence_bundle(&manifest, &expected, &receipts, &anchors, NOW);
+        let policy = default_policy();
+        let report = verify_evidence_bundle(&manifest, &expected, &policy, &receipts, &anchors, NOW);
         assert_eq!(report.status, EvidenceBundleStatus::Blocked);
         assert!(has(&report, |b| matches!(b, EvidenceBundleBlocker::SourceIdentityMismatch { field } if field == "source_commit_sha")));
     }

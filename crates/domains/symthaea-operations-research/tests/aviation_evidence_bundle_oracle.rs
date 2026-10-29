@@ -8,12 +8,33 @@
 use ed25519_dalek::{Signer, SigningKey};
 use sha2::{Digest, Sha256};
 use symthaea_operations_research::aviation_evidence_bundle::{
-    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, ExpectedSourceIdentity, TrustAnchor,
+    verify_evidence_bundle, EvidenceBundleStatus, EvidenceManifest, EvidenceVerificationPolicy, ExpectedSourceIdentity, TrustAnchor,
     VerifierReceipt, EVIDENCE_MANIFEST_SCHEMA_VERSION, VERIFIER_RECEIPT_SCHEMA_VERSION,
 };
 
 const NOW: i64 = 1_800_000_000;
 
+
+fn default_policy() -> EvidenceVerificationPolicy {
+    EvidenceVerificationPolicy {
+        max_manifest_age_seconds: 3_600,
+        max_decision_age_seconds: 900,
+    }
+}
+
+fn verify_fixture_with_policy(
+    manifest: &EvidenceManifest,
+    receipts: &[VerifierReceipt],
+    anchors: &[TrustAnchor],
+    policy: &EvidenceVerificationPolicy,
+    now: i64,
+) -> symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleReport {
+    let expected = ExpectedSourceIdentity {
+        commit_sha: &manifest.source_commit_sha,
+        tree_sha256: &manifest.source_tree_sha256,
+    };
+    verify_evidence_bundle(manifest, &expected, policy, receipts, anchors, now)
+}
 
 fn verify_fixture(
     manifest: &EvidenceManifest,
@@ -25,7 +46,8 @@ fn verify_fixture(
         commit_sha: &manifest.source_commit_sha,
         tree_sha256: &manifest.source_tree_sha256,
     };
-    verify_evidence_bundle(manifest, &expected, receipts, anchors, now)
+    let policy = default_policy();
+    verify_evidence_bundle(manifest, &expected, &policy, receipts, anchors, now)
 }
 
 fn independent_sha256(bytes: &[u8]) -> String {
@@ -248,4 +270,64 @@ fn unrecognized_wire_fields_are_rejected_on_security_boundaries() {
     assert!(serde_json::from_value::<TrustAnchor>(
         serde_json::Value::Object(anchor_object)
     ).is_err());
+}
+
+
+#[test]
+fn externally_pinned_source_identity_mismatch_blocks_verification() {
+    let manifest = fixture_manifest();
+    let (receipts, anchors) = signed_bundle(&manifest);
+    let policy = default_policy();
+    let wrong_commit = "c".repeat(40);
+    let expected = ExpectedSourceIdentity {
+        commit_sha: &wrong_commit,
+        tree_sha256: &manifest.source_tree_sha256,
+    };
+    let report = verify_evidence_bundle(&manifest, &expected, &policy, &receipts, &anchors, NOW);
+    assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+    assert!(report.blockers.iter().any(|blocker| {
+        matches!(
+            blocker,
+            symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleBlocker::SourceIdentityMismatch { field }
+                if field == "source_commit_sha"
+        )
+    }));
+}
+
+#[test]
+fn every_manifest_identity_and_artifact_digest_is_receipt_bound() {
+    let manifest = fixture_manifest();
+    let (receipts, anchors) = signed_bundle(&manifest);
+    let policy = default_policy();
+    let mutations: [fn(&mut EvidenceManifest); 12] = [
+        |m| m.source_commit_sha = "c".repeat(40),
+        |m| m.source_tree_sha256 = digest_label("changed-tree"),
+        |m| m.data_snapshot_sha256 = digest_label("changed-data"),
+        |m| m.scenario_sha256 = digest_label("changed-scenario"),
+        |m| m.model_sha256 = digest_label("changed-model"),
+        |m| m.policy_config_sha256 = digest_label("changed-policy"),
+        |m| m.candidate_plan_sha256 = digest_label("changed-plan"),
+        |m| m.calibration_artifact_sha256 = digest_label("changed-calibration"),
+        |m| m.drift_report_sha256 = digest_label("changed-drift"),
+        |m| m.plan_verification_report_sha256 = digest_label("changed-verification"),
+        |m| m.distributional_assessment_sha256 = digest_label("changed-distributional"),
+        |m| m.network_assessment_sha256 = digest_label("changed-network"),
+    ];
+
+    for mutate in mutations {
+        let mut changed = manifest.clone();
+        mutate(&mut changed);
+        let expected = ExpectedSourceIdentity {
+            commit_sha: &changed.source_commit_sha,
+            tree_sha256: &changed.source_tree_sha256,
+        };
+        let report = verify_evidence_bundle(&changed, &expected, &policy, &receipts, &anchors, NOW);
+        assert_eq!(report.status, EvidenceBundleStatus::Blocked);
+        assert!(report.blockers.iter().any(|blocker| {
+            matches!(
+                blocker,
+                symthaea_operations_research::aviation_evidence_bundle::EvidenceBundleBlocker::ReceiptManifestMismatch { .. }
+            )
+        }));
+    }
 }

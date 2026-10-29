@@ -42,7 +42,7 @@ Exactly one receipt is required for each of these roles:
 
 Each Ed25519 receipt signs its schema version, receipt ID, role, exact manifest digest, role-specific subject digest, verifier identity, verifier-binary digest, key ID, issue time, and expiry time. The signature field is not included in the signed payload.
 
-Verification fails closed on unsupported schema, unknown role, missing or duplicate role, duplicate receipt ID, malformed digest/signature, manifest or subject mismatch, issue time before manifest creation, future issue time, expired receipt, excessive lifetime, unknown/duplicate/revoked/out-of-validity trust anchor, verifier-role/identity/binary mismatch, or invalid signature. Blockers are sorted deterministically. Input structures reject unknown JSON fields when deserialized through their strict serde types.
+Verification fails closed on unsupported schema, unknown role, missing or duplicate role, duplicate receipt ID, malformed digest/signature, manifest or subject mismatch, issue time before manifest creation, future issue time, expired receipt, excessive lifetime, stale manifest or decision snapshot, zero freshness limits, inconsistent manifest/decision chronology, unknown/duplicate/revoked/out-of-validity trust anchor, verifier-role/identity/binary mismatch, or invalid signature. Maximum manifest age and maximum decision age are supplied by explicit verification policy; they are never chosen by the untrusted manifest. Blockers are sorted deterministically. Input structures reject unknown JSON fields when deserialized through their strict serde types.
 
 ## What Verified means
 
@@ -52,9 +52,9 @@ Verified is not the readiness gate's EligibleForHumanReview state. The evidence 
 
 ## Test coverage defined
 
-The module has unit tests for valid signing across all required roles, deterministic canonical bytes, manifest mutation, receipt-order independence, missing/duplicate roles, expired and future timestamps, pre-manifest receipt issuance, changed verifier binary, unknown key, revoked key, modified signature, and subject-digest mismatch.
+The module has unit tests for valid signing across all required roles, deterministic canonical bytes, manifest mutation, receipt-order independence, missing/duplicate roles, expired and future timestamps, pre-manifest receipt issuance, stale manifest/decision snapshots, zero freshness limits, invalid manifest/decision chronology, external source identity mismatch, changed verifier binary, unknown key, revoked key, modified signature, and subject-digest mismatch.
 
-A separately compiled integration oracle independently reconstructs manifest and receipt bytes, computes SHA-256 using its own implementation path, creates deterministic test signatures, compares canonical bytes, checks order independence and manifest mutation, and verifies strict rejection of unknown manifest/receipt/trust-anchor fields.
+A separately compiled integration oracle independently reconstructs manifest and receipt bytes, computes SHA-256 using its own implementation path, creates deterministic test signatures, compares canonical bytes, checks order independence, mutates every manifest identity/artifact digest to ensure prior receipts fail, verifies externally pinned source identity, and rejects unknown manifest/receipt/trust-anchor fields.
 
 These are test definitions, not passing evidence: they must execute against the exact commit in a Rust-equipped environment. Fixture keys are test-only and must never become production trust anchors.
 
