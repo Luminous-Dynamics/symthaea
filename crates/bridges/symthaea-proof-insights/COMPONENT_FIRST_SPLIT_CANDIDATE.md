@@ -27,6 +27,22 @@ The family-balance objective uses no theorem outcomes. The output reports family
 
 The output is always marked `candidate_only` and `qualified_for_confirmatory_use: false`. The command is a design instrument, not a new benchmark result.
 
+### Outcome-blind target-availability audit
+
+A split may contain 20 or more graph components yet have fewer than 20 **eligible target-bearing components** if some components contain no reviewed formal targets or only excluded/unknown candidates. The primary analyzer's cluster floor applies to eligible independent components, not to the component manifest's global count. Family-count balancing alone cannot detect this.
+
+The new diagnostic binary `audit_component_split_feasibility` accepts:
+
+```text
+<component-first-candidate.json> <pre-split-target-census.json> <report.json>
+```
+
+Its census contract is defined in `pre-split-target-eligibility-census-v0.schema.json`. The census enumerates the exact family universe and all candidate target IDs, pins source artifact/statement digests and eligibility receipts, and requires `sealed_before_evaluation=true` and `outcomes_used=false`. Family rows explicitly state `eligible`, `excluded`, or `unknown`; target rows preserve the same three-way status. The diagnostic reconciles family/target membership, recomputes the family-universe and candidate partition digests, reports target and eligible-component counts by split, and checks the 20-component held-out floor.
+
+This audit is intentionally **not a receipt authenticator**: digest syntax and identity do not establish reviewer signatures, review independence, or mathematical correctness. It always emits `qualified_for_confirmatory_use=false`; it only determines whether the allocation is structurally suitable to proceed to power planning. The checked-in fixture is a negative synthetic example with one eligible validation component and zero eligible test components, which must be reported as underpowered instead of silently treating all graph components as eligible tasks.
+
+Recommended successor order: freeze the source/family universe; audit and authenticate the hard-relationship inventory; freeze the outcome-blind eligibility census and policy; form graph components; allocate components while preserving held-out eligible-component floors and balancing eligible targets/domain strata; verify the allocation and receipt; then freeze the power plan before any model outcomes are observed. The exact optimization objectives and weighting of family counts, target counts, and domains must be preregistered before candidate allocation.
+
 ### Synthetic allocation screen
 
 `scripts/research/pitb_component_allocation_sensitivity_v0.py` compares the hash-ordered family-deficit heuristic to the component-quota-first swap optimizer on synthetic component-size profiles. It is design-only and uses no PITB relationship inventory or theorem outcomes. Reproduce with:
@@ -58,7 +74,7 @@ The successor verifier must verify those bytes, rebuild the hard-component graph
 3. **Split integrity:** no hard component crosses partitions; deterministic replay reproduces every assignment and the partition digest.
 4. **Receipt integrity:** old split-bound v0 receipt cannot qualify the new assignment; invalid signature, untrusted reviewer, unsigned edge reviewer, same-organization reviewer pair, incomplete inventory, and unresolved cross-split hard relation all fail closed.
 5. **Adversarial structure:** isolated nodes, a single giant component, highly imbalanced component sizes, chains, cycles, and transitive cross-family links are covered. Publish actual family/component counts for all splits.
-6. **Leakage and estimand audit:** separately inspect soft/citation relations and temporally newer source exposure; keep this distinct from hard-component construction. Freeze target eligibility only after split construction, and never tune a split to improve evaluation scores.
+6. **Eligibility census and estimand audit:** for a successor protocol, freeze a complete outcome-blind target-eligibility census before split allocation using a predeclared rule and pinned artifact/statement digests. Preserve eligible, excluded, and unknown rows. This lets the allocator account for target-bearing independent components without looking at model outcomes. Do not alter the frozen PITB v0 denominator or split. Separately inspect soft/citation relations and temporally newer source exposure; keep these distinct from hard-component construction. Never tune a split using proof outcomes or observed model performance.
 7. **Inference:** simulate strict-null and weak-null scenarios under component-size imbalance and within-component correlation; choose a calibration-valid analysis and freeze it before model outcomes. The 20-component floor is a provisional floor, not a substitute for simulation-based power.
 
 ## Research and comparison rationale
