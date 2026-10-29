@@ -647,11 +647,21 @@ fn validate_digest_set(value: Option<&Value>, path: &str, out: &mut Vec<Violatio
 
 fn validate_limitations(value: Option<&Value>, out: &mut Vec<Violation>) {
     let Some(limitations) = value.and_then(Value::as_array) else {
-        push(out, "INVALID_LIMITATIONS", "$.predicate.limitations", "limitations must be an array.");
+        push(
+            out,
+            "INVALID_LIMITATIONS",
+            "$.predicate.limitations",
+            "limitations must be an array.",
+        );
         return;
     };
     if limitations.iter().any(|v| v.as_str().is_none_or(str::is_empty)) {
-        push(out, "INVALID_LIMITATIONS", "$.predicate.limitations", "Each limitation must be a non-empty string.");
+        push(
+            out,
+            "INVALID_LIMITATIONS",
+            "$.predicate.limitations",
+            "Each limitation must be a non-empty string.",
+        );
     }
 }
 
@@ -696,7 +706,9 @@ mod tests {
             "_type": STATEMENT_TYPE,
             "subject": [{
                 "name": "synthetic-report.json",
-                "digest": {"sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4"}
+                "digest": {
+                    "sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4"
+                }
             }],
             "predicateType": PREDICATE_TYPE,
             "predicate": {
