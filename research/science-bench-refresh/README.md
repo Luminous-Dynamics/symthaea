@@ -269,3 +269,28 @@ The typed commitment is domain-separated and recomputed by the Rust verifier. Th
 **Claim boundary:** a valid result means only that the declared plan is structurally complete and its commitment matches. It does not prove that the plan was anchored before execution, that an external runner performed the interventions, that telemetry is complete, that a system causally used evidence, or that a scientific answer is correct. Keep evaluator-only labels and gold sources outside the policy environment; anchor the plan before the first trial in an independent append-only channel.
 
 For interpretation, pre-register direction-specific outcomes rather than expecting every intervention to change the answer: evidence removal should trigger appropriate uncertainty/abstention when the answer becomes unsupported; a coherent update should change claims that depend on the updated fact; a contradiction should preserve the conflict and provenance; irrelevant decoys should not change a supported conclusion. Score retrieval, reading, evidence attribution, inference, abstention/calibration, and cost separately. Never collapse them into a single scalar that hides a safety-critical failure.
+
+## Counterfactual evidence outcome receipts
+
+The outcome receipt validates what the evaluator says happened after running a paired intervention plan. It intentionally reuses the plan from `counterfactual_evidence.rs` and borrows full-denominator / missing-cell principles from the standalone paired-trial auditor in `research/scientific-tool-allocation-auditor`; it is not a replacement generic trial framework.
+
+Schemas:
+- `schema/evidence-outcome-report.schema.json`: complete evaluator-side report.
+- `schema/evidence-outcome-report-fields.schema.json`: the typed commitment input before the report commitment is attached.
+- `src/evidence_outcomes.rs`: exact-plan binding, outcome-axis/status invariants, deterministic condition summaries and resource coverage.
+
+CLI:
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-evidence-outcomes plan.json outcome-fields.json
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-evidence-outcomes plan.json outcome-report.json
+```
+
+The first command validates the plan and complete outcome coverage, then emits a domain-separated typed SHA-256 commitment. Attach that value as `report_commitment_sha256` in the full report. The verifier requires one ordered record for every exact planned pair/trial/condition, including timeouts, blocked trials, invalid receipts, contaminated trials and trials never started. It fails closed on missing, extra, duplicated or mismatched records.
+
+Keep these axes separate: terminal/execution disposition; answer/abstention status; task correctness; evidence use; claim support; abstention quality; confidence availability/source; and native resource counters. Confidence is probability in millionths, and null means *not recorded*, not zero. Per-condition summaries report category counts, confidence coverage and, for each resource field, both the number of observations and sum of observed values. Missing fields are not imputed as zero. No combined evidence/trust score or generalized-performance confidence interval is emitted.
+
+Scored labels are disallowed on contaminated, failed, invalid, timed-out and not-started trials. They remain visible in the outcome report and in the planned denominator. `runner_execution_proven` remains false and `external_anchor_required` remains true: the report hash binds content only, not the authenticity of the collector or evaluator.
+
+The validator deliberately does not compute calibration error or infer causal effects. Use the row-level pair/condition data in a separate preregistered analysis; distinguish fixed-benchmark accuracy from generalized accuracy and account for task/world dependence (for example, a well-specified GLMM when justified). Exact-head CI and independent runner evidence remain required.
