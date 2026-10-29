@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/counterfactual-evidence-intervention-plan-fields.schema.json",
+  "title": "Symthaea Counterfactual Evidence Intervention Plan Fields v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "plan_id",
+    "policy_revision_sha256",
+    "configuration_sha256",
+    "prompt_sha256",
+    "tool_manifest_sha256",
+    "budget_sha256",
+    "analysis_plan_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
+    "randomization_commitment_sha256",
+    "required_conditions",
+    "pairs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_counterfactual_evidence_plan.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policy_revision_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "configuration_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "prompt_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "tool_manifest_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "budget_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "analysis_plan_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "evaluator_revision_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/nonzero_digest"
+    },
+    "decision_rules_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/nonzero_digest"
+    },
+    "randomization_commitment_sha256": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/digest"
+    },
+    "required_conditions": {
+      "$ref": "counterfactual-evidence-intervention-plan.schema.json#/properties/required_conditions"
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": {
+        "$ref": "counterfactual-evidence-intervention-plan.schema.json#/$defs/pair"
+      }
+    }
+  },
+  "description": "Commitment input schema. This is the plan file with plan_commitment_sha256 omitted. The Rust CLI independently enforces exact pair/condition coverage and all cross-field invariants."
+}

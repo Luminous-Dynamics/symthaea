@@ -250,3 +250,22 @@ Exit behavior:
 For privacy, the match report does not emit protected content or the protected content digest. `protected_reference_sha256` is the hash of an opaque reference identifier; `evidence_artifact_sha256` is a domain-separated event/evidence binding, not the raw response hash. The input receipt still contains its own response digest, so receipt publication and access controls need a separate privacy review.
 
 **Claim limit:** this matcher catches byte-identical protected artifacts only. It does not detect a protected answer embedded within a larger web page, snippets with altered whitespace, paraphrases, semantic equivalents, cached derivatives, or unlogged tools. It is a high-precision positive control and a conservative baseline—not a completeness guarantee. The next matcher milestone should add separately measured canonicalized-span and semantic candidate tiers, with exact positives, benign-related negatives, blinded adjudication, and precision/recall reported independently. Do not merge the tiers into one unexplained leakage score.
+
+## Counterfactual evidence intervention plans (v1)
+
+The full-plan schema is `schema/counterfactual-evidence-intervention-plan.schema.json`; the commitment-input schema (the same object without `plan_commitment_sha256`) is `schema/counterfactual-evidence-intervention-plan-fields.schema.json`. The Rust module `src/counterfactual_evidence.rs` defines a strict pre-run contract for paired evidence interventions. The CLI is:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-evidence-intervention-plan plan-fields.json
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-evidence-intervention-plan plan.json
+```
+
+The plan binds the generation, frozen policy revision, configuration, prompt, tools, resource budget, analysis plan, evaluator revision, decision-rule digest, and randomization commitment. The evaluator implementation and outcome rubric are fixed before the first trial; the post-run report must match those exact pins. Every task/world pair must include each declared condition exactly once, with unique trial IDs and a complete per-pair randomization-order permutation. Supported conditions are `natural_retrieval`, `network_isolated`, `gold_evidence_injected`, `gold_evidence_withheld`, `decoy_noise`, and `source_contradiction`. Policy inputs, evidence manifests, seeds, and task references are represented by digests/opaque IDs—not raw protected targets. Every condition within a pair must use a distinct, nonzero evidence-manifest digest; reusing a manifest across nominally different interventions fails closed. All-zero placeholder digests are rejected.
+
+The typed commitment is domain-separated and recomputed by the Rust verifier. The focused CI fixture independently creates it in Python and checks Rust parity, complete-plan acceptance, incomplete-pair rejection even with a recomputed commitment, and mutated-commitment rejection.
+
+**Claim boundary:** a valid result means only that the declared plan is structurally complete and its commitment matches. It does not prove that the plan was anchored before execution, that an external runner performed the interventions, that telemetry is complete, that a system causally used evidence, or that a scientific answer is correct. Keep evaluator-only labels and gold sources outside the policy environment; anchor the plan before the first trial in an independent append-only channel.
+
+For interpretation, pre-register direction-specific outcomes rather than expecting every intervention to change the answer: evidence removal should trigger appropriate uncertainty/abstention when the answer becomes unsupported; a coherent update should change claims that depend on the updated fact; a contradiction should preserve the conflict and provenance; irrelevant decoys should not change a supported conclusion. Score retrieval, reading, evidence attribution, inference, abstention/calibration, and cost separately. Never collapse them into a single scalar that hides a safety-critical failure.

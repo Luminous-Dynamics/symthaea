@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/counterfactual-evidence-intervention-plan.schema.json",
+  "title": "Symthaea Counterfactual Evidence Intervention Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "plan_id",
+    "policy_revision_sha256",
+    "configuration_sha256",
+    "prompt_sha256",
+    "tool_manifest_sha256",
+    "budget_sha256",
+    "analysis_plan_sha256",
+    "evaluator_revision_sha256",
+    "decision_rules_sha256",
+    "randomization_commitment_sha256",
+    "required_conditions",
+    "pairs",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_counterfactual_evidence_plan.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policy_revision_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "configuration_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "tool_manifest_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "budget_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "analysis_plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluator_revision_sha256": {
+      "$ref": "#/$defs/nonzero_digest",
+      "description": "Digest of the exact evaluator implementation frozen before any trial outcome is observed."
+    },
+    "decision_rules_sha256": {
+      "$ref": "#/$defs/nonzero_digest",
+      "description": "Digest of the outcome-label rubric, severity rules and thresholds frozen before any trial outcome is observed."
+    },
+    "randomization_commitment_sha256": {
+      "$ref": "#/$defs/digest",
+      "description": "Commitment to the randomization plan/seed material. Raw seeds should remain protected until the declared reveal point."
+    },
+    "required_conditions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "natural_retrieval",
+          "network_isolated",
+          "gold_evidence_injected",
+          "gold_evidence_withheld",
+          "decoy_noise",
+          "source_contradiction"
+        ]
+      },
+      "description": "Must be in the canonical order shown here; the Rust validator enforces the order and paired coverage."
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": {
+        "$ref": "#/$defs/pair"
+      },
+      "description": "Each pair is one opaque task/world/replicate with one isolated trial per required condition."
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest",
+      "description": "Domain-separated typed commitment over all fields except this field. It still requires an independent pre-run anchor."
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonzero_digest": {
+      "allOf": [
+        { "$ref": "#/$defs/digest" },
+        { "not": { "pattern": "^0{64}$" } }
+      ]
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "task_ref_sha256",
+        "task_family_id",
+        "trials"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "task_ref_sha256": {
+          "$ref": "#/$defs/digest",
+          "description": "Opaque evaluator-side task/world identity. Do not place questions, targets, or oracle labels here."
+        },
+        "task_family_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "trials": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/trial"
+          },
+          "description": "Must contain each required condition exactly once, and randomization_order must be a complete permutation from zero."
+        }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "condition",
+        "policy_input_sha256",
+        "evidence_manifest_sha256",
+        "randomization_order",
+        "seed_commitment_sha256"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "condition": {
+          "enum": [
+            "natural_retrieval",
+            "network_isolated",
+            "gold_evidence_injected",
+            "gold_evidence_withheld",
+            "decoy_noise",
+            "source_contradiction"
+          ]
+        },
+        "policy_input_sha256": {
+          "$ref": "#/$defs/digest",
+          "description": "Digest of the exact policy-visible input artifact for this condition."
+        },
+        "evidence_manifest_sha256": {
+          "$ref": "#/$defs/digest",
+          "description": "Nonzero digest of the condition-specific evidence/environment manifest. Each pair must use a distinct digest per condition so a nominal intervention cannot silently reuse another condition's evidence provenance."
+        },
+        "randomization_order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "seed_commitment_sha256": {
+          "$ref": "#/$defs/digest",
+          "description": "Opaque seed commitment for the trial; never include raw seed or hidden targets in this plan."
+        }
+      }
+    }
+  },
+  "description": "Pre-run paired intervention plan for measuring whether evidence changes an agent's answer, attribution, confidence, and abstention. The structural verifier cannot prove execution, secrecy, truthful telemetry, causal identification, or scientific correctness."
+}

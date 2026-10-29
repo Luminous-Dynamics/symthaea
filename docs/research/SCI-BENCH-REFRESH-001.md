@@ -296,3 +296,27 @@ The protected index and protected artifact store must remain evaluator-only. Its
 This is a high-precision exact-digest baseline only. It does not detect partial-page substring hits, altered snippets, paraphrases, semantic matches, or unlogged retrieval. The next iteration should add span/canonicalized and semantic candidate tiers and measure their precision/recall against blinded adjudication sets; those tiers must remain separate and must not convert ambiguous similarity into an automatic contamination finding.
 
 Authored tests cover the three severities, severity precedence, a benign negative, blocked/not-evaluable events, malformed or altered indexes, mismatched generations, and report relabeling. The focused validator has not yet provided exact-head passing evidence, so no compile/test/format/Clippy pass is claimed.
+
+## Follow-on: precommitted counterfactual evidence interventions
+
+Research anchors:
+- [CounterMem (EMNLP Findings 2026)](https://aclanthology.org/2026.findings-emnlp.1054/) studies whether a RAG answer changes appropriately when retrieved evidence is removed, updated, or contradicted. It motivates an intervention-based companion to static faithfulness checks; its measured effects are not Symthaea results.
+- [Counterfactual Reasoning for Retrieval-Augmented Generation (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/1c078897dc08d46091d0d361d9955c6b-Abstract-Conference.html) motivates testing causal relevance against correlated-but-misleading evidence.
+- [ScienceAgentBench](https://proceedings.iclr.cc/paper_files/paper/2025/hash/f12b4df26344f3be803c06b555252efe-Abstract-Conference.html) is a useful science-agent execution/cost baseline. Its maintainers published verified benchmark artifacts in April 2026; select those artifacts rather than an older evaluation bundle when performing a future comparison.
+
+The new `counterfactual_evidence.rs` validator, full-plan schema, and separate commitment-input schema add a typed pre-run plan for paired conditions: natural retrieval, network isolation, gold evidence injected, gold evidence withheld, decoy/noise, and source contradiction. It freezes policy/configuration/prompt/tool/budget/analysis-plan/evaluator-revision/decision-rule commitments before any outcomes exist, binds condition-specific input and evidence manifests by digest, requires every declared condition exactly once for every pair, rejects repeated/zero evidence-manifest digests within a pair, and checks the per-pair order is a permutation. Distinct manifest digests prove distinct committed bytes only; the evaluator must still verify that each condition implements its intended semantic intervention. The plan is committed with a domain-separated typed SHA-256 digest. The CLI provides `commit-evidence-intervention-plan` and `verify-evidence-intervention-plan`.
+
+The focused workflow adds independent Python/Rust commitment parity and negative controls. Incomplete coverage must fail even when the malformed plan has a freshly recomputed hash; a complete plan with a mutated digest must fail separately. Those are authored checks until exact-head CI finishes.
+
+### How this becomes a scientific benchmark
+
+Freeze an outcome rubric before trials and interpret each intervention directionally. For example, evidence withholding should increase calibrated abstention only when the remaining evidence is insufficient; a coherent source update should change the affected claims; a contradiction should be surfaced with provenance rather than silently averaged away; irrelevant decoys should not perturb a supported answer. Gold injection should isolate reading/use failures from retrieval failure. Compare matched-budget closed-book, plain retrieval, tool-using RAG, and Symthaea policies under the same task/world/seed rules. Use paired estimates with task-family/world-aware uncertainty and report fixed-set results separately from generalized estimates.
+
+Proposed qualification targets (targets, not achieved results):
+- 100% detection in the qualified exact-canary positive-control suite.
+- For canonicalized-span and semantic candidate matchers, separately report blinded precision/recall and confidence intervals; ambiguous similarity remains review-required.
+- 100% planned-trial accounting, including timeouts, blocked retrieval, invalid receipts, abstentions, and contaminated cases.
+- Establish baseline variance and power before setting a minimum effect size; do not announce an improvement from a small unpowered pilot.
+- Report inference accuracy, evidence-use effect, citation/claim support, correct abstention, confident errors, latency, tool calls, and monetary/compute cost separately. No composite score can compensate for invalid evidence integrity.
+
+**Limitations:** the verifier cannot execute interventions, prove that the plan was anchored before the run, certify network isolation, prove complete telemetry, or adjudicate causal evidence use. The runner must independently enforce the interventions and anchor run receipts. No current Symthaea measurement, industry-leading result, or SOTA claim is implied.
