@@ -1,8 +1,9 @@
 use symthaea_operations_research::aviation_public_data_contract::{
     canonical_manifest_digest, validate_event_cluster_splits, validate_manifest,
-    validate_scoring_ready_manifest, validate_as_of_feature, AcquisitionStatus, DataContractError, DatasetPartition,
-    DatasetSource, EventClusterAssignment, FeatureAvailability, FeatureValueKind,
-    LicenseStatus, PublicDataManifest, SplitLabel, SplitWindow, TemporalSplitContract,
+    validate_scoring_ready_manifest, validate_as_of_feature, AcquisitionStatus, BenchmarkUse,
+    DataContractError, DatasetPartition, DatasetSource, DatasetUseScope, EventClusterAssignment,
+    FeatureAvailability, FeatureValueKind, LicenseStatus, PublicDataManifest, SplitLabel,
+    SplitWindow, TemporalSplitContract,
 };
 
 const HASH_A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -28,6 +29,7 @@ fn source(
         dataset_downloaded_at_epoch: downloaded_at,
         acquisition_status: status,
         license_status: LicenseStatus::Unknown,
+        use_scope: DatasetUseScope::Unknown,
     }
 }
 
@@ -189,11 +191,12 @@ fn catalogued_source_cannot_claim_downloaded_partitions() {
 }
 
 #[test]
-fn scoring_is_blocked_until_every_source_is_retrieved_and_terms_reviewed() {
+fn scoring_is_blocked_until_sources_are_retrieved_terms_reviewed_and_scope_allows_use() {
     let mut case = manifest();
     case.sources[0].license_status = LicenseStatus::VerifiedOpen;
+    case.sources[0].use_scope = DatasetUseScope::CommercialAllowed;
     assert_eq!(
-        validate_scoring_ready_manifest(&case).unwrap_err(),
+        validate_scoring_ready_manifest(&case, BenchmarkUse::CommercialDevelopment).unwrap_err(),
         DataContractError::SourceNotScoringReady {
             source_id: "solar".to_owned()
         }
@@ -203,14 +206,25 @@ fn scoring_is_blocked_until_every_source_is_retrieved_and_terms_reviewed() {
     case.sources[1].dataset_downloaded_at_epoch = Some(2_200);
     case.partitions.push(partition("solar", "solar-001", 1_000, 2_000, HASH_A));
     assert_eq!(
-        validate_scoring_ready_manifest(&case).unwrap_err(),
+        validate_scoring_ready_manifest(&case, BenchmarkUse::CommercialDevelopment).unwrap_err(),
         DataContractError::LicenseNotCleared {
             source_id: "solar".to_owned()
         }
     );
 
     case.sources[1].license_status = LicenseStatus::TermsReviewed;
-    validate_scoring_ready_manifest(&case).unwrap();
+    case.sources[1].use_scope = DatasetUseScope::NonCommercialOnly;
+    assert_eq!(
+        validate_scoring_ready_manifest(&case, BenchmarkUse::CommercialDevelopment).unwrap_err(),
+        DataContractError::UseScopeNotAuthorized {
+            source_id: "solar".to_owned(),
+            requested_use: BenchmarkUse::CommercialDevelopment,
+        }
+    );
+    validate_scoring_ready_manifest(&case, BenchmarkUse::NonCommercialResearch).unwrap();
+
+    case.sources[1].use_scope = DatasetUseScope::CommercialAllowed;
+    validate_scoring_ready_manifest(&case, BenchmarkUse::CommercialDevelopment).unwrap();
 }
 
 #[test]
