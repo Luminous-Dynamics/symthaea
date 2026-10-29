@@ -801,8 +801,16 @@ mod tests {
             coverage_receipt_sha256: Some(digest('b')),
             edges: vec![test_edges().remove(0)],
         };
-        let bytes = serde_json::to_vec(&inventory).unwrap();
-        let components = expected_components_from_inventory(&bytes, &families).unwrap();
+        let mut inventory_bytes = serde_json::to_vec(&inventory).unwrap();
+        // Canonical JSON serialization of the inventory is not relied upon for
+        // graph construction; formatting and edge order must not change membership.
+        let components = expected_components_from_inventory(&inventory_bytes, &families).unwrap();
+        let mut inventory_value: Value = serde_json::from_slice(&inventory_bytes).unwrap();
+        inventory_value["edges"] = serde_json::json!([]);
+        inventory_bytes = serde_json::to_vec_pretty(&inventory_value).unwrap();
+        let pretty_components =
+            expected_components_from_inventory(&inventory_bytes, &families).unwrap();
+        assert_eq!(components, pretty_components);
         assert_eq!(components.len(), 2);
         assert!(components.iter().any(|component| {
             component.family_ids == vec!["001".to_owned(), "002".to_owned()]
