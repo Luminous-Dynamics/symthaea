@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import random
 import statistics
 import sys
 from typing import Any, Sequence
@@ -25,6 +26,8 @@ DEFAULT_HISTORY_POINTS = 48
 DEFAULT_TEST_POINTS = 128
 DEFAULT_NEAREST_K = 16
 DEFAULT_REUSE_COUNT = 50
+FAMILY_BOOTSTRAP_REPLICATES = 2_000
+FAMILY_BOOTSTRAP_SEED = 17
 
 # Descriptors are normalized proxies for composition, thermal properties and
 # geometry. Task family is a split/audit label and is never an input feature.
@@ -124,6 +127,40 @@ def design_point(index: int) -> tuple[float, float]:
     if isinstance(index, bool) or not isinstance(index, int) or index < 1:
         raise ValueError("design index must be a positive integer")
     return _radical_inverse(index, 2), _radical_inverse(index, 3)
+
+
+def _percentile(values: Sequence[float], quantile: float) -> float:
+    if not values:
+        raise ValueError("percentile requires at least one value")
+    if isinstance(quantile, bool) or not 0.0 <= quantile <= 1.0:
+        raise ValueError("quantile must be in [0, 1]")
+    ordered = sorted(_finite(value, "percentile value") for value in values)
+    position = (len(ordered) - 1) * quantile
+    lower = math.floor(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
+
+
+def _bootstrap_mean_interval(
+    values: Sequence[float],
+    *,
+    replicates: int = FAMILY_BOOTSTRAP_REPLICATES,
+    seed: int = FAMILY_BOOTSTRAP_SEED,
+) -> list[float] | None:
+    """Deterministic percentile interval resampling family-level units only."""
+    if not values:
+        return None
+    replicates = _positive_int(replicates, "bootstrap replicates", maximum=100_000)
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("bootstrap seed must be an integer")
+    clean = [_finite(value, "bootstrap value") for value in values]
+    rng = random.Random(seed)
+    means = [
+        statistics.fmean(rng.choice(clean) for _ in range(len(clean)))
+        for _ in range(replicates)
+    ]
+    return [_percentile(means, 0.025), _percentile(means, 0.975)]
 
 
 def _descriptor(task: dict[str, Any]) -> tuple[float, float, float]:
@@ -571,8 +608,15 @@ def run_benchmark(
         ]
         family_comparisons[policy] = {
             "held_out_family_units": len(by_family),
+            "independent_generalization_unit": "held_out_task_family",
             "mean_relative_objective_mae_reduction_macro_over_families": (
                 statistics.fmean(defined_family_effects) if defined_family_effects else None
+            ),
+            "bootstrap_method": "percentile bootstrap over held-out family effects; task variants remain nested",
+            "bootstrap_replicates": FAMILY_BOOTSTRAP_REPLICATES,
+            "bootstrap_seed": FAMILY_BOOTSTRAP_SEED,
+            "bootstrap_95pct_ci_macro_mean_relative_objective_mae_reduction": _bootstrap_mean_interval(
+                defined_family_effects
             ),
             "families_with_lower_objective_mae": sum(
                 row["objective_mae_reduction"] > 0 for row in by_family.values()
