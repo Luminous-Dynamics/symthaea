@@ -254,10 +254,15 @@ fn semantic_checks(manifest: &Manifest) -> Vec<Check> {
         .cloned()
         .collect();
     let mut unique_input_columns = BTreeSet::new();
-    let duplicate_input_columns: Vec<_> = manifest.model_input_columns
+    let duplicate_input_columns: Vec<String> = manifest.model_input_columns
         .iter()
-        .filter(|column| !unique_input_columns.insert((*column).clone()))
-        .cloned()
+        .filter_map(|column| {
+            if unique_input_columns.insert(column.as_str()) {
+                None
+            } else {
+                Some(column.clone())
+            }
+        })
         .collect();
     if !duplicate_input_columns.is_empty() {
         checks.push(Check::fail(
