@@ -355,9 +355,16 @@ fn cases()->Vec<predictor::Dgp>{
         make_case("weak_alt_reversed",true,[0.5,0.8],2),
     ]
 }
-fn seed_for(case_index:usize,replicate:usize)->u64{
+fn seed_group(name:&str)->usize{
+    if name.starts_with("healthy_null_"){0}
+    else if name.starts_with("healthy_alt_"){1}
+    else if name.starts_with("weak_null_"){2}
+    else if name.starts_with("weak_alt_"){3}
+    else{panic!("unregistered benchmark case: {name}")}
+}
+fn seed_for(group_index:usize,replicate:usize)->u64{
     0x8b8b_8b8b_0450_0045
-        ^ ((case_index as u64+1).wrapping_mul(0xD6E8_FEB8_6659_FD93))
+        ^ ((group_index as u64+1).wrapping_mul(0xD6E8_FEB8_6659_FD93))
         ^ (replicate as u64).wrapping_mul(0xA076_1D64_78BD_642F)
 }
 
@@ -412,7 +419,7 @@ struct CaseResult{
     name:String,true_value:f64,w_max:f64,aggregates:Vec<Vec<Aggregate>>,
     elapsed_seconds:f64,observations:usize,root_checks:[u64;2],root_failures:[u64;2],
 }
-fn simulate_case(dgp:predictor::Dgp,index:usize,reps:usize,looks:&[usize])->Result<CaseResult,String>{
+fn simulate_case(dgp:predictor::Dgp,reps:usize,looks:&[usize])->Result<CaseResult,String>{
     let audit=predictor::audit(&dgp)?;
     let max_look=*looks.iter().max().ok_or("no observation look")?;
     let started=Instant::now();
@@ -420,7 +427,7 @@ fn simulate_case(dgp:predictor::Dgp,index:usize,reps:usize,looks:&[usize])->Resu
     let mut root_checks=[0u64;2];let mut root_failures=[0u64;2];
     let mut obs_count=0;
     for rep in 0..reps{
-        let mut rng=SplitMix64::new(seed_for(index,rep));
+        let mut rng=SplitMix64::new(seed_for(seed_group(dgp.name),rep));
         let mut raw=RawPair::new(dgp.max_weight,max_look)?;
         let mut adjusted=PredictorPair::new(&audit,max_look);
         let mut sequence_covered=[true;2];
@@ -506,10 +513,10 @@ fn emit_case(out:&mut String,result:&CaseResult,looks:&[usize]){
 fn benchmark(reps:usize,looks:&[usize])->Result<String,String>{
     let cases=cases();
     let mut out=String::from("record_type\tscenario\tmethod\tlook\tmetric\testimate\tstandard_error\tci_low\tci_high\n");
-    let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t0x8b8b8b8b04500045\tformula\tBASE xor scenario*D6E8FEB86659FD93 xor replicate*A0761D6478BD642F");
+    let _=writeln!(out,"SEED_SCHEDULE\tbase_seed\t0x8b8b8b8b04500045\tformula\tBASE xor DGP_GROUP*D6E8FEB86659FD93 xor replicate*A0761D6478BD642F");
     let _=writeln!(out,"BENCHMARK_CONFIG\treplicates\t{reps}\tmax_horizon\t{}",looks.iter().max().unwrap_or(&0));
-    for (index,dgp) in cases.into_iter().enumerate(){
-        let result=simulate_case(dgp,index,reps,looks)?;
+    for dgp in cases{
+        let result=simulate_case(dgp,reps,looks)?;
         emit_case(&mut out,&result,looks);
     }
     Ok(out)
@@ -537,6 +544,14 @@ fn main(){
 #[cfg(test)]
 mod tests{
     use super::*;
+
+    #[test]
+    fn predictor_variants_share_the_same_registered_seed_group(){
+        assert_eq!(seed_group("healthy_null_oracle"),seed_group("healthy_null_constant"));
+        assert_eq!(seed_group("healthy_null_constant"),seed_group("healthy_null_reversed"));
+        assert_eq!(seed_group("weak_alt_oracle"),seed_group("weak_alt_reversed"));
+        assert_ne!(seed_group("healthy_null_oracle"),seed_group("healthy_alt_oracle"));
+    }
 
     #[test]
     fn frozen_control_variate_remains_unbiased(){
@@ -585,8 +600,8 @@ mod tests{
     #[test]
     fn deterministic_paired_benchmark_replays(){
         let dgp=make_case("weak_null_oracle",true,[0.2,0.8],0);
-        let a=simulate_case(dgp.clone(),0,5,&[8]).unwrap();
-        let b=simulate_case(dgp,0,5,&[8]).unwrap();
+        let a=simulate_case(dgp.clone(),5,&[8]).unwrap();
+        let b=simulate_case(dgp,5,&[8]).unwrap();
         assert_eq!(a.aggregates[0][0].sequence_hits,b.aggregates[0][0].sequence_hits);
         assert_eq!(a.aggregates[1][0].sequence_hits,b.aggregates[1][0].sequence_hits);
         assert_eq!(a.aggregates[0][0].point_hits,b.aggregates[0][0].point_hits);
