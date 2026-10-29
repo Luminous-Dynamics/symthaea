@@ -749,6 +749,36 @@ mod tests {
     }
 
     #[test]
+    fn verified_digest_is_order_independent_and_binds_receipts() {
+        let (store, policy_key, ops_key, ingest_key) = store();
+        let signed_policy = SignedAuthorityPolicy::sign(
+            "policy-root", policy(1, "2026-01-01T00:00:00Z"), &policy_key,
+        ).unwrap();
+        let e1 = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:01Z", &ingest_key,
+        );
+        let e2 = sign_event(
+            "ops-key-1",
+            assertion("E2", "operations", "B", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:02Z", &ingest_key,
+        );
+        let left = store.verify_batch(&[signed_policy.clone()], &[e1.clone(), e2.clone()]).unwrap();
+        let right = store.verify_batch(&[signed_policy.clone()], &[e2.clone(), e1.clone()]).unwrap();
+        assert_eq!(left.event_chain_sha256(), right.event_chain_sha256());
+        assert_eq!(left.policy_chain_sha256(), right.policy_chain_sha256());
+
+        let changed_receipt = sign_event(
+            "ops-key-1",
+            assertion("E1", "operations", "A", "2026-01-02T00:00:00Z"),
+            &ops_key, "2026-01-02T00:00:03Z", &ingest_key,
+        );
+        let changed = store.verify_batch(&[signed_policy], &[changed_receipt, e2]).unwrap();
+        assert_ne!(left.event_chain_sha256(), changed.event_chain_sha256());
+    }
+
+    #[test]
     fn missing_ingestion_receipt_is_rejected() {
         let (store, _, ops_key, _) = store();
         let signed = SignedLedgerEvent::sign(
