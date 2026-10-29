@@ -31,8 +31,8 @@ This is not a causal graph and does not solve currentness. The stale-address adv
 - `fixtures/mutations/eligibility-ledger.jsonl` and `eligibility_filter.py`: digest-bound eligibility-first ablation with an annotated-intent upper-bound mode and a transparent keyword baseline; unknown source pointers fail closed.
 - `test_eligibility_filter.py`: tests for eligibility policy, the oracle/heuristic distinction, fixed-budget selection, abstention, fail-closed behavior, and receipt integrity.
 - `test_mutation_fixtures.py`: tests for pointer coverage, currentness negatives, provenance reversions, and the synthetic causal/temporal labels.
-- `fixtures/mutations/dependency_snapshots.jsonl` and `dependency_cascade.py`: four synthetic revisions of a dependency graph and a reference truth-maintenance evaluator that classifies historical, stale-dependent, unknown-dependent, and current claims.
-- `test_dependency_cascade.py`: tests direct and transitive invalidation, partial downstream refresh, stale-value absence, full-chain restoration, historical auditability, and fail-closed graph validation.
+- `fixtures/mutations/dependency_snapshots.jsonl` and `dependency_cascade.py`: seven synthetic snapshots of a dependency graph and a reference truth-maintenance evaluator that classifies historical, stale-dependent, unknown-dependent, and current claims.
+- `test_dependency_cascade.py`: 17 tests covering direct/transitive invalidation, partial downstream refresh, stale-value absence, A → B → A provenance, full-chain restoration, historical auditability, a 1,500-node dependency chain, order invariance, and fail-closed graph validation.
 - `test_score_probe.py`: offline unit tests for scoring and fail-closed dataset matching.
 
 The worker must be built from the exact Symthaea checkout under test. A probe run is not a substitute for the official LongMemEval-V2 harness.
@@ -97,7 +97,7 @@ A source-pointer hit demonstrates that a span was retrieved; it does **not** pro
 
 MEME: Multi-entity & Evolving Memory Evaluation isolates dependency cascade and absence—capabilities that static fact-recall metrics can miss. Its authors report very low default average accuracy on those tasks in their 100-episode study; the result is benchmark-specific, but it motivates our separate probe: https://arxiv.org/abs/2605.12477
 
-The new reference evaluator checks four snapshots: an initial current dependency chain, an upstream endpoint revision, a partial service-level refresh while the worker connection remains stale, and a complete downstream refresh. It computes a current view only from the latest revisions whose dependency references all point to latest/current dependencies. Stale values remain auditable and are excluded from the current view; missing dependencies become `unknown_dependency`; dependency cycles and duplicate revisions fail closed.
+The new reference evaluator checks seven snapshots: an initial current dependency chain; an upstream endpoint revision; partial service refresh; complete refresh; an A → B → A endpoint reversion; direct-dependent refresh while the worker remains stale; and final full-chain refresh. It computes a current view only from the latest revisions whose dependency references all point to latest/current dependencies. Stale values remain auditable and are excluded from the current view; missing dependencies become `unknown_dependency`; dependency cycles and duplicate revisions fail closed. The implementation uses iterative topological processing rather than recursion, and the report binds the input and evaluator-source SHA-256. A 1,500-node chain test guards against recursion-limit failures.
 
 ```sh
 python3 research/broca-causal-episode-probe-v1/dependency_cascade.py \
@@ -107,6 +107,17 @@ python3 research/broca-causal-episode-probe-v1/test_dependency_cascade.py
 ```
 
 This is a reference semantics and synthetic diagnostic, not a production worker integration or a benchmark score. Next, port the semantics into a Rust truth-maintenance implementation and test update transactions, rollback, persisted event replay, and index rebuilds against these expected transitions.
+
+## New benchmark lanes to plan for
+
+- **MEME Cascade / Absence / Deletion** is the immediate dependency-validity lane. The MEME authors evaluate six memory systems on 100 controlled episodes, using GPT-4.1-mini as the internal and answering model with approximately 32K filler tokens; they report 3% average Cascade accuracy and 1% Absence accuracy across tested defaults. This is a benchmark-specific result, not a universal field average. The tlc research page separately reports its own MEME results of 0.628 Cascade, 0.42 Absence and 0.574 overall; treat those as provider-reported and reproduce against the official harness before setting a definitive baseline.
+- **COLLABMEM (EMNLP 2026)** evaluates collaborative memory operations: which role gets information, provenance, access control, routing, conflict resolution and retention. Its released description includes 58 hand-authored scenarios / 1,118 core probes and a scaled split of 174 scenarios / 3,359 probes. This is a natural future lane for Mycelix-integrated, scope-aware Broca memory.
+- **MemoryArena (ICML 2026)** evaluates memory in interdependent multi-session agent-environment loops, connecting memory formation with later action.
+- **MemoryAgentBench (ICLR 2026)** covers accurate retrieval, test-time learning, long-range understanding and selective forgetting.
+- **Memory-R1 (ACL 2026)** is the comparator for learned ADD / UPDATE / DELETE / NOOP memory-management policies. Any learned writer must remain subordinate to provenance, scope, revocation and dependency invariants.
+- **Mem-Gallery** and **DMV-Bench (EMNLP 2026)** extend the research toward multimodal long-term memory and incidental visual cues. They belong after the existing worker's visual retrieval limitations are explicitly addressed.
+
+Do not blend scores from these benchmarks into one mean. Use their native evaluation protocols and fixed reader/settings.
 
 ## Eligibility-first currentness ablation
 
