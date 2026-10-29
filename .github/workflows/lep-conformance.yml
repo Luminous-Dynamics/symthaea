@@ -1,0 +1,66 @@
+name: LEP conformance
+
+on:
+  pull_request:
+    paths:
+      - "tools/lep-conformance/**"
+      - "docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json"
+      - "docs/research/fixtures/luminous-evidence-v0.1/**"
+      - ".github/workflows/lep-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lep-conformance-{{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: Schema, semantic, parser, and lint checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/lep-conformance/Cargo.toml -- --check
+
+      - name: Run locked unit tests
+        run: cargo test --locked --manifest-path tools/lep-conformance/Cargo.toml
+
+      - name: Run Clippy with warnings denied
+        run: cargo clippy --locked --manifest-path tools/lep-conformance/Cargo.toml --all-targets -- -D warnings
+
+      - name: Accept valid illustrative statement
+        run: cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json
+
+      - name: Reject invalid queued result
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(mktemp)"
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json >"$report"; then
+            echo "queued-but-passed fixture unexpectedly conformed" >&2
+            cat "$report" >&2
+            exit 1
+          fi
+          grep -q '"conforms": false' "$report"
+
+      - name: Reject duplicate-key JSON before schema validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(mktemp)"
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/invalid-duplicate-key.json >"$report"; then
+            echo "duplicate-key fixture unexpectedly conformed" >&2
+            cat "$report" >&2
+            exit 1
+          fi
+          grep -q '"DUPLICATE_JSON_KEY"' "$report"
