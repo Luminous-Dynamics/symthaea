@@ -797,15 +797,15 @@ mod tests {
     #[test]
     fn cluster_bootstrap_resamples_clusters_not_individual_rows() {
         let mut a = row("a", true, 0.9, 0.9, 1.0, 2.0, "fly:merge");
-        let mut b = row("b", true, 0.9, 0.9, 1.0, 2.0, "fly:merge");
-        let mut c = row("c", false, 0.1, 0.1, 1.0, 0.0, "fly:merge");
-        let mut d = row("d", false, 0.1, 0.1, 1.0, 0.0, "fly:merge");
-        a.cluster_id = "positive-cube".into();
-        b.cluster_id = "positive-cube".into();
-        c.cluster_id = "negative-cube".into();
-        d.cluster_id = "negative-cube".into();
+        let mut b = row("b", false, 0.1, 0.1, 1.0, 0.0, "fly:merge");
+        let mut c = row("c", true, 0.8, 0.8, 1.0, 2.0, "fly:merge");
+        let mut d = row("d", false, 0.2, 0.2, 1.0, 0.0, "fly:merge");
+        a.cluster_id = "cube-1".into();
+        b.cluster_id = "cube-1".into();
+        c.cluster_id = "cube-2".into();
+        d.cluster_id = "cube-2".into();
         let result = cluster_bootstrap(&[&a, &b, &c, &d], 100, "cluster-unit-test");
-        assert!(result.valid_replicates >= result.minimum_valid_replicates_for_interval);
+        assert_eq!(result.valid_replicates, 100);
         assert_eq!(result.balanced_accuracy_95, Some(Interval { lower: 1.0, upper: 1.0 }));
     }
 
