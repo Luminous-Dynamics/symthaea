@@ -35,7 +35,8 @@ Existing assets include:
 - `crates/bridges/symthaea-proof-audit/src/policy.rs`, which already audits a declared axiom base.
 - `crates/core/symthaea-evidence-plane`, which checks agreement between declared mechanisms and measured counters, and owns a deliberately non-cryptographic `config_hash`.
 - `crates/core/symthaea-communication/src/benchmark.rs`, which already defines benchmark manifests and dataset split-separation checks.
-- Multiple evidence-focused workflows and validation facilities.
+- Existing evidence-focused workflows and validation facilities.
+- Open follow-up work on predicate-scoped evidence identity (#6797) and non-scalar evidence resolution (#2617); LEP must interoperate with these rather than create a competing resolver.
 
 **Implication:** Do not create a second benchmark manifest or parallel schema framework. Inventory and harmonize existing formats first. A new experiment DSL should compose the evidence-plane integrity checks and benchmark records rather than replace them. Never promote `config_hash` to a cryptographic digest.
 
@@ -46,8 +47,9 @@ Existing assets include:
 - `crates/bridges/symtropy-mycelix-bridge/src/scenarios.rs`, with a typed `ScenarioConfig` and declarative scenario harness.
 - `crates/core/symtropy-physics/RESEARCH_VALIDATION.md`, which distinguishes local mathematical contracts, analytical references, and stronger validation tiers.
 - Deterministic replay, validation examples, and physics tests.
+- Existing open work already covers sealed scenario manifests and evidence identity (Symtropy #1202), plus a deterministic engineering scenario/replay substrate (Symtropy #1172).
 
-**Implication:** Promote the scenario configuration into a serializable, versioned manifest and add physical validation semantics. Do not replace the physics engine or invent a general equation language as part of this project.
+**Implication:** Do not create a competing scenario-identity project. Reconcile the DSL with #1202 and #1172, reusing sealed manifest/replay work and adding typed physical semantics where missing. Do not replace the physics engine or invent a general equation language.
 
 ### Mycelix
 
@@ -316,4 +318,8 @@ No state-of-the-art claim should be made until the baseline tools are run on pin
 - in-toto attestation framework: https://github.com/in-toto/attestation/blob/main/spec/README.md
 - SLSA Provenance v1: https://slsa.dev/spec/v1.0/provenance
 - FMI 3.0.2 specification: https://fmi-standard.org/docs/3.0.2/
+- Existing Symtropy sealed scenario manifest issue: https://github.com/Luminous-Dynamics/symtropy/issues/1202
+- Existing Symtropy engineering replay substrate issue: https://github.com/Luminous-Dynamics/symtropy/issues/1172
+- Existing Symthaea predicate-scoped evidence identity issue: https://github.com/Luminous-Dynamics/symthaea/issues/6797
+- Existing Symthaea evidence resolver issue: https://github.com/Luminous-Dynamics/symthaea/issues/2617
 - OPA/Rego policy language: https://www.openpolicyagent.org/docs/policy-language
