@@ -61,6 +61,7 @@ pub mod motif;
 pub mod motif_family;
 pub mod motif_foundry;
 pub mod motif_return;
+pub mod edit_contract_validation;
 pub mod edit_locality;
 pub mod edit_locality_attestation;
 pub mod obligation;
@@ -110,6 +111,14 @@ pub use melodic_contour_identity::{
 };
 pub use meter::{MeterError, TimeSignature};
 pub use motif::{Contour, Motif, MotifNote};
+pub use edit_contract_validation::{
+    AbstentionPolicy, ContractIssue, ContractStatus, ContractValidationReport, ContractValue,
+    EditContract, EditOperation as ContractEditOperation, EDIT_CONTRACT_SCHEMA_VERSION,
+    InvariantScope, Measurement as ContractMeasurement, PropertyAxis as ContractPropertyAxis,
+    ProtectedInvariant, RegionMask, RendererSpec, RequestedChange, RequiredEvidence, SourceAsset,
+    Tolerance as ContractTolerance, ToleranceMetric, VerifierSpec,
+    validate_edit_contract,
+};
 pub use edit_locality::{
     EDIT_LOCALITY_CONTRACT_VERSION, EditLocalityConfig, EditLocalityError, EditLocalityEvidence,
     EditOperation, EditRequest, LocalityEvent, PropertyCheck, MAX_EDIT_LOCALITY_EVENTS,

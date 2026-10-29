@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:mel-mr-eval-005:contract:0.1.0",
+  "title": "MEL-MR-EVAL-005 Rendered-Audio Preservation Contract",
+  "description": "Draft contract schema. Structural validation does not establish semantic consistency between requested changes, masks, tolerances, and protected invariants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "source",
+    "authorization_mask",
+    "requested_changes",
+    "protected_invariants",
+    "measurement",
+    "abstention_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "contract_id": {
+      "type": "string",
+      "pattern": "^MEL-MR-EVAL-005-[A-Z0-9-]+$",
+      "minLength": 20
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbolic_sha256",
+        "audio_sha256",
+        "audio_format",
+        "sample_rate_hz",
+        "channel_count",
+        "duration_frames",
+        "track_ids"
+      ],
+      "properties": {
+        "symbolic_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audio_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 768000
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "duration_frames": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "track_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "authorization_mask": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "region_id",
+          "start_us",
+          "end_us",
+          "track_ids"
+        ],
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start_us": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_us": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "track_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "requested_changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "protected_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "axis",
+          "scope",
+          "tolerance"
+        ],
+        "properties": {
+          "axis": {
+            "$ref": "#/$defs/axis"
+          },
+          "scope": {
+            "enum": [
+              "outside_mask",
+              "inside_mask",
+              "everywhere"
+            ]
+          },
+          "region_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "track_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "tolerance": {
+            "$ref": "#/$defs/tolerance"
+          },
+          "critical": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "renderer",
+        "verifier"
+      ],
+      "properties": {
+        "renderer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "renderer_id",
+            "renderer_version",
+            "sample_rate_hz",
+            "channel_count",
+            "deterministic"
+          ],
+          "properties": {
+            "renderer_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "renderer_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "instrument_bank_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "effect_chain_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "sample_rate_hz": {
+              "type": "integer",
+              "minimum": 8000,
+              "maximum": 768000
+            },
+            "channel_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "deterministic": {
+              "type": "boolean"
+            },
+            "latency_compensation_frames": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        },
+        "verifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "symbolic_verifier_version",
+            "acoustic_pipeline_version",
+            "config_sha256"
+          ],
+          "properties": {
+            "symbolic_verifier_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "acoustic_pipeline_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "abstention_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_evidence",
+        "on_detector_out_of_domain",
+        "on_measurement_uncertainty"
+      ],
+      "properties": {
+        "required_evidence": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "symbolic",
+              "acoustic",
+              "replay"
+            ]
+          }
+        },
+        "on_detector_out_of_domain": {
+          "const": "abstain"
+        },
+        "on_measurement_uncertainty": {
+          "const": "abstain"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "axis": {
+      "enum": [
+        "pitch",
+        "onset",
+        "duration",
+        "velocity",
+        "note_count",
+        "instrumentation",
+        "timbre",
+        "dynamics",
+        "stereo_image",
+        "accompaniment_density",
+        "harmony",
+        "rhythm",
+        "structure",
+        "transients",
+        "spectral_envelope",
+        "source_attribution",
+        "other"
+      ]
+    },
+    "tolerance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "max_deviation"
+      ],
+      "properties": {
+        "metric": {
+          "enum": [
+            "absolute",
+            "relative",
+            "log_ratio",
+            "feature_distance",
+            "categorical_exact",
+            "annotator_calibrated"
+          ]
+        },
+        "max_deviation": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "metric": {
+                "const": "annotator_calibrated"
+              }
+            },
+            "required": [
+              "metric"
+            ]
+          },
+          "then": {
+            "required": [
+              "calibration_id"
+            ]
+          }
+        }
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "axis",
+        "operation",
+        "region_ids",
+        "target",
+        "tolerance"
+      ],
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/axis"
+        },
+        "operation": {
+          "enum": [
+            "transpose_semitones",
+            "set_pitch",
+            "scale_duration",
+            "scale_onset",
+            "set_velocity",
+            "change_instrument",
+            "change_dynamics",
+            "change_stereo",
+            "change_density",
+            "change_harmony",
+            "change_rhythm",
+            "other"
+          ]
+        },
+        "region_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target": {
+          "oneOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "minProperties": 1
+            }
+          ]
+        },
+        "tolerance": {
+          "$ref": "#/$defs/tolerance"
+        }
+      }
+    }
+  }
+}
