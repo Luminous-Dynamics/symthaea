@@ -10,6 +10,7 @@
     "generation_id",
     "receipt_sha256",
     "receipt_commitment_sha256",
+    "protected_index_sha256",
     "matcher_revision_sha256",
     "decision_rules_sha256",
     "expected_event_count",
@@ -129,6 +130,11 @@
     "report_commitment_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "protected_index_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the exact protected artifact index bytes used to classify this report."
     }
   },
   "description": "Post-run evaluator-side classification of every event in a verified retrieval receipt. Never send this report to the evaluated policy during a scored run. The match report is tied to the exact receipt bytes, run commitment, matcher revision and decision-rule digest; its classifications still depend on independently reviewing/qualifying the matcher."
