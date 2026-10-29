@@ -590,6 +590,21 @@ mod tests {
         assert!(safe_relative_path("train/shard-000.parquet"));
     }
 
+    fn manifest_with_file_bytes(bytes: &[u8], suffix: &str) -> (PathBuf, Manifest) {
+        let root = std::env::temp_dir().join(format!(
+            "connectomics-intake-audit-{}-{suffix}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("train")).expect("create test root");
+        fs::write(root.join("train/shard-000.parquet"), bytes).expect("write test shard");
+
+        let mut manifest = base_manifest();
+        manifest.input_files[0].bytes = bytes.len() as u64;
+        manifest.input_files[0].sha256 = sha256_bytes(bytes);
+        (root, manifest)
+    }
+
     #[test]
     fn sha256_matches_known_digest() {
         assert_eq!(
@@ -597,4 +612,23 @@ mod tests {
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
     }
-}
+
+    #[test]
+    fn matching_local_file_bytes_produce_pass() {
+        let (root, manifest) = manifest_with_file_bytes(b"tiny parquet fixture", "valid");
+        let report = build_report(&manifest, br#"{"fixture":true}"#, &root);
+        assert_eq!(report.status, "PASS", "{:#?}", report.checks);
+        assert_eq!(report.files.len(), 1);
+        assert_eq!(report.files[0].status, "ok");
+        fs::remove_dir_all(root).expect("cleanup test root");
+    }
+
+    #[test]
+    fn changed_local_file_bytes_fail_closed() {
+        let (root, mut manifest) = manifest_with_file_bytes(b"actual bytes", "tampered");
+        manifest.input_files[0].sha256 = sha256_bytes(b"different bytes");
+        let report = build_report(&manifest, br#"{"fixture":true}"#, &root);
+        assert_eq!(report.status, "FAIL");
+        assert_eq!(report.files[0].status, "sha256_mismatch");
+        fs::remove_dir_all(root).expect("cleanup test root");
+    }
