@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 const UPSTREAM: &str = "1581d4cbdd69a0faf34b2089614fe2a814316a6a";
+const V0_PARTITION: &str = "e7ac417556cbd47cee1ddd51b98f9684fadfc8cd097587ae3beacc4dfb59f970";
 const CENSUS_SCHEMA: &str = "pitb.pre-split-target-eligibility-census.v0";
 const MIN_HELDOUT_COMPONENTS: usize = 20;
 const SPLITS: [&str; 3] = ["train", "validation", "test"];
@@ -116,6 +117,23 @@ fn partition_digest(assignments: &BTreeMap<String, String>) -> String {
     sha256(material.as_bytes())
 }
 
+fn component_quotas(component_count: usize) -> [usize; 3] {
+    let train_end = component_count * 70 / 100;
+    let validation_end = component_count * 85 / 100;
+    [
+        train_end,
+        validation_end - train_end,
+        component_count - validation_end,
+    ]
+}
+
+fn read_split_count(doc: &Value, field: &str, split: &str) -> Result<usize> {
+    doc[field][split]
+        .as_u64()
+        .map(|count| count as usize)
+        .with_context(|| format!("candidate {field}.{split} must be an integer"))
+}
+
 fn safe_repo_path(value: &str) -> bool {
     if value.trim().is_empty() {
         return false;
@@ -133,9 +151,20 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     if doc["schema_version"].as_str() != Some("pitb.component-first-split-candidate.v0")
         || doc["status"].as_str() != Some("candidate_only")
         || doc["upstream_commit"].as_str() != Some(UPSTREAM)
+        || doc["source_v0_partition_digest_sha256"].as_str() != Some(V0_PARTITION)
         || doc["qualified_for_confirmatory_use"].as_bool() != Some(false)
     {
         bail!("split input must be the pinned, explicitly unqualified component-first candidate format");
+    }
+    for field in [
+        "source_split_manifest_sha256",
+        "source_component_manifest_sha256",
+        "relationship_inventory_sha256",
+    ] {
+        let digest = doc[field]
+            .as_str()
+            .with_context(|| format!("candidate {field} is missing"))?;
+        validate_sha(digest, field)?;
     }
     let expected_family_count = doc["family_count"]
         .as_u64()
@@ -232,6 +261,42 @@ fn parse_candidate_split(bytes: &[u8]) -> Result<CandidateSplit> {
     }
     if partition_digest(&family_to_split) != expected_partition_digest {
         bail!("candidate partition digest does not match its family assignments");
+    }
+
+    let mut family_counts = [0usize; 3];
+    for split_name in family_to_split.values() {
+        let index = SPLITS
+            .iter()
+            .position(|candidate| candidate == split_name)
+            .context("candidate contains an unregistered split")?;
+        family_counts[index] += 1;
+    }
+    let mut component_counts = [0usize; 3];
+    for component in components.values() {
+        let index = SPLITS
+            .iter()
+            .position(|candidate| *candidate == component.split)
+            .context("candidate component contains an unregistered split")?;
+        component_counts[index] += 1;
+    }
+    let expected_component_counts = component_quotas(expected_component_count);
+    for (index, split_name) in SPLITS.iter().enumerate() {
+        if read_split_count(&doc, "family_count_by_split", split_name)? != family_counts[index] {
+            bail!("candidate family_count_by_split does not reconcile");
+        }
+        if read_split_count(&doc, "component_count_by_split", split_name)?
+            != component_counts[index]
+        {
+            bail!("candidate component_count_by_split does not reconcile");
+        }
+        if read_split_count(&doc, "target_component_count_by_split", split_name)?
+            != expected_component_counts[index]
+        {
+            bail!("candidate target component quotas do not match the frozen floor-based policy");
+        }
+        if component_counts[index] != expected_component_counts[index] {
+            bail!("candidate actual component counts violate the frozen component quotas");
+        }
     }
 
     Ok(CandidateSplit {
