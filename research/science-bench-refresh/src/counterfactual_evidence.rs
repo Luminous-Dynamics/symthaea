@@ -279,8 +279,7 @@ fn validate_fields(fields: &EvidenceInterventionPlanFieldsV1) -> Vec<String> {
                 ));
             } else if !evidence_manifest_digests.insert(trial.evidence_manifest_sha256.as_str()) {
                 issues.push(format!(
-                    "{pair_prefix} reuses evidence_manifest_sha256 across conditions; condition-specific \
-                     evidence/provenance manifests must have distinct commitments"
+                    "{pair_prefix} reuses evidence_manifest_sha256 across conditions"
                 ));
             }
             if !valid_digest(&trial.seed_commitment_sha256) {
