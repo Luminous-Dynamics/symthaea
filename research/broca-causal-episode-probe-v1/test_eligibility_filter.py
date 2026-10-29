@@ -9,6 +9,7 @@ from pathlib import Path
 
 from eligibility_filter import (
     FILTER_SCHEMA,
+    LEDGER_SCHEMA,
     RUNNER_SCHEMA,
     filter_dataset,
     sha256_bytes,
@@ -36,6 +37,7 @@ def candidate(pointer: str, trajectory_id: str = "t1", rank: int | None = None) 
 
 def ledger(pointer: str, status: str, trajectory_id: str = "t1") -> dict:
     return {
+        "schema": LEDGER_SCHEMA,
         "trajectory_id": trajectory_id,
         "source_pointer": pointer,
         "status": status,
@@ -158,6 +160,17 @@ class EligibilityFilterTests(unittest.TestCase):
                 [question()],
                 [{"question_id": "Q1", "audit": [candidate("/x")]}],
                 [repeated, repeated],
+                1,
+            )
+
+    def test_unversioned_ledger_fails_closed(self) -> None:
+        bad = ledger("/x", "current")
+        bad.pop("schema")
+        with self.assertRaisesRegex(ValueError, "wrong or missing schema"):
+            filter_dataset(
+                [question()],
+                [{"question_id": "Q1", "audit": [candidate("/x")]}],
+                [bad],
                 1,
             )
 
