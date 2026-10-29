@@ -1820,6 +1820,63 @@ mod tests {
     }
 
     #[test]
+    fn primary_performance_voices_retain_global_score_event_lineage() {
+        let score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let ordered_events = score.events();
+        let state = MusicalState::default();
+        let ensemble = (
+            Instrument::Violin,
+            Instrument::Piano,
+            Instrument::Cello,
+            Instrument::Clarinet,
+        );
+        let voices = performance_voices_with_dialect(
+            &score,
+            ensemble,
+            0.5,
+            &state,
+            true,
+            PerformanceDialect::ProcessExact,
+        );
+        for voice in &voices {
+            assert_eq!(
+                voice.notes.len(),
+                voice.source_event_indices.len(),
+                "notes and lineage must remain positionally aligned for {}",
+                voice.name
+            );
+            let expected_role = match voice.name {
+                "Bass" => Some(TheoryRole::Bass),
+                "Harmony" => Some(TheoryRole::Harmony),
+                "Counter" => Some(TheoryRole::CounterMelody),
+                "Melody" => Some(TheoryRole::Melody),
+                _ => None,
+            };
+            if let Some(expected_role) = expected_role {
+                let mut seen = Vec::new();
+                for source_index in voice.source_event_indices.iter().flatten() {
+                    assert!(
+                        *source_index < ordered_events.len(),
+                        "source event index must be within Score::events()"
+                    );
+                    assert_eq!(ordered_events[*source_index].role, expected_role);
+                    assert!(
+                        !seen.contains(source_index),
+                        "one source event must not identify two primary notes in {}",
+                        voice.name
+                    );
+                    seen.push(*source_index);
+                }
+            } else {
+                assert!(
+                    voice.source_event_indices.iter().all(Option::is_none),
+                    "generated voices must remain explicitly unmapped until ancestry is defined"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn dialect_derivation_maps_every_style_preset() {
         use PerformanceDialect as D;
         // The complete v1 derivation table over all 29 style presets —
