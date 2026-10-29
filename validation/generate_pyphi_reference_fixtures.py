@@ -70,6 +70,17 @@ def _model_digest(
         list(map(int, row if isinstance(row, tuple) else (row,)))
         for row in tpm_frame.index.tolist()
     ]
+    n_units = len(tpm[0]) if tpm else 0
+    expected_row_states = [
+        [(state_index >> unit) & 1 for unit in range(n_units)]
+        for state_index in range(1 << n_units)
+    ]
+    if len(state) != n_units or any(bit not in (0, 1) for bit in state):
+        raise RuntimeError("evaluation state does not match the binary TPM unit count")
+    if row_states != expected_row_states:
+        raise RuntimeError(
+            "PyPhi TPM row order does not match symthaea-iit's declared little-endian state order"
+        )
     model = {
         "formalism": formalism,
         "node_labels": [str(label) for label in substrate.node_labels],
