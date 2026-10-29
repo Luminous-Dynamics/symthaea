@@ -420,6 +420,12 @@ fn validate_scenario(
         if !offer.upstream_co2e_kg_per_quantum.is_finite() {
             return Err(EnergyDispatchError::InvalidNumericValue("upstream CO2e factor"));
         }
+        // Negative lifecycle factors can encode removal/credit accounting, which
+        // must not become a free optimization shortcut without a separately typed
+        // and independently qualified removal contract.
+        if offer.upstream_co2e_kg_per_quantum < 0.0 {
+            return Err(EnergyDispatchError::NegativeValue("upstream CO2e factor"));
+        }
         if !offer.direct_operational_co2e_kg_per_quantum.is_finite() {
             return Err(EnergyDispatchError::InvalidNumericValue("direct CO2e factor"));
         }
