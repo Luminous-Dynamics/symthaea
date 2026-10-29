@@ -408,7 +408,7 @@ mod tests {
         let pairs = validate_counterfactual_fixture_jsonl(FIXTURES).expect("fixtures must validate");
         assert!(pairs.len() >= 8, "retain a nontrivial adversarial fixture suite");
         let families: BTreeSet<_> = pairs.iter().map(|pair| pair.family.as_str()).collect();
-        assert!(families.len() >= 8, "cover distinct counterfactual failure families");
+        assert_eq!(families.len(), 10, "cover every pinned counterfactual failure family");
     }
 
     #[test]
@@ -496,6 +496,51 @@ mod tests {
         }
         assert_eq!(seen_ids.len(), expected_ids.len(), "every case must have exactly one gold label");
         assert_eq!(label_pair_ids.len(), pairs.len(), "every input pair must have a gold label pair");
+    }
+
+    #[test]
+    fn memory_influence_labels_mark_decisive_and_irrelevant_atoms_differently() {
+        let pairs = validate_counterfactual_fixture_jsonl(FIXTURES).expect("fixtures must validate");
+        let pair = pairs
+            .iter()
+            .find(|pair| pair.family == "memory_influence")
+            .expect("memory influence pair exists");
+        let labels: Vec<GoldLabels> = LABELS
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("gold labels are valid"))
+            .collect();
+        let label_pair = labels
+            .iter()
+            .find(|labels| labels.pair_id == pair.pair_id)
+            .expect("matching influence labels exist");
+        assert_eq!(
+            label_pair.cases[0].expected_claim,
+            label_pair.cases[1].expected_claim,
+            "adding an irrelevant atom must not change the expected material claim"
+        );
+        assert_eq!(
+            label_pair.cases[0].expected_decision,
+            label_pair.cases[1].expected_decision,
+            "adding an irrelevant atom must not change answer/abstain disposition"
+        );
+        let left_control = label_pair.cases[0]
+            .atom_use_targets
+            .iter()
+            .find(|target| target.evidence_id == "retry-config-1")
+            .expect("decisive atom has a target");
+        assert_eq!(left_control.target_level, "control");
+        let right_control = label_pair.cases[1]
+            .atom_use_targets
+            .iter()
+            .find(|target| target.evidence_id == "retry-config-1")
+            .expect("decisive atom retains its target");
+        assert_eq!(right_control.target_level, "control");
+        let distractor = label_pair.cases[1]
+            .atom_use_targets
+            .iter()
+            .find(|target| target.evidence_id == "notification-note-2")
+            .expect("added memory atom has a target");
+        assert_eq!(distractor.target_level, "ignore");
     }
 
     #[test]
