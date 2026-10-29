@@ -1,8 +1,8 @@
 # CMAQ-004: World-Model Value-Add Under Matched Budgets
 
-**Status:** executable synthetic smoke harness, v0.3 with cost frontier and paired uncertainty intervals  
+**Status:** executable synthetic smoke harness, v0.4 companion adds family-level held-out transfer and lower-tail risk  
 **Tracking issue:** [#9010](https://github.com/Luminous-Dynamics/symthaea/issues/9010)  
-**Evidence status:** exact-head Rust focused workflow passed at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324); 7 Rust tests and the cost-frontier/report checks passed. The panel remains synthetic smoke evidence, not blind qualification.  
+**Evidence status:** original value-add binary passed exact-head Rust workflow at [`9eddcf5`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/40950457324). The new family-transfer companion and integrated workflow have been committed but await exact-head CI. Both panels are synthetic smoke evidence, not blind qualification.  
 **Claim ceiling:** tiny finite held-out-composition harness only; no industry/SOTA, broad causal reasoning, or production Symthaea claim
 
 ## Research question
@@ -19,7 +19,7 @@ The dependency-free Rust CLI is pinned to Rust 1.96.0:
 
 ```sh
 cargo test --locked
-cargo run --quiet --locked
+cargo run --quiet --locked --bin cmaq-004-world-model-value-add
 ```
 
 It observes support contexts `00`, `01`, and `10`, then evaluates decisions in the held-out combination `11`. Each support context/action cell has 1,024 deterministic Bernoulli samples. The final policy is evaluated on 4,096 paired seeded reward draws.
@@ -82,6 +82,31 @@ The code emits all six cost levels, standard errors, and paired 95% intervals. T
 4. **Prediction MAE is diagnostic, not the primary outcome.** Closed-loop reward and net utility are the headline measures; a model that is wrong on a high-value action can be harmful even if average prediction error looks moderate.
 
 The first smoke test therefore suggests a design principle worth testing in Symthaea: **gate planning/model use on calibrated expected decision lift and explicit model freshness**, and fall back to direct policy when the estimated benefit does not repay model cost or when a mismatch/stale-model signal is present.
+
+## Family-level transfer companion (v0.1)
+
+The new `family_transfer` Rust binary widens the unit of analysis from repeated reward draws on one fixed law to **256 generated mechanism families**. For each family, the candidate receives support-outcome means for contexts `00`, `01`, and `10`; context `11` remains evaluator-only. The direct nearest-context policy and additive extrapolator use the same support outcomes. The generator balances three lanes: near-additive laws, strong held-out interaction laws, and a held-out sign-shift stress lane.
+
+Run it explicitly (the crate now has two binaries):
+
+```sh
+cargo test --locked
+cargo run --quiet --locked --bin cmaq-004-world-model-value-add
+cargo run --quiet --locked --bin family_transfer
+```
+
+The companion crosses five strategies—direct nearest-context, additive model, shuffled-model control, stale-model control and evaluator-only oracle—with four query-cost levels and four reporting groups (all families plus each mechanism lane). Its 80 JSON rows report:
+
+- mean net-utility lift vs direct, with an approximate 95% interval whose unit is the **generated mechanism family**;
+- fraction of families where the strategy is worse than the direct comparator;
+- lower-tail CVaR05 of family-level lift and the single worst family;
+- action-one rate, query cost and (for additive/shuffled policies) held-out prediction MAE.
+
+The most important new question is not just whether the *average* family benefits, but whether the model's average advantage masks a bad tail or fails under interaction/held-out-shift lanes. The cost sweep charges two model queries per decision; this is declared synthetic utility accounting, **not** measured wall-clock latency, energy, or hardware cost.
+
+The support-sample RNG is keyed by the family slot and observed context/action cell, not by hidden interaction or held-out-shift parameters. A regression test ensures that mechanisms with identical support laws produce identical support tapes under the same sample seed, even when their held-out laws differ. This prevents a subtle side-channel where held-out parameters could change observed sampling noise.
+
+**Evidence boundary:** candidate and evaluator are still in one synthetic process; the generator and its public specification are visible. The report is a development/smoke study, not sealed qualification. The normal intervals are approximate over this finite generated family sample and do not establish population-wide transfer. The next gate is separate candidate/evaluator execution with frozen candidate artifacts, blinded mechanism keys, and an independently maintained environment.
 
 ## Qualification gates before external claims
 
