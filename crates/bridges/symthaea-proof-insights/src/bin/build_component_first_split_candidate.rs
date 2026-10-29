@@ -245,7 +245,7 @@ fn family_balance_loss(family_counts: &[usize; 3], total_families: usize) -> f64
         .iter()
         .enumerate()
         .map(|(index, share)| {
-            let target = share * total;
+            let target = *share * total;
             let relative_error = (family_counts[index] as f64 - target) / target.max(1.0);
             relative_error * relative_error
         })
