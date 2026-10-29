@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json",
+  "title": "ConnectomeBench2 V2 intake manifest",
+  "description": "Machine-readable contract for a leakage-aware ConnectomeBench2 intake run. This schema validates declared intent; it does not independently prove that an upstream mapping reference is correct.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_revision_commit_sha",
+    "upstream_repo",
+    "upstream_commit",
+    "task",
+    "task_route_value",
+    "label_column",
+    "label_true_semantics",
+    "label_mapping_reference",
+    "split",
+    "input_mode",
+    "model_input_columns",
+    "input_files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "dataset_id": {
+      "const": "jeffbbrown2/ConnectomeBench2"
+    },
+    "dataset_revision": {
+      "const": "v2"
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "upstream_repo": {
+      "const": "https://github.com/timfarkas/ConnectomeBench2"
+    },
+    "upstream_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "task": {
+      "enum": [
+        "merge_correction_false_split",
+        "split_correction_false_merge"
+      ]
+    },
+    "task_route_value": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact route token verified against the pinned upstream training/evaluation code; do not guess from filenames."
+    },
+    "label_column": {
+      "enum": [
+        "false_split_correction_label",
+        "false_merge_identification_label"
+      ]
+    },
+    "label_true_semantics": {
+      "enum": [
+        "same_neuron",
+        "different_neuron"
+      ]
+    },
+    "label_mapping_reference": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path or URL to the exact upstream code/line or annotation specification that was reviewed."
+    },
+    "split": {
+      "enum": [
+        "train",
+        "validation",
+        "test",
+        "all"
+      ]
+    },
+    "input_mode": {
+      "enum": [
+        "single_segment",
+        "dual_segment"
+      ]
+    },
+    "model_input_columns": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "geometry",
+          "geometry_single",
+          "em_xy",
+          "em_xz",
+          "em_yz"
+        ]
+      },
+      "description": "Allowlist by construction: labels, task routing, metadata, identifiers, and em_best cannot be model inputs."
+    },
+    "input_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "split"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "split": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          }
+        }
+      }
+    },
+    "reviewed_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human responsible for reviewing the task/label mapping and upstream licensing."
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "merge_correction_false_split"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "label_column": {
+            "const": "false_split_correction_label"
+          },
+          "label_true_semantics": {
+            "const": "same_neuron"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "split_correction_false_merge"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "label_column": {
+            "const": "false_merge_identification_label"
+          },
+          "label_true_semantics": {
+            "const": "different_neuron"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "single_segment"
+          }
+        },
+        "required": [
+          "input_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model_input_columns": {
+            "not": {
+              "contains": {
+                "const": "geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "dual_segment"
+          }
+        },
+        "required": [
+          "input_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model_input_columns": {
+            "not": {
+              "contains": {
+                "const": "geometry_single"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
