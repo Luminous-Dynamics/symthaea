@@ -15,7 +15,7 @@ The theory-feature-gated module `symthaea_muse::symbolic_audio_binding` provides
 - `RendererManifest`: renderer ID/version, render-config digest, optional instrument-bank and effects-config digests, sample rate, channel count, and latency policy.
 - `renderer_manifest_sha256`: versioned, domain-separated manifest digest.
 - `create_symbolic_audio_render_binding`: consumes source/target event sequences, symbolic evidence, source/target audio views, acoustic and onset reports, and renderer metadata.
-- `verify_symbolic_audio_render_binding`: recomputes both evidence channels and the binding, then requires exact receipt equality.
+- `verify_symbolic_audio_render_binding`: replays symbolic verification, recomposes the audio result from the two child reports, recomputes buffer and manifest digests, then requires exact receipt equality.
 
 The binder does not accept a standalone composite audio report as authoritative. It recomposes the audio-only result from the two child reports so both child receipt digests are checked before a cross-modal envelope is created.
 
@@ -38,7 +38,7 @@ Six Rust unit tests cover:
 5. changing the manifest audio format is rejected;
 6. tampering with an audio child receipt is rejected, and a failed symbolic result dominates passing audio evidence.
 
-These tests are committed but not executed here. Rust compilation, rustfmt, clippy, and actual rendering validation remain pending.
+The render-binding module has six Rust test functions covering the seven checks listed above (the changed-score and tampered-binding checks share one test). These tests are committed but not executed here. Rust compilation, rustfmt, clippy, and actual rendering validation remain pending.
 
 ## Next evidence gates
 
