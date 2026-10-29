@@ -806,7 +806,7 @@ jobs:
             set +e
             cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
               verify-evidence-outcomes /tmp/sbr-counterfactual-evidence/valid-plan.json \
-              "/tmp/sbr-evidence-outcomes/$case-report.json" > "/tmp/sbr-evidence-outcomes/$case-verified.json"
+              "/tmp/sbr-evidence-outcomes/${case}-report.json" > "/tmp/sbr-evidence-outcomes/$case-verified.json"
             invalid_exit=$?
             set -e
             test "$invalid_exit" -eq 11
