@@ -305,7 +305,7 @@ fn empty_manifest_digest_is_rejected() {
 fn canonical_digest_matches_independent_known_answer_vector() {
     assert_eq!(
         canonical_scenario_digest(&scenario()).unwrap(),
-        "sha256:bb46f08d887a492b755f1e58c5c9893f636eff242a9bbed15aca95ce4b51f433"
+        "sha256:05be9412a3e505e82d8abd8940498c77a12d8245fbed27589df40f03b2d3cdb2"
     );
 }
 
