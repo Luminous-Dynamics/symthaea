@@ -18,6 +18,10 @@ exclude = [
     # Legacy example-only subtree (no Cargo.toml); the crates/core/* workspace glob
     # would otherwise treat it as a member and make cargo metadata fail.
     "crates/core/symthaea",
+    # Source-only research subtree without a Cargo.toml; exclude until it becomes a crate.
+    "crates/core/symthaea-observation-attestation",
+    # Documentation-only domain placeholder; exclude until a Cargo.toml is added.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
