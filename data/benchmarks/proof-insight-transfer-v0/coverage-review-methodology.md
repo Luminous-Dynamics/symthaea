@@ -47,7 +47,7 @@ Each reviewer signs the following exact UTF-8 message, with a newline after ever
 `{trust_store_sha256}`
 `complete_relationship_inventory`
 
-The trust-store digest is the SHA-256 of its exact raw bytes. The review-methodology digest is the SHA-256 of this exact file's raw bytes. The receipt's own SHA-256 is stored in the inventory; the signed message does **not** include the receipt's own digest, avoiding a self-referential hash cycle.
+The trust-store digest is the SHA-256 of its exact raw bytes. The review-methodology digest is the SHA-256 of this exact file's raw bytes. Both expected digests must also be supplied independently from the frozen run configuration; merely copying a digest from the receipt is not an independent pin. The receipt's own SHA-256 is stored in the inventory; the signed message does **not** include the receipt's own digest, avoiding a self-referential hash cycle.
 
 ## Fail-closed conditions
 
