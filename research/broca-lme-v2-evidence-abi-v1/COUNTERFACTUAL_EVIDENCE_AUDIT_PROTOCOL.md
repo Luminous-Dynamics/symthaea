@@ -122,6 +122,8 @@ This extension is motivated by [MemCalib](https://arxiv.org/abs/2609.24259), whi
 
 Report over-use and under-use separately. Do not combine them into a single accuracy number before showing both components, and never tune a response policy solely to reduce over-use if that causes the system to ignore required evidence. This complements QEMem's evidence-set sufficiency question with a separate question: once evidence reaches the reader, is each proposition given the appropriate influence?
 
+When a compatible MemCalib reader/judge protocol is used, report the paper's six metrics using its exact definitions: SCS and Exact (higher is better), plus sMOS, sMUS, AOR, and AUR (lower is better). Record the judge/model version and report results over three or more independent seeds, as the reference paper does. Do not reuse these metric names for ad hoc calculations. On this 10-pair synthetic smoke corpus, report fixture correctness and individual pair outcomes only; the sample is far too small to claim benchmark-level memory-use performance. A scaled held-out evaluation should aim for at least 100 reviewed pairs per mutation family, with source-family-disjoint development/test partitions and adjudicated target-use labels. This is a proposed Symthaea qualification target, not an established industry standard.
+
 ## 5. Test levels
 
 ### Level A — deterministic structural invariants
