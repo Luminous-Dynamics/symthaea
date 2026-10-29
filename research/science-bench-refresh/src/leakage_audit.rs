@@ -55,7 +55,10 @@ fn validate_split_label(label: &str) -> Result<(), String> {
         || label.len() > 128
         || !label.is_ascii()
         || !label.chars().all(|character| {
-            character.is_ascii_alphanumeric() || character == '_' || character == '-' || character == ':'
+            character.is_ascii_alphanumeric()
+                || character == '_'
+                || character == '-'
+                || character == ':'
         })
     {
         return Err(format!("invalid split label: {label}"));
@@ -81,7 +84,9 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
         Value::Null => Ok(Value::Null),
         Value::Bool(value) => Ok(Value::Bool(*value)),
         Value::String(value) => Ok(Value::String(value.clone())),
-        Value::Number(number) if !numeric_tolerant => Ok(Value::Number(canonical_exact_number(number)?)),
+        Value::Number(number) if !numeric_tolerant => {
+            Ok(Value::Number(canonical_exact_number(number)?))
+        }
         Value::Number(number) => {
             let value = number.as_f64().ok_or_else(|| {
                 "numeric fingerprint cannot represent a JSON number as f64".to_owned()
@@ -103,7 +108,10 @@ fn canonicalize(value: &Value, numeric_tolerant: bool) -> Result<Value, String> 
             keys.sort();
             let mut canonical = Map::new();
             for key in keys {
-                canonical.insert(key.clone(), canonicalize(&fields[key], numeric_tolerant)?);
+                canonical.insert(
+                key.clone(),
+                canonicalize(&fields[key], numeric_tolerant)?,
+            );
             }
             Ok(Value::Object(canonical))
         }
@@ -179,10 +187,16 @@ fn load_task_set(bytes: &[u8], label: &str) -> Result<TaskSetArtifactV1, String>
             return Err(format!("{label} contains an empty family_id"));
         }
         if !task.policy_input.is_object() {
-            return Err(format!("{label} task {} policy_input must be an object", task.task_id));
+            return Err(format!(
+                "{label} task {} policy_input must be an object",
+                task.task_id
+            ));
         }
         if !task.evaluator_only.is_object() {
-            return Err(format!("{label} task {} evaluator_only must be an object", task.task_id));
+            return Err(format!(
+                "{label} task {} evaluator_only must be an object",
+                task.task_id
+            ));
         }
     }
     Ok(task_set)
@@ -415,7 +429,8 @@ mod tests {
     fn exact_duplicate_is_detected_even_when_task_ids_and_generation_change() {
         let left = task_set("development-1", json!([task("dev-1", input(1.0, 2.0))]));
         let right = task_set("refresh-2", json!([task("new-id", input(1.0, 2.0))]));
-        let report = audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
+        let report =
+            audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 1);
         assert_eq!(report.near_duplicate_candidate_pair_count, 0);
         assert_eq!(report.admission, "blocked_exact_policy_input_overlap");
@@ -442,7 +457,8 @@ mod tests {
     fn close_numeric_inputs_are_review_candidates_not_confirmed_leaks() {
         let left = task_set("d", json!([task("a", input(1.23451, 2.34561))]));
         let right = task_set("r", json!([task("b", input(1.23452, 2.34562))]));
-        let report = audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
+        let report =
+            audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 0);
         assert_eq!(report.near_duplicate_candidate_pair_count, 1);
         assert_eq!(report.admission, "manual_review_required_for_numeric_near_duplicates");
@@ -452,7 +468,8 @@ mod tests {
     fn distant_numeric_worlds_with_same_schema_are_not_flagged() {
         let left = task_set("d", json!([task("a", input(1.0, 2.0))]));
         let right = task_set("r", json!([task("b", input(100.0, 200.0))]));
-        let report = audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
+        let report =
+            audit_policy_input_overlap("development", &left, "refresh:g2", &right).unwrap();
         assert_eq!(report.exact_overlap_pair_count, 0);
         assert_eq!(report.near_duplicate_candidate_pair_count, 0);
         assert_eq!(report.admission, "no_detected_exact_or_numeric_tolerant_overlap");
@@ -476,7 +493,19 @@ mod tests {
             task("same", input(1.0, 2.0)),
             task("same", input(3.0, 4.0))
         ]));
-        assert!(audit_policy_input_overlap("development", &duplicate_ids, "refresh:g2", &task_set("r", json!([task("x", input(9.0, 10.0))]))).is_err());
-        assert!(audit_policy_input_overlap("dev", &task_set("d", json!([task("a", input(1.0, 2.0))])), "refresh:g2", &task_set("r", json!([task("b", input(9.0, 10.0))]))).is_err());
+        assert!(audit_policy_input_overlap(
+            "development",
+            &duplicate_ids,
+            "refresh:g2",
+            &task_set("r", json!([task("x", input(9.0, 10.0))])),
+        )
+        .is_err());
+        assert!(audit_policy_input_overlap(
+            "dev",
+            &task_set("d", json!([task("a", input(1.0, 2.0))])),
+            "refresh:g2",
+            &task_set("r", json!([task("b", input(9.0, 10.0))])),
+        )
+        .is_err());
     }
 }
