@@ -576,6 +576,33 @@ mod tests {
         target
     }
 
+    fn full_score_source() -> Score {
+        let mut score = Score::new(
+            symthaea_music_theory::Key::major(symthaea_music_theory::PitchClass::C),
+            120.0,
+            4,
+        );
+        for (index, midi) in [60u8, 62, 64].into_iter().enumerate() {
+            score.push(symthaea_music_theory::ScoreNote {
+                part: symthaea_music_theory::PartId(0),
+                pitch: symthaea_music_theory::Pitch::from_midi(midi),
+                onset: symthaea_music_theory::Duration::new(index as i64, 1),
+                duration: symthaea_music_theory::Duration::new(1, 2),
+                velocity: 0.7,
+                role: symthaea_music_theory::VoiceRole::Melody,
+                emphasis: symthaea_music_theory::Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        score
+    }
+
+    fn full_score_target() -> Score {
+        let mut target = full_score_source();
+        target.notes[1].pitch = symthaea_music_theory::Pitch::from_midi(67);
+        target
+    }
+
     fn audio_pair() -> (Vec<f32>, Vec<f32>) {
         let total = 8_192usize;
         let sample_rate = 16_000.0f32;
@@ -765,6 +792,78 @@ mod tests {
             audio_view(&source_audio), audio_view(&target_audio), &acoustic, &onset, &manifest
         ).expect("a valid failed result should still be reportable");
         assert_eq!(binding.overall_verdict, PreservationVerdict::Fail);
+    }
+
+    #[test]
+    fn full_score_binding_verifies_full_serialized_scores() {
+        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+            build_fixture();
+        let source_score = full_score_source();
+        let target_score = full_score_target();
+        let binding = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        ).expect("supported full-score edit should bind");
+        assert_eq!(binding.projected_binding.overall_verdict, PreservationVerdict::Pass);
+        assert_ne!(
+            binding.source_score_content_sha256,
+            binding.target_score_content_sha256
+        );
+        assert!(verify_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest, &binding,
+        ).expect("full score binding should replay"));
+
+        let mut tampered = binding.clone();
+        tampered.target_score_content_sha256 = tampered.source_score_content_sha256.clone();
+        assert!(!verify_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest, &tampered,
+        ).expect("modified full-score digest should be rejected as a verdict"));
+    }
+
+    #[test]
+    fn full_score_adapter_rejects_unverified_note_metadata_changes() {
+        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+            build_fixture();
+        let source_score = full_score_source();
+        let mut target_score = full_score_target();
+        target_score.notes[0].velocity = 0.9;
+        let result = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        );
+        assert!(matches!(
+            result,
+            Err(SymbolicAudioBindingError::UnsupportedScore(_))
+        ));
+    }
+
+    #[test]
+    fn full_score_adapter_rejects_simultaneous_polyphonic_events() {
+        let (_source_events, _target_events, symbolic, source_audio, target_audio, acoustic, onset, manifest) =
+            build_fixture();
+        let mut source_score = full_score_source();
+        let mut extra_note = source_score.notes[0];
+        extra_note.pitch = symthaea_music_theory::Pitch::from_midi(67);
+        source_score.push(extra_note);
+        let mut target_score = full_score_target();
+        let mut target_extra = target_score.notes[0];
+        target_extra.pitch = symthaea_music_theory::Pitch::from_midi(67);
+        target_score.push(target_extra);
+        let result = create_full_score_render_binding(
+            &source_score, &target_score, &symbolic,
+            audio_view(&source_audio), audio_view(&target_audio),
+            &acoustic, &onset, &manifest,
+        );
+        assert!(matches!(
+            result,
+            Err(SymbolicAudioBindingError::UnsupportedScore(_))
+        ));
     }
 
     #[test]
