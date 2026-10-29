@@ -662,7 +662,7 @@ mod tests {
         let changed_tpm = BinaryCausalModel::new(
             2,
             vec![0.11, 0.2, 0.9, 0.2, 0.1, 0.8, 0.9, 0.8],
-            vec![false, true, true, false],
+            vec![true, true, false, true],
         ).unwrap();
         assert_ne!(model.model_sha256(), changed_tpm.model_sha256());
 
@@ -676,8 +676,8 @@ mod tests {
 
     #[test]
     fn negative_zero_is_canonicalized_for_model_identity() {
-        let positive_zero = BinaryCausalModel::new(1, vec![0.0, 1.0], vec![false]).unwrap();
-        let negative_zero = BinaryCausalModel::new(1, vec![-0.0, 1.0], vec![false]).unwrap();
+        let positive_zero = BinaryCausalModel::new(1, vec![0.0, 1.0], vec![true]).unwrap();
+        let negative_zero = BinaryCausalModel::new(1, vec![-0.0, 1.0], vec![true]).unwrap();
         assert_eq!(positive_zero.model_sha256(), negative_zero.model_sha256());
     }
 
@@ -840,7 +840,7 @@ mod tests {
             BinaryCausalModel::new(
                 2,
                 vec![0.1, 0.2, 0.9, 0.2, 0.1, 0.8, 0.9, 0.8],
-                vec![true, false, false, true]
+                vec![true, false, true, false]
             ),
             Err(ModelError::MissingCausalEdge {
                 source_unit: 1,
