@@ -216,7 +216,7 @@ fn resolve_new_output_path(root: &Path, requested: &Path) -> Result<PathBuf, Str
     let file_name = requested
         .file_name()
         .ok_or("output must name a file, not only a directory")?;
-    if !matches!(file_name, name if !name.is_empty()) {
+    if file_name.is_empty() {
         return Err("output filename must not be empty".into());
     }
 
