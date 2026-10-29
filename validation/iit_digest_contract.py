@@ -44,10 +44,9 @@ def canonical_model_bytes(
 
     for row in connectivity:
         for edge in row:
-            bit = int(edge)
-            if bit not in (0, 1):
+            if edge not in (0, 1, False, True):
                 raise ValueError("connectivity matrix must contain only binary entries")
-            encoded.append(bit)
+            encoded.append(int(edge))
 
     # Match Rust's fail-closed consistency rule: extra declared edges are allowed,
     # but an edge implied by a changed TPM conditional must be explicitly declared.
@@ -87,7 +86,7 @@ def model_digest(model_bytes: bytes) -> str:
 
 def evaluation_digest(model_bytes: bytes, state: Sequence[int | bool]) -> str:
     n_units = _model_unit_count(model_bytes)
-    if len(state) != n_units or any(int(bit) not in (0, 1) for bit in state):
+    if len(state) != n_units or any(bit not in (0, 1, False, True) for bit in state):
         raise ValueError("evaluation state must be n_units binary bits")
     return hashlib.sha256(EVALUATION_MAGIC + model_bytes + bytes(map(int, state))).hexdigest()
 
@@ -105,14 +104,17 @@ def analysis_request_digest(
         raise ValueError("evaluation state must be n_units binary bits")
     if not subset or len(set(subset)) != len(subset):
         raise ValueError("candidate subsystem must be non-empty and contain unique unit indices")
-    if any(int(unit) < 0 or int(unit) >= n_units for unit in subset):
+    if any(not isinstance(unit, int) or isinstance(unit, bool) for unit in subset):
+        raise ValueError("candidate subsystem indices must be integers")
+    if any(unit < 0 or unit >= n_units for unit in subset):
         raise ValueError("candidate subsystem index is outside the model unit range")
+    subset = sorted(subset)  # A candidate system is a set; use canonical ascending order.
     encoded = bytearray(ANALYSIS_REQUEST_MAGIC)
     encoded.extend(model_bytes)
     encoded.extend(bytes(map(int, state)))
     encoded.extend(struct.pack("<I", len(subset)))
     for unit in subset:
-        encoded.extend(struct.pack("<I", int(unit)))
+        encoded.extend(struct.pack("<I", unit))
     encoded.extend(b"\0")
     encoded.extend(formalism.encode("utf-8"))
     encoded.extend(b"\0")
