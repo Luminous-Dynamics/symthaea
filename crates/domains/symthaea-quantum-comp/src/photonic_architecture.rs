@@ -644,6 +644,14 @@ pub enum PhotonicEnvelopeError {
     InvalidProbabilityInterval,
     /// Invalid or negative optical loss, in dB.
     InvalidOpticalLoss(f64),
+    /// Optical routing requires at least one node.
+    InvalidNodeCount,
+    /// Optical link endpoint is outside the declared topology.
+    OpticalNodeOutOfRange(usize),
+    /// Self-loop links are rejected as noncanonical topology entries.
+    SelfLoopOpticalLink(usize),
+    /// Routing objective accumulated a non-finite cost.
+    InvalidRouteCost,
     /// Invalid aggregate attempt rate.
     InvalidAttemptRate(f64),
     /// Loss interval endpoints are not ordered.
