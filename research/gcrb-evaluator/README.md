@@ -6,9 +6,9 @@ It does not make decisions about people, public officials, legal guilt, rights, 
 
 ## Status
 
-- The isolated Rust CLI/library is authored with 18 core evaluator tests and six trace-auditor tests (24 authored total). None has been compiled or executed.
+- The isolated Rust CLI/library is authored with 18 core evaluator tests and seven trace-auditor tests (25 authored total). None has been compiled or executed.
 - The fixture and its expected dispositions are public known answers, so this is **not blind qualification**.
-- Candidate behavior observations and hard-gate violation fields are currently supplied by the candidate report. An independently instrumented event-trace oracle is not implemented.
+- Candidate behavior observations and hard-gate violation fields are currently supplied by the candidate report. A trace-derived rule auditor exists, but recorder authentication, independent capture-completeness attestation, and a hidden qualification oracle are not implemented.
 - No Rust compile, formatter, or unit-test run is claimed in this environment.
 - A matching SHA-256 digest proves exact input bytes only; it does not establish source truth or legitimacy.
 
@@ -71,13 +71,14 @@ A second, rule-based path derives six hard-gate findings from typed event fields
 - `docs/research/fixtures/governance-capture-resistance-trace-v0.1.schema.json` — input event-trace schema
 - `docs/research/fixtures/governance-capture-resistance-trace-audit-report-v0.1.schema.json` — audit-report schema
 - `docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json` — six synthetic unsafe events, 20 cases with unknown capture status
+- `docs/research/fixtures/governance-capture-resistance-trace-demo-report-v0.1.json` — expected synthetic report, pinned as a semantic golden test
 - `research/gcrb-evaluator/src/trace_audit.rs` — rule-based event-trace auditor
 
 Run the demo from the repository root:
 
     cargo run --manifest-path research/gcrb-evaluator/Cargo.toml -- trace-audit docs/research/fixtures/governance-capture-resistance-v0.1.json docs/research/fixtures/governance-capture-resistance-trace-demo-v0.1.json /tmp/gcrb-trace-audit.json
 
-The demo deliberately includes six unsafe synthetic events: a commitment revision without retained history/authority/reason, a model-executed rights restriction, simulation mislabeled as observed, an appeal reviewer who is the challenged authority, an unbounded emergency bypass, and evaluation configuration changed after outcomes became visible. A future Rust run should derive six corresponding findings.
+The demo deliberately includes six unsafe synthetic events: a commitment revision without retained history/authority/reason, a model-executed rights restriction, simulation mislabeled as observed, an appeal reviewer who is the challenged authority, an unbounded emergency bypass, and evaluation configuration changed after outcomes became visible. The committed expected report declares six corresponding findings; an authored Rust test checks semantic equality against it, but this test has not been executed.
 
 **Do not interpret this as an authenticated audit.** The prototype checks event syntax, sequence ordering, exact fixture binding, unique event IDs, and explicit role/reference fields. It does not authenticate the recorder, prove that all actions were captured, resolve authority/adjudication/observation references, validate actual expiry against trusted time, or establish legal facts. The demo marks 20 of 26 cases as capture status unknown. Even a report with zero findings must keep `absence_of_findings_proven = false` and `qualification_eligible = false` until capture provenance and completeness are independently established.
 
