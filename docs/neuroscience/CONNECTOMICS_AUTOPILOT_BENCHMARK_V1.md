@@ -105,7 +105,7 @@ A July 2026 preprint, *Connectome quality converges predictably to reveal optima
 
 Symthaea should test **query-specific stopping**, rather than treat a universal “connectome complete” score as biological truth:
 
-1. Track versioned graph snapshots and edit counts; compute a preregistered set of graph invariants and the actual scientific quantities the project intends to analyze.
+1. Track versioned graph snapshots and edit counts using the initial contract in [`CONNECTOME_STOPPING_SNAPSHOT.schema.json`](CONNECTOME_STOPPING_SNAPSHOT.schema.json); compute a preregistered set of graph invariants and the actual scientific quantities the project intends to analyze. The schema defines per-snapshot inputs only; a sequential validator must still check monotone edit counts, parent digest continuity, matching revisions, and consistency of edit-class totals.
 2. Fit candidate convergence curves using early snapshots only, then forecast later held-out snapshots without refitting on the future trajectory.
 3. Compare predicted remaining edits and uncertainty with the observed effort required to reach prespecified stability bands.
 4. Perturb the graph with held-out known split/merge errors to measure whether invariant stability can coexist with serious local or query-specific mistakes.
@@ -284,7 +284,7 @@ These targets are intentionally about efficient, safe proofreading, not unsuppor
 
 ## Symthaea-specific ablation plan
 
-The first implementation is deliberately small. The offline intake gate and frozen-prediction scorer are now prototyped as standalone Rust binaries; they are not yet compiled or benchmark-validated here. Next add Parquet/label/source-lineage audit, then test whether cognitive components add value.
+The first implementation is deliberately small. The offline intake gate and frozen-prediction scorer are now prototyped as standalone Rust binaries; they are not yet compiled or benchmark-validated here. The query-specific stopping snapshot JSON Schema is also defined, but no stopping-curve evaluator exists yet. Next add Parquet/label/source-lineage audit, then test whether cognitive components add value.
 
 - **Base ranker:** task-specific heuristics plus available direct evidence features.
 - **HDC retrieval:** retrieve analogous reviewed error cases; compare against no retrieval and lexical/feature nearest-neighbor controls.
