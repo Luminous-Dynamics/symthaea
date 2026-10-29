@@ -13,6 +13,7 @@ mod cognitive_replay_driver;
 mod cognitive_adaptation_audit;
 mod cognitive_adaptation_replay;
 mod cognitive_missingness;
+mod cognitive_missingness_schedule;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -105,6 +106,15 @@ enum Commands {
         receipt: Option<PathBuf>,
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Generate deterministic policy/evaluator sidecars for delay and informative-missingness stress tests.
+    GenerateCognitiveMissingnessSchedule {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        policy_out: PathBuf,
+        #[arg(long)]
+        evaluator_out: PathBuf,
     },
     /// Score bounded-loss identification bounds and MNAR sensitivity for missing outcomes.
     /// This is a statistical score, not a proof of measurement authenticity or causal identification.
@@ -291,6 +301,14 @@ fn main() -> anyhow::Result<()> {
             } else {
                 println!("{rendered}");
             }
+        }
+        Commands::GenerateCognitiveMissingnessSchedule { input, policy_out, evaluator_out } => {
+            let summary = cognitive_missingness_schedule::generate_file(
+                &input,
+                &policy_out,
+                &evaluator_out,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Commands::ScoreCognitiveMissingness { input, out } => {
             let result = cognitive_missingness::evaluate_file(&input)?;
