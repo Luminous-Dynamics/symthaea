@@ -2,7 +2,7 @@
 
 **Status:** research protocol and fixture contract only. No semantic verifier, official worker integration, benchmark score, or SOTA gain is claimed by this document.
 
-**Parent work:** [PR #8876](https://github.com/Luminous-Dynamics/symthaea/pull/8876) role-set selection; [PR #8894](https://github.com/Luminous-Dynamics/symthaea/pull/8894) source-span-bound role witnesses; [issue #8913](https://github.com/Luminous-Dynamics/symthaea/issues/8913).
+**Parent work:** [PR #8876](https://github.com/Luminous-Dynamics/symthaea/pull/8876) role-set selection; [PR #8894](https://github.com/Luminous-Dynamics/symthaea/pull/8894) payload-span-bound role witnesses with source-digest association; [issue #8913](https://github.com/Luminous-Dynamics/symthaea/issues/8913).
 
 ## 1. Research question
 
@@ -167,7 +167,7 @@ For selective answering, publish risk–coverage curves and compare at matched c
 | No-memory | Detect whether stored memory adds value |
 | Score-prefix retrieval | Ordinary relevance baseline |
 | Role-set selection | Isolate gains from explicit coverage annotations |
-| Source-span witnesses | Isolate byte-level traceability; not semantic correctness |
+| Payload-span witnesses | Isolate payload byte integrity and source-digest association; not raw-source offset mapping or semantic correctness |
 | Semantic support/contradiction gate | Test the semantic hypothesis when independently implemented |
 | One bounded refinement round | Determine whether targeted gap recovery improves quality per cost |
 | Always answer | Lower-bound diagnostic for abstention policy |
@@ -182,7 +182,7 @@ Before accessing held-out results, publish the evaluator version, primary metric
 
 A tranche advances only if:
 1. Level A invariants pass at the exact commit being evaluated.
-2. The new method reduces false-coverage or unsupported-answer risk against score-prefix and span-witness baselines at a matched context budget.
+2. The new method reduces false-coverage or unsupported-answer risk against score-prefix and payload-span-witness baselines at a matched context budget.
 3. The improvement does not come from always abstaining, leaked labels, extra context, a stronger reader, or hidden additional model calls.
 4. The held-out result preserves acceptable answerable-case coverage and its uncertainty supports the stated conclusion.
 5. The official benchmark's own scoring and latency definitions are preserved.
