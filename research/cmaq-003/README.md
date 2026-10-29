@@ -1,9 +1,42 @@
 # CMAQ-003: Sequential Causal Regime Shifts, Safe Adaptation, and Recovery
 
-**Status:** protocol draft, version 0.1  
+**Status:** protocol v0.1 + executable smoke harness, draft  
 **Linked tracking issue:** [#8983](https://github.com/Luminous-Dynamics/symthaea/issues/8983)  
-**Evidence status:** design only; no benchmark implementation or result is claimed  
-**Claim ceiling:** planned synthetic sequential evaluation until separately validated on held-out mechanisms and external tasks
+**Evidence status:** Rust source and CI workflow added; no exact-head passing test result is yet confirmed  
+**Claim ceiling:** two synthetic lanes only; no SOTA, real-world safety, or production Symthaea claim
+
+## Executable first slice (v0.1)
+
+The repository now includes a dependency-free Rust CLI at `src/main.rs`, pinned to Rust 1.96.0. It currently implements **two of the eight protocol lanes**:
+
+- S0 stationary null, where action 0 is optimal for the full episode;
+- S1 abrupt shift at step 128 of a 256-step episode, after which action 1 is optimal.
+
+The smoke harness evaluates a frozen policy and a sweep of seven one-sided CUSUM-like thresholds (`1.0` through `4.0`) over 128 paired deterministic seeds. The same uniform random draw is used for policy and oracle outcomes to reduce variance in regret comparisons. It reports stationary false alarms, abrupt-shift detection coverage, conditional detection-delay quantiles, mean reward rate and mean regret per episode. It does **not** yet implement candidate/evaluator process isolation, signed event receipts, sensor-drift diagnosis, selective memory invalidation, an independent physical safety envelope, or live Symthaea integration.
+
+Run from this directory:
+
+```sh
+cargo test --locked
+cargo run --quiet --locked
+```
+
+The focused workflow at `.github/workflows/cmaq-003.yml` checks the JSON schema and verifies that a lower threshold trades more false alarms for faster conditional detection on the fixed seed tape. This is a protocol smoke test, not a general detector-performance guarantee. Until exact-head CI passes, source-level calculations are not to be reported as Rust test results.
+
+### Exploratory detector tradeoff (Python source mirror; not Rust execution)
+
+A separate Python mirror of the same fixed-seed equations produced the following values over 128 episodes per lane. These are useful to test whether the report and tests express the intended trade-off; they are **not a Rust run, statistical qualification, or external benchmark score**.
+
+| CUSUM threshold | Stationary false-alarm episodes | Abrupt-shift detection rate | p90 delay among detected episodes | Mean abrupt-shift regret / episode |
+|---:|---:|---:|---:|---:|
+| 1.5 | 109 / 128 | 34.4% | 7 steps | 29.98 |
+| 2.0 | 44 / 128 | 78.9% | 10 steps | 11.16 |
+| 2.5 | 14 / 128 | 93.0% | 13 steps | 7.06 |
+| 3.0 | 2 / 128 | 100% | 14 steps | 5.52 |
+| 3.5 | 2 / 128 | 100% | 16 steps | 6.46 |
+| 4.0 | 2 / 128 | 100% | 18 steps | 7.34 |
+
+This toy panel exposes a valuable **false-alarm / detection-delay frontier**. Threshold 1.5 meets the proposed p90 target among detected episodes but has frequent stationary false alarms and misses most shifts because some episodes alarm before the change. Threshold 3.0 has far fewer false alarms and detects all shifts on this tape, but conditional p90 delay is 14 steps. The target pair therefore is not satisfied by a single threshold in this initial configuration. That is a benchmark result to investigate—not a reason to tune away the hard cases or weaken the gates.
 
 ## Why this benchmark exists
 
@@ -45,7 +78,7 @@ Avoid a single aggregate leaderboard number until these lanes have enough episod
 
 ## Candidate interface
 
-The first implementation should be a dependency-free Rust CLI, reproducible on the pinned toolchain. The evaluator emits an episode manifest with:
+The full benchmark should eventually be a dependency-free Rust CLI plus an independently isolated evaluator. The current smoke harness is a smaller stepping stone; the complete evaluator should emit an episode manifest with:
 
 - episode ID and public scenario-family category;
 - evaluator-only random seed commitment and hidden shift schedule;
@@ -141,12 +174,13 @@ Report capability and cost frontiers across task success, dynamic regret, detect
 
 ## Execution sequence
 
-1. Freeze this protocol and implement the evaluator/candidate separation.
-2. Add deterministic in-class stationary and abrupt-shift smoke tests.
-3. Add no-change and observation-only-drift negative controls before tuning detectors.
-4. Add recurrent, gradual, recombination and open-class qualification generators.
-5. Integrate the CMAQ-002 EVoI baseline and add ablations.
-6. Validate artifact hashes, failure accounting, exact-head Rust tests, and report parsing.
-7. Only then connect adapters to Symthaea memory, world-model and planning interfaces; keep synthetic and external results visibly separate.
+1. Freeze and review the protocol and keep all thresholds preregistered.
+2. **Implemented in v0.1:** deterministic stationary and abrupt-shift smoke lanes, frozen policy, seven-threshold detector sweep, JSON reporting, regression tests and focused workflow.
+3. Confirm exact-head compilation and test/report success; do not treat queued runs as passes.
+4. Add observation-only-drift and no-change negative controls to test discrimination, not only detection.
+5. Add recurrent, gradual, recombination and open-class qualification generators, with hidden held-out mechanisms.
+6. Add candidate/evaluator separation, artifact and receipt integrity checks, missing-episode accounting, and mutation tests.
+7. Integrate CMAQ-002 EVoI under matched budgets and run component ablations.
+8. Only then connect adapters to Symthaea memory, world-model and planning interfaces; keep synthetic and external results visibly separate.
 
-**Boundary:** until steps 1–6 are implemented and tested, this repository contains a research protocol—not a running CMAQ-003 benchmark.
+**Boundary:** CMAQ-003 now has an executable *smoke harness* for two synthetic lanes. It is not yet the full qualification benchmark described above, and it has no confirmed exact-head Rust test pass. The remaining lanes, evidence-isolation controls, and external integration must be added before drawing general claims.
