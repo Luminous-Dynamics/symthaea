@@ -20,7 +20,7 @@ use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const HEADER: [&str; 16] = [
+const HEADER: [&str; 17] = [
     "dataset_id",
     "domain",
     "source_artifact_id",
@@ -33,6 +33,7 @@ const HEADER: [&str; 16] = [
     "device_config_id",
     "capture_config_id",
     "counter_set_id",
+    "feature_modality_id",
     "security_outcome",
     "split_protocol",
     "split",
@@ -57,6 +58,7 @@ struct Sample {
     device_config_id: String,
     capture_config_id: String,
     counter_set_id: String,
+    feature_modality_id: String,
     security_outcome: String,
     split_protocol: String,
     split: String,
@@ -70,6 +72,7 @@ struct ArtifactBinding {
     device_config_id: String,
     capture_config_id: String,
     counter_set_id: String,
+    feature_modality_id: String,
     program_id: String,
     execution_id: String,
     attack_family_id: String,
@@ -85,6 +88,7 @@ struct AuditSummary {
     claim_scope: &'static str,
     dataset_id: String,
     domain: String,
+    feature_modality_id: String,
     split_protocol: String,
     manifest_sha256: String,
     samples: usize,
@@ -106,9 +110,10 @@ fn main() -> ExitCode {
                     }
                 }
                 println!(
-                    "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} train={} validation={} test={}",
+                    "HARDSEC_SPLIT_AUDIT_OK dataset_id={} domain={} feature_modality={} protocol={} manifest_sha256={} samples={} artifacts={} same_split_duplicate_content_aliases={} train={} validation={} test={}",
                     summary.dataset_id,
                     summary.domain,
+                    summary.feature_modality_id,
                     summary.split_protocol,
                     summary.manifest_sha256,
                     summary.samples,
@@ -249,10 +254,11 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             device_config_id: values[9].clone(),
             capture_config_id: values[10].clone(),
             counter_set_id: values[11].clone(),
-            security_outcome: values[12].clone(),
-            split_protocol: values[13].clone(),
-            split: values[14].clone(),
-            label: values[15].clone(),
+            feature_modality_id: values[12].clone(),
+            security_outcome: values[13].clone(),
+            split_protocol: values[14].clone(),
+            split: values[15].clone(),
+            label: values[16].clone(),
         });
     }
 
@@ -262,6 +268,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
 
     let dataset_id = samples[0].dataset_id.clone();
     let domain = samples[0].domain.clone();
+    let feature_modality_id = samples[0].feature_modality_id.clone();
     let split_protocol = samples[0].split_protocol.clone();
     if is_missing(&dataset_id) {
         return Err("dataset_id must not be empty or NA".into());
@@ -271,6 +278,20 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             "unsupported domain {domain:?}; expected one of {}",
             DOMAINS.join(", ")
         ));
+    }
+    if ![
+        "hpc",
+        "instruction_mnemonics",
+        "hpc_plus_instruction_mnemonics",
+    ]
+    .contains(&feature_modality_id.as_str())
+    {
+        return Err(format!(
+            "unsupported feature_modality_id {feature_modality_id:?}"
+        ));
+    }
+    if domain == "physical_hpc" && feature_modality_id != "hpc" {
+        return Err("physical_hpc domain supports only hpc feature modality".into());
     }
     if ![
         "program_holdout",
@@ -309,10 +330,11 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         let line_number = index + 2;
         if sample.dataset_id != dataset_id
             || sample.domain != domain
+            || sample.feature_modality_id != feature_modality_id
             || sample.split_protocol != split_protocol
         {
             return Err(format!(
-                "line {line_number}: a manifest must contain exactly one dataset_id, domain and split_protocol"
+                "line {line_number}: a manifest must contain exactly one dataset_id, domain, feature modality and split_protocol"
             ));
         }
         for (name, value) in [
@@ -323,7 +345,15 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             ("execution_id", sample.execution_id.as_str()),
             ("device_config_id", sample.device_config_id.as_str()),
             ("capture_config_id", sample.capture_config_id.as_str()),
-            ("counter_set_id", sample.counter_set_id.as_str()),
+            (
+                "counter_set_id",
+                if sample.feature_modality_id == "instruction_mnemonics" {
+                    "counter-set-not-applicable"
+                } else {
+                    sample.counter_set_id.as_str()
+                },
+            ),
+            ("feature_modality_id", sample.feature_modality_id.as_str()),
             (
                 "attack_family_id (for attack-labeled workload)",
                 if sample.label == "attack" {
@@ -415,6 +445,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
             device_config_id: sample.device_config_id.clone(),
             capture_config_id: sample.capture_config_id.clone(),
             counter_set_id: sample.counter_set_id.clone(),
+            feature_modality_id: sample.feature_modality_id.clone(),
             program_id: sample.program_id.clone(),
             execution_id: sample.execution_id.clone(),
             attack_family_id: sample.attack_family_id.clone(),
@@ -497,6 +528,7 @@ fn audit_manifest(manifest_path: &Path, dataset_root: &Path) -> Result<AuditSumm
         claim_scope: "metadata_and_split_integrity_only",
         dataset_id,
         domain,
+        feature_modality_id,
         split_protocol,
         manifest_sha256,
         samples: samples.len(),
@@ -709,7 +741,8 @@ mod tests {
                 device_config_id.into(),
                 capture_config_id.into(),
                 counter_set_id.into(),
-                if label == "benign" { "not_applicable" } else { "unknown" }.into(),
+                "hpc".into(),
+                (if label == "benign" { "not_applicable" } else { "unknown" }).into(),
                 split_protocol.into(),
                 split.into(),
                 label.into(),
@@ -1233,7 +1266,7 @@ mod tests {
             "attack",
         );
         let last = fixture.rows.len() - 1;
-        fixture.rows[last][12] = "success_observed".into();
+        fixture.rows[last][13] = "success_observed".into();
         assert!(fixture
             .audit()
             .unwrap_err()
@@ -1255,7 +1288,7 @@ mod tests {
     fn benign_sample_cannot_claim_attack_success() {
         let mut fixture = Fixture::new();
         add_balanced_program_holdout(&mut fixture);
-        fixture.rows[1][12] = "success_observed".into();
+        fixture.rows[1][13] = "success_observed".into();
         assert!(fixture
             .audit()
             .unwrap_err()
