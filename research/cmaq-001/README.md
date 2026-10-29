@@ -89,3 +89,16 @@ These targets are intentionally falsifiable. They must be revised *before* a qua
 - No exact-head Rust compile/test was run in the authoring environment because it lacks `cargo`/ `rustc`. The PR must remain draft until the isolated crate's pinned CI job compiles and executes the unit tests.
 - No experiment on AMA-Bench, CLE, LongMemEval, or an actual Symthaea agent is included here.
 - Before connecting to production code, add a seeded causal-intervention task generator, blind mechanism split, replay-receipt binding, and an independent outcome recorder. The live cognitive loop should not be changed by this research harness.
+
+
+## Run the scorer
+
+From the repository root:
+
+```bash
+cd research/cmaq-001
+cargo test --locked
+cargo run --quiet --locked -- score fixtures/answer-key-smoke.tsv fixtures/candidate-trace-smoke.tsv
+```
+
+The scorer exits successfully when input validation and scoring complete, even when `gate_pass` is false; this is deliberate so invalid candidate behavior can be reported rather than hidden by process failure. Qualification automation must inspect `gate_pass` and the individual hard-gate counters. The included smoke trace is expected to emit `"gate_pass": true`.
