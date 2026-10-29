@@ -6,8 +6,9 @@ research engine.
 ## Current scope: v0.1 causal-model substrate
 
 This crate currently provides a validated dense binary factored TPM, cause/effect
-repertoire primitives, a validated pointwise GID measure primitive, a bounded IIT 4.x
-directed-system-partition enumerator, typed formalism/quantity identities, and stable model, evaluation, and
+repertoire primitives, a validated pointwise GID measure primitive, an explicit
+partition-cut TPM transform, a bounded IIT 4.x directed-system-partition enumerator,
+and typed formalism/quantity identities, and stable model, evaluation, and
 analysis-request digests. It does not yet compute IIT system
 integrated information (phi_s), mechanism-level phi, a complete cause-effect
 structure, structure-level Phi, or any consciousness result.
@@ -40,8 +41,9 @@ evaluation state, time grain, or formalism.
 
 1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
    against a documented PyPhi fixture.
-2. Compare cause/effect repertoire distributions, GID point measures, and directed cut matrices against
-   the reference on identical model, state, subsystem, and partition-profile inputs,
+2. Compare cause/effect repertoire distributions, GID point measures, directed cut
+   matrices, and post-cut TPM rows against the reference on identical model, state,
+   subsystem, and partition-profile inputs,
    including deterministic, independent, and zero-likelihood negative controls.
 3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile, documented
    MIP repertoire-difference measure, and exhaustive partition search for tiny systems.
@@ -139,3 +141,18 @@ with a pinned PyPhi configuration and then implement the corresponding cause/eff
 repertoire comparison and minimum-information-partition selection. Different
 partition schemes must not be represented as a speed-only option when they alter
 the calculated quantity.
+
+
+## Partition application
+
+The model can apply an enumerated cut matrix by marginalizing each severed source
+bit under a uniform maximum-entropy intervention. For each cut source -> target
+edge, the target's transition probability is averaged over the source bit with all
+other bits held fixed; repeated averaging handles multiple cut inputs. The updated
+connectivity metadata removes the severed links and the resulting model is run
+through the normal TPM/connectivity validator again.
+
+This operation is tested on a directed cross-edge, a total cut including self-loops,
+and a cut restricted to a candidate system that leaves links to external units intact.
+It is a model-transform primitive; its exact agreement with PyPhi's induced cut
+system remains to be tested differentially.
