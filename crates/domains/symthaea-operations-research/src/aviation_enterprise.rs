@@ -1098,20 +1098,21 @@ pub fn solve_branch_and_bound(
             break;
         }
 
-        let node = frontier.pop().expect("frontier was non-empty");
+        let Some(node) = frontier.pop() else {
+            break;
+        };
         stats.expanded_nodes = stats.expanded_nodes.saturating_add(1);
 
         if node.depth == scenario.flights.len() {
             stats.complete_assignments_examined =
                 stats.complete_assignments_examined.saturating_add(1);
-            let complete_choices: Vec<Option<usize>> = node
-                .choices
-                .iter()
-                .map(|choice| {
-                    choice
-                        .expect("every leaf choice must be decided before expansion")
-                })
-                .collect();
+            let mut complete_choices = Vec::with_capacity(node.choices.len());
+            for choice in &node.choices {
+                match choice {
+                    Some(decision) => complete_choices.push(*decision),
+                    None => return Err("leaf reached with an undecided flight".into()),
+                }
+            }
 
             if !candidate_is_feasible(scenario, node.source, &complete_choices) {
                 stats.infeasible_complete_assignments =
@@ -1259,7 +1260,7 @@ fn push_recovery_child(
     }
     node.serial = *serial;
     frontier.push(node);
-    *serial = serial.saturating_add(1);
+    *serial = (*serial).saturating_add(1);
     stats.generated_nodes = stats.generated_nodes.saturating_add(1);
     stats.peak_frontier_nodes = stats.peak_frontier_nodes.max(frontier.len());
 }
@@ -1302,7 +1303,11 @@ fn partial_assignment_is_feasible(
 
     let mut by_aircraft: Vec<Vec<usize>> = vec![Vec::new(); scenario.aircraft.len()];
     for flight_index in 0..decided_count {
-        let Some(aircraft_index) = choices[flight_index].expect("decided prefix must be populated") else {
+        let decision = match choices[flight_index] {
+            Some(decision) => decision,
+            None => return false,
+        };
+        let Some(aircraft_index) = decision else {
             continue;
         };
         let Some(aircraft) = scenario.aircraft.get(aircraft_index) else {
