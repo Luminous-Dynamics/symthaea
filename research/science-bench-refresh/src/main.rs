@@ -6,6 +6,12 @@ use science_bench_refresh_validator::evidence_behavior_contracts::{
     compute_evidence_behavior_contract_report_commitment, verify_evidence_behavior_contract_plan,
     verify_evidence_behavior_contract_report,
 };
+use science_bench_refresh_validator::judge_robustness::{
+    compute_judge_robustness_plan_commitment,
+    compute_judge_robustness_report_commitment,
+    verify_judge_robustness_plan,
+    verify_judge_robustness_report,
+};
 use science_bench_refresh_validator::evidence_outcomes::{
     compute_evidence_outcome_report_commitment, verify_evidence_outcome_report,
 };
@@ -45,6 +51,10 @@ fn usage(program: &str) {
             "  {program} verify-evidence-behavior-contract-plan PLAN.json\n",
             "  {program} commit-evidence-behavior-contract-report PLAN.json REPORT_FIELDS.json\n",
             "  {program} verify-evidence-behavior-contract-report PLAN.json REPORT.json\n",
+            "  {program} commit-judge-robustness-plan PLAN_FIELDS.json\n",
+            "  {program} verify-judge-robustness-plan PLAN.json\n",
+            "  {program} commit-judge-robustness-report PLAN.json REPORT_FIELDS.json\n",
+            "  {program} verify-judge-robustness-report PLAN.json REPORT.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
@@ -75,6 +85,122 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-judge-robustness-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "judge robustness plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_judge_robustness_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("judge robustness plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-judge-robustness-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge robustness plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_judge_robustness_plan(&plan_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("judge robustness plan report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
+        "commit-judge-robustness-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge robustness plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let fields_bytes = match read(&args[2], "judge robustness report fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_judge_robustness_report_commitment(&plan_bytes, &fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_report_commitment.v1",
+                            "report_commitment_sha256": commitment
+                        }))
+                        .expect("judge robustness report commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-judge-robustness-report" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge robustness plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report_bytes = match read(&args[2], "judge robustness report") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_judge_robustness_report(&plan_bytes, &report_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("judge robustness report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "commit-evidence-behavior-contract-plan" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");
