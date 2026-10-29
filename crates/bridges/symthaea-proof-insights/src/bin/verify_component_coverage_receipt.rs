@@ -27,7 +27,7 @@ const RECEIPT_SCHEMA: &str = "pitb.component-coverage-receipt.v1";
 const TRUST_SCHEMA: &str = "pitb.coverage-reviewer-trust-store.v1";
 const DOMAIN: &str = "PITB_COMPONENT_COVERAGE_RECEIPT_V1";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Inventory {
     schema_version: String,
@@ -49,7 +49,7 @@ struct Edge {
     reviewer_ids: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Receipt {
     schema_version: String,
@@ -62,7 +62,7 @@ struct Receipt {
     signatures: Vec<ReviewerSignature>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ReviewerSignature {
     reviewer_id: String,
@@ -70,14 +70,14 @@ struct ReviewerSignature {
     signature_hex: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct TrustStore {
     schema_version: String,
     reviewers: Vec<TrustedReviewer>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct TrustedReviewer {
     reviewer_id: String,
@@ -268,12 +268,13 @@ fn verify_receipt(
     trust_store_bytes: &[u8],
     methodology_bytes: &[u8],
     expected_trust_store_digest: &str,
+    expected_partition_digest: &str,
     families: &BTreeMap<String, String>,
 ) -> Result<VerificationReport> {
     let inventory: Inventory =
         serde_json::from_slice(inventory_bytes).context("parse relationship inventory")?;
     if inventory.schema_version != "pitb.family-leakage-edges.v0"
-        || inventory.source_partition_digest_sha256 != EXPECTED_PARTITION_DIGEST
+        || inventory.source_partition_digest_sha256 != expected_partition_digest
         || partition_digest(families) != inventory.source_partition_digest_sha256
     {
         bail!("relationship inventory schema or frozen partition digest mismatch");
@@ -298,6 +299,9 @@ fn verify_receipt(
     }
 
     let edges_digest = canonical_edges_digest(&inventory.edges, families)?;
+    if methodology_bytes.is_empty() {
+        bail!("review methodology document must not be empty");
+    }
     if !is_sha256(&receipt.relationship_inventory_edges_sha256)
         || receipt.relationship_inventory_edges_sha256 != edges_digest
     {
@@ -425,6 +429,7 @@ fn run(args: &[String]) -> Result<()> {
         &trust_bytes,
         &methodology_bytes,
         &args[5],
+        EXPECTED_PARTITION_DIGEST,
         &families,
     )?;
     fs::write(&args[6], serde_json::to_vec_pretty(&report)?)
@@ -448,7 +453,7 @@ mod tests {
     use ed25519_dalek::{Signer, SigningKey};
 
     fn digest(byte: char) -> String {
-        std::iter::repeat_n(byte, 64).collect()
+        std::iter::repeat(byte).take(64).collect()
     }
 
     fn test_edges() -> Vec<Edge> {
@@ -473,8 +478,9 @@ mod tests {
 
     fn signed_fixture(
         organizations: [&str; 2],
-    ) -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, BTreeMap<String, String>) {
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, String, String, BTreeMap<String, String>) {
         let families = test_families();
+        let test_partition_digest = partition_digest(&families);
         let mut edges = test_edges();
         let edges_digest = canonical_edges_digest(&edges, &families).unwrap();
         edges[0].reviewer_ids.sort();
@@ -505,7 +511,7 @@ mod tests {
         let trust_digest = sha256_hex(&trust_bytes);
         let message = signing_message(
             UPSTREAM_COMMIT,
-            EXPECTED_PARTITION_DIGEST,
+            &test_partition_digest,
             &edges_digest,
             &method_digest,
             &trust_digest,
@@ -513,7 +519,7 @@ mod tests {
         let receipt = Receipt {
             schema_version: RECEIPT_SCHEMA.to_owned(),
             upstream_commit: UPSTREAM_COMMIT.to_owned(),
-            source_partition_digest_sha256: EXPECTED_PARTITION_DIGEST.to_owned(),
+            source_partition_digest_sha256: test_partition_digest.clone(),
             relationship_inventory_edges_sha256: edges_digest,
             review_methodology_sha256: method_digest,
             trust_store_sha256: trust_digest.clone(),
@@ -531,7 +537,7 @@ mod tests {
         let receipt_bytes = serde_json::to_vec_pretty(&receipt).unwrap();
         let inventory = Inventory {
             schema_version: "pitb.family-leakage-edges.v0".to_owned(),
-            source_partition_digest_sha256: EXPECTED_PARTITION_DIGEST.to_owned(),
+            source_partition_digest_sha256: test_partition_digest.clone(),
             coverage_status: "independently_reviewed_complete".to_owned(),
             coverage_receipt_sha256: Some(sha256_hex(&receipt_bytes)),
             edges,
@@ -542,16 +548,17 @@ mod tests {
             trust_bytes,
             methodology,
             trust_digest,
+            test_partition_digest,
             families,
         )
     }
 
     #[test]
     fn valid_two_organization_receipt_verifies_but_does_not_qualify_analysis() {
-        let (inventory, receipt, trust, method, trust_digest, families) =
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["research-lab-a", "research-lab-b"]);
         let report = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
         )
         .unwrap();
         assert!(report.cryptographically_verified);
@@ -565,10 +572,10 @@ mod tests {
 
     #[test]
     fn same_organization_cannot_supply_independent_endorsements() {
-        let (inventory, receipt, trust, method, trust_digest, families) =
+        let (inventory, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["same-org", "same-org"]);
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("distinct organizations"));
@@ -576,13 +583,13 @@ mod tests {
 
     #[test]
     fn edge_mutation_invalidates_signed_payload_digest() {
-        let (inventory_bytes, receipt, trust, method, trust_digest, families) =
+        let (inventory_bytes, receipt, trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["org-a", "org-b"]);
         let mut inventory: Value = serde_json::from_slice(&inventory_bytes).unwrap();
         inventory["edges"][0]["target_family_id"] = Value::String("003".to_owned());
         let mutated_inventory = serde_json::to_vec_pretty(&inventory).unwrap();
         let error = verify_receipt(
-            &mutated_inventory, &receipt, &trust, &method, &trust_digest, &families,
+            &mutated_inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("signed relationship-edge payload digest"));
@@ -590,11 +597,11 @@ mod tests {
 
     #[test]
     fn changed_trust_store_is_rejected_even_with_an_old_receipt() {
-        let (inventory, receipt, mut trust, method, trust_digest, families) =
+        let (inventory, receipt, mut trust, method, trust_digest, partition_digest, families) =
             signed_fixture(["org-a", "org-b"]);
         trust.push(b' ');
         let error = verify_receipt(
-            &inventory, &receipt, &trust, &method, &trust_digest, &families,
+            &inventory, &receipt, &trust, &method, &trust_digest, &partition_digest, &families,
         )
         .unwrap_err();
         assert!(error.to_string().contains("trust store does not match"));
@@ -613,6 +620,7 @@ mod tests {
             &trust,
             &method,
             &trust_digest,
+            &partition_digest,
             &families,
         )
         .unwrap_err();
