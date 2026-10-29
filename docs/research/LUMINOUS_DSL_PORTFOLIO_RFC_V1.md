@@ -236,7 +236,7 @@ Use mutation/property-based tests and independent hand-authored expected outcome
 
 ### P0 — First working vertical slice
 
-Build one small Rust conformance CLI that reads a versioned record, validates schema + semantic rules, emits stable diagnostics, and verifies artifact references without network access. Bundle schemas and fixtures with the repository and make the CLI runnable through a documented local command.
+**Prototype source added; compilation not yet verified locally.** The initial Rust CLI and semantic-checking library now exist in `crates/core/luminous-evidence-profile`, with fixture-backed unit tests and the schema/fixtures under `docs/research/`. The next implementation gate is to compile/test this crate in the pinned Nix shell, correct any diagnostics exposed by the compiler, then add schema validation and artifact-byte resolution as separate layers. The current CLI does not yet validate the full JSON Schema or artifact contents.
 
 ### P1 — Domain pilots
 
@@ -266,7 +266,7 @@ This amendment sharpens the original proposal after comparing the repository's e
 
 ### A. LEP is a predicate profile, not a new envelope
 
-Use the **in-toto Statement v1** as the outer statement shape: \`_type\`, immutable \`subject\` digest(s), \`predicateType\`, and a versioned \`predicate\`. LEP defines only the predicate semantics that existing projects do not already share. Reuse the established in-toto envelope for signing/authentication rather than inventing a Luminous signature envelope.
+Use the **in-toto Statement v1** as the outer statement shape: `_type`, immutable `subject` digest(s), `predicateType`, and a versioned `predicate`. LEP defines only the predicate semantics that existing projects do not already share. Reuse the established in-toto envelope for signing/authentication rather than inventing a Luminous signature envelope.
 
 Use **SLSA Provenance v1** for software build provenance where it fits. Do not force it to represent a physical simulation result or a governance decision; those require domain-specific predicate types. The evidence profile must distinguish:
 - an authentic statement;
@@ -275,17 +275,17 @@ Use **SLSA Provenance v1** for software build provenance where it fits. Do not f
 - measured or simulated support for a claim; and
 - whether that support justifies the claim's stated scope.
 
-Existing \`symthaea-evidence-plane\` and \`symthaea-communication\` records remain domain/runtime interfaces. LEP should map to them through adapters rather than replace them. The evidence-plane crate's \`config_hash\` is explicitly non-cryptographic and unsuitable for signing or adversarial integrity checks.
+Existing `symthaea-evidence-plane` and `symthaea-communication` records remain domain/runtime interfaces. LEP should map to them through adapters rather than replace them. The evidence-plane crate's `config_hash` is explicitly non-cryptographic and unsuitable for signing or adversarial integrity checks.
 
 ### B. First schema and fixture prototype
 
-A first draft predicate schema lives at \`docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json\`; examples live in \`docs/research/fixtures/luminous-evidence-v0.1/\`.
+A first draft predicate schema lives at `docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json`; examples live in `docs/research/fixtures/luminous-evidence-v0.1/`.
 
 The schema enforces required target identity, version and enumerated states, digest shape for common algorithms, and the rule that a verification cannot be marked passed unless execution is completed and passed. A queued or not-run record cannot claim a passed execution. The fixtures include a valid illustrative statement and negative cases for a queued-but-passed result and a missing target.
 
 A Rust semantic checker now exists in `crates/core/luminous-evidence-profile` with an offline CLI and fixture-backed unit tests. It adds exact structured target/checked-target equality, immutable source-revision enforcement, supported digest-shape checks, execution/result consistency, and check outcome/id consistency. It deliberately does not authenticate in-toto/DSSE signatures, resolve artifact URIs, recompute artifact bytes, or prove that a declared run occurred.
 
-**Scope and limitations:** these are structural constraints only. The example digests are placeholders; this fixture is not a production run receipt. JSON Schema cannot prove that artifacts exist, that the checked target matches the declared target, that a signature is valid, or that a test genuinely ran. A separate semantic verifier must compare the declared \`target\` with \`verification.checkedTarget\`, resolve and hash evidence artifacts, check signer authority where applicable, and test whether the named checks justify the claim. Local structural validation is not yet CI or cross-implementation conformance.
+**Scope and limitations:** the schema and semantic checker are separate layers. The example digests are placeholders; these fixtures are not production run receipts. The Rust checker source and fixture-backed tests have been added, but could not be compiled or executed in the current environment because no Rust toolchain is available; no passing Rust test result is claimed. Neither layer proves artifacts exist, signatures are valid, a test genuinely ran, or the scientific/normative claim is true. Production verification still requires resolving and hashing evidence artifacts, authenticating in-toto/DSSE statements and signer authority, and independently verifying the named checks. Hosted CI and cross-implementation conformance remain pending.
 
 ### C. Physical-model interoperability before a proprietary equation language
 
