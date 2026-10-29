@@ -844,7 +844,7 @@ fn require_contract_profile_tolerance(
         .filter(|obligation| matches!(
             &obligation.requirement,
             ObligationRequirement::PreserveWithin { comparator_id: actual, .. }
-                if actual == comparator_id
+                if actual.as_str() == comparator_id
         ))
         .collect();
     if matching.len() != 1 {
