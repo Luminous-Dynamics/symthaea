@@ -574,8 +574,33 @@ mod tests {
     }
 
     #[test]
+    fn blocked_event_must_be_marked_not_evaluable() {
+        let receipt = sealed_receipt(false);
+        let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
+        let report = match_report(
+            &receipt_bytes,
+            "not_evaluable",
+            "none",
+            0,
+            0,
+            None,
+            None,
+        );
+        let verified = verify_search_exposure_match_report(
+            &receipt_bytes,
+            &serde_json::to_vec(&report).unwrap(),
+        )
+        .unwrap();
+        assert!(verified.integrity_valid);
+        assert_eq!(
+            verified.admission,
+            "no_detected_retrieval_contamination_under_declared_matcher"
+        );
+    }
+
+    #[test]
     fn explicit_answer_match_blocks_and_records_evidence_digests() {
-        let receipt = sealed_receipt();
+        let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
         let report = match_report(
             &receipt_bytes,
@@ -598,11 +623,11 @@ mod tests {
 
     #[test]
     fn missing_records_and_mutated_match_report_fail_closed() {
-        let receipt = sealed_receipt();
+        let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
         let report = match_report(
             &receipt_bytes,
-            "not_evaluable",
+            "no_match",
             "none",
             0,
             0,
@@ -633,7 +658,7 @@ mod tests {
 
     #[test]
     fn a_match_report_cannot_rebind_to_another_receipt() {
-        let receipt = sealed_receipt();
+        let receipt = sealed_receipt(true);
         let receipt_bytes = serde_json::to_vec(&receipt).unwrap();
         let report = match_report(
             &receipt_bytes,
