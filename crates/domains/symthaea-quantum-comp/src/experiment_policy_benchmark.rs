@@ -89,8 +89,10 @@ pub struct ExperimentPolicyBakeoffReport {
     pub utility_unit: String,
     /// Measurement cost units.
     pub measurement_cost_unit: String,
-    /// Expected utility of taking no measurement and choosing the best prior action.
+    /// Oracle utility from no measurement using the held-out true prior.
     pub no_measurement_expected_utility: f64,
+    /// Utility of the deployable no-measurement policy using the planning prior.
+    pub policy_no_measurement_expected_utility: f64,
     /// Oracle expected utility, taking the best of no measurement or one experiment.
     pub oracle_expected_utility: f64,
     /// Experiment attaining oracle utility, if measuring is weakly better than abstaining.
@@ -188,10 +190,19 @@ pub fn run_experiment_policy_bakeoff(
     let reference = nominal.problem();
     validate_ground_truth_contract(reference, ground_truth)?;
 
-    let no_measurement_action = best_action(ground_truth, ground_truth.prior())?;
+    // The deployed no-measurement baseline must select its action with the same
+    // planning information as the other policies. Held-out truth is used only
+    // to score that action and to compute the oracle reference.
+    let policy_no_measurement_action = best_action(reference, &averaged_prior(planning_scenarios))?;
+    let policy_no_measurement_expected_utility = expected_action_utility(
+        ground_truth,
+        policy_no_measurement_action,
+        ground_truth.prior(),
+    )?;
+    let oracle_no_measurement_action = best_action(ground_truth, ground_truth.prior())?;
     let no_measurement_expected_utility = expected_action_utility(
         ground_truth,
-        no_measurement_action,
+        oracle_no_measurement_action,
         ground_truth.prior(),
     )?;
 
@@ -314,7 +325,7 @@ pub fn run_experiment_policy_bakeoff(
     policy_results.push(policy_result(
         ExperimentSelectionPolicy::NoMeasurement,
         None,
-        no_measurement_expected_utility,
+        policy_no_measurement_expected_utility,
         0.0,
         0.0,
         oracle_expected_utility,
@@ -330,6 +341,7 @@ pub fn run_experiment_policy_bakeoff(
         utility_unit: reference.utility_unit().to_string(),
         measurement_cost_unit: reference.measurement_cost_unit().to_string(),
         no_measurement_expected_utility,
+        policy_no_measurement_expected_utility,
         oracle_expected_utility,
         oracle_experiment_id,
         candidate_results,
@@ -874,6 +886,26 @@ mod tests {
                 .expected_measurement_cost,
             0.0
         );
+    }
+
+
+    #[test]
+    fn no_measurement_policy_does_not_leak_the_held_out_prior() {
+        let (models, _) = fixture_models();
+        let truth = problem_with_prior(
+            vec![0.1, 0.9],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+        );
+        let report =
+            run_experiment_policy_bakeoff("opposite-prior-shift", &truth, &models).unwrap();
+
+        assert!((report.no_measurement_expected_utility - 0.9).abs() < 1e-12);
+        assert!((report.policy_no_measurement_expected_utility - 0.1).abs() < 1e-12);
+        assert!((report.oracle_expected_utility - 0.9).abs() < 1e-12);
+        let no_measurement = policy(&report, ExperimentSelectionPolicy::NoMeasurement);
+        assert!((no_measurement.expected_decision_utility - 0.1).abs() < 1e-12);
+        assert!((no_measurement.decision_regret - 0.8).abs() < 1e-12);
     }
 
     #[test]
