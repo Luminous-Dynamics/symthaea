@@ -85,6 +85,10 @@ jobs:
           assert set(receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"]) == {
               "pooled_residual_transfer", "descriptor_x_knn_transfer", "shuffled_descriptor_control"
           }
+          assert all(
+              len(row["bootstrap_95pct_ci_macro_mean_relative_objective_mae_reduction"]) == 2
+              for row in receipt["comparisons_vs_low_fidelity_only_macro_by_target_family"].values()
+          )
           assert receipt["target_high_fidelity_used_by_predictor"] is False
           assert receipt["history_pair_count"] == 16
           print("historical transfer synthetic receipt validated")
