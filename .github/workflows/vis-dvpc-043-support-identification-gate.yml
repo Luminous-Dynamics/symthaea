@@ -1,0 +1,61 @@
+name: VIS-DVPC-043 support identification fail-closed audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/vision-dvpc-043-support-identification-gate.rs"
+      - "docs/research/VIS_DVPC_043_SUPPORT_IDENTIFICATION_GATE_V1.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-043-support-identification-gate.rs"
+      - "docs/research/VIS_DVPC_043_SUPPORT_IDENTIFICATION_GATE_V1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact support gate
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run all Rust tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-043-support-identification-gate.rs -o /tmp/vis-dvpc-043-tests
+          /tmp/vis-dvpc-043-tests
+      - name: Run six frozen support fixtures
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-043-support-identification-gate.rs -o /tmp/vis-dvpc-043
+          /tmp/vis-dvpc-043 --audit > /tmp/vis-dvpc-043-results.tsv
+          test "$(grep -c '^SUPPORT_CASE' /tmp/vis-dvpc-043-results.tsv)" = "54"
+          test "$(grep -c '^CASE' /tmp/vis-dvpc-043-results.tsv)" = "6"
+          test "$(grep -c '^SUPPORT_CONTROL' /tmp/vis-dvpc-043-results.tsv)" = "3"
+          grep -Fq $'SUPPORT_CASE\tzero_support\tstatus\tNOT_IDENTIFIED' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tzero_support\tmax_importance_ratio\tSUPPRESSED' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tzero_support\tpopulation_ess_fraction\tSUPPRESSED' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tweak_overlap\tdecision\tINSUFFICIENT_EVIDENCE' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tbalanced\tstatus\tIDENTIFIED' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tnear_zero_overlap\tstatus\tWEAK_SUPPORT' /tmp/vis-dvpc-043-results.tsv
+          grep -Fq $'SUPPORT_CASE\tinvalid_probability_sum\tstatus\tINVALID_INPUT' /tmp/vis-dvpc-043-results.tsv
+      - name: Create source and result receipt
+        run: |
+          {
+            printf 'VIS_DVPC_043_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$GITHUB_SHA"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-043-support-identification-gate.rs /tmp/vis-dvpc-043-results.tsv
+          } > /tmp/vis-dvpc-043-receipt.tsv
+          cat /tmp/vis-dvpc-043-receipt.tsv
+      - name: Publish support gate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-043-support-identification-gate
+          path: |
+            /tmp/vis-dvpc-043-results.tsv
+            /tmp/vis-dvpc-043-receipt.tsv
+          retention-days: 90
