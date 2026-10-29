@@ -149,7 +149,7 @@ Report accuracy separately for static state recall, dynamic state tracking, work
 
 ### Audited evidence coverage and abstention boundary (new opt-in contract)
 
-The resolver now has an opt-in audited path that emits the selected, provenance-bearing context plus one disposition for each input HDC hit. Decisions distinguish emitted evidence, duplicate IDs, unknown IDs, invalid records, inactive lifecycle, cross-scope evidence, not-yet-valid evidence, expired evidence, and otherwise eligible evidence excluded by the output limit. Corrupt eligible payloads remain hard errors; they are not converted into an empty result.
+The resolver now has an opt-in audited path that emits the selected, provenance-bearing context plus one disposition for each input HDC hit. Decisions distinguish emitted evidence, duplicate IDs, unknown IDs, invalid records, inactive lifecycle, cross-scope evidence, not-yet-valid evidence, expired evidence, and evidence that passed metadata eligibility checks but was not payload-verified because the output limit was already reached. Corrupt eligible payloads remain hard errors; they are not converted into an empty result.
 
 An EvidenceFloorPolicy can require a minimum emitted-item count and a minimum number of distinct source trajectories. The resulting audit reports observed counts and whether the configured **operational coverage floor** was met. It explicitly does *not* claim semantic sufficiency, entailment, contradiction detection, or answer correctness. Two correlated records can satisfy the floor yet fail to support the question; a single authoritative record may be enough for some questions and still fail a two-source policy. Treat the floor only as a calibrated abstention/escalation feature, not a truth detector.
 
