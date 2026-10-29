@@ -686,14 +686,14 @@ fn run(replicates: usize, horizons: &[usize]) -> Result<String, String> {
                     ag.selected_lcb.push(lower_bounds[chosen]);
                     ag.selected_lcb_gap.push(true_values[chosen] - lower_bounds[chosen]);
                     let is_winner_certificate = certified_winner.is_some();
-                    let is_false_certificate = certified_winner
+                    let is_false_certificate_trial = certified_winner
                         .map(|winner| is_false_certificate(winner, &true_values))
                         .unwrap_or(false);
                     replicate_method_metrics[method_index] = Some(TrialSummary {
                         top1: if is_best_value(true_values[chosen], oracle_value) { 1.0 } else { 0.0 },
                         regret,
                         winner_certificate: if is_winner_certificate { 1.0 } else { 0.0 },
-                        false_certificate: if is_false_certificate { 1.0 } else { 0.0 },
+                        false_certificate: if is_false_certificate_trial { 1.0 } else { 0.0 },
                         interval_width: mean_interval_width,
                         plausible_winner_set_size,
                     });
