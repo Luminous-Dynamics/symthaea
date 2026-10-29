@@ -87,6 +87,18 @@ jobs:
         run: python tools/vleb/test_compare_paired_runs.py
       - name: Test reproducible two-sided oracle-control replay
         run: python tools/vleb/test_verify_oracle_controls.py
+      - name: Test oracle-control verifier mutation campaign
+        run: python tools/vleb/test_oracle_control_mutation_campaign.py
+      - name: Mutation-test oracle-control verifier guardrails
+        run: python tools/vleb/run_oracle_control_mutation_campaign.py --output "$RUNNER_TEMP/vleb-oracle-control-mutation-report.json"
+      - name: Upload oracle-control mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vleb-oracle-control-mutation-report-${{ github.sha }}
+          path: ${{ runner.temp }}/vleb-oracle-control-mutation-report.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Validate trusted run manifest schema and controls
         run: python tools/vleb/test_run_manifest.py
       - name: Test run manifest integrity and provenance checker
