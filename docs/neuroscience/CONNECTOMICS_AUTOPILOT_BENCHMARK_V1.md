@@ -59,6 +59,8 @@ The dataset schema and instructions introduce several high-priority leakage guar
 - The dataset's overall license field is `other`; upstream source datasets can have different licenses. Check use and redistribution conditions per source, not merely the MIT license on the data-generation code.
 
 Required intake manifest:
+
+A machine-readable schema is committed at [`CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json`](CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json). It pins the dataset revision and code commit, requires a reviewed task/label mapping reference, allowlists model-input columns, and structurally excludes `em_best`, labels, IDs, routing fields, and metadata from model inputs. Schema validity is only a declaration check; the audit utility must still inspect the actual Parquet content and verify the declared reference.
 - exact dataset repository and revision (default target: `v2`), upstream code commit, source URL, file SHA-256 and byte size;
 - Parquet schema, per-shard row count, unique sample IDs, class distribution, null coverage, and duplicate checks;
 - task routing and label semantics verified against upstream training/evaluation code;
