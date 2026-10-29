@@ -552,12 +552,24 @@ mod tests {
             .find(|target| target.evidence_id == "retry-config-1")
             .expect("decisive atom has a target");
         assert_eq!(left_control.target_level, "control");
+        let left_bound = label_pair.cases[0]
+            .atom_use_targets
+            .iter()
+            .find(|target| target.evidence_id == "retry-applicability-2")
+            .expect("bounded constraint has a target");
+        assert_eq!(left_bound.target_level, "bound");
         let right_control = label_pair.cases[1]
             .atom_use_targets
             .iter()
             .find(|target| target.evidence_id == "retry-config-1")
             .expect("decisive atom retains its target");
         assert_eq!(right_control.target_level, "control");
+        let right_bound = label_pair.cases[1]
+            .atom_use_targets
+            .iter()
+            .find(|target| target.evidence_id == "retry-applicability-2")
+            .expect("bounded constraint retains its target");
+        assert_eq!(right_bound.target_level, "bound");
         let distractor = label_pair.cases[1]
             .atom_use_targets
             .iter()
