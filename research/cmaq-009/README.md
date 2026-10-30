@@ -1,6 +1,6 @@
 # CMAQ-009: Costed Active Diagnostic Probes for Fast Shift Detection
 
-**Status:** protocol v0.3 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.3 + executable synthetic smoke harness; PR #9069 review  
 **Tracking issue:** [#9066](https://github.com/Luminous-Dynamics/symthaea/issues/9066)  
 **Claim ceiling:** synthetic information-channel experiment only; no production, physical-safety or SOTA claim
 
@@ -73,4 +73,4 @@ The focused workflow validates schema v0.3, ten policy arms across three scenari
 - No calibration split or hidden evaluation family yet; the generator is public and the smoke panel is not sealed qualification.
 - No model integration, external environment or reproduced industry baseline.
 
-Next: introduce calibration/development seed families and held-out qualification; vary probe quality/cost and correlate probe/action errors; add probe-budget Pareto frontiers and event-receipt integrity; then compare the method with independent Bayesian changepoint/Page–Hinkley baselines on held-out action-coupled environments.
+Next: introduce calibration/development seed families and held-out qualification; vary probe quality/cost and correlate probe/action errors; add probe-budget Pareto frontiers and event-receipt integrity; then compare the method with ADWIN and Bayesian changepoint baselines on held-out action-coupled environments. Keep Page–Hinkley and CUSUM as fixed passive references.
