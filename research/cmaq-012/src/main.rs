@@ -647,6 +647,7 @@ mod tests {
             epistemic_std: 0.1,
             aleatoric_std: 0.1,
             realized_reward: 0.5,
+            ensemble_values: [0.5; ENSEMBLE_HEADS],
         };
         let marginal = interval_for_action(
             &action, Policy::MarginalConformalLcb, calibration, fixed
