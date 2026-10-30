@@ -557,6 +557,12 @@ fn evaluate_policy_budget(
     };
     let accept_adjudicated = counts.accepted_correct + counts.accepted_incorrect;
     let applied_adjudicated = counts.applied_correct + counts.applied_incorrect;
+    let accepted_decision_precision = ratio(counts.accepted_correct, accept_adjudicated);
+    let applied_correction_precision = ratio(counts.applied_correct, applied_adjudicated);
+    let correct_proposal_review_recall = ratio(counts.reviewed_correct, pool_correct);
+    let correct_proposal_acceptance_recall = ratio(counts.accepted_correct, pool_correct);
+    let correct_proposal_application_recall = ratio(counts.applied_correct, pool_correct);
+    let incorrect_proposal_acceptance_rate = ratio(counts.accepted_incorrect, pool_incorrect);
     Ok(EvaluatedPolicyBudget {
         policy: policy_order.policy.clone(),
         review_budget_minutes: policy_order.review_budget_minutes,
@@ -571,12 +577,12 @@ fn evaluate_policy_budget(
         outcome_counts: counts,
         candidate_pool_correct_count: pool_correct,
         candidate_pool_incorrect_count: pool_incorrect,
-        accepted_decision_precision: ratio(counts.accepted_correct, accept_adjudicated),
-        applied_correction_precision: ratio(counts.applied_correct, applied_adjudicated),
-        correct_proposal_review_recall: ratio(counts.reviewed_correct, pool_correct),
-        correct_proposal_acceptance_recall: ratio(counts.accepted_correct, pool_correct),
-        correct_proposal_application_recall: ratio(counts.applied_correct, pool_correct),
-        incorrect_proposal_acceptance_rate: ratio(counts.accepted_incorrect, pool_incorrect),
+        accepted_decision_precision,
+        applied_correction_precision,
+        correct_proposal_review_recall,
+        correct_proposal_acceptance_recall,
+        correct_proposal_application_recall,
+        incorrect_proposal_acceptance_rate,
         baseline_weighted_query_error: baseline_error,
         final_weighted_query_error: final_error,
         weighted_query_error_reduction: error_reduction,
@@ -857,6 +863,7 @@ mod tests {
         assert_eq!(row.accepted_decision_precision,Some(0.5));
         assert_eq!(row.correct_proposal_review_recall,Some(0.5));
         assert_eq!(row.correct_proposal_acceptance_recall,Some(0.5));
+        assert_eq!(row.correct_proposal_application_recall,Some(0.5));
         assert_eq!(row.incorrect_proposal_acceptance_rate,Some(1.0));
     }
 
@@ -983,4 +990,15 @@ mod tests {
         assert_eq!(row.outcome_counts.accepted_indeterminate,1);
         assert_eq!(row.outcome_counts.applied_indeterminate,1);
     }
+    #[test]
+    fn parses_checked_in_reviewer_outcome_template_and_schema() {
+        let template: OutcomeFile = serde_json::from_str(include_str!("../../../../docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"))
+            .expect("reviewer outcome template parses");
+        assert_eq!(template.candidate_outcomes.len(), 3);
+        let schema: serde_json::Value = serde_json::from_str(include_str!("../../../../docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"))
+            .expect("reviewer outcome schema parses");
+        assert_eq!(schema["title"], "Connectome post-hoc reviewer outcomes");
+    }
+
+
 }
