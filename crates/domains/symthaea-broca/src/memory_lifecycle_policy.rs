@@ -1046,11 +1046,11 @@ mod tests {
                 conclusion_id: "C1".into(),
                 state: ClaimLifecycleState::SupportedCurrent,
                 selected_justification_id: Some("proof-C1".into()),
-                current_evidence_ids: BTreeSet::from(["E1".into()]),
+                current_evidence_ids: BTreeSet::from(["E1".into(), "E2".into()]),
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
-                source_session_ids: BTreeSet::from(["session-1".into()]),
+                source_session_ids: BTreeSet::from(["session-1".into(), "session-2".into()]),
             }],
         };
         let decision = decide_lifecycle_action(lifecycle_request, Some(&token)).unwrap();
