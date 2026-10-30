@@ -1,0 +1,90 @@
+name: CMAQ-014 dual-control collateral disturbance benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-014/**"
+      - ".github/workflows/cmaq-014.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-014/**"
+      - ".github/workflows/cmaq-014.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dual-control-disturbance:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-014
+        run: cargo test --locked
+      - name: Generate and validate disturbance report
+        working-directory: research/cmaq-014
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-014-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-014-report.json").read_text())
+          assert report["schema_version"] == "cmaq-014-dual-control-disturbance-v0.1"
+          assert report["episode_count"] == 512
+          assert report["damage_threshold"] == 0.12
+          assert report["max_damage_probability"] == 0.05
+          assert report["lanes"] == ["robust_assets", "mixed_assets", "fragile_assets"]
+          assert len(report["cells"]) == 3
+          expected = {
+              "no_probe", "visual_only", "information_greedy", "cost_only",
+              "disturbance_aware", "risk_constrained", "oracle_fragility_aware"
+          }
+          for cell in report["cells"]:
+              assert cell["episode_count"] == 512
+              rows = {row["policy"]: row for row in cell["summaries"]}
+              assert set(rows) == expected
+              for row in rows.values():
+                  for key in ["mean_task_success", "mean_decision_accuracy", "damage_rate", "risk_budget_violation_rate"]:
+                      assert 0.0 <= row[key] <= 1.0
+                  assert 0.0 <= row["mean_information_gain_bits"] <= 1.0
+                  assert len(row["probe_counts"]) == 5
+                  assert sum(row["probe_counts"]) == 512
+              assert rows["visual_only"]["damage_rate"] == 0.0
+              assert rows["visual_only"]["mean_disturbance"] == 0.0
+              assert rows["risk_constrained"]["risk_budget_violation_rate"] == 0.0
+          fragile = next(cell for cell in report["cells"] if cell["lane"] == "fragile_assets")
+          greedy = {row["policy"]: row for row in fragile["summaries"]}["information_greedy"]
+          safe = {row["policy"]: row for row in fragile["summaries"]}["risk_constrained"]
+          aware = {row["policy"]: row for row in fragile["summaries"]}["disturbance_aware"]
+          assert greedy["mean_decision_accuracy"] > safe["mean_decision_accuracy"]
+          assert greedy["damage_rate"] > safe["damage_rate"]
+          assert greedy["mean_task_success"] < safe["mean_task_success"]
+          assert aware["mean_task_success"] > greedy["mean_task_success"]
+          assert aware["mean_net_utility"] > greedy["mean_net_utility"]
+          assert next(cell for cell in report["cells"] if cell["lane"] == "fragile_assets")["summaries"][2]["probe_counts"][4] == 512
+          print(json.dumps({
+              cell["lane"]: {
+                  row["policy"]: {
+                      "task_success": row["mean_task_success"],
+                      "decision_accuracy": row["mean_decision_accuracy"],
+                      "net_utility": row["mean_net_utility"],
+                      "disturbance": row["mean_disturbance"],
+                      "damage_rate": row["damage_rate"],
+                      "probe_cost": row["mean_probe_cost"],
+                      "information_gain_bits": row["mean_information_gain_bits"]
+                  }
+                  for row in cell["summaries"]
+                  if row["policy"] in ["visual_only", "information_greedy", "cost_only", "disturbance_aware", "risk_constrained", "oracle_fragility_aware"]
+              }
+              for cell in report["cells"]
+          }, sort_keys=True))
+          print("CMAQ-014 validated: information accuracy, collateral disturbance, task success and hard risk budget remain distinct")
+          PY
