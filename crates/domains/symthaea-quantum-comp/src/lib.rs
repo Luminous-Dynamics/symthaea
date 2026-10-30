@@ -72,6 +72,7 @@ pub mod paired_advantage;
 pub mod clustered_advantage;
 pub mod adaptive_evaluation;
 pub mod architecture_portfolio;
+pub mod architecture_routing;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -173,6 +174,13 @@ pub use architecture_portfolio::{
     ArchitectureParetoRelation, ArchitectureResourceEnvelope,
     ArchitectureWorkloadKind, ComputeArchitectureFamily, MemoryInterval,
     MetricInterval,
+};
+pub use architecture_routing::{
+    select_architecture_candidate, ArchitectureResourceLimits,
+    ArchitectureRoutingAbstention, ArchitectureRoutingCandidate,
+    ArchitectureRoutingError, ArchitectureRoutingExclusion,
+    ArchitectureRoutingPriority, ArchitectureRoutingReport,
+    ArchitectureRoutingRequest,
 };
 pub use paired_advantage::{
     ExactSignTest, HolmAdjustedPValue, PairedAdvantageConfig, PairedAdvantageError,

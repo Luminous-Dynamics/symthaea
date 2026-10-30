@@ -11,6 +11,8 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | CPU / GPU / NPU / FPGA | Conventional digital | General-purpose, dense vector/matrix, fixed-function and reconfigurable execution |
 | Digital neuromorphic | Event-driven digital spiking/local-state | Sparse temporal events, continuous streams, local state and online updates |
 | Mixed-signal neuromorphic | Accelerated analog neural dynamics | Low-latency dynamical systems, but with calibration and variability costs |
+| Digital processing-in-memory | Digital logic in DRAM/SRAM banks, memory modules or stacked-memory logic layers | Data-movement-bound reductions, matrix/vector operations and bank-local primitives with explicit precision and bank-level parallelism |
+| Digital near-memory compute | Digital logic adjacent to memory arrays/modules, but not inside the arrays | Partial reductions, filtering and data-local scheduling where local-link traffic is still accounted for |
 | Analog compute-in-memory | RRAM/memristor, PCM, flash/NOR arrays | Data-local matrix/vector operations where conversion and correction costs do not erase array gains |
 | Classical photonic linear | Interferometric, diffractive or wavelength-multiplexed optics | High-throughput linear transforms and low-latency optical paths |
 | Photonic / physical reservoir | Physical dynamical substrate | Temporal feature expansion and reservoir tasks with cheap readout |
@@ -19,6 +21,10 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | Spintronic / probabilistic | Spin devices and p-bits | Stochastic sampling or specialized low-energy probabilistic inference |
 | Reversible / adiabatic | Reversible logic and adiabatic circuits | Workloads where switching energy, clocking and physical overhead make a practical comparison possible |
 | Hybrid heterogeneous | Explicit multi-family system | Workloads that benefit from deliberate placement/scheduling across substrates |
+
+Memory-centric designs require separate labels for where computation occurs (in-array, in-module/stack, or adjacent to memory), how it is computed (digital or analog), and the memory substrate (SRAM, DRAM, flash, RRAM, PCM, etc.). Digital HBM/DRAM processing-in-memory is not analog memristor compute-in-memory; near-memory logic is not in-array compute.
+
+For these workloads, report bytes moved at each hierarchy boundary, bank bandwidth/parallelism, precision, host/device transfers, and end-to-end energy/latency. For analog arrays, include ADC/DAC, sensing, calibration, programming, correction and readout. Do not compare an array-only peak with a full-system PIM or GPU result.
 
 An event camera is a sensor modality, not a neuromorphic compute family. Classical photonic matrix multiplication is not quantum photonics. Quantum-inspired software on CPU/GPU remains a classical implementation. A CfC or continuous-time model must not be forced into a spiking-network representation merely to qualify as neuromorphic.
 
@@ -133,3 +139,31 @@ Condition on event sparsity/burstiness, data locality, precision, latency tail, 
 ## Claim ceiling
 
 This module is a data contract and conservative comparison primitive. Its tests and synthetic fixture do not constitute physical measurements, system benchmarking, statistical significance, or evidence that any family is superior.
+
+
+## Constraint-aware architecture selection (QARCH-019B)
+
+The routing primitive is a deterministic selector over **already measured** observations. It is not a learned model, an online scheduler, or a claim that automatic routing is already useful.
+
+A request freezes the workload kind and fingerprint, comparison-contract digest, evidence class, measurement boundary, minimum quality, four hard resource ceilings, and one explicit lexicographic priority. A candidate is eligible only when:
+
+- its workload, comparison contract, evidence class and measurement boundary exactly match the request;
+- the lower bound of its quality interval meets the minimum quality threshold;
+- the upper bound of every resource interval is within its hard ceiling;
+- the observation passes the architecture-portfolio validation contract.
+
+The selector distinguishes definite failures from unresolved intervals. For example, a latency interval wholly above the ceiling is a measured limit violation; an interval that straddles the ceiling is simply not proven feasible. Either excludes the candidate, but the report preserves the distinction. The selector abstains when no candidate proves all requirements.
+
+Among eligible candidates, the caller chooses one lexicographic resource priority (latency, energy, monetary cost, or memory). Remaining resources provide deterministic tie-breaks, followed by the guaranteed quality lower bound and stable candidate identifiers. This is intentionally not a weighted scalar score: the priority is visible and the hard limits remain hard constraints.
+
+### What this selector does not do
+
+- It does not estimate the performance of an unmeasured architecture.
+- It does not learn a router or generalize beyond an exact workload/contract identity.
+- It does not switch devices at runtime.
+- It does not include migration, cold-start, cache-warmup, provisioning, or transition costs unless those are measured inside the supplied resource envelope.
+- It does not treat a simulation result as interchangeable with a prototype or production result.
+
+The next empirical stage is to populate a capability atlas from canonical Symthaea tasks and compatible NeuroBench/MLPerf/QOBLIB suites, then compare this transparent constrained selector against best-static, hand-coded, learned and empirical-oracle policies. Only then should we report routing regret, feasibility violations, switching cost, cold-start penalty and out-of-domain abstention. The first goal is **zero hard-constraint violations on the measured operating region**, not maximum average reward.
+
+All unit-test examples are synthetic logic checks. They do not represent hardware, measured energy, or architecture advantage.
