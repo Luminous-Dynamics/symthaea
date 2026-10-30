@@ -149,7 +149,7 @@ python3 scripts/research/import_naslib_suite_zero.py \
   --top-k 100
 ```
 
-The tool records the raw input SHA-256 in the manifest, emits deterministic canonical JSON, writes the canonical output SHA-256 and counts of normalized infinite proxy scores to stderr, and refuses to overwrite an existing output unless `--force` is provided. The raw SuiteZero artifact is still not acquired or pinned in this repository; the importer is validated only against local synthetic fixtures until that artifact is fetched, hashed and schema-audited.
+The tool records the raw input SHA-256 in the manifest, pins the observed NASLib source commit and upstream Google Drive artifact ID, emits deterministic canonical JSON, writes the canonical output SHA-256 and counts of normalized infinite proxy scores to stderr, and refuses to overwrite an existing output unless `--force` is provided. Seven standard-library Python unit tests are authored in `scripts/research/test_import_naslib_suite_zero.py`; run them with `python3 scripts/research/test_import_naslib_suite_zero.py`. They have not been executed in this environment. The raw SuiteZero artifact is still not acquired or pinned in this repository; the importer remains unvalidated against the real data until it is fetched, hashed and schema-audited.
 
 ## 8. Qualification plan
 
