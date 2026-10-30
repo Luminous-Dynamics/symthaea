@@ -78,7 +78,7 @@ For each declared path:
 - `retained`: every edge was preserved with an exact source identity and endpoint match;
 - `cut_and_reported`: at least one edge was explicitly excluded with a recorded reason.
 
-The receipt reports path endpoints, edge counts, retained/excluded counts and partition crossings. It is unsigned and has an explicit claim ceiling.
+The receipt reports the path endpoints, edge counts, retained/excluded counts, partition crossings, and every individual path step with edge ID, source/destination, disposition, represented partition, and exclusion reason. It also records each input path locator alongside its SHA-256 digest. It is unsigned and has an explicit claim ceiling.
 
 ## 4. Implementation and reproduction
 
