@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::tabular_nas_firewall::{
@@ -20,21 +21,26 @@ use super::tabular_nas_firewall::{
 
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.tabular-nas.multi-fidelity-query-trace.v0.1";
 const IMPORT_DOMAIN: &[u8] = b"symthaea.tabular-nas.multi-fidelity-import.v0.1";
+const CANONICAL_IMPORT_SCHEMA: &str = "symthaea.tabular-nas.multi-fidelity-canonical-import";
+const CANONICAL_IMPORT_VERSION: &str = "0.1.0";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FidelityLevel {
     pub id: String,
     /// Cost from a clean start to this fidelity.
     pub cumulative_cost_units: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FidelityCostModel {
     ResumablePrefix,
     IndependentRuns,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiFidelityManifest {
     pub base: TabularBenchmarkManifest,
     pub fidelity_levels: Vec<FidelityLevel>,
@@ -44,14 +50,16 @@ pub struct MultiFidelityManifest {
     pub max_total_cost_units: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FidelityTargetLabel {
     pub architecture_id: String,
     pub fidelity_index: usize,
     pub value: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FidelityQueryObservation {
     pub architecture_id: String,
     pub metric_id: String,
@@ -87,7 +95,8 @@ impl fmt::Display for FidelityQueryError {
 }
 impl Error for FidelityQueryError {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FidelityQueryAttemptStatus {
     Revealed,
     UnknownArchitecture,
@@ -97,7 +106,8 @@ pub enum FidelityQueryAttemptStatus {
     ResourceBudgetExhausted,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FidelityQueryAttempt {
     pub attempt_index: usize,
     pub architecture_id: String,
@@ -109,7 +119,8 @@ pub struct FidelityQueryAttempt {
     pub observation_sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiFidelityQueryReceipt {
     pub benchmark_id: String,
     pub metric_id: String,
@@ -133,7 +144,8 @@ pub struct MultiFidelityQueryReceipt {
     pub query_trace_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiFidelityEvaluation {
     pub unique_architectures_touched: usize,
     pub final_fidelity_queries: usize,
@@ -163,7 +175,8 @@ pub struct MultiFidelityEvaluation {
     pub final_normalized_regret_percent: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MultiFidelityTabularRun {
     pub receipt: MultiFidelityQueryReceipt,
     pub evaluation: MultiFidelityEvaluation,
@@ -334,6 +347,16 @@ impl MultiFidelityQueryOracle<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalMultiFidelityImport {
+    schema: String,
+    version: String,
+    manifest: MultiFidelityManifest,
+    architectures: Vec<ArchitectureFeatures>,
+    target_labels: Vec<FidelityTargetLabel>,
+}
+
 pub struct MultiFidelityTabularBenchmark {
     manifest: MultiFidelityManifest,
     features: Vec<ArchitectureFeatures>,
@@ -346,6 +369,19 @@ pub struct MultiFidelityTabularBenchmark {
 }
 
 impl MultiFidelityTabularBenchmark {
+    /// Strict canonical JSON reader for pinned multi-fidelity benchmark imports.
+    pub fn from_canonical_json(source: &str) -> Result<Self, MultiFidelityFirewallError> {
+        let imported: CanonicalMultiFidelityImport = serde_json::from_str(source)
+            .map_err(|error| MultiFidelityFirewallError::new("$", format!("invalid canonical multi-fidelity import: {error}")))?;
+        if imported.schema != CANONICAL_IMPORT_SCHEMA {
+            return Err(MultiFidelityFirewallError::new("schema", "wrong multi-fidelity canonical import schema"));
+        }
+        if imported.version != CANONICAL_IMPORT_VERSION {
+            return Err(MultiFidelityFirewallError::new("version", "wrong multi-fidelity canonical import version"));
+        }
+        Self::new(imported.manifest, imported.architectures, imported.target_labels)
+    }
+
     pub fn new(
         manifest: MultiFidelityManifest,
         features: Vec<ArchitectureFeatures>,
@@ -913,6 +949,27 @@ mod tests {
         let mut invalid = manifest(FidelityCostModel::ResumablePrefix, 500);
         invalid.fidelity_levels[1].id = invalid.fidelity_levels[0].id.clone();
         assert!(MultiFidelityTabularBenchmark::new(invalid, features(12), labels(12)).is_err());
+    }
+
+    #[test]
+    fn canonical_json_import_is_strict_and_round_trips_the_fidelity_contract() {
+        let imported = CanonicalMultiFidelityImport {
+            schema: CANONICAL_IMPORT_SCHEMA.into(),
+            version: CANONICAL_IMPORT_VERSION.into(),
+            manifest: manifest(FidelityCostModel::ResumablePrefix, 500),
+            architectures: features(12),
+            target_labels: labels(12),
+        };
+        let json = serde_json::to_string(&imported).unwrap();
+        let benchmark = MultiFidelityTabularBenchmark::from_canonical_json(&json).unwrap();
+        let run = benchmark.run_search(|_, oracle| {
+            oracle.query("arch-011", 2).unwrap();
+        });
+        assert_eq!(run.receipt.canonical_import_sha256.len(), 64);
+
+        let mut value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        value["target_label_leak"] = serde_json::json!({"arch-011": 91.0});
+        assert!(MultiFidelityTabularBenchmark::from_canonical_json(&value.to_string()).is_err());
     }
 
     #[test]
