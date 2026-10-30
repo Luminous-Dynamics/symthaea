@@ -9,6 +9,8 @@ The previous post-hoc evaluator stores one reviewer decision and one adjudicatio
 
 The new `connectome-multi-rater-audit` binary is isolated from `connectome-query-impact`. It consumes the exact proposal input, exact frozen ranking report, and a separate evaluation-only outcome file. It does not rank, propose, select, or mutate graph annotations.
 
+A directly relevant comparator is Lee et al., *Beyond Agreement: Standardizing Crowdsourced Synapse Annotations through Proofreading in EM Connectomics* (bioRxiv preprint, 2025; updated 2026): five raters (one expert plus four calibrated annotators) reviewed model-proposed synapse candidates, and the study used a probabilistic Dawid–Skene model to retain consensus uncertainty. The authors report that calibration improved individual agreement with the expert, while chance-corrected agreement gains were modest and dataset-dependent. This supports retaining raw votes and uncertainty; it does not imply that this project has reproduced the method or achieved its results. https://doi.org/10.1101/2025.09.26.678851
+
 ## Data contract
 
 For every candidate in the frozen proposal pool, record at least two adjudicator votes and at least two reviewer reviews.
