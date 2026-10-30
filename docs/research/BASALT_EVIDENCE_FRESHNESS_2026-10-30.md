@@ -32,10 +32,11 @@ The fixture illustrates four directly invalidated evidence records, one transiti
 6. A resource change directly invalidates evidence that pinned that resource. Invalidation propagates to all transitive evidence descendants.
 7. Evidence whose resource inputs remain unchanged is preserved. Irrelevant file changes do not cause blanket invalidation.
 8. Returning a resource to its earlier digest does not resurrect old evidence: generation is monotonic across every declared change. Re-verification creates a new evidence record against the current generation.
-9. A result is `usable_for_success` only when it is fresh, its outcome is `pass`, and every declared evidence dependency is itself usable. A fresh failure is still a fresh failure; a stale pass is not usable.
-10. The emitted re-verification plan lists stale evidence IDs in original topological/creation order. It is a deterministic candidate queue, not proof that a runner has executed the checks. A structurally valid audit may still contain stale evidence: command success means the timeline was internally consistent, not that every check is current or that the task has passed. Consumers must inspect freshness and `usable_for_success` fields.
+9. Every evidence record declares `dependency_coverage` as `complete` or `incomplete`. Complete requires an empty `unresolved_inputs` list; incomplete requires named unresolved inputs. Contradictory declarations are structurally invalid.
+10. `eligible_under_declared_coverage` is true only when the evidence is fresh, passing, declared complete, and unblocked by its evidence parents. It is explicitly conditional on the producer's declaration; that declaration is not authenticated or independently proven by this auditor. Incomplete evidence is ineligible even before a change, is queued for re-verification, and conservatively becomes directly stale after any later resource change. Its descendants are invalidated transitively.
+11. The emitted re-verification plan contains stale, incomplete-coverage, and evidence blocked by non-eligible parents in topological/creation order. It is a deterministic candidate queue, not proof that a runner has executed the checks. The report exposes `structurally_valid` separately from `confirmatory_eligible`; confirmatory eligibility is hard-coded false until authenticated runner/coverage receipts are independently verified.
 
-The implementation maintains reverse resource and evidence indexes. Evidence leaves those indexes when first invalidated, so later workspace changes do not repeatedly rescan already-stale nodes. A final topological provenance pass closes the full stale-ancestor and invalidation-event history across multi-parent DAGs, independent of traversal order; a diamond-dependency regression covers converging stale parents. Bounds are explicit: 64 MiB input, 20,000 timeline entries, 100,000 initial resources, 4,096 resource pins or evidence parents per record, and 250,000 total dependency edges.
+The implementation maintains reverse resource and evidence indexes. Evidence leaves those indexes when first invalidated, so later workspace changes do not repeatedly rescan already-stale nodes. Incomplete-coverage evidence is tracked separately and conservatively included in every later invalidation event. A final topological provenance pass closes the full stale-ancestor and invalidation-event history across multi-parent DAGs, independent of traversal order; a diamond-dependency regression covers converging stale parents. `confirmatory_eligible` remains false in every report because the timeline digest and self-declared coverage flag do not authenticate the producer or prove observation completeness. Bounds are explicit: 64 MiB input, 20,000 timeline entries, 100,000 initial resources, 4,096 resource pins or evidence parents per record, and 250,000 total dependency edges.
 
 ## Trust boundary
 
@@ -59,13 +60,14 @@ This is falsifiable. A dependency model that misses hidden inputs, incomplete ev
 
 Build a separate state-continuity lane with paired clean and shifted continuations, using the same saved initial state, agent/model/scaffold, task, budget, and toolchain. Vary intervention position (early, middle, late) and change family (source, dependency lock, toolchain, task contract, configuration/environment, tool/session).
 
-Compare four evidence policies:
+Compare five evidence policies:
 1. **No invalidation:** reuse all old evidence (deliberately unsafe negative control).
 2. **Global invalidation:** rerun every check after every event (safe but expensive reference policy).
 3. **Content-only cache:** invalidate only when current digests differ, without generation/lineage propagation (detects the ABA reversion weakness).
 4. **BASALT graph:** exact digest + monotonic generation + transitive evidence dependencies.
+5. **BASALT graph with incomplete coverage:** declare hidden/untracked inputs and exercise conservative fallback. Incomplete evidence must not be accepted before a change and must be invalidated by any subsequent resource change.
 
-Include positive controls where only an irrelevant resource changes, negative controls where a required source/dependency/toolchain/contract changes, digest A→B→A reversion, stale-parent reuse, missing event, duplicated/out-of-order event, forged before-state, and fresh re-verification after a change.
+Include positive controls where only an irrelevant resource changes, negative controls where a required source/dependency/toolchain/contract changes, digest A→B→A reversion, stale-parent reuse, missing event, duplicated/out-of-order event, forged before-state, and fresh re-verification after a change. Add incomplete-coverage controls for untracked environment variables, build-script reads, generated artifacts, network-fetched inputs, and a declared-complete assertion that conflicts with independently observed runner inputs.
 
 Report:
 - strict task completion under the current contract;
@@ -74,7 +76,7 @@ Report:
 - unaffected-evidence retention and false invalidation rate;
 - re-verification work as fraction of global-rerun work;
 - cost, wall time, tool calls, and p50/p90 recovery latency;
-- unresolved/untracked dependency rate and runner receipt coverage.
+- unresolved/untracked dependency rate, incomplete-coverage rate, conservative-invalidation rate, and runner receipt coverage.
 
 ### Proposed gates (targets, not results or industry standards)
 
@@ -83,7 +85,9 @@ Report:
 - 100% preservation on deterministic irrelevant-change controls.
 - At least 30% lower re-verification work than the global-rerun policy, with no increase in stale-evidence acceptance, before claiming an efficiency advantage.
 - At least 70% clean-to-shift success retention on a preregistered confirmatory cohort as a stretch target; report absolute shifted success and paired success separately.
-- 100% of confirmatory timeline entries tied to independently authenticated runner receipts.
+- Zero success eligibility for incomplete-coverage evidence, including when no known resource has changed.
+- 100% of confirmatory timeline entries tied to independently authenticated runner receipts and independently verified dependency-coverage receipts.
+- 0% of timeline-only auditor reports eligible for confirmatory scoring; the current auditor's explicit `confirmatory_eligible=false` is a hard boundary, not a temporary status guess.
 
 Use task/scenario clustering for confidence intervals. Do not treat repeated tests, evidence nodes, or intervention positions within a repository as independent tasks. Publish every unresolved event and untracked input; never silently drop it from the denominator.
 
