@@ -12,7 +12,7 @@
         "Rust"
       ],
       "base_tree_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
-      "spec_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "spec_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
       "paired_transform_id": null,
       "quality_audit": {
         "status": "accepted",
@@ -149,13 +149,13 @@
         {
           "requirement_id": "req-compiles",
           "source_span": {
-            "source_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "source_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
             "start_byte": 0,
-            "end_byte": 24
+            "end_byte": 40
           },
           "origin": "explicit",
           "ambiguity": "none",
-          "statement_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "statement_digest": "sha256:34de22addea92583a6d10573644a559ab5cd76d778d54039763679722d1b9abb",
           "expectation_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "inference_rationale_digest": null,
           "blocking_check_ids": [
@@ -165,13 +165,13 @@
         {
           "requirement_id": "req-api-stable",
           "source_span": {
-            "source_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-            "start_byte": 25,
-            "end_byte": 54
+            "source_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
+            "start_byte": 41,
+            "end_byte": 89
           },
           "origin": "explicit",
           "ambiguity": "none",
-          "statement_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "statement_digest": "sha256:980003ceb862ee2e17661696e7cde954edfb1aa057bd8dbe0abb5fd67d62b6be",
           "expectation_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "inference_rationale_digest": null,
           "blocking_check_ids": [
@@ -179,7 +179,7 @@
           ]
         }
       ],
-      "spec_byte_length": 100
+      "spec_byte_length": 90
     }
   ],
   "seed_policy": "fixed_paired",
