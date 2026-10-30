@@ -839,6 +839,18 @@ mod tests {
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const ASSUMPTIONS: &str =
         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const SEQCUBE_INFECTED_NETLIST: &str =
+        "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de";
+    const SEQCUBE_ACTIVE_TRACE: &str =
+        "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a";
+    const SEQCUBE_INACTIVE_TRACE: &str =
+        "3d7cf845a7d530a2d4356aa264ec4b3fea13308f9dc2b3e4fe5295f50c4f9359";
+    const SEQCUBE_BOUNDARY: &str =
+        "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d";
+    const SEQCUBE_INACTIVE_SMT: &str =
+        "b93fddb6a38e1ef148e8a259bf26634d031c44dccbc168c50161c1e50846379f";
+    const SEQCUBE_CONFIG: &str =
+        "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9";
 
     fn base_packet() -> Value {
         json!({
@@ -974,6 +986,128 @@ mod tests {
             "scope": "test scope",
             "evidence_ids": ids
         }]);
+    }
+
+    #[test]
+    fn accepts_seqcube_witness_only_packet_without_inventing_a_detector() {
+        let mut packet = base_packet();
+        packet["packet_id"] = json!("seqcube-reference-ctrl-0001");
+        packet["dataset_id"] = json!("seqcube-ht-witness-validation-artifact-v1.0");
+        packet["evaluation_mode"] = json!("witness_validation");
+        packet.as_object_mut().unwrap().remove("detector");
+        packet["subject"]["design_id"] = json!("seqctrl_infected");
+        packet["subject"]["netlist_sha256"] = json!(SEQCUBE_INFECTED_NETLIST);
+        packet["evidence"] = json!([
+            {
+                "evidence_id": "seqcube-active-cover",
+                "kind": "cover_witness",
+                "subject_sha256": SEQCUBE_INFECTED_NETLIST,
+                "evidence_sha256": SEQCUBE_ACTIVE_TRACE,
+                "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/main/replay/active.csv",
+                "status": "pass",
+                "tool": "SeqCube-HT reference verifier",
+                "tool_version": "1.0",
+                "scope": "reset-consistent 10-cycle active replay; trigger phases at cycles 2, 4 and 6",
+                "formal_result": "cover_reached",
+                "property_id": "three_phase_trigger_path",
+                "stimuli_count": 10,
+                "activation_count": 3,
+                "witness_sha256": SEQCUBE_ACTIVE_TRACE
+            },
+            {
+                "evidence_id": "seqcube-active-payload",
+                "kind": "payload_effect_trace",
+                "subject_sha256": SEQCUBE_INFECTED_NETLIST,
+                "evidence_sha256": SEQCUBE_BOUNDARY,
+                "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/main/replay/expected_boundary.json",
+                "status": "pass",
+                "tool": "SeqCube-HT reference verifier",
+                "tool_version": "1.0",
+                "scope": "paired clean/infected primary output difference first observed at cycle 8",
+                "stimuli_count": 10,
+                "payload_effects_observed": 1,
+                "witness_sha256": SEQCUBE_BOUNDARY
+            },
+            {
+                "evidence_id": "seqcube-inactive-trace",
+                "kind": "stimulus_trace",
+                "subject_sha256": SEQCUBE_INFECTED_NETLIST,
+                "evidence_sha256": SEQCUBE_INACTIVE_TRACE,
+                "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/main/replay/inactive.csv",
+                "status": "pass",
+                "tool": "SeqCube-HT reference verifier",
+                "tool_version": "1.0",
+                "scope": "10-cycle inactive control; ack changes at cycle 4",
+                "stimuli_count": 10,
+                "activation_count": 0
+            },
+            {
+                "evidence_id": "seqcube-inactive-payload",
+                "kind": "payload_effect_trace",
+                "subject_sha256": SEQCUBE_INFECTED_NETLIST,
+                "evidence_sha256": SEQCUBE_BOUNDARY,
+                "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/main/replay/expected_boundary.json",
+                "status": "pass",
+                "tool": "SeqCube-HT reference verifier",
+                "tool_version": "1.0",
+                "scope": "paired clean/infected output difference not observed on inactive control",
+                "stimuli_count": 10,
+                "payload_effects_observed": 0
+            },
+            {
+                "evidence_id": "seqcube-inactive-bounded-audit",
+                "kind": "formal_proof",
+                "subject_sha256": SEQCUBE_INFECTED_NETLIST,
+                "evidence_sha256": SEQCUBE_INACTIVE_SMT,
+                "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/main/audit/inactive.smt2",
+                "status": "pass",
+                "tool": "Z3 Boolean API (publisher-reported)",
+                "tool_version": "4.x",
+                "scope": "inactive trigger activation query bounded to the recorded reset/vector sequence",
+                "proof_scope": "bounded",
+                "formal_result": "bounded_no_counterexample",
+                "property_id": "inactive_trigger_activation",
+                "assumptions_sha256": SEQCUBE_CONFIG,
+                "bound_cycles": 10
+            }
+        ]);
+        packet["claims"] = json!([
+            {
+                "claim_type": "trigger_activated",
+                "status": "supported",
+                "scope": "active reset-consistent trace reached all three phases",
+                "evidence_ids": ["seqcube-active-cover"]
+            },
+            {
+                "claim_type": "payload_effect_observed",
+                "status": "supported",
+                "scope": "active trace reached the primary output observation boundary at cycle 8",
+                "evidence_ids": ["seqcube-active-payload"]
+            },
+            {
+                "claim_type": "trigger_not_observed_under_budget",
+                "status": "supported",
+                "scope": "inactive 10-cycle control only",
+                "evidence_ids": ["seqcube-inactive-trace"]
+            },
+            {
+                "claim_type": "payload_effect_not_observed_under_budget",
+                "status": "supported",
+                "scope": "inactive 10-cycle control only",
+                "evidence_ids": ["seqcube-inactive-payload"]
+            },
+            {
+                "claim_type": "bounded_reachability_not_found",
+                "status": "supported",
+                "scope": "inactive query and its declared 10-cycle bound only",
+                "evidence_ids": ["seqcube-inactive-bounded-audit"]
+            }
+        ]);
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        assert_eq!(summary.evaluation_mode, "witness_validation");
+        assert_eq!(summary.model_sha256, None);
+        assert_eq!(summary.evidence_count, 5);
+        assert_eq!(summary.claims.len(), 5);
     }
 
     #[test]
