@@ -54,7 +54,7 @@ JUDGMENT_FIELDS = (
     "evidence_span_ids", "rationale_sha256",
 )
 RESOLUTION_FIELDS = (
-    "resolution_id", "claim_id", "decision", "prior_record_ids",
+    "resolution_id", "claim_id", "adjudicator_id_sha256", "decision", "prior_record_ids",
     "evidence_span_ids", "rationale_sha256",
 )
 
@@ -262,17 +262,54 @@ def validate_package(package: dict[str, Any]) -> list[str]:
                     issues.append(f"material claim {claim['claim_id']} lacks three declared independence groups")
 
     for event in resolutions:
+        event_id = event["resolution_id"]
         if event["claim_id"] not in known_claims:
-            issues.append(f"resolution {event['resolution_id']} has orphan claim")
+            issues.append(f"resolution {event_id} has orphan claim")
+        resolver_id = event["adjudicator_id_sha256"]
+        resolver = known_adjudicators.get(resolver_id)
+        if resolver is None:
+            issues.append(f"resolution {event_id} has orphan resolver")
+        if event["decision"] == "abstain":
+            issues.append(f"resolution {event_id} cannot use an unqualified abstention")
         if len(event["prior_record_ids"]) < 2:
-            issues.append(f"resolution {event['resolution_id']} lacks prior judgments")
+            issues.append(f"resolution {event_id} lacks prior judgments")
+        prior_voters: set[str] = set()
+        prior_groups: set[str] = set()
         for record_id in event["prior_record_ids"]:
             previous = known_judgments.get(record_id)
             if previous is None or previous["claim_id"] != event["claim_id"]:
-                issues.append(f"resolution {event['resolution_id']} has invalid predecessor")
+                issues.append(f"resolution {event_id} has invalid predecessor")
+            else:
+                prior_voters.add(previous["adjudicator_id_sha256"])
+                prior_groups.add(group_by_adjudicator[previous["adjudicator_id_sha256"]])
+        if len(prior_voters) < 2:
+            issues.append(f"resolution {event_id} needs at least two distinct prior raters")
+        if resolver_id in prior_voters:
+            issues.append(f"resolution {event_id} resolver is in the initial voting set")
+        if resolver and not example and resolver["independence_group_sha256"] in prior_groups:
+            issues.append(f"resolution {event_id} resolver shares a prior independence group")
+        if event["decision"] in {"supported_within_scope", "contradicted_within_scope", "mixed_or_contested", "temporally_stale"} and not event["evidence_span_ids"]:
+            issues.append(f"resolution {event_id} requires evidence")
+        if event["decision"] in {"supported_within_scope", "contradicted_within_scope"}:
+            target = next((row["scope"]["target_date"] for row in claims if row["claim_id"] == event["claim_id"]), None)
+            for span_id in event["evidence_span_ids"]:
+                span = span_by_id.get(span_id)
+                source = source_by_id.get(span["source_id"]) if span else None
+                if source and source["lifecycle"] != "active":
+                    issues.append(f"resolution {event_id} uses withdrawn source")
+                if source and target and source["publication_date"] and source["publication_date"] > target:
+                    issues.append(f"resolution {event_id} uses future source")
+        if event["decision"] == "temporally_stale":
+            stale = any(span_by_id.get(span_id) and source_by_id.get(span_by_id[span_id]["source_id"], {}).get("lifecycle") != "active" for span_id in event["evidence_span_ids"])
+            if not stale:
+                issues.append(f"resolution {event_id} lacks stale-source evidence")
+        if len(event["evidence_span_ids"]) != len(set(event["evidence_span_ids"])):
+            issues.append(f"resolution {event_id} repeats an evidence span")
         for span_id in event["evidence_span_ids"]:
             if span_id not in known_spans:
-                issues.append(f"resolution {event['resolution_id']} has orphan span")
+                issues.append(f"resolution {event_id} has orphan span")
+        if not valid_digest(event["rationale_sha256"]):
+            issues.append(f"resolution {event_id} has invalid rationale digest")
 
     if not verify_commitment(package):
         issues.append("package commitment mismatch")
@@ -311,6 +348,22 @@ class ReferenceAssuranceOracleTests(unittest.TestCase):
         value["sources"][1]["snapshot_sha256"] = value["sources"][0]["snapshot_sha256"]
         self.assertTrue(any("duplicate exact source snapshot" in issue for issue in validate_package(value)))
 
+    def test_resolution_is_separate_and_has_independent_resolver(self) -> None:
+        event = self.fixture["resolutions"][0]
+        initial_voters = {row["adjudicator_id_sha256"] for row in self.fixture["initial_adjudications"]}
+        self.assertNotIn(event["adjudicator_id_sha256"], initial_voters)
+        self.assertEqual(len(self.fixture["initial_adjudications"]), 3)
+        self.assertEqual(event["decision"], "mixed_or_contested")
+
+    def test_resolution_cannot_be_made_by_an_initial_voter(self) -> None:
+        value = copy.deepcopy(self.fixture)
+        value["resolutions"][0]["adjudicator_id_sha256"] = value["initial_adjudications"][0]["adjudicator_id_sha256"]
+        self.assertTrue(any("resolver is in the initial voting set" in issue for issue in validate_package(value)))
+
+    def test_resolution_requires_evidence_for_a_positive_or_contested_state(self) -> None:
+        value = copy.deepcopy(self.fixture)
+        value["resolutions"][0]["evidence_span_ids"] = []
+        self.assertTrue(any("requires evidence" in issue for issue in validate_package(value)))
     def test_retracted_source_cannot_support_current_claim(self) -> None:
         value = copy.deepcopy(self.fixture)
         value["sources"][0]["lifecycle"] = "retracted"
