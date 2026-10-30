@@ -479,6 +479,29 @@ Useful tool references:
 - EQY equivalence tutorial: https://formal.org/tutorials/symbiyosys/equivalence-checking (gold/gate comparison, partition proofs and counterexamples)
 - SeqCube-HT (2026): https://doi.org/10.1186/s42400-026-00676-2 (state-cube-guided sequential Trojan benchmark methodology)
 
-## 15. Scope boundary
+## 15. Portable evidence interfaces and supply-chain pinning
+
+The evidence contract is now published as JSON Schema Draft 2020-12, so CI systems, EDA vendors, labs and external reviewers can validate packet shape without importing Symthaea code:
+
+- `schemas/hardsec-evidence-packet-v1.schema.json` — detector-alert and detector-free witness-validation packet shape;
+- `schemas/hardsec-evidence-audit-receipt-v1.schema.json` — packet-audit and optional referenced-byte-integrity receipt;
+- `schemas/hardsec-seqcubewitness-attestation-v1.schema.json` — custom predicate for the signed reproducibility bundle.
+
+The focused workflow validates the witness fixture, generated packet receipt and generated attestation predicate against these schemas. Structural schema validation complements, but does not replace, the Rust semantic validator: JSON Schema cannot decide whether a bounded no-counterexample result was promoted to an unbounded claim or whether the cited evidence actually proves the statement.
+
+Third-party workflow actions are recorded in `tools/hardsec-audit-harness/actions.lock.json` and used by immutable 40-character commit references:
+- `actions/checkout` v7.0.1;
+- `dtolnay/rust-toolchain` at commit `683b588c487a69d01f6c6ddf40f036ff682cc2c8`, installing Rust 1.96.0 explicitly;
+- `actions/setup-python` v7.1.0;
+- `actions/upload-artifact` v7.0.2;
+- `actions/attest` v4.2.2.
+
+The workflow extracts every `uses:` reference, deduplicates it, requires a full commit SHA, and compares the exact owner/repository and SHA against the lock file. The action-lock digest is included in the run manifest and signed predicate. Release tags are metadata only; the execution references the immutable commits.
+
+The nested harness now commits `tools/hardsec-audit-harness/Cargo.lock` (raw SHA-256 `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`). CI checks this exact digest and invokes Cargo with `--locked`; it no longer resolves transitive dependency versions afresh on every run. The JSON Schema checker is pinned at `jsonschema==4.23.0`.
+
+**Current revision status:** action-pin enforcement, committed lockfile, three schemas and three distinct negative controls are committed to the draft branch. The exact-head focused workflow result is pending; the earlier successful run does not validate these newer changes or the signature step.
+
+## 16. Scope boundary
 
 This is defensive benchmark and evaluation infrastructure. It does not construct or deploy Trojan payloads, claim a Trojan is absent because finite simulation was quiet, or certify silicon. Formal results must preserve assumptions, bounds and solver provenance. The public contest repository's code/checkpoint/data must not be redistributed until a license or explicit permission is established.
