@@ -254,7 +254,6 @@ fn fit_sse(samples: &[Sample], feature: Feature) -> f64 {
         .map(|sample| (sample.distance_nm - mean_x) * (feature.value(sample) - mean_y))
         .sum::<f64>();
     let slope = covariance / variance_x;
-    let _intercept = mean_y - slope * mean_x;
     samples.iter()
         .map(|sample| (feature.value(sample) - (mean_y + slope * (sample.distance_nm - mean_x))).powi(2))
         .sum()
