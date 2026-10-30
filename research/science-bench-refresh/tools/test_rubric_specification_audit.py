@@ -74,6 +74,41 @@ class RubricSpecificationAuditTests(unittest.TestCase):
         self.assertFalse(report["valid"])
         self.assertTrue(any("references an unknown criterion" in item for item in report["issues"]))
 
+    def test_dependency_cycle_is_rejected(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["dependency_rules"].append({
+            "from_criterion_id": "clarity", "to_criterion_id": "claim_accuracy",
+            "relation": "overrides",
+            "rationale": "This intentionally closes a cycle for the hostile control.",
+        })
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("dependency graph contains a cycle" in item for item in report["issues"]))
+
+    def test_override_must_flow_from_higher_priority_to_lower_priority(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["dependency_rules"][0]["from_criterion_id"] = "clarity"
+        value["dependency_rules"][0]["to_criterion_id"] = "claim_accuracy"
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("higher-priority criterion" in item for item in report["issues"]))
+
+    def test_reversed_conflict_edge_is_not_double_counted(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["dependency_rules"].extend([
+            {"from_criterion_id": "claim_accuracy", "to_criterion_id": "clarity", "relation": "conflicts_with", "rationale": "An explicit tradeoff is recorded here."},
+            {"from_criterion_id": "clarity", "to_criterion_id": "claim_accuracy", "relation": "conflicts_with", "rationale": "The reversed edge duplicates the same symmetric conflict."},
+        ])
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("duplicates a symmetric conflicts_with rule" in item for item in report["issues"]))
+
+    def test_score_anchor_unknown_field_is_rejected(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["criteria"][0]["score_anchors"][0]["secret_weight"] = 99
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("score anchor 0 has invalid fields" in item for item in report["issues"]))
     def test_duplicate_criterion_id_is_rejected(self) -> None:
         value = json.loads(json.dumps(self.fixture))
         value["criteria"][1]["criterion_id"] = value["criteria"][0]["criterion_id"]
