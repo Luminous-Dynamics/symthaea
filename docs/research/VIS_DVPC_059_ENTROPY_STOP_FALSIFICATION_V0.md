@@ -43,7 +43,7 @@ The code intentionally follows that value-optimal next annotation for two additi
 ## Stop-rule comparison
 
 - APRIL-style global entropy stop: `H(A) >= log(|A|) - 0.001`;
-- value-based stop: stop only when no feasible one-step annotation has robust worst-policy MSE gain per cost greater than `1e-10` (v0 diagnostic threshold).
+- value-based stop: stop only when no feasible one-step annotation has robust worst-policy MSE gain per cost greater than `1e-10` (v0 diagnostic threshold). The row reports both decisions separately.
 
 Future iterations should compare marginal entropy gain, context entropy, target-weighted coverage thresholds, best-policy expected-simple-regret gain, and sequential batch acquisition. The current v0 comparison focuses on the falsification of aggregate entropy as a sufficient stop signal.
 
