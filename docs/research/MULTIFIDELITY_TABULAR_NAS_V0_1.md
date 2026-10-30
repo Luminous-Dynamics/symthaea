@@ -149,9 +149,17 @@ Fifteen Rust unit tests are authored for resumable versus restart costs, touched
 
 ## 8. External benchmark and data limitations
 
-The initial test fixture is synthetic; it does not reproduce NAS-Bench-201 or CoRA-NAS. The public SuiteZero importer from the preceding branch imports per-architecture zero-cost proxy scores and proxy runtimes. It does not yet import training learning curves.
+The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201 or CoRA-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
 
-The next data task is a one-time NAS-Bench-201 training-curve importer. The official NAS-Bench-201 v1.1 checkpoint is documented as a 4.7GB PyTorch artifact; inspect its actual structure, license and data hashes before selecting it. Convert only the necessary train/validation curve fields to the canonical multi-fidelity format and retain the raw source digest. Do not bring Python/PyTorch into the production Rust runtime. Do not acquire the 226GB trained-weight archive merely to obtain tabular learning curves.
+The observed NASLib API structure is:
+- `nb201_data[architecture_string][dataset_key]["eval_acc1es"]`;
+- CIFAR-10 maps to `cifar10-valid`, CIFAR-100 to `cifar100`;
+- the curve is indexed by epoch (NASLib's query API returns the first 50 elements for `full_lc=True, epoch=50`);
+- the importer uses one-based milestones (default 5, 15, 200) and maps them to zero-based curve indices (4, 14, 199).
+
+The CIFAR-10 pickle is documented upstream as `nb201_cifar10_full_training.pickle`, Google Drive ID `1sh8pEhdrgZ97-VFBVL94rI36gedExVgJ`; NASLib's Colab artifact log reports 117 MB. The importer requires a caller-supplied expected raw SHA-256 and checks it **before** unpickling. Pickle deserialization can execute code: only use the official artifact after verifying the expected digest from a trusted, independent source. The importer validates exact architecture-set equality against SuiteZero, validates complete curves, checks the final curve point against SuiteZero `val_accuracy` within a declared tolerance, and emits the multi-fidelity canonical schema. It records the raw curve digest and SuiteZero canonical-import digest in a composite source provenance digest.
+
+Eight standard-library Python tests are authored in `scripts/research/test_import_naslib_nb201_learning_curves.py` for epoch mapping, endpoint agreement, missing/extra architectures, missing/short curves, non-finite values, schedule/budget guards and pre-unpickle SHA verification. They have not been executed. The real 117 MB artifact has not been downloaded or hash-pinned, so importer validation remains synthetic until that step is completed. The 4.7 GB checkpoint or 226 GB trained-weight archive is not a prerequisite for this initial curve table.
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
