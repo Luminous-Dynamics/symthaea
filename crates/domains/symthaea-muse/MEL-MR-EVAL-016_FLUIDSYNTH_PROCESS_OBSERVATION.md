@@ -11,7 +11,7 @@ MEL-MR-EVAL-015 records a local render receipt, but its first integration only h
 - `render_midi_to_wav_observed` returns a structured observation even when the child cannot start or exits unsuccessfully.
 - The adapter canonicalizes the executable, SoundFont and MIDI paths; builds an explicit ordered argument vector; invokes the executable directly without a shell; and captures stdout/stderr.
 - The exact parent environment snapshot is passed to the child after `env_clear`; a deterministic digest commits to the complete environment without persisting potentially sensitive values.
-- Full stdout/stderr streams are SHA-256 committed, with bounded 4 KiB previews stored for diagnostics.
+- Full stdout/stderr streams are drained concurrently and SHA-256 committed incrementally; only bounded 4 KiB previews are retained, so diagnostic memory does not grow with log size.
 - Executable and SoundFont content hashes are taken before and after the child invocation. A receipt-producing render requires both pairs to match.
 - A process-output WAV is mastered only after exit code zero and stable pre/post executable and SoundFont hashes.
 - Renderer receipt v0.2 binds executable/SoundFont paths, pre/post hashes, ordered argv, environment digest, diagnostic digests/previews, truncation state and actual exit code.
