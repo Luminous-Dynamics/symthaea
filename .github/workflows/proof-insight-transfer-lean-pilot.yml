@@ -191,6 +191,12 @@ jobs:
               "base_structured_local_context_sha256": base_state["structured_local_context_sha256"],
               "variant_structured_local_context_sha256": variant_state["structured_local_context_sha256"],
               "snapshot_schema_version": "pitb.lean-proof-state-snapshot.v0",
+              "structured_snapshots": {
+                  "base": base_state["structured"],
+                  "variant": variant_state["structured"],
+                  "irrelevant_base": irrelevant_base_state["structured"],
+                  "irrelevant_variant": irrelevant_variant_state["structured"]
+              },
               "trace_log_sha256": hashlib.sha256(state_trace_path.read_bytes()).hexdigest(),
               "irrelevant_context_intervention": {
                   "operation": "clear hIrrelevant",
@@ -389,6 +395,61 @@ jobs:
                   != trace_cases[0].get("variant_statement_fragment_sha256")
               ):
                   errors.append("clear-h trace does not preserve the normalized theorem statement")
+
+              irrelevant_trace = trace.get("irrelevant_context_intervention", {})
+              irrelevant_cases = [
+                  case for case in bindings
+                  if case.get("case_id") == irrelevant_trace.get("case_id")
+                  and (case.get("state_intervention") or {}).get("operation") == "clear hIrrelevant"
+              ]
+              if len(irrelevant_cases) != 1:
+                  errors.append("irrelevant-context trace is not bound to exactly one clear-hIrrelevant manifest case")
+              elif (
+                  irrelevant_cases[0].get("base_statement_fragment_sha256")
+                  != irrelevant_cases[0].get("variant_statement_fragment_sha256")
+              ):
+                  errors.append("irrelevant-context trace does not preserve the normalized theorem statement")
+
+              snapshots = trace.get("structured_snapshots", {})
+              snapshot_bindings = {
+                  "base": (trace, "base_structured_snapshot_sha256", "base_structured_local_context_sha256"),
+                  "variant": (trace, "variant_structured_snapshot_sha256", "variant_structured_local_context_sha256"),
+                  "irrelevant_base": (irrelevant_trace, "base_snapshot_sha256", "base_local_context_sha256"),
+                  "irrelevant_variant": (irrelevant_trace, "variant_snapshot_sha256", "variant_local_context_sha256")
+              }
+              for label, (binding, snapshot_key, context_key) in snapshot_bindings.items():
+                  snapshot = snapshots.get(label)
+                  if not isinstance(snapshot, dict):
+                      errors.append(f"missing structured proof-state snapshot: {label}")
+                      continue
+                  expected_label = label.replace("_", "-")
+                  if snapshot.get("schema_version") != "pitb.lean-proof-state-snapshot.v0" or snapshot.get("label") != expected_label:
+                      errors.append(f"structured proof-state snapshot identity mismatch: {label}")
+                      continue
+                  canonical_snapshot = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                  canonical_context = json.dumps(snapshot.get("declarations"), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                  if hashlib.sha256(canonical_snapshot).hexdigest() != binding.get(snapshot_key):
+                      errors.append(f"structured snapshot digest mismatch: {label}")
+                  if hashlib.sha256(canonical_context).hexdigest() != binding.get(context_key):
+                      errors.append(f"structured local-context digest mismatch: {label}")
+
+              main_base = snapshots.get("base", {})
+              main_variant = snapshots.get("variant", {})
+              if main_base.get("goal") != main_variant.get("goal"):
+                  errors.append("required-hypothesis removal changed the structured goal")
+              irrelevant_base = snapshots.get("irrelevant_base", {})
+              irrelevant_variant = snapshots.get("irrelevant_variant", {})
+              if irrelevant_base.get("goal") != irrelevant_variant.get("goal"):
+                  errors.append("irrelevant-context removal changed the structured goal")
+              def names(snapshot):
+                  return {item.get("user_name") for item in snapshot.get("declarations", []) if isinstance(item, dict)}
+              if "h" not in names(main_base) or "h" in names(main_variant) or "hEq" not in names(main_variant):
+                  errors.append("required-hypothesis withdrawal snapshot does not show h removed and hEq retained")
+              if "h" not in names(irrelevant_base) or "h" not in names(irrelevant_variant):
+                  errors.append("irrelevant-context pair does not preserve required hypothesis h")
+              if "hIrrelevant" not in names(irrelevant_base) or "hIrrelevant" in names(irrelevant_variant):
+                  errors.append("irrelevant-context pair does not show hIrrelevant removed")
+
               return errors
 
           errors = receipt_errors(receipt)
@@ -437,6 +498,18 @@ jobs:
           missing_artifact_digest = copy.deepcopy(receipt)
           del missing_artifact_digest["checked_artifact"]["sha256"]
           negative_controls.append(("missing checked artifact digest", missing_artifact_digest))
+
+          altered_snapshot = copy.deepcopy(receipt)
+          altered_snapshot["proof_state_intervention_trace"]["structured_snapshots"]["base"]["goal"] = "False"
+          negative_controls.append(("structured snapshot content/digest mismatch", altered_snapshot))
+
+          missing_structured_snapshot = copy.deepcopy(receipt)
+          del missing_structured_snapshot["proof_state_intervention_trace"]["structured_snapshots"]["variant"]
+          negative_controls.append(("missing structured proof-state snapshot", missing_structured_snapshot))
+
+          false_irrelevant_retention = copy.deepcopy(receipt)
+          false_irrelevant_retention["proof_state_intervention_trace"]["irrelevant_context_intervention"]["irrelevant_declaration_absent_after"] = False
+          negative_controls.append(("irrelevant context retained after declared removal", false_irrelevant_retention))
 
           for name, invalid_receipt in negative_controls:
               if not receipt_errors(invalid_receipt):
