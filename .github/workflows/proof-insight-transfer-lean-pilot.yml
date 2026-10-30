@@ -175,6 +175,57 @@ jobs:
           if any(line.startswith("hIrrelevant:") for line in irrelevant_variant_state["declarations"]):
               raise SystemExit("irrelevant-context variant still contains removed declaration hIrrelevant")
 
+          support_lines = [
+              line.split("PITB_PROOF_SUPPORT_JSON:", 1)[1]
+              for line in state_trace.splitlines()
+              if "PITB_PROOF_SUPPORT_JSON:" in line
+          ]
+          if len(support_lines) != 2:
+              raise SystemExit(f"expected exactly two proof-term support receipts, found {len(support_lines)}")
+          expected_support_labels = {
+              "alternate-route-after-required-hypothesis-withdrawal": ("hEq", "h"),
+              "original-route-after-irrelevant-context-removal": ("h", "hIrrelevant")
+          }
+          proof_support_receipts = []
+          support_by_label = {}
+          for raw in support_lines:
+              try:
+                  support = json.loads(raw)
+              except json.JSONDecodeError as exc:
+                  raise SystemExit(f"invalid proof-term support JSON: {exc}")
+              if support.get("schema_version") != "pitb.proof-term-support.v0":
+                  raise SystemExit("unsupported proof-term support receipt version")
+              label = support.get("label")
+              if label not in expected_support_labels or label in support_by_label:
+                  raise SystemExit(f"unexpected or duplicate proof-term support label: {label}")
+              if not isinstance(support.get("proof_term"), str) or not support["proof_term"]:
+                  raise SystemExit(f"proof-term support receipt {label} has no proof term")
+              direct = support.get("direct_free_variable_support")
+              closure = support.get("transitive_local_dependency_closure")
+              if not isinstance(direct, list) or not isinstance(closure, list):
+                  raise SystemExit(f"proof-term support receipt {label} has malformed dependency sets")
+              for name, rows in (("direct", direct), ("transitive", closure)):
+                  ids = [row.get("fvar_id") for row in rows if isinstance(row, dict)]
+                  if len(ids) != len(rows) or len(ids) != len(set(ids)):
+                      raise SystemExit(f"proof-term {name} support IDs are malformed or duplicated for {label}")
+              direct_names = {row.get("user_name") for row in direct}
+              closure_names = {row.get("user_name") for row in closure}
+              required_name, forbidden_name = expected_support_labels[label]
+              if required_name not in direct_names:
+                  raise SystemExit(f"proof term {label} does not directly reference required declaration {required_name}")
+              if forbidden_name in direct_names:
+                  raise SystemExit(f"proof term {label} unexpectedly references forbidden declaration {forbidden_name}")
+              if not direct_names.issubset(closure_names):
+                  raise SystemExit(f"transitive closure for {label} omits a direct proof-term dependency")
+              canonical_support = json.dumps(support, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+              proof_support_receipts.append({
+                  "receipt": support,
+                  "evidence_sha256": hashlib.sha256(canonical_support).hexdigest()
+              })
+              support_by_label[label] = support
+          if set(support_by_label) != set(expected_support_labels):
+              raise SystemExit("proof-term support receipts do not cover both registered intervention cases")
+
           state_trace_receipt = {
               "operation": "clear h",
               "base_snapshot_sha256": hashlib.sha256(base_state["block"].encode("utf-8")).hexdigest(),
@@ -191,6 +242,7 @@ jobs:
               "base_structured_local_context_sha256": base_state["structured_local_context_sha256"],
               "variant_structured_local_context_sha256": variant_state["structured_local_context_sha256"],
               "snapshot_schema_version": "pitb.lean-proof-state-snapshot.v0",
+              "proof_term_support_receipts": proof_support_receipts,
               "structured_snapshots": {
                   "base": base_state["structured"],
                   "variant": variant_state["structured"],
@@ -382,6 +434,33 @@ jobs:
               if len(case_ids) != len(set(case_ids)):
                   errors.append("receipt contains duplicate case-manifest binding IDs")
               trace = candidate.get("proof_state_intervention_trace", {})
+              support_rows = trace.get("proof_term_support_receipts", [])
+              support_by_label = {}
+              for support_row in support_rows:
+                  support = support_row.get("receipt", {})
+                  label = support.get("label")
+                  canonical = json.dumps(support, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                  if hashlib.sha256(canonical).hexdigest() != support_row.get("evidence_sha256"):
+                      errors.append(f"proof-term support receipt digest mismatch: {label}")
+                  if label in support_by_label:
+                      errors.append(f"duplicate proof-term support receipt: {label}")
+                  support_by_label[label] = support
+              expected_support = {
+                  "alternate-route-after-required-hypothesis-withdrawal": ("hEq", "h"),
+                  "original-route-after-irrelevant-context-removal": ("h", "hIrrelevant")
+              }
+              if set(support_by_label) != set(expected_support):
+                  errors.append("proof-term support receipts do not cover exactly the two intervention cases")
+              for label, (required_name, forbidden_name) in expected_support.items():
+                  support = support_by_label.get(label, {})
+                  direct = support.get("direct_free_variable_support", [])
+                  closure = support.get("transitive_local_dependency_closure", [])
+                  direct_names = {row.get("user_name") for row in direct if isinstance(row, dict)}
+                  closure_names = {row.get("user_name") for row in closure if isinstance(row, dict)}
+                  if required_name not in direct_names or forbidden_name in direct_names:
+                      errors.append(f"proof-term support contract failed for {label}")
+                  if not direct_names.issubset(closure_names):
+                      errors.append(f"transitive support closure omits direct dependencies for {label}")
               trace_id = trace.get("case_id")
               trace_cases = [
                   case for case in bindings
