@@ -587,6 +587,24 @@ mod tests {
             sha256_hex(single_group.to_str().unwrap().as_bytes()),
         );
         assert!(effects_groups_setting(0).is_none());
+        assert_eq!(
+            render_midi_to_wav_observed_with_effects_groups(
+                Path::new("/missing/midi.mid"),
+                48_000,
+                None,
+                0,
+            ),
+            None,
+        );
+        assert_eq!(
+            render_midi_to_wav_observed_with_effects_groups(
+                Path::new("/missing/midi.mid"),
+                0,
+                None,
+                1,
+            ),
+            None,
+        );
     }
 
     #[test]
