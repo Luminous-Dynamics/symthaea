@@ -40,12 +40,13 @@ The fixed-scope joint policy calibrates at K=8 and reuses that quantile at large
 - **Direct fallback:** uses a fixed baseline value of 0.42 and does not select a modeled action.
 - **Greedy predicted mean:** chooses the candidate with the largest predicted mean; no uncertainty penalty.
 - **Total-variance LCB:** subtracts 1.645 times the square root of reported epistemic plus aleatoric variance.
+- **Pessimistic ensemble minimum:** evaluates five independently perturbed value heads and ranks each action by its minimum predicted value. This is a local synthetic analogue of pessimistic ensemble-value aggregation, not a reproduction of MRS.Q's architecture or training protocol.
 - **Marginal conformal LCB:** subtracts the marginal split-conformal quantile times epistemic standard deviation.
 - **Fixed-K joint conformal LCB:** subtracts the K=8 joint quantile at all candidate counts.
 - **Matched-K joint conformal LCB:** uses a separately calibrated joint quantile for each candidate count.
 - **Oracle action:** selects the candidate with the highest true expected value; diagnostic ceiling only.
 
-The lower-confidence-bound policies fall back when their best lower bound is below the fixed fallback value. That cost is counted as reduced model-use coverage and decision regret—not hidden.
+The lower-confidence-bound policies fall back when their best lower bound is below the fixed fallback value. The pessimistic ensemble arm also falls back when the best minimum-head estimate is below the same value. That cost is counted as reduced model-use coverage and decision regret—not hidden.
 
 ## Required metrics
 
