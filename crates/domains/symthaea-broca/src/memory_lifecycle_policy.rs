@@ -244,7 +244,7 @@ pub struct ClaimLifecycleLedgerEntry {
     pub conflicting_evidence_ids: BTreeSet<String>,
     pub rejected_evidence_ids: BTreeSet<String>,
     /// Exact distinct source-session IDs supporting the selected proof.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub source_session_ids: BTreeSet<String>,
 }
 
