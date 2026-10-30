@@ -880,6 +880,12 @@ pub enum RepertoireError {
     #[error("cause repertoire has zero or non-finite likelihood mass")]
     UndefinedCauseRepertoire,
 
+    #[error("IIT 4.0 background posterior is undefined for the observed whole-substrate state")]
+    UndefinedBackgroundPosterior,
+
+    #[error("subset {subset} contains unit {unit} outside the candidate system")]
+    SubsetOutsideSystem { subset: &'static str, unit: usize },
+
     #[error("GID distribution lengths differ: forward={forward}, partitioned={partitioned}, selectivity={selectivity}")]
     DistributionLengthMismatch { forward: usize, partitioned: usize, selectivity: usize },
 
@@ -1335,6 +1341,256 @@ impl BinaryCausalModel {
         Ok(repertoire)
     }
 
+    /// Compute an IIT 4.0 Eq. 3 effect repertoire within an embedded candidate system.
+    ///
+    /// Units outside candidate_system are fixed at their observed values in
+    /// current_state. Candidate-system units outside mechanism are marginalized
+    /// under a maximum-entropy (uniform) intervention.
+    pub fn effect_repertoire_iit4(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(candidate_system, "candidate_system")?;
+        self.validate_subset(mechanism, "mechanism")?;
+        self.validate_subset(purview, "purview")?;
+        for unit in mechanism {
+            if !candidate_system.contains(unit) {
+                return Err(RepertoireError::SubsetOutsideSystem {
+                    subset: "mechanism",
+                    unit: *unit,
+                });
+            }
+        }
+        for unit in purview {
+            if !candidate_system.contains(unit) {
+                return Err(RepertoireError::SubsetOutsideSystem {
+                    subset: "purview",
+                    unit: *unit,
+                });
+            }
+        }
+        if purview.is_empty() {
+            return Ok(vec![1.0]);
+        }
+
+        let candidate_state_count = 1usize << candidate_system.len();
+        let unconstrained_count = 1usize << (candidate_system.len() - mechanism.len());
+        let mechanism_slots: Vec<usize> = mechanism
+            .iter()
+            .map(|unit| {
+                candidate_system
+                    .iter()
+                    .position(|candidate_unit| candidate_unit == unit)
+                    .expect("mechanism membership was validated")
+            })
+            .collect();
+        let mut per_purview_unit = vec![0.0; purview.len()];
+
+        for candidate_state_index in 0..candidate_state_count {
+            let mechanism_matches = mechanism_slots
+                .iter()
+                .zip(mechanism)
+                .all(|(slot, unit)| {
+                    (((candidate_state_index >> slot) & 1) != 0) == current_state[*unit]
+                });
+            if !mechanism_matches {
+                continue;
+            }
+
+            let mut full_past_state = current_state.to_vec();
+            for (slot, unit) in candidate_system.iter().copied().enumerate() {
+                full_past_state[unit] = ((candidate_state_index >> slot) & 1) != 0;
+            }
+            let past_index = self.state_index(&full_past_state)?;
+            for (purview_slot, target_unit) in purview.iter().copied().enumerate() {
+                per_purview_unit[purview_slot] +=
+                    self.transition_probabilities[past_index * self.n_units + target_unit];
+            }
+        }
+
+        for probability in &mut per_purview_unit {
+            *probability /= unconstrained_count as f64;
+        }
+
+        let purview_state_count = 1usize << purview.len();
+        let mut repertoire = vec![1.0; purview_state_count];
+        for (future_state, probability) in repertoire.iter_mut().enumerate() {
+            for (slot, p_on) in per_purview_unit.iter().copied().enumerate() {
+                let target_on = ((future_state >> slot) & 1) != 0;
+                *probability *= if target_on { p_on } else { 1.0 - p_on };
+            }
+        }
+        Ok(repertoire)
+    }
+
+    /// Compute the unnormalized IIT 4.0 Eq. 4 forward-cause likelihood.
+    ///
+    /// The posterior over background past states is obtained by conditioning on
+    /// the observed whole-substrate current state. Each mechanism-unit factor is
+    /// then averaged over that posterior and over system-past units outside
+    /// purview. This dense exhaustive path is the reference implementation for
+    /// correctness; a factor-graph variable-elimination kernel can replace its
+    /// posterior contraction without changing the public contract.
+    pub fn forward_cause_likelihood_iit4(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(candidate_system, "candidate_system")?;
+        self.validate_subset(mechanism, "mechanism")?;
+        self.validate_subset(purview, "purview")?;
+        for unit in mechanism {
+            if !candidate_system.contains(unit) {
+                return Err(RepertoireError::SubsetOutsideSystem {
+                    subset: "mechanism",
+                    unit: *unit,
+                });
+            }
+        }
+        for unit in purview {
+            if !candidate_system.contains(unit) {
+                return Err(RepertoireError::SubsetOutsideSystem {
+                    subset: "purview",
+                    unit: *unit,
+                });
+            }
+        }
+
+        let purview_state_count = 1usize << purview.len();
+        if purview.is_empty() {
+            return Ok(vec![1.0]);
+        }
+        if mechanism.is_empty() {
+            return Ok(vec![1.0; purview_state_count]);
+        }
+
+        let background: Vec<usize> = (0..self.n_units)
+            .filter(|unit| !candidate_system.contains(unit))
+            .collect();
+        let background_state_count = 1usize << background.len();
+        let mut background_posterior = vec![0.0; background_state_count];
+
+        // P(observed whole-substrate state | full past), marginalized by
+        // background-past assignment. The TPM is factored across next units.
+        for past_index in 0..self.n_states() {
+            let mut whole_state_likelihood = 1.0;
+            for target_unit in 0..self.n_units {
+                let p_on = self.transition_probabilities
+                    [past_index * self.n_units + target_unit];
+                whole_state_likelihood *= if current_state[target_unit] {
+                    p_on
+                } else {
+                    1.0 - p_on
+                };
+            }
+
+            let background_state_index = background
+                .iter()
+                .enumerate()
+                .fold(0usize, |index, (slot, unit)| {
+                    if ((past_index >> unit) & 1) != 0 {
+                        index | (1usize << slot)
+                    } else {
+                        index
+                    }
+                });
+            background_posterior[background_state_index] += whole_state_likelihood;
+        }
+
+        let posterior_mass: f64 = background_posterior.iter().sum();
+        if !posterior_mass.is_finite() || posterior_mass <= 0.0 {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+        for weight in &mut background_posterior {
+            *weight /= posterior_mass;
+        }
+
+        let nonpurview_system_count = 1usize << (candidate_system.len() - purview.len());
+        let mut per_mechanism_unit =
+            vec![vec![0.0; purview_state_count]; mechanism.len()];
+
+        for past_index in 0..self.n_states() {
+            let purview_state_index = purview
+                .iter()
+                .enumerate()
+                .fold(0usize, |index, (slot, unit)| {
+                    if ((past_index >> unit) & 1) != 0 {
+                        index | (1usize << slot)
+                    } else {
+                        index
+                    }
+                });
+            let background_state_index = background
+                .iter()
+                .enumerate()
+                .fold(0usize, |index, (slot, unit)| {
+                    if ((past_index >> unit) & 1) != 0 {
+                        index | (1usize << slot)
+                    } else {
+                        index
+                    }
+                });
+            let background_weight = background_posterior[background_state_index];
+            if background_weight == 0.0 {
+                continue;
+            }
+
+            for (mechanism_slot, target_unit) in mechanism.iter().copied().enumerate() {
+                let p_on =
+                    self.transition_probabilities[past_index * self.n_units + target_unit];
+                let likelihood = if current_state[target_unit] {
+                    p_on
+                } else {
+                    1.0 - p_on
+                };
+                per_mechanism_unit[mechanism_slot][purview_state_index] +=
+                    background_weight * likelihood / nonpurview_system_count as f64;
+            }
+        }
+
+        let mut forward = vec![1.0; purview_state_count];
+        for factor in &per_mechanism_unit {
+            for (joint, factor_value) in forward.iter_mut().zip(factor) {
+                *joint *= factor_value;
+            }
+        }
+        if forward.iter().any(|value| !value.is_finite()) {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+        Ok(forward)
+    }
+
+    /// Compute the normalized IIT 4.0 Eq. 4 cause repertoire.
+    pub fn cause_repertoire_iit4(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        let mut forward = self.forward_cause_likelihood_iit4(
+            candidate_system,
+            mechanism,
+            current_state,
+            purview,
+        )?;
+        let mass: f64 = forward.iter().sum();
+        if !mass.is_finite() || mass <= 0.0 {
+            return Err(RepertoireError::UndefinedCauseRepertoire);
+        }
+        for probability in &mut forward {
+            *probability /= mass;
+        }
+        Ok(forward)
+    }
+
     fn validate_subset(&self, subset: &[usize], name: &'static str) -> Result<(), RepertoireError> {
         let mut seen = vec![false; self.n_units];
         for unit in subset.iter().copied() {
@@ -1466,23 +1722,31 @@ impl BinaryCausalModel {
         if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(SystemPhiError::CandidateSystemNotCanonical);
         }
-        if !candidate_system.iter().copied().eq(0..self.n_units) {
-            return Err(SystemPhiError::UnsupportedSubsystemBackground);
-        }
-
         let state_count = 1usize << candidate_system.len();
         let (selectivity, forward, unconstrained_forward) = match direction {
             CausalDirection::Cause => {
-                let selectivity =
-                    self.cause_repertoire(candidate_system, current_state, candidate_system)?;
-                let forward =
-                    self.forward_cause_likelihood(candidate_system, current_state, candidate_system)?;
+                let selectivity = self.cause_repertoire_iit4(
+                    candidate_system,
+                    candidate_system,
+                    current_state,
+                    candidate_system,
+                )?;
+                let forward = self.forward_cause_likelihood_iit4(
+                    candidate_system,
+                    candidate_system,
+                    current_state,
+                    candidate_system,
+                )?;
                 let mean = forward.iter().sum::<f64>() / state_count as f64;
                 (selectivity, forward, vec![mean; state_count])
             }
             CausalDirection::Effect => {
-                let selectivity =
-                    self.effect_repertoire(candidate_system, current_state, candidate_system)?;
+                let selectivity = self.effect_repertoire_iit4(
+                    candidate_system,
+                    candidate_system,
+                    current_state,
+                    candidate_system,
+                )?;
                 let forward = selectivity.clone();
                 let mut unconstrained = vec![0.0; state_count];
                 for mechanism_state_index in 0..state_count {
@@ -1490,7 +1754,8 @@ impl BinaryCausalModel {
                     for (slot, unit) in candidate_system.iter().copied().enumerate() {
                         mechanism_state[unit] = ((mechanism_state_index >> slot) & 1) != 0;
                     }
-                    let repertoire = self.effect_repertoire(
+                    let repertoire = self.effect_repertoire_iit4(
+                        candidate_system,
                         candidate_system,
                         &mechanism_state,
                         candidate_system,
@@ -1625,9 +1890,6 @@ impl BinaryCausalModel {
             });
         }
         self.validate_subset(candidate, "candidate_system")?;
-        if !candidate.iter().copied().eq(0..self.n_units) {
-            return Err(SystemPhiError::UnsupportedSubsystemBackground);
-        }
         let cut_edges = partition.cut_matrix().iter().filter(|cut| **cut).count();
         if cut_edges == 0 {
             return Err(SystemPhiError::ZeroSeveredConnections);
@@ -1647,16 +1909,20 @@ impl BinaryCausalModel {
                 if *on { index | (1usize << unit) } else { index }
             });
 
-        let cause_selectivity = self.cause_repertoire(candidate, current_state, candidate)?;
-        let cause_forward = self.forward_cause_likelihood(candidate, current_state, candidate)?;
-        let effect_selectivity = self.effect_repertoire(candidate, current_state, candidate)?;
+        let cause_selectivity =
+            self.cause_repertoire_iit4(candidate, candidate, current_state, candidate)?;
+        let cause_forward =
+            self.forward_cause_likelihood_iit4(candidate, candidate, current_state, candidate)?;
+        let effect_selectivity =
+            self.effect_repertoire_iit4(candidate, candidate, current_state, candidate)?;
         // In IIT 4.0 the forward effect repertoire is the effect repertoire.
         let effect_forward = effect_selectivity.clone();
 
         let cut_model = self.apply_partition(partition)?;
         let cause_partitioned =
-            cut_model.forward_cause_likelihood(candidate, current_state, candidate)?;
-        let effect_partitioned = cut_model.effect_repertoire(candidate, current_state, candidate)?;
+            cut_model.forward_cause_likelihood_iit4(candidate, candidate, current_state, candidate)?;
+        let effect_partitioned =
+            cut_model.effect_repertoire_iit4(candidate, candidate, current_state, candidate)?;
 
         let cause = system_phi_direction_score(
             CausalDirection::Cause,
@@ -1717,9 +1983,6 @@ impl BinaryCausalModel {
         }
         if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(SystemPhiError::CandidateSystemNotCanonical);
-        }
-        if !candidate_system.iter().copied().eq(0..self.n_units) {
-            return Err(SystemPhiError::UnsupportedSubsystemBackground);
         }
         if config.decimal_precision > 15 {
             return Err(SystemPhiError::InvalidNumericalPrecision {
