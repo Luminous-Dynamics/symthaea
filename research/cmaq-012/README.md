@@ -43,6 +43,8 @@ The Rust harness runs **256 deterministic paired episodes per scenario**, 64 ste
 
 The information proxy is `0.5 * ln(1 + Var(b) * u^2 / sigma^2)`. It is a local Gaussian approximation, not an exact mutual-information computation for the discrete posterior. The actual posterior is updated from the noisy action-conditioned transition response. Reported information gain is initial posterior entropy minus final posterior entropy; it can be negative in the shift lane because the parameter changes and the filter forgets old evidence.
 
+The dual-gatekeeper's two-step score uses three-point quadrature over the response-noise channel and computes the next safe one-step control cost under the posterior for each synthetic observation. It is a deliberately small one-step lookahead approximation to the expected value of information; it is not a global optimal-control solution or a formal certificate.
+
 ## Required measures
 
 Mean and paired cost difference versus shielded certainty-equivalent control; paired 95% interval; p95 and CVaR95 task cost; violation-episode and violation-step rates; maximum absolute state; posterior entropy reduction; mission-budget spend; probe count/cost; and action effort.
