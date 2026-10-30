@@ -15,3 +15,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "pod-meta-demo"
 path = "src/main.rs"
+
+[[bin]]
+name = "poar-v1"
+path = "src/bin/poar_v1.rs"
