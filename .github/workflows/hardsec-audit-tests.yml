@@ -368,7 +368,7 @@ jobs:
           verification = json.loads((output / "verification_report.json").read_text(encoding="utf-8"))
           upstream_manifest = json.loads((archive_root / "manifest.json").read_text(encoding="utf-8"))
           negative_lines = [
-              line.split("\\t")
+              line.split("\t")
               for line in (output / "negative-controls/results.tsv").read_text(encoding="utf-8").splitlines()
           ]
           negative = [
