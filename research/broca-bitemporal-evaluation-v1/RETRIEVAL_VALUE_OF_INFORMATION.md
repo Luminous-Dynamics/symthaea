@@ -37,7 +37,7 @@ The Evidence Sufficiency Benchmark uses five evidence levels from full support t
 
 ## Data contract
 
-The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at, exact EvidenceIndex state digest and unresolved claim set. A state change or newly ingested source invalidates the estimate and requires recalculation. The canonical orchestrator API accepts an EvidenceIndexSnapshotReceipt produced by `EvidenceIndex::snapshot_receipt` / `search_bm25_at_snapshot`, and checks both its index digest and known_at coordinate. It includes:
+The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at, exact EvidenceIndex state digest, unresolved claim set, and a passing calibration-report digest tied to the estimator, feature schema and utility schema. A state change or newly ingested source invalidates the estimate and requires recalculation. The canonical orchestrator API accepts an EvidenceIndexSnapshotReceipt produced by `EvidenceIndex::snapshot_receipt` / `search_bm25_at_snapshot`, and checks both its index digest and known_at coordinate. It includes:
 
 - exact evidence-index snapshot SHA-256, unresolved conclusion IDs and their deterministic digest;
 - estimator identity/version and estimator artifact digest;
