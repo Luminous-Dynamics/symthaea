@@ -19,6 +19,7 @@ pub mod tabular_nas_firewall;
 pub mod multi_fidelity_tabular_nas;
 pub mod nasbench201_trajectory;
 pub mod proxy_consensus;
+pub mod proxy_acquisition;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
