@@ -17,6 +17,7 @@
 use crate::memory_retrieval_value_calibration::RetrievalUtilityCalibrationObservation;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
