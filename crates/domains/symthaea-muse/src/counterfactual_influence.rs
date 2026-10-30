@@ -762,6 +762,13 @@ pub fn calibrate_repeatability(
     if noop_renderer_evidence.len() != noop_renders.len() {
         return Err(CounterfactualInfluenceError::CalibrationReplayMismatch);
     }
+    let unique_noop_receipts: std::collections::BTreeSet<&str> = noop_renderer_evidence
+        .iter()
+        .map(|evidence| evidence.receipt_sha256.as_str())
+        .collect();
+    if unique_noop_receipts.len() != noop_renderer_evidence.len() {
+        return Err(CounterfactualInfluenceError::CalibrationReplayMismatch);
+    }
     if anchor_renderer_evidence.audio_sha256 != audio_sha256(anchor) {
         return Err(CounterfactualInfluenceError::RendererAudioMismatch);
     }
@@ -1283,6 +1290,27 @@ mod tests {
         midi
     }
 
+    /// Same declared removal of event 0, but event 1 is illegally transposed.
+    /// The symbolic verifier must reject before acoustic metrics can bless it.
+    fn without_event_zero_but_change_event_one_pitch() -> Vec<u8> {
+        let mut track = Vec::new();
+        push_lineage_marker(&mut track, 1, 1);
+        push_delta_event(&mut track, 0, &[0x90, 65, 90]);
+        push_delta_event(&mut track, 1, &[0x80, 65, 0]);
+        push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
+
+        let mut midi = vec![
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
+            0, 0,
+            0, 1,
+            1, 0xe0,
+        ];
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&track);
+        midi
+    }
+
     fn float_wav(samples: &[f32]) -> Vec<u8> {
         let spec = hound::WavSpec {
             channels: 1,
@@ -1592,6 +1620,8 @@ mod tests {
         let counterfactual_evidence =
             verify_bound_render(&counterfactual, &counterfactual_samples, Some(0));
 
+        let baseline_audio_view = audio(&baseline_samples);
+        let counterfactual_audio_view = audio(&counterfactual_samples);
         let experiment = CounterfactualInfluenceInput {
             source_event_id: "score_event_index:0",
             intervention: EventIntervention::Remove,
@@ -1603,8 +1633,8 @@ mod tests {
             counterfactual_schedule_bytes: &counterfactual_midi,
             baseline_renderer_evidence: &anchor_evidence,
             counterfactual_renderer_evidence: &counterfactual_evidence,
-            baseline_audio: &audio(&baseline_samples),
-            counterfactual_audio: &audio(&counterfactual_samples),
+            baseline_audio: &baseline_audio_view,
+            counterfactual_audio: &counterfactual_audio_view,
         };
 
         let report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
@@ -1621,6 +1651,78 @@ mod tests {
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+    }
+
+    #[test]
+    fn removing_target_note_cannot_change_a_protected_notes_pitch() {
+        let baseline_samples = vec![0.0f32; 128];
+        let mut changed_samples = baseline_samples.clone();
+        changed_samples[0..50].fill(0.2);
+        let baseline_midi = baseline_midi();
+        let anchor = build_render("baseline-protected-pitch", &baseline_midi, &baseline_samples);
+        let anchor_evidence = verify_bound_render(&anchor, &baseline_samples, None);
+        let noops = [
+            build_render("protected-noop-1", &baseline_midi, &baseline_samples),
+            build_render("protected-noop-2", &baseline_midi, &baseline_samples),
+            build_render("protected-noop-3", &baseline_midi, &baseline_samples),
+        ];
+        let noop_evidence: Vec<_> = noops
+            .iter()
+            .map(|render| verify_bound_render(render, &baseline_samples, None))
+            .collect();
+        let noop_audio: Vec<_> = (0..3)
+            .map(|_| audio(&baseline_samples))
+            .collect();
+        let calibration = verify_repeatability_calibration(
+            &calibrate_repeatability(
+                &audio(&baseline_samples),
+                &noop_audio,
+                SCORE_BYTES,
+                &anchor.map_bytes,
+                &baseline_midi,
+                &anchor_evidence,
+                &noop_evidence,
+                &config(),
+            )
+            .unwrap(),
+            &audio(&baseline_samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &anchor.map_bytes,
+            &baseline_midi,
+            &anchor_evidence,
+            &noop_evidence,
+        )
+        .unwrap();
+
+        let changed_midi = without_event_zero_but_change_event_one_pitch();
+        let counterfactual = build_render(
+            "illegal-protected-pitch-change",
+            &changed_midi,
+            &changed_samples,
+        );
+        let counterfactual_evidence =
+            verify_bound_render(&counterfactual, &changed_samples, Some(0));
+        let baseline_audio_view = audio(&baseline_samples);
+        let counterfactual_audio_view = audio(&changed_samples);
+        let experiment = CounterfactualInfluenceInput {
+            source_event_id: "score_event_index:0",
+            intervention: EventIntervention::Remove,
+            source_score_bytes: SCORE_BYTES,
+            performed_event_map_bytes: &anchor.map_bytes,
+            counterfactual_performed_event_map_bytes: &counterfactual.map_bytes,
+            expected_score_event_count: 2,
+            baseline_schedule_bytes: &baseline_midi,
+            counterfactual_schedule_bytes: &changed_midi,
+            baseline_renderer_evidence: &anchor_evidence,
+            counterfactual_renderer_evidence: &counterfactual_evidence,
+            baseline_audio: &baseline_audio_view,
+            counterfactual_audio: &counterfactual_audio_view,
+        };
+        assert_eq!(
+            measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InvalidIntervention
+        );
     }
 
     #[test]
