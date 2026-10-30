@@ -357,6 +357,24 @@ Three 2026 results change how this programme should benchmark itself:
 2. **Sequential witness generation has a concrete baseline.** SeqCube-HT reports 3,240 witness-validated instances from 4,500 attempts (72.0%) and 20.9 seconds per accepted instance, compared with 50.6% and 39.5 seconds for the best matched comparator. Its detector probes also show a source-transfer penalty: SeqCube F1 falls from 69.2% instance-random to 47.8% source-held-out; localization recall falls from 55.7% to 31.4%. The paper's covariate-matched 77.2% F1 is a different protocol and must not be compared as if it were the held-out result.
 3. **Industrial scale exposes another failure regime.** A DATE 2026 paper describes function-preserving stress patterns in large netlists using SCOAP testability and graph transformations, and reports that representative graph-learning detectors fail on its generated challenge instances. This is evidence that academic-sized benchmark success is not sufficient—not proof that a particular Symthaea detector is better.
 
+### What the SOTA results imply for the next model
+
+The latest SeqCube-HT paper gives a useful warning: its detector probes report 69.2% graph F1 and 55.7% localization recall for SeqCube-generated instances under instance-random splits, but 47.8% F1 and 31.4% localization recall under insertion-source holdout. Its cross-scale ISCAS-to-Extended-IP transfer reports 56.8% F1 without threshold retuning. Covariate matching raises the SeqCube detector probe to 77.2% F1, but still leaves a source difference. These are the paper's own probe results, not a Symthaea baseline. The main implication is that a validated generator can still emit a source signature that a detector learns. Challenge provenance, source-held-out splits and transform diversity must therefore be first-class benchmark dimensions. <Cite refs={["turn912414view2"]}/>
+
+The paper also states that its state-cube compatibility graph screens shared state only at adjacent event endpoints when the gap is greater than one; the intermediate state transitions are completed later by concrete replay. Its authors explicitly note that a trigger event absent from the trace-mined pool cannot be selected, and that its witness yield does not establish reachable-state coverage or diversity beyond that pool. Our profile therefore distinguishes temporal phase observations, finite replay, formal bound and population coverage rather than using one “validated” flag for all four. <Cite refs={["turn912414view0","turn912414view1"]}/>
+
+DATE 2026's industrial-scale study reports general GNN degradation on multi-million-edge challenge graphs, with parser/graph pipeline peaks around 140.5 GB on its largest design. It reports that NetVGE retains rare-tail sensitivity through its evaluated 99th-percentile regions but with modest overall accuracy (about 49–70%), while other detectors lose sensitivity as long-range trigger/payload paths and reconvergence grow. This suggests the competition is not “GNN versus HDC” in isolation. A viable design needs a hierarchical, multi-resolution representation that preserves a sparse set of high-value cross-partition relations and supports explicit path queries. <Cite refs={["turn533758view2","turn533758view3"]}/>
+
+Proposed Symthaea architecture experiment:
+1. Build a streaming netlist-to-feature index with stable net IDs, source lineage, fanin/fanout, component membership and cutpoint boundaries; never require the full graph in RAM just to calculate baseline metadata.
+2. Run a cheap testability/structure pass (SCOAP where valid, plus sequential-cut metadata) to nominate suspicious regions.
+3. Construct a sparse cross-region relation index for long-range dependencies instead of expanding all message-passing neighborhoods.
+4. Use HDC to bind region identity, temporal phase summaries, evidence and relation signatures; use a temporal/state-transition component only on candidate subgraphs with a recorded witness.
+5. Route any candidate alert to an independent simulator/formal verifier and a byte-bound evidence packet. The learned model never upgrades its own score into a proof.
+6. Measure recall against exact end-to-end path retention: how often does partitioning or sampling sever a real trigger-to-observation path, and can the system detect that loss and abstain?
+
+This is a research hypothesis, not a claim that the HDC/CfC stack has beaten NetVGE, Netwise or commercial EDA. The first benchmark should be the retained-path rate and resource frontier on deterministic graph fixtures, before detector accuracy.
+
 ### Confirmatory targets
 
 These are proposed research gates, not measured results, standards or certification criteria:
