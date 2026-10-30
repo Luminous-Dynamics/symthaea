@@ -197,7 +197,7 @@ cargo run -p symthaea-broca --features aml-http-server --bin broca-aml-server
 
 Environment: `AML_DB_PATH` and `AML_API_KEY` are required; optional `AML_BIND`, `AML_PAYLOAD_ROOT`, `AML_MAX_BODY_BYTES`, and `AML_MAX_CONCURRENCY` have documented defaults in [HTTP_SERVER_DEPLOYMENT.md](./HTTP_SERVER_DEPLOYMENT.md).
 
-This executable is a plain HTTP listener intended to sit behind public HTTPS ingress. It is not deployed by CI and is not a public endpoint by virtue of merging the PR. The server currently has no automatic 30-day retention worker; an operator must schedule and verify the SQLite logical purge, then also handle WAL/SHM files, backups and snapshots. A successful local router test does not replace the official AML Smoke or Full evaluation.
+This executable is a plain HTTP listener intended to sit behind public HTTPS ingress. It is not deployed by CI and is not a public endpoint by virtue of merging the PR. The server starts a daily logical-retention worker when run through `serve()`, purging Add batches older than 29 days and dependent lifecycle events to leave a one-day margin under the organizer's 30-day rule. This is not forensic erasure: WAL/SHM sidecars, backups and snapshots retain separate operator-controlled deletion policies. A successful local router test does not replace the official AML Smoke or Full evaluation.
 
 ## 6. Conformance artifacts
 
