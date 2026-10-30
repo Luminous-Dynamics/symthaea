@@ -53,7 +53,7 @@ struct ArmSummary {
 #[derive(Clone, Debug)]
 struct SliceSummary {
     task_id: String, capability: String, split: String, n_pairs: usize,
-    eligible: bool, reason: String, arms: BTreeMap<Arm, ArmSummary>,
+    qualification_floor_met: bool, reason: String, arms: BTreeMap<Arm, ArmSummary>,
     contrasts: BTreeMap<&'static str, (Estimate, Estimate)>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -232,7 +232,7 @@ fn summarize_arm(episodes: &[Episode], arm: Arm) -> ArmSummary {
 fn summarize_slice(key: SliceKey, episodes: &[Episode]) -> SliceSummary {
     let (task_id, capability, split) = key;
     let n_pairs = episodes.len();
-    let eligible = split == "qualification" && n_pairs >= MIN_QUALIFICATION_PAIRS;
+    let qualification_floor_met = split == "qualification" && n_pairs >= MIN_QUALIFICATION_PAIRS;
     let reason = if split != "qualification" {
         "development split is never qualification eligible"
     } else if n_pairs < MIN_QUALIFICATION_PAIRS {
@@ -257,7 +257,7 @@ fn summarize_slice(key: SliceKey, episodes: &[Episode]) -> SliceSummary {
         let success = make_contrast(episodes, left, right, success_value, BOOTSTRAP_SEED ^ slice_seed ^ name_seed ^ 0x51CC_E551);
         contrast_map.insert(name, (returns, success));
     }
-    SliceSummary { task_id, capability, split, n_pairs, eligible, reason, arms, contrasts: contrast_map }
+    SliceSummary { task_id, capability, split, n_pairs, qualification_floor_met, reason, arms, contrasts: contrast_map }
 }
 fn json_string(value: &str) -> String {
     let mut out = String::from("\"");
@@ -294,7 +294,7 @@ fn slice_json(slice: &SliceSummary) -> String {
         concat!("{{\"task_id\":{},\"capability\":{},\"split\":{},\"n_pairs\":{},",
         "\"eligible\":{},\"eligibility_reason\":{},\"arms\":{{{}}},\"contrasts\":{{{}}}}}"),
         json_string(&slice.task_id), json_string(&slice.capability), json_string(&slice.split),
-        slice.n_pairs, slice.eligible, json_string(&slice.reason), arms, contrasts
+        slice.n_pairs, slice.qualification_floor_met, json_string(&slice.reason), arms, contrasts
     )
 }
 
@@ -374,12 +374,13 @@ mod tests {
     }
     #[test]
     fn qualification_fixture_has_all_paired_arms_and_positive_aop() {
-        let input = include_str!("../fixtures/qualification.tsv");
+        let input = include_str!("../fixtures/smoke.tsv");
         let slices = parse_and_validate(input).unwrap();
         assert_eq!(slices.len(), 1);
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert_eq!(slice.n_pairs, 20);
-        assert!(slice.eligible);
+        assert!(!slice.qualification_floor_met);
+        assert!(slice.reason.contains("development split"));
         assert!(slice.contrasts["aop_w1_minus_d1"].0.mean > 0.0);
         assert!(slice.contrasts["prediction_mediation_w1_minus_w2"].0.mean > 0.0);
     }
@@ -420,13 +421,21 @@ mod tests {
         assert_eq!(slice.n_pairs, 20);
     }
     #[test]
+    fn twenty_paired_rows_meet_only_the_mechanical_qualification_floor() {
+        let input = include_str!("../fixtures/smoke.tsv").replace("\\tdevelopment\\t", "\\tqualification\\t");
+        let slices = parse_and_validate(&input).unwrap();
+        let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
+        assert!(slice.qualification_floor_met);
+        assert!(slice.reason.contains("subject to held-out"));
+    }
+    #[test]
     fn below_minimum_qualification_count_is_smoke_only() {
-        let input = include_str!("../fixtures/qualification.tsv");
+        let input = include_str!("../fixtures/smoke.tsv").replace("\\tdevelopment\\t", "\\tqualification\\t");
         let lines: Vec<&str> = input.lines().take(1 + 19 * 5).collect();
-        let mutated = format!("{}\n", lines.join("\n"));
+        let mutated = format!("{}\\n", lines.join("\\n"));
         let slices = parse_and_validate(&mutated).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
-        assert!(!slice.eligible);
+        assert!(!slice.qualification_floor_met);
         assert!(slice.reason.contains("below the minimum"));
     }
     #[test]
