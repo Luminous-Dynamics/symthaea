@@ -491,6 +491,20 @@ fn run(args: Args) -> Result<(), String> {
         ));
     }
 
+    // Re-hash after the streaming pass. This detects persistent input mutation
+    // between the initial digest pass and completion of the merge join.
+    for (input_path, label, expected) in [
+        (&args.original_edges, "original edges", &original_sha),
+        (&args.partitioned_edges, "partitioned edges", &partitioned_sha),
+        (&args.node_partitions, "node partitions", &partitions_sha),
+        (&args.witness_paths, "witness paths", &witnesses_sha),
+    ] {
+        let actual = sha256_file(input_path, label)?;
+        if &actual != expected {
+            return Err(format!("{label} changed during audit; discard this run and retry"));
+        }
+    }
+
     for (path_id, steps) in &paths {
         for step in steps {
             if !witness_edges.contains_key(&step.edge.edge_id) {
@@ -827,6 +841,69 @@ mod tests {
             .replace("c\tp2\n", "");
         fs::write(&fixture.partitions, text).unwrap();
         assert!(run(fixture.args()).unwrap_err().contains("no partition assignment"));
+    }
+
+    #[test]
+    fn streams_large_edge_sets_with_small_witness_ledger() {
+        use std::io::BufWriter;
+
+        const EDGE_COUNT: usize = 250_000;
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        let root = env::temp_dir().join(format!(
+            "hardsec-stream-scale-{}-{id}",
+            std::process::id()
+        ));
+        fs::create_dir_all(root.join("out")).unwrap();
+        let original = root.join("original.tsv");
+        let partitioned = root.join("partitioned.tsv");
+        let partitions = root.join("partitions.tsv");
+        let witnesses = root.join("witnesses.tsv");
+        let receipt = root.join("out/receipt.json");
+
+        {
+            let file = File::create(&original).unwrap();
+            let mut writer = BufWriter::new(file);
+            writeln!(writer, "{ORIGINAL_HEADER}").unwrap();
+            for index in 0..EDGE_COUNT {
+                writeln!(writer, "e{index:08}\ta\tb").unwrap();
+            }
+            writer.flush().unwrap();
+        }
+        {
+            let file = File::create(&partitioned).unwrap();
+            let mut writer = BufWriter::new(file);
+            writeln!(writer, "{PARTITIONED_HEADER}").unwrap();
+            for index in 0..EDGE_COUNT {
+                writeln!(writer, "e{index:08}\ta\tb\tinternal").unwrap();
+            }
+            writer.flush().unwrap();
+        }
+        fs::write(
+            &partitions,
+            "node_id\tpartition_id\na\tp1\nb\tp1\n",
+        )
+        .unwrap();
+        fs::write(
+            &witnesses,
+            "path_id\tsequence_index\tedge_id\tsrc_node_id\tdst_node_id\nw1\t0\te00000000\ta\tb\n",
+        )
+        .unwrap();
+
+        let fixture = Args {
+            original_edges: original,
+            partitioned_edges: partitioned,
+            node_partitions: partitions,
+            witness_paths: witnesses,
+            receipt: receipt.clone(),
+        };
+        run(fixture).unwrap();
+        let output: serde_json::Value =
+            serde_json::from_slice(&fs::read(&receipt).unwrap()).unwrap();
+        assert_eq!(output["audit"]["original_edge_count"], EDGE_COUNT);
+        assert_eq!(output["audit"]["partitioned_edge_count"], EDGE_COUNT);
+        assert_eq!(output["audit"]["total_witness_edges"], 1);
+        assert_eq!(output["audit"]["lost_witness_edge_count"], 0);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
