@@ -49,7 +49,7 @@ class MetamorphicEvaluatorAuditTests(unittest.TestCase):
 
     def test_plan_commitment_tampering_is_rejected(self) -> None:
         plan = copy.deepcopy(self.plan)
-        plan["pairs"][0]["relation_rule"] = "support_non_decreasing"
+        plan["pairs"][0]["baseline_input_sha256"] = "f" * 64
         with self.assertRaisesRegex(MetamorphicAuditError, "plan commitment mismatch"):
             audit_receipt(encode(plan), self.receipt_bytes)
 
