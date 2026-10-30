@@ -22,7 +22,7 @@ V1 uses one-stage stratified simple random sampling without replacement of PSUs:
 - The population frame contains every eligible PSU in the declared volume/revision, with a unique `psu_id` and a predeclared `stratum_id`.
 - A PSU belongs to exactly one stratum. Strata are mutually exclusive and exhaustive over the claimed search frame.
 - Every PSU has positive inclusion probability. Within each stratum, exactly `n_h` of `N_h` PSUs are selected with equal probability, without replacement.
-- Every error inside a selected PSU is exhaustively searched and recorded. A selected PSU with no errors must still appear with an empty `errors` array.
+- Every error inside a selected PSU is exhaustively searched and recorded. A selected PSU with no errors must still appear with an empty `errors` array. The complete `error_families` vocabulary is declared in the audit file before collection; it must be unique and non-empty. Errors outside that vocabulary invalidate the run. Declared families absent from the sample remain visible with zero estimated count and undefined recall when their denominator is zero.
 - V1 does not permit within-PSU subsampling, unequal-probability sampling, PPS, systematic spatial sampling, or nonresponse substitution.
 
 The seed must be generated from a cryptographically secure source and its SHA-256 commitment timestamped in a trusted preregistration artifact before outcomes are collected. The seed is revealed in the evaluator-only audit file. The executable checks the commitment but cannot establish the timestamp or prove that the search itself was blind.
