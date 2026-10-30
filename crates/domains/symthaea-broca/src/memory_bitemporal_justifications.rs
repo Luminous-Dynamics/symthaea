@@ -159,9 +159,9 @@ impl BitemporalJustificationRuntime {
         }
         self.verify_consistency()?;
 
-        if self.ledger.events().last().is_some_and(|event| event.recorded_at > recorded_at) {
+        if self.ledger.events().last().is_some_and(|event| event.recorded_at >= recorded_at) {
             return Err(
-                "derived conclusion recorded_at cannot precede the latest committed source event"
+                "derived-fact batch timestamp must be strictly later than the latest committed source-event batch"
                     .into(),
             );
         }
@@ -441,7 +441,7 @@ mod tests {
                     justification("via-A", [source("A")]),
                     justification("via-B", [source("B")]),
                 ],
-            ), instant(1))
+            ), instant(2))
             .unwrap();
         runtime
     }
@@ -450,7 +450,7 @@ mod tests {
     fn later_retraction_does_not_rewrite_historical_known_at_support() {
         let mut runtime = base_runtime();
         let before = runtime
-            .support_status_at("C", date("2026-01-15"), instant(1), "tenant-1")
+            .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
             .unwrap();
         assert_eq!(
             before,
@@ -465,7 +465,7 @@ mod tests {
         let receipts = runtime
             .append_source_events([SourceEventRevision {
                 revision_id: "R-A".into(),
-                recorded_at: instant(2),
+                recorded_at: instant(3),
                 operation: SourceEventOperation::Retract {
                     target_revision_id: "A".into(),
                     reason: "source withdrawn".into(),
@@ -483,11 +483,11 @@ mod tests {
         );
 
         let historical = runtime
-            .support_status_at("C", date("2026-01-15"), instant(1), "tenant-1")
+            .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
             .unwrap();
         assert_eq!(historical, before);
         let current = runtime
-            .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
+            .support_status_at("C", date("2026-01-15"), instant(3), "tenant-1")
             .unwrap();
         assert_eq!(
             current,
@@ -503,7 +503,7 @@ mod tests {
         runtime
             .append_source_events([SourceEventRevision {
                 revision_id: "A2".into(),
-                recorded_at: instant(2),
+                recorded_at: instant(3),
                 operation: SourceEventOperation::Supersede {
                     target_revision_id: "A".into(),
                     assertion: assertion("platinum", "tenant-1", "2026-01-01", None),
@@ -512,7 +512,7 @@ mod tests {
             .unwrap();
 
         let after_supersede = runtime
-            .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
+            .support_status_at("C", date("2026-01-15"), instant(4), "tenant-1")
             .unwrap();
         assert_eq!(
             after_supersede,
@@ -539,7 +539,7 @@ mod tests {
         );
         assert_eq!(
             runtime
-                .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
+                .support_status_at("C", date("2026-01-15"), instant(3), "tenant-1")
                 .unwrap(),
             after_supersede
         );
@@ -566,12 +566,12 @@ mod tests {
             .derive_at(conclusion(
                 "C",
                 [justification("via-window", [source("WINDOW")])],
-            ), instant(1))
+            ), instant(2))
             .unwrap();
 
         assert!(matches!(
             runtime
-                .support_status_at("C", date("2026-01-10"), instant(1), "tenant-1")
+                .support_status_at("C", date("2026-01-10"), instant(2), "tenant-1")
                 .unwrap(),
             AsOfSupportStatus::Supported { .. }
         ));
@@ -596,7 +596,7 @@ mod tests {
             .derive_at(conclusion(
                 "C",
                 [justification("via-A", [source("A")])],
-            ), instant(1))
+            ), instant(2))
             .unwrap();
 
         let ledger_status = runtime
@@ -606,14 +606,14 @@ mod tests {
                 "plan",
                 "tenant-1",
                 date("2026-01-15"),
-                instant(1),
+                instant(2),
             )
             .unwrap()
             .status;
         assert!(matches!(ledger_status, BitemporalEvidenceStatus::Contested { .. }));
         assert_eq!(
             runtime
-                .support_status_at("C", date("2026-01-15"), instant(1), "tenant-1")
+                .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
                 .unwrap(),
             AsOfSupportStatus::Unsupported
         );
@@ -635,12 +635,12 @@ mod tests {
             .derive_at(conclusion(
                 "C",
                 [justification("both-tenants", [source("A"), source("B")])],
-            ), instant(1))
+            ), instant(2))
             .unwrap();
 
         assert_eq!(
             runtime
-                .support_status_at("C", date("2026-01-15"), instant(1), "tenant-1")
+                .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
                 .unwrap(),
             AsOfSupportStatus::Unsupported
         );
@@ -651,10 +651,10 @@ mod tests {
         let mut runtime = base_runtime();
         let before = runtime.state_sha256().unwrap();
         let failed = runtime.append_source_events([
-            assert_event("NEW", 2, "bronze"),
+            assert_event("NEW", 3, "bronze"),
             SourceEventRevision {
                 revision_id: "R-MISSING".into(),
-                recorded_at: instant(2),
+                recorded_at: instant(3),
                 operation: SourceEventOperation::Retract {
                     target_revision_id: "does-not-exist".into(),
                     reason: "invalid target".into(),
@@ -720,7 +720,7 @@ mod tests {
                 instant(1),
             )
             .unwrap_err();
-        assert!(error.contains("cannot precede the latest committed source event"));
+        assert!(error.contains("strictly later than the latest committed source-event batch"));
         assert_eq!(runtime.state_sha256().unwrap(), before);
     }
 
@@ -754,12 +754,12 @@ mod tests {
                 [SupportRef::DerivedFact("P".into())],
             )],
         );
-        runtime.derive_batch_at([parent, child], instant(1)).unwrap();
+        runtime.derive_batch_at([parent, child], instant(2)).unwrap();
 
         for fact_id in ["P", "C"] {
             assert!(matches!(
                 runtime
-                    .support_status_at(fact_id, date("2026-01-15"), instant(1), "tenant-1")
+                    .support_status_at(fact_id, date("2026-01-15"), instant(2), "tenant-1")
                     .unwrap(),
                 AsOfSupportStatus::Supported { .. }
             ));
@@ -784,7 +784,7 @@ mod tests {
         );
         let parent_second = conclusion("P", [justification("via-A", [source("A")])]);
         let error = runtime
-            .derive_batch_at([child_first, parent_second], instant(1))
+            .derive_batch_at([child_first, parent_second], instant(2))
             .unwrap_err();
         assert!(error.contains("unknown derived parent"));
         assert_eq!(runtime.state_sha256().unwrap(), before);
@@ -795,7 +795,7 @@ mod tests {
             [justification("via-missing", [source("MISSING")])],
         );
         let error = runtime
-            .derive_batch_at([valid_parent, invalid_child], instant(1))
+            .derive_batch_at([valid_parent, invalid_child], instant(2))
             .unwrap_err();
         assert!(error.contains("unknown source revision"));
         assert_eq!(runtime.state_sha256().unwrap(), before);
@@ -810,14 +810,14 @@ mod tests {
         runtime
             .derive_at(
                 conclusion("P", [justification("via-A", [source("A")])]),
-                instant(1),
+                instant(2),
             )
             .unwrap();
         let before = runtime.state_sha256().unwrap();
         let error = runtime
             .derive_at(
                 conclusion("C", [justification("via-A", [source("A")])]),
-                instant(1),
+                instant(2),
             )
             .unwrap_err();
         assert!(error.contains("strictly later timestamp"));
@@ -842,7 +842,7 @@ mod tests {
                 .map(|id| justification(&format!("via-{id}"), [source(id)]))
                 .collect();
             runtime
-                .derive_at(conclusion("C", alternatives), instant(1))
+                .derive_at(conclusion("C", alternatives), instant(2))
                 .unwrap();
 
             // Deterministic seed-dependent ordering without an RNG dependency.
@@ -854,7 +854,7 @@ mod tests {
 
             let mut remaining: BTreeSet<String> = source_ids.iter().cloned().collect();
             for (index, source_id) in source_ids.iter().enumerate() {
-                let day = index as u32 + 2;
+                let day = index as u32 + 3;
                 let before_retraction = remaining
                     .iter()
                     .map(|id| format!("via-{id}"))
@@ -918,7 +918,7 @@ mod tests {
                     .support_status_at(
                         "C",
                         date("2026-01-15"),
-                        instant(source_count as u32 + 1),
+                        instant(source_count as u32 + 2),
                         "tenant-1",
                     )
                     .unwrap(),
