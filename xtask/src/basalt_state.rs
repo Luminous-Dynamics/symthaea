@@ -337,6 +337,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
     let mut evidence = BTreeMap::<String, EvidenceState>::new();
     let mut evidence_order = Vec::<String>::new();
     let mut reverse_resources = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut resources_with_evidence = BTreeSet::<String>::new();
     let mut reverse_evidence = BTreeMap::<String, BTreeSet<String>>::new();
     let mut total_edges = 0_usize;
     let mut counts = StateAuditCounts {
@@ -405,7 +406,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     .get(resource_id)
                     .cloned()
                     .unwrap_or_default();
-                if direct_dependents.is_empty() {
+                if !resources_with_evidence.contains(resource_id) {
                     counts.unrelated_resource_changes += 1;
                 }
                 counts.resource_changes += 1;
@@ -510,6 +511,10 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     invalidation_event_ids: Vec::new(),
                     blocked_by_evidence_ids: blocked_by.into_iter().collect(),
                 };
+
+                for pin in resource_pins {
+                    resources_with_evidence.insert(pin.resource_id.clone());
+                }
 
                 // Only current evidence belongs in reverse invalidation indexes.
                 // Evidence born stale through an upstream dependency remains in
@@ -733,6 +738,7 @@ mod tests {
         assert!(report.valid, "{:?}", report.errors);
         assert_eq!(freshness(&report, "build-after-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "tests-after-change"), EvidenceFreshness::StaleDirect);
+        assert_eq!(report.counts.unrelated_resource_changes, 1);
     }
 
     #[test]
