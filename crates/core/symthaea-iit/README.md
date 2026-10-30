@@ -120,11 +120,12 @@ intrinsic specified-state tie selection still run through the dense reference
 model. A large sparse per-partition benchmark must not be represented as full
 system-analysis throughput.
 
-Validation includes dense-to-sparse transition equality, an independent
-full-joint Eq. 4 posterior oracle on small embedded systems, and sparse ring
-fixtures at 64, 256, and 512 units. The full-joint oracle enumerates the
-background posterior directly and does not call the production elimination
-or projection helpers.
+Validation includes dense-to-sparse transition equality, Eq. 3 repertoire
+parity, maximum-entropy cut TPM and partitioned Eq. 4 parity, full per-partition
+cause/effect score parity, an independent full-joint Eq. 4 posterior oracle on
+small embedded systems, and sparse ring fixtures at 64, 256, and 512 units.
+The full-joint oracle enumerates the background posterior directly and does not
+call the production elimination or projection helpers.
 
 The sparse Eq. 4 scale sweep measures ring substrates at 64, 256, 512, 1,024,
 and 2,048 units with a four-unit candidate. It reports local CPT cells, parent
@@ -136,9 +137,10 @@ PyPhi system-analysis timings.
 
 A separate fixed-partition score sweep uses the same 64–2,048-unit ring
 substrates and a four-unit embedded candidate. It records cause/effect signed
-scores, normalized partition score, severed-edge count, partitioned Eq. 4
-receipt, and latency. This is one fixed-state per-partition evaluation, not the
-exhaustive intrinsic-state / all-partitions search needed for phi_s.
+scores, normalized partition score, severed-edge count, uncut and partitioned
+Eq. 4 receipts, a complete per-partition score receipt, and latency. This is
+one fixed-state per-partition evaluation, not the exhaustive intrinsic-state /
+all-partitions search needed for phi_s.
 
 ## Published reference fixture
 
