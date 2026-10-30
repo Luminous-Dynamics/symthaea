@@ -46,6 +46,11 @@ struct Args {
     #[arg(long)]
     input: PathBuf,
 
+    /// Exact 40-character Hugging Face commit SHA resolved from revision=v2.
+    /// This is operator-supplied provenance; the offline auditor does not fetch the Hub ref.
+    #[arg(long)]
+    dataset_revision_commit_sha: String,
+
     /// Spatial split cube edge in nanometres. ConnectomeBench2 V2 uses 50 µm cubes.
     #[arg(long, default_value_t = CUBE_EDGE_NM)]
     cube_edge_nm: f64,
@@ -103,6 +108,8 @@ struct Report {
     input_sha256: String,
     dataset_id: &'static str,
     dataset_revision: &'static str,
+    dataset_revision_commit_sha: String,
+    pinned_upstream_commit: &'static str,
     cube_edge_nm: f64,
     row_count: usize,
     split_counts: BTreeMap<String, u64>,
@@ -329,7 +336,7 @@ fn parse_rows(bytes: &[u8]) -> Result<Vec<ParsedRow>, String> {
     Ok(rows)
 }
 
-fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64) -> Report {
+fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset_revision_commit_sha: String) -> Report {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let mut split_counts = BTreeMap::<String, u64>::new();
@@ -543,6 +550,8 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64) -> Repo
         input_sha256: input_hash,
         dataset_id: DATASET_ID,
         dataset_revision: DATASET_REVISION,
+        dataset_revision_commit_sha,
+        pinned_upstream_commit: "5679b39aa2641d8d0afeed88b441e696f87a66df",
         cube_edge_nm,
         row_count: rows.len(),
         split_counts,
@@ -562,6 +571,9 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64) -> Repo
 
 fn run() -> Result<i32, String> {
     let args = Args::parse();
+    if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
+        return Err("--dataset-revision-commit-sha must be a lowercase 40-character Git SHA resolved from the V2 revision".to_string());
+    }
     if !args.cube_edge_nm.is_finite() || args.cube_edge_nm <= 0.0 {
         return Err("--cube-edge-nm must be finite and positive".to_string());
     }
@@ -569,7 +581,7 @@ fn run() -> Result<i32, String> {
         .map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
     let input_hash = sha256(&bytes);
     let rows = parse_rows(&bytes)?;
-    let report = audit_rows(&rows, input_hash, args.cube_edge_nm);
+    let report = audit_rows(&rows, input_hash, args.cube_edge_nm, args.dataset_revision_commit_sha);
     let status = report.status;
     let json = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("failed to serialize report: {error}"))? + "\n";
@@ -687,7 +699,7 @@ mod tests {
     }
 
     fn report(rows: &[ParsedRow]) -> Report {
-        audit_rows(rows, "0".repeat(64), CUBE_EDGE_NM)
+        audit_rows(rows, "0".repeat(64), CUBE_EDGE_NM, "1".repeat(40))
     }
 
     #[test]
