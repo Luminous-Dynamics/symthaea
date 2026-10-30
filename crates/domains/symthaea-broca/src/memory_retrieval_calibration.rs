@@ -570,6 +570,62 @@ mod tests {
             .collect()
     }
 
+    #[derive(serde::Deserialize)]
+    struct CalibrationFixtureFile {
+        schema_version: String,
+        policy_version: String,
+        scenarios: Vec<CalibrationFixtureScenario>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct CalibrationFixtureScenario {
+        case_id: String,
+        sample_count: usize,
+        covered_count: usize,
+        family_size: u32,
+        target_lower_bound_coverage: f64,
+        minimum_audit_observations: usize,
+        expected_pass: bool,
+        expected_error: Option<String>,
+    }
+
+    #[test]
+    fn versioned_retrieval_calibration_fixtures_match_finite_sample_audit() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/retrieval-calibration-fixtures-v1.json"
+        );
+        let fixture: CalibrationFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-retrieval-calibration-fixtures-v1");
+        assert_eq!(fixture.policy_version, RETRIEVAL_CALIBRATION_POLICY_VERSION);
+        assert_eq!(fixture.scenarios.len(), 4);
+
+        for scenario in fixture.scenarios {
+            let mut observations = covered_observations(scenario.sample_count);
+            for observation in observations.iter_mut().skip(scenario.covered_count) {
+                observation.observed_net_value_micro = -100;
+            }
+            let mut request = request_with(observations);
+            request.family_size = scenario.family_size;
+            request.target_lower_bound_coverage = scenario.target_lower_bound_coverage;
+            request.minimum_audit_observations = scenario.minimum_audit_observations;
+
+            let result = audit_retrieval_value_estimator(request);
+            if let Some(expected_error) = scenario.expected_error {
+                assert!(
+                    result.unwrap_err().contains(&expected_error),
+                    "fixture {} should fail with {expected_error}",
+                    scenario.case_id
+                );
+            } else {
+                let (report, capability) = result.unwrap();
+                assert_eq!(report.passed, scenario.expected_pass, "fixture {}", scenario.case_id);
+                assert_eq!(capability.is_some(), scenario.expected_pass, "fixture {}", scenario.case_id);
+                assert_eq!(report.covered_count, scenario.covered_count, "fixture {}", scenario.case_id);
+                report.verify_internal_consistency().unwrap();
+            }
+        }
+    }
+
     #[test]
     fn passing_held_out_coverage_audit_mints_opaque_calibration_capability() {
         let (report, capability) =
