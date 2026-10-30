@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_ranking_report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "adjudication_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "candidate_outcomes": [
+    {
+      "candidate_id": "candidate-1",
+      "adjudicator_votes": [
+        { "adjudicator_id": "adj-01", "adjudication": "correct" },
+        { "adjudicator_id": "adj-02", "adjudication": "correct" },
+        { "adjudicator_id": "adj-03", "adjudication": "incorrect" }
+      ],
+      "reviewer_reviews": [
+        {
+          "reviewer_id": "reviewer-01",
+          "reviewer_decision": "accept",
+          "decision_confidence": 0.9,
+          "actual_review_minutes": 2.2
+        },
+        {
+          "reviewer_id": "reviewer-02",
+          "reviewer_decision": "accept",
+          "decision_confidence": 0.8,
+          "actual_review_minutes": 1.8
+        },
+        {
+          "reviewer_id": "reviewer-03",
+          "reviewer_decision": "reject",
+          "decision_confidence": 0.7,
+          "actual_review_minutes": 2.5
+        }
+      ]
+    },
+    {
+      "candidate_id": "candidate-2",
+      "adjudicator_votes": [
+        { "adjudicator_id": "adj-01", "adjudication": "incorrect" },
+        { "adjudicator_id": "adj-02", "adjudication": "incorrect" },
+        { "adjudicator_id": "adj-03", "adjudication": "indeterminate" }
+      ],
+      "reviewer_reviews": [
+        {
+          "reviewer_id": "reviewer-01",
+          "reviewer_decision": "reject",
+          "decision_confidence": 0.8,
+          "actual_review_minutes": 1.2
+        },
+        {
+          "reviewer_id": "reviewer-02",
+          "reviewer_decision": "reject",
+          "decision_confidence": 0.75,
+          "actual_review_minutes": 1.3
+        },
+        {
+          "reviewer_id": "reviewer-03",
+          "reviewer_decision": "abstain",
+          "decision_confidence": null,
+          "actual_review_minutes": 3.1
+        }
+      ]
+    },
+    {
+      "candidate_id": "candidate-3",
+      "adjudicator_votes": [
+        { "adjudicator_id": "adj-01", "adjudication": "correct" },
+        { "adjudicator_id": "adj-02", "adjudication": "incorrect" },
+        { "adjudicator_id": "adj-03", "adjudication": "indeterminate" }
+      ],
+      "reviewer_reviews": [
+        {
+          "reviewer_id": "reviewer-01",
+          "reviewer_decision": "accept",
+          "decision_confidence": 0.6,
+          "actual_review_minutes": 2.0
+        },
+        {
+          "reviewer_id": "reviewer-02",
+          "reviewer_decision": "reject",
+          "decision_confidence": 0.6,
+          "actual_review_minutes": 2.1
+        },
+        {
+          "reviewer_id": "reviewer-03",
+          "reviewer_decision": "abstain",
+          "decision_confidence": null,
+          "actual_review_minutes": 3.0
+        }
+      ]
+    }
+  ]
+}
