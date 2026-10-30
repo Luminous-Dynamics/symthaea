@@ -189,6 +189,8 @@ fn conformal_quantile(values: &[f64], level: f64) -> f64 {
 struct MethodSummary {
     method: &'static str,
     selected_action_coverage: f64,
+    pre_shift_selected_coverage: f64,
+    post_shift_selected_coverage: f64,
     random_action_coverage: f64,
     false_safe_rate: f64,
     fallback_rate: f64,
@@ -219,6 +221,10 @@ fn evaluate_method(
 ) -> MethodSummary {
     let total = episodes.len() * DECISIONS_PER_EPISODE;
     let mut selected_covered = 0usize;
+    let mut pre_shift_covered = 0usize;
+    let mut pre_shift_count = 0usize;
+    let mut post_shift_covered = 0usize;
+    let mut post_shift_count = 0usize;
     let mut random_covered = 0usize;
     let mut accepted = 0usize;
     let mut false_safe = 0usize;
@@ -261,6 +267,18 @@ fn evaluate_method(
             let random_lower_bound = random.predicted - q;
             let random_is_covered = random.actual >= random_lower_bound;
             selected_covered += if covered { 1 } else { 0 };
+            if let Some(start) = shift_start {
+                if step < start {
+                    pre_shift_count += 1;
+                    pre_shift_covered += if covered { 1 } else { 0 };
+                } else {
+                    post_shift_count += 1;
+                    post_shift_covered += if covered { 1 } else { 0 };
+                }
+            } else {
+                pre_shift_count += 1;
+                pre_shift_covered += if covered { 1 } else { 0 };
+            }
             random_covered += if random_is_covered { 1 } else { 0 };
             interval_width_sum += q;
 
@@ -301,6 +319,8 @@ fn evaluate_method(
     MethodSummary {
         method: method.name(),
         selected_action_coverage: selected_covered as f64 / total as f64,
+        pre_shift_selected_coverage: if pre_shift_count > 0 { pre_shift_covered as f64 / pre_shift_count as f64 } else { -1.0 },
+        post_shift_selected_coverage: if post_shift_count > 0 { post_shift_covered as f64 / post_shift_count as f64 } else { -1.0 },
         random_action_coverage: random_covered as f64 / total as f64,
         false_safe_rate: if accepted > 0 { false_safe as f64 / accepted as f64 } else { 0.0 },
         fallback_rate: fallback as f64 / total as f64,
@@ -372,6 +392,7 @@ fn render_report(cells: &[CellReport]) -> String {
     writeln!(&mut out, "  \"rolling_window\": {ROLLING_WINDOW},").unwrap();
     writeln!(&mut out, "  \"online_step_size\": {},", number(ONLINE_STEP_SIZE)).unwrap();
     writeln!(&mut out, "  \"search_widths\": [8,32,128],").unwrap();
+    writeln!(&mut out, "  \"rollout_horizons\": [1,3,8],").unwrap();
     writeln!(&mut out, "  \"scenarios\": [\"stationary\",\"abrupt_shift\",\"gradual_shift\"],").unwrap();
     writeln!(&mut out, "  \"methods\": [\"fixed_gaussian\",\"random_action_split_conformal\",\"selected_action_split_conformal\",\"online_aci_style_quantile\",\"rolling_residual_quantile\",\"oracle_selected_quantile\"],").unwrap();
     writeln!(&mut out, "  \"cells\": [").unwrap();
@@ -380,6 +401,7 @@ fn render_report(cells: &[CellReport]) -> String {
         writeln!(&mut out, "    {{").unwrap();
         writeln!(&mut out, "      \"scenario\": \"{}\",", cell.scenario).unwrap();
         writeln!(&mut out, "      \"search_width\": {},", cell.search_width).unwrap();
+        writeln!(&mut out, "      \"rollout_horizon\": {},", cell.rollout_horizon).unwrap();
         writeln!(&mut out, "      \"episode_count\": {},", cell.episode_count).unwrap();
         writeln!(&mut out, "      \"decisions_per_episode\": {},", cell.decisions_per_episode).unwrap();
         writeln!(&mut out, "      \"calibration_samples\": {},", cell.calibration_samples).unwrap();
@@ -392,13 +414,15 @@ fn render_report(cells: &[CellReport]) -> String {
             writeln!(&mut out,
                 concat!(
                     "        {{\"method\":\"{}\",\"selected_action_coverage\":{},",
-                    "\"random_action_coverage\":{},\"false_safe_rate\":{},\"fallback_rate\":{},",
+                    "\"random_action_coverage\":{},\"pre_shift_selected_coverage\":{},\"post_shift_selected_coverage\":{},",
+                    "\"false_safe_rate\":{},\"fallback_rate\":{},",
                     "\"mean_realized_utility\":{},\"mean_interval_width\":{},",
                     "\"feedback_updates_per_episode\":{},\"recovery_episode_rate\":{},",
                     "\"p90_recovery_delay\":{}}}{}"
                 ),
                 method.method, number(method.selected_action_coverage),
-                number(method.random_action_coverage), number(method.false_safe_rate),
+                number(method.random_action_coverage), number(method.pre_shift_selected_coverage),
+                number(method.post_shift_selected_coverage), number(method.false_safe_rate),
                 number(method.fallback_rate), number(method.mean_realized_utility),
                 number(method.mean_interval_width), number(method.feedback_updates_per_episode),
                 number(method.recovery_episode_rate), number(method.p90_recovery_delay), method_comma
@@ -420,14 +444,14 @@ mod tests {
 
     #[test]
     fn selection_conditioned_calibration_is_wider_than_random_at_large_search() {
-        let (random, selected) = collect_calibration(128, BASE_SEED ^ 0xCA11_BA7E);
+        let (random, selected) = collect_calibration(128, 8, BASE_SEED ^ 0xCA11_BA7E);
         assert!(conformal_quantile(&selected, TARGET_COVERAGE) > conformal_quantile(&random, TARGET_COVERAGE));
     }
 
     #[test]
     fn selected_calibration_widens_with_candidate_search() {
-        let (_, small) = collect_calibration(8, BASE_SEED ^ 0xCA11_BA7E);
-        let (_, large) = collect_calibration(128, BASE_SEED ^ 0xCA11_BA7E);
+        let (_, small) = collect_calibration(8, 1, BASE_SEED ^ 0xCA11_BA7E);
+        let (_, large) = collect_calibration(128, 8, BASE_SEED ^ 0xCA11_BA7E);
         assert!(conformal_quantile(&large, TARGET_COVERAGE) > conformal_quantile(&small, TARGET_COVERAGE));
     }
 
@@ -439,13 +463,13 @@ mod tests {
 
     #[test]
     fn deterministic_tapes_repeat() {
-        assert_eq!(generate_evaluation(Scenario::AbruptShift, 32), generate_evaluation(Scenario::AbruptShift, 32));
+        assert_eq!(generate_evaluation(Scenario::AbruptShift, 32, 3), generate_evaluation(Scenario::AbruptShift, 32, 3));
     }
 
     #[test]
     fn feedback_delay_and_drops_bound_online_updates() {
-        let (random, selected) = collect_calibration(32, 44);
-        let episodes = generate_evaluation(Scenario::AbruptShift, 32);
+        let (random, selected) = collect_calibration(32, 3, 44);
+        let episodes = generate_evaluation(Scenario::AbruptShift, 32, 3);
         let scores: Vec<f64> = episodes.iter().flat_map(|t| t.iter().map(|o| o.selected.nonconformity)).collect();
         let oracle = conformal_quantile(&scores, TARGET_COVERAGE);
         let online = evaluate_method(Method::OnlineAciStyle, Scenario::AbruptShift, &episodes,
@@ -456,8 +480,8 @@ mod tests {
 
     #[test]
     fn rolling_quantile_consumes_delayed_selected_residuals() {
-        let (random, selected) = collect_calibration(8, 55);
-        let episodes = generate_evaluation(Scenario::GradualShift, 8);
+        let (random, selected) = collect_calibration(8, 1, 55);
+        let episodes = generate_evaluation(Scenario::GradualShift, 8, 1);
         let scores: Vec<f64> = episodes.iter().flat_map(|t| t.iter().map(|o| o.selected.nonconformity)).collect();
         let oracle = conformal_quantile(&scores, TARGET_COVERAGE);
         let rolling = evaluate_method(Method::RollingQuantile, Scenario::GradualShift, &episodes,
@@ -469,16 +493,16 @@ mod tests {
     #[test]
     fn benchmark_has_all_cells_and_calibration_controls_are_measurable() {
         let cells = run_benchmark();
-        assert_eq!(cells.len(), 9);
+        assert_eq!(cells.len(), 27);
         assert!(cells.iter().all(|cell| cell.methods.len() == 6));
         assert!(cells.iter().all(|cell| cell.episode_count == 512));
 
-        let stationary = cells.iter().find(|c| c.scenario == "stationary" && c.search_width == 32).unwrap();
+        let stationary = cells.iter().find(|c| c.scenario == "stationary" && c.search_width == 32 && c.rollout_horizon == 3).unwrap();
         let selected = stationary.methods.iter().find(|m| m.method == "selected_action_split_conformal").unwrap();
         assert!(selected.selected_action_coverage >= 0.86);
         assert!(selected.selected_action_coverage <= 0.96);
 
-        let shifted = cells.iter().find(|c| c.scenario == "abrupt_shift" && c.search_width == 128).unwrap();
+        let shifted = cells.iter().find(|c| c.scenario == "abrupt_shift" && c.search_width == 128 && c.rollout_horizon == 8).unwrap();
         let oracle = shifted.methods.iter().find(|m| m.method == "oracle_selected_quantile").unwrap();
         assert!(oracle.selected_action_coverage >= 0.88);
     }
