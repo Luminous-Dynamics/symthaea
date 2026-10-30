@@ -11,7 +11,10 @@
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, FactorGraphError};
+use crate::{
+    min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, DirectedSystemPartition,
+    FactorGraphError, ModelError, PartitionApplyError, MAX_DENSE_UNITS,
+};
 
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
@@ -117,8 +120,14 @@ pub enum SparseCausalError {
     UndefinedBackgroundPosterior,
     #[error("sparse Eq4 report entry {index} is not finite and nonnegative: {value}")]
     InvalidReportValue { index: usize, value: f64 },
+    #[error("cannot convert {units} sparse units to dense; maximum is {maximum}")]
+    DenseConversionLimit { units: usize, maximum: usize },
     #[error("dense model target {target} is not a function of its declared parent scope at full state {state}")]
     DenseModelNotLocal { target: usize, state: usize },
+    #[error(transparent)]
+    PartitionApply(#[from] PartitionApplyError),
+    #[error(transparent)]
+    DenseModel(#[from] ModelError),
     #[error(transparent)]
     FactorGraph(#[from] FactorGraphError),
 }
@@ -288,6 +297,154 @@ impl SparseBinaryCausalModel {
 
     pub fn mechanism(&self, target_unit: usize) -> Option<&SparseMechanismCpt> {
         self.mechanisms.get(target_unit)
+    }
+
+    /// Convert to the dense reference representation when its exponential
+    /// storage bound permits it.
+    pub fn to_dense(&self) -> Result<BinaryCausalModel, SparseCausalError> {
+        if self.n_units > MAX_DENSE_UNITS {
+            return Err(SparseCausalError::DenseConversionLimit {
+                units: self.n_units,
+                maximum: MAX_DENSE_UNITS,
+            });
+        }
+        let state_count = 1usize << self.n_units;
+        let mut transition_probabilities = vec![0.0; state_count * self.n_units];
+        let mut connectivity = vec![false; self.n_units * self.n_units];
+        for mechanism in &self.mechanisms {
+            for parent in mechanism.parent_units.iter().copied() {
+                connectivity[parent * self.n_units + mechanism.target_unit] = true;
+            }
+        }
+        for state_index in 0..state_count {
+            let state = (0..self.n_units)
+                .map(|unit| ((state_index >> unit) & 1) != 0)
+                .collect::<Vec<_>>();
+            for target in 0..self.n_units {
+                transition_probabilities[state_index * self.n_units + target] =
+                    self.probability_next_one(&state, target)?;
+            }
+        }
+        Ok(BinaryCausalModel::new(
+            self.n_units,
+            transition_probabilities,
+            connectivity,
+        )?)
+    }
+
+    /// Apply a directed system partition by maximum-entropy marginalizing every
+    /// severed internal parent bit from each target's local CPT.
+    ///
+    /// Parent variables outside the candidate system are untouched. The
+    /// transformation is local to each target CPT and exactly matches the dense
+    /// TPM operation: average the target probability over every severed source
+    /// bit while retaining all uncut parent assignments.
+    pub fn apply_partition(
+        &self,
+        partition: &DirectedSystemPartition,
+    ) -> Result<Self, SparseCausalError> {
+        let candidate = partition.candidate_system();
+        let candidate_count = candidate.len();
+        let expected_cut_entries = candidate_count
+            .checked_mul(candidate_count)
+            .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                target: candidate.first().copied().unwrap_or(0),
+                parents: candidate_count.saturating_mul(2),
+            })?;
+        if partition.cut_matrix().len() != expected_cut_entries {
+            return Err(PartitionApplyError::CutMatrixShapeMismatch {
+                expected: expected_cut_entries,
+                actual: partition.cut_matrix().len(),
+            }.into());
+        }
+
+        let mut candidate_slot = vec![None; self.n_units];
+        for (slot, unit) in candidate.iter().copied().enumerate() {
+            if unit >= self.n_units {
+                return Err(PartitionApplyError::CandidateUnitOutOfRange {
+                    unit,
+                    unit_count: self.n_units,
+                }.into());
+            }
+            if candidate_slot[unit].is_some() {
+                return Err(SparseCausalError::DuplicateCandidateUnit { unit });
+            }
+            candidate_slot[unit] = Some(slot);
+        }
+
+        let mut transformed = Vec::with_capacity(self.n_units);
+        for mechanism in &self.mechanisms {
+            let target_slot = candidate_slot[mechanism.target_unit];
+            let cut_parent_flags = mechanism
+                .parent_units
+                .iter()
+                .map(|parent| {
+                    match (candidate_slot[*parent], target_slot) {
+                        (Some(source_slot), Some(target_slot)) => {
+                            partition.cut_matrix()[source_slot * candidate_count + target_slot]
+                        }
+                        _ => false,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let cut_count = cut_parent_flags.iter().filter(|cut| **cut).count();
+            if cut_count == 0 {
+                transformed.push(mechanism.clone());
+                continue;
+            }
+
+            let retained_parents = mechanism
+                .parent_units
+                .iter()
+                .copied()
+                .zip(cut_parent_flags.iter().copied())
+                .filter_map(|(parent, cut)| if cut { None } else { Some(parent) })
+                .collect::<Vec<_>>();
+            let retained_entries = 1usize
+                .checked_shl(retained_parents.len() as u32)
+                .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                    target: mechanism.target_unit,
+                    parents: retained_parents.len(),
+                })?;
+            let cut_assignments = 1usize
+                .checked_shl(cut_count as u32)
+                .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                    target: mechanism.target_unit,
+                    parents: cut_count,
+                })?;
+            let cut_weight = 1.0 / cut_assignments as f64;
+            let mut probability_table = Vec::with_capacity(retained_entries);
+            for retained_assignment in 0..retained_entries {
+                let mut average = 0.0;
+                for cut_assignment in 0..cut_assignments {
+                    let mut original_assignment = 0usize;
+                    let mut retained_slot = 0usize;
+                    let mut cut_slot = 0usize;
+                    for (original_slot, is_cut) in cut_parent_flags.iter().copied().enumerate() {
+                        let bit = if is_cut {
+                            let bit = ((cut_assignment >> cut_slot) & 1) != 0;
+                            cut_slot += 1;
+                            bit
+                        } else {
+                            let bit = ((retained_assignment >> retained_slot) & 1) != 0;
+                            retained_slot += 1;
+                            bit
+                        };
+                        if bit {
+                            original_assignment |= 1usize << original_slot;
+                        }
+                    }
+                    average += cut_weight * mechanism.probability_next_one[original_assignment];
+                }
+                probability_table.push(average);
+            }
+            transformed.push(SparseMechanismCpt::new(
+                mechanism.target_unit,
+                retained_parents,
+                probability_table,
+            )?);
+        }
+        Self::new(self.n_units, transformed)
     }
 
     /// Versioned SHA-256 identity in a namespace distinct from dense TPM digests.
@@ -697,6 +854,28 @@ mod tests {
             }
         }
         forward
+    }
+
+    #[test]
+    fn sparse_partition_transform_matches_dense_maximum_entropy_cut() {
+        let dense = dense_ring_model(5);
+        let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
+        let candidate = [0, 1, 3];
+        let partitions = enumerate_iit4_system_partitions(&candidate, 5, true, 100)
+            .unwrap();
+        assert!(partitions.iter().any(DirectedSystemPartition::is_total_cut));
+        for partition in &partitions {
+            let dense_cut = dense.apply_partition(partition).unwrap();
+            let sparse_cut = sparse.apply_partition(partition).unwrap().to_dense().unwrap();
+            assert_eq!(
+                sparse_cut,
+                dense_cut,
+                "sparse/dense cut mismatch: total={}, parts={:?}, directions={:?}",
+                partition.is_total_cut(),
+                partition.parts(),
+                partition.directions()
+            );
+        }
     }
 
     #[test]
