@@ -498,7 +498,10 @@ mod tests {
         }
         let report = analyze_clustered_advantage(&observations, config(3)).unwrap();
         assert!(!report.resource_margin_survives_every_cluster_deletion);
-        assert!(report.leave_one_cluster_out_min_resource_median < 0.0);
+        assert!(
+            report.leave_one_cluster_out_min_resource_median
+                < -(-config(3).min_relative_resource_reduction).ln_1p()
+        );
     }
 
     #[test]
