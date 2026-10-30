@@ -83,7 +83,8 @@ enum Policy {
     ShieldedCertaintyEquivalent,
     WorstCaseRobust,
     UnconstrainedInfoBonus,
-    BudgetedDualControl,
+    WeightedBudgetedDualControl,
+    DualGatekeeper,
     SeparatedSensorProbe,
     OracleKnownGain,
 }
@@ -95,7 +96,8 @@ impl Policy {
             Self::ShieldedCertaintyEquivalent,
             Self::WorstCaseRobust,
             Self::UnconstrainedInfoBonus,
-            Self::BudgetedDualControl,
+            Self::WeightedBudgetedDualControl,
+            Self::DualGatekeeper,
             Self::SeparatedSensorProbe,
             Self::OracleKnownGain,
         ]
@@ -107,7 +109,8 @@ impl Policy {
             Self::ShieldedCertaintyEquivalent => "shielded_certainty_equivalent",
             Self::WorstCaseRobust => "worst_case_robust",
             Self::UnconstrainedInfoBonus => "unconstrained_information_bonus",
-            Self::BudgetedDualControl => "budgeted_dual_control",
+            Self::WeightedBudgetedDualControl => "weighted_budgeted_dual_control",
+            Self::DualGatekeeper => "dual_gatekeeper",
             Self::SeparatedSensorProbe => "separated_sensor_probe_reference",
             Self::OracleKnownGain => "oracle_known_gain",
         }
@@ -256,6 +259,46 @@ fn robustly_safe(state: f64, action: f64) -> bool {
     })
 }
 
+fn minimum_safe_future_cost(state: f64, belief: &[f64; 5], target: f64) -> f64 {
+    ACTIONS.iter().copied()
+        .filter(|action| robustly_safe(state, *action))
+        .map(|action| expected_stage_cost(state, action, belief, target))
+        .fold(f64::INFINITY, f64::min)
+}
+
+fn expected_future_cost_after_observation(
+    state: f64,
+    action: f64,
+    belief: &[f64; 5],
+    next_target: f64,
+) -> f64 {
+    const NOISE: [(f64, f64); 3] = [(-1.5, 0.25), (0.0, 0.50), (1.5, 0.25)];
+    let mut expected_cost = 0.0;
+    for gain_index in 0..5 {
+        for (noise_sigma, noise_weight) in NOISE {
+            let mut posterior = *belief;
+            let observation = GAINS[gain_index] * action
+                + noise_sigma * RESPONSE_NOISE_STD;
+            update_transition_belief(&mut posterior, action, observation);
+            let next_state = A * state + GAINS[gain_index] * action;
+            let future_cost = minimum_safe_future_cost(next_state, &posterior, next_target);
+            expected_cost += belief[gain_index] * noise_weight * future_cost;
+        }
+    }
+    expected_cost
+}
+
+fn expected_two_step_cost(
+    state: f64,
+    action: f64,
+    belief: &[f64; 5],
+    target: f64,
+    next_target: f64,
+) -> f64 {
+    expected_stage_cost(state, action, belief, target)
+        + 0.90 * expected_future_cost_after_observation(state, action, belief, next_target)
+}
+
 fn certainty_equivalent_action(state: f64, belief: &[f64; 5], target: f64) -> f64 {
     let mut best_action = ACTIONS[0];
     let mut best_cost = f64::INFINITY;
@@ -288,6 +331,7 @@ fn select_action(
     state: f64,
     belief: &[f64; 5],
     target: f64,
+    next_target: f64,
     true_gain: f64,
     remaining_budget: f64,
 ) -> (f64, f64) {
@@ -318,7 +362,7 @@ fn select_action(
                 .unwrap_or(0.0);
             (action, 0.0)
         }
-        Policy::BudgetedDualControl => {
+        Policy::WeightedBudgetedDualControl => {
             let mut best_action = safe_ce_action(state, belief, target);
             let mut best_score = f64::INFINITY;
             let mut best_spend = 0.0;
@@ -331,6 +375,31 @@ fn select_action(
                 if score < best_score {
                     best_score = score;
                     best_action = action;
+                    best_spend = degradation;
+                }
+            }
+            (best_action, best_spend)
+        }
+        Policy::DualGatekeeper => {
+            let baseline_action = safe_ce_action(state, belief, target);
+            let baseline_task_cost = expected_stage_cost(state, baseline_action, belief, target);
+            let baseline_score = expected_two_step_cost(
+                state, baseline_action, belief, target, next_target,
+            );
+            let mut best_action = baseline_action;
+            let mut best_score = baseline_score;
+            let mut best_spend = 0.0;
+            for action in ACTIONS {
+                if !robustly_safe(state, action) { continue; }
+                let task_cost = expected_stage_cost(state, action, belief, target);
+                let degradation = (task_cost - baseline_task_cost).max(0.0);
+                if degradation > remaining_budget + 1e-12 { continue; }
+                let score = expected_two_step_cost(state, action, belief, target, next_target);
+                // Commit an informative control intervention only when its predicted
+                // two-step task cost improves on the safe nominal plan.
+                if score + 1e-9 < baseline_score && score < best_score {
+                    best_action = action;
+                    best_score = score;
                     best_spend = degradation;
                 }
             }
@@ -380,9 +449,10 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &EpisodeTape) -> Outcom
         }
 
         let (action, spend) = select_action(
-            policy, state, &belief, target, true_gain, budget_remaining,
+            policy, state, &belief, target, target_at((step + 1).min(HORIZON - 1)),
+            true_gain, budget_remaining,
         );
-        if policy == Policy::BudgetedDualControl {
+        if matches!(policy, Policy::WeightedBudgetedDualControl | Policy::DualGatekeeper) {
             budget_remaining = (budget_remaining - spend).max(0.0);
             budget_spent += spend;
         }
@@ -581,7 +651,7 @@ mod tests {
         for state in [-0.55, -0.2, 0.0, 0.2, 0.55] {
             let belief = [0.20; 5];
             let (action, _) = select_action(
-                Policy::BudgetedDualControl, state, &belief, 0.4, 1.0,
+                Policy::WeightedBudgetedDualControl, state, &belief, 0.4, 0.4, 1.0,
                 MISSION_DEGRADATION_BUDGET,
             );
             assert!(robustly_safe(state, action));
@@ -594,7 +664,7 @@ mod tests {
         for state in [-0.4, -0.1, 0.0, 0.1, 0.4] {
             let expected = safe_ce_action(state, &belief, 0.4);
             let (actual, spend) = select_action(
-                Policy::BudgetedDualControl, state, &belief, 0.4, 1.0, 0.0,
+                Policy::WeightedBudgetedDualControl, state, &belief, 0.4, 0.4, 1.0, 0.0,
             );
             assert!((actual - expected).abs() < 1e-12);
             assert_eq!(spend, 0.0);
@@ -617,7 +687,7 @@ mod tests {
         for scenario in Scenario::all() {
             for episode in 0..32 {
                 let tape = EpisodeTape::new(scenario, episode);
-                let outcome = run_episode(scenario, Policy::BudgetedDualControl, &tape);
+                let outcome = run_episode(scenario, Policy::DualGatekeeper, &tape);
                 assert!(outcome.budget_spent <= MISSION_DEGRADATION_BUDGET + 1e-9);
                 assert_eq!(outcome.probe_count, 0);
             }
