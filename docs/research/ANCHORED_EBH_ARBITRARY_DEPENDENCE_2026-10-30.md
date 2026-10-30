@@ -47,7 +47,7 @@ The independent implementation contains ordinary e-BH, scalar and batched Anchor
 
 It reproduces the paper's strict witness \(m=2,\alpha=.05,e=(39.5,1)\): ordinary e-BH returns no discoveries and Anchored-eBH certifies one.
 
-12 regression tests cover randomized differential comparison against exhaustive closure for 640 small families, baseline containment, selected-set maximality, input boundaries, and scalar/batch agreement.
+12 regression tests cover randomized differential comparison against exhaustive closure for 640 small families, baseline containment, selected-set maximality, input boundaries, and scalar/batch agreement. The exact committed source and test blobs were fetched back from GitHub and run locally: 12/12 passed.
 
 **Local validation:** 12/12 passed.
 
@@ -104,12 +104,14 @@ Interpretation:
 ## Scaling probe
 
 Single-family scalar implementation, one random e-value vector per size:
-- \(m=100\): 1.38 ms
-- \(m=1,000\): 3.22 ms
-- \(m=10,000\): 37.80 ms
-- \(m=100,000\): 1.48 s
+- \(m=100\): 0.35 ms
+- \(m=1,000\): 2.35 ms
+- \(m=10,000\): 36.48 ms
+- \(m=100,000\): 1.37 s
 
 This is a Python/NumPy microbenchmark, not a head-to-head production benchmark. It confirms the expected growth trend, not a production performance claim. A Rust port needs a separate benchmark and differential parity suite.
+
+Committed file SHA-256: source 8394051ed10faba98856991a5e0a2ed5bbddf46bedccf0fe5b6437391657d0d4; tests c59cb104d202207d8efd4ad596cab1bb46161d4c0d169c8e7c51dcace0e8053f. The JSON artifact contains the complete 18-setting grid and its paired power-gain confidence intervals.
 
 ## Scope boundaries and next steps
 
