@@ -256,7 +256,7 @@ jobs:
           set -euo pipefail
           tampered_root="$RUNNER_TEMP/seqcube-tampered"
           cp -a "$SEQCUBE_PACKAGE_ROOT" "$tampered_root"
-          printf '\\n# intentional tamper negative control\\n' >> "$tampered_root/replay/active.csv"
+          printf '\n# intentional tamper negative control\n' >> "$tampered_root/replay/active.csv"
 
           set +e
           cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
@@ -283,7 +283,7 @@ jobs:
 
           cp "$RUNNER_TEMP/tampered-auditor.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
           cp "$RUNNER_TEMP/tampered-upstream.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
-          printf 'auditor_exit=%s\\nupstream_exit=%s\\n' "$auditor_status" "$upstream_status" \
+          printf 'auditor_exit=%s\nupstream_exit=%s\n' "$auditor_status" "$upstream_status" \
             > "$RUNNER_TEMP/hardsec-seqcube/negative-control-status.txt"
 
       - name: Upload SeqCube witness packet and replay receipts
