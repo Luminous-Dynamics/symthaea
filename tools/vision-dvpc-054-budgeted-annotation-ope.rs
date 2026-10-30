@@ -389,6 +389,16 @@ fn reward_variance(mean: f64) -> f64 {
 /// tau_f^2 * loading[k,f] * loading[l,f] between every distinct annotation
 /// draw. This is PSD by construction (diagonal residual covariance plus
 /// low-rank positive-semidefinite shared factors).
+fn shared_source_covariance(world: &World, left: usize, right: usize) -> f64 {
+    (0..2)
+        .map(|factor| {
+            world.shared_factor_variance[factor]
+                * world.source_shared_loadings[left][factor]
+                * world.source_shared_loadings[right][factor]
+        })
+        .sum()
+}
+
 fn shared_annotation_covariance_numerator(
     world: &World,
     allocation: &Allocation,
@@ -2002,6 +2012,31 @@ mod tests {
                 .sum::<f64>();
         let (_, q_variance) = cell_bias_and_variance(&world, &allocation, x, a);
         assert!((q_variance - independent_numerator / n.powi(2)).abs() < 1e-14);
+    }
+
+    #[test]
+    fn low_rank_shared_source_covariance_is_positive_semidefinite() {
+        for world in correlated_stress_worlds() {
+            world.validate().unwrap();
+            let covariance: [[f64; SOURCES]; SOURCES] =
+                std::array::from_fn(|k| {
+                    std::array::from_fn(|l| shared_source_covariance(&world, k, l))
+                });
+            for vector in [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [1.0, -1.0, 0.5],
+                [-0.25, 0.75, 2.0],
+                [1.0, 1.0, 1.0],
+            ] {
+                let quadratic = (0..SOURCES)
+                    .flat_map(|k| (0..SOURCES).map(move |l| (k, l)))
+                    .map(|(k, l)| vector[k] * covariance[k][l] * vector[l])
+                    .sum::<f64>();
+                assert!(quadratic >= -1e-12, "quadratic={quadratic}");
+            }
+        }
     }
 
     #[test]
