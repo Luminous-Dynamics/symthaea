@@ -376,6 +376,103 @@ mod tests {
         }
     }
 
+    struct MockBackend {
+        durable: bool,
+        searchable: bool,
+        mismatch_digest: bool,
+        search_response: AmlSearchResponse,
+    }
+
+    impl AmlMemoryBackend for MockBackend {
+        fn commit_add_and_confirm_searchable(
+            &mut self,
+            request: &AmlAddRequest,
+            payload_sha256: &str,
+        ) -> Result<AmlAddCommitReceipt, String> {
+            Ok(AmlAddCommitReceipt {
+                request_id: request.request_id.clone(),
+                payload_sha256: if self.mismatch_digest {
+                    "0".repeat(64)
+                } else {
+                    payload_sha256.to_owned()
+                },
+                durable: self.durable,
+                searchable: self.searchable,
+            })
+        }
+
+        fn search_ranked(
+            &self,
+            _request: &AmlSearchRequest,
+        ) -> Result<AmlSearchResponse, String> {
+            Ok(self.search_response.clone())
+        }
+    }
+
+    #[test]
+    fn executor_returns_add_success_only_after_durable_and_searchable_receipt() {
+        let mut backend = MockBackend {
+            durable: true,
+            searchable: true,
+            mismatch_digest: false,
+            search_response: AmlSearchResponse::empty(),
+        };
+        let request = add_request();
+        let response = execute_aml_add(&mut backend, request.clone()).unwrap();
+        response.validate_echo(&request).unwrap();
+    }
+
+    #[test]
+    fn executor_rejects_add_receipt_before_durable_commit() {
+        let mut backend = MockBackend {
+            durable: false,
+            searchable: true,
+            mismatch_digest: false,
+            search_response: AmlSearchResponse::empty(),
+        };
+        assert!(execute_aml_add(&mut backend, add_request()).unwrap_err().contains("durably persisted"));
+    }
+
+    #[test]
+    fn executor_rejects_add_receipt_before_immediate_searchability() {
+        let mut backend = MockBackend {
+            durable: true,
+            searchable: false,
+            mismatch_digest: false,
+            search_response: AmlSearchResponse::empty(),
+        };
+        assert!(execute_aml_add(&mut backend, add_request()).unwrap_err().contains("immediately searchable"));
+    }
+
+    #[test]
+    fn executor_rejects_add_receipt_for_a_different_payload() {
+        let mut backend = MockBackend {
+            durable: true,
+            searchable: true,
+            mismatch_digest: true,
+            search_response: AmlSearchResponse::empty(),
+        };
+        assert!(execute_aml_add(&mut backend, add_request()).unwrap_err().contains("payload digest"));
+    }
+
+    #[test]
+    fn executor_validates_search_response_without_rewriting_rank_order() {
+        let mut backend = MockBackend {
+            durable: true,
+            searchable: true,
+            mismatch_digest: false,
+            search_response: AmlSearchResponse {
+                data: vec![result("rank-1", "best evidence", 0.95), result("rank-2", "next evidence", 0.7)],
+            },
+        };
+        let result = execute_aml_search(&backend, search_request(2)).unwrap();
+        assert_eq!(result.data[0].id, "rank-1");
+        assert_eq!(result.data[1].id, "rank-2");
+
+        backend.search_response.data.push(result("rank-3", "over top_k", 0.1));
+        assert!(execute_aml_search(&backend, search_request(2)).unwrap_err().contains("exceeding top_k"));
+    }
+
     #[test]
     fn add_request_preserves_order_and_round_trips() {
         let request = add_request();
