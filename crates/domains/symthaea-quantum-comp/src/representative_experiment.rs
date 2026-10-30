@@ -537,12 +537,20 @@ mod tests {
             ranking(&report, RidaAblationPolicy::FullRidaProxy).candidates[0].experiment_id,
             "C-balanced-rid"
         );
-        assert_eq!(
-            ranking(&report, RidaAblationPolicy::RepresentativenessAndInformativeness).candidates[0].experiment_id,
-            "C-balanced-rid"
+        let representative_and_informative = ranking(
+            &report,
+            RidaAblationPolicy::RepresentativenessAndInformativeness,
         );
         assert_eq!(
-            ranking(&report, RidaAblationPolicy::InformativenessAndDeAmplification).candidates[0].experiment_id,
+            representative_and_informative.candidates[0].experiment_id,
+            "C-balanced-rid"
+        );
+        let informative_and_de_amplifying = ranking(
+            &report,
+            RidaAblationPolicy::InformativenessAndDeAmplification,
+        );
+        assert_eq!(
+            informative_and_de_amplifying.candidates[0].experiment_id,
             "C-balanced-rid"
         );
     }
