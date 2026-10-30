@@ -116,3 +116,16 @@ A `CERTIFIED_WITHIN_DECLARED_SCOPE` certificate requires all critical quality ga
 
 
 Certification requires all critical gates to PASS. Non-critical NOT_APPLICABLE gates are allowed only with a scope justification. A critical NOT_APPLICABLE, NOT_ESTIMABLE, or FAIL gate blocks full certification. Every uncertainty component must list assumptions; ESTIMATED components require a point estimate, and NOT_ESTIMABLE components may not carry estimates or intervals.
+
+
+## 9. Executable dependency-closure graph verification
+
+The certificate contract now includes:
+- `query.dependency_roots`: the exact object/revision identities that define the query's starting dependency set;
+- `dependency_closure[].depends_on`: explicit typed directed edges to other dependency nodes.
+
+The Rust verifier checks that roots and child references resolve exactly, roots and child lists contain no duplicates, every dependency node is reachable from a declared root, and the graph contains no directed cycle. Every node must still bind to a source revision already listed in `source_revisions`.
+
+The synthetic query has a single edge root (`edge-17-42`) that depends on two endpoint neuron nodes. New adversarial tests cover missing roots, unresolved child references, cycles, unreachable extra nodes, and duplicate child edges.
+
+**Scope limitation:** this verifies completeness relative to the supplied root and edge manifest. It cannot prove that the query author declared every scientifically relevant root or that the source objects and dependency edges are biologically correct. That requires query-specific extractor validation and independent review. A future production certificate should bind the query dependency extractor binary, its output manifest, and an independently checked extraction policy.
