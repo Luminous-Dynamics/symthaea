@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QARCH-016 exact cluster sign-test power-plan record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_class",
+    "design",
+    "cases",
+    "fixed_cluster_sensitivity",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "qarch-016-cluster-power/1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "const": "exact_analytic_power_calculation"
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alpha_per_claim",
+        "desired_joint_power",
+        "minimum_independent_clusters",
+        "maximum_independent_clusters",
+        "joint_power_lower_bound",
+        "quality_resource_dependence_assumption",
+        "family_win_probability_definition"
+      ],
+      "properties": {
+        "alpha_per_claim": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "desired_joint_power": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "maximum_independent_clusters": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "joint_power_lower_bound": {
+          "const": "max(0, quality_component_power + resource_component_power - 1)"
+        },
+        "quality_resource_dependence_assumption": {
+          "const": "no independence assumption; Frechet/union lower bound"
+        },
+        "family_win_probability_definition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "quality_cluster_win_probability",
+          "resource_cluster_win_probability",
+          "required_independent_clusters",
+          "quality_critical_wins",
+          "resource_critical_wins",
+          "quality_component_power",
+          "resource_component_power",
+          "joint_power_lower_bound"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_cluster_win_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "resource_cluster_win_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "required_independent_clusters": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 2
+          },
+          "quality_critical_wins": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "resource_critical_wins": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "quality_component_power": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "resource_component_power": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "joint_power_lower_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "fixed_cluster_sensitivity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "independent_clusters",
+          "critical_wins",
+          "component_power_by_equal_cluster_win_probability"
+        ],
+        "properties": {
+          "independent_clusters": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "critical_wins": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "component_power_by_equal_cluster_win_probability": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "p",
+                "exact_power",
+                "joint_power_lower_bound"
+              ],
+              "properties": {
+                "p": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "exact_power": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "joint_power_lower_bound": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "sample_size_sensitivity_under_independent_clusters_and_sign-test_model"
+    }
+  }
+}
