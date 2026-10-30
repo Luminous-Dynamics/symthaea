@@ -1,0 +1,74 @@
+{
+  "schema_version": "cmaq-011-task-manifest-v0.1",
+  "benchmark_id": "cmaq-011",
+  "track": "vector_control",
+  "status": "example_template_not_a_locked_environment",
+  "task": {
+    "suite": "gymnasium-mujoco",
+    "environment_id": "HalfCheetah-v4",
+    "environment_package_version": null,
+    "physics_engine_version": null,
+    "source_revision": null,
+    "wrapper_stack": [],
+    "reward_definition_digest": null,
+    "observation_transform_digest": null,
+    "action_transform_digest": null,
+    "episode_horizon": null,
+    "reset_distribution_digest": null
+  },
+  "split": {
+    "name": "qualification",
+    "task_parameter_family_ids": [],
+    "seed_manifest_sha256": null,
+    "hidden_from_tuning": false
+  },
+  "budget": {
+    "max_candidate_action_sequences_per_decision": null,
+    "max_rollout_horizon": null,
+    "max_environment_queries_per_decision": null,
+    "max_model_queries_per_decision": null,
+    "wallclock_budget_ms_per_decision": null,
+    "peak_memory_bytes": null,
+    "training_compute_excluded": true
+  },
+  "baselines": [
+    {
+      "id": "direct_policy",
+      "kind": "no_world_model"
+    },
+    {
+      "id": "mpc_cem",
+      "kind": "model_based_search"
+    },
+    {
+      "id": "mrsq",
+      "kind": "external_pinned_baseline"
+    },
+    {
+      "id": "symthaea",
+      "kind": "candidate"
+    }
+  ],
+  "metrics_required": [
+    "normalized_state_rmse",
+    "reward_mae",
+    "spearman_action_rank_correlation",
+    "kendall_action_rank_correlation",
+    "top1_action_agreement",
+    "topk_oracle_regret",
+    "closed_loop_return_mean",
+    "closed_loop_return_median",
+    "closed_loop_cvar95_loss",
+    "task_success_rate",
+    "failure_rate",
+    "search_optimism_gap",
+    "unsupported_action_rate",
+    "latency_p50_ms",
+    "latency_p95_ms",
+    "peak_memory_bytes",
+    "model_queries_per_decision",
+    "environment_queries_per_decision",
+    "probe_count"
+  ],
+  "claim_ceiling": "schema_template_only_no_results"
+}
