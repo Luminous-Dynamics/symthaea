@@ -218,6 +218,28 @@ fn make_pool(rng: &mut SplitMix64, width: usize, factor: f64) -> Vec<Candidate> 
     (0..width).map(|_| make_candidate(rng, factor)).collect()
 }
 
+#[derive(Clone, Debug)]
+struct EpisodeTape {
+    pools: Vec<Vec<Candidate>>,
+    feedback_dropped: Vec<bool>,
+}
+
+fn make_episode_tape(scenario: Scenario, width: usize, episode: usize) -> EpisodeTape {
+    let seed = BASE_SEED
+        ^ ((scenario as u64) << 48)
+        ^ ((width as u64) << 24)
+        ^ (episode as u64).wrapping_mul(0xD134_2543_DE82_EF95);
+    let mut rng = SplitMix64::new(seed);
+    let mut feedback_rng = SplitMix64::new(seed ^ 0xFEE1_DEAD);
+    let mut pools = Vec::with_capacity(HORIZON);
+    let mut feedback_dropped = Vec::with_capacity(HORIZON);
+    for step in 0..HORIZON {
+        pools.push(make_pool(&mut rng, width, scenario.factor(step)));
+        feedback_dropped.push(feedback_rng.unit() < FEEDBACK_DROP_RATE);
+    }
+    EpisodeTape { pools, feedback_dropped }
+}
+
 fn selected_candidate(pool: &[Candidate]) -> Candidate {
     *pool.iter().max_by(|a, b| a.predicted.total_cmp(&b.predicted)).expect("candidate pool is non-empty")
 }
@@ -300,19 +322,12 @@ fn recovery_delay(coverage_tape: &[bool], shift_onset: Option<usize>) -> f64 {
 fn simulate_episode(
     scenario: Scenario,
     policy: Policy,
-    width: usize,
-    episode: usize,
+    tape: &EpisodeTape,
     calibration: &Calibration,
 ) -> EpisodeStats {
-    let seed = BASE_SEED
-        ^ ((scenario as u64) << 48)
-        ^ ((width as u64) << 24)
-        ^ (episode as u64).wrapping_mul(0xD134_2543_DE82_EF95);
-    let mut rng = SplitMix64::new(seed);
-    let mut feedback_rng = SplitMix64::new(seed ^ 0xFEE1_DEAD);
+    let mut q = initial_q(policy, calibration);
     let mut pending = VecDeque::<Feedback>::new();
     let mut rolling = VecDeque::<f64>::new();
-    let mut q = initial_q(policy, calibration);
     let mut stats = EpisodeStats::default();
 
     for step in 0..HORIZON {
@@ -328,9 +343,8 @@ fn simulate_episode(
             }
         }
 
-        let factor = scenario.factor(step);
-        let pool = make_pool(&mut rng, width, factor);
-        let selected = selected_candidate(&pool);
+        let pool = &tape.pools[step];
+        let selected = selected_candidate(pool);
         let q_used = match policy {
             Policy::OracleSelectedQuantile => calibration.oracle_q(factor),
             _ => q,
@@ -374,7 +388,7 @@ fn simulate_episode(
             stats.audit_count += 1;
         }
         if accepted_feedback || audit_feedback {
-            if feedback_rng.unit() >= FEEDBACK_DROP_RATE {
+            if !tape.feedback_dropped[step] {
                 pending.push_back(Feedback {
                     release_step: step + FEEDBACK_DELAY,
                     normalized_error: selected.normalized_error,
@@ -485,18 +499,26 @@ fn run_benchmark() -> Vec<Summary> {
     let mut rows = Vec::new();
     for scenario in Scenario::all() {
         for (width, calibration) in &calibrations {
-            let point: Vec<EpisodeStats> = (0..EPISODES)
-                .map(|episode| simulate_episode(scenario, Policy::PointNoGuard, *width, episode, calibration))
+            // Generate each candidate/feedback tape once and share it across
+            // all policies. This guarantees exact pairing and avoids wasting
+            // compute regenerating identical simulator outcomes.
+            let mut outcomes_by_policy: Vec<Vec<EpisodeStats>> = Policy::all().iter()
+                .map(|_| Vec::with_capacity(EPISODES))
                 .collect();
-            for policy in Policy::all() {
-                let outcomes: Vec<EpisodeStats> = if policy == Policy::PointNoGuard {
-                    point.clone()
-                } else {
-                    (0..EPISODES)
-                        .map(|episode| simulate_episode(scenario, policy, *width, episode, calibration))
-                        .collect()
-                };
-                rows.push(summarize(scenario, *width, policy, calibration, &outcomes, &point));
+            for episode in 0..EPISODES {
+                let tape = make_episode_tape(scenario, *width, episode);
+                for (index, policy) in Policy::all().iter().enumerate() {
+                    outcomes_by_policy[index].push(
+                        simulate_episode(scenario, *policy, &tape, calibration)
+                    );
+                }
+            }
+            let point = &outcomes_by_policy[0];
+            for (index, policy) in Policy::all().iter().enumerate() {
+                rows.push(summarize(
+                    scenario, *width, *policy, calibration,
+                    &outcomes_by_policy[index], point
+                ));
             }
         }
     }
