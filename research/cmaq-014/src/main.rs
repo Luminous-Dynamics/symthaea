@@ -155,7 +155,7 @@ fn choose_probe(policy: Policy, lane: Lane, hidden_fragile: Option<bool>) -> Pro
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Episode {
     fragile: bool,
     hidden_sign: bool,
@@ -291,7 +291,7 @@ fn render_report(cells: &[Cell]) -> String {
                 concat!(
                     "      {{\"policy\":\"{}\",\"mean_task_success\":{},\"mean_decision_accuracy\":{},",
                     "\"mean_net_utility\":{},\"mean_disturbance\":{},\"mean_probe_cost\":{},",
-                    "\"damage_rate\":{},\"risk_budget_violation_rate\":{},\"mean_probe_accuracy\":{},\"mean_information_gain_bits\":{},"
+                    "\"damage_rate\":{},\"risk_budget_violation_rate\":{},\"mean_probe_accuracy\":{},\"mean_information_gain_bits\":{},",
                     "\"probe_counts\":[{},{},{},{},{}]}}{}"
                 ),
                 row.policy, number(row.mean_task_success), number(row.mean_decision_accuracy),
