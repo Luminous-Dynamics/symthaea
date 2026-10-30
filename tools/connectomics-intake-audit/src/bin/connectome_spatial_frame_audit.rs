@@ -171,12 +171,21 @@ fn canonical_frame_sha256(frame: &FrameInput) -> Result<String, String> {
     Ok(sha256(&bytes))
 }
 
-fn population_frame_sha256(population: &[PopulationPsu]) -> Result<String, String> {
-    let mut canonical = population.to_vec();
-    canonical.sort_by(|left, right| left.psu_id.cmp(&right.psu_id));
-    let bytes = serde_json::to_vec(&canonical)
-        .map_err(|error| format!("could not serialize population frame: {error}"))?;
-    Ok(sha256(&bytes))
+fn population_frame_sha256(population: &[PopulationPsu]) -> String {
+    // Match connectome-candidate-coverage-audit::frame_sha256 exactly.
+    let mut rows: Vec<(String, String)> = population
+        .iter()
+        .map(|row| (row.psu_id.clone(), row.stratum_id.clone()))
+        .collect();
+    rows.sort();
+    let mut hasher = Sha256::new();
+    for (psu_id, stratum_id) in rows {
+        hasher.update((psu_id.len() as u64).to_be_bytes());
+        hasher.update(psu_id.as_bytes());
+        hasher.update((stratum_id.len() as u64).to_be_bytes());
+        hasher.update(stratum_id.as_bytes());
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
@@ -317,7 +326,7 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
     }
 
     let canonical_digest = canonical_frame_sha256(frame)?;
-    let population_digest = population_frame_sha256(&population_frame)?;
+    let population_digest = population_frame_sha256(&population_frame);
     let total_cells_u64 = u64::try_from(expected_cells)
         .map_err(|_| "grid cell count exceeds u64 report range".to_string())?;
     let total_voxels_f64 = declared_voxels as f64;
@@ -472,7 +481,7 @@ mod tests {
         assert_eq!(report.eligible_voxel_count, "430");
         assert_eq!(report.excluded_voxel_count, "20");
         assert_eq!(report.population_frame.len(), 3);
-        assert_eq!(report.population_frame_sha256, population_frame_sha256(&report.population_frame).unwrap());
+        assert_eq!(report.population_frame_sha256, population_frame_sha256(&report.population_frame));
     }
 
     #[test]
@@ -563,6 +572,24 @@ mod tests {
         let mut frame = fixture();
         frame.coordinate_frame.voxel_size_nm[1] = 0.0;
         assert!(validate(&frame).unwrap_err().contains("voxel_size_nm"));
+    }
+
+    #[test]
+    fn population_frame_digest_matches_candidate_coverage_contract() {
+        let report = validate(&fixture()).unwrap();
+        let population = report.population_frame;
+        let mut rows: Vec<(String, String)> = population.iter()
+            .map(|row| (row.psu_id.clone(), row.stratum_id.clone()))
+            .collect();
+        rows.sort();
+        let mut hasher = Sha256::new();
+        for (psu_id, stratum_id) in rows {
+            hasher.update((psu_id.len() as u64).to_be_bytes());
+            hasher.update(psu_id.as_bytes());
+            hasher.update((stratum_id.len() as u64).to_be_bytes());
+            hasher.update(stratum_id.as_bytes());
+        }
+        assert_eq!(report.population_frame_sha256, hex::encode(hasher.finalize()));
     }
 
     #[test]
