@@ -3458,10 +3458,11 @@ mod tests {
             .collect();
         assert_eq!(rows.len(), 3);
         for row in &rows {
-            assert_eq!(row.split('\t').count(), 18);
+            assert_eq!(row.split('\t').count(), 19);
         }
         assert_eq!(rows[0].split('\t').nth(7), Some("true"));
-        assert!(rows[0].split('\t').nth(10).unwrap().parse::<f64>().unwrap() > 0.0);
+        assert_eq!(rows[0].split('\t').nth(8), Some("false"));
+        assert!(rows[0].split('\t').nth(11).unwrap().parse::<f64>().unwrap() > 0.0);
     }
 
     #[test]
