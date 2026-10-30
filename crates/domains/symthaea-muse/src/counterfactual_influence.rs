@@ -156,6 +156,36 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_lineage: Vec<PerformedEventLineage>,
 }
 
+/// Test-only constructor for exercising downstream coalition validators.
+/// Production code must use verify_renderer_audio_binding or its typed-Score
+/// wrapper; this helper is excluded from non-test builds.
+#[cfg(test)]
+pub(crate) fn test_verified_renderer_audio_binding(
+    audio: &AudioView<'_>,
+    receipt_sha256: String,
+    renderer_identity_sha256: String,
+    renderer_config_sha256: String,
+    source_score_sha256: String,
+    input_artifact_sha256: String,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
+    performed_event_lineage: Vec<PerformedEventLineage>,
+) -> VerifiedRendererAudioBinding {
+    VerifiedRendererAudioBinding {
+        receipt_sha256,
+        audio_sha256: audio_sha256(audio),
+        renderer_identity_sha256,
+        renderer_config_sha256,
+        source_score_sha256,
+        input_artifact_sha256,
+        performed_event_map_sha256,
+        performed_event_map_artifact_sha256,
+        expected_primary_pitches_sha256,
+        performed_event_lineage,
+    }
+}
+
 impl VerifiedRendererAudioBinding {
     pub fn receipt_sha256(&self) -> &str {
         &self.receipt_sha256
@@ -187,6 +217,10 @@ impl VerifiedRendererAudioBinding {
 
     pub fn performed_event_map_artifact_sha256(&self) -> &str {
         &self.performed_event_map_artifact_sha256
+    }
+
+    pub fn expected_primary_pitches_sha256(&self) -> &str {
+        &self.expected_primary_pitches_sha256
     }
 
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
@@ -269,6 +303,32 @@ pub(crate) fn verify_renderer_audio_binding(
     excluded_source_event_index: Option<usize>,
     audio: &AudioView<'_>,
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let excluded = excluded_source_event_index
+        .map(|index| vec![index])
+        .unwrap_or_default();
+    verify_renderer_audio_binding_excluding_set(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_score_event_count,
+        expected_primary_midi_by_score_index,
+        &excluded,
+        audio,
+    )
+}
+
+/// Multi-event variant used by factorial interaction experiments. Exclusions
+/// are explicit source-score indices and do not weaken coverage for any other
+/// event. The same receipt/PCM/MIDI/map replay checks apply.
+pub(crate) fn verify_renderer_audio_binding_excluding_set(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    expected_score_event_count: usize,
+    expected_primary_midi_by_score_index: &[u8],
+    excluded_source_event_indices: &[usize],
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
     let frames = validate_audio(audio)?;
     if receipt.backend != crate::renderer_execution_receipt::RendererBackend::FluidSynth {
         // NativeMuse needs its own exact performed-schedule parser before it
@@ -289,24 +349,25 @@ pub(crate) fn verify_renderer_audio_binding(
     if expected_primary_midi_by_score_index.len() != expected_score_event_count {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
-    match excluded_source_event_index {
-        None => parsed_map.verify_for_score_and_pitches(
+    if excluded_source_event_indices.is_empty() {
+        parsed_map.verify_for_score_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
             expected_primary_midi_by_score_index,
-        ),
-        Some(excluded_index) => parsed_map.verify_for_score_excluding_and_pitches(
+        )
+    } else {
+        parsed_map.verify_for_score_excluding_many_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
-            excluded_index,
+            excluded_source_event_indices,
             expected_primary_midi_by_score_index,
-        ),
+        )
     }
     .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
 
@@ -320,7 +381,7 @@ pub(crate) fn verify_renderer_audio_binding(
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
-    if excluded_source_event_index.is_none()
+    if excluded_source_event_indices.is_empty()
         && receipt.performed_event_map_sha256.as_deref()
             != Some(parsed_map.receipt_sha256.as_str())
     {
@@ -391,6 +452,41 @@ pub fn verify_renderer_audio_binding_for_score(
         expected_primary_midi_by_score_index.len(),
         &expected_primary_midi_by_score_index,
         excluded_source_event_index,
+        audio,
+    )
+}
+
+/// Typed-Score multi-event variant for factorial interaction experiments.
+/// The caller cannot supply a different pitch inventory: it is derived from
+/// the exact serialized Score and checked against the renderer receipt.
+#[cfg(feature = "theory")]
+pub fn verify_renderer_audio_binding_for_score_excluding_set(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    score: &symthaea_music_theory::Score,
+    excluded_source_event_indices: &[usize],
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let serialized_score = serde_json::to_vec(score)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    if inputs.score_bytes != serialized_score.as_slice()
+        || receipt.score_sha256 != sha256_hex(&serialized_score)
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let expected_primary_midi_by_score_index: Vec<u8> = score
+        .events()
+        .iter()
+        .map(|event| event.pitch.midi())
+        .collect();
+    verify_renderer_audio_binding_excluding_set(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_primary_midi_by_score_index.len(),
+        &expected_primary_midi_by_score_index,
+        excluded_source_event_indices,
         audio,
     )
 }
@@ -567,7 +663,7 @@ fn parse_score_event_index(value: &str) -> Option<usize> {
     suffix.parse().ok()
 }
 
-fn audio_sha256(audio: &AudioView<'_>) -> String {
+pub(crate) fn audio_sha256(audio: &AudioView<'_>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous-dynamics-mel-mr-eval-017-audio-v1\0");
     hasher.update(audio.sample_rate_hz.to_le_bytes());
