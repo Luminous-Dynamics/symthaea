@@ -434,8 +434,13 @@ impl<'a> ExactSearch<'a> {
             return;
         }
 
-        let obligation = &self.request.obligations[obligation_index];
-        for alternative in &obligation.alternatives {
+        // Clone the small immutable branch point so recursive mutable search
+        // does not retain an immutable borrow into self.request.
+        let conclusion_id = self.request.obligations[obligation_index].conclusion_id.clone();
+        let minimum_independent_families =
+            self.request.obligations[obligation_index].minimum_independent_families;
+        let alternatives = self.request.obligations[obligation_index].alternatives.clone();
+        for alternative in &alternatives {
             if self.search_limit_reached {
                 return;
             }
@@ -457,7 +462,7 @@ impl<'a> ExactSearch<'a> {
 
             if missing || ineligible {
                 self.justification_rejections.insert(JustificationRejection {
-                    conclusion_id: obligation.conclusion_id.clone(),
+                    conclusion_id: conclusion_id.clone(),
                     justification_id: alternative.justification_id.clone(),
                     reason: if missing {
                         JustificationRejectionReason::MissingEvidenceReference
@@ -467,9 +472,9 @@ impl<'a> ExactSearch<'a> {
                 });
                 continue;
             }
-            if families.len() < obligation.minimum_independent_families as usize {
+            if families.len() < minimum_independent_families as usize {
                 self.justification_rejections.insert(JustificationRejection {
-                    conclusion_id: obligation.conclusion_id.clone(),
+                    conclusion_id: conclusion_id.clone(),
                     justification_id: alternative.justification_id.clone(),
                     reason: JustificationRejectionReason::IndependentFamilyCountInsufficient,
                 });
@@ -646,6 +651,11 @@ pub fn verify_proof_packet(
     }
     if result.selected_proofs.len() != request.obligations.len() {
         return Err("proof packet does not select exactly one proof per obligation".into());
+    }
+    let mut canonical_selected = result.selected_proofs.clone();
+    canonical_selected.sort_by(|left, right| left.conclusion_id.cmp(&right.conclusion_id));
+    if canonical_selected != result.selected_proofs {
+        return Err("selected proof order is not canonical by conclusion ID".into());
     }
 
     let candidate_by_id: BTreeMap<_, _> = request.candidates
@@ -1084,6 +1094,60 @@ mod tests {
         verify_proof_budget_result(&req, &result).unwrap();
         result.evidence[0].payload_sha256 = digest('f');
         assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
+    #[test]
+    fn packet_sufficiency_and_minimum_cost_optimality_are_distinct_checks() {
+        let req = request(
+            vec![
+                candidate("A-cheap", "family-A", 1),
+                candidate("B-valid", "family-B", 2),
+            ],
+            vec![obligation(
+                "claim-1",
+                vec![
+                    justification("proof-cheap", &["A-cheap"]),
+                    justification("proof-valid-but-costlier", &["B-valid"]),
+                ],
+            )],
+            5,
+        );
+        let mut non_minimal = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(non_minimal.selected_proofs[0].justification_id, "proof-cheap");
+
+        let canonical = canonicalize_request(req.clone());
+        let candidate = canonical.candidates.iter()
+            .find(|item| item.evidence_id == "B-valid").unwrap();
+        non_minimal.selected_proofs = vec![SelectedProof {
+            conclusion_id: "claim-1".into(),
+            justification_id: "proof-valid-but-costlier".into(),
+        }];
+        non_minimal.evidence = vec![ProofPacketEvidenceRef {
+            evidence_id: candidate.evidence_id.clone(),
+            source_family_id: candidate.source_family_id.clone(),
+            payload_sha256: candidate.payload_sha256.clone(),
+            source_span_sha256: candidate.source_span_sha256.clone(),
+            authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
+            retrieval_rank: candidate.retrieval_rank,
+            token_cost: candidate.token_cost,
+        }];
+        non_minimal.total_token_cost = candidate.token_cost as u64;
+        let payload = ProofPacketPayload {
+            decision_id: &canonical.decision_id,
+            principal_id: &canonical.principal_id,
+            scope_id: &canonical.scope_id,
+            valid_at_unix_ms: canonical.valid_at_unix_ms,
+            known_at_unix_ms: canonical.known_at_unix_ms,
+            policy_id: &canonical.policy_id,
+            policy_sha256: &canonical.policy_sha256,
+            selected_proofs: &non_minimal.selected_proofs,
+            evidence: &non_minimal.evidence,
+            total_token_cost: non_minimal.total_token_cost,
+        };
+        non_minimal.packet_sha256 = Some(sha256_json(&payload, "test proof packet").unwrap());
+
+        verify_proof_packet(&req, &non_minimal).unwrap();
+        assert!(verify_proof_budget_result(&req, &non_minimal).is_err());
     }
 
     #[test]
