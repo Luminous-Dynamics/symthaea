@@ -238,7 +238,7 @@ that separates:
 For the current enumerator and no TotalCut, the combinatorial fixtures specify:
 - 3 units: 54 assignments, 22 unique cuts, 32 duplicates;
 - 4 units: 306 assignments, 150 unique cuts, 156 duplicates;
-- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates.
+- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates;\n- 6 units: 12,348 assignments, 7,896 unique cuts, 4,452 duplicates.
 
 These counts are implementation regression anchors, not performance measurements.
 They make future optimizations measurable: reduce wall time/memory or allocation cost
@@ -248,7 +248,7 @@ while preserving the exact cut-matrix set and reporting candidate work transpare
 ## Reproducible partition microbenchmark
 
 A standard-library-only Rust example records median/minimum elapsed nanoseconds
-alongside exact search counters for the two-, three-, four-, and five-unit
+alongside exact search counters for the two- through six-unit
 partition fixtures. Every warm-up and timed iteration must reproduce the frozen
 assignment and unique-cut counts; otherwise it exits nonzero.
 
@@ -274,7 +274,7 @@ source/target matrix loops.
 
 The test suite contains a deliberately simpler brute-force reference generator
 that uses the original block-membership definition, then compares the complete set
-of matrices—not merely the count—against the optimized enumerator for 2–5 units.
+of matrices—not merely the count—against the optimized enumerator for 2–6 units.
 The existing assignment/unique-cut counts remain fixed. This is an exact-semantic
 optimization candidate; runtime improvement must still be measured in the Rust
 release microbenchmark before claiming a speedup.
@@ -284,14 +284,16 @@ For context before timing is available, the combinatorics imply the following
 matrix-loop work counts for the previous implementation (one full n² pass per
 block and assignment) versus the current implementation (one full n² pass per
 block-direction assignment). These are analytical operation counts, not elapsed
-time or a claim of end-to-end speedup:
+time or a claim of end-to-end speedup. The six-unit workload now also acts as an
+exhaustive exact-matrix parity case; its loop counts are derived from the same
+partition expansion, not a measured runtime:
 
 | Units | Assignments | Previous block-by-matrix iterations | Current matrix-cell checks | Ratio |
 |---:|---:|---:|---:|---:|
 | 2 | 9 | 72 | 36 | 2.00× |
 | 3 | 54 | 1,215 | 486 | 2.50× |
 | 4 | 306 | 14,976 | 4,896 | 3.06× |
-| 5 | 1,863 | 168,750 | 46,575 | 3.62× |
+| 5 | 1,863 | 168,750 | 46,575 | 3.62× |\n| 6 | 12,348 | 1,778,112 | 444,528 | 4.00× |
 
 The older path also performed linear membership scans for both endpoints within
 each block iteration; the new path uses the precomputed block index plus incoming/
