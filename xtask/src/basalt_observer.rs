@@ -268,13 +268,13 @@ fn validate_catalog(catalog: &Catalog, report: &mut CatalogAuditReport) {
     }
 
     report.counts.cases_total = catalog.cases.len();
-    let mut case_indices = BTreeMap::<&str, usize>::new();
+    let mut case_indices = BTreeMap::<String, usize>::new();
 
     for (index, case) in catalog.cases.iter().enumerate() {
         let path = format!("cases[{index}]");
         validate_case(case, &path, report);
 
-        if case_indices.insert(case.case_id.as_str(), index).is_some() {
+        if case_indices.insert(case.case_id.clone(), index).is_some() {
             push_error(report, "E_CASE_ID_DUPLICATE", &format!("{path}.case_id"), "case IDs must be unique");
         }
 
@@ -383,12 +383,12 @@ fn validate_pairs(
     case: &ChallengeCase,
     path: &str,
     catalog: &Catalog,
-    case_indices: &BTreeMap<&str, usize>,
+    case_indices: &BTreeMap<String, usize>,
     report: &mut CatalogAuditReport,
 ) {
     for (pair_index, pair_id) in case.paired_case_ids.iter().enumerate() {
         let pair_path = format!("{path}.paired_case_ids[{pair_index}]");
-        let Some(other_index) = case_indices.get(pair_id.as_str()).copied() else {
+        let Some(other_index) = case_indices.get(pair_id).copied() else {
             push_error(report, "E_PAIR_UNKNOWN", &pair_path, "paired case ID does not exist in this catalog");
             continue;
         };
@@ -405,7 +405,7 @@ fn validate_pairs(
                 if other.expected_disposition != "capture_dependency" {
                     push_error(report, "E_PRESERVE_PAIR_DISPOSITION", path, "preserve_unrelated must pair with capture_dependency");
                 }
-                if other.ground_truth_resource_id.value != case.ground_truth_resource_id.value {
+                if other.ground_truth_resource_id.value.as_ref() != case.ground_truth_resource_id.value.as_ref() {
                     push_error(report, "E_PRESERVE_PAIR_RESOURCE", path, "preserve_unrelated must pair against the same injected resource as its capture_dependency control");
                 }
             }
