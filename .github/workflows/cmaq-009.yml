@@ -38,10 +38,13 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-009-report.json").read_text())
-          assert report["schema_version"] == "cmaq-009-active-diagnostic-probes-v0.2"
+          assert report["schema_version"] == "cmaq-009-active-diagnostic-probes-v0.3"
           assert report["episode_count"] == 512
           assert report["horizon"] == 128
           assert report["change_detection_threshold"] == 5.0
+          assert report["page_hinkley_delta"] == 0.08
+          assert report["page_hinkley_threshold"] == 2.0
+          assert report["page_hinkley_burn_in"] == 8
           assert report["probe_cost"] == 0.003
           assert report["feedback_delay_steps"] == 4
           assert report["feedback_drop_rate"] == 0.05
@@ -52,13 +55,13 @@ jobs:
           assert report["adaptive_probe_cap"] == 32
           assert report["scenarios"] == ["stationary", "abrupt_support_shift", "gradual_support_shift"]
           assert report["policies"] == [
-              "direct_fallback", "fixed_gate", "passive_cusum", "periodic_probe_8",
+              "direct_fallback", "fixed_gate", "passive_cusum", "page_hinkley_passive", "periodic_probe_8",
               "periodic_probe_16", "periodic_probe_32", "adaptive_probe_32",
               "zero_info_probe_32", "oracle_changepoint"
           ]
 
           rows = report["summary"]
-          assert len(rows) == 27
+          assert len(rows) == 30
           by_key = {(row["scenario"], row["policy"]): row for row in rows}
           assert len(by_key) == len(rows)
           for scenario in report["scenarios"]:
@@ -88,6 +91,9 @@ jobs:
               assert by_key[(scenario, "direct_fallback")]["max_probe_count"] == 0
               assert by_key[(scenario, "fixed_gate")]["mean_model_action_coverage"] == 1.0
           abrupt = "abrupt_support_shift"
+          page_hinkley = by_key[(abrupt, "page_hinkley_passive")]
+          assert page_hinkley["max_probe_count"] == 0
+          assert page_hinkley["probe_cap"] == 0
           passive = by_key[(abrupt, "passive_cusum")]
           adaptive = by_key[(abrupt, "adaptive_probe_32")]
           assert adaptive["max_probe_count"] <= 32
@@ -104,7 +110,7 @@ jobs:
           assert zero["p90_detection_delay_steps"] == passive["p90_detection_delay_steps"]
           assert zero["shift_detection_coverage"] == passive["shift_detection_coverage"]
 
-          print("CMAQ-009 schema, hard probe caps, zero-information control, adaptive detection, and paired net-utility assertions validated")
+          print("CMAQ-009 schema, Page-Hinkley comparator, hard probe caps, zero-information control, adaptive detection, and paired net-utility assertions validated")
           print(json.dumps({
               scenario: {
                   policy: {
@@ -121,7 +127,7 @@ jobs:
                   }
                   for scenario in report["scenarios"]
                   for policy in report["policies"]
-                  if policy in ["fixed_gate", "passive_cusum", "periodic_probe_8", "periodic_probe_16", "periodic_probe_32", "adaptive_probe_32", "zero_info_probe_32", "oracle_changepoint"]
+                  if policy in ["fixed_gate", "passive_cusum", "page_hinkley_passive", "periodic_probe_8", "periodic_probe_16", "periodic_probe_32", "adaptive_probe_32", "zero_info_probe_32", "oracle_changepoint"]
               }
           }, sort_keys=True))
           PY
