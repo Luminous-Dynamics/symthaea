@@ -68,6 +68,7 @@ pub struct BenchmarkLineageManifest {
 pub enum LineageViolationKind {
     EmptyBenchmarkId,
     EmptyDatasetRevision,
+    EmptyManifest,
     EmptySampleId,
     DuplicateSampleId,
     EmptyOperationFamily,
@@ -86,6 +87,7 @@ impl LineageViolationKind {
         match self {
             Self::EmptyBenchmarkId => "empty_benchmark_id",
             Self::EmptyDatasetRevision => "empty_dataset_revision",
+            Self::EmptyManifest => "empty_manifest",
             Self::EmptySampleId => "empty_sample_id",
             Self::DuplicateSampleId => "duplicate_sample_id",
             Self::EmptyOperationFamily => "empty_operation_family",
@@ -187,7 +189,7 @@ fn record_violation(
     kind: LineageViolationKind,
     record: &BenchmarkLineageRecord,
 ) {
-    let sample_ids = if record.sample_id.is_empty() {
+    let sample_ids = if record.sample_id.trim().is_empty() {
         Vec::new()
     } else {
         vec![record.sample_id.clone()]
@@ -309,6 +311,14 @@ pub fn audit_benchmark_lineage(
     if manifest.dataset_revision.trim().is_empty() {
         violations.push(LineageViolation {
             kind: LineageViolationKind::EmptyDatasetRevision,
+            identity_sha256: None,
+            sample_ids: Vec::new(),
+            splits: Vec::new(),
+        });
+    }
+    if manifest.records.is_empty() {
+        violations.push(LineageViolation {
+            kind: LineageViolationKind::EmptyManifest,
             identity_sha256: None,
             sample_ids: Vec::new(),
             splits: Vec::new(),
@@ -583,6 +593,40 @@ mod tests {
         assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::InvalidInstructionDigest));
         assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::InvalidTargetAudioDigest));
         assert!(!audit.is_clean());
+    }
+
+
+    #[test]
+    fn empty_manifest_and_blank_metadata_fail_closed() {
+        let mut input = manifest(Vec::new());
+        input.benchmark_id.clear();
+        input.dataset_revision = "  ".to_owned();
+        let audit = audit_benchmark_lineage(&input);
+        assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::EmptyManifest));
+        assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::EmptyBenchmarkId));
+        assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::EmptyDatasetRevision));
+    }
+
+    #[test]
+    fn same_role_audio_reuse_across_splits_is_rejected() {
+        let audit = audit_benchmark_lineage(&manifest(vec![
+            record("train-1", DatasetSplit::Train, 7, 8, None, 21),
+            record("test-1", DatasetSplit::Test, 7, 9, None, 31),
+        ]));
+        assert!(audit.violations.iter().any(|v| {
+            v.kind == LineageViolationKind::CrossSplitAudioAsset
+                && v.identity_sha256.as_deref() == Some(digest(7).as_str())
+        }));
+    }
+
+    #[test]
+    fn whitespace_sample_id_and_malformed_optional_score_are_invalid() {
+        let mut invalid = record("placeholder", DatasetSplit::Train, 1, 2, None, 21);
+        invalid.sample_id = "  ".to_owned();
+        invalid.source_score_sha256 = Some("ABC".to_owned());
+        let audit = audit_benchmark_lineage(&manifest(vec![invalid]));
+        assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::EmptySampleId));
+        assert!(audit.violations.iter().any(|v| v.kind == LineageViolationKind::InvalidSourceScoreDigest));
     }
 
     #[test]
