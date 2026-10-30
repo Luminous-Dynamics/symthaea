@@ -615,6 +615,32 @@ fn build_receipt(
     let (calibration_metrics, calibration_bins) = calibration(test)?;
     let per_group = groups(test, point);
 
+    let mut split_audit = BTreeMap::<String, (u64, u64, u64, BTreeSet<String>)>::new();
+    for row in &ledger.predictions {
+        let entry = split_audit
+            .entry(row.split.clone())
+            .or_insert_with(|| (0, 0, 0, BTreeSet::new()));
+        entry.0 += 1;
+        if row.label == 1 {
+            entry.1 += 1;
+        } else {
+            entry.2 += 1;
+        }
+        entry.3.insert(row.group_id.clone());
+    }
+    let split_summary = split_audit
+        .iter()
+        .map(|(split, (samples, positives, negatives, groups))| {
+            json!({
+                "split": split,
+                "samples": samples,
+                "positives": positives,
+                "negatives": negatives,
+                "group_count": groups.len(),
+            })
+        })
+        .collect::<Vec<_>>();
+
     let aggregate_constraints_met = ratio_within(
         test_metrics.false_alert_rate,
         max_false_alert_rate,
@@ -662,7 +688,7 @@ fn build_receipt(
             "group_id_disjoint_across_train_validation_test": true,
             "validation_used_for_threshold_selection": true,
             "test_used_for_threshold_selection": false,
-            "test_predictions_used_once_for_report": true,
+            "test_used_only_for_reporting": true,
         },
         "decision_policy": {
             "clear_if_score_lte": point.clear_max_score,
@@ -682,6 +708,7 @@ fn build_receipt(
                 "alert_threshold_two": "alert no samples"
             }
         },
+        "split_summary": split_summary,
         "operating_point": {
             "clear_max_score": point.clear_max_score,
             "alert_min_score": point.alert_min_score,
@@ -1053,6 +1080,91 @@ mod tests {
     #[test]
     fn calibration_requires_nonempty_test_data() {
         assert!(calibration(&[]).is_err());
+    }
+
+    #[test]
+    fn threshold_search_matches_brute_force_coverage_optimum() {
+        let scores = [0.1, 0.1, 0.5, 0.5, 0.9, 0.9];
+        let caps = [0.0, 0.25, 0.5, 1.0];
+
+        for mask in 1_u32..63 {
+            let rows = scores
+                .iter()
+                .enumerate()
+                .map(|(index, score)| {
+                    row(
+                        &format!("v-{index}"),
+                        "host-v",
+                        "validation",
+                        ((mask >> index) & 1) as u8,
+                        *score,
+                    )
+                })
+                .collect::<Vec<_>>();
+            if !rows.iter().any(|item| item.label == 0)
+                || !rows.iter().any(|item| item.label == 1)
+            {
+                continue;
+            }
+
+            for max_false_alert_rate in caps {
+                for max_false_clear_rate in caps {
+                    let selected = select_operating_point(
+                        &rows,
+                        max_false_alert_rate,
+                        max_false_clear_rate,
+                    )
+                    .unwrap();
+                    let selected_counts = calculate_counts(&rows, selected);
+                    let allowed_alerts =
+                        max_allowed_errors(max_false_alert_rate, selected_counts.negatives);
+                    let allowed_clears =
+                        max_allowed_errors(max_false_clear_rate, selected_counts.positives);
+                    assert!(selected_counts.false_alerts <= allowed_alerts);
+                    assert!(selected_counts.false_clears <= allowed_clears);
+
+                    let unique = unique_sorted_scores(&rows);
+                    let mut best_coverage = 0.0;
+                    for clear_threshold in std::iter::once(-1.0).chain(unique.iter().copied()) {
+                        for alert_threshold in unique.iter().copied().chain(std::iter::once(2.0)) {
+                            if clear_threshold >= alert_threshold {
+                                continue;
+                            }
+                            let candidate = OperatingPoint {
+                                clear_max_score: clear_threshold,
+                                alert_min_score: alert_threshold,
+                            };
+                            let counts = calculate_counts(&rows, candidate);
+                            if counts.false_alerts <= allowed_alerts
+                                && counts.false_clears <= allowed_clears
+                            {
+                                best_coverage = best_coverage.max(
+                                    counts.cleared as f64 / counts.total as f64
+                                        + counts.alerted as f64 / counts.total as f64,
+                                );
+                            }
+                        }
+                    }
+                    assert_eq!(
+                        selected_counts.cleared + selected_counts.alerted,
+                        (best_coverage * selected_counts.total as f64).round() as u64,
+                        "mask={mask}, max_false_alert_rate={max_false_alert_rate}, max_false_clear_rate={max_false_clear_rate}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ece_last_bin_includes_score_exactly_one() {
+        let rows = vec![
+            row("t-1", "g", "test", 0, 0.95),
+            row("t-2", "g", "test", 1, 1.0),
+        ];
+        let (cal, bins) = calibration(&rows).unwrap();
+        assert_eq!(bins[9]["count"], 2);
+        assert_eq!(bins[9]["upper_bound_inclusive"], true);
+        assert!(cal.expected_calibration_error.is_finite());
     }
 
     #[test]
