@@ -374,6 +374,7 @@ fn validate_inputs(
     }
 
     let mut architecture_ids = BTreeSet::new();
+    let mut topology_encodings = BTreeSet::new();
     for (index, feature) in features.iter().enumerate() {
         if feature.architecture_id.trim().is_empty()
             || !architecture_ids.insert(feature.architecture_id.as_str())
@@ -391,10 +392,12 @@ fn validate_inputs(
                 "NAS-Bench-201 topology must contain six operation IDs in 0..5",
             ));
         }
-        if feature.proxy_scores.contains_key(&config.target_metric_id) {
+        if feature.proxy_scores.contains_key(&config.target_metric_id)
+            || feature.proxy_times_seconds.contains_key(&config.target_metric_id)
+        {
             return Err(ProxyConsensusError::new(
-                format!("features[{index}].proxy_scores.{}", config.target_metric_id),
-                "target metric is forbidden in the target-free proxy feature table",
+                format!("features[{index}]"),
+                "target metric cannot appear in target-free proxy values or runtimes",
             ));
         }
         if feature.topology_encoding.len() != 6
@@ -403,6 +406,12 @@ fn validate_inputs(
             return Err(ProxyConsensusError::new(
                 format!("features[{index}].topology_encoding"),
                 "NAS-Bench-201 topology must contain six operation IDs in 0..5",
+            ));
+        }
+        if !topology_encodings.insert(feature.topology_encoding.as_slice()) {
+            return Err(ProxyConsensusError::new(
+                format!("features[{index}].topology_encoding"),
+                "duplicate NAS-Bench-201 topology encoding",
             ));
         }
         for proxy_id in config.proxy_directions.keys() {
@@ -829,6 +838,15 @@ mod tests {
         let mut missing_runtime = features();
         missing_runtime[0].proxy_times_seconds.remove("proxy_a");
         assert!(build_proxy_consensus(&missing_runtime, &config()).is_err());
+    }
+
+    #[test]
+    fn target_metric_runtime_column_is_rejected() {
+        let mut rows = features();
+        for row in &mut rows {
+            row.proxy_times_seconds.insert("val_accuracy".into(), 0.0);
+        }
+        assert!(build_proxy_consensus(&rows, &config()).is_err());
     }
 
     #[test]
