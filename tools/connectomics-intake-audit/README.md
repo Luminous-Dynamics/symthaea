@@ -184,7 +184,7 @@ sha256sum proposals.json frozen-ranking.json adjudication-protocol.md
 
 # 4. Evaluate the frozen policies using measured review time and human decisions.
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-review-outcome-audit -- \\
-  --proposals proposals.json \\
+  --proposals proposals.json \
   --ranking-report frozen-ranking.json \\
   --outcomes reviewer-outcomes.json \\
   --output post-hoc-review-evaluation.json
