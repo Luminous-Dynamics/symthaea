@@ -84,6 +84,7 @@ The crate remains conservative: local reports are not publishable proof, hardwar
 - `adaptive_evaluation` — development/validation/one-shot-confirmatory exposure policy; not a cryptographic holdout.
 - `architecture_portfolio` — cross-paradigm family/evidence/boundary vocabulary and conservative quality/resource Pareto comparability; not hardware execution or statistical inference.
 - `architecture_routing` — deterministic selection over exact-workload measured candidates, with hard quality/resource constraints, explicit lexicographic priorities, auditable exclusions and abstention; not a learned or runtime-switching router.
+- `architecture_evidence` — content-addressed evidence receipts bound to exact observations, workload and comparison contracts; validates source origin and admits only receipt-checked records to comparison/selection. Digests are not signatures or chain-of-custody proof.
 - `audit` — conservative local claim-audit helpers.
 - `preflight` — local configuration checks before running experiments.
 - `presets` — stable local run presets for examples and CLI use.
