@@ -484,7 +484,6 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     let mut per_claim_independence_groups: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     let mut seen_claim_adjudicator_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
     let mut seen_claim_independence_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
-    let mut claim_decisions: BTreeMap<&str, BTreeSet<ReferenceDecisionV1>> = BTreeMap::new();
     let mut abstentions = 0_u64;
     for record in &fields.initial_adjudications {
         if record.record_id.trim().is_empty() || record.record_id.len() > 128 {
@@ -540,9 +539,6 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         }
         per_claim_adjudicators.entry(record.claim_id.as_str()).or_default().insert(record.adjudicator_id_sha256.as_str());
         per_claim_independence_groups.entry(record.claim_id.as_str()).or_default().insert(adjudicator.independence_group_sha256.as_str());
-        if record.decision != ReferenceDecisionV1::Abstain {
-            claim_decisions.entry(record.claim_id.as_str()).or_default().insert(record.decision);
-        }
 
         if fields.purpose.is_audit_candidate()
             && (!adjudicator.blind_to_system_identity
@@ -559,15 +555,12 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         }
         let adjudicators_for_claim = per_claim_adjudicators.get(claim.claim_id.as_str());
         let independence_groups = per_claim_independence_groups.get(claim.claim_id.as_str());
-        let count = adjudicators_for_claim.map_or(0, BTreeSet::len);
+        let count = adjudicators_for_claim.map_or(0, |set| set.len());
         let independent_group_count = independence_groups.map_or(0, |set| set.len());
         if fields.purpose.is_audit_candidate()
             && (count < 3 || independent_group_count < 3)
         {
             issues.push(format!("material claim {} requires at least three distinct initial adjudicators and declared independence groups", claim.claim_id));
-        }
-        if claim_decisions.get(claim.claim_id.as_str()).is_some_and(|decisions| decisions.len() > 1) {
-            // Disagreement is reported, never overwritten by a majority label.
         }
     }
 
