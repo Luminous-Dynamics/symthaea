@@ -626,8 +626,8 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                 for span_id in &record.evidence_span_ids {
                     if let Some(span) = spans.get(span_id.as_str()) {
                         if let Some(source) = sources.get(span.source_id.as_str()) {
-                            if matches!(source.lifecycle, SourceLifecycleV1::Deleted | SourceLifecycleV1::Retracted) {
-                                issues.push(format!("adjudication {} uses deleted/retracted source as current support", record.record_id));
+                            if source.lifecycle != SourceLifecycleV1::Active {
+                                issues.push(format!("adjudication {} uses a non-active source as current support without a source-validity interval", record.record_id));
                             }
                             if let (Some(target), Some(published)) = (
                                 claim.and_then(|item| item.scope.target_date.as_deref()),
@@ -906,6 +906,15 @@ mod tests {
         let report = verify_value(&value);
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| issue.contains("deleted/retracted source")));
+    }
+
+    #[test]
+    fn superseded_source_cannot_be_used_as_current_support_without_validity_interval() {
+        let mut value = fixture_value();
+        value["sources"][0]["lifecycle"] = json!("superseded");
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("non-active source as current support")));
     }
 
     #[test]
