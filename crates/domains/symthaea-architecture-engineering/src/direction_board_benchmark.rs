@@ -642,10 +642,13 @@ fn select_global_ucb(
     let mut best_potential = new_mean + new_bonus;
 
     for (direction_id, values) in observations {
-        if values.is_empty() {
-            continue;
-        }
-        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        // An admitted but untried direction is still an arm. Omitting it would
+        // make the global-UCB control unable to discover/evaluate new operators.
+        let mean = if values.is_empty() {
+            0.0
+        } else {
+            values.iter().sum::<f64>() / values.len() as f64
+        };
         let bonus = GLOBAL_UCB_EXPLORATION
             * (2.0 * log_total / (values.len() as f64 + 1.0)).sqrt();
         let potential = mean + bonus;
@@ -908,6 +911,20 @@ mod tests {
         assert_eq!(run.admitted_new_directions, 1);
         assert!(run.actions.iter().any(|action| action.arm_id == "NEW"
             && action.proposal_disposition == Some(NewDirectionDisposition::Admitted)));
+        assert!(run.actions.iter().any(|action| action.arm_id == "D"
+            && action.observed_score.is_some()));
+    }
+
+    #[test]
+    fn global_ucb_can_evaluate_a_newly_admitted_direction() {
+        let run = run_direction_campaign(
+            DirectionLandscapeFamily::NewOperatorBreakthrough,
+            DirectionCampaignPolicy::GlobalUcb,
+            64,
+            71,
+        )
+        .unwrap();
+        assert_eq!(run.admitted_new_directions, 1);
         assert!(run.actions.iter().any(|action| action.arm_id == "D"
             && action.observed_score.is_some()));
     }
