@@ -15,16 +15,17 @@ use symthaea_iit::enumerate_iit4_system_partitions_with_stats;
 #[derive(Clone, Copy)]
 struct Fixture {
     units: usize,
-    expected_assignments: usize,
-    expected_unique_cuts: usize,
+    raw_direction_assignments: usize,
+    canonical_assignments: usize,
+    unique_cuts: usize,
 }
 
 const FIXTURES: [Fixture; 5] = [
-    Fixture { units: 2, expected_assignments: 9, expected_unique_cuts: 3 },
-    Fixture { units: 3, expected_assignments: 54, expected_unique_cuts: 22 },
-    Fixture { units: 4, expected_assignments: 306, expected_unique_cuts: 150 },
-    Fixture { units: 5, expected_assignments: 1_863, expected_unique_cuts: 1_061 },
-    Fixture { units: 6, expected_assignments: 12_348, expected_unique_cuts: 7_896 },
+    Fixture { units: 2, raw_direction_assignments: 9, canonical_assignments: 3, unique_cuts: 3 },
+    Fixture { units: 3, raw_direction_assignments: 54, canonical_assignments: 22, unique_cuts: 22 },
+    Fixture { units: 4, raw_direction_assignments: 306, canonical_assignments: 150, unique_cuts: 150 },
+    Fixture { units: 5, raw_direction_assignments: 1_863, canonical_assignments: 1_061, unique_cuts: 1_061 },
+    Fixture { units: 6, raw_direction_assignments: 12_348, canonical_assignments: 7_896, unique_cuts: 7_896 },
 ];
 
 fn median_duration(samples: &mut [Duration]) -> Duration {
@@ -58,12 +59,12 @@ fn parse_repeats() -> Result<usize, String> {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "n_units,repeats,assignments_evaluated,unique_non_total_cuts,duplicates_suppressed,median_ns,min_ns,validated"
+        "n_units,repeats,raw_direction_assignments_equivalent,canonical_assignments_evaluated,redundant_assignments_pruned,unique_non_total_cuts,median_ns,min_ns,validated"
     );
 
     for fixture in FIXTURES {
         let candidate: Vec<usize> = (0..fixture.units).collect();
-        let max_combinations = fixture.expected_assignments;
+        let max_combinations = fixture.canonical_assignments;
 
         // Warm-up is not included in the timing samples.
         let warmup = enumerate_iit4_system_partitions_with_stats(
@@ -72,16 +73,21 @@ fn run() -> Result<(), String> {
             false,
             max_combinations,
         ).map_err(|err| format!("warm-up failed for n={}: {err}", fixture.units))?;
-        if warmup.block_direction_assignments_evaluated != fixture.expected_assignments
-            || warmup.unique_non_total_cuts != fixture.expected_unique_cuts
+        if warmup.canonical_direction_assignments_evaluated != fixture.canonical_assignments
+            || warmup.raw_direction_assignments_equivalent != fixture.raw_direction_assignments
+            || warmup.redundant_direction_assignments_pruned
+                != fixture.raw_direction_assignments - fixture.canonical_assignments
+            || warmup.unique_non_total_cuts != fixture.unique_cuts
         {
             return Err(format!(
-                "count mismatch for n={}: assignments={} (expected {}), unique={} (expected {})",
+                "count mismatch for n={}: raw={} (expected {}), canonical={} (expected {}), unique={} (expected {})",
                 fixture.units,
-                warmup.block_direction_assignments_evaluated,
-                fixture.expected_assignments,
+                warmup.raw_direction_assignments_equivalent,
+                fixture.raw_direction_assignments,
+                warmup.canonical_direction_assignments_evaluated,
+                fixture.canonical_assignments,
                 warmup.unique_non_total_cuts,
-                fixture.expected_unique_cuts,
+                fixture.unique_cuts,
             ));
         }
 
@@ -95,8 +101,11 @@ fn run() -> Result<(), String> {
                 max_combinations,
             ).map_err(|err| format!("enumeration failed for n={}: {err}", fixture.units))?;
             samples.push(start.elapsed());
-            if report.block_direction_assignments_evaluated != fixture.expected_assignments
-                || report.unique_non_total_cuts != fixture.expected_unique_cuts
+            if report.canonical_direction_assignments_evaluated != fixture.canonical_assignments
+                || report.raw_direction_assignments_equivalent != fixture.raw_direction_assignments
+                || report.redundant_direction_assignments_pruned
+                    != fixture.raw_direction_assignments - fixture.canonical_assignments
+                || report.unique_non_total_cuts != fixture.unique_cuts
             {
                 return Err(format!("partition counts changed during timed trial for n={}", fixture.units));
             }
@@ -104,18 +113,20 @@ fn run() -> Result<(), String> {
 
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
-        let duplicates = warmup.duplicate_cut_matrices_suppressed;
-        let validated = warmup.block_direction_assignments_evaluated == fixture.expected_assignments
-            && warmup.unique_non_total_cuts == fixture.expected_unique_cuts
-            && duplicates == fixture.expected_assignments - fixture.expected_unique_cuts;
+        let validated = warmup.raw_direction_assignments_equivalent == fixture.raw_direction_assignments
+            && warmup.canonical_direction_assignments_evaluated == fixture.canonical_assignments
+            && warmup.redundant_direction_assignments_pruned
+                == fixture.raw_direction_assignments - fixture.canonical_assignments
+            && warmup.unique_non_total_cuts == fixture.unique_cuts;
 
         println!(
-            "{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{}",
             fixture.units,
             repeats,
-            warmup.block_direction_assignments_evaluated,
+            warmup.raw_direction_assignments_equivalent,
+            warmup.canonical_direction_assignments_evaluated,
+            warmup.redundant_direction_assignments_pruned,
             warmup.unique_non_total_cuts,
-            duplicates,
             median_ns,
             min_ns,
             validated,
