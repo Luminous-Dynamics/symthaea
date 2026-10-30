@@ -1,0 +1,79 @@
+{
+  "schema": "symthaea.science_bench_refresh_judge_robustness_plan.v1",
+  "purpose": "example_only",
+  "audit_set_id": "JUDGE-AUDIT-EXAMPLE-NOT-FOR-SCORING",
+  "judge_source_revision": "NOT_IMPLEMENTED_YET",
+  "judge_prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "rubric_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "decision_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "repeats_per_condition": 2,
+  "plan_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "cases": [
+    {
+      "case_id": "repeat-001",
+      "family": "repeatability",
+      "expected_relation": "semantic_decision_invariant",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_a_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "position-001",
+      "family": "position_swap",
+      "expected_relation": "semantic_decision_invariant",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_b_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "format-001",
+      "family": "formatting_invariance",
+      "expected_relation": "semantic_decision_invariant",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_a_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "confidence-001",
+      "family": "confidence_style_invariance",
+      "expected_relation": "semantic_decision_invariant",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_a_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "authority-001",
+      "family": "authority_cue_invariance",
+      "expected_relation": "semantic_decision_invariant",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_a_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "case_id": "sensitivity-001",
+      "family": "semantic_sensitivity_control",
+      "expected_relation": "semantic_decision_must_change",
+      "baseline_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "variant_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseline_order": "candidate_a_first",
+      "variant_order": "candidate_a_first",
+      "reference_baseline_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reference_variant_decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
