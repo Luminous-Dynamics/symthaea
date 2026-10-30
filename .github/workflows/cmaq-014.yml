@@ -54,6 +54,7 @@ jobs:
               for row in rows.values():
                   for key in ["mean_task_success", "mean_decision_accuracy", "damage_rate", "risk_budget_violation_rate"]:
                       assert 0.0 <= row[key] <= 1.0
+                  assert 0.0 <= row["mean_information_gain_bits"] <= 1.0
                   assert len(row["probe_counts"]) == 5
                   assert sum(row["probe_counts"]) == 512
               assert rows["visual_only"]["damage_rate"] == 0.0
