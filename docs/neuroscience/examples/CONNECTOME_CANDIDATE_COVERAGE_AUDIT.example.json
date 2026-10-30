@@ -4,7 +4,7 @@
   "source_ranking_report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "sampling_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
   "sample_seed": "fixed-candidate-coverage-seed-2026-10-30",
-  "sample_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "sample_seed_commitment_sha256": "8e9923b5dfe65f151bede2e3592c86fc30c1397c7ab8b1f3d891076a90b9ce7d",
   "strata": [
     { "stratum_id": "region-a", "sampled_psu_count": 2 },
     { "stratum_id": "region-b", "sampled_psu_count": 2 }
