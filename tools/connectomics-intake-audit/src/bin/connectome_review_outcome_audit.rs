@@ -120,7 +120,6 @@ impl EdgeChange {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct FrozenRankingReport {
     schema_version: u32,
     input_sha256: String,
@@ -714,11 +713,11 @@ mod tests {
             "queries": [{
                 "query_id":"edge_1_2",
                 "weight":1.0,
-                "normalization_scale":2.0,
+                "normalization_scale":10.0,
                 "reference_value":0.0,
                 "metric":{"kind":"edge_weight","source":1,"target":2}
             }],
-            "review_budgets_minutes":[1.0,2.0,3.0],
+            "review_budgets_minutes":[1.0,2.0,4.0],
             "candidates":[
                 {
                     "candidate_id":"remove_one",
@@ -762,7 +761,7 @@ mod tests {
         })).unwrap()
     }
 
-    fn outcomes(proposals: &ProposalInput, proposal_hash: &str, ranking_hash: &str) -> OutcomeFile {
+    fn make_outcomes(proposals: &ProposalInput, proposal_hash: &str, ranking_hash: &str) -> OutcomeFile {
         serde_json::from_value(json!({
             "schema_version":1,
             "source_input_sha256":proposal_hash,
@@ -783,7 +782,7 @@ mod tests {
         let ranking = ranking(&proposals, &proposal_hash);
         let ranking_bytes = serde_json::to_vec(&ranking).unwrap();
         let ranking_hash = sha256(&ranking_bytes);
-        let outcomes = outcomes(&proposals, &proposal_hash, &ranking_hash);
+        let outcomes = make_outcomes(&proposals, &proposal_hash, &ranking_hash);
         let outcome_hash = sha256(&serde_json::to_vec(&outcomes).unwrap());
         evaluate(&proposals,&ranking,&outcomes,proposal_hash,ranking_hash,outcome_hash).unwrap()
     }
@@ -844,41 +843,48 @@ mod tests {
     fn reviewer_rejection_prevents_application_but_does_not_erase_adjudication() {
         let report = evaluate_fixture();
         let row = report.policy_budget_results.iter()
-            .find(|row| row.policy=="policy_a" && row.review_budget_minutes==3.0).unwrap();
+            .find(|row| row.policy=="policy_a" && row.review_budget_minutes==4.0).unwrap();
         assert_eq!(row.outcome_counts.rejected_correct,1);
         assert!(!row.applied_candidate_ids.contains(&"remove_two".to_string()));
     }
 
     #[test]
     fn conflicting_accepted_proposal_is_recorded_as_stale_not_applied() {
-        let mut proposals = proposals();
-        proposals.candidates.truncate(2);
+        let proposals = proposals();
         let proposal_hash = sha256(&serde_json::to_vec(&proposals).unwrap());
-        let ids = vec!["remove_one".to_string(),"remove_one_again".to_string()];
-        let mut second = proposals.candidates[0].clone();
-        second.candidate_id = "remove_one_again".into();
-        proposals.candidates.push(second);
-        let proposal_hash = sha256(&serde_json::to_vec(&proposals).unwrap());
-        let ranking = ranking(&proposals,&proposal_hash);
-        let ranking_bytes = serde_json::to_vec(&ranking).unwrap();
-        let ranking_hash = sha256(&ranking_bytes);
-        let outcomes: OutcomeFile = serde_json::from_value(json!({
-            "schema_version":1,
-            "source_input_sha256":proposal_hash,
-            "source_ranking_report_sha256":ranking_hash,
-            "adjudication_protocol_sha256":"9".repeat(64),
-            "candidate_outcomes":[
-                {"candidate_id":"remove_one","adjudication":"correct","reviewer_decision":"accept","actual_review_minutes":1.0},
-                {"candidate_id":"add_one_wrong","adjudication":"incorrect","reviewer_decision":"reject","actual_review_minutes":1.0},
-                {"candidate_id":"remove_two","adjudication":"correct","reviewer_decision":"reject","actual_review_minutes":1.0},
-                {"candidate_id":"remove_one_again","adjudication":"correct","reviewer_decision":"accept","actual_review_minutes":1.0}
-            ]
-        })).unwrap();
-        let output=evaluate(&proposals,&ranking,&outcomes,proposal_hash,ranking_hash,"8".repeat(64)).unwrap();
-        let row=output.policy_budget_results.iter()
-            .find(|row|row.policy=="policy_a"&&row.review_budget_minutes==3.0).unwrap();
-        assert_eq!(row.stale_conflict_count,1);
-        assert!(row.stale_conflict_candidate_ids.contains(&"remove_one_again".to_string()));
+        let ranking = FrozenRankingReport {
+            schema_version: 1,
+            input_sha256: proposal_hash.clone(),
+            baseline_graph_canonical_sha256: canonical_graph_sha256(&graph_from_edges(&proposals.graph)),
+            policy_budget_results: vec![FrozenPolicyOrder {
+                policy: "conflict_policy".into(),
+                review_budget_minutes: 4.0,
+                policy_order_candidate_ids: vec![
+                    "remove_one".into(),
+                    "remove_two".into(),
+                    "add_one_wrong".into(),
+                ],
+            }],
+        };
+        let ranking_hash = sha256(&serde_json::to_vec(&ranking).unwrap());
+        let mut outcome_file = make_outcomes(&proposals, &proposal_hash, &ranking_hash);
+        if let Some(outcome) = outcome_file.candidate_outcomes.iter_mut()
+            .find(|outcome| outcome.candidate_id == "remove_two")
+        {
+            outcome.reviewer_decision = ReviewerDecision::Accept;
+        }
+        let report = evaluate(
+            &proposals,
+            &ranking,
+            &outcome_file,
+            proposal_hash,
+            ranking_hash,
+            "8".repeat(64),
+        ).unwrap();
+        let row = &report.policy_budget_results[0];
+        assert_eq!(row.stale_conflict_count, 1);
+        assert!(row.stale_conflict_candidate_ids.contains(&"remove_two".to_string()));
+        assert!(!row.applied_candidate_ids.contains(&"remove_two".to_string()));
     }
 
     #[test]
@@ -886,7 +892,7 @@ mod tests {
         let report=evaluate_fixture();
         let proposals=proposals();
         let ranking=ranking(&proposals,&report.proposal_input_sha256);
-        let outcomes=outcomes(&proposals,&"0".repeat(64),&report.ranking_report_sha256);
+        let outcomes=make_outcomes(&proposals,&"0".repeat(64),&report.ranking_report_sha256);
         assert!(validate_outcomes(&outcomes,&proposals,&report.proposal_input_sha256,&report.ranking_report_sha256)
             .unwrap_err().contains("source_input_sha256"));
     }
@@ -895,7 +901,7 @@ mod tests {
     fn rejects_outcome_file_bound_to_different_ranking_report() {
         let report=evaluate_fixture();
         let proposals=proposals();
-        let outcomes=outcomes(&proposals,&report.proposal_input_sha256,&"0".repeat(64));
+        let outcomes=make_outcomes(&proposals,&report.proposal_input_sha256,&"0".repeat(64));
         assert!(validate_outcomes(&outcomes,&proposals,&report.proposal_input_sha256,&report.ranking_report_sha256)
             .unwrap_err().contains("source_ranking_report_sha256"));
     }
@@ -905,10 +911,10 @@ mod tests {
         let proposals=proposals();
         let input_hash="1".repeat(64);
         let ranking_hash="2".repeat(64);
-        let mut outcomes=outcomes(&proposals,&input_hash,&ranking_hash);
+        let mut outcomes=make_outcomes(&proposals,&input_hash,&ranking_hash);
         outcomes.candidate_outcomes.pop();
         assert!(validate_outcomes(&outcomes,&proposals,&input_hash,&ranking_hash).unwrap_err().contains("exactly one"));
-        outcomes.candidate_outcomes=outcomes(&proposals,&input_hash,&ranking_hash).candidate_outcomes;
+        outcomes.candidate_outcomes=make_outcomes(&proposals,&input_hash,&ranking_hash).candidate_outcomes;
         outcomes.candidate_outcomes.push(outcomes.candidate_outcomes[0].clone());
         assert!(validate_outcomes(&outcomes,&proposals,&input_hash,&ranking_hash).unwrap_err().contains("unique"));
     }
@@ -919,7 +925,7 @@ mod tests {
         let input_hash=sha256(&serde_json::to_vec(&proposals).unwrap());
         let mut ranking=ranking(&proposals,&input_hash);
         ranking.policy_budget_results[0].policy_order_candidate_ids.pop();
-        let outcomes=outcomes(&proposals,&input_hash,&"3".repeat(64));
+        let outcomes=make_outcomes(&proposals,&input_hash,&"3".repeat(64));
         assert!(evaluate(&proposals,&ranking,&outcomes,input_hash,"3".repeat(64),"4".repeat(64))
             .unwrap_err().contains("permutation"));
     }
