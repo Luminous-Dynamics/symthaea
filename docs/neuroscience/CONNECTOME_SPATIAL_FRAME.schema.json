@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_SPATIAL_FRAME.schema.json",
+  "title": "Connectome spatial PSU lattice frame",
+  "description": "Exact partition of a declared integer voxel box into eligible and explicitly excluded lattice PSUs. This verifies tiling within the declared box, not biological/source-volume completeness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "frame_id",
+    "source",
+    "coordinate_frame",
+    "origin_voxel",
+    "extent_voxels",
+    "tile_shape_voxels",
+    "edge_policy",
+    "eligibility_mask",
+    "frame_protocol_sha256",
+    "frame_generator",
+    "cells"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "frame_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "volume_id",
+        "volume_revision_id",
+        "volume_content_sha256",
+        "segmentation_id",
+        "segmentation_revision_id",
+        "segmentation_content_sha256"
+      ],
+      "properties": {
+        "volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "volume_revision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "volume_content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "segmentation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segmentation_revision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segmentation_content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "coordinate_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate_frame_id",
+        "transform_sha256",
+        "voxel_size_nm"
+      ],
+      "properties": {
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transform_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "voxel_size_nm": {
+          "$ref": "#/$defs/triplePositiveNumber"
+        }
+      }
+    },
+    "origin_voxel": {
+      "$ref": "#/$defs/tripleInteger"
+    },
+    "extent_voxels": {
+      "$ref": "#/$defs/triplePositiveInteger"
+    },
+    "tile_shape_voxels": {
+      "$ref": "#/$defs/triplePositiveInteger"
+    },
+    "edge_policy": {
+      "const": "clip_last_tile"
+    },
+    "eligibility_mask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "artifact_sha256",
+        "selection_rule_sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selection_rule_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "frame_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "frame_generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_id",
+        "tool_version",
+        "binary_sha256"
+      ],
+      "properties": {
+        "tool_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binary_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/frameCell"
+      }
+    }
+  },
+  "$defs": {
+    "tripleInteger": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "triplePositiveInteger": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "triplePositiveNumber": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "frameCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "psu_id",
+        "grid_index",
+        "disposition",
+        "stratum_id",
+        "exclusion_reason"
+      ],
+      "properties": {
+        "psu_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grid_index": {
+          "$ref": "#/$defs/tripleIntegerNonNegative"
+        },
+        "disposition": {
+          "enum": [
+            "eligible",
+            "excluded"
+          ]
+        },
+        "stratum_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exclusion_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "eligible"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stratum_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "exclusion_reason": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "excluded"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stratum_id": {
+                "type": "null"
+              },
+              "exclusion_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "tripleIntegerNonNegative": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  }
+}
