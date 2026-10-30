@@ -12,7 +12,7 @@
 //! Confirmatory protocols are leave-one-base-family-out and
 //! leave-one-insertion-source-out. Random splits are diagnostics only.
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -68,7 +68,9 @@ fn parse_args() -> Result<Option<Args>, String> {
         if flag == "--help" || flag == "-h" {
             return Ok(None);
         }
-        let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--manifest" => manifest = Some(PathBuf::from(value)),
             "--receipt" => receipt = Some(PathBuf::from(value)),
@@ -95,7 +97,9 @@ fn required_string(value: &Value, field: &str) -> Result<String, String> {
         .and_then(Value::as_str)
         .ok_or_else(|| format!("{field} must be a string"))?;
     if text.trim().is_empty() || text.trim() != text {
-        return Err(format!("{field} must be non-empty with no surrounding whitespace"));
+        return Err(format!(
+            "{field} must be non-empty with no surrounding whitespace"
+        ));
     }
     Ok(text.to_owned())
 }
@@ -185,10 +189,8 @@ fn parse_record(value: &Value, index: usize) -> Result<Record, String> {
             .map_err(|error| format!("{prefix}: {error}"))?,
         normalized_structure_sha256: normalize_digest(value, "normalized_structure_sha256")
             .map_err(|error| format!("{prefix}: {error}"))?,
-        label: required_string(value, "label")
-            .map_err(|error| format!("{prefix}: {error}"))?,
-        split: required_string(value, "split")
-            .map_err(|error| format!("{prefix}: {error}"))?,
+        label: required_string(value, "label").map_err(|error| format!("{prefix}: {error}"))?,
+        split: required_string(value, "split").map_err(|error| format!("{prefix}: {error}"))?,
     };
 
     if !LABELS.contains(&record.label.as_str()) {
@@ -329,7 +331,9 @@ fn validate_manifest(value: &Value, manifest_sha256: String) -> Result<Value, St
     }
 
     if protocol == "leave_one_base_family_out" && host_assignments.len() < 3 {
-        return Err("leave_one_base_family_out requires at least three distinct host families".to_owned());
+        return Err(
+            "leave_one_base_family_out requires at least three distinct host families".to_owned(),
+        );
     }
     if protocol == "leave_one_insertion_source_out" && insertion_assignments.len() < 3 {
         return Err(
@@ -372,19 +376,21 @@ fn validate_manifest(value: &Value, manifest_sha256: String) -> Result<Value, St
         .collect::<BTreeSet<_>>();
     let record_provenance = records
         .iter()
-        .map(|record| json!({
-            "sample_id": record.sample_id,
-            "design_id": record.design_id,
-            "host_family_id": record.host_family_id,
-            "insertion_source_id": record.insertion_source_id,
-            "source_uri": record.source_uri,
-            "source_revision": record.source_revision,
-            "source_sha256": record.source_sha256,
-            "netlist_sha256": record.netlist_sha256,
-            "normalized_structure_sha256": record.normalized_structure_sha256,
-            "label": record.label,
-            "split": record.split,
-        }))
+        .map(|record| {
+            json!({
+                "sample_id": record.sample_id,
+                "design_id": record.design_id,
+                "host_family_id": record.host_family_id,
+                "insertion_source_id": record.insertion_source_id,
+                "source_uri": record.source_uri,
+                "source_revision": record.source_revision,
+                "source_sha256": record.source_sha256,
+                "netlist_sha256": record.netlist_sha256,
+                "normalized_structure_sha256": record.normalized_structure_sha256,
+                "label": record.label,
+                "split": record.split,
+            })
+        })
         .collect::<Vec<_>>();
 
     let confirmatory = protocol != "diagnostic_random";
@@ -436,7 +442,9 @@ fn receipt_target(manifest: &Path, receipt: &Path) -> Result<PathBuf, String> {
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
-    let filename = receipt.file_name().ok_or("receipt path must include filename")?;
+    let filename = receipt
+        .file_name()
+        .ok_or("receipt path must include filename")?;
     let parent = fs::canonicalize(parent)
         .map_err(|error| format!("canonicalize receipt parent {}: {error}", parent.display()))?;
     let target = parent.join(filename);
@@ -455,8 +463,8 @@ fn run(args: Args) -> Result<(), String> {
     let bytes = fs::read(&args.manifest)
         .map_err(|error| format!("read manifest {}: {error}", args.manifest.display()))?;
     let manifest_sha256 = sha256_bytes(&bytes);
-    let value: Value = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("parse manifest JSON: {error}"))?;
+    let value: Value =
+        serde_json::from_slice(&bytes).map_err(|error| format!("parse manifest JSON: {error}"))?;
     let receipt = validate_manifest(&value, manifest_sha256)?;
     let target = receipt_target(&args.manifest, &args.receipt)?;
     let serialized = serde_json::to_vec_pretty(&receipt)
@@ -494,9 +502,7 @@ fn main() -> ExitCode {
             }
         },
         Ok(None) => {
-            println!(
-                "usage: hardsec_family_split_audit --manifest FILE --receipt NEW_FILE"
-            );
+            println!("usage: hardsec_family_split_audit --manifest FILE --receipt NEW_FILE");
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -571,10 +577,8 @@ mod tests {
     impl Fixture {
         fn new(value: &Value) -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let base = env::temp_dir().join(format!(
-                "hardsec-family-audit-{}-{id}",
-                std::process::id()
-            ));
+            let base =
+                env::temp_dir().join(format!("hardsec-family-audit-{}-{id}", std::process::id()));
             let input = base.join("input");
             fs::create_dir_all(&input).unwrap();
             let manifest = input.join("manifest.json");
@@ -596,10 +600,15 @@ mod tests {
     #[test]
     fn accepts_leave_one_base_family_out_manifest() {
         let fixture = Fixture::new(&base_manifest("leave_one_base_family_out"));
-        let receipt = fixture.audit(&base_manifest("leave_one_base_family_out")).unwrap();
+        let receipt = fixture
+            .audit(&base_manifest("leave_one_base_family_out"))
+            .unwrap();
         assert_eq!(receipt["result"], "pass");
         assert_eq!(receipt["confirmatory_generalization_protocol"], true);
-        assert_eq!(receipt["host_family_assignments"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            receipt["host_family_assignments"].as_array().unwrap().len(),
+            3
+        );
     }
 
     #[test]
@@ -607,7 +616,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("leave_one_base_family_out"));
         let mut manifest = base_manifest("leave_one_base_family_out");
         manifest["records"][2]["host_family_id"] = json!("host-family-a");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("host_family_id"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("host_family_id")
+        );
     }
 
     #[test]
@@ -619,7 +633,13 @@ mod tests {
         }
         let receipt = fixture.audit(&manifest).unwrap();
         assert_eq!(receipt["result"], "pass");
-        assert_eq!(receipt["insertion_source_assignments"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            receipt["insertion_source_assignments"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
     }
 
     #[test]
@@ -627,7 +647,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("leave_one_insertion_source_out"));
         let mut manifest = base_manifest("leave_one_insertion_source_out");
         manifest["records"][2]["insertion_source_id"] = json!("insert-a");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("insertion_source_id"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("insertion_source_id")
+        );
     }
 
     #[test]
@@ -635,7 +660,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][2]["netlist_sha256"] = manifest["records"][0]["netlist_sha256"].clone();
-        assert!(fixture.audit(&manifest).unwrap_err().contains("netlist digest"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("netlist digest")
+        );
     }
 
     #[test]
@@ -644,7 +674,12 @@ mod tests {
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][2]["normalized_structure_sha256"] =
             manifest["records"][0]["normalized_structure_sha256"].clone();
-        assert!(fixture.audit(&manifest).unwrap_err().contains("normalized structure digest"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("normalized structure digest")
+        );
     }
 
     #[test]
@@ -652,7 +687,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][2]["source_sha256"] = manifest["records"][0]["source_sha256"].clone();
-        assert!(fixture.audit(&manifest).unwrap_err().contains("source artifact digest"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("source artifact digest")
+        );
     }
 
     #[test]
@@ -660,7 +700,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][0]["label"] = json!("unknown");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("unknown labels fail closed"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("unknown labels fail closed")
+        );
     }
 
     #[test]
@@ -668,7 +713,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][0]["netlist_sha256"] = json!("1234");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("64-character SHA-256"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("64-character SHA-256")
+        );
     }
 
     #[test]
@@ -676,7 +726,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][1]["sample_id"] = json!("tr-a");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("duplicate sample_id"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("duplicate sample_id")
+        );
     }
 
     #[test]
@@ -684,41 +739,74 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][1]["design_id"] = manifest["records"][0]["design_id"].clone();
-        assert!(fixture.audit(&manifest).unwrap_err().contains("duplicate design_id"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("duplicate design_id")
+        );
     }
 
     #[test]
     fn rejects_unknown_split_protocol() {
         let fixture = Fixture::new(&base_manifest("unknown_protocol"));
-        assert!(fixture.audit(&base_manifest("unknown_protocol")).unwrap_err().contains("unsupported split_protocol"));
+        assert!(
+            fixture
+                .audit(&base_manifest("unknown_protocol"))
+                .unwrap_err()
+                .contains("unsupported split_protocol")
+        );
     }
 
     #[test]
     fn rejects_missing_normalizer_version() {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
-        manifest["normalization"].as_object_mut().unwrap().remove("normalizer_version");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("normalizer_version"));
+        manifest["normalization"]
+            .as_object_mut()
+            .unwrap()
+            .remove("normalizer_version");
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("normalizer_version")
+        );
     }
 
     #[test]
     fn rejects_missing_split() {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
-        manifest["records"].as_array_mut().unwrap().retain(|record| {
-            record["split"].as_str() != Some("test")
-        });
-        assert!(fixture.audit(&manifest).unwrap_err().contains("split test is empty"));
+        manifest["records"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|record| record["split"].as_str() != Some("test"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("split test is empty")
+        );
     }
 
     #[test]
     fn rejects_single_class_validation_or_test_split() {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
-        manifest["records"].as_array_mut().unwrap().retain(|record| {
-            !(record["split"].as_str() == Some("test") && record["label"].as_str() == Some("clean"))
-        });
-        assert!(fixture.audit(&manifest).unwrap_err().contains("both clean and trojan"));
+        manifest["records"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|record| {
+                !(record["split"].as_str() == Some("test")
+                    && record["label"].as_str() == Some("clean"))
+            });
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("both clean and trojan")
+        );
     }
 
     #[test]
@@ -734,7 +822,12 @@ mod tests {
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][1]["normalized_structure_sha256"] =
             manifest["records"][0]["normalized_structure_sha256"].clone();
-        assert!(fixture.audit(&manifest).unwrap_err().contains("conflicting labels"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("conflicting labels")
+        );
     }
 
     #[test]
@@ -746,7 +839,12 @@ mod tests {
         alias["design_id"] = json!("design-tr-a-alias");
         manifest["records"].as_array_mut().unwrap().push(alias);
         let receipt = fixture.audit(&manifest).unwrap();
-        assert!(receipt["duplicate_same_split_content_aliases"].as_u64().unwrap() >= 3);
+        assert!(
+            receipt["duplicate_same_split_content_aliases"]
+                .as_u64()
+                .unwrap()
+                >= 3
+        );
     }
 
     #[test]
@@ -754,7 +852,12 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][1]["insertion_source_id"] = json!("some-insertion");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("clean samples must set"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("clean samples must set")
+        );
     }
 
     #[test]
@@ -762,13 +865,22 @@ mod tests {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
         manifest["records"][0]["insertion_source_id"] = json!("none");
-        assert!(fixture.audit(&manifest).unwrap_err().contains("must identify an insertion_source_id"));
+        assert!(
+            fixture
+                .audit(&manifest)
+                .unwrap_err()
+                .contains("must identify an insertion_source_id")
+        );
     }
 
     #[test]
     fn receipt_target_must_be_outside_manifest_directory() {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let inside = fixture.manifest.parent().unwrap().join("receipt.json");
-        assert!(receipt_target(&fixture.manifest, &inside).unwrap_err().contains("outside the manifest directory"));
+        assert!(
+            receipt_target(&fixture.manifest, &inside)
+                .unwrap_err()
+                .contains("outside the manifest directory")
+        );
     }
 }
