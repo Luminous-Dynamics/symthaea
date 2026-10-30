@@ -50,7 +50,7 @@ No single split estimates all six.
 
 For every original RTL, netlist or gate graph, record:
 
-- dataset, DOI/release/archive URI, license statement and exact source digest;
+- dataset, DOI/release/archive URI, license statement and exact source digests for the original RTL, evaluated netlist and derived graph as distinct artifacts;
 - base host design and family identifier;
 - benign/Trojan status, Trojan family/primitive, insertion revision/transform and source lineage;
 - RTL source digest and generated netlist digest;
@@ -240,6 +240,8 @@ cargo run --example hardsec_design_lineage_audit --features hardsec-design-audit
   --root /path/to/pinned-dataset \
   --receipt /path/outside/dataset/design-lineage-receipt.json
 ```
+
+**Important source-path contract:** in this manifest, `source_path` and `source_sha256` identify the exact artifact consumed by the detector (for a gate-level graph detector, normally the synthesized netlist file), not a shared clean RTL ancestor used to derive multiple variants. A single evaluated netlist may be referenced by many gate/sample rows, but its complete sample group must remain in one split. Upstream RTL, parent commit and synthesis inputs belong in the separate design-lineage inventory and retain their own hashes; they must not be substituted for the evaluated-artifact digest. This distinction prevents the exact-duplicate guard from mistaking legitimate shared ancestry for reused classifier input.
 
 The first schema is intentionally narrow and strict (14 tab-separated fields, exact order): `dataset_id, source_artifact_id, source_path, source_sha256, sample_id, design_id, base_design_family_id, netlist_id, trojan_family_id, synthesis_config_id, cell_library_id, split_protocol, split, label`.
 
