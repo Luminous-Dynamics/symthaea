@@ -24,10 +24,15 @@ avoided.
 
 The search is complete only for the declared binary factored TPM profile, the
 IIT 4.0 (2023) Integration-level quantity, the default directed-set-partition
-family, and the explicit work budgets passed to the API. It applies the default
-PyPhi MIP ranking: minimum normalized phi, then maximum nonnegative phi, then
-lexicographic induced cut. It evaluates every tied cause/effect specified-state
-pair before applying the Integration-level maximum-phi rule.
+family, and the explicit work budgets passed to the API. The three independent
+caps bound canonical partition generation, tied specified-state pairs, and the
+Cartesian product of state pairs × partitions scored. The product is checked
+before any partition scoring begins; exhaustion returns an error, never a partial
+analysis marked complete. All three limits are bound into the result receipt.
+It applies the default PyPhi MIP ranking: minimum normalized phi, then maximum
+nonnegative phi, then lexicographic induced cut. It evaluates every tied
+cause/effect specified-state pair before applying the Integration-level
+maximum-phi rule.
 
 This remains a partial implementation, not a complete PyPhi port. It does not
 construct the full cause-effect structure, compute structure-level big Phi, or
