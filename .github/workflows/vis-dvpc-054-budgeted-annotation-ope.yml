@@ -1,4 +1,4 @@
-name: VIS-DVPC-054/056/057 multi-source, correlated, and portfolio counterfactual annotation OPE
+name: VIS-DVPC-054/056/057/058 multi-source, correlated, portfolio, and selection-adjusted OPE
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - "docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md"
       - "docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md"
       - "docs/research/VIS_DVPC_057_POLICY_PORTFOLIO_ANNOTATION_OPE_V0.md"
+      - "docs/research/VIS_DVPC_058_SELECTION_ADJUSTED_SIMULTANEOUS_OPE_V0.md"
       - ".github/workflows/vis-dvpc-054-budgeted-annotation-ope.yml"
   push:
     branches: ["main"]
@@ -16,6 +17,7 @@ on:
       - "docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md"
       - "docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md"
       - "docs/research/VIS_DVPC_057_POLICY_PORTFOLIO_ANNOTATION_OPE_V0.md"
+      - "docs/research/VIS_DVPC_058_SELECTION_ADJUSTED_SIMULTANEOUS_OPE_V0.md"
       - ".github/workflows/vis-dvpc-054-budgeted-annotation-ope.yml"
 
 permissions:
@@ -27,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Check out exact VIS-DVPC-054/056/057 head
+      - name: Check out exact VIS-DVPC-054/056/057/058 head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -55,8 +57,9 @@ jobs:
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           awk -F '\\t' '$1 == "PORTFOLIO_RESULT" { if (NF != 31 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 < 0 || $13 != $13 || $14 != $14 || $15 != $15 || $16 < 0 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 != $22 || $23 != $23 || $24 != $24 || $25 < 0 || $25 > 1 || $26 < 0 || $27 < 0 || $28 < 0 || $29 < 0 || $30 < 0 || $31 < 0) bad=1; n++ } END { if (n != 12 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           awk -F '\\t' '$1 == "PORTFOLIO_CONFIG" { if (NF != 5 || $2 == "" || $3 < 0 || $3 > 2 || $4 == "" || $5 < 0 || $5 > 1) bad=1; n++ } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          awk -F '\\t' '$1 == "INFERENCE_RESULT" { if (NF != 20 || $2 == "" || $3 == "" || $4 < 1 || $5 < 2 || $6 <= 0 || $6 >= 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $11 < 0 || $11 > 1 || $12 < 0 || $12 > 1 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > 1 || $15 < 0 || $16 != $16 || $17 != $17 || $18 < 0 || $19 <= 0 || ($20 != 0 && $20 != 1)) bad=1; n++ } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
-      - name: Run full deterministic independent and correlated allocation frontier
+      - name: Run full deterministic independent, correlated, portfolio, and selection-inference frontier
         run: |
           /tmp/vis-dvpc-054 > /tmp/vis-dvpc-054-full.tsv
           awk -F '\t' '$1 == "RESULT" { if (NF != 20 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
@@ -66,6 +69,7 @@ jobs:
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\\t' '$1 == "PORTFOLIO_RESULT" { if (NF != 31 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 < 0 || $13 != $13 || $14 != $14 || $15 != $15 || $16 < 0 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 != $22 || $23 != $23 || $24 != $24 || $25 < 0 || $25 > 1 || $26 < 0 || $27 < 0 || $28 < 0 || $29 < 0 || $30 < 0 || $31 < 0) bad=1; n++ } END { if (n != 12 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\\t' '$1 == "PORTFOLIO_CONFIG" { if (NF != 5 || $2 == "" || $3 < 0 || $3 > 2 || $4 == "" || $5 < 0 || $5 > 1) bad=1; n++ } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
+          awk -F '\\t' '$1 == "INFERENCE_RESULT" { if (NF != 20 || $2 == "" || $3 == "" || $4 < 1 || $5 < 2 || $6 <= 0 || $6 >= 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $11 < 0 || $11 > 1 || $12 < 0 || $12 > 1 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > 1 || $15 < 0 || $16 != $16 || $17 != $17 || $18 < 0 || $19 <= 0 || ($20 != 0 && $20 != 1)) bad=1; n++ } END { if (n != 9 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           grep -F $'BENCHMARK_CONFIG\tVIS-DVPC-054' /tmp/vis-dvpc-054-full.tsv
       - name: Create exact-source and output SHA-256 receipt
@@ -77,7 +81,7 @@ jobs:
             printf 'VIS_DVPC_054_RECEIPT\tformat\tv1\n'
             printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-054-budgeted-annotation-ope.rs docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_057_POLICY_PORTFOLIO_ANNOTATION_OPE_V0.md /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-full.tsv
+            sha256sum tools/vision-dvpc-054-budgeted-annotation-ope.rs docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_057_POLICY_PORTFOLIO_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_058_SELECTION_ADJUSTED_SIMULTANEOUS_OPE_V0.md /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-full.tsv
           } > /tmp/vis-dvpc-054-receipt.tsv
           cat /tmp/vis-dvpc-054-receipt.tsv
       - name: Publish results and receipt
