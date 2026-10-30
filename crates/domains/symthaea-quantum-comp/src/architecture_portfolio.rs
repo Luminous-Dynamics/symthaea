@@ -22,6 +22,10 @@ pub enum ComputeArchitectureFamily {
     NeuromorphicDigital,
     /// Mixed-signal or accelerated analog neuromorphic systems.
     NeuromorphicMixedSignal,
+    /// Digital processing integrated within DRAM/SRAM banks or a memory-module logic layer.
+    DigitalProcessingInMemory,
+    /// Digital compute adjacent to memory arrays, but outside the arrays and memory module.
+    NearMemoryCompute,
     /// Analog compute-in-memory, including resistive and flash arrays.
     AnalogComputeInMemory,
     /// Classical optical/photonic linear or matrix computation.
@@ -446,6 +450,22 @@ mod tests {
             interval(0.96, 0.97),
             resource_envelope((0.8, 0.9), (3.0, 4.0), (0.03, 0.04), (4_000, 5_000)),
         )
+    }
+
+    #[test]
+    fn memory_centric_compute_families_remain_distinct() {
+        assert_ne!(
+            ComputeArchitectureFamily::DigitalProcessingInMemory,
+            ComputeArchitectureFamily::NearMemoryCompute
+        );
+        assert_ne!(
+            ComputeArchitectureFamily::DigitalProcessingInMemory,
+            ComputeArchitectureFamily::AnalogComputeInMemory
+        );
+        assert_ne!(
+            ComputeArchitectureFamily::NearMemoryCompute,
+            ComputeArchitectureFamily::AnalogComputeInMemory
+        );
     }
 
     #[test]
