@@ -319,6 +319,7 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         witness_sha256,
         stimuli_count,
         activation_count,
+        payload_effects_observed,
         bound_cycles,
     })
 }
@@ -712,6 +713,7 @@ fn run(args: Args) -> Result<(), String> {
             "witness_sha256": item.witness_sha256,
             "stimuli_count": item.stimuli_count,
             "activation_count": item.activation_count,
+            "payload_effects_observed": item.payload_effects_observed,
             "bound_cycles": item.bound_cycles
         })).collect::<Vec<_>>(),
         "claims": claims,
