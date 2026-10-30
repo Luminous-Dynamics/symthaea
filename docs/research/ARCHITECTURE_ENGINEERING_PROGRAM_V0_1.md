@@ -7,6 +7,7 @@
 **Next-stage qualification protocol:** [Held-out architecture-search landscape suite v0.1](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md) ([#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959); design only).
 **Multi-fidelity follow-up:** [Cost-aware promotion and evaluation contract v0.1](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md) ([#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994)); scheduling code authored, not compiled or qualified.
 **Canonical analytical benchmark layer:** `crates/domains/symthaea-architecture-engineering/src/analytical_benchmark.rs`, exposed via `analytical-sweep`; four standard objectives and custom synthetic fidelity transforms, code authored but uncompiled/unqualified.
+**Public NAS benchmark bridge:** [#9071](https://github.com/Luminous-Dynamics/symthaea/issues/9071) proposes pinned public tabular NAS evaluation after analytical qualification; design only.
 
 ## 1. Research question
 
@@ -272,7 +273,7 @@ The next acceptance step is to run these commands on the exact branch head and i
 
 ### Known limitation and next stage
 
-The two fixed surfaces in this v0.1 harness are implementation controls, not evidence that a search policy generalizes across optimization landscapes. The proposed follow-up is the [held-out landscape suite](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md), tracked by [#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959). It remains a design proposal; it has not been implemented or run. A separate [multi-fidelity evaluation contract](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md), tracked by [#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994), now has a scheduling primitive authored to make cost accounting and uncertainty-aware promotions explicit; it remains uncompiled and unqualified.
+The two fixed surfaces in this v0.1 harness are implementation controls, not evidence that a search policy generalizes across optimization landscapes. The proposed follow-up is the [held-out landscape suite](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md), tracked by [#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959). It remains a design proposal; it has not been implemented or run. A separate [multi-fidelity evaluation contract](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md), tracked by [#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994), now has a scheduling primitive authored to make cost accounting and uncertainty-aware promotions explicit; it remains uncompiled and unqualified. The next external-validity step is to test on pinned public tabular NAS spaces before expensive real-model training; see [#9071](https://github.com/Luminous-Dynamics/symthaea/issues/9071).
 
 ## 10. Non-goals and claim ceiling
 
