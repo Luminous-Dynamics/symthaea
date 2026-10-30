@@ -3698,14 +3698,18 @@ jobs:
           python3 "$script" "$splits" "$first"
           python3 "$script" "$splits" "$second"
           cmp "$first" "$second"
-          python3 - "$splits" "$first" <<'PY'
+          snapshot="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/coverage-review-docket.pending.json"
+          python3 - "$splits" "$first" "$snapshot" <<'PY'
           import hashlib, json, sys
           from pathlib import Path
 
-          split_path, docket_path = map(Path, sys.argv[1:])
+          split_path, docket_path, snapshot_path = map(Path, sys.argv[1:])
           split_bytes = split_path.read_bytes()
           manifest = json.loads(split_bytes)
           docket = json.loads(docket_path.read_text())
+          snapshot = json.loads(snapshot_path.read_text())
+          if snapshot != docket:
+              raise SystemExit("checked-in pending docket differs from the independently regenerated docket")
           families = docket.get("families")
           if len(families) != 372 or docket["coverage_contract"]["family_count"] != 372:
               raise SystemExit("coverage docket must contain exactly 372 families")
@@ -3738,7 +3742,7 @@ jobs:
                   raise SystemExit(f"{family_id}: generated docket fabricated completed review evidence")
           if seen != set(source):
               raise SystemExit("docket does not cover the complete frozen family universe")
-          print("PITB_COVERAGE_REVIEW_DOCKET_PASS: families=372 review_rows=744 reproducible=true status=pending confirmatory=false")
+          print("PITB_COVERAGE_REVIEW_DOCKET_PASS: families=372 review_rows=744 reproducible=true checked_in_snapshot=matched status=pending confirmatory=false")
           PY
       - name: Test paired-outcome missingness bounds diagnostic
         shell: bash
