@@ -1400,6 +1400,120 @@ mod tests {
     }
 
     #[test]
+    fn optimizer_selects_higher_cost_cross_session_proof_over_cheaper_single_session_proof() {
+        let mut same_session_a = candidate("A", "family-A", 1);
+        same_session_a.source_session_id = Some("session-1".into());
+        let mut same_session_b = candidate("B", "family-B", 1);
+        same_session_b.source_session_id = Some("session-1".into());
+        let mut cross_session_c = candidate("C", "family-C", 5);
+        cross_session_c.source_session_id = Some("session-2".into());
+
+        let mut obligation = obligation(
+            "claim-cross-session",
+            vec![
+                justification("cheap-single-session", &["A", "B"]),
+                justification("verified-cross-session", &["A", "C"]),
+            ],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let req = request(
+            vec![same_session_a, same_session_b, cross_session_c],
+            vec![obligation],
+            64,
+        );
+        let result = solve_proof_budget(req.clone()).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 6);
+        assert_eq!(
+            result.selected_proofs[0].justification_id,
+            "verified-cross-session"
+        );
+        assert_eq!(
+            result.evidence
+                .iter()
+                .map(|item| item.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-1", "session-2"]
+        );
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.justification_id == "cheap-single-session"
+                && rejection.reason == JustificationRejectionReason::DistinctSessionCountInsufficient
+        }));
+
+        // The independent, exhaustive verifier must agree with the constrained
+        // optimizer and validate the session provenance carried by the packet.
+        verify_proof_budget_result(&req, &result).unwrap();
+    }
+
+    #[test]
+    fn multiple_independent_sources_from_one_session_do_not_satisfy_multisession_requirement() {
+        let mut a = candidate("A", "family-A", 1);
+        let mut b = candidate("B", "family-B", 1);
+        a.source_session_id = Some("session-one".into());
+        b.source_session_id = Some("session-one".into());
+
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-source-one-session", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(
+            request(vec![a, b], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::DistinctSessionCountInsufficient
+        }));
+    }
+
+    #[test]
+    fn sessions_do_not_substitute_for_independent_source_families() {
+        let mut a = candidate("A", "family-same", 1);
+        let mut b = candidate("B", "family-same", 1);
+        a.source_session_id = Some("session-one".into());
+        b.source_session_id = Some("session-two".into());
+
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("two-sessions-one-family", &["A", "B"])],
+        );
+        obligation.minimum_independent_families = 2;
+        obligation.minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(
+            request(vec![a, b], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::IndependentFamilyCountInsufficient
+        }));
+    }
+
+    #[test]
+    fn missing_trusted_session_provenance_cannot_satisfy_session_requirement() {
+        let mut a = candidate("A", "family-A", 1);
+        a.source_session_id = None;
+        let mut obligation = obligation(
+            "claim-1",
+            vec![justification("missing-session", &["A"])],
+        );
+        obligation.minimum_distinct_sessions = 1;
+
+        let result = solve_proof_budget(
+            request(vec![a], vec![obligation], 10)
+        ).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == JustificationRejectionReason::SessionProvenanceMissing
+        }));
+    }
+
+    #[test]
     fn out_of_scope_candidate_is_not_eligible() {
         let mut item = candidate("A", "family-A", 1);
         item.scope_id = "scope-2".into();
