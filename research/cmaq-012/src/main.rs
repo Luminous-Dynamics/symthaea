@@ -292,7 +292,8 @@ fn select_action(
     remaining_budget: f64,
 ) -> (f64, f64) {
     let ce = certainty_equivalent_action(state, belief, target);
-    let ce_cost = expected_stage_cost(state, ce, belief, target);
+    let shielded_ce = safe_ce_action(state, belief, target);
+    let shielded_ce_cost = expected_stage_cost(state, shielded_ce, belief, target);
 
     match policy {
         Policy::CertaintyEquivalent => (ce, 0.0),
@@ -324,7 +325,7 @@ fn select_action(
             for action in ACTIONS {
                 if !robustly_safe(state, action) { continue; }
                 let task_cost = expected_stage_cost(state, action, belief, target);
-                let degradation = (task_cost - ce_cost).max(0.0);
+                let degradation = (task_cost - shielded_ce_cost).max(0.0);
                 if degradation > remaining_budget + 1e-12 { continue; }
                 let score = task_cost - INFO_WEIGHT * information_proxy(belief, action);
                 if score < best_score {
@@ -342,9 +343,9 @@ fn select_action(
                     + PROCESS_NOISE_BOUND <= STATE_LIMIT)
                 .min_by(|a, b| {
                     let cost_a = (A * state + true_gain * *a - target).powi(2)
-                        + CONTROL_EFFORT * a * a;
+                        + CONTROL_EFFORT * (*a) * (*a);
                     let cost_b = (A * state + true_gain * *b - target).powi(2)
-                        + CONTROL_EFFORT * b * b;
+                        + CONTROL_EFFORT * (*b) * (*b);
                     cost_a.total_cmp(&cost_b)
                 })
                 .map(|action| (action, 0.0))
@@ -440,7 +441,8 @@ fn summarize(
         / (n - 1.0).max(1.0);
     let standard_error = (variance / n).sqrt();
     let mut costs = outcomes.iter().map(|o| o.total_cost).collect::<Vec<_>>();
-    let p95_cost = percentile(&mut costs.clone(), 0.95);
+    let mut p95_values = costs.clone();
+    let p95_cost = percentile(&mut p95_values, 0.95);
     costs.sort_by(|a, b| b.total_cmp(a));
     let tail_count = ((costs.len() as f64 * 0.05).ceil() as usize).max(1);
     let cvar95_cost = costs.iter().take(tail_count).sum::<f64>() / tail_count as f64;
@@ -474,13 +476,6 @@ fn summarize(
 fn initial_entropy() -> f64 {
     let uniform = [0.20; 5];
     entropy(&uniform)
-}
-
-fn make_outcomes(scenario: Scenario, policy: Policy) -> Vec<Outcome> {
-    (0..EPISODES).map(|episode| {
-        let tape = EpisodeTape::new(scenario, episode);
-        run_episode(scenario, policy, &tape)
-    }).collect()
 }
 
 fn render_number(value: f64) -> String {
