@@ -411,3 +411,23 @@ For Q0 versus Q2, use the same indexed memory store, reader/backbone, retrieval/
 5. Run official external tasks and compare with fixed readers/budgets. Keep the entire research harness reproducible offline where licensing/data access permits.
 
 This protocol is a research plan, not a completed implementation or a claim that Broca currently outperforms any baseline.
+
+## 13. Evidence-graded industry baseline ledger
+
+The companion [industry baseline ledger](INDUSTRY_BASELINE_LEDGER.md) and machine-readable [baseline registry](industry-baseline-ledger-v1.json) record external results with their benchmark revision, model, judge, sample size, metric, publication date, evidence grade, source, and comparison caveats.
+
+This is deliberately **not a unified leaderboard**. In particular:
+
+- QEMem's LoCoMo shared-memory-store result is a direct evidence-sufficiency comparator.
+- Zep and Mem0 publish strong commercial results, but their scores are vendor-reported and use their own evaluation configurations.
+- LongMemEval and LongMemEval-V2 are separate protocol revisions; their scores must not be pooled.
+- MemDerive and SciValidityBench measure different capabilities from ordinary conversational answer accuracy.
+- Small third-party matched-harness pilots are useful for failure diagnosis, but do not become definitive vendor rankings when samples are incomplete or underpowered.
+
+### Matched-comparison gate
+
+A Broca result can be called a direct comparison only when the benchmark revision/split, source corpus, answer model, judge, prompts/rubric, memory formation, tool-call limit, token accounting and context budget are held constant. Preserve paired per-question outputs, raw evidence receipts, failure cases and uncertainty intervals.
+
+### Broca positioning
+
+The target is a Pareto frontier across answer quality, evidence sufficiency, state maintenance, decision-use validity, governance, latency, tokens and operating cost. Vendor headline accuracy is context, not the sole promotion objective. No Broca score is claimed by this ledger.
