@@ -1008,7 +1008,7 @@ mod tests {
 
     #[test]
     fn candidate_recall_counts_a_verified_error_once_even_with_multiple_proposals() {
-        let (mut proposals, mut ranking, mut audit, proposal, ranking_hash, protocol) = fixture();
+        let (proposals, ranking, mut audit, proposal, ranking_hash, protocol) = fixture();
         audit.sampled_units[0].errors[0].proposal_candidate_ids = vec![
             "candidate-1".into(), "candidate-2".into(),
         ];
@@ -1021,10 +1021,6 @@ mod tests {
         ).unwrap();
         assert_eq!(report.sampled_covered_error_count, 2);
         assert_eq!(report.estimated_covered_errors.total, 2.0);
-        // Keep mutable bindings intentional: the fixture's proposal/ranking types
-        // are also used by adversarial tests below.
-        proposals.candidates.reverse();
-        ranking.input_sha256 = proposal;
     }
 
     #[test]
@@ -1060,6 +1056,26 @@ mod tests {
         let estimate = estimate(&values, 5).unwrap();
         assert!(estimate.design_variance > 0.0);
         assert_eq!(estimate.normal_approx_95_interval, None);
+    }
+
+    #[test]
+    fn horvitz_thompson_total_is_exactly_unbiased_over_all_two_of_three_samples() {
+        let population_total = 1.0 + 2.0 + 3.0;
+        let samples = [vec![1.0, 2.0], vec![1.0, 3.0], vec![2.0, 3.0]];
+        let mean_estimate = samples
+            .iter()
+            .map(|sample| estimate(sample, 3).unwrap().total)
+            .sum::<f64>()
+            / samples.len() as f64;
+        assert!((mean_estimate - population_total).abs() < 1e-12);
+    }
+
+    #[test]
+    fn horvitz_thompson_variance_uses_the_finite_population_correction() {
+        let estimate = estimate(&[1.0, 3.0], 4).unwrap();
+        // N^2 * (1 - n/N) * s^2 / n = 16 * 0.5 * 2 / 2 = 8.
+        assert_eq!(estimate.total, 8.0);
+        assert!((estimate.design_variance - 8.0).abs() < 1e-12);
     }
 
     #[test]
@@ -1121,10 +1137,42 @@ mod tests {
     #[test]
     fn outcome_for_unselected_psu_is_rejected() {
         let (proposals, ranking, mut audit, proposal, ranking_hash, protocol) = fixture();
-        audit.strata[0].sampled_psu_count = 1;
-        // Selection is recomputed from the seed; retain the previous census records,
-        // so at least one record must be rejected as unselected.
-        assert!(validate(&proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol).is_err());
+        audit.population_frame.push(PopulationPsu {
+            psu_id: "psu-a3".into(),
+            stratum_id: "region-a".into(),
+        });
+        audit.strata[0].sampled_psu_count = 2;
+
+        let mut frame = BTreeMap::<String, Vec<String>>::new();
+        for psu in &audit.population_frame {
+            frame.entry(psu.stratum_id.clone()).or_default().push(psu.psu_id.clone());
+        }
+        let selected = expected_sample(&audit.sample_seed, &frame, &audit.strata).unwrap();
+        audit.sampled_units.clear();
+        for psu_id in selected.values().flat_map(|ids| ids.iter()) {
+            audit.sampled_units.push(SampledPsuOutcome {
+                psu_id: psu_id.clone(),
+                exhaustive_search_completed: true,
+                audit_panel_person_minutes: 1.0,
+                errors: vec![],
+            });
+        }
+        let selected_ids: BTreeSet<String> =
+            selected.values().flat_map(|ids| ids.iter().cloned()).collect();
+        let unselected_psu = frame["region-a"]
+            .iter()
+            .find(|psu_id| !selected_ids.contains(*psu_id))
+            .unwrap()
+            .clone();
+        audit.sampled_units.push(SampledPsuOutcome {
+            psu_id: unselected_psu,
+            exhaustive_search_completed: true,
+            audit_panel_person_minutes: 1.0,
+            errors: vec![],
+        });
+
+        assert!(validate(&proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol)
+            .unwrap_err().contains("unselected PSU"));
     }
 
     #[test]
