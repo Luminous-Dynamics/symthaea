@@ -643,7 +643,7 @@ mod tests {
             for (sample_id, split, family, trojan_family) in rows {
                 let source_name = format!("design-{sample_id}.v");
                 let source = root.join(&source_name);
-                let source_bytes = format!("module fixture_{sample_id}; endmodule\\n");
+                let source_bytes = format!("module fixture_{sample_id}; endmodule\n");
                 fs::write(&source, source_bytes.as_bytes()).unwrap();
                 let source_hash = sha256_file_stable(&source).unwrap();
                 let source_artifact_id = format!("src-{sample_id}");
@@ -748,6 +748,31 @@ mod tests {
         );
         let error = run(fixture.args()).unwrap_err();
         assert!(error.contains("trojan_family_id=flush"));
+    }
+
+    #[test]
+    fn rejects_identical_source_bytes_crossing_group_splits() {
+        let fixture = Fixture::new(
+            "lofo_base_family",
+            &[
+                ("s1", "train", "host-a", "trojan-a"),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        let mut lines: Vec<String> = fs::read_to_string(&fixture.manifest)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let first: Vec<String> = lines[1].split('\t').map(str::to_owned).collect();
+        let mut third: Vec<String> = lines[3].split('\t').map(str::to_owned).collect();
+        third[2] = first[2].clone();
+        third[3] = first[3].clone();
+        lines[3] = third.join("\t");
+        fs::write(&fixture.manifest, lines.join("\n") + "\n").unwrap();
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("exact source artifact hash leakage"));
     }
 
     #[test]
@@ -877,9 +902,23 @@ mod tests {
                 ("s3", "test", "host-a", "trojan-c"),
             ],
         );
+        let mut lines: Vec<String> = fs::read_to_string(&fixture.manifest)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let first: Vec<String> = lines[1].split('\t').map(str::to_owned).collect();
+        for row_index in [2, 3] {
+            let mut row: Vec<String> = lines[row_index].split('\t').map(str::to_owned).collect();
+            row[2] = first[2].clone();
+            row[3] = first[3].clone();
+            lines[row_index] = row.join("\t");
+        }
+        fs::write(&fixture.manifest, lines.join("\n") + "\n").unwrap();
         run(fixture.args()).unwrap();
         let receipt: serde_json::Value =
             serde_json::from_slice(&fs::read(&fixture.receipt).unwrap()).unwrap();
         assert_eq!(receipt["cross_split_lineage_group_counts"]["base_design_family_id"], 1);
+        assert_eq!(receipt["cross_split_source_hash_count"], 1);
     }
 }
