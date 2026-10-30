@@ -50,6 +50,8 @@ Candidate recall is candidate true positives / exact contextual-positive pairs. 
 
 The cost ratio is planned renders divided by exhaustive renders. Pair counts describe selected probes, not completed renderer measurements. It is an exact synthetic accounting comparison; it is not a measured wall-clock speedup.
 
+Three separately versioned positive L2 floors govern contextual pair positives, global order-2 Harsanyi counts, and higher-order Harsanyi counts. The first two must not be conflated: the same fixture can have a contextual pair effect above its threshold while its global order-2 diagnostic is below its own threshold. Thresholds are part of the replay receipt.
+
 ## Known-answer fixtures authored
 
 1. **Sparse pair case:** eight events; only events 0 and 1 interact through a quadratic shared processor. Their nonzero source samples exactly match their overlapping synthetic acoustic supports; all other event supports are disjoint. The expected result is one true pair found, no candidate false positives, candidate precision/recall 1.0, and 10 planned renders versus 37 exhaustive pairwise renders (10/37 ≈ 27.0%). These are asserted source-level expectations, not executed results.
@@ -71,4 +73,4 @@ Thresholds must be frozen per fixture family before comparing policies. Confiden
 
 ## Validation boundary
 
-Four Rust tests are authored for sparse pair recall/cost, an independent audit catching a support omission, the distinction between contextual pair effects and a pure third-order Harsanyi term, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
+Five Rust tests are authored for sparse pair recall/cost, an independent audit catching a support omission, the distinction between contextual pair effects and a pure third-order Harsanyi term, independent contextual/global thresholds, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
