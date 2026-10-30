@@ -20,7 +20,7 @@
 //!     --manifest /data/scoap.jsonl --ranking-output /output/ranking.tsv \
 //!     --receipt /output/audit.json --evidence-root /data/netlists
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::env;
@@ -29,8 +29,7 @@ use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const CLAIM_SCOPE: &str =
-    "supplied_scoap_metric_integrity_and_per_design_rarity_ranking_only";
+const CLAIM_SCOPE: &str = "supplied_scoap_metric_integrity_and_per_design_rarity_ranking_only";
 const ALGORITHM: &str = "scoap-rarity-fixed-point-midrank-percentile-v2";
 const RECORD_ORDER: &str = "design_id_then_node_id_ascending";
 const ALPHA_MIN_MILLI: u64 = 500;
@@ -148,7 +147,9 @@ fn parse_args() -> Result<Option<Args>, String> {
         if flag == "--help" || flag == "-h" {
             return Ok(None);
         }
-        let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--manifest" => manifest = Some(PathBuf::from(value)),
             "--ranking-output" => ranking_output = Some(PathBuf::from(value)),
@@ -171,7 +172,9 @@ fn required_string<'a>(value: &'a Value, field: &str) -> Result<&'a str, String>
         .and_then(Value::as_str)
         .ok_or_else(|| format!("{field} must be a string"))?;
     if result.trim().is_empty() || result.trim() != result {
-        return Err(format!("{field} must be non-empty and have no surrounding whitespace"));
+        return Err(format!(
+            "{field} must be non-empty and have no surrounding whitespace"
+        ));
     }
     Ok(result)
 }
@@ -192,21 +195,27 @@ fn valid_sha256(value: &str) -> bool {
 
 fn safe_relative_path(value: &str, field: &str) -> Result<(), String> {
     if value.contains('\\') || value.contains('\0') {
-        return Err(format!("{field} must use portable relative path separators"));
+        return Err(format!(
+            "{field} must use portable relative path separators"
+        ));
     }
     let path = Path::new(value);
     if path.is_absolute() || path.as_os_str().is_empty() {
         return Err(format!("{field} must be a non-empty relative path"));
     }
-    if path.components().any(|part| !matches!(part, Component::Normal(_))) {
-        return Err(format!("{field} must not contain '.', '..', root or prefix components"));
+    if path
+        .components()
+        .any(|part| !matches!(part, Component::Normal(_)))
+    {
+        return Err(format!(
+            "{field} must not contain '.', '..', root or prefix components"
+        ));
     }
     Ok(())
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let mut file = File::open(path)
-        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    let mut file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
     loop {
@@ -228,7 +237,10 @@ fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
         return Err("evidence root must be a regular non-symlink directory".to_owned());
     }
     let relative = design.netlist_path.as_deref().ok_or_else(|| {
-        format!("design {}: netlist_path is required with --evidence-root", design.design_id)
+        format!(
+            "design {}: netlist_path is required with --evidence-root",
+            design.design_id
+        )
     })?;
     safe_relative_path(relative, "netlist_path")?;
     let canonical_root = fs::canonicalize(root)
@@ -238,7 +250,10 @@ fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
 
     for (index, component) in components.iter().enumerate() {
         let Component::Normal(part) = component else {
-            return Err(format!("design {}: non-normal path component", design.design_id));
+            return Err(format!(
+                "design {}: non-normal path component",
+                design.design_id
+            ));
         };
         candidate.push(part);
         let metadata = fs::symlink_metadata(&candidate)
@@ -252,17 +267,26 @@ fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
         }
         if index + 1 == components.len() {
             if !metadata.is_file() {
-                return Err(format!("design {}: netlist is not a regular file", design.design_id));
+                return Err(format!(
+                    "design {}: netlist is not a regular file",
+                    design.design_id
+                ));
             }
         } else if !metadata.is_dir() {
-            return Err(format!("design {}: netlist parent is not a directory", design.design_id));
+            return Err(format!(
+                "design {}: netlist parent is not a directory",
+                design.design_id
+            ));
         }
     }
 
     let resolved = fs::canonicalize(&candidate)
         .map_err(|error| format!("canonicalize netlist {}: {error}", candidate.display()))?;
     if !resolved.starts_with(&canonical_root) {
-        return Err(format!("design {}: netlist path escapes evidence root", design.design_id));
+        return Err(format!(
+            "design {}: netlist path escapes evidence root",
+            design.design_id
+        ));
     }
     let actual = sha256_file(&resolved)?;
     if actual != design.netlist_sha256 {
@@ -330,11 +354,12 @@ fn parse_header(value: &Value) -> Result<Header, String> {
 
     for item in design_values {
         let design_id = required_string(item, "design_id")?.to_owned();
-        let base_design_family_id =
-            required_string(item, "base_design_family_id")?.to_owned();
+        let base_design_family_id = required_string(item, "base_design_family_id")?.to_owned();
         let split = required_string(item, "split")?.to_owned();
         if !["train", "validation", "test"].contains(&split.as_str()) {
-            return Err(format!("design {design_id}: split must be train, validation or test"));
+            return Err(format!(
+                "design {design_id}: split must be train, validation or test"
+            ));
         }
         let netlist_sha256 = required_string(item, "netlist_sha256")?.to_ascii_lowercase();
         if !valid_sha256(&netlist_sha256) {
@@ -520,9 +545,7 @@ fn evaluate_tails(nodes: &[Node]) -> Vec<TailMetrics> {
         .map(|threshold_bps| {
             let selected_measured: Vec<&Node> = nodes
                 .iter()
-                .filter(|node| {
-                    node.metric_measured && node.rarity_percentile_bps >= threshold_bps
-                })
+                .filter(|node| node.metric_measured && node.rarity_percentile_bps >= threshold_bps)
                 .collect();
             let selected_labeled: Vec<&Node> = selected_measured
                 .iter()
@@ -579,10 +602,26 @@ fn summarize_design(metadata: &DesignMeta, data: &mut DesignData) -> Result<Desi
         netlist_path: metadata.netlist_path.clone(),
         node_count: data.nodes.len(),
         measured_metric_count,
-        trigger_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Trigger).count(),
-        payload_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Payload).count(),
-        benign_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Benign).count(),
-        unknown_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Unknown).count(),
+        trigger_label_count: data
+            .nodes
+            .iter()
+            .filter(|node| node.label == NodeLabel::Trigger)
+            .count(),
+        payload_label_count: data
+            .nodes
+            .iter()
+            .filter(|node| node.label == NodeLabel::Payload)
+            .count(),
+        benign_label_count: data
+            .nodes
+            .iter()
+            .filter(|node| node.label == NodeLabel::Benign)
+            .count(),
+        unknown_label_count: data
+            .nodes
+            .iter()
+            .filter(|node| node.label == NodeLabel::Unknown)
+            .count(),
         unknown_metric_count,
         tails: evaluate_tails(&data.nodes),
     })
@@ -605,10 +644,7 @@ fn flush_design(
             writeln!(
                 ranking,
                 "{}\t{}\t{}\t{}\t{}\t{}",
-                metadata.design_id,
-                metadata.base_design_family_id,
-                metadata.split,
-                node.node_id,
+                metadata.design_id, metadata.base_design_family_id, metadata.split, node.node_id,
                 node.score_milli,
                 node.rarity_percentile_bps
             )
@@ -653,8 +689,9 @@ fn target_path_outside(
         }
     }
     for input in directory_inputs {
-        let canonical = fs::canonicalize(input)
-            .map_err(|error| format!("canonicalize input directory {}: {error}", input.display()))?;
+        let canonical = fs::canonicalize(input).map_err(|error| {
+            format!("canonicalize input directory {}: {error}", input.display())
+        })?;
         if target.starts_with(canonical) {
             return Err(format!(
                 "output {} must be outside input directory {}",
@@ -712,16 +749,9 @@ fn run(args: Args) -> Result<(), String> {
     if let Some(root) = args.evidence_root.as_deref() {
         directory_inputs.push(root);
     }
-    let ranking_path = target_path_outside(
-        &args.ranking_output,
-        &[&args.manifest],
-        &directory_inputs,
-    )?;
-    let receipt_path = target_path_outside(
-        &args.receipt,
-        &[&args.manifest],
-        &directory_inputs,
-    )?;
+    let ranking_path =
+        target_path_outside(&args.ranking_output, &[&args.manifest], &directory_inputs)?;
+    let receipt_path = target_path_outside(&args.receipt, &[&args.manifest], &directory_inputs)?;
     if ranking_path == receipt_path {
         return Err("ranking output and receipt paths must differ".to_owned());
     }
@@ -848,7 +878,9 @@ fn run(args: Args) -> Result<(), String> {
                 .get(next_design_index)
                 .map(|value| value.as_str())
                 .unwrap_or("<unknown>");
-            return Err(format!("manifest missing node records for design {missing}"));
+            return Err(format!(
+                "manifest missing node records for design {missing}"
+            ));
         }
 
         ranking
@@ -963,7 +995,10 @@ fn run(args: Args) -> Result<(), String> {
         Ok(value) => value,
         Err(error) => {
             let _ = fs::remove_file(&ranking_path);
-            return Err(format!("create receipt {}: {error}", receipt_path.display()));
+            return Err(format!(
+                "create receipt {}: {error}",
+                receipt_path.display()
+            ));
         }
     };
     let write_result = output
@@ -985,7 +1020,10 @@ fn run(args: Args) -> Result<(), String> {
     );
     println!(
         "unknown SCOAP records: {}",
-        summaries.iter().map(|item| item.unknown_metric_count).sum::<usize>()
+        summaries
+            .iter()
+            .map(|item| item.unknown_metric_count)
+            .sum::<usize>()
     );
     println!("ranking output SHA-256: {ranking_sha256}");
     println!("receipt: {}", receipt_path.display());
@@ -1053,14 +1091,7 @@ mod tests {
         }
     }
 
-    fn node(
-        node_id: u64,
-        cc0: u64,
-        cc1: u64,
-        co: u64,
-        label: NodeLabel,
-        alpha: u64,
-    ) -> Node {
+    fn node(node_id: u64, cc0: u64, cc1: u64, co: u64, label: NodeLabel, alpha: u64) -> Node {
         let max_cc = u128::from(cc0.max(cc1));
         Node {
             node_id,
@@ -1110,17 +1141,15 @@ mod tests {
     struct Fixture {
         base: PathBuf,
         manifest: PathBuf,
-            ranking: PathBuf,
+        ranking: PathBuf,
         receipt: PathBuf,
     }
 
     impl Fixture {
         fn new(node_rows: &[(&str, u64, &str, Option<(u64, u64, u64)>, &str)]) -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let base = env::temp_dir().join(format!(
-                "hardsec-scoap-audit-{}-{id}",
-                std::process::id()
-            ));
+            let base =
+                env::temp_dir().join(format!("hardsec-scoap-audit-{}-{id}", std::process::id()));
             let input_dir = base.join("input");
             let output_dir = base.join("output");
             fs::create_dir_all(&input_dir).unwrap();
@@ -1266,11 +1295,17 @@ mod tests {
         rank_design(&mut low).unwrap();
         rank_design(&mut high).unwrap();
         assert_eq!(
-            low.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
+            low.iter()
+                .find(|node| node.node_id == 2)
+                .unwrap()
+                .rarity_percentile_bps,
             7_500
         );
         assert_eq!(
-            high.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
+            high.iter()
+                .find(|node| node.node_id == 2)
+                .unwrap()
+                .rarity_percentile_bps,
             7_500
         );
     }
@@ -1363,9 +1398,11 @@ mod tests {
             "cc0": null,
             "label": "unknown"
         });
-        assert!(parse_node(&value, &header)
-            .unwrap_err()
-            .contains("unknown metric_status must omit cc0"));
+        assert!(
+            parse_node(&value, &header)
+                .unwrap_err()
+                .contains("unknown metric_status must omit cc0")
+        );
     }
 
     #[test]
@@ -1426,9 +1463,11 @@ mod tests {
             netlist_sha256: "a".repeat(64),
             netlist_path: Some("../outside.v".to_owned()),
         };
-        assert!(verify_source_file(&base, &design)
-            .unwrap_err()
-            .contains("must not contain"));
+        assert!(
+            verify_source_file(&base, &design)
+                .unwrap_err()
+                .contains("must not contain")
+        );
         fs::remove_dir_all(base).unwrap();
     }
 
@@ -1451,17 +1490,21 @@ mod tests {
             netlist_sha256: sha256_file(&actual).unwrap(),
             netlist_path: Some("design.v".to_owned()),
         };
-        assert!(verify_source_file(&base, &design)
-            .unwrap_err()
-            .contains("symlink is forbidden"));
+        assert!(
+            verify_source_file(&base, &design)
+                .unwrap_err()
+                .contains("symlink is forbidden")
+        );
         fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
     fn rejects_invalid_alpha() {
-        assert!(parse_header(&header_value(499, "per_design"))
-            .unwrap_err()
-            .contains("alpha_milli"));
+        assert!(
+            parse_header(&header_value(499, "per_design"))
+                .unwrap_err()
+                .contains("alpha_milli")
+        );
         assert!(parse_header(&header_value(1_001, "per_design")).is_err());
     }
 
@@ -1469,16 +1512,20 @@ mod tests {
     fn rejects_family_leakage_and_duplicate_netlists_across_splits() {
         let mut family = header_value(1_000, "leave_one_base_family_out");
         family["designs"][1]["base_design_family_id"] = json!("family-a");
-        assert!(parse_header(&family)
-            .unwrap_err()
-            .contains("appears in train and validation"));
+        assert!(
+            parse_header(&family)
+                .unwrap_err()
+                .contains("appears in train and validation")
+        );
 
         let mut duplicated = header_value(1_000, "leave_one_design_out");
         duplicated["designs"][1]["netlist_sha256"] =
             duplicated["designs"][0]["netlist_sha256"].clone();
-        assert!(parse_header(&duplicated)
-            .unwrap_err()
-            .contains("identical netlist SHA-256"));
+        assert!(
+            parse_header(&duplicated)
+                .unwrap_err()
+                .contains("identical netlist SHA-256")
+        );
     }
 
     #[test]
@@ -1524,9 +1571,11 @@ mod tests {
             ("design-b", 1, "payload", Some((2, 2, 2)), "measured"),
             ("design-c", 1, "unknown", None, "unknown"),
         ]);
-        assert!(run(fixture.args())
-            .unwrap_err()
-            .contains("is not greater than previous node_id"));
+        assert!(
+            run(fixture.args())
+                .unwrap_err()
+                .contains("is not greater than previous node_id")
+        );
     }
 
     #[test]
@@ -1537,7 +1586,11 @@ mod tests {
             ("design-c", 1, "unknown", None, "unknown"),
         ]);
         fixture.ranking = fixture.manifest.parent().unwrap().join("ranking.tsv");
-        assert!(run(fixture.args()).unwrap_err().contains("outside input directory"));
+        assert!(
+            run(fixture.args())
+                .unwrap_err()
+                .contains("outside input directory")
+        );
     }
 
     fn header_value(alpha_milli: u64, protocol: &str) -> Value {
