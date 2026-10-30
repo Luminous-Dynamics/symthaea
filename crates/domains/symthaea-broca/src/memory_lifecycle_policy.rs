@@ -108,7 +108,10 @@ pub struct VerifiedLifecycleProofToken {
     known_at_unix_ms: u64,
     request_sha256: String,
     packet_sha256: String,
-    selected_proofs: std::collections::BTreeMap<String, (String, BTreeSet<String>)>,
+    selected_proofs: std::collections::BTreeMap<
+        String,
+        (String, BTreeSet<String>, BTreeSet<String>),
+    >,
 }
 
 impl VerifiedLifecycleProofToken {
@@ -157,7 +160,7 @@ impl VerifiedLifecycleProofToken {
             if claim.state != ClaimLifecycleState::SupportedCurrent {
                 return Err("verified proof token cannot be used with a non-current claim".into());
             }
-            let (justification_id, dependencies) = self
+            let (justification_id, dependencies, session_ids) = self
                 .selected_proofs
                 .get(&claim.conclusion_id)
                 .ok_or_else(|| format!(
@@ -166,9 +169,10 @@ impl VerifiedLifecycleProofToken {
                 ))?;
             if claim.selected_justification_id.as_deref() != Some(justification_id.as_str())
                 || &claim.current_evidence_ids != dependencies
+                || &claim.source_session_ids != session_ids
             {
                 return Err(format!(
-                    "lifecycle claim {:?} does not match the independently verified selected proof",
+                    "lifecycle claim {:?} does not match the independently verified selected proof or session coverage",
                     claim.conclusion_id
                 ));
             }
@@ -185,15 +189,31 @@ pub fn verify_proof_packet_for_lifecycle(
 ) -> Result<VerifiedLifecycleProofToken, String> {
     let context = build_verified_proof_reader_context(request, result)?;
     context.verify_internal_consistency()?;
+    let session_by_evidence_id: std::collections::BTreeMap<&str, &Option<String>> =
+        context.evidence
+            .iter()
+            .map(|evidence| (evidence.evidence_id.as_str(), &evidence.source_session_id))
+            .collect();
     let selected_proofs = context
         .claim_proofs
         .iter()
         .map(|proof| {
+            let dependencies: BTreeSet<String> =
+                proof.evidence_dependencies.iter().cloned().collect();
+            let session_ids: BTreeSet<String> = proof.evidence_dependencies
+                .iter()
+                .filter_map(|evidence_id| {
+                    session_by_evidence_id
+                        .get(evidence_id.as_str())
+                        .and_then(|session_id| (*session_id).clone())
+                })
+                .collect();
             (
                 proof.conclusion_id.clone(),
                 (
                     proof.justification_id.clone(),
-                    proof.evidence_dependencies.iter().cloned().collect(),
+                    dependencies,
+                    session_ids,
                 ),
             )
         })
@@ -222,6 +242,8 @@ pub struct ClaimLifecycleLedgerEntry {
     pub stale_evidence_ids: BTreeSet<String>,
     pub conflicting_evidence_ids: BTreeSet<String>,
     pub rejected_evidence_ids: BTreeSet<String>,
+    /// Exact distinct source-session IDs supporting the selected proof.
+    pub source_session_ids: BTreeSet<String>,
 }
 
 impl ClaimLifecycleLedgerEntry {
@@ -247,6 +269,10 @@ impl ClaimLifecycleLedgerEntry {
                     ));
                 }
             }
+        }
+
+        for session_id in &self.source_session_ids {
+            require_non_empty(session_id, "source_session_id")?;
         }
 
         match self.state {
@@ -754,6 +780,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -766,6 +793,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::from([format!("stale-{id}")]),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -781,6 +809,7 @@ mod tests {
                 format!("conflict-{id}-b"),
             ]),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -793,6 +822,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -805,6 +835,7 @@ mod tests {
             stale_evidence_ids: BTreeSet::new(),
             conflicting_evidence_ids: BTreeSet::new(),
             rejected_evidence_ids: BTreeSet::from([format!("rejected-{id}")]),
+            source_session_ids: BTreeSet::new(),
         }
     }
 
@@ -825,6 +856,7 @@ mod tests {
                     (
                         claim.selected_justification_id.clone().unwrap(),
                         claim.current_evidence_ids.clone(),
+                        claim.source_session_ids.clone(),
                     ),
                 )
             })
@@ -921,6 +953,7 @@ mod tests {
                     evidence_dependencies: vec!["E1".into()],
                 }],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 1,
                 selection_overhead_tokens: 1,
             }],
         }
@@ -949,6 +982,8 @@ mod tests {
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
+                source_session_ids: BTreeSet::from(["session-1".into()]),
+            source_session_ids: BTreeSet::new(),
             }],
         };
         lifecycle_request.principal_id = "other-principal".into();
@@ -986,6 +1021,7 @@ mod tests {
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
+            source_session_ids: BTreeSet::new(),
             }],
         };
         let decision = decide_lifecycle_action(lifecycle_request, Some(&token)).unwrap();
