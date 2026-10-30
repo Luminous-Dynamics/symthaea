@@ -480,6 +480,9 @@ mod tests {
             let response = execute_aml_add(&mut backend, request.clone()).unwrap();
             response.validate_echo(&request).unwrap();
             assert_eq!(backend.persisted_batch_count(), 1);
+            let persisted = backend.existing_batch(&request).unwrap().unwrap();
+            assert_eq!(persisted.records[0].source.step_id.as_deref(), Some("user-0"));
+            assert_eq!(persisted.records[1].source.step_id.as_deref(), Some("assistant-1"));
 
             let result = execute_aml_search(
                 &backend,
