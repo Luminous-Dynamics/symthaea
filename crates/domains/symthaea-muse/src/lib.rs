@@ -42,6 +42,7 @@ pub mod analysis_crosscheck;
 pub mod analyst;
 pub mod audio_analyzer;
 pub mod audio_preservation;
+pub mod benchmark_lineage;
 pub mod counterfactual_influence;
 pub mod counterfactual_interaction;
 pub mod factorial_ground_truth;
