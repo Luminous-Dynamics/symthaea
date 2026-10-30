@@ -185,7 +185,7 @@ fn population_frame_sha256(population: &[PopulationPsu]) -> String {
         hasher.update((stratum_id.len() as u64).to_be_bytes());
         hasher.update(stratum_id.as_bytes());
     }
-    Ok(hex::encode(hasher.finalize()))
+    hex::encode(hasher.finalize())
 }
 
 fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
