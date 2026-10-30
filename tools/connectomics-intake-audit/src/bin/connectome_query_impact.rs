@@ -36,6 +36,7 @@ struct Input {
     dataset_id: String,
     dataset_revision_commit_sha: String,
     source_graph_sha256: String,
+    baseline_graph_canonical_sha256: String,
     query_bundle_sha256: String,
     graph: Vec<Edge>,
     queries: Vec<Query>,
@@ -128,6 +129,7 @@ struct CandidateEvaluation {
     weighted_query_impact: f64,
     expected_weighted_query_impact: f64,
     expected_query_impact_per_review_minute: f64,
+    counterfactual_graph_canonical_sha256: String,
     query_impacts: Vec<QueryImpact>,
     overlaps_with_candidates: Vec<String>,
     recommendation: &'static str,
@@ -147,6 +149,16 @@ type Graph = BTreeMap<(u64, u64), f64>;
 
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
+}
+
+fn canonical_graph_sha256(graph: &Graph) -> String {
+    let mut hasher = Sha256::new();
+    for ((source, target), weight) in graph {
+        hasher.update(source.to_be_bytes());
+        hasher.update(target.to_be_bytes());
+        hasher.update(weight.to_bits().to_be_bytes());
+    }
+    hex::encode(hasher.finalize())
 }
 
 fn is_lower_hex(value: &str, length: usize) -> bool {
@@ -429,6 +441,7 @@ fn evaluate_candidate(
         weighted_query_impact,
         expected_weighted_query_impact,
         expected_query_impact_per_review_minute,
+        counterfactual_graph_canonical_sha256: canonical_graph_sha256(&counterfactual),
         query_impacts,
         overlaps_with_candidates: overlaps.to_vec(),
         recommendation: "HUMAN_REVIEW_ONLY",
@@ -478,6 +491,7 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
         dataset_id: input.dataset_id.clone(),
         dataset_revision_commit_sha: input.dataset_revision_commit_sha.clone(),
         source_graph_sha256: input.source_graph_sha256.clone(),
+        baseline_graph_canonical_sha256: canonical_graph_sha256(&graph),
         query_bundle_sha256: input.query_bundle_sha256.clone(),
         graph_edge_count: input.graph.len(),
         query_count: input.queries.len(),
@@ -762,6 +776,24 @@ mod tests {
         assert!(report.candidate_evaluations.iter().any(|item| item.candidate_id == "remove_second_leg"
             && item.overlaps_with_candidates == vec!["remove_part_of_second_leg".to_string()]));
         assert_eq!(report.status, "RANKED_FOR_HUMAN_REVIEW_ONLY");
+    }
+
+    #[test]
+    fn canonical_graph_digest_is_independent_of_input_edge_order() {
+        let input = fixture();
+        let forward = graph_from_edges(&input.graph);
+        let mut reversed_edges = input.graph.clone();
+        reversed_edges.reverse();
+        let reversed = graph_from_edges(&reversed_edges);
+        assert_eq!(canonical_graph_sha256(&forward), canonical_graph_sha256(&reversed));
+    }
+
+    #[test]
+    fn counterfactual_graph_digest_changes_when_a_mutation_changes_graph() {
+        let input = fixture();
+        let graph = graph_from_edges(&input.graph);
+        let after = apply_candidate(&graph, &input.candidates[0]).unwrap();
+        assert_ne!(canonical_graph_sha256(&graph), canonical_graph_sha256(&after));
     }
 
 }
