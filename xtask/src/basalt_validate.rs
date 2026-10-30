@@ -1,8 +1,12 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
+
+const MAX_RUN_RECORD_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_SUITE_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
 
 /// A deterministic report about record validity. It is not a benchmark score.
 #[derive(Debug, Serialize)]
@@ -370,9 +374,23 @@ enum Outcome {
 }
 
 pub fn validate_file(input_path: &Path, manifest_path: &Path) -> anyhow::Result<ValidationReport> {
-    let input_bytes = fs::read(input_path)?;
-    let manifest_bytes = fs::read(manifest_path)?;
+    let input_bytes = read_bounded(input_path, MAX_RUN_RECORD_BYTES)?;
+    let manifest_bytes = read_bounded(manifest_path, MAX_SUITE_MANIFEST_BYTES)?;
     Ok(validate_bytes(&input_bytes, &manifest_bytes))
+}
+
+fn read_bounded(path: &Path, max_bytes: u64) -> anyhow::Result<Vec<u8>> {
+    let file = File::open(path)?;
+    let mut bytes = Vec::new();
+    file.take(max_bytes + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > max_bytes {
+        anyhow::bail!(
+            "{} exceeds the configured {} byte input limit",
+            path.display(),
+            max_bytes
+        );
+    }
+    Ok(bytes)
 }
 
 fn validate_bytes(bytes: &[u8], manifest_bytes: &[u8]) -> ValidationReport {
@@ -643,8 +661,41 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
                             if first.paired_group_id != other.paired_group_id {
                                 error(report, "E_PAIR_ID_MISMATCH", format!("{task_path}.trials"), format!("all system arms in attempt {attempt} must share paired_group_id"));
                             }
-                            if run.suite.seed_policy == SeedPolicy::FixedPaired && first.seed != other.seed {
-                                error(report, "E_PAIR_SEED_MISMATCH", format!("{task_path}.trials"), format!("fixed_paired arms must share the same seed for attempt {attempt}"));
+                            match run.suite.seed_policy {
+                                SeedPolicy::FixedPaired | SeedPolicy::PredeclaredRandom => {
+                                    if first.seed != other.seed {
+                                        error(
+                                            report,
+                                            "E_PAIR_SEED_MISMATCH",
+                                            format!("{task_path}.trials"),
+                                            format!("paired arms must share the same predeclared seed for attempt {attempt}"),
+                                        );
+                                    }
+                                }
+                                SeedPolicy::Unseeded => {
+                                    if first.seed != Seed::String("unseeded".to_string())
+                                        || other.seed != Seed::String("unseeded".to_string())
+                                    {
+                                        error(
+                                            report,
+                                            "E_UNSEEDED_SENTINEL",
+                                            format!("{task_path}.trials"),
+                                            "unseeded policy must use the literal seed marker 'unseeded' for every paired arm",
+                                        );
+                                    }
+                                }
+                                SeedPolicy::NotApplicable => {
+                                    if first.seed != Seed::String("not_applicable".to_string())
+                                        || other.seed != Seed::String("not_applicable".to_string())
+                                    {
+                                        error(
+                                            report,
+                                            "E_SEED_NOT_APPLICABLE_SENTINEL",
+                                            format!("{task_path}.trials"),
+                                            "not_applicable policy must use the literal seed marker 'not_applicable' for every paired arm",
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
@@ -1147,6 +1198,34 @@ mod tests {
         });
         assert!(!report.valid);
         assert!(has_code(&report, "E_PAIR_SEED_MISMATCH"));
+    }
+
+    #[test]
+    fn predeclared_random_seed_must_match_across_paired_systems() {
+        let report = validate_value(|v| {
+            v["suite"]["seed_policy"] = Value::String("predeclared_random".into());
+            v["task_records"][0]["trials"][1]["seed"] = Value::from(18);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_PAIR_SEED_MISMATCH"));
+    }
+
+    #[test]
+    fn unseeded_policy_requires_explicit_unseeded_marker() {
+        let report = validate_value(|v| {
+            v["suite"]["seed_policy"] = Value::String("unseeded".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_UNSEEDED_SENTINEL"));
+    }
+
+    #[test]
+    fn not_applicable_seed_policy_requires_explicit_marker() {
+        let report = validate_value(|v| {
+            v["suite"]["seed_policy"] = Value::String("not_applicable".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_SEED_NOT_APPLICABLE_SENTINEL"));
     }
 
     #[test]
