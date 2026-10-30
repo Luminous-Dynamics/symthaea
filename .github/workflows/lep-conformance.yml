@@ -38,15 +38,6 @@ jobs:
       - name: Check formatting
         run: cargo fmt --manifest-path tools/lep-conformance/Cargo.toml -- --check
 
-      - name: Regenerate standalone Cargo lockfile from pinned manifest
-        run: |
-          rm -f tools/lep-conformance/Cargo.lock
-          cargo generate-lockfile --manifest-path tools/lep-conformance/Cargo.toml
-          sha256sum tools/lep-conformance/Cargo.lock
-          echo "LEP_GENERATED_LOCK_BASE64_BEGIN"
-          base64 -w0 tools/lep-conformance/Cargo.lock
-          echo
-          echo "LEP_GENERATED_LOCK_BASE64_END"
       - name: Run locked conformance tests
         run: cargo test --locked --manifest-path tools/lep-conformance/Cargo.toml
 
