@@ -77,6 +77,7 @@ pub mod memory_proof_admission;
 pub mod memory_lifecycle_policy;
 pub mod memory_retrieval_value;
 pub mod memory_retrieval_value_calibration;
+pub mod memory_retrieval_value_benchmark;
 pub mod memory_proof_optimality;
 pub mod memory_challenge_api;
 pub mod memory_challenge_sled;
