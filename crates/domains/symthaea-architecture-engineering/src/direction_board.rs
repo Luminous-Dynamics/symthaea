@@ -67,8 +67,11 @@ pub struct DirectionBoardConfig {
     pub metric_id: String,
     /// UCB exploration coefficient. Set before any direction outcomes are observed.
     pub exploration_coefficient: f64,
-    /// Prior reward per cost unit for the NEW-direction arm.
+    /// Prior reward per cost unit for the NEW-direction arm before its first proposal.
     pub new_direction_prior_yield: f64,
+    /// Verifier-admitted novel directions receive this normalized credit per admission.
+    /// Keep this on the same declared utility scale as local-record score improvements.
+    pub new_direction_admission_credit: f64,
     /// Each arm receives this many initial evaluations before pure proportional allocation,
     /// whenever the requested budget is large enough to cover all arms.
     pub minimum_initial_evaluations: u64,
@@ -89,6 +92,14 @@ impl DirectionBoardConfig {
         if !self.new_direction_prior_yield.is_finite() || self.new_direction_prior_yield < 0.0 {
             return Err(DirectionBoardError::new(
                 "new_direction_prior_yield",
+                "must be finite and non-negative",
+            ));
+        }
+        if !self.new_direction_admission_credit.is_finite()
+            || self.new_direction_admission_credit < 0.0
+        {
+            return Err(DirectionBoardError::new(
+                "new_direction_admission_credit",
                 "must be finite and non-negative",
             ));
         }
@@ -159,26 +170,34 @@ pub struct NewDirectionProposal {
 pub struct DirectionStats {
     pub direction_sha256: String,
     pub descriptor: DirectionDescriptor,
+    pub verifier_receipt_sha256: String,
     pub attempted_evaluations: u64,
     pub verified_evaluations: u64,
     pub rejected_evaluations: u64,
     pub inconclusive_evaluations: u64,
     pub total_cost_units: u64,
+    pub total_record_improvement: f64,
     pub local_best_score: Option<f64>,
-    /// Sum of successive local-record improvements divided by evaluation cost.
+    /// Cumulative local-record improvement divided by *all* attempted evaluation cost.
     pub improvement_yield_per_cost: f64,
 }
 
 impl DirectionStats {
-    fn new(direction_sha256: String, descriptor: DirectionDescriptor) -> Self {
+    fn new(
+        direction_sha256: String,
+        descriptor: DirectionDescriptor,
+        verifier_receipt_sha256: String,
+    ) -> Self {
         Self {
             direction_sha256,
             descriptor,
+            verifier_receipt_sha256,
             attempted_evaluations: 0,
             verified_evaluations: 0,
             rejected_evaluations: 0,
             inconclusive_evaluations: 0,
             total_cost_units: 0,
+            total_record_improvement: 0.0,
             local_best_score: None,
             improvement_yield_per_cost: 0.0,
         }
@@ -207,10 +226,8 @@ impl DirectionStats {
                     DirectionBoardError::new("score", "verified attempts require a score")
                 })?;
                 let previous = self.local_best_score.unwrap_or(0.0);
-                if score > previous {
-                    let improvement = score - previous;
-                    self.improvement_yield_per_cost +=
-                        improvement / attempt.evaluation_cost_units as f64;
+                if self.local_best_score.is_none() || score > previous {
+                    self.total_record_improvement += score - previous;
                     self.local_best_score = Some(score);
                 }
             }
@@ -229,15 +246,22 @@ impl DirectionStats {
                 )?;
             }
         }
+        self.improvement_yield_per_cost = if self.total_cost_units == 0 {
+            0.0
+        } else {
+            self.total_record_improvement / self.total_cost_units as f64
+        };
+        if !self.improvement_yield_per_cost.is_finite() {
+            return Err(DirectionBoardError::new(
+                "improvement_yield_per_cost",
+                "non-finite result",
+            ));
+        }
         Ok(())
     }
 
     fn mean_yield(&self) -> f64 {
-        if self.total_cost_units == 0 {
-            0.0
-        } else {
-            self.improvement_yield_per_cost
-        }
+        self.improvement_yield_per_cost
     }
 }
 
@@ -249,6 +273,7 @@ pub struct NewDirectionStats {
     pub rejected_proposals: u64,
     pub inconclusive_proposals: u64,
     pub total_cost_units: u64,
+    pub total_admission_credit: f64,
     pub admissions_per_cost: f64,
 }
 
@@ -261,6 +286,7 @@ impl Default for NewDirectionStats {
             rejected_proposals: 0,
             inconclusive_proposals: 0,
             total_cost_units: 0,
+            total_admission_credit: 0.0,
             admissions_per_cost: 0.0,
         }
     }
@@ -309,6 +335,8 @@ struct BoardDigestPayload<'a> {
     new_direction: &'a NewDirectionStats,
     attempt_ids: &'a BTreeSet<String>,
     proposal_ids: &'a BTreeSet<String>,
+    attempts: &'a BTreeMap<String, DirectionAttempt>,
+    proposals: &'a BTreeMap<String, NewDirectionProposal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -320,6 +348,8 @@ pub struct DirectionBoard {
     new_direction: NewDirectionStats,
     attempt_ids: BTreeSet<String>,
     proposal_ids: BTreeSet<String>,
+    attempts: BTreeMap<String, DirectionAttempt>,
+    proposals: BTreeMap<String, NewDirectionProposal>,
 }
 
 impl DirectionBoard {
@@ -333,6 +363,8 @@ impl DirectionBoard {
             new_direction: NewDirectionStats::default(),
             attempt_ids: BTreeSet::new(),
             proposal_ids: BTreeSet::new(),
+            attempts: BTreeMap::new(),
+            proposals: BTreeMap::new(),
         })
     }
 
@@ -353,7 +385,11 @@ impl DirectionBoard {
         }
         self.directions.insert(
             digest.clone(),
-            DirectionStats::new(digest.clone(), canonical),
+            DirectionStats::new(
+                digest.clone(),
+                canonical,
+                verifier_receipt_sha256.to_owned(),
+            ),
         );
         Ok(digest)
     }
@@ -391,58 +427,78 @@ impl DirectionBoard {
             _ => {}
         }
 
-        self.proposal_ids.insert(proposal.proposal_id.clone());
-        self.new_direction.attempted_proposals = checked_add(
+        let mut next_stats = self.new_direction.clone();
+        next_stats.attempted_proposals = checked_add(
             "new_direction.attempted_proposals",
-            self.new_direction.attempted_proposals,
+            next_stats.attempted_proposals,
             1,
         )?;
-        self.new_direction.total_cost_units = checked_add(
+        next_stats.total_cost_units = checked_add(
             "new_direction.total_cost_units",
-            self.new_direction.total_cost_units,
+            next_stats.total_cost_units,
             proposal.evaluation_cost_units,
         )?;
 
+        let admitted = proposal.disposition == NewDirectionDisposition::Admitted;
         match proposal.disposition {
             NewDirectionDisposition::Admitted => {
-                self.new_direction.admitted_directions = checked_add(
+                next_stats.admitted_directions = checked_add(
                     "new_direction.admitted_directions",
-                    self.new_direction.admitted_directions,
+                    next_stats.admitted_directions,
                     1,
                 )?;
-                self.new_direction.admissions_per_cost +=
-                    1.0 / proposal.evaluation_cost_units as f64;
+                next_stats.total_admission_credit +=
+                    self.config.new_direction_admission_credit;
                 self.directions.insert(
                     direction_sha256.clone(),
-                    DirectionStats::new(direction_sha256.clone(), canonical),
+                    DirectionStats::new(
+                        direction_sha256.clone(),
+                        canonical,
+                        proposal.verifier_receipt_sha256.clone(),
+                    ),
                 );
                 Ok(Some(direction_sha256))
             }
             NewDirectionDisposition::Duplicate => {
-                self.new_direction.duplicate_proposals = checked_add(
+                next_stats.duplicate_proposals = checked_add(
                     "new_direction.duplicate_proposals",
-                    self.new_direction.duplicate_proposals,
+                    next_stats.duplicate_proposals,
                     1,
                 )?;
                 Ok(None)
             }
             NewDirectionDisposition::Rejected => {
-                self.new_direction.rejected_proposals = checked_add(
+                next_stats.rejected_proposals = checked_add(
                     "new_direction.rejected_proposals",
-                    self.new_direction.rejected_proposals,
+                    next_stats.rejected_proposals,
                     1,
                 )?;
                 Ok(None)
             }
             NewDirectionDisposition::Inconclusive => {
-                self.new_direction.inconclusive_proposals = checked_add(
+                next_stats.inconclusive_proposals = checked_add(
                     "new_direction.inconclusive_proposals",
-                    self.new_direction.inconclusive_proposals,
+                    next_stats.inconclusive_proposals,
                     1,
                 )?;
                 Ok(None)
             }
         }
+        next_stats.admissions_per_cost = if next_stats.total_cost_units == 0 {
+            0.0
+        } else {
+            next_stats.total_admission_credit / next_stats.total_cost_units as f64
+        };
+        if !next_stats.admissions_per_cost.is_finite() {
+            return Err(DirectionBoardError::new(
+                "new_direction.admissions_per_cost",
+                "non-finite result",
+            ));
+        }
+        self.proposal_ids.insert(proposal.proposal_id.clone());
+        self.proposals.insert(proposal.proposal_id.clone(), proposal);
+        self.new_direction = next_stats;
+        Ok(if admitted { Some(direction_sha256) } else { None })
     }
 
     pub fn record_attempt(
@@ -456,14 +512,17 @@ impl DirectionBoard {
                 format!("duplicate attempt ID {:?}", attempt.attempt_id),
             ));
         }
-        let direction = self.directions.get_mut(&attempt.direction_sha256).ok_or_else(|| {
+        let direction = self.directions.get(&attempt.direction_sha256).ok_or_else(|| {
             DirectionBoardError::new(
                 "direction_sha256",
                 format!("unknown direction {:?}", attempt.direction_sha256),
             )
         })?;
-        direction.record_attempt(&attempt)?;
-        self.attempt_ids.insert(attempt.attempt_id);
+        let mut updated = direction.clone();
+        updated.record_attempt(&attempt)?;
+        self.directions.insert(attempt.direction_sha256.clone(), updated);
+        self.attempt_ids.insert(attempt.attempt_id.clone());
+        self.attempts.insert(attempt.attempt_id.clone(), attempt);
         Ok(())
     }
 
@@ -492,8 +551,9 @@ impl DirectionBoard {
         let total_attempts = self
             .directions
             .values()
-            .map(|stats| stats.attempted_evaluations)
-            .sum::<u64>()
+            .fold(0u64, |total, stats| {
+                total.saturating_add(stats.attempted_evaluations)
+            })
             .saturating_add(self.new_direction.attempted_proposals);
         let log_total = ((total_attempts as f64) + 2.0).ln();
 
@@ -604,6 +664,8 @@ impl DirectionBoard {
             new_direction: &self.new_direction,
             attempt_ids: &self.attempt_ids,
             proposal_ids: &self.proposal_ids,
+            attempts: &self.attempts,
+            proposals: &self.proposals,
         };
         let bytes = serde_json::to_vec(&payload)
             .map_err(|error| DirectionBoardError::new("board", error.to_string()))?;
@@ -829,6 +891,7 @@ mod tests {
             metric_id: "held_out_task_quality".to_owned(),
             exploration_coefficient: 0.25,
             new_direction_prior_yield: 0.02,
+            new_direction_admission_credit: 0.10,
             minimum_initial_evaluations: 1,
         }
     }
@@ -943,7 +1006,7 @@ mod tests {
             .find(|stats| stats.direction_sha256 == direction)
             .unwrap();
         assert_eq!(stats.local_best_score, Some(0.80));
-        assert!((stats.improvement_yield_per_cost - 0.40).abs() < 1e-12);
+        assert!((stats.improvement_yield_per_cost - (0.80 / 6.0)).abs() < 1e-12);
         assert_eq!(stats.verified_evaluations, 3);
     }
 
@@ -1025,7 +1088,7 @@ mod tests {
         assert_eq!(stats.attempted_proposals, 2);
         assert_eq!(stats.admitted_directions, 1);
         assert_eq!(stats.duplicate_proposals, 1);
-        assert!((stats.admissions_per_cost - 0.25).abs() < 1e-12);
+        assert!((stats.admissions_per_cost - (0.10 / 8.0)).abs() < 1e-12);
     }
 
     #[test]
