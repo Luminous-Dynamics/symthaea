@@ -49,16 +49,18 @@ enum LoggerKind {
     Uniform,
     IncumbentMixture,
     PortfolioAverage,
+    SecondMomentPseudoTargetProp6,
     MinimaxWeightSecondMoment,
     RewardEnvelopeMinimaxSecondMoment,
     OracleRewardAwareMinimaxVariance,
     RewardGreedyWithFloor,
 }
 impl LoggerKind {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::Uniform,
         Self::IncumbentMixture,
         Self::PortfolioAverage,
+        Self::SecondMomentPseudoTargetProp6,
         Self::MinimaxWeightSecondMoment,
         Self::RewardEnvelopeMinimaxSecondMoment,
         Self::OracleRewardAwareMinimaxVariance,
@@ -69,6 +71,7 @@ impl LoggerKind {
             Self::Uniform => "uniform",
             Self::IncumbentMixture => "incumbent_mixture",
             Self::PortfolioAverage => "portfolio_average",
+            Self::SecondMomentPseudoTargetProp6 => "prop6_second_moment_pseudotarget_known_reward",
             Self::MinimaxWeightSecondMoment => "minimax_weight_second_moment_grid",
             Self::RewardEnvelopeMinimaxSecondMoment => "reward_envelope_minimax_ips_second_moment_grid",
             Self::OracleRewardAwareMinimaxVariance => "oracle_reward_aware_minimax_ope_variance_grid",
@@ -76,7 +79,12 @@ impl LoggerKind {
         }
     }
     fn oracle_only(self) -> bool {
-        matches!(self, Self::OracleRewardAwareMinimaxVariance | Self::RewardGreedyWithFloor)
+        matches!(
+            self,
+            Self::SecondMomentPseudoTargetProp6
+                | Self::OracleRewardAwareMinimaxVariance
+                | Self::RewardGreedyWithFloor
+        )
     }
 }
 
@@ -100,6 +108,7 @@ struct Metrics {
     worst_weight_second_moment: f64,
     implied_ess_fraction: f64,
     worst_ips_reward_variance: f64,
+    mean_ips_reward_variance: f64,
     worst_reward_envelope_second_moment: f64,
     min_action_propensity: f64,
     max_action_propensity: f64,
@@ -300,6 +309,16 @@ fn worst_ips_variance(policy_set: &[Policy], logger: Logger) -> (usize, f64) {
         .max_by(|a, b| a.1.total_cmp(&b.1))
         .unwrap_or((0, f64::INFINITY))
 }
+fn mean_ips_variance(policy_set: &[Policy], logger: Logger) -> f64 {
+    if policy_set.is_empty() {
+        return f64::INFINITY;
+    }
+    policy_set
+        .iter()
+        .map(|policy| ips_reward_variance(*policy, logger))
+        .sum::<f64>()
+        / policy_set.len() as f64
+}
 
 fn clamp_floor(p: f64, floor: f64) -> f64 {
     p.clamp(floor, 1.0 - floor)
@@ -314,6 +333,47 @@ fn portfolio_average_logger(policy_set: &[Policy], floor: f64) -> Logger {
     Logger {
         p1: [clamp_floor(p1[0], floor), clamp_floor(p1[1], floor)],
     }
+}
+
+/// Proposition 6 (Douglas, Persson & Provost, 2026): for a known distribution
+/// over target policies and known reward means, the expected-MSE-optimal logger
+/// is proportional to sqrt(E[pi_t(a|x)^2]) * sqrt(mu(a,x)) for each action.
+/// This finite portfolio uses the uniform empirical prior over its policies.
+fn second_moment_pseudotarget_logger(
+    policy_set: &[Policy],
+    floor: f64,
+) -> Result<Logger, String> {
+    if policy_set.is_empty() {
+        return Err("target policy distribution must be nonempty".into());
+    }
+    validate_floor(floor)?;
+    let mut p1 = [0.0; 2];
+    for context in 0..2 {
+        let pseudo_target_action1 = (policy_set
+            .iter()
+            .map(|policy| policy.p1[context].powi(2))
+            .sum::<f64>()
+            / policy_set.len() as f64)
+            .sqrt();
+        let pseudo_target_action0 = (policy_set
+            .iter()
+            .map(|policy| (1.0 - policy.p1[context]).powi(2))
+            .sum::<f64>()
+            / policy_set.len() as f64)
+            .sqrt();
+        let weighted_action1 =
+            pseudo_target_action1 * reward_mean(context, 1).sqrt();
+        let weighted_action0 =
+            pseudo_target_action0 * reward_mean(context, 0).sqrt();
+        let normalizer = weighted_action1 + weighted_action0;
+        if !normalizer.is_finite() || normalizer <= EPS {
+            return Err("Proposition 6 pseudo-target has a zero or invalid normalizer".into());
+        }
+        p1[context] = clamp_floor(weighted_action1 / normalizer, floor);
+    }
+    let logger = Logger { p1 };
+    validate_logger(logger, floor)?;
+    Ok(logger)
 }
 fn incumbent_mixture_logger(policy_set: &[Policy], floor: f64) -> Logger {
     let incumbent = policy_set[0];
@@ -400,6 +460,9 @@ fn logger_for(
         LoggerKind::Uniform => Logger { p1: [0.5, 0.5] },
         LoggerKind::IncumbentMixture => incumbent_mixture_logger(policy_set, floor),
         LoggerKind::PortfolioAverage => portfolio_average_logger(policy_set, floor),
+        LoggerKind::SecondMomentPseudoTargetProp6 => {
+            second_moment_pseudotarget_logger(policy_set, floor)?
+        }
         LoggerKind::MinimaxWeightSecondMoment => minimax_logger(
             policy_set,
             floor,
@@ -431,6 +494,7 @@ fn metrics(policy_set: &[Policy], logger: Logger, floor: f64) -> Result<Metrics,
     }
     let (worst_policy_id, worst_weight_m2) = worst_weight_second_moment(policy_set, logger);
     let (_, worst_variance) = worst_ips_variance(policy_set, logger);
+    let mean_variance = mean_ips_variance(policy_set, logger);
     let (_, worst_reward_envelope_m2) = worst_reward_envelope_second_moment(policy_set, logger);
     let greedy_reward = logger_reward(reward_greedy_logger(floor));
     let min_action_propensity = logger
@@ -449,6 +513,7 @@ fn metrics(policy_set: &[Policy], logger: Logger, floor: f64) -> Result<Metrics,
         worst_weight_second_moment: worst_weight_m2,
         implied_ess_fraction: 1.0 / worst_weight_m2.max(1.0),
         worst_ips_reward_variance: worst_variance,
+        mean_ips_reward_variance: mean_variance,
         worst_reward_envelope_second_moment: worst_reward_envelope_m2,
         min_action_propensity,
         max_action_propensity,
@@ -462,7 +527,7 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
     }
     validate_reward_envelope(REWARD_UPPER_ENVELOPE, frozen_reward_mean_table())?;
     let mut out = String::from(
-        "record_type\tportfolio\tM\tlogger\tp1_context0\tp1_context1\tmin_action_propensity\tmax_action_propensity\texpected_logger_reward\treward_gap_vs_floor_greedy\tworst_policy_id\tworst_weight_second_moment\tworst_reward_envelope_ips_second_moment\timplied_min_ess_fraction\tworst_ips_reward_variance\toracle_only\tgrid_intervals\n",
+        "record_type\tportfolio\tM\tlogger\tp1_context0\tp1_context1\tmin_action_propensity\tmax_action_propensity\texpected_logger_reward\treward_gap_vs_floor_greedy\tworst_policy_id\tworst_weight_second_moment\tworst_reward_envelope_ips_second_moment\timplied_min_ess_fraction\tworst_ips_reward_variance\tmean_ips_reward_variance\toracle_only\tgrid_intervals\n",
     );
     out.push_str(&format!(
         "BENCHMARK_CONFIG\tid\tVIS-DVPC-051\tfloor\t{ACTION_PROPENSITY_FLOOR:.6}\tgrid_intervals\t{grid_intervals}\n"
@@ -508,7 +573,7 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
                 let logger = logger_for(kind, &policy_set, ACTION_PROPENSITY_FLOOR, grid_intervals)?;
                 let met = metrics(&policy_set, logger, ACTION_PROPENSITY_FLOOR)?;
                 out.push_str(&format!(
-                    "RESULT\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\n",
+                    "RESULT\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\n",
                     regime.name(),
                     m,
                     kind.name(),
@@ -523,6 +588,7 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
                     met.worst_reward_envelope_second_moment,
                     met.implied_ess_fraction,
                     met.worst_ips_reward_variance,
+                    met.mean_ips_reward_variance,
                     kind.oracle_only(),
                     grid_intervals,
                 ));
@@ -641,6 +707,58 @@ mod tests {
         }
         let expected_variance = (second_moment - target_value(policy).powi(2)).max(0.0);
         assert!((ips_reward_variance(policy, logger) - expected_variance).abs() < EPS);
+    }
+
+    #[test]
+    fn prop6_second_moment_pseudotarget_matches_independent_formula() {
+        let policy_set = policies(PortfolioRegime::Action1Heavy, 8);
+        let logger = second_moment_pseudotarget_logger(&policy_set, ACTION_PROPENSITY_FLOOR)
+            .unwrap();
+        for context in 0..2 {
+            let pseudo1 = (policy_set
+                .iter()
+                .map(|policy| policy.p1[context].powi(2))
+                .sum::<f64>()
+                / policy_set.len() as f64)
+                .sqrt();
+            let pseudo0 = (policy_set
+                .iter()
+                .map(|policy| (1.0 - policy.p1[context]).powi(2))
+                .sum::<f64>()
+                / policy_set.len() as f64)
+                .sqrt();
+            let expected = (pseudo1 * reward_mean(context, 1).sqrt())
+                / (pseudo1 * reward_mean(context, 1).sqrt()
+                    + pseudo0 * reward_mean(context, 0).sqrt());
+            assert!((logger.p1[context] - expected).abs() < EPS);
+        }
+        validate_logger(logger, ACTION_PROPENSITY_FLOOR).unwrap();
+    }
+
+    #[test]
+    fn prop6_pseudotarget_minimizes_average_variance_over_policy_distribution() {
+        let policy_set = policies(PortfolioRegime::Balanced, 8);
+        let logger = second_moment_pseudotarget_logger(&policy_set, ACTION_PROPENSITY_FLOOR)
+            .unwrap();
+        let optimal_average = mean_ips_variance(&policy_set, logger);
+        let mut grid_minimum = f64::INFINITY;
+        let intervals = 400;
+        for i in 0..=intervals {
+            let p0 = ACTION_PROPENSITY_FLOOR
+                + (1.0 - 2.0 * ACTION_PROPENSITY_FLOOR) * i as f64 / intervals as f64;
+            for j in 0..=intervals {
+                let p1 = ACTION_PROPENSITY_FLOOR
+                    + (1.0 - 2.0 * ACTION_PROPENSITY_FLOOR) * j as f64 / intervals as f64;
+                grid_minimum = grid_minimum.min(mean_ips_variance(
+                    &policy_set,
+                    Logger { p1: [p0, p1] },
+                ));
+            }
+        }
+        assert!(
+            optimal_average <= grid_minimum + 1e-6,
+            "Prop 6 logger average variance={optimal_average}, grid minimum={grid_minimum}"
+        );
     }
 
     #[test]
@@ -781,7 +899,7 @@ mod tests {
         let a = benchmark(10).unwrap();
         let b = benchmark(10).unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 63);
+        assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 72);
         assert_eq!(
             a.lines()
                 .filter(|line| line.starts_with("ENVELOPE_SENSITIVITY\t"))
