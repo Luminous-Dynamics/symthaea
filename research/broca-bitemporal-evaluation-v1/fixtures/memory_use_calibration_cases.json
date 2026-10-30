@@ -1,7 +1,7 @@
 {
   "schema_version": "broca-memory-use-calibration-v1",
   "status": "proposed_gold_cases_not_yet_executed",
-  "reader_contract": "Structured decisions are scored separately from prose; oracle role labels are hidden from the reader.",
+  "reader_contract": "Each eligible atom has an oracle target influence level Ignore, Bound, or Control. The eligibility gate is separate: blocked atoms must not reach the reader; a test-only bypass must demonstrate zero influence.",
   "cases": [
     {
       "id": "U01",
@@ -11,19 +11,25 @@
           "id": "M-hard",
           "role": "required_constraint",
           "eligible": true,
-          "content": "No external network is permitted."
+          "content": "No external network is permitted.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-noise-1",
           "role": "irrelevant",
           "eligible": true,
-          "content": "The project uses a blue logo."
+          "content": "The project uses a blue logo.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-noise-2",
           "role": "irrelevant",
           "eligible": true,
-          "content": "The team prefers short meetings."
+          "content": "The team prefers short meetings.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Choose a deployment plan.",
@@ -46,7 +52,9 @@
           "id": "M-context",
           "role": "helpful_context",
           "eligible": true,
-          "content": "The service is used by a small internal team."
+          "content": "The service is used by a small internal team.",
+          "target_influence": "Bound",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "What is the approved production database?",
@@ -65,7 +73,9 @@
           "id": "M-salient",
           "role": "irrelevant",
           "eligible": true,
-          "content": "The executive strongly prefers Vendor A."
+          "content": "The executive strongly prefers Vendor A.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Which vendor meets the mandatory encryption standard?",
@@ -84,13 +94,17 @@
           "id": "M-hard",
           "role": "required_constraint",
           "eligible": true,
-          "content": "Data must remain in-region."
+          "content": "Data must remain in-region.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-pref",
           "role": "optional_preference",
           "eligible": true,
-          "content": "Prefer the cheapest global cloud region."
+          "content": "Prefer the cheapest global cloud region.",
+          "target_influence": "Bound",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Choose the deployment region.",
@@ -110,7 +124,10 @@
           "id": "M-retracted",
           "role": "invalidated",
           "eligible": false,
-          "content": "The account is approved."
+          "content": "The account is approved.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "blocked",
+          "hard_zero_influence": true
         }
       ],
       "task": "May this account be activated?",
@@ -129,13 +146,17 @@
           "id": "M-true",
           "role": "conflict_member",
           "eligible": true,
-          "content": "Build 42 is approved."
+          "content": "Build 42 is approved.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-false",
           "role": "conflict_member",
           "eligible": true,
-          "content": "Build 42 is not approved."
+          "content": "Build 42 is not approved.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Is Build 42 approved?",
@@ -155,7 +176,9 @@
           "id": "M-policy",
           "role": "required_fact",
           "eligible": true,
-          "content": "The minimum key length is 256 bits."
+          "content": "The minimum key length is 256 bits.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Does a 128-bit key meet policy?",
@@ -176,13 +199,17 @@
           "id": "M-proof-a",
           "role": "alternative_support",
           "eligible": true,
-          "content": "CI and review are complete."
+          "content": "CI and review are complete.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-proof-b",
           "role": "alternative_support",
           "eligible": true,
-          "content": "A separately authorized release approval exists."
+          "content": "A separately authorized release approval exists.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Is the release ready?",
@@ -202,7 +229,9 @@
           "id": "M-only-proof",
           "role": "required_fact",
           "eligible": true,
-          "content": "The sole required certificate is valid."
+          "content": "The sole required certificate is valid.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Is the release ready?",
@@ -222,13 +251,18 @@
           "id": "M-known",
           "role": "required_fact",
           "eligible": true,
-          "content": "As of the cutoff, the owner is Alice."
+          "content": "As of the cutoff, the owner is Alice.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-late",
           "role": "out_of_cutoff",
           "eligible": false,
-          "content": "A correction received after the cutoff says the owner is Bob."
+          "content": "A correction received after the cutoff says the owner is Bob.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "blocked",
+          "hard_zero_influence": true
         }
       ],
       "task": "Who did the system know owned the asset at cutoff?",
@@ -247,25 +281,33 @@
           "id": "M-required",
           "role": "required_constraint",
           "eligible": true,
-          "content": "The destination must be a private subnet."
+          "content": "The destination must be a private subnet.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-distractor-a",
           "role": "irrelevant",
           "eligible": true,
-          "content": "Use the preferred font."
+          "content": "Use the preferred font.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-distractor-b",
           "role": "irrelevant",
           "eligible": true,
-          "content": "The team met on Tuesday."
+          "content": "The team met on Tuesday.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-distractor-c",
           "role": "irrelevant",
           "eligible": true,
-          "content": "The office is on the third floor."
+          "content": "The office is on the third floor.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Choose a network placement.",
@@ -283,13 +325,17 @@
           "id": "M-half-a",
           "role": "joint_required",
           "eligible": true,
-          "content": "The backup is encrypted."
+          "content": "The backup is encrypted.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         },
         {
           "id": "M-half-b",
           "role": "joint_required",
           "eligible": true,
-          "content": "The encryption key is independently recoverable."
+          "content": "The encryption key is independently recoverable.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
         }
       ],
       "task": "Is the backup recovery-ready?",
