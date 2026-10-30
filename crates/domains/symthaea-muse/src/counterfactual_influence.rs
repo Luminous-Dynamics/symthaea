@@ -156,6 +156,36 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_lineage: Vec<PerformedEventLineage>,
 }
 
+/// Test-only constructor for exercising downstream coalition validators.
+/// Production code must use verify_renderer_audio_binding or its typed-Score
+/// wrapper; this helper is excluded from non-test builds.
+#[cfg(test)]
+pub(crate) fn test_verified_renderer_audio_binding(
+    audio: &AudioView<'_>,
+    receipt_sha256: String,
+    renderer_identity_sha256: String,
+    renderer_config_sha256: String,
+    source_score_sha256: String,
+    input_artifact_sha256: String,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
+    performed_event_lineage: Vec<PerformedEventLineage>,
+) -> VerifiedRendererAudioBinding {
+    VerifiedRendererAudioBinding {
+        receipt_sha256,
+        audio_sha256: audio_sha256(audio),
+        renderer_identity_sha256,
+        renderer_config_sha256,
+        source_score_sha256,
+        input_artifact_sha256,
+        performed_event_map_sha256,
+        performed_event_map_artifact_sha256,
+        expected_primary_pitches_sha256,
+        performed_event_lineage,
+    }
+}
+
 impl VerifiedRendererAudioBinding {
     pub fn receipt_sha256(&self) -> &str {
         &self.receipt_sha256
