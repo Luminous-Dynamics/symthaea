@@ -113,6 +113,24 @@ fn required_u64(value: &Value, field: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("{field} must be a non-negative integer"))
 }
 
+fn string_array(value: &Value, field: &str) -> Result<Vec<String>, String> {
+    let entries = value
+        .get(field)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{field} must be an array"))?;
+    let mut result = Vec::with_capacity(entries.len());
+    for (index, entry) in entries.iter().enumerate() {
+        let item = entry
+            .as_str()
+            .ok_or_else(|| format!("{field}[{index}] must be a string"))?;
+        if item.trim().is_empty() || item.trim() != item {
+            return Err(format!("{field}[{index}] must be a non-empty string"));
+        }
+        result.push(item.to_owned());
+    }
+    Ok(result)
+}
+
 fn unique_string_array(value: &Value, field: &str) -> Result<Vec<String>, String> {
     let entries = value
         .get(field)
@@ -222,7 +240,7 @@ fn parse_traces(
                 "trace {id}: initial_state {initial_state} is not declared as an allowed initial state"
             ));
         }
-        let steps = unique_string_array(item, "steps")?;
+        let steps = string_array(item, "steps")?;
         traces.push(Trace {
             id,
             initial_state,
