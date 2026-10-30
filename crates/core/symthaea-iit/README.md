@@ -80,6 +80,44 @@ recompute the digest from a serialized result and separately replay the analysis
 - An analysis request binds the evaluation state, candidate subsystem, explicit
   formalism profile, and requested quantity so incompatible requests are rejected.
 
+## Sparse local-CPT substrate and Eq. 4 scaling
+
+The dense reference model stores 2^n probabilities per target and remains
+capped at 16 units. The separate SparseBinaryCausalModel stores one local CPT
+per target: a sorted parent scope plus a table of size 2^k for k parents. Its
+model and evaluation digests use a distinct versioned encoding from dense TPM
+digests. Conversion from dense is allowed only when every TPM column is exactly
+a function of its declared parent scope.
+
+The sparse model's forward-cause API runs the exact IIT 4.0 Eq. 4 background
+posterior with the log-domain min-fill factor engine. Candidate-past variables
+are duplicated, external-background variables are shared, and the original
+system observation likelihood is normalized before the target-wise cause
+factors are multiplied. Zero likelihoods remain exact negative-infinity log
+weights. All local and intermediate factor tables, plus the returned candidate
+state vector, are checked against the explicit factor-entry budget.
+
+This is an independently usable Eq. 4 primitive, **not yet the complete
+Integration-level phi_s search path**. The main system search still uses the
+dense model and dense full-system score/partition machinery. The sparse API
+does not make the complete IIT calculation scalable by itself; it is a
+controlled way to scale the proper-subsystem cause contraction when the
+dependency graph has low induced width.
+
+Validation includes dense-to-sparse transition equality, an independent
+full-joint Eq. 4 posterior oracle on small embedded systems, and sparse ring
+fixtures at 64, 256, and 512 units. The full-joint oracle enumerates the
+background posterior directly and does not call the production elimination
+or projection helpers.
+
+The sparse Eq. 4 scale sweep measures ring substrates at 64, 256, 512, 1,024,
+and 2,048 units with a four-unit candidate. It reports local CPT cells, parent
+references, posterior and target induced widths, peak factor entries, factor
+multiplications, median and minimum elapsed time, and an output checksum.
+These measurements are for the Eq. 4 cause-likelihood primitive only; they
+must not be represented as full phi_s throughput or compared with end-to-end
+PyPhi system-analysis timings.
+
 ## Published reference fixture
 
 The integration fixture pins the three-unit logistic substrate from PyPhi's
