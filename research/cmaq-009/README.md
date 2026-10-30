@@ -1,6 +1,6 @@
 # CMAQ-009: Costed Active Diagnostic Probes for Fast Shift Detection
 
-**Status:** protocol v0.1 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.2 + executable synthetic smoke harness; draft  
 **Tracking issue:** [#9066](https://github.com/Luminous-Dynamics/symthaea/issues/9066)  
 **Claim ceiling:** synthetic information-channel experiment only; no production, physical-safety or SOTA claim
 
@@ -16,6 +16,8 @@ The dependency-free Rust CLI runs 512 paired deterministic episodes per scenario
 
 For ordinary model actions, the unsupported-outcome rate is 1% in the stationary phase and reaches 25% in the shifted phase. A supported action yields +0.03 utility; an unsupported action yields -0.20. Direct fallback yields zero utility.
 
+Passive action feedback arrives four decisions after the action. Five percent of feedback observations are dropped; the remainder pass through a sensor with 0.85 sensitivity and 0.98 specificity. The CUSUM consumes the resulting noisy binary signal using null/shift signal rates derived from those sensor characteristics. This prevents the detector from seeing the true outcome tape immediately.
+
 A probe is an independent diagnostic measurement governed by the same hidden shift but a different signal quality: its failure/signal rate is 1% under the null and 60% under the shifted regime. Each probe is externally declared safe in this synthetic harness and costs 0.003 utility units. The probe runs alongside the regular model action but consumes a limited monitoring resource. That is an explicit assumption, not a general claim that real diagnostic probes can be parallelized or safely executed without affecting the environment.
 
 ## Policies and budgets
@@ -23,13 +25,16 @@ A probe is an independent diagnostic measurement governed by the same hidden shi
 - **Direct fallback:** no model actions and no probes.
 - **Fixed gate:** uses the model throughout; does not detect or revoke.
 - **Passive CUSUM:** monitors ordinary action outcomes only.
-- **Probe every 2 steps:** tests the latency/risk frontier with a hard cap of 64 probes per 128-step episode.
-- **Probe every 4 steps:** hard cap of 32 probes.
-- **Adaptive probe:** starts probing when passive evidence reaches a weak-evidence level (CUSUM >= 1.0), stops probing when that evidence falls below the level, and never exceeds 32 probes. The adaptive policy must not see hidden shift labels.
-- **Zero-information probe control:** spends up to 64 probes on a signal distribution that remains at the null rate even after a shift. Its policy ignores those probes for detector updates; it should reproduce passive decisions and do worse only because of explicit probe cost.
+- **Periodic 8-probe policy:** one scheduled probe every 16 decisions, hard cap 8 per episode.
+- **Periodic 16-probe policy:** one scheduled probe every 8 decisions, hard cap 16.
+- **Periodic 32-probe policy:** one scheduled probe every 4 decisions, hard cap 32.
+- **Adaptive probe:** starts probing when passive evidence reaches a weak-evidence level (CUSUM >= 1.0), stops probing when that evidence falls below the level, and never exceeds the same 32-probe maximum as the periodic 32 arm. The adaptive policy must not see hidden shift labels.
+- **Zero-information probe control:** spends up to 32 probes on a signal distribution that remains at the null rate even after a shift. Its policy ignores those probes for detector updates; it should reproduce passive decisions and lose utility only through the explicit probe cost.
 - **Oracle changepoint:** evaluator-only fallback at the hidden change time; an upper-bound comparator, not an eligible method.
 
-Both action and probe observations contribute their log-likelihood increments when the probe is informative. The detector uses one shared one-sided CUSUM with a fixed threshold of 5.0. A trigger revokes future model actions after the current action and probe costs have already been incurred.
+Delayed noisy action-feedback and informative probe observations contribute separate log-likelihood increments to one shared one-sided CUSUM with a fixed threshold of 5.0. Probe results are immediate in this synthetic channel; action feedback has the four-step delay and corruption above. A trigger revokes future model actions after the current action and any probe costs have already been incurred.
+
+Probe permission is supplied by an independent `SafetyEnvelope`; the candidate policy cannot modify it or infer it from probe evidence. The current benchmark scenarios provide an all-authorized probe tape to make probe budgeting comparable. A deny-all test fixture verifies that periodic and adaptive policies produce zero probes when the envelope denies authorization. This is a software contract test, not a physical probe safety case.
 
 ## Required metrics
 
@@ -55,12 +60,14 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The focused workflow validates schema, report dimensions, row uniqueness, probe caps, fallback/oracle controls, the zero-information negative control, stationary false-revocation, abrupt detection, p90 delay and paired net utility lift. A green CI pass validates the reproducible synthetic contract only.
+The focused workflow validates schema v0.2, report dimensions, row uniqueness, the 8/16/32 caps, the four-step delayed/noisy feedback metadata, fallback/oracle controls, the zero-information negative control, stationary false-revocation, abrupt detection, p90 delay and paired net utility lift. A green CI pass validates the reproducible synthetic contract only.
 
 ## Limitations / next steps
 
 - Probe outcomes and their shifted signal rate are designed into the synthetic generator, not learned from data.
-- No state transitions, physical actions, probe safety case, resource contention or real-time latency/energy measurements.
+- Feedback and probe channels are separate by construction; correlated sensor/probe failure is not yet tested.
+- The current probe authorization tape allows all requested probes; only the deny-all software test exercises a denied envelope.
+- No state transitions, physical actions, physical probe safety case, resource contention or real-time latency/energy measurements.
 - No calibration split or hidden evaluation family yet; the generator is public and the smoke panel is not sealed qualification.
 - No model integration, external environment or reproduced industry baseline.
 
