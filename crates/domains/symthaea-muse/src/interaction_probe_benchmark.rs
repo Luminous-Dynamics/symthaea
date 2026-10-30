@@ -392,6 +392,20 @@ mod tests {
         }
     }
 
+    fn source_event_window(
+        index: usize,
+        value: f64,
+        start_frame: usize,
+        end_frame: usize,
+    ) -> SyntheticEventSignal {
+        let mut samples = vec![0.0; 64];
+        samples[start_frame..end_frame].fill(value);
+        SyntheticEventSignal {
+            source_event_index: index,
+            samples,
+        }
+    }
+
     fn support(
         index: usize,
         start_frame: u64,
@@ -450,13 +464,16 @@ mod tests {
 
     #[test]
     fn sparse_pair_recall_and_render_savings_are_measured_against_exhaustive_truth() {
-        let events: Vec<_> = (0..8)
-            .map(|index| match index {
-                0 => source_event(index, 0.2),
-                1 => source_event(index, 0.3),
-                _ => source_event(index, 0.0),
-            })
-            .collect();
+        let events = vec![
+            source_event_window(0, 0.2, 0, 20),
+            source_event_window(1, 0.3, 16, 30),
+            source_event_window(2, 0.1, 31, 34),
+            source_event_window(3, 0.1, 35, 38),
+            source_event_window(4, 0.1, 39, 42),
+            source_event_window(5, 0.1, 43, 46),
+            source_event_window(6, 0.1, 47, 50),
+            source_event_window(7, 0.1, 51, 54),
+        ];
         let effect = SyntheticEffect::Polynomial {
             quadratic_coefficient: 0.5,
             cubic_coefficient: 0.0,
@@ -534,9 +551,9 @@ mod tests {
             coefficient: 0.5,
         };
         let supports = vec![
-            support(0, 0, 8),
-            support(1, 16, 24),
-            support(2, 32, 40),
+            support(0, 0, 64),
+            support(1, 0, 64),
+            support(2, 0, 64),
         ];
         let cfg = probe_config(0);
         let (factorial, plan) = setup(&events, &effect, &supports, &cfg);
@@ -559,6 +576,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.ground_truth_interacting_pair_count, 0);
+        assert_eq!(result.candidate_pair_count, 3);
+        assert_eq!(result.candidate_false_positive_count, 3);
         assert_eq!(result.candidate_recall, None);
         assert_eq!(result.nonzero_higher_order_interaction_count, 1);
         assert!(result.higher_order_total_pcm_l2_norm > 0.0);
