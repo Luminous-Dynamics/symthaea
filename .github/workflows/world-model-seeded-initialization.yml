@@ -121,7 +121,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-008-residual-report.json").read_text())
-          assert report["schema_version"] == "cmaq-008-residual-ablation-v0.1"
+          assert report["schema_version"] == "cmaq-008-residual-ablation-v0.2"
           assert report["model"] == "HierarchicalCfCWorldModel"
           assert report["dimensions"] == {"hdc": 16, "hidden": 24}
           assert report["training"] == {
@@ -129,6 +129,15 @@ jobs:
           }
           assert report["evaluation_samples_per_regime_per_seed"] == 64
           assert report["regimes"] == ["source_holdout", "action_effect_reversal"]
+          linear = report["linear_arx_baseline"]
+          assert linear["features"] == 33
+          assert linear["ridge"] == 0.001
+          for regime in ("source", "action_effect_reversal"):
+              for key in ("mse", "mae", "persistence_mse", "zero_mse"):
+                  assert math.isfinite(linear[regime][key]) and linear[regime][key] >= 0.0
+          # The low-cost linear model must beat persistence on the source law;
+          # this is a baseline sanity check, not a requirement that CfC beat ARX.
+          assert linear["source"]["mse"] < linear["source"]["persistence_mse"]
 
           objectives = report["objectives"]
           assert [item["objective"] for item in objectives] == [
@@ -150,13 +159,15 @@ jobs:
                       "mse_delta_vs_persistence_ci95_low",
                       "mse_delta_vs_persistence_ci95_high",
                       "paired_mse_delta_vs_absolute", "paired_mse_delta_ci95_low",
-                      "paired_mse_delta_ci95_high",
+                      "paired_mse_delta_ci95_high", "paired_mse_delta_vs_linear_arx",
+                      "paired_linear_ci95_low", "paired_linear_ci95_high",
                   ):
                       assert math.isfinite(metrics[key]), (item["objective"], regime, key)
                   assert metrics["mse"] >= 0.0
                   assert metrics["persistence_mse"] > 0.0
                   assert metrics["mse_delta_vs_persistence_ci95_low"] <= metrics["mse_delta_vs_persistence_ci95_high"]
                   assert metrics["paired_mse_delta_ci95_low"] <= metrics["paired_mse_delta_ci95_high"]
+                  assert metrics["paired_linear_ci95_low"] <= metrics["paired_linear_ci95_high"]
 
           for regime in ("source", "action_effect_reversal"):
               absolute = objectives[0][regime]
@@ -166,14 +177,16 @@ jobs:
               assert abs(absolute["paired_mse_delta_ci95_high"]) <= 1e-10
               assert residual["paired_mse_delta_ci95_low"] <= residual["paired_mse_delta_ci95_high"]
 
-          print("CMAQ-008 absolute-vs-residual CfC report, paired seeds, persistence baseline and confidence intervals validated")
+          print("CMAQ-008 absolute-vs-residual CfC report, paired seeds, persistence and ridge-ARX baselines, and confidence intervals validated")
           print(json.dumps({
+              "linear_arx_baseline": linear,
               regime: {
                   objective["objective"]: {
                       "mse": objective[regime]["mse"],
                       "persistence_mse": objective[regime]["persistence_mse"],
                       "mse_ratio_to_persistence": objective[regime]["mse_to_persistence_ratio"],
                       "paired_mse_delta_vs_absolute": objective[regime]["paired_mse_delta_vs_absolute"],
+                      "paired_mse_delta_vs_linear_arx": objective[regime]["paired_mse_delta_vs_linear_arx"],
                       "paired_ci95": [
                           objective[regime]["paired_mse_delta_ci95_low"],
                           objective[regime]["paired_mse_delta_ci95_high"],
