@@ -119,7 +119,7 @@ struct Report {
     scope_note: &'static str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParsedRow {
     row: Row,
     metadata: Value,
