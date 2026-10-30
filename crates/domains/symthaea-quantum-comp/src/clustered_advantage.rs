@@ -1023,6 +1023,26 @@ mod tests {
     }
 
     #[test]
+    fn full_icc_null_stress_matches_frozen_median_reference() {
+        let config = ClusterNullStressConfig {
+            independent_clusters: 10,
+            instances_per_cluster: 10,
+            intraclass_correlations: vec![0.0, 0.05, 0.15, 0.30, 0.60, 1.0],
+            replicates: 10_000,
+            seed: 0x0051_6016,
+            significance_level: 0.05,
+        };
+        let report = run_cluster_null_stress(&config).unwrap();
+        let expected_naive = [473, 849, 1_373, 1_913, 2_542, 3_714];
+        let expected_cluster = [119, 120, 110, 103, 105, 103];
+        assert_eq!(report.points.len(), expected_naive.len());
+        for (index, point) in report.points.iter().enumerate() {
+            assert_eq!(point.naive_instance_rejections, expected_naive[index]);
+            assert_eq!(point.cluster_level_rejections, expected_cluster[index]);
+        }
+    }
+
+    #[test]
     fn cluster_null_stress_rejects_invalid_icc() {
         let config = ClusterNullStressConfig {
             independent_clusters: 5,
