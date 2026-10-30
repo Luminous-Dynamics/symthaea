@@ -34,7 +34,7 @@ docker compose -f deploy/aml/compose.yaml up -d
 docker compose -f deploy/aml/compose.yaml ps
 \`\`\`
 
-Caddy obtains and renews public TLS certificates automatically when the DNS name and inbound ports are correctly configured. The Broca listener is only exposed on the Compose network; port 8080 is not published directly to the host.
+Caddy is pinned to the official 2.11.7-alpine image. It obtains and renews public TLS certificates automatically when the DNS name and inbound ports are correctly configured. The Broca listener is only exposed on the Compose network; port 8080 is not published directly to the host.
 
 Verify health from outside the host:
 
