@@ -49,11 +49,11 @@ jobs:
           ]
           assert report["policies"] == [
               "direct_fallback", "greedy_predicted_mean", "total_variance_lcb",
-              "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb",
+              "pessimistic_ensemble_min_value", "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb",
               "matched_k_joint_conformal_lcb", "oracle_action"
           ]
           rows = report["summary"]
-          assert len(rows) == 112
+          assert len(rows) == 128
           keys = {(row["scenario"], row["candidate_count"], row["policy"]) for row in rows}
           assert len(keys) == len(rows)
           expected = {
@@ -110,7 +110,7 @@ jobs:
                           "selected_coverage": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["selected_action_error_coverage"],
                           "model_use_rate": next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == policy)["model_use_rate"]
                       }
-                      for policy in ["greedy_predicted_mean", "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb", "matched_k_joint_conformal_lcb", "total_variance_lcb"]
+                      for policy in ["greedy_predicted_mean", "pessimistic_ensemble_min_value", "marginal_conformal_lcb", "fixed_k8_joint_conformal_lcb", "matched_k_joint_conformal_lcb", "total_variance_lcb"]
                   }
                   for count in report["candidate_counts"]
               }
