@@ -1,0 +1,3 @@
+candidate_id,representativeness_score,amplification_risk,observation_std_uncertainty,acquisition_cost,cost_unit,eligible,eligibility_state,eligibility_receipt_sha256
+TX-CAND-REP-001,0.95000000,0.05000000,0.00200000,125.00000000,USD_2026,true,ELIGIBLE,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+TX-CAND-OOD-002,0.08000000,0.91000000,0.01000000,95.00000000,USD_2026,true,ELIGIBLE,bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
