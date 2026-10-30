@@ -32,11 +32,11 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION: &str =
-    "mel-mr-eval-025-counterfactual-support-adapter-v1";
+    "mel-mr-eval-025-counterfactual-support-adapter-v2";
 const EVENT_EVIDENCE_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v2\0";
 const ADAPTER_REPORT_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v2\0";
 const MAX_ADAPTER_EVENTS: usize = 100_000;
 const MAX_SUPPORT_INTERVALS_PER_EVENT: usize = 100_000;
 const ROUTING_INCOMPLETE_REASON: &str =
@@ -883,6 +883,32 @@ mod tests {
             support.support_evidence_sha256.as_ref().is_some_and(|digest| is_sha256(digest))
                 && !support.routing_complete
         }));
+    }
+
+    #[test]
+    fn clipped_tail_prevents_planner_handoff() {
+        let mut clipped = event(
+            0,
+            vec![AcousticSupportInterval { start_frame: 60, end_frame: 67 }],
+        );
+        clipped.evidence.tail_guard_was_clipped = true;
+        clipped.evidence.evidence_sha256 =
+            event_evidence_sha256(&clipped.evidence).unwrap();
+        clipped.evidence.support.support_evidence_sha256 =
+            Some(clipped.evidence.evidence_sha256.clone());
+
+        let report = assemble_counterfactual_support_adapter_report(&[
+            clipped,
+            event(1, Vec::new()),
+        ])
+        .unwrap();
+        assert!(report.report().receipt_is_intact());
+        assert!(!report.report().planner_ready());
+        assert!(report.report().tail_guard_was_clipped);
+        assert_eq!(
+            report.planner_event_supports().unwrap_err(),
+            CounterfactualSupportAdapterError::TailGuardClipped
+        );
     }
 
     #[test]
