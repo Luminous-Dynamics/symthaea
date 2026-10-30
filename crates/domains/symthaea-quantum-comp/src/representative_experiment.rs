@@ -575,6 +575,65 @@ mod tests {
     }
 
     #[test]
+    fn full_policy_ranking_adapts_to_a_preregistered_target_shift() {
+        let problem = problem();
+        let mut shifted = context();
+        shifted.target_regime_probabilities = vec![0.1, 0.2, 0.7];
+        let report = rank_rida_ablations(&problem, &shifted).unwrap();
+
+        assert_eq!(
+            ranking(&report, RidaAblationPolicy::FullRidaProxy).candidates[0]
+                .experiment_id,
+            "A-high-info-out-of-distribution"
+        );
+    }
+
+    #[test]
+    fn zero_information_candidates_have_zero_information_component() {
+        let uninformative_problem = ActiveExperimentProblem::new(
+            vec!["H0".into(), "H1".into()],
+            vec![0.5, 0.5],
+            vec!["choose-H0".into(), "choose-H1".into()],
+            vec![vec![2.0, 0.0], vec![0.0, 2.0]],
+            "utility_points",
+            "measurement_seconds",
+            vec![
+                candidate("A-zero-information", 0.5),
+                candidate("B-zero-information", 0.5),
+            ],
+        )
+        .unwrap();
+        let mut data = context();
+        data.profiles = vec![
+            profile(
+                "A-zero-information",
+                vec![0.5, 0.3, 0.2],
+                vec![0.2, 0.2, 0.2],
+            ),
+            profile(
+                "B-zero-information",
+                vec![0.5, 0.3, 0.2],
+                vec![0.2, 0.2, 0.2],
+            ),
+        ];
+        let report = rank_rida_ablations(&uninformative_problem, &data).unwrap();
+
+        assert!(report
+            .component_scores
+            .iter()
+            .all(|score| score.informativeness_score == 0.0));
+        assert!(ranking(&report, RidaAblationPolicy::FullRidaProxy)
+            .candidates
+            .iter()
+            .all(|score| score.score == 0.0));
+        assert_eq!(
+            ranking(&report, RidaAblationPolicy::FullRidaProxy).candidates[0]
+                .experiment_id,
+            "A-zero-information"
+        );
+    }
+
+    #[test]
     fn evaluator_only_artifact_cannot_equal_validation_artifact() {
         let mut data = context();
         data.evaluation_artifact_digest = data.validation_artifact_digest.clone();
