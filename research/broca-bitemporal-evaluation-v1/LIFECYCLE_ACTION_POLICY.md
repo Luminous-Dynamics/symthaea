@@ -121,3 +121,9 @@ The production generation loop is not yet wired to call this controller. No Life
 - Vera-Life PDF: https://aclanthology.org/2026.groundlm-1.18.pdf
 - LongMemEval-V2 protocol: https://xiaowu0162.github.io/longmemeval-v2/
 - AgentMemory BM25 LongMemEval-S retrieval component report: https://www.agent-memory.dev/benchmarks
+
+## Versioned synthetic conformance corpus
+
+The file [lifecycle-action-fixtures-v1.json](lifecycle-action-fixtures-v1.json) contains 60 deterministic cases: five non-verified proof outcomes × six claim lifecycle states × two retrieval states (exhausted / continuation available). Each row carries the expected action. The Rust test suite reads this checked-in file using compile-time inclusion and asserts the policy output for every case. A separate real-proof integration test covers ANSWER, which is intentionally excluded from the synthetic table because it must be authorized by an actual independently verified packet and opaque token.
+
+The fixture corpus is a policy-conformance suite, not a substitute for Vera-Life-Eval. It contains no natural-language answer generation, hidden evidence chronology or human annotation; it only makes the deterministic controller truth table reusable and versioned.
