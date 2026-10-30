@@ -147,7 +147,7 @@ The initial module implements:
 - evaluator-only touched/final P@K and direction-aware final regret;
 - strict canonical JSON import with unknown-field rejection and order-invariant content digest.
 
-Eighteen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports, empty queries, preflighted Successive Halving and a successful metadata-only no-proxy baseline. They have not been compiled or executed.
+Twenty Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports, empty queries, preflighted Successive Halving and a successful metadata-only no-proxy baseline. They have not been compiled or executed.
 
 ### Runnable Successive Halving comparator
 
