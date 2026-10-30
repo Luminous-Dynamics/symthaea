@@ -12,27 +12,54 @@
     "sampling_protocol_sha256",
     "sample_seed",
     "sample_seed_commitment_sha256",
+    "error_families",
     "strata",
     "population_frame",
     "sampled_units"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
-    "source_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "source_ranking_report_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "sampling_protocol_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "sample_seed": { "type": "string", "minLength": 16 },
-    "sample_seed_commitment_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "schema_version": {
+      "const": 1
+    },
+    "source_input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_ranking_report_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sampling_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_seed": {
+      "type": "string",
+      "minLength": 16
+    },
+    "sample_seed_commitment_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "strata": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["stratum_id", "sampled_psu_count"],
+        "required": [
+          "stratum_id",
+          "sampled_psu_count"
+        ],
         "properties": {
-          "stratum_id": { "type": "string", "minLength": 1 },
-          "sampled_psu_count": { "type": "integer", "minimum": 1 }
+          "stratum_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sampled_psu_count": {
+            "type": "integer",
+            "minimum": 1
+          }
         }
       }
     },
@@ -42,10 +69,19 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["psu_id", "stratum_id"],
+        "required": [
+          "psu_id",
+          "stratum_id"
+        ],
         "properties": {
-          "psu_id": { "type": "string", "minLength": 1 },
-          "stratum_id": { "type": "string", "minLength": 1 }
+          "psu_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stratum_id": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -55,27 +91,63 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["psu_id", "exhaustive_search_completed", "audit_panel_person_minutes", "errors"],
+        "required": [
+          "psu_id",
+          "exhaustive_search_completed",
+          "audit_panel_person_minutes",
+          "errors"
+        ],
         "properties": {
-          "psu_id": { "type": "string", "minLength": 1 },
-          "exhaustive_search_completed": { "const": true },
-          "audit_panel_person_minutes": { "type": "number", "exclusiveMinimum": 0 },
+          "psu_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exhaustive_search_completed": {
+            "const": true
+          },
+          "audit_panel_person_minutes": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
           "errors": {
             "type": "array",
-            "items": { "$ref": "#/$defs/verifiedError" }
+            "items": {
+              "$ref": "#/$defs/verifiedError"
+            }
           }
         }
       }
+    },
+    "error_families": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Complete preregistered error-family vocabulary. Families absent from sampled outcomes remain in the report with zero estimates."
     }
   },
   "$defs": {
     "verifiedError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verified_error_id", "error_family", "impact_weight", "proposal_candidate_ids"],
+      "required": [
+        "verified_error_id",
+        "error_family",
+        "impact_weight",
+        "proposal_candidate_ids"
+      ],
       "properties": {
-        "verified_error_id": { "type": "string", "minLength": 1 },
-        "error_family": { "type": "string", "minLength": 1 },
+        "verified_error_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "error_family": {
+          "type": "string",
+          "minLength": 1
+        },
         "impact_weight": {
           "type": "number",
           "minimum": 0,
@@ -83,7 +155,10 @@
         },
         "proposal_candidate_ids": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true,
           "description": "Frozen proposal IDs independently determined to cover this verified error. Empty means the error was not proposed."
         }
