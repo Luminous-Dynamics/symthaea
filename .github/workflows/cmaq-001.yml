@@ -1,0 +1,52 @@
+name: CMAQ-001 causal-memory trace scorer
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-001/**"
+      - ".github/workflows/cmaq-001.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-001/**"
+      - ".github/workflows/cmaq-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scorer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Test dependency-free scorer
+        run: cargo test --locked
+      - name: Score public smoke trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked --bin cmaq-001 -- score fixtures/answer-key-smoke.tsv fixtures/candidate-trace-smoke.tsv fixtures/outcome-receipt-smoke.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "cmaq-001-report-v0.1"' <<< "$report"
+          grep -F '"receipt_mismatches": 0' <<< "$report"
+          grep -F '"gate_pass": true' <<< "$report"
+      - name: Test world-model decision scorecard
+        run: cargo test --locked --bin score_world_model
+      - name: Score counterfactual world-model predictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cargo run --quiet --locked --bin score_world_model -- score fixtures/answer-key-smoke.tsv fixtures/world-model-predictions-smoke.tsv)"
+          printf '%s\n' "$report"
+          grep -F '"schema_version": "cmaq-world-model-report-v0.1"' <<< "$report"
+          grep -F '"counterfactual_reward_mae_milli": 0.000000' <<< "$report"
+          grep -F '"safe_action_pair_ranking_accuracy": 1.000000' <<< "$report"
+          grep -F '"selected_policy_mean_regret_milli": 0.000000' <<< "$report"
+          grep -F '"model_greedy_mean_regret_milli": 0.000000' <<< "$report"
+          grep -F '"hard_gate_pass": true' <<< "$report"

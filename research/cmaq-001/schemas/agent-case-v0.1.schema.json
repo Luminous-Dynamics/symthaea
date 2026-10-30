@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-001-agent-case-v0.1.json",
+  "title": "CMAQ-001 Agent-Visible Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "suite",
+    "episode_id",
+    "step_id",
+    "observation",
+    "event_history",
+    "allowed_actions",
+    "budgets"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-001-agent-case-v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suite": {
+      "type": "string",
+      "enum": [
+        "intervention-vs-observation",
+        "causal-transfer",
+        "regime-shift",
+        "stale-evidence",
+        "partial-observability",
+        "failed-action-recovery"
+      ]
+    },
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "step_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observation": {
+      "type": "object",
+      "description": "Current agent-visible observation; must not include unobserved counterfactual outcomes."
+    },
+    "event_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "event_type",
+          "timestamp",
+          "source_id",
+          "source_revision",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_type": {
+            "enum": [
+              "observation",
+              "intervention",
+              "action",
+              "outcome",
+              "claim_revision",
+              "revocation",
+              "failure_receipt"
+            ]
+          },
+          "timestamp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "validity": {
+            "enum": [
+              "valid",
+              "superseded",
+              "revoked",
+              "unknown"
+            ]
+          },
+          "payload": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "allowed_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "remaining_queries",
+        "remaining_actions",
+        "context_tokens"
+      ],
+      "properties": {
+        "remaining_queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining_actions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "context_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "description": "Agent-visible case contract. Hidden mechanism family, regime labels, counterfactual labels, and answer keys belong only in evaluator-side artifacts. Include regime metadata only in a separate explicitly public experimental lane."
+}

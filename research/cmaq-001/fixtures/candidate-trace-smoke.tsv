@@ -1,0 +1,6 @@
+case_id	action_id	predicted_success_ppm	abstained	evidence_ids	latency_us	memory_bytes
+case-001	0	900000	false	evt-001-current	100	512
+case-002	1	800000	false	evt-002-current	150	640
+case-003	0	650000	false	evt-003-valid	180	768
+case-004	1	900000	false	evt-004-current	200	768
+case-005	-1	0	true		50	128

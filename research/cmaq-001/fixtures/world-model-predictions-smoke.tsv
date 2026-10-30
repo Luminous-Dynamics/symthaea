@@ -1,0 +1,6 @@
+case_id	predicted_reward_a0_milli	predicted_reward_a1_milli	predicted_reward_a2_milli	predicted_safe_a0_ppm	predicted_safe_a1_ppm	predicted_safe_a2_ppm	predicted_success_a0_ppm	predicted_success_a1_ppm	predicted_success_a2_ppm	selected_action	latency_us	memory_bytes
+case-001	1000	0	-500	1000000	1000000	0	1000000	0	0	0	100	512
+case-002	-200	900	100	1000000	1000000	1000000	0	1000000	1000000	1	150	640
+case-003	400	400	1200	1000000	1000000	0	1000000	1000000	0	0	180	768
+case-004	100	250	0	1000000	1000000	1000000	1000000	1000000	0	1	200	768
+case-005	-100	0	0	1000000	1000000	1000000	0	0	0	-1	50	128
