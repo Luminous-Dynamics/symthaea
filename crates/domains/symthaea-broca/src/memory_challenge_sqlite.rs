@@ -469,14 +469,15 @@ impl SqliteAmlMemoryBackend {
             .map_err(|error| format!("failed to begin AML lifecycle transaction: {error}"))?;
         let existing = transaction
             .query_row(
-                "SELECT sequence, event_id, recorded_at_unix_ms, body_json
+                "SELECT sequence, event_id, recorded_at_unix_ms, event_sha256, body_json
                  FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
                 params![event_id],
                 |row| Ok(PersistedLifecycleRow {
                     sequence: row.get(0)?,
                     event_id: row.get(1)?,
                     recorded_at_unix_ms: row.get(2)?,
-                    body_json: row.get(3)?,
+                    event_sha256: row.get(3)?,
+                    body_json: row.get(4)?,
                 }),
             )
             .optional()
@@ -505,12 +506,13 @@ impl SqliteAmlMemoryBackend {
             .map_err(|_| "lifecycle timestamp exceeds SQLite signed integer range".to_string())?;
         let body_json = serde_json::to_vec(&event)
             .map_err(|error| format!("failed to serialize AML lifecycle event: {error}"))?;
+        let event_sha256 = sha256_hex(&body_json);
         transaction
             .execute(
                 "INSERT INTO aml_evidence_lifecycle_events
-                    (event_id, recorded_at_unix_ms, body_json)
-                 VALUES (?1, ?2, ?3)",
-                params![event.event_id, recorded_at, body_json],
+                    (event_id, recorded_at_unix_ms, event_sha256, body_json)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![event.event_id, recorded_at, event_sha256, body_json],
             )
             .map_err(|error| format!("failed to persist AML lifecycle event: {error}"))?;
         transaction
@@ -523,7 +525,7 @@ impl SqliteAmlMemoryBackend {
     fn read_persisted_lifecycle_rows(&self) -> Result<Vec<PersistedLifecycleRow>, String> {
         let mut statement = self.connection
             .prepare(
-                "SELECT sequence, event_id, recorded_at_unix_ms, body_json
+                "SELECT sequence, event_id, recorded_at_unix_ms, event_sha256, body_json
                  FROM aml_evidence_lifecycle_events
                  ORDER BY sequence ASC",
             )
@@ -534,7 +536,8 @@ impl SqliteAmlMemoryBackend {
                     sequence: row.get(0)?,
                     event_id: row.get(1)?,
                     recorded_at_unix_ms: row.get(2)?,
-                    body_json: row.get(3)?,
+                    event_sha256: row.get(3)?,
+                    body_json: row.get(4)?,
                 })
             })
             .map_err(|error| format!("failed to query AML lifecycle events: {error}"))?;
@@ -919,6 +922,9 @@ fn decode_and_validate_lifecycle_row(
         .map_err(|error| format!("persisted AML lifecycle event is invalid JSON: {error}"))?;
     require_non_empty(&event.event_id, "lifecycle event_id")?;
     event.operation.validate()?;
+    if sha256_hex(&row.body_json) != row.event_sha256 {
+        return Err("SQLite lifecycle event content digest mismatch".into());
+    }
     if event.event_id != row.event_id
         || u64::try_from(row.recorded_at_unix_ms).ok() != Some(event.recorded_at_unix_ms)
     {
