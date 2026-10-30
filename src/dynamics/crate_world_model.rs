@@ -411,6 +411,11 @@ impl HierarchicalCfCWorldModel {
         let d_loss: Vec<f32> = error.iter().map(|&e| 2.0 * e / n as f32).collect();
         let d_loss_arr = Array1::from_vec(d_loss.clone());
 
+        // Propagate through the output projection using the pre-update weights.
+        // Updating W_output first and then using it here mixes parameter versions
+        // within one gradient step and no longer computes the chain-rule gradient.
+        let d_hidden = self.w_output.t().dot(&d_loss_arr);
+
         // ∂L/∂W_output = outer(∂L/∂y, h)
         // Update output weights
         for (i, &dl) in d_loss
@@ -425,9 +430,6 @@ impl HierarchicalCfCWorldModel {
                 self.b_output[i] -= lr * dl;
             }
         }
-
-        // ∂L/∂h = W_output^T · ∂L/∂y
-        let d_hidden = self.w_output.t().dot(&d_loss_arr);
 
         // ∂h/∂A = 1 - decay_factor
         let d_output_d_A = 1.0 - &decay_factor;
@@ -658,6 +660,61 @@ impl ExperienceBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn target_head_gradient_uses_pre_update_output_projection() {
+        let config = WorldModelConfig {
+            hdc_dim: 8,
+            hidden_dim: 6,
+            learning_rate: 0.002,
+            ..Default::default()
+        };
+        let mut model = HierarchicalCfCWorldModel::new_with_seed(config, 0x6A4D_1A7E).unwrap();
+        let state = vec![0.15, -0.20, 0.35, -0.10, 0.45, -0.30, 0.25, -0.40];
+        let action = vec![-0.12, 0.22, -0.32, 0.42, -0.52, 0.62, -0.72, 0.82];
+        let next_state = vec![0.05, -0.05, 0.20, -0.15, 0.30, -0.15, 0.05, -0.20];
+        let learning_rate = model.config.learning_rate;
+
+        let prediction = model.predict(&state, &action, 1.0).unwrap();
+        let error = prediction.iter()
+            .zip(&next_state)
+            .map(|(predicted, actual)| predicted - actual)
+            .collect::<Vec<_>>();
+        let d_loss = error.iter()
+            .map(|value| 2.0 * value / error.len() as f32)
+            .collect::<Vec<_>>();
+        let d_loss_array = Array1::from_vec(d_loss.clone());
+
+        let input = state.iter().chain(action.iter()).copied().collect::<Vec<_>>();
+        let input_array = Array1::from_vec(input);
+        let projected = (model.w_input.dot(&input_array) + &model.b_input).mapv(f32::tanh);
+        let backbone_input = model.w_backbone.dot(&model.cfc_state) + &projected;
+        let backbone_activation = backbone_input.mapv(f32::tanh);
+        let target_state = model.w_target.dot(&backbone_activation) + &model.b_target;
+        let decay = (-1.0_f32 / (&model.cfc_tau + 0.01)).mapv(f32::exp);
+        let _next_hidden = (&model.cfc_state - &target_state) * &decay + &target_state;
+
+        let pre_update_output = model.w_output.clone();
+        let d_hidden = pre_update_output.t().dot(&d_loss_array);
+        let d_loss_d_target = &d_hidden * &(1.0 - &decay);
+        let expected_target_weights = &model.w_target
+            - &Array2::from_shape_fn(model.w_target.raw_dim(), |(row, column)| {
+                learning_rate * d_loss_d_target[row] * backbone_activation[column]
+            });
+        let expected_output_weights = &pre_update_output
+            - &Array2::from_shape_fn(pre_update_output.raw_dim(), |(row, column)| {
+                learning_rate * d_loss[row] * _next_hidden[column]
+            });
+
+        model.train_step(&state, &action, &next_state, 1.0).unwrap();
+
+        for (actual, expected) in model.w_target.iter().zip(expected_target_weights.iter()) {
+            assert!((actual - expected).abs() < 1e-6, "target-weight gradient used a mixed parameter version");
+        }
+        for (actual, expected) in model.w_output.iter().zip(expected_output_weights.iter()) {
+            assert!((actual - expected).abs() < 1e-6, "output-weight update mismatch");
+        }
+    }
 
     #[test]
     fn residual_prediction_preserves_identity_when_the_delta_head_is_zero() {
