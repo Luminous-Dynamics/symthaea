@@ -311,7 +311,7 @@ fn validate_coalition<'view, 'audio>(
     channels: usize,
     total_frames: usize,
 ) -> Result<(), PairwiseInteractionError> {
-    let _frames = validate_audio(render.audio)?;
+    let frames = validate_audio(render.audio)?;
     if frames != total_frames
         || render.audio.sample_rate_hz != sample_rate_hz
         || render.audio.channels != channels
