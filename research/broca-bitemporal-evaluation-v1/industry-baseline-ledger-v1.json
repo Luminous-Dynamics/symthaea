@@ -525,6 +525,46 @@
       "evidence_grade": "vendor-self-report-methodology-published",
       "comparison_notes": "Honcho publishes BEAM values alongside its own LoCoMo/LongMemEval results. The methodology page reports Gemini 2.5 Flash Lite as deriver and Claude Haiku 4.5 as dreamer/dialectic. The figures are vendor results and are not directly comparable to other providers' independently run BEAM figures.",
       "source": "https://honcho.dev/evals/"
+    },
+    {
+      "id": "hindsight-beam-multiscale-published-2026-10-02",
+      "system": "Hindsight",
+      "category": "vendor-published-leaderboard-result",
+      "benchmark": "BEAM",
+      "benchmark_revision": "Published full BEAM splits; sizes reported at 100K/500K/1M/10M tokens",
+      "metric": "answer accuracy by history size",
+      "value_percent": 64.1,
+      "reported_date": "2026-10-02",
+      "sample_size": 200,
+      "secondary_metrics": {
+        "accuracy_100k_percent": 86.2,
+        "accuracy_500k_percent": 80.1,
+        "accuracy_1m_percent": 79.1,
+        "accuracy_10m_percent": 64.1
+      },
+      "evidence_grade": "vendor-result-aggregated-by-provider-leaderboard",
+      "comparison_notes": "Past.dev's BEAM result page attributes these numbers to Hindsight's published results and says all provider values were separately published full-split runs, not a common harness. Do not treat rank or difference as a controlled head-to-head. The 200-question sample is the 10M slice; smaller-history slices use different sample sizes.",
+      "source": "https://www.past.dev/benchmarks/beam"
+    },
+    {
+      "id": "exabase-m1-beam-multiscale-published-2026-10-02",
+      "system": "Exabase M-1",
+      "category": "vendor-published-leaderboard-result",
+      "benchmark": "BEAM",
+      "benchmark_revision": "Published full BEAM splits; 100K/1M/10M tokens; 500K not published",
+      "metric": "answer accuracy by history size",
+      "value_percent": 68,
+      "reported_date": "2026-10-02",
+      "sample_size": 200,
+      "secondary_metrics": {
+        "accuracy_100k_percent": 76.9,
+        "accuracy_1m_percent": 75,
+        "accuracy_10m_percent": 68,
+        "accuracy_500k_percent": null
+      },
+      "evidence_grade": "vendor-result-aggregated-by-provider-leaderboard",
+      "comparison_notes": "Past.dev's BEAM page attributes these figures to Exabase M-1 and says the vendor figures were separately published full-split runs using different models, judges and configurations. This is not a common-harness result or a Broca baseline reproduced under an identical setup.",
+      "source": "https://www.past.dev/benchmarks/beam"
     }
   ],
   "broca_targets": {
