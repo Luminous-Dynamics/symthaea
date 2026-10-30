@@ -231,6 +231,65 @@ These are project targets, not external standards:
 
 Do not average these metrics into one score. Publish official evaluator versions, exact source commit, data split, reader/model, prompt, budgets, hardware, raw episode receipts and paired uncertainty.
 
+## 8B. Governed consolidation extension (D24-D31)
+
+### Why consolidation is a governed state transition
+
+Consolidation is not just compression or summarization. It changes what future retrieval and action can see. A memory system must justify why an episode was retained, compressed, promoted to a procedure/rule, superseded, quarantined, removed from the active index, or erased for privacy.
+
+The September 26, 2026 ConsolidationBench work makes this a distinct optimization problem. It reports a 22.7% task-success improvement at 7x compression in one phase, but also records degenerate forgetting and distribution-shift failures. Its subsequent evaluation found that its consolidation-quality score did not reliably predict transfer accuracy (pooled Spearman rho -0.24, n=12, interval spanning zero). Treat these as paper-specific findings, not Broca measurements: https://arxiv.org/abs/2609.33013
+
+### D24-D31 deterministic cases
+
+The companion [governed-consolidation-fixtures-v1.json](./governed-consolidation-fixtures-v1.json) contains eight cases and 40 variants. Each baseline-to-flip pair changes exactly one decisive field; each invariance control changes only one irrelevant field. Reader input is separate from evaluator-only oracle labels.
+
+| Case | Governing state | Required result |
+|---|---|---|
+| D24: independent repeated success | Independent source-family count, failed/success episode counts, and held-out transfer receipt | Promote to procedure only when the minimum independent-family and transfer conditions are met |
+| D25: correlated duplicates | Revision multiplicity versus independent family count and duplicate lineage | Repeated copies from one family must not satisfy independent corroboration thresholds |
+| D26: poisoned contradiction | Contradiction validation state, trusted source count, affected rule and descendants | Unverified contradictory evidence is quarantined; it cannot silently rewrite a durable rule |
+| D27: distribution shift | Source/target domain, prevalence shift, and held-out domain coverage | Promote a scoped rule unless transfer evidence supports the broader domain |
+| D28: rare safety gotcha | Candidate compression savings, gotcha severity, and independent coverage | Preserve a critical gotcha unless another valid source independently covers it |
+| D29: retracted source ancestry | Retraction at known_at, promoted procedure, and descendant count | Invalidate unsupported descendants or rebuild them from an eligible alternative proof |
+| D30: privacy erasure versus forgetting | Verified erasure request, descendant lineage, reversibility policy | Privacy erasure removes source and descendants irreversibly; ordinary active-index forgetting remains a separate reversible operation |
+| D31: promotion utility | Held-out transfer gain, minimum gain threshold, paired interval, independent evaluator and leakage state | Promote only when preregistered held-out transfer criteria are satisfied |
+
+### Consolidation comparison arms
+
+Add the following arms, keeping model, task split, prompt, reader, and total storage/token budgets matched:
+- C0 raw episodic store (no consolidation).
+- C1 heuristic summarization/compression.
+- C2 learned promotion/forgetting gate.
+- C3 source-linked, level-aware consolidation.
+- C4 governed consolidation with lineage, poison resistance, rollback/compensation, and privacy-erasure semantics.
+- C5 oracle-optimal consolidation (diagnostic upper bound only).
+
+### Metrics and causal controls
+
+Report independently:
+- consolidation decision regret against the symbolic oracle;
+- held-out downstream task success and cross-level transfer;
+- compression ratio, retrieval quality, and total lifecycle token/storage cost;
+- retention precision/recall and harmful-forgetting rate;
+- false promotion rate and poisoning success rate;
+- rollback/compensation correctness, latency, and replay parity;
+- privacy-erasure completion across all descendants;
+- provenance/audit coverage and policy-version binding;
+- distribution-shift robustness and calibration.
+
+Each fixture includes baseline, decisive flip, irrelevant invariance, exact repair, and matched irrelevant repair. Add source-order permutations, generated source-family partitions, poison mutations, retraction-after-promotion, descendant-depth expansion, and shifted task prevalence. A promotion score without held-out transfer evidence is not a qualification result.
+
+### Proposed project gates
+
+These are project qualification targets, not industry standards:
+1. 100% agreement with the independent symbolic oracle on deterministic D24-D31 cases.
+2. Zero poisoned-to-durable-rule promotion on deterministic adversarial fixtures.
+3. 100% rollback/replay parity for reversible consolidation transitions.
+4. 100% descendant invalidation or erasure coverage in deterministic source-retraction and privacy-erasure fixtures.
+5. Held-out transfer improves on raw episodic memory at matched total storage/token budgets, with paired task-template uncertainty.
+6. Report consolidation quality separately from governance quality; always-keep and always-forget policies must both fail.
+7. No production-transfer claim from synthetic scores alone; use independent held-out task families and distribution-shift tests.
+
 ## 9. Implementation sequence
 
 1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
