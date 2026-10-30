@@ -19,17 +19,49 @@ use crate::active_experiment::{ActiveExperimentProblem, ExperimentDesignError};
 use std::error::Error;
 use std::fmt;
 
+/// Eligibility status imported from the upstream physical/evidence qualification gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExperimentEligibilityStatus {
+    /// Candidate has passed all preregistered eligibility checks for this benchmark.
+    Eligible,
+    /// No qualified optical/physical model is available.
+    NotCalibrated,
+    /// Calibration does not match the current hardware configuration.
+    StaleCalibration,
+    /// Requested operating point is outside the model's validated domain.
+    OutOfDomain,
+    /// Evidence is insufficient to establish eligibility.
+    InsufficientEvidence,
+}
+
 /// Validation evidence for one experiment's operating-regime coverage.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExperimentRegimeProfile {
     /// Stable candidate experiment ID.
     pub experiment_id: String,
+    /// Eligibility result from the upstream qualification gate.
+    pub eligibility_status: ExperimentEligibilityStatus,
+    /// Digest/immutable ID of the artifact supporting the eligibility result.
+    pub eligibility_evidence_digest: String,
     /// Fraction of this experiment's measurement budget in each regime.
     /// The values are ordered exactly as RepresentativeExperimentContext::regime_labels.
+    /// Must be empty when eligibility_status is not Eligible.
     pub sampling_regime_probabilities: Vec<f64>,
     /// Validation error estimate in each regime, normalized to [0, 1].
     /// These values must come from the declared validation artifact, not held-out truth.
+    /// Must be empty when eligibility_status is not Eligible.
     pub validation_error_by_regime: Vec<f64>,
+}
+
+/// Candidate that failed the upstream eligibility gate and was excluded from rankings.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RidaIneligibleCandidate {
+    /// Stable candidate experiment ID.
+    pub experiment_id: String,
+    /// Exact rejection status supplied by the upstream gate.
+    pub eligibility_status: ExperimentEligibilityStatus,
+    /// Digest/immutable ID of the evidence supporting the rejection.
+    pub eligibility_evidence_digest: String,
 }
 
 /// Target operating distribution and split provenance shared by candidate profiles.
@@ -44,6 +76,7 @@ pub struct RepresentativeExperimentContext {
     /// Digest or immutable ID of the evaluator-only artifact used downstream.
     pub evaluation_artifact_digest: String,
     /// Candidate profiles, one per experiment in the decision problem.
+    /// Ineligible profiles must carry empty scoring vectors.
     pub profiles: Vec<ExperimentRegimeProfile>,
 }
 
@@ -125,7 +158,9 @@ pub struct RidaAblationReport {
     pub utility_unit: String,
     /// Measurement-cost unit from QARCH-005.
     pub measurement_cost_unit: String,
-    /// Component metrics for each candidate.
+    /// Candidate IDs/statuses excluded by the upstream eligibility gate.
+    pub ineligible_candidates: Vec<RidaIneligibleCandidate>,
+    /// Component metrics for eligible candidates only.
     pub component_scores: Vec<RidaExperimentComponentScore>,
     /// Rankings for all one-, two-, and three-component policies.
     pub policy_rankings: Vec<RidaPolicyRanking>,
@@ -162,6 +197,13 @@ impl fmt::Display for RidaAblationError {
             Self::EmptyMetadata => "required regime or artifact metadata is empty",
             Self::ValidationEvaluationArtifactOverlap => {
                 "validation and evaluator-only artifacts must be distinct"
+            }
+            Self::NoEligibleCandidates => "no experiment candidate passed the eligibility gate",
+            Self::IneligibleCandidateContainsMetrics => {
+                "ineligible candidates must not carry numerical scoring data"
+            }
+            Self::MissingEligibilityEvidence => {
+                "every candidate eligibility result must bind an evidence artifact"
             }
             Self::InvalidRegimeLabels => "regime labels must be unique and non-empty",
             Self::RegimeDimensionMismatch => {
@@ -209,7 +251,11 @@ pub fn rank_rida_ablations(
         .fold(0.0_f64, f64::max);
 
     let mut component_scores = Vec::with_capacity(context.profiles.len());
-    for profile in &context.profiles {
+    for profile in context
+        .profiles
+        .iter()
+        .filter(|profile| profile.eligibility_status == ExperimentEligibilityStatus::Eligible)
+    {
         let nominal = nominal_ranking
             .scores
             .iter()
@@ -265,6 +311,10 @@ pub fn rank_rida_ablations(
         });
     }
 
+    if component_scores.is_empty() {
+        return Err(RidaAblationError::NoEligibleCandidates);
+    }
+
     let policies = [
         RidaAblationPolicy::RepresentativenessOnly,
         RidaAblationPolicy::InformativenessOnly,
@@ -312,6 +362,16 @@ pub fn rank_rida_ablations(
         evaluation_artifact_digest: context.evaluation_artifact_digest.clone(),
         utility_unit: nominal_ranking.utility_unit,
         measurement_cost_unit: nominal_ranking.measurement_cost_unit,
+        ineligible_candidates: context
+            .profiles
+            .iter()
+            .filter(|profile| profile.eligibility_status != ExperimentEligibilityStatus::Eligible)
+            .map(|profile| RidaIneligibleCandidate {
+                experiment_id: profile.experiment_id.clone(),
+                eligibility_status: profile.eligibility_status,
+                eligibility_evidence_digest: profile.eligibility_evidence_digest.clone(),
+            })
+            .collect(),
         component_scores,
         policy_rankings,
     })
@@ -355,6 +415,17 @@ fn validate_context(
         if profile.experiment_id.trim().is_empty() {
             return Err(RidaAblationError::EmptyMetadata);
         }
+        if profile.eligibility_evidence_digest.trim().is_empty() {
+            return Err(RidaAblationError::MissingEligibilityEvidence);
+        }
+        if profile.eligibility_status != ExperimentEligibilityStatus::Eligible {
+            if !profile.sampling_regime_probabilities.is_empty()
+                || !profile.validation_error_by_regime.is_empty()
+            {
+                return Err(RidaAblationError::IneligibleCandidateContainsMetrics);
+            }
+            continue;
+        }
         if profile.sampling_regime_probabilities.len() != regime_count
             || profile.validation_error_by_regime.len() != regime_count
         {
@@ -376,6 +447,11 @@ fn validate_context(
         || candidate_ids.iter().any(|id| !profile_ids.contains(id))
     {
         return Err(RidaAblationError::CandidateProfileSetMismatch);
+    }
+    if !context.profiles.iter().any(|profile| {
+        profile.eligibility_status == ExperimentEligibilityStatus::Eligible
+    }) {
+        return Err(RidaAblationError::NoEligibleCandidates);
     }
     Ok(())
 }
@@ -474,6 +550,8 @@ mod tests {
     ) -> ExperimentRegimeProfile {
         ExperimentRegimeProfile {
             experiment_id: experiment_id.into(),
+            eligibility_status: ExperimentEligibilityStatus::Eligible,
+            eligibility_evidence_digest: format!("eligibility-evidence-{experiment_id}"),
             sampling_regime_probabilities: sampling,
             validation_error_by_regime: errors,
         }
@@ -630,6 +708,44 @@ mod tests {
             ranking(&report, RidaAblationPolicy::FullRidaProxy).candidates[0]
                 .experiment_id,
             "A-zero-information"
+        );
+    }
+
+    #[test]
+    fn stale_calibration_candidate_is_ineligible_even_with_high_evsi() {
+        let mut data = context();
+        data.profiles[0].eligibility_status = ExperimentEligibilityStatus::StaleCalibration;
+        data.profiles[0].sampling_regime_probabilities.clear();
+        data.profiles[0].validation_error_by_regime.clear();
+        let report = rank_rida_ablations(&problem(), &data).unwrap();
+
+        assert_eq!(report.component_scores.len(), 3);
+        assert!(report
+            .component_scores
+            .iter()
+            .all(|score| score.experiment_id != "A-high-info-out-of-distribution"));
+        assert_eq!(
+            report.ineligible_candidates,
+            vec![RidaIneligibleCandidate {
+                experiment_id: "A-high-info-out-of-distribution".into(),
+                eligibility_status: ExperimentEligibilityStatus::StaleCalibration,
+                eligibility_evidence_digest:
+                    "eligibility-evidence-A-high-info-out-of-distribution".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn no_eligible_candidates_is_a_hard_error() {
+        let mut data = context();
+        for profile in &mut data.profiles {
+            profile.eligibility_status = ExperimentEligibilityStatus::OutOfDomain;
+            profile.sampling_regime_probabilities.clear();
+            profile.validation_error_by_regime.clear();
+        }
+        assert_eq!(
+            rank_rida_ablations(&problem(), &data),
+            Err(RidaAblationError::NoEligibleCandidates)
         );
     }
 
