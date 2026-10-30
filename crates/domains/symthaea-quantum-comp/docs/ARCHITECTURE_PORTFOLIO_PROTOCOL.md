@@ -174,6 +174,7 @@ All unit-test examples are synthetic logic checks. They do not represent hardwar
 Each normalized architecture observation can be paired with an evidence receipt that binds:
 
 - the observation ID, exact workload fingerprint and comparison-contract fingerprint;
+- a public DOI, URL, repository path or immutable source-registry reference;
 - the benchmark suite/version and upstream case ID;
 - source/document, runner (when available), fixture, run manifest, environment, raw output, interval analysis and summary digests;
 - evidence origin (direct measurement, published result, simulation execution or analytical reference);
@@ -188,6 +189,6 @@ The observation's `evidence_class` answers *what kind of evidence is represented
 
 Direct measurement requires a device, toolchain and runner identity. Published physical/production results require the reported device identity, but undisclosed runner/toolchain values remain unknown. Simulations cannot be promoted to physical evidence. Analytical references cannot enter the system-level resource comparator.
 
-A SHA-256 digest is content identity only. It does not authenticate the submitter, certify the meter, prove chain of custody or prove that a publication's reported measurement is correct. Cryptographic attestation and trusted measurement capture are separate capabilities.
+A SHA-256 digest is content identity only. It does not authenticate the submitter, certify the meter, prove chain of custody or prove that a publication's reported measurement is correct. Published results may retain unknown repeat counts, toolchains, interval methods and aggregation methods as absent values. Such records remain visible as references, but the evidence-bound system comparison/routing path refuses to rank them until repeat counts and uncertainty/aggregation provenance are available. Cryptographic attestation and trusted measurement capture are separate capabilities.
 
 All fixture hashes and identities are fabricated test values. They do not refer to actual devices, benchmark submissions or measurements.
