@@ -1629,6 +1629,109 @@ mod tests {
         }));
     }
 
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureFile {
+        schema_version: String,
+        protocol_version: String,
+        case_count: usize,
+        cases: Vec<CrossSessionFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureCase {
+        case_id: String,
+        minimum_independent_families: u32,
+        minimum_distinct_sessions: u32,
+        candidates: Vec<CrossSessionFixtureCandidate>,
+        alternatives: Vec<CrossSessionFixtureAlternative>,
+        expected_status: ProofBudgetStatus,
+        expected_selected_justification_id: Option<String>,
+        expected_rejection: Option<JustificationRejectionReason>,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureCandidate {
+        evidence_id: String,
+        source_family_id: String,
+        source_session_id: Option<String>,
+        token_cost: u32,
+    }
+
+    #[derive(Deserialize)]
+    struct CrossSessionFixtureAlternative {
+        justification_id: String,
+        evidence_dependencies: Vec<String>,
+    }
+
+    #[test]
+    fn versioned_cross_session_proof_fixtures_match_optimizer_and_verifier() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/cross-session-proof-fixtures-v1.json"
+        );
+        let fixture: CrossSessionFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-cross-session-proof-fixtures-v1");
+        assert_eq!(fixture.protocol_version, "BROCA-CROSS-SESSION-PROOF-V1");
+        assert_eq!(fixture.case_count, fixture.cases.len());
+        assert_eq!(fixture.case_count, 4);
+
+        for case in fixture.cases {
+            let candidates = case.candidates
+                .into_iter()
+                .map(|source| {
+                    let mut item = candidate(
+                        &source.evidence_id,
+                        &source.source_family_id,
+                        source.token_cost,
+                    );
+                    item.source_session_id = source.source_session_id;
+                    item
+                })
+                .collect();
+            let alternatives = case.alternatives
+                .into_iter()
+                .map(|alternative| ProofJustification {
+                    justification_id: alternative.justification_id,
+                    evidence_dependencies: alternative.evidence_dependencies,
+                })
+                .collect();
+            let mut proof_obligation = obligation(&case.case_id, alternatives);
+            proof_obligation.minimum_independent_families =
+                case.minimum_independent_families;
+            proof_obligation.minimum_distinct_sessions =
+                case.minimum_distinct_sessions;
+            let req = request(candidates, vec![proof_obligation], 128);
+            let result = solve_proof_budget(req.clone()).unwrap();
+
+            assert_eq!(
+                result.status,
+                case.expected_status,
+                "proof status mismatch in fixture {}",
+                case.case_id
+            );
+            if let Some(expected_id) = case.expected_selected_justification_id {
+                assert_eq!(result.selected_proofs.len(), 1);
+                assert_eq!(
+                    result.selected_proofs[0].justification_id,
+                    expected_id,
+                    "selected proof mismatch in fixture {}",
+                    case.case_id
+                );
+                verify_proof_budget_result(&req, &result).unwrap();
+            } else {
+                assert!(result.selected_proofs.is_empty());
+                let expected_rejection = case.expected_rejection.unwrap();
+                assert!(
+                    result.justification_rejections.iter().any(|rejection| {
+                        rejection.reason == expected_rejection
+                    }),
+                    "expected rejection {:?} in fixture {}",
+                    expected_rejection,
+                    case.case_id
+                );
+            }
+        }
+    }
+
     #[test]
     fn out_of_scope_candidate_is_not_eligible() {
         let mut item = candidate("A", "family-A", 1);
