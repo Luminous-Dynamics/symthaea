@@ -2861,6 +2861,36 @@ mod tests {
         ).expect("valid fixture")
     }
 
+    fn sparse_five_unit_model() -> BinaryCausalModel {
+        // Sparse directed parent sets with local dependencies only:
+        // A' <- {A,C}; B' <- {A,B,D}; C' <- {B,C,E};
+        // D' <- {A,D}; E' <- {C,E}.
+        let parents = [
+            [true, false, true, false, false],
+            [true, true, false, true, false],
+            [false, true, true, false, true],
+            [true, false, false, true, false],
+            [false, false, true, false, true],
+        ];
+        let mut connectivity = vec![false; 25];
+        for source in 0..5 {
+            for target in 0..5 {
+                connectivity[source * 5 + target] = parents[target][source];
+            }
+        }
+        let mut tpm = Vec::with_capacity(32 * 5);
+        for past_state in 0..32 {
+            for target in 0..5 {
+                let active_parents = (0..5)
+                    .filter(|source| parents[target][*source])
+                    .filter(|source| ((past_state >> source) & 1) != 0)
+                    .count();
+                tpm.push(0.12 + 0.07 * target as f64 + 0.09 * active_parents as f64);
+            }
+        }
+        BinaryCausalModel::new(5, tpm, connectivity).expect("valid sparse five-unit model")
+    }
+
     // Deliberately simple reference implementation used only by tests. It
     // materializes each block-direction assignment and applies the original
     // block-membership definition, independent of the optimized block-label path.
@@ -2948,6 +2978,93 @@ mod tests {
         let mut blocks = Vec::new();
         enumerate_set_partitions(0, unit_count, &mut blocks, &mut output);
         output
+    }
+
+    #[test]
+    fn min_fill_iit4_eq4_factors_match_dense_oracle_for_embedded_subsystems() {
+        let model = sparse_five_unit_model();
+        let candidate_systems = [
+            vec![0],
+            vec![0, 2],
+            vec![1, 2, 4],
+            vec![0, 1, 2, 3, 4],
+        ];
+        let states = [
+            vec![true, false, true, false, true],
+            vec![false, true, false, true, false],
+        ];
+
+        for candidate in &candidate_systems {
+            for state in &states {
+                let dense = model
+                    .forward_cause_likelihood_iit4_factors_dense(
+                        candidate, candidate, state, candidate,
+                    )
+                    .unwrap();
+                let sparse = model
+                    .forward_cause_likelihood_iit4_system_factors_min_fill(candidate, state)
+                    .unwrap();
+                assert_eq!(dense.len(), sparse.len());
+                for (target_slot, (dense_factor, sparse_factor)) in
+                    dense.iter().zip(&sparse).enumerate()
+                {
+                    assert_eq!(dense_factor.len(), sparse_factor.len());
+                    for (state_index, (expected, actual)) in
+                        dense_factor.iter().zip(sparse_factor).enumerate()
+                    {
+                        let tolerance = expected.abs().max(1.0) * 1e-12;
+                        assert!(
+                            (expected - actual).abs() <= tolerance,
+                            "candidate={candidate:?}, state={state:?}, target_slot={target_slot}, purview_state={state_index}: dense={expected:.17}, min_fill={actual:.17}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn min_fill_iit4_eq4_factors_match_dense_oracle_when_joint_likelihood_underflows() {
+        let n_units = 4;
+        let mut tpm = Vec::with_capacity((1usize << n_units) * n_units);
+        let mut connectivity = vec![false; n_units * n_units];
+        for unit in 0..n_units {
+            connectivity[unit * n_units + unit] = true;
+        }
+        for past_state in 0..(1usize << n_units) {
+            for unit in 0..n_units {
+                // The observed all-ON next state has joint probability around
+                // 10^-400, so direct products underflow; the log/scaled paths
+                // must still agree on each unnormalized Eq. 4 factor.
+                tpm.push(if ((past_state >> unit) & 1) != 0 {
+                    2e-100
+                } else {
+                    1e-100
+                });
+            }
+        }
+        let model = BinaryCausalModel::new(n_units, tpm, connectivity).unwrap();
+        let candidate = [0, 1, 2, 3];
+        let state = [true, true, true, true];
+        let dense = model
+            .forward_cause_likelihood_iit4_factors_dense(
+                &candidate, &candidate, &state, &candidate,
+            )
+            .unwrap();
+        let sparse = model
+            .forward_cause_likelihood_iit4_system_factors_min_fill(&candidate, &state)
+            .unwrap();
+
+        for (target, (expected, actual)) in dense.iter().zip(&sparse).enumerate() {
+            assert_eq!(expected.len(), actual.len());
+            for (state_index, (expected, actual)) in expected.iter().zip(actual).enumerate() {
+                let tolerance = expected.abs() * 1e-12;
+                assert!(
+                    (expected - actual).abs() <= tolerance,
+                    "target={target}, state={state_index}: dense={expected:.17e}, min_fill={actual:.17e}"
+                );
+            }
+        }
     }
 
     #[test]
