@@ -8,7 +8,10 @@ on:
       - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_IMPACT_INPUT.schema.json"
       - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MULTI_RATER_OUTCOMES.example.json"
       - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
@@ -23,7 +26,10 @@ on:
       - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_IMPACT_INPUT.schema.json"
       - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MULTI_RATER_OUTCOMES.example.json"
       - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
@@ -47,5 +53,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, and stopping audits
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, and multi-rater audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
