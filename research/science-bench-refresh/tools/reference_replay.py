@@ -278,7 +278,12 @@ def first_difference(expected: Any, observed: Any, path: str = "$") -> str | Non
             return f"{path}: missing key {missing[0]!r}"
         if extra:
             return f"{path}: unexpected key {extra[0]!r}"
-        for key in sorted(expected_keys):
+        # Compare identity fields before payload fields. When task arrays
+        # are misordered, reporting an evaluator-only payload mismatch first
+        # obscures the actual task-identity/order divergence.
+        priority = [key for key in ("task_id", "family_id", "generation_id") if key in expected_keys]
+        ordered_keys = priority + sorted(expected_keys - set(priority))
+        for key in ordered_keys:
             difference = first_difference(expected[key], observed[key], f"{path}.{key}")
             if difference is not None:
                 return difference
