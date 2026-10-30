@@ -46,7 +46,7 @@ partial def closeLocalSupport (lctx : LocalContext) (frontier visited : FVarIdSe
 
 def supportDeclarationJson (lctx : LocalContext) (id : FVarId) : MetaM Json := do
   let some declaration := lctx.find? id
-    | return Json.mkObj [("fvar_id", toJson id.name.toString), ("unresolved", toJson true)]
+    | throwError "PITB support receipt references a free variable outside the captured local context: {id}"
   let typeText ← ppExpr declaration.type
   return Json.mkObj [
     ("fvar_id", toJson id.name.toString),
