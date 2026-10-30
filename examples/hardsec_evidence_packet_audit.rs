@@ -515,6 +515,22 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
     let mut claims = Vec::new();
     for item in claims_value {
         let claim_type = required_string(item, "claim_type")?;
+        const CLAIM_TYPES: &[&str] = &[
+            "model_suspects_trojan",
+            "localization_provided",
+            "trigger_activated",
+            "trigger_not_observed_under_budget",
+            "bounded_reachability_not_found",
+            "trigger_unreachable_under_assumptions",
+            "functional_equivalence",
+            "source_integrity_checked",
+            "reviewer_confirmed",
+            "trojan_absent",
+            "design_is_secure",
+        ];
+        if !CLAIM_TYPES.contains(&claim_type.as_str()) {
+            return Err(format!("unsupported claim_type: {claim_type}"));
+        }
         let status = required_string(item, "status")?;
         let scope = required_string(item, "scope")?;
         if !["supported", "contradicted", "unknown", "not_evaluated"].contains(&status.as_str()) {
