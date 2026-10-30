@@ -1043,9 +1043,7 @@ fn mm_candidate_for_lambda(
     // The fixed-lambda subproblem may intentionally return a globally
     // over-budget candidate. The outer lambda bracket/bisection observes its
     // cost and raises the multiplier; only the outer loop may admit candidates.
-    if (0..CONTEXTS)
-        .any(|x| allocation.context_count(x) > world.context_annotation_cap[x] as u32)
-    {
+    if (0..CONTEXTS).any(|x| allocation.context_count(x) > world.context_annotation_cap[x] as u32) {
         return Err("MM context DP violated a context annotation cap".into());
     }
     Ok(MmCandidate {
