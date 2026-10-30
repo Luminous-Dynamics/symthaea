@@ -1410,13 +1410,15 @@ mod tests {
 
                 let direction_id = match &allocation.arm {
                     AllocationArm::NewDirection => {
+                        let mut proposed_descriptor = descriptor(
+                            "task quality",
+                            "unverified new object",
+                            "unverified new construction",
+                        );
+                        proposed_descriptor.scope = format!("synthetic proposal scope {step}");
                         let proposal = NewDirectionProposal {
                             proposal_id: format!("new-direction-probe-{step}"),
-                            descriptor: descriptor(
-                                "task quality",
-                                "unverified new object",
-                                "unverified new construction",
-                            ),
+                            descriptor: proposed_descriptor,
                             proposal_sha256: PROPOSAL.to_owned(),
                             comparison_profile_sha256: PROFILE.to_owned(),
                             metric_id: "held_out_task_quality".to_owned(),
