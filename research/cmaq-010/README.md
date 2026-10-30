@@ -37,6 +37,8 @@ CMAQ-010 adds two deliberately narrower sequential-detection comparators; these 
 
 The comparison matters: a discount factor alone is not the full safety contract. The provenance graph, evidence weights, freshness, and per-window ingestion bound all matter. The present harness uses a single provenance-group label rather than a full influence graph, so it should not be presented as a direct CONFPROP benchmark.
 
+A subtle but important point: the paper's γ discount does **not** make a fully dependent batch equivalent to exactly one observation. With one effective independent source and K=3, six duplicate increments become (1/3) × 6 = 2 single-increment units. CONFPROP bounds the update only under its separate raw-batch ingestion assumption; it still globally caps confidence at 1.0. CMAQ-010 makes this visible: the discount-only arm admits six increments, while the count-capped ablation processes at most three per window and therefore admits at most one effective increment in this six-clone test. This is a sequential log-likelihood stress test, not the paper's positive-only confidence recurrence.
+
 ## Policies
 
 1. `naive_claim_sum`: adds a likelihood increment for every report, even when reports share provenance.
