@@ -140,6 +140,12 @@ fn parse_args() -> Result<Args, String> {
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
+        if flag == "--help" || flag == "-h" {
+            return Err(
+                "usage: hardsec_design_lineage_audit --manifest FILE --root DIR --receipt NEW_FILE"
+                    .to_owned(),
+            );
+        }
         let value = args
             .next()
             .ok_or_else(|| format!("missing value for {flag}"))?;
@@ -147,12 +153,6 @@ fn parse_args() -> Result<Args, String> {
             "--manifest" => manifest = Some(PathBuf::from(value)),
             "--root" => root = Some(PathBuf::from(value)),
             "--receipt" => receipt = Some(PathBuf::from(value)),
-            "--help" | "-h" => {
-                return Err(
-                    "usage: hardsec_design_lineage_audit --manifest FILE --root DIR --receipt NEW_FILE"
-                        .to_owned(),
-                );
-            }
             _ => return Err(format!("unknown argument: {flag}")),
         }
     }
@@ -179,9 +179,18 @@ fn sha256_reader(mut reader: impl Read) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
+fn sha256_file_stable(path: &Path) -> Result<String, String> {
+    let before = fs::metadata(path).map_err(|error| format!("stat {} before hashing: {error}", path.display()))?;
+    if !before.is_file() {
+        return Err(format!("source is not a regular file: {}", path.display()));
+    }
     let file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
-    sha256_reader(file)
+    let digest = sha256_reader(file)?;
+    let after = fs::metadata(path).map_err(|error| format!("stat {} after hashing: {error}", path.display()))?;
+    if before.len() != after.len() || before.modified().ok() != after.modified().ok() {
+        return Err(format!("source changed while hashing: {}", path.display()));
+    }
+    Ok(digest)
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -232,7 +241,8 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
     let text = std::str::from_utf8(bytes).map_err(|error| format!("manifest is not UTF-8: {error}"))?;
     let mut lines = text.split_terminator('\n');
     let first = lines.next().ok_or("manifest is empty")?.trim_end_matches('\r');
-    if first.split('\t').collect::<Vec<_>>() != HEADER {
+    let actual_header: Vec<_> = first.split('\t').collect();
+    if actual_header.as_slice() != HEADER.as_slice() {
         return Err(format!("manifest header must exactly match: {}", HEADER.join("\t")));
     }
 
@@ -465,7 +475,7 @@ fn run(args: Args) -> Result<(), String> {
             value.clone()
         } else {
             let path = resolve_source(&root, &sample.source_path)?;
-            let value = sha256_file(&path)?;
+            let value = sha256_file_stable(&path)?;
             source_hash_cache.insert(sample.source_path.clone(), value.clone());
             value
         };
@@ -528,8 +538,10 @@ fn run(args: Args) -> Result<(), String> {
             .collect::<Vec<_>>(),
         "signature": null,
         "security_verdict": null,
+        "lineage_metadata_status": "caller_declared_not_independently_inferred",
         "notes": [
             "Exact source file hashes and the declared split group were checked.",
+            "Design-lineage IDs are caller-declared metadata; this tool does not independently infer source ancestry.",
             "Structural similarity and semantic netlist equivalence were not evaluated.",
             "A pass does not establish detector quality, Trojan absence, or design security.",
             "random_gate is diagnostic only; cross-split lineage overlaps are reported, not rejected."
@@ -543,11 +555,15 @@ fn run(args: Args) -> Result<(), String> {
         .create_new(true)
         .open(&receipt_path)
         .map_err(|error| format!("create new receipt {}: {error}", receipt_path.display()))?;
-    output
+    let write_result = output
         .write_all(&serialized)
         .and_then(|_| output.write_all(b"\n"))
-        .and_then(|_| output.sync_all())
-        .map_err(|error| format!("write receipt {}: {error}", receipt_path.display()))?;
+        .and_then(|_| output.sync_all());
+    drop(output);
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&receipt_path);
+        return Err(format!("write receipt {}: {error}", receipt_path.display()));
+    }
 
     println!("HARDSEC-005 design-lineage audit: PASS");
     println!("protocol: {}", protocol.as_str());
@@ -586,7 +602,6 @@ mod tests {
         root: PathBuf,
         manifest: PathBuf,
         receipt: PathBuf,
-        source_hash: String,
     }
 
     impl Fixture {
@@ -597,7 +612,7 @@ mod tests {
             fs::create_dir_all(&root).unwrap();
             let source = root.join("design.v");
             fs::write(&source, b"module fixture; endmodule\n").unwrap();
-            let source_hash = sha256_file(&source).unwrap();
+            let source_hash = sha256_file_stable(&source).unwrap();
             let manifest = base.join("manifest.tsv");
             let receipt = base.join("out").join("receipt.json");
             fs::create_dir_all(receipt.parent().unwrap()).unwrap();
@@ -623,7 +638,7 @@ mod tests {
                 text.push('\n');
             }
             fs::write(&manifest, text).unwrap();
-            Self { root, manifest, receipt, source_hash }
+            Self { root, manifest, receipt }
         }
 
         fn args(&self) -> Args {
