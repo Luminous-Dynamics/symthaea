@@ -168,7 +168,7 @@ fn parse_header<R: BufRead>(
         return Err(format!("{label} file is empty"));
     }
     let header = line.trim_end_matches(['\n', '\r']);
-    if header.split('\t').collect::<Vec<_>>() != expected {
+    if header.split('\t').collect::<Vec<_>>().as_slice() != expected {
         return Err(format!(
             "{label} header must exactly match {}",
             expected.join("\t")
@@ -436,11 +436,12 @@ fn audit_readers<S: BufRead, R: BufRead, X: BufRead, P: BufRead>(
 
         if let Some(references) = path_edge_lookup.get(&source_edge.edge_id) {
             for (path_index, step_index) in references {
+                let path_id = paths[*path_index].path_id.clone();
                 let step = &mut paths[*path_index].steps[*step_index];
                 if step.src != source_edge.src || step.dst != source_edge.dst {
                     return Err(format!(
-                        "reference path {} edge {} endpoint mismatch against source graph",
-                        paths[*path_index].path_id, source_edge.edge_id
+                        "reference path {path_id} edge {} endpoint mismatch against source graph",
+                        source_edge.edge_id
                     ));
                 }
                 step.source_verified = true;
@@ -655,6 +656,18 @@ fn audit_files(args: &Args) -> Result<serde_json::Value, String> {
     );
 
     let summary = audit_readers(source, represented, exclusions, paths)?;
+
+    // The parser consumes each input in a second pass after its pre-hash.
+    // Re-hash afterwards so the receipt cannot bind a different version of
+    // the bytes than the version actually parsed.
+    if stable_sha256(&args.source_edges)? != source_hash
+        || stable_sha256(&args.represented_edges)? != represented_hash
+        || stable_sha256(&args.exclusions)? != exclusion_hash
+        || stable_sha256(&args.reference_paths)? != paths_hash
+    {
+        return Err("an input changed between hashing and audit parsing".to_owned());
+    }
+
     Ok(json!({
         "schema_version": "hardsec-graph-path-retention-receipt-v1",
         "result": "pass",
