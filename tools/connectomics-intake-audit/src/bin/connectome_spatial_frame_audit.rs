@@ -117,10 +117,10 @@ struct AuditReport {
     eligible_grid_cells: u64,
     excluded_grid_cells: u64,
     declared_voxel_count: String,
-    eligible_voxel_count: String,
-    excluded_voxel_count: String,
-    eligible_voxel_fraction: f64,
-    excluded_voxel_fraction: f64,
+    eligible_tile_voxel_count: String,
+    excluded_tile_voxel_count: String,
+    eligible_tile_voxel_fraction: f64,
+    excluded_tile_voxel_fraction: f64,
     population_frame_sha256: String,
     population_frame: Vec<PopulationPsu>,
     status: &'static str,
@@ -253,8 +253,8 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
     let mut seen_indices = BTreeSet::new();
     let mut seen_ids = BTreeSet::new();
     let mut population_frame = Vec::new();
-    let mut eligible_voxels = 0_u128;
-    let mut excluded_voxels = 0_u128;
+    let mut eligible_tile_voxels = 0_u128;
+    let mut excluded_tile_voxels = 0_u128;
     let mut eligible_cells = 0_u64;
     let mut excluded_cells = 0_u64;
 
@@ -303,7 +303,7 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
                 }
                 eligible_cells = eligible_cells.checked_add(1)
                     .ok_or_else(|| "eligible cell count overflows u64".to_string())?;
-                eligible_voxels = eligible_voxels.checked_add(cell_voxels)
+                eligible_tile_voxels = eligible_tile_voxels.checked_add(cell_voxels)
                     .ok_or_else(|| "eligible voxel count overflows u128".to_string())?;
                 population_frame.push(PopulationPsu {
                     psu_id: cell.psu_id.clone(),
@@ -319,7 +319,7 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
                 }
                 excluded_cells = excluded_cells.checked_add(1)
                     .ok_or_else(|| "excluded cell count overflows u64".to_string())?;
-                excluded_voxels = excluded_voxels.checked_add(cell_voxels)
+                excluded_tile_voxels = excluded_tile_voxels.checked_add(cell_voxels)
                     .ok_or_else(|| "excluded voxel count overflows u128".to_string())?;
             }
             other => return Err(format!("PSU {} has invalid disposition {other}", cell.psu_id)),
@@ -332,7 +332,7 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
     if population_frame.is_empty() {
         return Err("spatial frame contains no eligible PSUs".into());
     }
-    let partitioned_voxels = eligible_voxels.checked_add(excluded_voxels)
+    let partitioned_voxels = eligible_tile_voxels.checked_add(excluded_tile_voxels)
         .ok_or_else(|| "partitioned voxel count overflows u128".to_string())?;
     if partitioned_voxels != declared_voxels {
         return Err("eligible and excluded tiles do not partition the declared voxel box".into());
@@ -363,14 +363,14 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
         eligible_grid_cells: eligible_cells,
         excluded_grid_cells: excluded_cells,
         declared_voxel_count: declared_voxels.to_string(),
-        eligible_voxel_count: eligible_voxels.to_string(),
-        excluded_voxel_count: excluded_voxels.to_string(),
-        eligible_voxel_fraction: eligible_voxels as f64 / total_voxels_f64,
-        excluded_voxel_fraction: excluded_voxels as f64 / total_voxels_f64,
+        eligible_tile_voxel_count: eligible_tile_voxels.to_string(),
+        excluded_tile_voxel_count: excluded_tile_voxels.to_string(),
+        eligible_tile_voxel_fraction: eligible_tile_voxels as f64 / total_voxels_f64,
+        excluded_tile_voxel_fraction: excluded_tile_voxels as f64 / total_voxels_f64,
         population_frame_sha256: population_digest,
         population_frame,
         status: "PASS",
-        scope_note: "Proves exactly-once lattice tiling and eligible/excluded partitioning only within the declared integer voxel bounding box. Does not prove the box or eligibility mask covers all biologically eligible tissue, or that source digests are truthful.",
+        scope_note: "Proves exactly-once lattice tiling and eligible/excluded tile partitioning only within the declared integer voxel bounding box. Tile voxel counts are full geometric tile volumes, not foreground voxel counts from the external eligibility mask. Does not prove the box or mask covers all biologically eligible tissue, or that source digests are truthful.",
     };
     Ok(report)
 }
@@ -496,8 +496,8 @@ mod tests {
         assert_eq!(report.eligible_grid_cells, 3);
         assert_eq!(report.excluded_grid_cells, 1);
         assert_eq!(report.declared_voxel_count, "450");
-        assert_eq!(report.eligible_voxel_count, "430");
-        assert_eq!(report.excluded_voxel_count, "20");
+        assert_eq!(report.eligible_tile_voxel_count, "430");
+        assert_eq!(report.excluded_tile_voxel_count, "20");
         assert_eq!(report.population_frame.len(), 3);
         assert_eq!(report.population_frame_sha256, population_frame_sha256(&report.population_frame));
     }
