@@ -625,7 +625,7 @@ mod tests {
         let mut cost = amounts(100, 100, 100, 100, 100);
         cost.energy_millijoules = None;
         let plan = allocator.recommend(&[candidate("unknown", 0.9, cost)]).unwrap();
-        assert!(matches!(plan.candidate_feasibility[0].status, FeasibilityStatus::Infeasible { .. }));
+        assert!(matches!(&plan.candidate_feasibility[0].status, FeasibilityStatus::Infeasible { .. }));
     }
 
     #[test]
