@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod basalt_state;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -15,6 +16,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Audit currentness and re-verification obligations for a BASALT evidence timeline.
+    BasaltStateAudit {
+        /// Path to the event-sourced resource/evidence timeline JSON.
+        #[arg(long)]
+        input: PathBuf,
+    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -83,6 +90,13 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::BasaltStateAudit { input } => {
+            let report = basalt_state::audit_file(&input)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.structurally_valid {
+                anyhow::bail!("BASALT evidence-state timeline is structurally invalid");
+            }
+        }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
             println!("{}", serde_json::to_string_pretty(&report)?);

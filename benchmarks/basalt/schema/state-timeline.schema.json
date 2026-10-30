@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT event-sourced evidence-state timeline",
+  "description": "Ordered resource changes and evidence records. Resource generations prevent evidence resurrection after digest reversion. Freshness is not issuer authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program",
+    "run_id",
+    "initial_resources",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "program": {
+      "const": "BASALT"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "initial_resources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "digest"
+        ],
+        "properties": {
+          "resource_id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "digest": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 20000,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/resourceChanged"
+          },
+          {
+            "$ref": "#/$defs/evidenceRecorded"
+          }
+        ]
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "resourceChanged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_type",
+        "sequence",
+        "event_id",
+        "change_kind",
+        "event_digest",
+        "resource_id",
+        "before_digest",
+        "after_digest"
+      ],
+      "properties": {
+        "entry_type": {
+          "const": "resource_changed"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "change_kind": {
+          "enum": [
+            "source_change",
+            "dependency_change",
+            "toolchain_change",
+            "configuration_change",
+            "task_contract_change",
+            "environment_change",
+            "session_change",
+            "other"
+          ]
+        },
+        "event_digest": {
+          "$ref": "#/$defs/digest",
+          "description": "SHA-256 of compact canonical JSON over the domain `basalt.resource-change.v1`, schema_version=1, run_id, sequence, event_id, change_kind, resource_id, before_digest, and after_digest, in that field order. This binds payload identity but is not an issuer signature."
+        },
+        "resource_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "before_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "after_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "resourcePin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "digest",
+        "generation"
+      ],
+      "properties": {
+        "resource_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "evidenceRecorded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_type",
+        "sequence",
+        "evidence_id",
+        "check_id",
+        "evidence_kind",
+        "outcome",
+        "evidence_digest",
+        "resource_pins",
+        "evidence_dependencies",
+        "dependency_coverage",
+        "unresolved_inputs"
+      ],
+      "properties": {
+        "entry_type": {
+          "const": "evidence_recorded"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "check_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "evidence_kind": {
+          "enum": [
+            "build",
+            "test",
+            "typecheck",
+            "lint",
+            "security",
+            "scope",
+            "regression",
+            "other"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "unresolved",
+            "not_run"
+          ]
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "resource_pins": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/resourcePin"
+          }
+        },
+        "evidence_dependencies": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "dependency_coverage": {
+          "$ref": "#/$defs/dependencyCoverage"
+        },
+        "unresolved_inputs": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/unresolvedInput"
+          },
+          "description": "Required empty when dependency_coverage=complete; required non-empty and explicitly identified when dependency_coverage=incomplete."
+        }
+      }
+    },
+    "dependencyCoverage": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "incomplete"
+      ],
+      "description": "Complete means the producer asserts the dependency observation is exhaustive for the evidence. Incomplete is a conservative declaration that untracked inputs remain."
+    },
+    "unresolvedInput": {
+      "$ref": "#/$defs/identifier"
+    }
+  }
+}

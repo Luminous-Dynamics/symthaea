@@ -72,6 +72,14 @@ The filesystem loader canonicalizes the supplied specification root, rejects sym
 
 The synthetic specification is public only because it is a deliberately fabricated development fixture. The same file layout does not imply that holdout specifications should be committed to a public repository.
 
+## Event-sourced evidence freshness audit
+
+The separate `xtask basalt-state-audit --input STATE-TIMELINE.json` command audits ordered resource changes and evidence records. It starts resources at generation zero, requires every evidence record to pin the exact current resource digest and generation, and uses prior evidence IDs as explicit dependency edges. A resource change increments generation and invalidates direct evidence dependents plus their transitive descendants. Unrelated evidence is retained; digest reversion does not resurrect old evidence. The report distinguishes fresh, directly stale, and transitively stale evidence, and emits a topological re-verification queue. Each evidence record must declare `dependency_coverage=complete|incomplete` and name any unresolved inputs. Incomplete evidence is never eligible under the declared coverage, is queued even before a change, and is conservatively invalidated by every later resource change. Descendants are invalidated transitively. The output distinguishes `structurally_valid` from `confirmatory_eligible`; the latter is always false because a producer's completeness assertion and unsigned timeline do not prove complete observation or issuer identity.
+
+See [the evidence freshness protocol](BASALT_EVIDENCE_FRESHNESS_2026-10-30.md), the [state timeline schema](../../benchmarks/basalt/schema/state-timeline.schema.json), and the [synthetic timeline](../../benchmarks/basalt/examples/state-timeline.example.json).
+
+This auditor establishes consistency relative to the supplied timeline; it does not authenticate event issuers, prove that a runner observed every real change, or establish that recorded checks executed honestly. Event/evidence receipt verification and isolated runner delivery remain mandatory before confirmatory scoring.
+
 ## Frozen requirement-to-verifier coverage ledger
 
 Suite-manifest schema version 3 adds a per-task requirement ledger. Each atomic requirement has a unique ID, a content-addressed source span into the pinned task specification (UTF-8 byte offsets, half-open range bounded by the frozen specification byte length), a statement digest, a pre-run expectation digest, explicit/inferred origin, ambiguity disposition, and one or more mapped blocking check IDs. Inferred requirements additionally require a content-addressed rationale; explicit requirements must not carry an inference rationale.
@@ -151,3 +159,6 @@ BASALT's differentiated aim should be **verified change per unit cost under cont
 - [in-toto Attestation Framework v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md)
 - [SLSA v1.2 specification](https://slsa.dev/spec/v1.2/)
 - [GitHub artifact attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
+
+
+For current task-quality context, Scale AI's SWE-Bench Pro V2 update on 22 September 2026 reduced its public split to 642 tasks across 11 repositories after removing 89 invalid tasks and correcting 69 instruction/test contradictions. It disabled agent web tools and re-graded every candidate diff in a pristine image, detecting Go module checksum and cache tampering. BASALT should adopt the same separation between agent-visible workspace and pristine verifier, while explicitly testing patch-controlled verifier execution and environment integrity. Artificial Analysis Coding Agent Index v2.0 now combines 100 private FrontierCode v1.1 maintainer-merge tasks, 66 Terminal-Bench 4.0 tasks, and 124 SWE-Atlas-QnA-AA tasks. Reproduce public lanes with matched harness/budgets and use private maintainer-merge results as methodological context only; do not compare their composite directly with BASALT.
