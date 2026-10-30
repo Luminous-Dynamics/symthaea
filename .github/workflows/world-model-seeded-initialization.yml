@@ -10,6 +10,7 @@ on:
       - "src/dynamics/crate_world_model.rs"
       - "src/bin/cmaq-008-world-model-smoke.rs"
       - "src/bin/cmaq-008-residual-ablation.rs"
+      - "src/bin/cmaq-008-action-ranking.rs"
       - ".github/workflows/world-model-seeded-initialization.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -19,6 +20,7 @@ on:
     paths:
       - "src/dynamics/crate_world_model.rs"
       - "src/bin/cmaq-008-residual-ablation.rs"
+      - "src/bin/cmaq-008-action-ranking.rs"
       - ".github/workflows/world-model-seeded-initialization.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -198,5 +200,77 @@ jobs:
                       ],
                   } for objective in objectives
               } for regime in ("source", "action_effect_reversal")
+          }, sort_keys=True))
+          PY
+- name: Test real CfC counterfactual action ranking
+        run: cargo test --bin cmaq-008-action-ranking
+
+      - name: Run real CfC counterfactual action ranking
+        run: cargo run --bin cmaq-008-action-ranking > /tmp/cmaq-008-action-ranking.json
+
+      - name: Validate action ranking, regret and held-out shift
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-008-action-ranking.json").read_text())
+          assert report["schema_version"] == "cmaq-008-action-ranking-v0.1"
+          assert report["model"] == "HierarchicalCfCWorldModel"
+          assert report["dimensions"] == {"hdc": 16, "hidden": 24}
+          assert report["training"] == {
+              "samples": 192, "epochs": 12, "seeds": 10, "learning_rate": 0.001
+          }
+          assert report["evaluation_states_per_regime_per_seed"] == 96
+          assert report["candidate_actions"] == ["zero", "cancel_source", "reverse_source"]
+          assert report["model_forward_calls_per_decision"] == 3
+          assert report["direct_policy"].startswith("best constant action transform selected from logged training outcomes")
+          assert set(report["regimes"]) == {"source_holdout", "action_effect_reversal"}
+          assert len(report["per_seed"]) == 10
+
+          for regime, row in report["regimes"].items():
+              for key in (
+                  "model_reward", "direct_reward", "oracle_reward", "model_lift_vs_direct",
+                  "model_regret", "direct_regret", "model_beats_direct_rate", "model_harm_rate",
+                  "oracle_action_agreement", "pairwise_ranking_accuracy",
+                  "reward_prediction_mae", "next_state_prediction_mse", "model_action_override_rate",
+              ):
+                  assert math.isfinite(row[key]), (regime, key, row)
+              assert len(row["lift_ci95"]) == 2
+              assert row["lift_ci95"][0] <= row["lift_ci95"][1]
+              for key in (
+                  "model_beats_direct_rate", "model_harm_rate", "oracle_action_agreement",
+                  "pairwise_ranking_accuracy", "model_action_override_rate",
+              ):
+                  assert 0.0 <= row[key] <= 1.0
+              assert row["model_regret"] >= -1e-9
+              assert row["direct_regret"] >= -1e-9
+
+          for seed in report["per_seed"]:
+              assert len(seed["seed"]) == 16
+              assert seed["direct_mode"] in {"zero", "cancel_source", "reverse_source"}
+              assert seed["training_steps"] == 192 * 12
+              for key in (
+                  "training_mse", "source_lift", "source_regret", "source_pairwise_accuracy",
+                  "reversal_lift", "reversal_regret", "reversal_pairwise_accuracy",
+              ):
+                  assert math.isfinite(seed[key]), (key, seed)
+
+          print("CMAQ-008 actual CfC counterfactual action ranking, logged direct baseline, oracle regret, paired seed interval and held-out action-effect reversal validated")
+          print(json.dumps({
+              regime: {
+                  "model_lift_vs_direct": row["model_lift_vs_direct"],
+                  "lift_ci95": row["lift_ci95"],
+                  "model_regret": row["model_regret"],
+                  "direct_regret": row["direct_regret"],
+                  "model_harm_rate": row["model_harm_rate"],
+                  "pairwise_ranking_accuracy": row["pairwise_ranking_accuracy"],
+                  "oracle_action_agreement": row["oracle_action_agreement"],
+                  "reward_prediction_mae": row["reward_prediction_mae"],
+              }
+              for regime, row in report["regimes"].items()
           }, sort_keys=True))
           PY
