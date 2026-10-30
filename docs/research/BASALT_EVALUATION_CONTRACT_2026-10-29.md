@@ -62,9 +62,17 @@ The Rust module now contains 37 unit-test cases, including paired-arm omissions,
 
 The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
 
+## Frozen requirement-to-verifier coverage ledger
+
+Suite-manifest schema version 3 adds a per-task requirement ledger. Each atomic requirement has a unique ID, a content-addressed source span into the pinned task specification (UTF-8 byte offsets, half-open range), a statement digest, a pre-run expectation digest, explicit/inferred origin, ambiguity disposition, and one or more mapped blocking check IDs. Inferred requirements additionally require a content-addressed rationale; explicit requirements must not carry an inference rationale.
+
+The validator enforces that source-span digests equal the frozen task `spec_digest`, spans are non-empty, requirement IDs are unique, accepted tasks contain no materially unresolved requirement, and every requirement maps to a check declared as required and blocking in that task. The run validator still does not possess the hidden task-spec bytes or oracle semantics, so it cannot prove the offsets resolve to the stated requirement, that the interpretation is correct, or that the mapped test actually covers the behavior. Those are independent reference-assurance and reviewer duties tracked in [#9115](https://github.com/Luminous-Dynamics/symthaea/issues/9115) and [#9081](https://github.com/Luminous-Dynamics/symthaea/issues/9081).
+
+The synthetic fixture's two requirements and digest values are illustrative placeholders only. They are not real prompt quotations, executed tests, or evidence of oracle coverage.
+
 ## Frozen task-specific patch-quality rubric
 
-Suite-manifest schema version 2 freezes a task-specific rubric before any system outcome is observed. Each task declares a rubric ID/version, a 10000-basis-point total, unique criteria, an explicit applicability decision and rationale, admissible evidence sources, reviewer guidance, and five ordered anchors (scores 0 through 4) for every criterion.
+Suite-manifest schema version 3 freezes a task-specific requirement ledger and task-specific rubric before any system outcome is observed. Each task declares a rubric ID/version, a 10000-basis-point total, unique criteria, an explicit applicability decision and rationale, admissible evidence sources, reviewer guidance, and five ordered anchors (scores 0 through 4) for every criterion.
 
 Only criteria marked `scored` carry positive weight; their weights must sum exactly to 10000 basis points. A `not_applicable` criterion must carry zero weight and a non-empty pre-run rationale. Criterion IDs and evidence sources are unique. The validator rejects duplicate criteria, missing evidence, missing guidance, unordered anchors, invalid applicability weights, and weight totals that drift from the declared total. Changing any rubric byte changes the manifest digest and therefore invalidates a record pinned to the previous manifest.
 
