@@ -671,8 +671,7 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         }
     }
 
-    if fields.purpose.is_audit_candidate() {
-        for record in &fields.initial_adjudications {
+    for record in &fields.initial_adjudications {
             if record.decision.requires_current_source() {
                 let claim = claims.get(record.claim_id.as_str());
                 for span_id in &record.evidence_span_ids {
@@ -703,7 +702,6 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                     issues.push(format!("adjudication {} declares temporal staleness without a superseded/deleted/retracted source", record.record_id));
                 }
             }
-        }
     }
     issues
 }
