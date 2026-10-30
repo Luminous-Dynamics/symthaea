@@ -28,6 +28,9 @@
     "right_unmapped_criterion_count",
     "left_weight_total_millionths",
     "right_weight_total_millionths",
+    "left_right_mapping_adjudicator_overlap_count",
+    "mapping_adjudicator_ids_disjoint",
+    "mapping_panel_independence_proven",
     "shared_anchor_item_count",
     "minimum_anchor_items_per_construct",
     "direct_score_comparison_allowed",
@@ -173,6 +176,16 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "left_right_mapping_adjudicator_overlap_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mapping_adjudicator_ids_disjoint": {
+      "type": "boolean"
+    },
+    "mapping_panel_independence_proven": {
+      "const": false
     }
   },
   "$defs": {
