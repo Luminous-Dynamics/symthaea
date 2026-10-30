@@ -27,7 +27,7 @@
   "preregistration": {
     "independent_unit_definition": "One independently sampled workload instance; each fingerprint appears once. Repeated seeds, attempts and timing samples are reduced within instance before analysis.",
     "within_block_reduction": "Median end-to-end resource and median output quality across preregistered repeated runs.",
-    "minimum_relative_resource_gain": 0.1,
+    "minimum_relative_resource_reduction": 0.1,
     "quality_non_inferiority_margin": 0.02,
     "resource_tie_tolerance_log_ratio": 1e-12,
     "quality_tie_tolerance": 1e-12,
