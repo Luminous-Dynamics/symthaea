@@ -247,6 +247,12 @@ pub fn rank_rida_ablations(
     let maximum_evsi_per_cost = nominal_ranking
         .scores
         .iter()
+        .filter(|score| {
+            context.profiles.iter().any(|profile| {
+                profile.eligibility_status == ExperimentEligibilityStatus::Eligible
+                    && profile.experiment_id == score.experiment_id
+            })
+        })
         .map(|score| score.value_per_cost)
         .fold(0.0_f64, f64::max);
 
@@ -724,6 +730,12 @@ mod tests {
             .component_scores
             .iter()
             .all(|score| score.experiment_id != "A-high-info-out-of-distribution"));
+        let c = report
+            .component_scores
+            .iter()
+            .find(|score| score.experiment_id == "C-balanced-rid")
+            .unwrap();
+        assert!((c.informativeness_score - 1.0).abs() < 1e-12);
         assert_eq!(
             report.ineligible_candidates,
             vec![RidaIneligibleCandidate {
