@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "certificate_id": "synthetic-query-cert-001",
+  "state": "CONDITIONAL",
+  "query": {
+    "query_id": "synthetic-directed-path-query",
+    "specification_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "implementation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "parameters_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "scope": "Synthetic graph only; path existence from neuron-17 to neuron-42 in region-sim-01."
+  },
+  "source_revisions": [
+    {
+      "source_kind": "volume",
+      "source_id": "synthetic-volume",
+      "revision_id": "rev-1",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "source_kind": "connectome_graph",
+      "source_id": "synthetic-graph",
+      "revision_id": "graph-1",
+      "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "dependency_closure": [
+    {
+      "object_kind": "neuron",
+      "object_id": "neuron-17",
+      "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "object_kind": "neuron",
+      "object_id": "neuron-42",
+      "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "object_kind": "edge",
+      "object_id": "edge-17-42",
+      "source_revision_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "applied_corrections": [],
+  "evidence_bindings": [
+    {
+      "evidence_type": "dataset_intake",
+      "artifact_id": "synthetic-intake",
+      "artifact_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "role": "source identity"
+    },
+    {
+      "evidence_type": "candidate_generation_audit",
+      "artifact_id": "synthetic-coverage",
+      "artifact_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "role": "search coverage"
+    }
+  ],
+  "quality_gates": [
+    {
+      "gate_id": "source-lineage",
+      "status": "PASS",
+      "critical": true,
+      "scope_note": "Synthetic source digests are internally consistent."
+    },
+    {
+      "gate_id": "critical-family-recall",
+      "status": "NOT_ESTIMABLE",
+      "critical": true,
+      "scope_note": "No biological sampling support exists in this synthetic example."
+    }
+  ],
+  "uncertainty_components": [
+    {
+      "component_type": "sampling_design",
+      "status": "NOT_ESTIMABLE",
+      "estimate": null,
+      "interval_95": null,
+      "assumptions": [
+        "No probability sample was collected."
+      ],
+      "scope_note": "No biological inference."
+    },
+    {
+      "component_type": "unseen_error_mse",
+      "status": "SENSITIVITY_ONLY",
+      "estimate": null,
+      "interval_95": null,
+      "assumptions": [
+        "No multi-list capture histories supplied."
+      ],
+      "scope_note": "No unseen-error point estimate."
+    }
+  ],
+  "scope_exclusions": [
+    "No biological dataset",
+    "No whole-connectome claim",
+    "No causal reviewer-efficiency claim"
+  ],
+  "invalidation_policy_version": "synthetic-dependency-invalidation-v1",
+  "verifier": {
+    "tool_id": "connectome-query-cert-audit",
+    "tool_version": "0.1.0-protocol-fixture",
+    "binary_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  }
+}
