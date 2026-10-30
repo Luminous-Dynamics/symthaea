@@ -17,7 +17,7 @@ High window-level accuracy can coexist with missed attack episodes, unacceptable
 The following are published findings, not locally reproduced results:
 
 - The HARPY-V-GEM5 study published on 27 October 2026 reports known-workload detection accuracy above 99% for lightweight Decision Tree / Random Forest methods, but also large gaps under Leave-One-Program-Out evaluation and near-zero detection for some held-out attack families. It suggests instruction features for inexpensive screening and HPC features for attribution, while noting that its experiments are simulator-based and include only 16 proof-of-concept exploit implementations.
-- The physical HARPY-V study published on 24 September 2026 reports that concurrently recording multiple hardware performance counters inflated some recorded values by over 300% in one example. It instead collected each event separately on its test platform and notes that direct energy measurement was unavailable.
+- The physical HARPY-V study published on 24 September 2026 reports that concurrently recording multiple hardware performance counters inflated some recorded values by over 300% in one example. It therefore collected each event separately on its test platform. In a separate multi-process experiment on that platform, dividing each raw counter value by retired instructions for the sample reportedly produced 98.56% accuracy versus 60% for unnormalized counts; it evaluated one attack plus one benign process and one attack plus three benign processes. The paper reports an average `perf` collection overhead of about 0.2 ms per 10 ms sample (2% of execution time). The platform was one Xuantie C910, direct energy was not measured, and these values are study-specific—not a portable deployment guarantee.
 
 These results make four failure modes first-class: source/program leakage, held-out-family failure, false alarms in benign but unusual workloads, and measurement-induced distribution shift.
 
@@ -108,7 +108,19 @@ Record per-stage and end-to-end:
 - frequency of expensive stage activation and fallback/abstention;
 - measured energy only when a calibrated measurement source exists.
 
-Use identical hardware/tool settings for paired comparisons. Separate inference cost from instrumentation cost. Report observer effect by comparing workload/counter behavior and detector output with and without collection; isolate counters when concurrent collection is known to perturb the platform. Do not infer energy from CPU utilization or model FLOPs.
+Use identical hardware/tool settings for paired comparisons. Separate inference cost from instrumentation cost. Report observer effect by comparing workload/counter behavior and detector output with and without collection; isolate counters when concurrent collection is known to perturb the platform.
+
+### 4.6 Counter normalization and measurement invariance
+
+Include a predeclared raw-versus-normalized feature ablation wherever the source schema supports the required denominator. The physical HARPY-V study's per-retired-instruction normalization result (98.56% versus 60% in its specific multi-process experiment) is a compelling baseline to reproduce, not a result to assume will transfer.
+
+At minimum compare:
+- raw event counts;
+- event counts per retired instruction (the cited study's normalization);
+- alternative physically meaningful denominators only where units and acquisition semantics are validated;
+- no-denominator / zero-denominator / missing-denominator behavior.
+
+Keep the denominator as a provenance-bearing input. Do not calculate a ratio when the denominator is zero, missing, saturated, or captured in a different acquisition interval; return an explicit invalid/abstain state. Fit any data-dependent transforms using training data only. Compare raw and normalized modes on the same group holdouts, benign interference conditions, and device/configuration strata. Normalization can suppress workload-scale variation, but it can also conceal genuine attacks or amplify denominator noise; treat this as a falsifiable invariance hypothesis, not an automatic improvement.
 
 ## 5. Frozen comparison matrix
 
