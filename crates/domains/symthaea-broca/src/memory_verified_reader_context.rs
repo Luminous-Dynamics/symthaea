@@ -1,0 +1,463 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
+//! Fail-closed adapter from independently verified proof packets to reader context.
+//!
+//! No retrieval, reranking, truncation, or excerpt rewriting occurs here. The
+//! adapter verifies sufficiency and optimality first, then exposes exact source
+//! spans as MemoryContextItems while retaining provenance and proof edges in a
+//! separate control-plane structure.
+//!
+//! This module does not prove natural-language entailment. A downstream claim
+//! extractor must map answer claims to registered conclusion IDs; this module
+//! then checks the declared selected justification and its complete evidence set.
+//! Source resolution, authorization, contradiction discovery, tokenization and
+//! rendering remain the responsibility of separately identified trusted adapters.
+
+use crate::memory_evidence::{MemoryContextItem, MemoryContextType};
+use crate::memory_proof_budget::{
+    ProofBudgetRequest, ProofBudgetResult, ProofBudgetStatus, SelectedProof,
+    verify_proof_budget_result,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Provenance retained outside reader-visible text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedReaderEvidence {
+    pub evidence_id: String,
+    pub source_revision_id: String,
+    pub source_pointer: String,
+    pub source_family_id: String,
+    pub payload_sha256: String,
+    pub source_span_sha256: String,
+    pub authorization_receipt_sha256: String,
+    pub retrieval_rank: u32,
+    pub token_cost: u32,
+}
+
+/// The selected OR-of-AND proof for one required conclusion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedReaderClaimProof {
+    pub conclusion_id: String,
+    pub justification_id: String,
+    /// Complete conjunctive dependency set in canonical order.
+    pub evidence_dependencies: Vec<String>,
+}
+
+/// Claim/evidence declaration supplied by a downstream answer adapter.
+///
+/// The struct records a mapping made by the caller; it is not a natural-language
+/// entailment proof and does not discover claims in generated prose.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReaderClaimEvidenceUse {
+    pub conclusion_id: String,
+    pub justification_id: String,
+    pub cited_evidence_ids: BTreeSet<String>,
+}
+
+/// Reader context built only from an independently verified proof packet.
+///
+/// context_items are the reader-visible source excerpts. evidence and
+/// claim_proofs are control-plane metadata and must not be silently serialized
+/// as additional memory text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedProofReaderContext {
+    pub decision_id: String,
+    pub principal_id: String,
+    pub scope_id: String,
+    pub valid_at_unix_ms: u64,
+    pub known_at_unix_ms: u64,
+    pub request_sha256: String,
+    pub packet_sha256: String,
+    pub tokenizer_id: String,
+    pub tokenizer_version: String,
+    pub tokenizer_sha256: String,
+    pub packet_renderer_sha256: String,
+    pub total_token_cost: u64,
+    pub token_budget: u64,
+    pub context_items: Vec<MemoryContextItem>,
+    pub evidence: Vec<VerifiedReaderEvidence>,
+    pub claim_proofs: Vec<VerifiedReaderClaimProof>,
+}
+
+impl VerifiedProofReaderContext {
+    /// Borrow the exact reader context without changing its order or contents.
+    pub fn memory_context_items(&self) -> &[MemoryContextItem] {
+        &self.context_items
+    }
+
+    /// Check each declared claim against the exact selected proof dependencies.
+    ///
+    /// This rejects unknown conclusions, wrong alternative proofs, omitted
+    /// premises, added distractors and evidence absent from reader context.
+    /// It does not establish that the natural-language claim follows from them.
+    pub fn verify_claim_evidence_uses(
+        &self,
+        uses: &[ReaderClaimEvidenceUse],
+    ) -> Result<(), String> {
+        let proofs_by_conclusion: BTreeMap<&str, &VerifiedReaderClaimProof> = self
+            .claim_proofs
+            .iter()
+            .map(|proof| (proof.conclusion_id.as_str(), proof))
+            .collect();
+        let context_evidence_ids: BTreeSet<&str> = self
+            .evidence
+            .iter()
+            .map(|evidence| evidence.evidence_id.as_str())
+            .collect();
+
+        let mut seen_conclusions = BTreeSet::new();
+        for usage in uses {
+            if !seen_conclusions.insert(usage.conclusion_id.as_str()) {
+                return Err(format!(
+                    "duplicate evidence-use declarations for conclusion {:?}",
+                    usage.conclusion_id
+                ));
+            }
+            let proof = proofs_by_conclusion
+                .get(usage.conclusion_id.as_str())
+                .ok_or_else(|| format!(
+                    "answer claim references unknown or unselected conclusion {:?}",
+                    usage.conclusion_id
+                ))?;
+            if usage.justification_id != proof.justification_id {
+                return Err(format!(
+                    "answer claim for {:?} names justification {:?}, but packet selected {:?}",
+                    usage.conclusion_id, usage.justification_id, proof.justification_id
+                ));
+            }
+
+            let expected: BTreeSet<&str> = proof
+                .evidence_dependencies
+                .iter()
+                .map(String::as_str)
+                .collect();
+            let cited: BTreeSet<&str> = usage
+                .cited_evidence_ids
+                .iter()
+                .map(String::as_str)
+                .collect();
+            if cited != expected {
+                return Err(format!(
+                    "answer claim for {:?} must cite the complete exact selected dependency set",
+                    usage.conclusion_id
+                ));
+            }
+            if let Some(missing) = cited
+                .iter()
+                .find(|evidence_id| !context_evidence_ids.contains(*evidence_id))
+            {
+                return Err(format!(
+                    "answer claim cites evidence {:?} absent from verified reader context",
+                    missing
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Check that reader-visible spans and control-plane provenance remain aligned.
+    pub fn verify_internal_consistency(&self) -> Result<(), String> {
+        if self.context_items.len() != self.evidence.len() {
+            return Err(format!(
+                "reader item count {} differs from evidence metadata count {}",
+                self.context_items.len(),
+                self.evidence.len()
+            ));
+        }
+        if self.context_items.is_empty() {
+            return Err("verified reader context must contain at least one evidence item".into());
+        }
+        if self.total_token_cost > self.token_budget {
+            return Err("verified reader context exceeds its declared token budget".into());
+        }
+
+        let mut evidence_ids = BTreeSet::new();
+        for (index, (item, evidence)) in self
+            .context_items
+            .iter()
+            .zip(&self.evidence)
+            .enumerate()
+        {
+            if item.kind != MemoryContextType::Text || item.value.trim().is_empty() {
+                return Err(format!("reader evidence item {index} is not non-empty text"));
+            }
+            if evidence.evidence_id.trim().is_empty()
+                || !evidence_ids.insert(evidence.evidence_id.as_str())
+            {
+                return Err(format!("reader evidence item {index} has an empty or duplicate ID"));
+            }
+            if evidence.source_revision_id.trim().is_empty()
+                || evidence.source_pointer.trim().is_empty()
+                || evidence.source_family_id.trim().is_empty()
+            {
+                return Err(format!("reader evidence item {index} has incomplete provenance"));
+            }
+        }
+
+        let mut conclusions = BTreeSet::new();
+        for proof in &self.claim_proofs {
+            if proof.conclusion_id.trim().is_empty()
+                || proof.justification_id.trim().is_empty()
+                || !conclusions.insert(proof.conclusion_id.as_str())
+            {
+                return Err("claim proof metadata has an empty or duplicate conclusion".into());
+            }
+            if proof.evidence_dependencies.is_empty() {
+                return Err(format!("selected proof {:?} has no dependencies", proof.justification_id));
+            }
+            let mut dependencies = BTreeSet::new();
+            for evidence_id in &proof.evidence_dependencies {
+                if !evidence_ids.contains(evidence_id.as_str()) {
+                    return Err(format!(
+                        "selected proof {:?} references absent evidence {:?}",
+                        proof.justification_id, evidence_id
+                    ));
+                }
+                if !dependencies.insert(evidence_id.as_str()) {
+                    return Err(format!(
+                        "selected proof {:?} repeats evidence {:?}",
+                        proof.justification_id, evidence_id
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Independently verify a proof result and construct its exact reader context.
+/// A non-Supported, insufficient, non-optimal, tampered or over-budget packet
+/// is rejected before any reader-visible item is returned.
+pub fn build_verified_proof_reader_context(
+    request: &ProofBudgetRequest,
+    result: &ProofBudgetResult,
+) -> Result<VerifiedProofReaderContext, String> {
+    if result.status != ProofBudgetStatus::Supported {
+        return Err(format!("cannot build reader context from proof status {:?}", result.status));
+    }
+    verify_proof_budget_result(request, result)?;
+    if result.evidence.is_empty() || result.selected_proofs.is_empty() {
+        return Err("Supported packet must contain evidence and selected proofs".into());
+    }
+    if result.total_token_cost > request.token_budget {
+        return Err("verified packet exceeds request token budget".into());
+    }
+
+    let context_items = result
+        .evidence
+        .iter()
+        .map(|evidence| MemoryContextItem {
+            kind: MemoryContextType::Text,
+            value: evidence.source_span_text.clone(),
+        })
+        .collect();
+    let evidence = result
+        .evidence
+        .iter()
+        .map(|evidence| VerifiedReaderEvidence {
+            evidence_id: evidence.evidence_id.clone(),
+            source_revision_id: evidence.source_revision_id.clone(),
+            source_pointer: evidence.source_pointer.clone(),
+            source_family_id: evidence.source_family_id.clone(),
+            payload_sha256: evidence.payload_sha256.clone(),
+            source_span_sha256: evidence.source_span_sha256.clone(),
+            authorization_receipt_sha256: evidence.authorization_receipt_sha256.clone(),
+            retrieval_rank: evidence.retrieval_rank,
+            token_cost: evidence.token_cost,
+        })
+        .collect();
+    let claim_proofs = result
+        .selected_proofs
+        .iter()
+        .map(|proof: &SelectedProof| VerifiedReaderClaimProof {
+            conclusion_id: proof.conclusion_id.clone(),
+            justification_id: proof.justification_id.clone(),
+            evidence_dependencies: proof.evidence_dependencies.clone(),
+        })
+        .collect();
+
+    let context = VerifiedProofReaderContext {
+        decision_id: request.decision_id.clone(),
+        principal_id: request.principal_id.clone(),
+        scope_id: request.scope_id.clone(),
+        valid_at_unix_ms: request.valid_at_unix_ms,
+        known_at_unix_ms: request.known_at_unix_ms,
+        request_sha256: result.request_sha256.clone(),
+        packet_sha256: result
+            .packet_sha256
+            .clone()
+            .ok_or_else(|| "Supported packet is missing packet_sha256".to_string())?,
+        tokenizer_id: request.tokenizer_id.clone(),
+        tokenizer_version: request.tokenizer_version.clone(),
+        tokenizer_sha256: request.tokenizer_sha256.clone(),
+        packet_renderer_sha256: request.packet_renderer_sha256.clone(),
+        total_token_cost: result.total_token_cost,
+        token_budget: request.token_budget,
+        context_items,
+        evidence,
+        claim_proofs,
+    };
+    context.verify_internal_consistency()?;
+    Ok(context)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory_proof_budget::{
+        ProofBudgetRequest, ProofEvidenceCandidate, ProofJustification, ProofObligation,
+        solve_proof_budget,
+    };
+    use sha2::{Digest, Sha256};
+
+    fn digest(value: &str) -> String {
+        format!("{:x}", Sha256::digest(value.as_bytes()))
+    }
+
+    fn candidate(id: &str, token_cost: u32) -> ProofEvidenceCandidate {
+        let excerpt = format!("source excerpt {id}");
+        let span_sha256 = digest(&excerpt);
+        ProofEvidenceCandidate {
+            evidence_id: id.into(),
+            source_revision_id: format!("revision-{id}"),
+            source_pointer: format!("/messages/{id}/content"),
+            source_span_text: excerpt.clone(),
+            source_span_start: 0,
+            source_span_end: excerpt.len() as u64,
+            source_family_id: format!("family-{id}"),
+            scope_id: "scope-1".into(),
+            payload_sha256: digest("payload"),
+            source_span_sha256: span_sha256.clone(),
+            resolved_span_sha256: span_sha256,
+            conflicts_with: BTreeSet::new(),
+            recorded_at_unix_ms: 100,
+            retracted_at_unix_ms: None,
+            valid_from_unix_ms: Some(10),
+            valid_until_unix_ms: None,
+            authorized_principal_id: "principal-1".into(),
+            authorization_accepted: true,
+            authorization_receipt_sha256: digest("authorization receipt"),
+            retrieval_rank: 50,
+            token_cost,
+        }
+    }
+
+    fn request() -> ProofBudgetRequest {
+        ProofBudgetRequest {
+            decision_id: "decision-1".into(),
+            principal_id: "principal-1".into(),
+            scope_id: "scope-1".into(),
+            valid_at_unix_ms: 200,
+            known_at_unix_ms: 200,
+            policy_id: "policy-v1".into(),
+            policy_sha256: digest("policy"),
+            fixed_packet_overhead_tokens: 3,
+            token_budget: 64,
+            max_search_nodes: 10_000,
+            tokenizer_id: "test-tokenizer".into(),
+            tokenizer_version: "1".into(),
+            tokenizer_sha256: digest("tokenizer"),
+            packet_renderer_sha256: digest("renderer"),
+            candidates: vec![candidate("A", 2), candidate("B", 3)],
+            obligations: vec![ProofObligation {
+                conclusion_id: "claim-1".into(),
+                alternatives: vec![
+                    ProofJustification {
+                        justification_id: "proof-A".into(),
+                        evidence_dependencies: vec!["A".into()],
+                    },
+                    ProofJustification {
+                        justification_id: "proof-B".into(),
+                        evidence_dependencies: vec!["B".into()],
+                    },
+                ],
+                minimum_independent_families: 1,
+                selection_overhead_tokens: 2,
+            }],
+        }
+    }
+
+    #[test]
+    fn reader_context_is_built_only_from_independently_verified_packet() {
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+
+        assert_eq!(context.context_items.len(), 1);
+        assert_eq!(context.context_items[0].kind, MemoryContextType::Text);
+        assert_eq!(context.context_items[0].value, "source excerpt A");
+        assert_eq!(context.evidence[0].evidence_id, "A");
+        assert_eq!(context.claim_proofs[0].justification_id, "proof-A");
+        assert_eq!(context.total_token_cost, 7);
+        context.verify_internal_consistency().unwrap();
+    }
+
+    #[test]
+    fn reader_context_rejects_non_supported_search_results() {
+        let mut req = request();
+        req.max_search_nodes = 1;
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::SearchLimitReached);
+        assert!(build_verified_proof_reader_context(&req, &result)
+            .unwrap_err()
+            .contains("SearchLimitReached"));
+    }
+
+    #[test]
+    fn answer_claim_must_cite_exact_selected_and_dependencies() {
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+
+        let valid_use = ReaderClaimEvidenceUse {
+            conclusion_id: "claim-1".into(),
+            justification_id: "proof-A".into(),
+            cited_evidence_ids: BTreeSet::from(["A".into()]),
+        };
+        context.verify_claim_evidence_uses(&[valid_use.clone()]).unwrap();
+
+        let missing_premise = ReaderClaimEvidenceUse {
+            cited_evidence_ids: BTreeSet::new(),
+            ..valid_use.clone()
+        };
+        assert!(context.verify_claim_evidence_uses(&[missing_premise]).is_err());
+
+        let wrong_alternative = ReaderClaimEvidenceUse {
+            justification_id: "proof-B".into(),
+            ..valid_use.clone()
+        };
+        assert!(context.verify_claim_evidence_uses(&[wrong_alternative]).is_err());
+
+        let invented_claim = ReaderClaimEvidenceUse {
+            conclusion_id: "not-required".into(),
+            ..valid_use
+        };
+        assert!(context.verify_claim_evidence_uses(&[invented_claim]).is_err());
+    }
+
+    #[test]
+    fn context_never_truncates_or_changes_packet_evidence_order() {
+        let mut req = request();
+        req.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "proof-AB".into(),
+            evidence_dependencies: vec!["B".into(), "A".into()],
+        }];
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+
+        assert_eq!(
+            context.evidence.iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(),
+            vec!["A", "B"]
+        );
+        assert_eq!(context.context_items.len(), 2);
+        assert_eq!(context.context_items[0].value, "source excerpt A");
+        assert_eq!(context.context_items[1].value, "source excerpt B");
+        assert_eq!(
+            context.claim_proofs[0].evidence_dependencies,
+            vec!["A".to_string(), "B".to_string()]
+        );
+    }
+}
