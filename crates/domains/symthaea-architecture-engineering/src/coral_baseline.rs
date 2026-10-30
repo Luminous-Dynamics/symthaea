@@ -499,7 +499,8 @@ impl CoralDirectionBoard {
             }
         }
         Ok(())
-    }}
+    }
+}
 
 fn canonical_id(field: &str, value: &str) -> Result<String, CoralBaselineError> {
     let id = value.split_whitespace().collect::<Vec<_>>().join(" ");
