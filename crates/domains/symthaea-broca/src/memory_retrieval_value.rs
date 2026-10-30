@@ -24,8 +24,9 @@
 //! ABSTAIN (or ANSWER if a verified proof already exists).
 
 use crate::memory_lifecycle_policy::{
-    ClaimLifecycleState, LifecycleActionDecision, LifecyclePolicyRequest,
-    LifecycleRetrievalProgress, VerifiedLifecycleProofToken, decide_lifecycle_action,
+    ClaimLifecycleLedgerEntry, ClaimLifecycleState, LifecycleAction, LifecycleActionDecision,
+    LifecyclePolicyRequest, LifecycleRetrievalProgress, ProofVerificationState,
+    VerifiedLifecycleProofToken, decide_lifecycle_action,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -395,6 +396,48 @@ mod tests {
         sha256_hex(value.as_bytes())
     }
 
+    fn estimate_for_claims(
+        unresolved: BTreeSet<String>,
+    ) -> RetrievalUtilityEstimate {
+        let mut value = estimate();
+        value.unresolved_claims_sha256 =
+            RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap();
+        value.unresolved_required_claim_ids = unresolved;
+        value
+    }
+
+    fn lifecycle_request_for_missing_claims(
+        unresolved: &BTreeSet<String>,
+    ) -> LifecyclePolicyRequest {
+        LifecyclePolicyRequest {
+            decision_id: "decision-1".into(),
+            principal_id: "principal-1".into(),
+            scope_id: "scope-1".into(),
+            valid_at_unix_ms: 200,
+            known_at_unix_ms: 300,
+            proof_status: ProofVerificationState::NoEligibleProof,
+            proof_packet_sha256: None,
+            retrieval: LifecycleRetrievalProgress {
+                complete: false,
+                can_continue: true,
+                remaining_calls: 2,
+                value_decision_sha256: None,
+            },
+            required_claims: unresolved
+                .iter()
+                .map(|claim_id| ClaimLifecycleLedgerEntry {
+                    conclusion_id: claim_id.clone(),
+                    state: ClaimLifecycleState::Missing,
+                    selected_justification_id: None,
+                    current_evidence_ids: BTreeSet::new(),
+                    stale_evidence_ids: BTreeSet::new(),
+                    conflicting_evidence_ids: BTreeSet::new(),
+                    rejected_evidence_ids: BTreeSet::new(),
+                })
+                .collect(),
+        }
+    }
+
     fn estimate() -> RetrievalUtilityEstimate {
         let unresolved = BTreeSet::from(["C1".to_string(), "C2".to_string()]);
         RetrievalUtilityEstimate {
@@ -445,6 +488,65 @@ mod tests {
         expected_net_value_micro: i128,
         expected_action: RetrievalValueAction,
         expected_reason: RetrievalValueReason,
+    }
+
+    #[test]
+    fn canonical_voi_adapter_selects_retrieve_more_for_bound_unresolved_claims() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let estimate = estimate_for_claims(unresolved.clone());
+        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let request = lifecycle_request_for_missing_claims(&unresolved);
+
+        let action = decide_lifecycle_action_with_voi(
+            request,
+            None,
+            &value_decision,
+            &digest("evidence index state"),
+        ).unwrap();
+        assert_eq!(action.action, LifecycleAction::RetrieveMore);
+        assert_eq!(
+            action.retrieval.value_decision_sha256.as_deref(),
+            Some(value_decision.decision_sha256.as_str())
+        );
+        action.verify_internal_consistency().unwrap();
+    }
+
+    #[test]
+    fn canonical_voi_adapter_stops_and_abstains_when_next_call_is_not_worthwhile() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let mut estimate = estimate_for_claims(unresolved.clone());
+        estimate.correctness_gain_lcb_micro = 1;
+        estimate.lifecycle_risk_reduction_lcb_micro = 0;
+        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let request = lifecycle_request_for_missing_claims(&unresolved);
+
+        let action = decide_lifecycle_action_with_voi(
+            request,
+            None,
+            &value_decision,
+            &digest("evidence index state"),
+        ).unwrap();
+        assert_eq!(action.action, LifecycleAction::Abstain);
+        assert!(!action.retrieval.complete);
+        assert!(!action.retrieval.can_continue);
+        assert_eq!(action.retrieval.remaining_calls, 2);
+        assert!(action.retrieval.value_decision_sha256.is_some());
+    }
+
+    #[test]
+    fn canonical_voi_adapter_rejects_changed_evidence_index_snapshot() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let estimate = estimate_for_claims(unresolved.clone());
+        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let request = lifecycle_request_for_missing_claims(&unresolved);
+
+        let error = decide_lifecycle_action_with_voi(
+            request,
+            None,
+            &value_decision,
+            &digest("different evidence index"),
+        ).unwrap_err();
+        assert!(error.contains("evidence-index snapshot mismatch"));
     }
 
     #[test]
