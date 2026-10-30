@@ -124,13 +124,36 @@ impl VerifiedLifecycleProofToken {
         if request.proof_packet_sha256.as_deref() != Some(self.packet_sha256.as_str()) {
             return Err("verified proof token packet digest does not match lifecycle request".into());
         }
+        self.verify_claim_bindings(&request.required_claims)
+    }
+
+    fn verify_decision_binding(&self, decision: &LifecycleActionDecision) -> Result<(), String> {
+        if self.decision_id != decision.decision_id
+            || self.principal_id != decision.principal_id
+            || self.scope_id != decision.scope_id
+            || self.valid_at_unix_ms != decision.valid_at_unix_ms
+            || self.known_at_unix_ms != decision.known_at_unix_ms
+        {
+            return Err("verified proof token does not match the final decision identity or time".into());
+        }
+        if decision.proof_request_sha256.as_deref() != Some(self.request_sha256.as_str())
+            || decision.proof_packet_sha256.as_deref() != Some(self.packet_sha256.as_str())
+        {
+            return Err("verified proof token digest does not match the final decision".into());
+        }
+        self.verify_claim_bindings(&decision.claim_ledger)
+    }
+
+    fn verify_claim_bindings(
+        &self,
+        claims: &[ClaimLifecycleLedgerEntry],
+    ) -> Result<(), String> {
         validate_sha256(&self.request_sha256, "verified proof request digest")?;
         validate_sha256(&self.packet_sha256, "verified proof packet digest")?;
-
-        if self.selected_proofs.len() != request.required_claims.len() {
+        if self.selected_proofs.len() != claims.len() {
             return Err("verified proof token does not cover every required lifecycle claim".into());
         }
-        for claim in &request.required_claims {
+        for claim in claims {
             if claim.state != ClaimLifecycleState::SupportedCurrent {
                 return Err("verified proof token cannot be used with a non-current claim".into());
             }
@@ -511,11 +534,24 @@ impl LifecycleActionDecision {
         Ok(())
     }
 
-    /// A generation loop may emit an answer only after rechecking this receipt.
-    pub fn answer_is_permitted(&self) -> Result<bool, String> {
+    /// A generation loop may emit an answer only while it retains and presents
+    /// the opaque proof token created by verify_proof_packet_for_lifecycle.
+    /// A serialized decision receipt alone is never authorization to answer.
+    pub fn answer_is_permitted(
+        &self,
+        verified_proof: Option<&VerifiedLifecycleProofToken>,
+    ) -> Result<bool, String> {
         self.verify_internal_consistency()?;
-        Ok(self.action == LifecycleAction::Answer
-            && self.proof_status == ProofVerificationState::VerifiedOptimal)
+        if self.action != LifecycleAction::Answer
+            || self.proof_status != ProofVerificationState::VerifiedOptimal
+        {
+            return Ok(false);
+        }
+        let token = verified_proof.ok_or_else(|| {
+            "ANSWER requires the original opaque proof-verifier token at the final response gate".to_string()
+        })?;
+        token.verify_decision_binding(self)?;
+        Ok(true)
     }
 }
 
@@ -920,7 +956,8 @@ mod tests {
         assert_eq!(decision.action, LifecycleAction::Answer);
         assert_eq!(decision.proof_request_sha256.as_deref(), Some(token.request_sha256.as_str()));
         assert_eq!(decision.proof_packet_sha256.as_deref(), Some(token.packet_sha256.as_str()));
-        assert!(decision.answer_is_permitted().unwrap());
+        assert!(decision.answer_is_permitted(Some(&token)).unwrap());
+        assert!(decision.answer_is_permitted(None).unwrap_err().contains("original opaque proof-verifier token"));
     }
 
     #[test]
@@ -977,7 +1014,7 @@ mod tests {
         )).unwrap();
 
         assert_eq!(decision.action, LifecycleAction::Abstain);
-        assert!(!decision.answer_is_permitted().unwrap());
+        assert!(!decision.answer_is_permitted(None).unwrap());
     }
 
     #[test]
@@ -1000,7 +1037,7 @@ mod tests {
         )).unwrap();
 
         assert_eq!(decision.action, LifecycleAction::ExplainConflict);
-        assert!(!decision.answer_is_permitted().unwrap());
+        assert!(!decision.answer_is_permitted(None).unwrap());
     }
 
     #[test]
@@ -1012,7 +1049,7 @@ mod tests {
         )).unwrap();
 
         assert_eq!(decision.action, LifecycleAction::WarnStale);
-        assert!(!decision.answer_is_permitted().unwrap());
+        assert!(!decision.answer_is_permitted(None).unwrap());
     }
 
     #[test]
@@ -1038,7 +1075,7 @@ mod tests {
                 progress(true, false),
             )).unwrap();
             assert_eq!(decision.action, LifecycleAction::Abstain);
-            assert!(!decision.answer_is_permitted().unwrap());
+            assert!(!decision.answer_is_permitted(None).unwrap());
         }
     }
 
