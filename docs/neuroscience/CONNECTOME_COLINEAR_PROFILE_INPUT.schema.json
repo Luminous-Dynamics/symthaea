@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_COLINEAR_PROFILE_INPUT.schema.json",
+  "title": "Co-linear merge morphology profile input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "dataset_id", "dataset_revision_commit_sha", "detector", "noise", "tracks"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "dataset_id": { "type": "string", "minLength": 1 },
+    "dataset_revision_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "detector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["half_window_samples", "score_threshold", "min_separation_nm"],
+      "properties": {
+        "half_window_samples": { "type": "integer", "minimum": 3 },
+        "score_threshold": { "type": "number", "exclusiveMinimum": 0 },
+        "min_separation_nm": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "noise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["radius_nm", "tangent_degrees", "membrane_integrity", "synapse_density"],
+      "properties": {
+        "radius_nm": { "type": "number", "exclusiveMinimum": 0 },
+        "tangent_degrees": { "type": "number", "exclusiveMinimum": 0 },
+        "membrane_integrity": { "type": "number", "exclusiveMinimum": 0 },
+        "synapse_density": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["track_id", "samples"],
+        "properties": {
+          "track_id": { "type": "string", "minLength": 1 },
+          "samples": {
+            "type": "array",
+            "minItems": 7,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["distance_nm", "radius_nm", "tangent_degrees", "membrane_integrity", "synapse_density"],
+              "properties": {
+                "distance_nm": { "type": "number" },
+                "radius_nm": { "type": "number", "exclusiveMinimum": 0 },
+                "tangent_degrees": { "type": "number" },
+                "membrane_integrity": { "type": "number", "minimum": 0, "maximum": 1 },
+                "synapse_density": { "type": "number", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
