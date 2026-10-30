@@ -1,6 +1,6 @@
 # CMAQ-009: Costed Active Diagnostic Probes for Fast Shift Detection
 
-**Status:** protocol v0.2 + executable synthetic smoke harness; draft  
+**Status:** protocol v0.3 + executable synthetic smoke harness; draft  
 **Tracking issue:** [#9066](https://github.com/Luminous-Dynamics/symthaea/issues/9066)  
 **Claim ceiling:** synthetic information-channel experiment only; no production, physical-safety or SOTA claim
 
@@ -24,7 +24,8 @@ A probe is an independent diagnostic measurement governed by the same hidden shi
 
 - **Direct fallback:** no model actions and no probes.
 - **Fixed gate:** uses the model throughout; does not detect or revoke.
-- **Passive CUSUM:** monitors ordinary action outcomes only.
+- **Passive CUSUM:** monitors ordinary action outcomes only using the declared null/shift likelihood ratio and threshold 5.0.
+- **Passive Page–Hinkley:** independent mean-shift detector on the same noisy/delayed action-feedback stream, with delta 0.08, threshold 2.0 and an eight-observation burn-in. It performs no probes and is not given the CUSUM likelihood model.
 - **Periodic 8-probe policy:** one scheduled probe every 16 decisions, hard cap 8 per episode.
 - **Periodic 16-probe policy:** one scheduled probe every 8 decisions, hard cap 16.
 - **Periodic 32-probe policy:** one scheduled probe every 4 decisions, hard cap 32.
@@ -32,7 +33,7 @@ A probe is an independent diagnostic measurement governed by the same hidden shi
 - **Zero-information probe control:** spends up to 32 probes on a signal distribution that remains at the null rate even after a shift. Its policy ignores those probes for detector updates; it should reproduce passive decisions and lose utility only through the explicit probe cost.
 - **Oracle changepoint:** evaluator-only fallback at the hidden change time; an upper-bound comparator, not an eligible method.
 
-Delayed noisy action-feedback and informative probe observations contribute separate log-likelihood increments to one shared one-sided CUSUM with a fixed threshold of 5.0. Probe results are immediate in this synthetic channel; action feedback has the four-step delay and corruption above. A trigger revokes future model actions after the current action and any probe costs have already been incurred.
+Delayed noisy action-feedback and informative probe observations contribute separate log-likelihood increments to one shared one-sided CUSUM with a fixed threshold of 5.0. The Page–Hinkley arm instead consumes only the noisy binary action-feedback signal and applies its running-mean cumulative-deviation statistic; it does not receive likelihood increments or probe data. Probe results are immediate in this synthetic channel; action feedback has the four-step delay and corruption above. Both detectors revoke future model actions only after the current action and any probe costs have already been incurred.
 
 Probe permission is supplied by an independent `SafetyEnvelope`; the candidate policy cannot modify it or infer it from probe evidence. The current benchmark scenarios provide an all-authorized probe tape to make probe budgeting comparable. A deny-all test fixture verifies that periodic and adaptive policies produce zero probes when the envelope denies authorization. This is a software contract test, not a physical probe safety case.
 
@@ -60,7 +61,7 @@ cargo test --locked
 cargo run --quiet --locked
 ```
 
-The focused workflow validates schema v0.2, report dimensions, row uniqueness, the 8/16/32 caps, the four-step delayed/noisy feedback metadata, fallback/oracle controls, the zero-information negative control, stationary false-revocation, abrupt detection, p90 delay and paired net utility lift. A green CI pass validates the reproducible synthetic contract only.
+The focused workflow validates schema v0.3, ten policy arms across three scenarios, Page–Hinkley parameters, report dimensions, row uniqueness, the 8/16/32 caps, four-step delayed/noisy feedback, fallback/oracle controls, the zero-information negative control, stationary false-revocation, abrupt detection, p90 delay and paired net utility lift. A green CI pass validates the reproducible synthetic contract only.
 
 ## Limitations / next steps
 
@@ -68,6 +69,7 @@ The focused workflow validates schema v0.2, report dimensions, row uniqueness, t
 - Feedback and probe channels are separate by construction; correlated sensor/probe failure is not yet tested.
 - The current probe authorization tape allows all requested probes; only the deny-all software test exercises a denied envelope.
 - No state transitions, physical actions, physical probe safety case, resource contention or real-time latency/energy measurements.
+- Page–Hinkley parameters are fixed engineering settings, not calibrated guarantees of false-alarm probability on arbitrary streams.
 - No calibration split or hidden evaluation family yet; the generator is public and the smoke panel is not sealed qualification.
 - No model integration, external environment or reproduced industry baseline.
 
