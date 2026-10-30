@@ -58,6 +58,9 @@ pub struct TrajectoryEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SearchTrajectoryArchive {
     pub config: TrajectorySearchConfig,
+    /// True only when all 5^6 NAS-Bench-201 topologies are present. Otherwise local-optimum
+    /// events are relative to the supplied catalog, not the complete search space.
+    pub catalog_is_complete: bool,
     pub proxy_id: String,
     pub proxy_direction: ProxyDirection,
     pub seed: u64,
@@ -319,9 +322,12 @@ pub fn build_trajectory_archive(
     let first_improvement_ids = deduplicate_in_order(first_improvement_ids);
     let local_optima_ids = deduplicate_in_order(local_optima_ids);
     let escape_ids = deduplicate_in_order(escape_ids);
+    let catalog_is_complete =
+        features.len() == (NB201_OPERATIONS as usize).pow(NB201_EDGES as u32);
     let feature_catalog_sha256 = digest_feature_catalog(features, &config.proxy_id);
     let archive_sha256 = digest_archive(
         config,
+        catalog_is_complete,
         &feature_catalog_sha256,
         &visited_order,
         &start_ids,
@@ -332,6 +338,7 @@ pub fn build_trajectory_archive(
     );
     Ok(SearchTrajectoryArchive {
         config: config.clone(),
+        catalog_is_complete,
         proxy_id: config.proxy_id.clone(),
         proxy_direction: config.proxy_direction,
         seed: config.seed,
@@ -653,6 +660,14 @@ pub fn plan_promotions(
         ));
     }
     let supplied_catalog_sha256 = digest_feature_catalog(features, &archive.proxy_id);
+    let supplied_catalog_is_complete =
+        features.len() == (NB201_OPERATIONS as usize).pow(NB201_EDGES as u32);
+    if supplied_catalog_is_complete != archive.catalog_is_complete {
+        return Err(TrajectorySearchError::new(
+            "archive.catalog_is_complete",
+            "catalog-completeness flag does not match supplied topology catalog",
+        ));
+    }
     if supplied_catalog_sha256 != archive.feature_catalog_sha256 {
         return Err(TrajectorySearchError::new(
             "archive.feature_catalog_sha256",
@@ -661,6 +676,7 @@ pub fn plan_promotions(
     }
     let expected_archive_sha256 = digest_archive(
         &archive.config,
+        archive.catalog_is_complete,
         &archive.feature_catalog_sha256,
         &archive.visited_architecture_ids,
         &archive.start_architecture_ids,
@@ -1136,6 +1152,7 @@ fn digest_feature_catalog(
 
 fn digest_archive(
     config: &TrajectorySearchConfig,
+    catalog_is_complete: bool,
     feature_catalog_sha256: &str,
     visited: &[String],
     starts: &[String],
@@ -1154,6 +1171,7 @@ fn digest_archive(
     hasher.update((config.max_unique_visits as u64).to_be_bytes());
     hasher.update((config.max_moves_per_walk as u64).to_be_bytes());
     hasher.update((config.max_escapes_per_walk as u64).to_be_bytes());
+    hasher.update([catalog_is_complete as u8]);
     update_string(&mut hasher, feature_catalog_sha256);
     hasher.update((visited.len() as u64).to_be_bytes());
     for architecture_id in visited {
