@@ -690,6 +690,45 @@ mod tests {
     }
 
     #[test]
+    fn contextual_and_global_harsanyi_thresholds_are_independent() {
+        let events = vec![source_event(0, 0.2), source_event(1, 0.3)];
+        let effect = SyntheticEffect::Polynomial {
+            quadratic_coefficient: 0.5,
+            cubic_coefficient: 0.0,
+        };
+        let supports = vec![support(0, 0, 64), support(1, 0, 64)];
+        let cfg = probe_config(0);
+        let (factorial, plan) = setup(&events, &effect, &supports, &cfg);
+        let factorial_config = FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
+            spectral_window_frames: 64,
+        };
+        let benchmark_config = InteractionProbeBenchmarkConfig {
+            minimum_contextual_pair_pcm_l2_norm: 1.0e-9,
+            minimum_global_order_two_harsanyi_pcm_l2_norm: 10.0,
+            minimum_higher_order_pcm_l2_norm: 1.0e-9,
+        };
+        let result = evaluate_interaction_probe_plan(
+            &factorial,
+            &events,
+            &effect,
+            &factorial_config,
+            &plan,
+            &digest("score"),
+            &digest("renderer"),
+            64,
+            &supports,
+            &cfg,
+            &benchmark_config,
+        )
+        .unwrap();
+
+        assert_eq!(result.ground_truth_interacting_pair_count, 1);
+        assert_eq!(result.global_order_two_harsanyi_interaction_count, 0);
+        assert!(result.global_order_two_harsanyi_total_pcm_l2_norm > 0.0);
+    }
+
+    #[test]
     fn benchmark_receipt_rejects_report_tampering() {
         let events = vec![
             source_event_window(0, 0.2, 0, 20),
