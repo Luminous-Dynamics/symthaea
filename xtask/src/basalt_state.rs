@@ -13,9 +13,9 @@ const MAX_EVIDENCE_PARENTS: usize = 4_096;
 const MAX_TOTAL_EDGES: usize = 250_000;
 const MAX_TOTAL_PROVENANCE_LINKS: usize = 1_000_000;
 
-/// A structurally valid timeline can still contain stale evidence. The valid
-/// flag means the event/evidence history is consistent, not that every item
-/// remains current or that the issuer of any event has been authenticated.
+/// A structurally valid timeline can still contain stale or ineligible evidence.
+/// `structurally_valid` means only that the supplied event/evidence history is
+/// internally consistent; it does not authenticate the issuer or certify success.
 #[derive(Debug, Serialize)]
 pub struct StateAuditReport {
     pub report_version: u32,
@@ -66,6 +66,7 @@ pub struct EvidenceAssessment {
     pub unresolved_inputs: Vec<String>,
     pub invalidated_by_unknown_dependency_change: bool,
     pub requires_reverification: bool,
+    /// Conditional graph eligibility only; this producer-declared flag is not authenticated.
     pub eligible_under_declared_coverage: bool,
     pub stale_resources: Vec<String>,
     pub stale_ancestor_evidence_ids: Vec<String>,
@@ -98,7 +99,9 @@ pub enum EvidenceOutcome {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DependencyCoverage {
+    /// Producer claims all relevant inputs were observed; this claim is not authenticated here.
     Complete,
+    /// One or more relevant inputs were not observed and must be named.
     Incomplete,
 }
 
@@ -899,7 +902,7 @@ mod tests {
     }
 
     fn next_dag_random(state: &mut u64) -> u64 {
-        *state = state
+        *state = (*state)
             .wrapping_mul(6_364_136_223_846_793_005)
             .wrapping_add(1_442_695_040_888_963_407);
         *state
