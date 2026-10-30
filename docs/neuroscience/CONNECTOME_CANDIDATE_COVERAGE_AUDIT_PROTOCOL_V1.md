@@ -55,7 +55,7 @@ Primary metrics:
 1. Candidate-generation recall: estimated number of independently verified errors covered by at least one frozen proposal divided by estimated total verified errors.
 2. Impact-weighted candidate-generation recall: estimated impact mass covered by proposals divided by estimated total impact mass.
 3. Estimated missed error count and missed impact mass.
-4. Results by predeclared error family, with denominators and sample support shown.
+4. Results by the complete predeclared error-family vocabulary, with sampled counts and denominators shown; an unobserved family has an undefined recall and does not imply that the family is absent from unsampled PSUs.
 5. Estimated exhaustive-audit person-minutes, separate from normal policy-review time and compute cost.
 
 The ratio variance uses a first-order Taylor linearization at the estimated ratio (R). Within each sampled PSU, form (z_{hi}=y_{hi}-R x_{hi}), where (y) is the covered count/impact and (x) is the total count/impact. Then:
