@@ -1,0 +1,126 @@
+name: CMAQ-010 adversarial evidence integrity benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-010/**"
+      - ".github/workflows/cmaq-010.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-010/**"
+      - ".github/workflows/cmaq-010.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-integrity:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-010
+        run: cargo test --locked
+      - name: Generate report and validate attack controls
+        working-directory: research/cmaq-010
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-010-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-010-report.json").read_text())
+          assert report["schema_version"] == "cmaq-010-evidence-integrity-v0.1"
+          assert report["episode_count"] == 512
+          assert report["horizon"] == 128
+          assert report["shift_step"] == 64
+          assert report["cusum_threshold"] == 5.0
+          assert report["null_signal_rate"] == 0.01
+          assert report["shift_signal_rate"] == 0.80
+          assert report["robust_null_upper"] == 0.02
+          assert report["robust_shift_lower"] == 0.70
+          assert report["min_independent_groups"] == 2
+          assert report["missing_steps_to_fallback"] == 4
+          assert report["scenarios"] == [
+              "clean_independent", "common_mode_duplicates", "sybil_fanout",
+              "one_byzantine_source", "stale_safe_replay"
+          ]
+          assert report["policies"] == [
+              "direct_fallback", "naive_claim_sum", "naive_claim_majority",
+              "provenance_root_dedup_sum", "robust_root_majority",
+              "freshness_provenance_fail_closed", "oracle_changepoint"
+          ]
+
+          rows = report["summary"]
+          assert len(rows) == 35
+          by_key = {(row["scenario"], row["policy"]): row for row in rows}
+          assert len(by_key) == len(rows)
+
+          numeric = [
+              "mean_utility", "utility_delta_vs_claim_sum", "model_action_coverage",
+              "unsupported_rate_per_model_action", "false_revocation_episode_rate",
+              "shift_detection_coverage", "p90_detection_delay_steps",
+              "provenance_fail_closed_rate", "mean_rejected_stale",
+              "mean_rejected_duplicate", "mean_max_evidence_updates",
+              "mean_independent_groups"
+          ]
+          for scenario in report["scenarios"]:
+              for policy in report["policies"]:
+                  row = by_key[(scenario, policy)]
+                  for key in numeric:
+                      assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+                  for key in [
+                      "model_action_coverage", "unsupported_rate_per_model_action",
+                      "false_revocation_episode_rate", "shift_detection_coverage",
+                      "provenance_fail_closed_rate"
+                  ]:
+                      assert 0.0 <= row[key] <= 1.0
+                  assert row["max_evidence_updates"] >= 0
+
+          # Adversarial controls: identity fan-out must not manufacture independent roots.
+          assert by_key[("sybil_fanout", "naive_claim_sum")]["max_evidence_updates"] == 6
+          assert by_key[("sybil_fanout", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
+          assert by_key[("common_mode_duplicates", "naive_claim_sum")]["max_evidence_updates"] == 3
+          assert by_key[("common_mode_duplicates", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
+
+          # The integrity gate must fail closed where it cannot establish two fresh roots.
+          assert by_key[("common_mode_duplicates", "freshness_provenance_fail_closed")]["provenance_fail_closed_rate"] == 1.0
+          assert by_key[("sybil_fanout", "freshness_provenance_fail_closed")]["provenance_fail_closed_rate"] == 1.0
+          replay = by_key[("stale_safe_replay", "freshness_provenance_fail_closed")]
+          assert replay["mean_rejected_stale"] > 0.0
+          assert replay["provenance_fail_closed_rate"] == 1.0
+
+          # A green run validates measurement mechanics and explicit controls, not a blanket
+          # accuracy/safety/SOTA claim. Keep observed performance in the report for review.
+          print("CMAQ-010 report schema and adversarial provenance/freshness controls validated")
+          print(json.dumps({
+              scenario: {
+                  policy: {
+                      "utility": by_key[(scenario, policy)]["mean_utility"],
+                      "utility_delta_vs_claim_sum": by_key[(scenario, policy)]["utility_delta_vs_claim_sum"],
+                      "coverage": by_key[(scenario, policy)]["model_action_coverage"],
+                      "false_revocation": by_key[(scenario, policy)]["false_revocation_episode_rate"],
+                      "detection": by_key[(scenario, policy)]["shift_detection_coverage"],
+                      "p90_delay": by_key[(scenario, policy)]["p90_detection_delay_steps"],
+                      "fail_closed": by_key[(scenario, policy)]["provenance_fail_closed_rate"],
+                      "stale_rejected": by_key[(scenario, policy)]["mean_rejected_stale"],
+                      "duplicate_rejected": by_key[(scenario, policy)]["mean_rejected_duplicate"],
+                      "mean_evidence_updates": by_key[(scenario, policy)]["mean_max_evidence_updates"],
+                      "max_evidence_updates": by_key[(scenario, policy)]["max_evidence_updates"]
+                  }
+                  for policy in [
+                      "naive_claim_sum", "provenance_root_dedup_sum",
+                      "robust_root_majority", "freshness_provenance_fail_closed",
+                      "oracle_changepoint"
+                  ]
+              }
+              for scenario in report["scenarios"]
+          }, sort_keys=True))
+          PY
