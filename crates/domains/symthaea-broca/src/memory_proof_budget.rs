@@ -634,7 +634,9 @@ impl<'a> ExactSearch<'a> {
                     };
                     if total_lower_bound > best_cost {
                         self.bound_pruned_nodes = self.bound_pruned_nodes.saturating_add(1);
-                        self.explore(next_obligation_index, &next_evidence, &next_proofs);
+                        // Skip only this alternative. Other alternatives at the
+                        // current obligation remain candidates for the optimum.
+                        continue;
                     }
                 }
             }
