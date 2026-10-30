@@ -21,7 +21,11 @@ const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
 const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.1\0";
+const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
+const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.1\0";
 pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.1.0";
+pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
+    "symthaea-iit/sparse-iit4-partition-score/0.1.0";
 
 pub const MAX_SPARSE_UNITS: usize = 1_000_000;
 pub const MAX_LOCAL_PARENTS: usize = 20;
@@ -125,6 +129,8 @@ pub enum SparseCausalError {
     UndefinedBackgroundPosterior,
     #[error("sparse Eq4 report entry {index} is not finite and nonnegative: {value}")]
     InvalidReportValue { index: usize, value: f64 },
+    #[error("partition score report field {field} is not finite: {value}")]
+    InvalidScoreReportValue { field: &'static str, value: f64 },
     #[error("cannot convert {units} sparse units to dense; maximum is {maximum}")]
     DenseConversionLimit { units: usize, maximum: usize },
     #[error("partition cut-matrix size overflows for {candidate_count} candidate units")]
@@ -190,6 +196,80 @@ impl SparseEq4Report {
         sparse_receipt_u64(&mut bytes, self.factor_multiplications as u64);
         Ok(sparse_hex_digest(&bytes))
     }
+}
+
+/// Proof-carrying sparse per-partition score report.
+///
+/// This records one fixed state pair and one directed partition. It is not a
+/// complete system phi_s search result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SparsePartitionScoreReport {
+    pub request_sha256: String,
+    pub max_factor_entries: usize,
+    pub uncut_cause_receipt_sha256: String,
+    pub partitioned_cause_receipt_sha256: String,
+    pub score: SystemPhiPartitionScore,
+}
+
+impl SparsePartitionScoreReport {
+    /// Integrity receipt binding both Eq. 4 contractions and the complete score.
+    pub fn receipt_sha256(&self) -> Result<String, SparseCausalError> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SPARSE_PARTITION_SCORE_RECEIPT_MAGIC);
+        sparse_receipt_string(&mut bytes, SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID);
+        sparse_receipt_string(&mut bytes, &self.request_sha256);
+        sparse_receipt_u64(&mut bytes, self.max_factor_entries as u64);
+        sparse_receipt_string(&mut bytes, &self.uncut_cause_receipt_sha256);
+        sparse_receipt_string(&mut bytes, &self.partitioned_cause_receipt_sha256);
+        sparse_score_f64(&mut bytes, "cause.selectivity", self.score.cause.selectivity)?;
+        sparse_score_f64(&mut bytes, "cause.forward", self.score.cause.forward_probability)?;
+        sparse_score_f64(
+            &mut bytes,
+            "cause.partitioned_forward",
+            self.score.cause.partitioned_forward_probability,
+        )?;
+        sparse_score_f64(&mut bytes, "cause.signed_phi", self.score.cause.signed_phi)?;
+        sparse_score_f64(&mut bytes, "effect.selectivity", self.score.effect.selectivity)?;
+        sparse_score_f64(&mut bytes, "effect.forward", self.score.effect.forward_probability)?;
+        sparse_score_f64(
+            &mut bytes,
+            "effect.partitioned_forward",
+            self.score.effect.partitioned_forward_probability,
+        )?;
+        sparse_score_f64(&mut bytes, "effect.signed_phi", self.score.effect.signed_phi)?;
+        sparse_score_f64(&mut bytes, "signed_phi", self.score.signed_phi)?;
+        sparse_score_f64(&mut bytes, "phi", self.score.phi)?;
+        sparse_score_f64(
+            &mut bytes,
+            "normalization_factor",
+            self.score.normalization_factor,
+        )?;
+        sparse_score_f64(
+            &mut bytes,
+            "signed_normalized_phi",
+            self.score.signed_normalized_phi,
+        )?;
+        sparse_score_f64(
+            &mut bytes,
+            "normalized_phi",
+            self.score.normalized_phi,
+        )?;
+        sparse_receipt_u64(&mut bytes, self.score.severed_connections as u64);
+        Ok(sparse_hex_digest(&bytes))
+    }
+}
+
+fn sparse_score_f64(
+    bytes: &mut Vec<u8>,
+    field: &'static str,
+    value: f64,
+) -> Result<(), SparseCausalError> {
+    if !value.is_finite() {
+        return Err(SparseCausalError::InvalidScoreReportValue { field, value });
+    }
+    let canonical = if value == 0.0 { 0.0 } else { value };
+    bytes.extend_from_slice(&canonical.to_bits().to_le_bytes());
+    Ok(())
 }
 
 fn sparse_receipt_u64(bytes: &mut Vec<u8>, value: u64) {
@@ -471,7 +551,7 @@ impl SparseBinaryCausalModel {
         current_state: &[bool],
         system_state: &crate::Iit4SystemState,
         max_factor_entries: usize,
-    ) -> Result<SystemPhiPartitionScore, SparseCausalError> {
+    ) -> Result<SparsePartitionScoreReport, SparseCausalError> {
         self.check_state(current_state)?;
         let candidate = partition.candidate_system();
         if system_state.cause_specified_state.len() != candidate.len() {
@@ -557,7 +637,7 @@ impl SparseBinaryCausalModel {
         let normalization_factor = 1.0 / severed_connections as f64;
         let signed_normalized_phi = signed_phi * normalization_factor;
 
-        Ok(SystemPhiPartitionScore {
+        let score = SystemPhiPartitionScore {
             cause,
             effect,
             signed_phi,
@@ -566,6 +646,19 @@ impl SparseBinaryCausalModel {
             signed_normalized_phi,
             normalized_phi: signed_normalized_phi.max(0.0),
             severed_connections,
+        };
+        let request_sha256 = self.partition_score_request_sha256(
+            partition,
+            current_state,
+            system_state,
+            max_factor_entries,
+        );
+        Ok(SparsePartitionScoreReport {
+            request_sha256,
+            max_factor_entries,
+            uncut_cause_receipt_sha256: cause_forward_report.receipt_sha256()?,
+            partitioned_cause_receipt_sha256: cause_partitioned.receipt_sha256()?,
+            score,
         })
     }
 
@@ -943,6 +1036,33 @@ impl SparseBinaryCausalModel {
         })
     }
 
+    fn partition_score_request_sha256(
+        &self,
+        partition: &DirectedSystemPartition,
+        current_state: &[bool],
+        system_state: &crate::Iit4SystemState,
+        max_factor_entries: usize,
+    ) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SPARSE_PARTITION_SCORE_REQUEST_MAGIC);
+        sparse_receipt_string(&mut bytes, SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID);
+        sparse_receipt_string(&mut bytes, &self.model_sha256());
+        sparse_receipt_u64(&mut bytes, current_state.len() as u64);
+        bytes.extend(current_state.iter().map(|on| u8::from(*on)));
+        sparse_receipt_u64(&mut bytes, partition.candidate_system().len() as u64);
+        for unit in partition.candidate_system() {
+            sparse_receipt_u64(&mut bytes, *unit as u64);
+        }
+        sparse_receipt_u64(&mut bytes, partition.cut_matrix().len() as u64);
+        bytes.extend(partition.cut_matrix().iter().map(|cut| u8::from(*cut)));
+        sparse_receipt_u64(&mut bytes, system_state.cause_specified_state.len() as u64);
+        bytes.extend(system_state.cause_specified_state.iter().map(|on| u8::from(*on)));
+        sparse_receipt_u64(&mut bytes, system_state.effect_specified_state.len() as u64);
+        bytes.extend(system_state.effect_specified_state.iter().map(|on| u8::from(*on)));
+        sparse_receipt_u64(&mut bytes, max_factor_entries as u64);
+        sparse_hex_digest(&bytes)
+    }
+
     fn eq4_request_sha256(
         &self,
         target_model: &Self,
@@ -1296,11 +1416,18 @@ mod tests {
                     1 << 16,
                 )
                 .unwrap();
-            assert_eq!(dense_score.severed_connections, sparse_score.severed_connections);
-            assert!((dense_score.cause.signed_phi - sparse_score.cause.signed_phi).abs() <= 1e-12);
-            assert!((dense_score.effect.signed_phi - sparse_score.effect.signed_phi).abs() <= 1e-12);
-            assert!((dense_score.signed_phi - sparse_score.signed_phi).abs() <= 1e-12);
-            assert!((dense_score.normalized_phi - sparse_score.normalized_phi).abs() <= 1e-12);
+            let sparse_score_value = &sparse_score.score;
+            assert_eq!(dense_score.severed_connections, sparse_score_value.severed_connections);
+            assert!((dense_score.cause.signed_phi - sparse_score_value.cause.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.effect.signed_phi - sparse_score_value.effect.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.signed_phi - sparse_score_value.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.normalized_phi - sparse_score_value.normalized_phi).abs() <= 1e-12);
+            assert_eq!(
+                sparse_score.receipt_sha256().unwrap(),
+                sparse.score_iit4_system_partition(
+                    &partition, &current_state, &system_state, 1 << 16
+                ).unwrap().receipt_sha256().unwrap()
+            );
         }
     }
 
