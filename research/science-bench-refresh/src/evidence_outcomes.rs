@@ -606,17 +606,15 @@ fn resource_summary(
         recorded_trials: 0,
         total_observed: 0,
     };
-    for value in values {
-        if let Some(value) = value {
-            summary.recorded_trials = summary
-                .recorded_trials
-                .checked_add(1)
-                .ok_or_else(|| "resource recorded-trial count overflow".to_owned())?;
-            summary.total_observed = summary
-                .total_observed
-                .checked_add(value)
-                .ok_or_else(|| "resource total overflow".to_owned())?;
-        }
+    for value in values.flatten() {
+        summary.recorded_trials = summary
+            .recorded_trials
+            .checked_add(1)
+            .ok_or_else(|| "resource recorded-trial count overflow".to_owned())?;
+        summary.total_observed = summary
+            .total_observed
+            .checked_add(value)
+            .ok_or_else(|| "resource total overflow".to_owned())?;
     }
     Ok(summary)
 }
