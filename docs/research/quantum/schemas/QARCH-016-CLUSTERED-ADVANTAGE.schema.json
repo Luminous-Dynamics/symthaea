@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QARCH-016 cluster-aware paired benchmark record",
+  "description": "Syntactic schema for hierarchical benchmark observations and cluster-level inference. Schema validation cannot establish cluster independence, target-population sampling, source lineage, or correctness of upstream measurement receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_class",
+    "claim_ceiling",
+    "comparison_contract_fingerprint",
+    "hierarchy",
+    "preregistration",
+    "observations",
+    "expected_analysis"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "qarch-016-clustered-advantage/1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "measured_backend",
+        "calibrated_simulation",
+        "analytic_estimate"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "synthetic_demonstration_only",
+        "finite_suite_descriptive",
+        "target_population_inference_with_cluster_sampling_design"
+      ]
+    },
+    "comparison_contract_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hierarchy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "levels",
+        "independent_cluster_unit",
+        "instance_unit",
+        "repeated_measurement_policy"
+      ],
+      "properties": {
+        "levels": {
+          "const": [
+            "suite",
+            "independent_cluster",
+            "workload_instance",
+            "repeated_measurement"
+          ]
+        },
+        "independent_cluster_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instance_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repeated_measurement_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "within_cluster_reduction",
+        "between_cluster_estimand",
+        "minimum_relative_resource_reduction",
+        "quality_non_inferiority_margin",
+        "resource_tie_tolerance_log_ratio",
+        "quality_tie_tolerance",
+        "minimum_independent_clusters"
+      ],
+      "properties": {
+        "within_cluster_reduction": {
+          "const": "median"
+        },
+        "between_cluster_estimand": {
+          "const": "equal_cluster_weighted_median"
+        },
+        "minimum_relative_resource_reduction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "quality_non_inferiority_margin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resource_tie_tolerance_log_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality_tie_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "independent_cluster_id",
+          "cluster_fingerprint",
+          "instance_id",
+          "workload_fingerprint",
+          "comparison_contract_fingerprint",
+          "quantum_resource_per_accepted_answer",
+          "classical_resource_per_accepted_answer",
+          "quantum_quality",
+          "classical_quality"
+        ],
+        "properties": {
+          "independent_cluster_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cluster_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workload_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparison_contract_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantum_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "classical_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "quantum_quality": {
+            "type": "number"
+          },
+          "classical_quality": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "expected_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_clusters",
+        "total_instances",
+        "minimum_cluster_size",
+        "maximum_cluster_size",
+        "cluster_balanced_median_quality_difference",
+        "cluster_balanced_median_log_resource_ratio",
+        "quality_non_inferiority",
+        "resource_superiority",
+        "composite_claim_p_value",
+        "quality_margin_survives_every_cluster_deletion",
+        "resource_margin_survives_every_cluster_deletion"
+      ],
+      "properties": {
+        "independent_clusters": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "total_instances": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_cluster_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_cluster_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cluster_balanced_median_quality_difference": {
+          "type": "number"
+        },
+        "cluster_balanced_median_log_resource_ratio": {
+          "type": "number"
+        },
+        "quality_non_inferiority": {
+          "$ref": "#/$defs/exact_sign_test"
+        },
+        "resource_superiority": {
+          "$ref": "#/$defs/exact_sign_test"
+        },
+        "composite_claim_p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "quality_margin_survives_every_cluster_deletion": {
+          "type": "boolean"
+        },
+        "resource_margin_survives_every_cluster_deletion": {
+          "type": "boolean"
+        }
+      }
+    },
+    "naive_instance_level_counterexample": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "independent_assumption",
+        "wins",
+        "observations",
+        "raw_p_value"
+      ],
+      "properties": {
+        "independent_assumption": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "raw_p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "exact_sign_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wins",
+        "losses",
+        "ties",
+        "effective_n",
+        "p_value_one_sided"
+      ],
+      "properties": {
+        "wins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "losses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ties": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effective_n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "p_value_one_sided": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
