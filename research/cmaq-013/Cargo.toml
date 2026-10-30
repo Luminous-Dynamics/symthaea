@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-013-advantage-of-prediction"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Paired synthetic benchmark for causal value of predictive models in action selection"
+
+[dependencies]
+
+[workspace]
