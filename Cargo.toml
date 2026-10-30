@@ -729,6 +729,7 @@ notifications = ["zbus"]                    # D-Bus desktop notifications
 nixward = ["dep:nixward"]                 # Nixward: causal NixOS diagnosis with HDC world model + active inference
 # Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p nixward --features cli/tui/daemon` directly
 identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
+hardsec-design-audit = ["dep:sha2"]  # Opt-in source-integrity and design-lineage audit for HARDSEC-005
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 multirotor = ["dep:symthaea-multirotor"]   # HDC-LTC multirotor control via FEP Active Inference
 multirotor-mujoco = ["multirotor", "symthaea-multirotor/mujoco"]   # Multirotor control with MuJoCo physics
@@ -2543,3 +2544,9 @@ name = "recurrent_mask_recovery"
 # observed. Must be declared here -- autoexamples = false.
 [[example]]
 name = "action_semantics_probe"
+
+
+# HARDSEC-005: hierarchy-aware hardware-design lineage and split auditor.
+[[example]]
+name = "hardsec_design_lineage_audit"
+required-features = ["hardsec-design-audit"]
