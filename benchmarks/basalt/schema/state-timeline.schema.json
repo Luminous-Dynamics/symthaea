@@ -110,7 +110,7 @@
         },
         "event_digest": {
           "$ref": "#/$defs/digest",
-          "description": "SHA-256 of compact canonical JSON over run_id, sequence, event_id, change_kind, resource_id, before_digest, and after_digest, in that field order. This binds payload identity but is not an issuer signature."
+          "description": "SHA-256 of compact canonical JSON over the domain `basalt.resource-change.v1`, schema_version=1, run_id, sequence, event_id, change_kind, resource_id, before_digest, and after_digest, in that field order. This binds payload identity but is not an issuer signature."
         },
         "resource_id": {
           "$ref": "#/$defs/identifier"
