@@ -34,6 +34,10 @@ pub const FIXTURE_CATALOG_SCHEMA: &str = "symthaea.quantum_comp.fixture_catalog.
 pub const INTEGRATION_DECLARATION_SCHEMA: &str =
     "symthaea.quantum_comp.integration_declaration.v0.alpha10";
 
+/// Schema label for QARCH-017 adaptive evaluation reservations.
+pub const ADAPTIVE_EVALUATION_SCHEMA: &str =
+    "symthaea.quantum_comp.adaptive_evaluation.v1";
+
 /// Returns all known alpha.10 schema labels.
 pub fn known_schema_labels() -> &'static [&'static str] {
     &[
@@ -52,6 +56,14 @@ pub fn known_schema_labels() -> &'static [&'static str] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adaptive_evaluation_schema_is_versioned() {
+        assert_eq!(
+            ADAPTIVE_EVALUATION_SCHEMA,
+            "symthaea.quantum_comp.adaptive_evaluation.v1"
+        );
+    }
 
     #[test]
     fn schema_labels_are_namespaced() {
