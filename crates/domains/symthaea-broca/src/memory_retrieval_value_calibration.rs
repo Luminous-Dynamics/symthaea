@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn takes_worst_residual_within_each_independent_group() {
         let mut rows = calibration_rows();
-        rows.push(observation(29, 0, -100, -90, 100));
+        rows.push(observation(29, 0, -100, -92, 101));
         let bounds = calibrate_retrieval_utility_bounds(&rows).unwrap();
         assert_eq!(bounds.correctness_gain_lcb_residual_micro, -100);
         assert_eq!(bounds.lifecycle_risk_reduction_lcb_residual_micro, -92);
