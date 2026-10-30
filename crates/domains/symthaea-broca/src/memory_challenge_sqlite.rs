@@ -34,10 +34,11 @@ use crate::memory_evidence::{
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const SQLITE_SCHEMA_VERSION: i64 = 1;
+const SQLITE_SCHEMA_VERSION: i64 = 2;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Canonical row payload for one Add transaction.
@@ -48,6 +49,74 @@ struct PersistedAmlAddBatch {
     payload_sha256: String,
     stored_at_unix_ms: u64,
     records: Vec<EvidenceRecord>,
+}
+
+/// Append-only lifecycle transition over one or two immutable evidence IDs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum EvidenceLifecycleOperation {
+    Revoke { evidence_id: String },
+    Delete { evidence_id: String },
+    Supersede {
+        old_evidence_id: String,
+        new_evidence_id: String,
+    },
+}
+
+impl EvidenceLifecycleOperation {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            Self::Revoke { evidence_id } | Self::Delete { evidence_id } => {
+                require_non_empty(evidence_id, "evidence_id")
+            }
+            Self::Supersede { old_evidence_id, new_evidence_id } => {
+                require_non_empty(old_evidence_id, "old_evidence_id")?;
+                require_non_empty(new_evidence_id, "new_evidence_id")?;
+                if old_evidence_id == new_evidence_id {
+                    return Err("old_evidence_id and new_evidence_id must differ".into());
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn references_any(&self, evidence_ids: &BTreeSet<String>) -> bool {
+        match self {
+            Self::Revoke { evidence_id } | Self::Delete { evidence_id } => {
+                evidence_ids.contains(evidence_id)
+            }
+            Self::Supersede { old_evidence_id, new_evidence_id } => {
+                evidence_ids.contains(old_evidence_id) || evidence_ids.contains(new_evidence_id)
+            }
+        }
+    }
+
+    fn apply(&self, index: &mut EvidenceIndex) -> Result<(), String> {
+        match self {
+            Self::Revoke { evidence_id } => index.revoke_evidence(evidence_id),
+            Self::Delete { evidence_id } => index.delete_evidence(evidence_id),
+            Self::Supersede { old_evidence_id, new_evidence_id } => {
+                index.supersede_evidence(old_evidence_id, new_evidence_id)
+            }
+        }
+    }
+}
+
+/// Immutable lifecycle event. sequence is assigned by SQLite and defines
+/// replay order; event_id makes caller retries idempotent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PersistedEvidenceLifecycleEvent {
+    event_id: String,
+    recorded_at_unix_ms: u64,
+    operation: EvidenceLifecycleOperation,
+}
+
+struct PersistedLifecycleRow {
+    sequence: i64,
+    event_id: String,
+    recorded_at_unix_ms: i64,
+    body_json: Vec<u8>,
 }
 
 /// One immutable SQLite row decoded and checked before it enters the index.
@@ -107,7 +176,15 @@ impl SqliteAmlMemoryBackend {
                      body_json BLOB NOT NULL
                  );
                  CREATE INDEX IF NOT EXISTS aml_add_batches_stored_at
-                     ON aml_add_batches(stored_at_unix_ms);",
+                     ON aml_add_batches(stored_at_unix_ms);
+                 CREATE TABLE IF NOT EXISTS aml_evidence_lifecycle_events (
+                     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                     event_id TEXT UNIQUE NOT NULL COLLATE BINARY,
+                     recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms >= 0),
+                     body_json BLOB NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS aml_evidence_lifecycle_events_recorded_at
+                     ON aml_evidence_lifecycle_events(recorded_at_unix_ms);",
             )
             .map_err(|error| format!("failed to initialize AML SQLite schema: {error}"))?;
 
