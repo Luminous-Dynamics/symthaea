@@ -555,14 +555,13 @@ jobs:
               "negative_controls": manifest["negative_controls"],
               "claim_ceiling": manifest["claim_ceiling"],
           }
-          Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\n", encoding="utf-8")
           schema = json.loads(Path("schemas/hardsec-seqcubewitness-attestation-v1.schema.json").read_text(encoding="utf-8"))
           from jsonschema import Draft202012Validator
           Draft202012Validator.check_schema(schema)
           errors = list(Draft202012Validator(schema).iter_errors(predicate))
           if errors:
               raise SystemExit("attestation predicate schema failure: " + "; ".join(error.message for error in errors))
-          Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\\n", encoding="utf-8")
+          Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\n", encoding="utf-8")
           print(json.dumps({
               "subject": predicate["subject"],
               "source_commit": manifest["run"]["source_commit"],
