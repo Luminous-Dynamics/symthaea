@@ -127,7 +127,6 @@
     },
     "searchResult": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "id",
         "content"
@@ -156,7 +155,6 @@
     },
     "searchResponse": {
       "type": "object",
-      "additionalProperties": false,
       "required": [
         "data"
       ],
@@ -168,7 +166,8 @@
           },
           "description": "Relevance-ordered; empty results must be data: []."
         }
-      }
+      },
+      "description": "Unknown response fields are ignored by the platform; participants should emit only declared fields."
     }
   },
   "x-runtimeInvariants": [
