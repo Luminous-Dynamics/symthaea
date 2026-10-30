@@ -2530,7 +2530,7 @@ fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<St
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "INFERENCE_RESULT\t{}\t{}\t{}\t{}\t{:.4}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",
+                "INFERENCE_RESULT\t{}\t{}\t{}\t{}\t{:.4}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}",
                 scenario_name,
                 INFERENCE_METHODS[method],
                 inference_replicates,
@@ -2549,7 +2549,6 @@ fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<St
                 summary.selective_winner_curse,
                 summary.mean_interval_width,
                 summary.mean_critical_value,
-                if method == 0 { pointwise_critical } else if method == 1 { bonferroni_critical } else { summary.mean_critical_value },
                 unique_best as u8,
                 );
         }
@@ -3198,7 +3197,7 @@ mod tests {
             .collect();
         assert_eq!(rows.len(), 9);
         for row in rows {
-            assert_eq!(row.split('\t').count(), 21);
+            assert_eq!(row.split('\t').count(), 20);
         }
     }
 
