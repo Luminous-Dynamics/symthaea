@@ -566,7 +566,8 @@
         "label",
         "proof_term",
         "direct_free_variable_support",
-        "transitive_local_dependency_closure"
+        "transitive_local_dependency_closure",
+        "direct_global_constants"
       ],
       "properties": {
         "schema_version": {
@@ -592,6 +593,14 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/support_declaration"
+          }
+        },
+        "direct_global_constants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
