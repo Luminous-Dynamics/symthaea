@@ -1128,7 +1128,14 @@ mod tests {
     #[test]
     fn regime_comparison_requires_evidence_uncertainty_provenance() {
         let mut record = bound_record();
+        record.evidence.receipt.origin =
+            crate::architecture_evidence::ArchitectureEvidenceOrigin::PublishedResult;
+        record.evidence.receipt.runner_artifact_sha256 = None;
+        record.evidence.receipt.toolchain_identity = None;
+        record.evidence.receipt.repeat_count = Some(30);
+        record.evidence.receipt.failed_run_count = Some(0);
         record.evidence.receipt.interval_method_id = None;
+        record.evidence.receipt.aggregation_method_id = None;
         assert_eq!(
             validate_regime_bound_evidence_record(&record),
             Ok(())
