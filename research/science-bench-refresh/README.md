@@ -55,7 +55,7 @@ cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.
   /tmp/judge-factorial/judge-factorial-receipt.example.json
 ```
 
-The report contains main effects, per-criterion criterion-order shifts and all ten pairwise factor interactions. It also reports candidate score-gap and candidate-choice effects. The analyzer is descriptive only; it does not authenticate execution/randomization, prove raw prompt custody or semantic equivalence, estimate population effects, or permit scoring. See [SCI-FACTORIAL-JUDGE-BIAS-001](../../docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md).
+The report contains main effects, per-criterion criterion-order shifts and all ten pairwise factor interactions. It also reports candidate score-gap and candidate-choice effects. All effect estimates use only fully completed 32-cell block/repeat units; incomplete repeats are excluded whole, with completed-but-excluded conditions separately counted while every planned cell remains in the denominator. The analyzer is descriptive only; it does not authenticate execution/randomization, prove raw prompt custody or semantic equivalence, estimate population effects, or permit scoring. See [SCI-FACTORIAL-JUDGE-BIAS-001](../../docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md).
 
 ## Audit intervention-based evaluator consistency
 
