@@ -689,6 +689,12 @@
         },
         "reference_netlist_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "assumptions_local_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "reference_local_path": {
+          "$ref": "#/$defs/relativePath"
         }
       },
       "allOf": [
@@ -709,7 +715,9 @@
               "tool_version",
               "assumptions_sha256",
               "proof_evidence_id",
-              "reference_netlist_sha256"
+              "reference_netlist_sha256",
+              "assumptions_local_path",
+              "reference_local_path"
             ]
           }
         }
@@ -923,8 +931,50 @@
         },
         "assumptions_local_path": {
           "$ref": "#/$defs/relativePath"
+        },
+        "subject_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "equivalence_report"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "formal_result",
+              "property_id",
+              "proof_scope",
+              "assumptions_sha256",
+              "assumptions_local_path",
+              "subject_netlist_sha256",
+              "reference_netlist_sha256"
+            ],
+            "properties": {
+              "formal_result": {
+                "const": "equivalence_proved"
+              },
+              "proof_scope": {
+                "enum": [
+                  "unbounded",
+                  "assumption_scoped"
+                ]
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "allOf": [
