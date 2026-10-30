@@ -130,9 +130,16 @@ struct Calibration {
 
 impl Calibration {
     fn oracle_q(&self, factor: f64) -> f64 {
-        let best = self.oracle_q_by_factor.iter()
-            .min_by(|(fa, _), (fb, _)| (fa - factor).abs().total_cmp(&(fb - factor).abs()));
-        best.map(|(_, q)| *q).unwrap_or(self.selected_q)
+        let mut best_q = self.selected_q;
+        let mut best_distance = f64::INFINITY;
+        for (candidate_factor, candidate_q) in &self.oracle_q_by_factor {
+            let distance = (*candidate_factor - factor).abs();
+            if distance < best_distance {
+                best_distance = distance;
+                best_q = *candidate_q;
+            }
+        }
+        best_q
     }
 }
 
