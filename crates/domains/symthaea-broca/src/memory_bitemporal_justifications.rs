@@ -47,6 +47,8 @@ pub struct SourceEventApplicationReceipt {
 pub struct BitemporalJustificationRuntime {
     ledger: BitemporalSourceLedger,
     justifications: JustificationGraph,
+    /// Transaction time when each derived conclusion first became part of memory.
+    derived_known_at: BTreeMap<String, DateTime<Utc>>,
 }
 
 impl BitemporalJustificationRuntime {
@@ -111,20 +113,77 @@ impl BitemporalJustificationRuntime {
         let candidate = Self {
             ledger: candidate_ledger,
             justifications: candidate_graph,
+            derived_known_at: self.derived_known_at.clone(),
         };
         candidate.verify_consistency()?;
         *self = candidate;
         Ok(receipts)
     }
 
-    /// Add one derived conclusion with OR-of-AND source/derived dependencies.
-    /// The graph clones and validates before committing the update.
-    pub fn derive(&mut self, conclusion: DerivedConclusionInput) -> Result<(), String> {
+    /// Add one derived conclusion with an explicit transaction/knowledge time.
+    ///
+    /// Every source leaf and derived parent must already have been recorded by
+    /// recorded_at. This prevents a later-ingested source or conclusion from
+    /// appearing in an earlier historical "as known" reconstruction.
+    pub fn derive_at(
+        &mut self,
+        conclusion: DerivedConclusionInput,
+        recorded_at: DateTime<Utc>,
+    ) -> Result<(), String> {
         self.verify_consistency()?;
-        let mut candidate = self.justifications.clone();
-        candidate.derive(conclusion)?;
-        candidate.verify_consistency()?;
-        self.justifications = candidate;
+        if self.derived_known_at.contains_key(&conclusion.fact_id) {
+            return Err(format!("duplicate derived fact ID {:?}", conclusion.fact_id));
+        }
+
+        for justification in &conclusion.justifications {
+            for dependency in &justification.dependencies {
+                match dependency {
+                    crate::memory_justifications::SupportRef::SourceEvent(source_id) => {
+                        let source_event = self.ledger.events().iter().find(|event| {
+                            event.revision_id == *source_id
+                                && matches!(
+                                    event.operation,
+                                    SourceEventOperation::Assert { .. }
+                                        | SourceEventOperation::Supersede { .. }
+                                )
+                        }).ok_or_else(|| format!("unknown source revision {source_id:?}"))?;
+                        if source_event.recorded_at > recorded_at {
+                            return Err(format!(
+                                "source revision {source_id:?} was not known at derived-fact recorded_at"
+                            ));
+                        }
+                        if self.ledger.events().iter().any(|event| {
+                            event.recorded_at <= recorded_at
+                                && event.operation.target_revision_id() == Some(source_id.as_str())
+                        }) {
+                            return Err(format!(
+                                "source revision {source_id:?} was already superseded or retracted at derived-fact recorded_at"
+                            ));
+                        }
+                    }
+                    crate::memory_justifications::SupportRef::DerivedFact(parent_id) => {
+                        let parent_known_at = self.derived_known_at.get(parent_id)
+                            .ok_or_else(|| format!("unknown derived parent {parent_id:?}"))?;
+                        if parent_known_at > &recorded_at {
+                            return Err(format!(
+                                "derived parent {parent_id:?} was not known at child recorded_at"
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let fact_id = conclusion.fact_id.clone();
+        let mut candidate_graph = self.justifications.clone();
+        candidate_graph.derive(conclusion)?;
+        candidate_graph.verify_consistency()?;
+
+        let mut candidate_known_at = self.derived_known_at.clone();
+        candidate_known_at.insert(fact_id, recorded_at);
+        self.justifications = candidate_graph;
+        self.derived_known_at = candidate_known_at;
+        self.verify_consistency()?;
         Ok(())
     }
 
@@ -147,9 +206,17 @@ impl BitemporalJustificationRuntime {
         let eligible_source_ids = self
             .ledger
             .active_assertion_revision_ids_at(valid_at, known_at, scope)?;
-        self.justifications.support_statuses_at_with_source_events(
+        let eligible_derived_fact_ids: BTreeSet<String> = self
+            .derived_known_at
+            .iter()
+            .filter_map(|(fact_id, derived_at)| {
+                (*derived_at <= known_at).then(|| fact_id.clone())
+            })
+            .collect();
+        self.justifications.support_statuses_at_with_evidence(
             &valid_at.format("%Y-%m-%d").to_string(),
             &eligible_source_ids,
+            &eligible_derived_fact_ids,
         )
     }
 
@@ -198,6 +265,18 @@ impl BitemporalJustificationRuntime {
                 ));
             }
         }
+        if self.derived_known_at.len() != self.justifications.fact_count() {
+            return Err(format!(
+                "derived-fact knowledge-time cardinality mismatch: {} timestamps for {} facts",
+                self.derived_known_at.len(),
+                self.justifications.fact_count()
+            ));
+        }
+        for fact_id in self.derived_known_at.keys() {
+            if self.justifications.fact(fact_id).is_none() {
+                return Err(format!("knowledge-time index references missing fact {fact_id:?}"));
+            }
+        }
         Ok(())
     }
 
@@ -208,7 +287,7 @@ impl BitemporalJustificationRuntime {
         self.verify_consistency()?;
         let source_sha256 = self.ledger.state_sha256()?;
         let justification_sha256 = self.justifications.state_sha256()?;
-        let encoded = serde_json::to_vec(&(source_sha256, justification_sha256))
+        let encoded = serde_json::to_vec(&(source_sha256, justification_sha256, &self.derived_known_at))
             .map_err(|error| format!("cannot serialize bitemporal justification state: {error}"))?;
         Ok(format!("{:x}", Sha256::digest(encoded)))
     }
@@ -299,13 +378,13 @@ mod tests {
             ])
             .unwrap();
         runtime
-            .derive(conclusion(
+            .derive_at(conclusion(
                 "C",
                 [
                     justification("via-A", [source("A")]),
                     justification("via-B", [source("B")]),
                 ],
-            ))
+            ), instant(1))
             .unwrap();
         runtime
     }
@@ -430,7 +509,7 @@ mod tests {
             .derive(conclusion(
                 "C",
                 [justification("via-window", [source("WINDOW")])],
-            ))
+            ), instant(1))
             .unwrap();
 
         assert!(matches!(
@@ -460,7 +539,7 @@ mod tests {
             .derive(conclusion(
                 "C",
                 [justification("via-A", [source("A")])],
-            ))
+            ), instant(1))
             .unwrap();
 
         let ledger_status = runtime
@@ -499,7 +578,7 @@ mod tests {
             .derive(conclusion(
                 "C",
                 [justification("both-tenants", [source("A"), source("B")])],
-            ))
+            ), instant(1))
             .unwrap();
 
         assert_eq!(
