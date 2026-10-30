@@ -32,6 +32,7 @@ NASLIB_REPO = "automl/NASLib"
 NASLIB_BRANCH = "zerocost"
 NASLIB_OBSERVED_COMMIT = "8cb5d2ba1e29784de43039d9824c68e88fb1a1da"
 SUITEZERO_FILENAME = "zc_nasbench201.json"
+NASBENCH201_ZC_DRIVE_FILE_ID = "1R7n7GpFHAjUZpPISzbhxH0QjubnvZM5H"
 
 CANONICAL_SCHEMA = "symthaea.tabular-nas.canonical-import"
 BENCHMARK_SCHEMA = "symthaea.tabular-nas.benchmark"
@@ -255,6 +256,7 @@ def build_canonical_import(
     source_description = (
         f"NAS-Bench-Suite-Zero {SUITEZERO_FILENAME}; dataset={dataset}; "
         f"{NASLIB_REPO}@{source_commit}; NASLib {NASLIB_BRANCH} loader; "
+        f"Google Drive artifact ID={NASBENCH201_ZC_DRIVE_FILE_ID}; "
         "NAS-Bench-201 topology encoding=6 operation indices in range 0..4; "
         f"proxy names={','.join(sorted(chosen))}; proxy runtime unit=seconds"
     )
@@ -284,6 +286,8 @@ def build_canonical_import(
         "proxy_names": list(sorted(chosen)),
         "raw_artifact_bytes": len(raw_bytes),
         "raw_artifact_sha256": artifact_sha256,
+        "upstream_google_drive_file_id": NASBENCH201_ZC_DRIVE_FILE_ID,
+        "naslib_source_commit": source_commit,
         "normalized_infinite_proxy_scores": normalized_infinite_proxy_scores,
         "target_metric": "val_accuracy",
         "target_metric_direction": "maximize",
