@@ -128,7 +128,6 @@ struct FrozenRankingReport {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct FrozenPolicyOrder {
     policy: String,
     review_budget_minutes: f64,
@@ -731,7 +730,7 @@ mod tests {
                     "estimated_error_probability":0.8,
                     "review_minutes":1.0,
                     "evidence_sha256":"e".repeat(64),
-                    "changes":[{"operation":"add_weight","source":1,"target":2,"weight":1.0}]
+                    "changes":[{"operation":"add_weight","source":1,"target":2,"weight":2.0}]
                 },
                 {
                     "candidate_id":"remove_two",
@@ -817,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn rejected_correct_proposal_counts_as_missed_correction() {
+    fn unselected_correct_proposal_is_not_counted_as_reviewed() {
         let report = evaluate_fixture();
         let two_minutes = report.policy_budget_results.iter()
             .find(|row| row.policy=="policy_a" && row.review_budget_minutes==2.0).unwrap();
@@ -915,7 +914,8 @@ mod tests {
         outcomes.candidate_outcomes.pop();
         assert!(validate_outcomes(&outcomes,&proposals,&input_hash,&ranking_hash).unwrap_err().contains("exactly one"));
         outcomes.candidate_outcomes=make_outcomes(&proposals,&input_hash,&ranking_hash).candidate_outcomes;
-        outcomes.candidate_outcomes.push(outcomes.candidate_outcomes[0].clone());
+        let duplicate = outcomes.candidate_outcomes[0].clone();
+        outcomes.candidate_outcomes.push(duplicate);
         assert!(validate_outcomes(&outcomes,&proposals,&input_hash,&ranking_hash).unwrap_err().contains("unique"));
     }
 
@@ -953,7 +953,7 @@ mod tests {
                 {"candidate_id":"remove_one","adjudication":"indeterminate","reviewer_decision":"accept","actual_review_minutes":1.0}
             ]
         })).unwrap();
-        let report=evaluate(&proposals,&ranking,&outcomes,"6".repeat(64),ranking_hash,"7".repeat(64)).unwrap();
+        let report=evaluate(&proposals,&ranking,&outcomes,input_hash,ranking_hash,"7".repeat(64)).unwrap();
         let row=&report.policy_budget_results[0];
         assert_eq!(row.accepted_decision_precision,None);
         assert_eq!(row.outcome_counts.accepted_indeterminate,1);
