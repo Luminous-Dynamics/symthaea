@@ -244,7 +244,55 @@
         "expected_dea_weight": 0.7310585786300049
       }
     ],
-    "conclusion": "The printed absolute-gap DeA gate cannot identify the sign of the squared-error interaction. The two candidates receive identical DeA weights despite different signed interactions and different true squared errors. This is a mathematical negative control, not a correction claim."
+    "conclusion": "The printed absolute-gap DeA gate cannot identify the sign of the squared-error interaction. The two candidates receive identical DeA weights despite different signed interactions and different true squared errors. This is a mathematical negative control, not a correction claim.",
+    "model_class_witness": {
+      "design_domain": [
+        "x0"
+      ],
+      "true_function_value": 0.5,
+      "finite_model_class": [
+        {
+          "model_id": "constant-minus-one",
+          "prediction": -1,
+          "true_squared_error": 2.25
+        },
+        {
+          "model_id": "constant-one",
+          "prediction": 1,
+          "true_squared_error": 0.25,
+          "best_in_class": true
+        },
+        {
+          "model_id": "constant-three",
+          "prediction": 3,
+          "true_squared_error": 6.25
+        }
+      ],
+      "best_in_class_prediction": 1,
+      "misspecification_sup_bound": 0.5,
+      "outcome_model": "At x0, observations equal the true mean 0.5 plus noise taking values -2.5 or +2.5 with equal probability. Outcomes -2 and 3 are within the declared outcome bound y_infinity=3.",
+      "empirical_erm_witnesses": [
+        {
+          "observed_target": -2,
+          "empirical_squared_losses": {
+            "constant-minus-one": 1,
+            "constant-one": 9,
+            "constant-three": 25
+          },
+          "erm": "constant-minus-one"
+        },
+        {
+          "observed_target": 3,
+          "empirical_squared_losses": {
+            "constant-minus-one": 16,
+            "constant-one": 4,
+            "constant-three": 0
+          },
+          "erm": "constant-three"
+        }
+      ],
+      "interpretation": "Both fitted predictors can be empirical risk minimizers for admissible finite observations, while constant-one is the unique best-in-class predictor under the target distribution."
+    }
   },
   "prohibited_claims": [
     "The primitive module does not implement or optimize the proxy predictor g.",
