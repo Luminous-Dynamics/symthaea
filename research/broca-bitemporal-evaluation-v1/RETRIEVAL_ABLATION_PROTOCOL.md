@@ -80,7 +80,7 @@ The current implementation supplies a deterministic VOI gate and grouped calibra
 
 ## Versioned calibration artifact
 
-The calibration fixture [retrieval-value-calibration-fixtures-v1.json](retrieval-value-calibration-fixtures-v1.json) contains 29 synthetic independent groups with paired predicted/observed utility components and expected conformal residual offsets. The Rust calibration test reads this artifact directly. It is a deterministic conformance fixture, not an empirical calibration dataset and not evidence that real-world coverage has been achieved.
+The calibration fixture [retrieval-value-calibration-fixtures-v1.json](retrieval-value-calibration-fixtures-v1.json) contains 29 synthetic independent groups with paired predicted/observed utility components and expected conformal residual offsets. The Rust calibration test reads this artifact directly. It is a deterministic conformance fixture, not an empirical calibration dataset and not evidence that real-world coverage has been achieved. The module `memory_retrieval_value_benchmark.rs` consumes matched with/without-retrieval outcomes, derives disjoint component deltas, and reports 2,000-replicate deterministic cluster-bootstrap 95% intervals over independent source/user/conversation groups. It also exports paired outcomes into calibration observations for a frozen point estimator.
 
 ## Relevant external comparisons
 
