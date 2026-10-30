@@ -338,6 +338,38 @@ impl BitemporalSourceLedger {
         &self.events
     }
 
+    /// Return assertion revision IDs that are both known at the supplied
+    /// transaction-time coordinate and valid at the supplied world-time date.
+    ///
+    /// A supersede/retract event affects its target only when that mutation is
+    /// itself visible at known_at. This is therefore suitable for reconstructing
+    /// historical evidence eligibility after later corrections have arrived.
+    pub fn active_assertion_revision_ids_at(
+        &self,
+        valid_at: NaiveDate,
+        known_at: DateTime<Utc>,
+    ) -> Result<BTreeSet<String>, String> {
+        self.verify_consistency()?;
+        let visible_events: Vec<&SourceEventRevision> = self.events
+            .iter()
+            .filter(|event| event.recorded_at <= known_at)
+            .collect();
+        let invalidated_revision_ids: BTreeSet<String> = visible_events
+            .iter()
+            .filter_map(|event| event.operation.target_revision_id())
+            .map(str::to_owned)
+            .collect();
+
+        let active_ids = visible_events
+            .into_iter()
+            .filter(|event| !invalidated_revision_ids.contains(&event.revision_id))
+            .filter(|event| event.operation.assertion()
+                .is_some_and(|assertion| assertion.is_valid_at(valid_at)))
+            .map(|event| event.revision_id.clone())
+            .collect();
+        Ok(active_ids)
+    }
+
     /// Recheck revision uniqueness, transaction ordering, target ancestry,
     /// one-time mutation, and assertion invariants without mutating the ledger.
     pub fn verify_consistency(&self) -> Result<(), String> {
