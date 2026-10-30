@@ -132,3 +132,7 @@ This protocol is a research plan, not a completed implementation or a claim that
 
 See [LIFECYCLE_ACTION_POLICY.md](LIFECYCLE_ACTION_POLICY.md) for the deterministic ANSWER / WARN_STALE / EXPLAIN_CONFLICT / RETRIEVE_MORE / ABSTAIN policy, opaque proof-verifier capability, action receipt and Vera-Life-Eval scorecard. This is the policy layer between verified proof construction and answer generation. It has not yet been wired into the production generation loop, and no LifeEM benchmark result is claimed.
 The deterministic policy truth table is also versioned at [lifecycle-action-fixtures-v1.json](lifecycle-action-fixtures-v1.json) (60 cases: five non-verified proof outcomes × six claim states × two retrieval-progress states). The Rust test suite reads that checked-in fixture directly. ANSWER is covered separately through a real independently verified proof-packet integration test and opaque capability check.
+
+## 16. Calibrated retrieval stopping and value-of-information
+
+See [RETRIEVAL_VALUE_OF_INFORMATION.md](RETRIEVAL_VALUE_OF_INFORMATION.md) and [retrieval-value-fixtures-v1.json](retrieval-value-fixtures-v1.json) for the conservative utility gate that decides whether another retrieval call is worth its marginal correctness/lifecycle benefit, harm risk and measured cost. This builds on HALT's claim–evidence coverage stop condition and adds the budgeted utility, calibration, retrieval-harm and realized-budget evaluation required by Active RAG research. It is not yet trained or measured; the fixture corpus is synthetic policy conformance only.
