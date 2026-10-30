@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-seqcubewitness-attestation-v1.schema.json",
+  "title": "HARDSEC SeqCube Witness Validation Attestation Predicate v1",
+  "description": "Custom predicate describing a deterministic evidence bundle from a repository workflow. It is a signed provenance statement, not a correctness oracle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "subject",
+    "run",
+    "upstream",
+    "tests",
+    "replay",
+    "evidence_packet",
+    "negative_controls",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-seqcubewitness-attestation-v1"
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "name",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "repository",
+        "source_commit",
+        "workflow_ref",
+        "workflow_file_blob",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "event_name",
+        "ref"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "workflow_ref": {
+          "type": "string"
+        },
+        "workflow_file_blob": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "workflow_run_id": {
+          "type": "string"
+        },
+        "workflow_run_attempt": {
+          "type": "string"
+        },
+        "event_name": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "required": [
+        "repository",
+        "commit",
+        "reported_corpus_member",
+        "generator_included",
+        "github_archive_sha256",
+        "publisher_checksum_manifest_sha256",
+        "publisher_checksum_entries",
+        "exact_byte_matches",
+        "line_ending_reconciled_matches",
+        "mismatches",
+        "canonical_copy_manifest_entries_verified",
+        "canonical_copy_files_transformed"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "reported_corpus_member": {
+          "type": "boolean"
+        },
+        "generator_included": {
+          "type": "boolean"
+        },
+        "github_archive_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "publisher_checksum_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "publisher_checksum_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_byte_matches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "line_ending_reconciled_matches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mismatches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_copy_manifest_entries_verified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "canonical_copy_files_transformed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "required": [
+        "trigger_budget",
+        "evidence_packet",
+        "rustfmt"
+      ],
+      "properties": {
+        "trigger_budget": {
+          "type": "object",
+          "required": [
+            "passed",
+            "failed",
+            "result"
+          ],
+          "properties": {
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "result": {
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            }
+          }
+        },
+        "evidence_packet": {
+          "type": "object",
+          "required": [
+            "passed",
+            "failed",
+            "result"
+          ],
+          "properties": {
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "result": {
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            }
+          }
+        },
+        "rustfmt": {
+          "const": "pass"
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "required": [
+        "upstream_verifier",
+        "active_audit",
+        "inactive_audit",
+        "icarus",
+        "active_trigger_phase_cycles",
+        "active_first_payload_difference_cycle",
+        "inactive_first_payload_difference_cycle"
+      ],
+      "properties": {
+        "upstream_verifier": {
+          "type": "string"
+        },
+        "active_audit": {
+          "type": "object"
+        },
+        "inactive_audit": {
+          "type": "object"
+        },
+        "icarus": {
+          "type": "string"
+        },
+        "active_trigger_phase_cycles": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "active_first_payload_difference_cycle": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inactive_first_payload_difference_cycle": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence_packet": {
+      "type": "object",
+      "required": [
+        "packet_id",
+        "packet_sha256",
+        "receipt_sha256",
+        "evaluation_mode",
+        "model_sha256",
+        "verified_local_file_count",
+        "claims",
+        "security_verdict"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string"
+        },
+        "packet_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "evaluation_mode": {
+          "enum": [
+            "detector_alert",
+            "witness_validation"
+          ]
+        },
+        "model_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verified_local_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "claims": {
+          "type": "array"
+        },
+        "security_verdict": {
+          "type": "null"
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "object",
+      "required": [
+        "expected_case_count",
+        "rejected_case_count",
+        "cases"
+      ],
+      "properties": {
+        "expected_case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_case_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "mutation",
+              "relative_path",
+              "evidence_auditor_exit",
+              "upstream_verifier_exit",
+              "both_rejected"
+            ],
+            "properties": {
+              "mutation": {
+                "type": "string"
+              },
+              "relative_path": {
+                "type": "string"
+              },
+              "evidence_auditor_exit": {
+                "type": "integer"
+              },
+              "upstream_verifier_exit": {
+                "type": "integer"
+              },
+              "both_rejected": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  }
+}
