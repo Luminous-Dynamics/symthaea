@@ -2401,6 +2401,34 @@ mod tests {
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let segmentation = InfluenceSegmentationConfig::default();
+        let segmented =
+            measure_counterfactual_influence_segmented(&experiment, &calibration, &segmentation)
+                .unwrap();
+        assert_eq!(segmented.base_report, report);
+        assert_eq!(
+            segmented.raw_measured_intervals,
+            report.measured_influence_intervals
+        );
+        assert!(verify_counterfactual_influence_segmented(
+            &segmented,
+            &experiment,
+            &calibration,
+        )
+        .unwrap());
+
+        let mut tampered_segmented = segmented.clone();
+        tampered_segmented.window_measurements[0].rms_delta += 0.01;
+        assert_eq!(
+            verify_counterfactual_influence_segmented(
+                &tampered_segmented,
+                &experiment,
+                &calibration,
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt
+        );
     }
 
     #[test]
@@ -2615,7 +2643,7 @@ mod tests {
     }
 
     #[test]
-    fn RMS_and_spectral_combination_mode_is_explicit_and_replayable() {
+    fn rms_and_spectral_combination_mode_is_explicit_and_replayable() {
         let measurements = vec![
             influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
         ];
