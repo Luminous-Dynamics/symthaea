@@ -278,10 +278,10 @@ impl Rk45Integrator {
         }
     }
 
-    /// Take one adaptive step, returning (new_state, actual_dt, error_estimate).
+    /// Attempt one adaptive substep, returning (new_state, accepted_dt, error_estimate).
     ///
-    /// This is the core method; the `Integrator` trait's `step` wraps it with
-    /// a fixed-dt interface for compatibility with `simulate()`.
+    /// The returned duration may be shorter than `dt` after rejected trials.
+    /// The caller is responsible for advancing time by exactly `accepted_dt`.
     pub fn adaptive_step(
         &self,
         system: &dyn DynamicalSystem,
@@ -289,7 +289,20 @@ impl Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> (Vec<f64>, f64, f64) {
+        assert!(dt.is_finite() && dt > 0.0, "RK45 requires a finite positive trial interval");
+        assert!(self.tol.is_finite() && self.tol > 0.0, "RK45 tolerance must be finite and positive");
+        assert!(
+            self.dt_min.is_finite()
+                && self.dt_min > 0.0
+                && self.dt_max.is_finite()
+                && self.dt_max >= self.dt_min,
+            "RK45 step bounds must be finite, positive, and ordered"
+        );
+
         let dim = state.len();
+        // The minimum step is a lower bound only when it fits inside the
+        // caller's requested interval. Never enlarge a trial beyond dt.
+        let minimum_step = self.dt_min.min(dt);
         let mut h = dt.min(self.dt_max);
 
         loop {
@@ -357,35 +370,116 @@ impl Rk45Integrator {
                 })
                 .collect();
 
-            // Error estimate (max norm)
-            let error: f64 = y5
-                .iter()
-                .zip(y4.iter())
-                .map(|(&a, &b)| (a - b).abs())
-                .fold(0.0f64, f64::max);
+            // Error estimate (max norm). Treat any non-finite candidate as
+            // an infinite error instead of allowing f64::max to mask NaNs.
+            let finite_candidates = y5.iter().chain(y4.iter()).all(|value| value.is_finite());
+            let error: f64 = if finite_candidates {
+                y5.iter()
+                    .zip(y4.iter())
+                    .map(|(&a, &b)| (a - b).abs())
+                    .fold(0.0f64, f64::max)
+            } else {
+                f64::INFINITY
+            };
 
-            if error <= self.tol || h <= self.dt_min {
-                // Accept the step; compute next step size
-                let scale = if error > 1e-30 {
-                    0.9 * (self.tol / error).powf(0.2)
-                } else {
-                    2.0
-                };
-                let _next_h = (h * scale).clamp(self.dt_min, self.dt_max);
+            if error <= self.tol || h <= minimum_step {
+                // Return this accepted substep. The interval-level wrapper below
+                // is responsible for carrying the suggested next step forward.
                 return (y5, h, error);
             }
 
-            // Reject step; shrink h and retry
-            let scale = 0.9 * (self.tol / error).powf(0.25);
-            h = (h * scale).max(self.dt_min);
+            // The embedded Cash-Karp 4(5) difference scales as O(h^5),
+            // so rejected and accepted-step controllers both use exponent 1/5.
+            // Keep the trial bounded by the original requested interval.
+            let scale = 0.9 * (self.tol / error).powf(0.2);
+            h = (h * scale).max(minimum_step).min(dt);
         }
     }
 }
 
 impl Integrator for Rk45Integrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
-        let (new_state, _actual_dt, _error) = self.adaptive_step(system, state, t, dt);
-        new_state
+        assert!(dt.is_finite() && dt > 0.0, "RK45 requires a finite positive interval");
+        assert!(
+            (t + dt).is_finite() && t + dt > t,
+            "RK45 requested interval is not representable at start time {t} (dt={dt})"
+        );
+        assert!(self.tol.is_finite() && self.tol > 0.0, "RK45 tolerance must be finite and positive");
+        assert!(
+            self.dt_min.is_finite()
+                && self.dt_min > 0.0
+                && self.dt_max.is_finite()
+                && self.dt_max >= self.dt_min,
+            "RK45 step bounds must be finite, positive, and ordered"
+        );
+
+        // The Integrator trait promises a state at t + dt. adaptive_step may
+        // reject the requested step and accept a shorter substep, so consume
+        // the whole interval here instead of returning a state at t + h while
+        // the caller advances its clock by dt.
+        const MAX_SUBSTEPS_PER_INTERVAL: usize = 100_000;
+        let mut current_state = state.to_vec();
+        let mut elapsed = 0.0_f64;
+        let mut h = dt.min(self.dt_max);
+        let mut accepted_steps = 0_usize;
+
+        while elapsed < dt {
+            assert!(
+                accepted_steps < MAX_SUBSTEPS_PER_INTERVAL,
+                "RK45 exceeded {MAX_SUBSTEPS_PER_INTERVAL} accepted substeps in one interval"
+            );
+
+            let remaining = dt - elapsed;
+            let attempted_dt = h.min(remaining);
+            let (next_state, actual_dt, error) =
+                self.adaptive_step(system, &current_state, t + elapsed, attempted_dt);
+
+            assert!(
+                actual_dt.is_finite() && actual_dt > 0.0 && actual_dt <= remaining,
+                "RK45 returned invalid accepted step {actual_dt} for remaining interval {remaining}"
+            );
+            assert!(
+                error.is_finite(),
+                "RK45 produced a non-finite local error estimate"
+            );
+            assert!(
+                error <= self.tol,
+                "RK45 could not satisfy tolerance {} at minimum step {} (error {})",
+                self.tol,
+                self.dt_min,
+                error
+            );
+
+            current_state = next_state;
+            accepted_steps += 1;
+
+            // Stop only when the accepted trial consumed the remaining
+            // interval. Do not discard a merely-small remainder: simulate()
+            // advances its external clock by the full requested dt.
+            if actual_dt >= remaining {
+                break;
+            }
+
+            let next_elapsed = elapsed + actual_dt;
+            assert!(
+                next_elapsed > elapsed && t + next_elapsed > t + elapsed,
+                "RK45 accepted substep {actual_dt} cannot advance representable time at t={} (elapsed={elapsed})",
+                t + elapsed
+            );
+            if next_elapsed >= dt {
+                break;
+            }
+            elapsed = next_elapsed;
+
+            let scale = if error > 1e-30 {
+                0.9 * (self.tol / error).powf(0.2)
+            } else {
+                2.0
+            };
+            h = (actual_dt * scale).clamp(self.dt_min, self.dt_max);
+        }
+
+        current_state
     }
 
     fn name(&self) -> &str {
@@ -1063,6 +1157,22 @@ pub fn trajectory_to_hvs(result: &SimulationResult) -> Vec<ContinuousHV> {
 mod tests {
     use super::*;
 
+    struct TimePolynomial;
+
+    impl DynamicalSystem for TimePolynomial {
+        fn state_dim(&self) -> usize {
+            1
+        }
+
+        fn derivatives(&self, _state: &[f64], t: f64) -> Vec<f64> {
+            vec![t.powi(5)]
+        }
+
+        fn name(&self) -> &str {
+            "time-polynomial"
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Harmonic oscillator: energy conservation
     // -------------------------------------------------------------------------
@@ -1497,6 +1607,66 @@ mod tests {
             error <= 1e-6 || actual_dt <= rk45.dt_min,
             "Error {:.2e} should be within tolerance or at minimum step",
             error
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "could not satisfy tolerance")]
+    fn test_rk45_does_not_overshoot_interval_when_dt_min_is_larger() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let rk45 = Rk45Integrator {
+            tol: 1e-20,
+            dt_min: 1.0,
+            dt_max: 1.0,
+        };
+
+        // The requested interval is shorter than dt_min and the requested
+        // tolerance cannot be met. Fail closed at the requested interval;
+        // never grow the trial to dt_min and step beyond the caller's time.
+        let _ = rk45.step(&osc, &[1.0, 0.0], 0.0, 0.1);
+    }
+
+    #[test]
+    fn test_rk45_adaptive_substeps_integrate_non_autonomous_interval_endpoint() {
+        let system = TimePolynomial;
+        let rk45 = Rk45Integrator::new(1e-12);
+        let result = simulate(&system, &rk45, &[0.0], 1.0, 4.0, 3.0);
+
+        // Integral from t=1 to t=4 of t^5 dt = (4^6 - 1^6)/6.
+        let exact = (4.0_f64.powi(6) - 1.0) / 6.0;
+        assert_eq!(result.times.last().copied(), Some(4.0));
+        assert!(
+            (result.final_state()[0] - exact).abs() < 1e-9,
+            "RK45 state={} at t=4; expected {exact}",
+            result.final_state()[0]
+        );
+    }
+
+    #[test]
+    fn test_rk45_rejected_substeps_preserve_requested_time_interval() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let rk45 = Rk45Integrator::new(1e-12);
+        let initial = [1.0, 0.0];
+
+        // The one-second macro interval initially exceeds the accepted step
+        // under this tolerance. The integrator must consume the full interval
+        // internally, so the state returned to simulate() corresponds to the
+        // same time that simulate() records.
+        let result = simulate(&osc, &rk45, &initial, 0.0, 10.0, 1.0);
+        let exact_x = 10.0_f64.cos();
+        let exact_v = -10.0_f64.sin();
+        let state = result.final_state();
+
+        assert_eq!(result.times.last().copied(), Some(10.0));
+        assert!(
+            (state[0] - exact_x).abs() < 1e-9,
+            "RK45 position must correspond to t=10: got {}, expected {exact_x}",
+            state[0]
+        );
+        assert!(
+            (state[1] - exact_v).abs() < 1e-9,
+            "RK45 velocity must correspond to t=10: got {}, expected {exact_v}",
+            state[1]
         );
     }
 
