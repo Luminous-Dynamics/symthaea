@@ -123,6 +123,8 @@ pub enum ClusteredAdvantageError {
     InvalidQuality,
     /// A margin, tolerance or minimum-cluster configuration is invalid.
     InvalidConfig,
+    /// The synthetic null-stress configuration is invalid.
+    InvalidStressConfig,
     /// Fewer independent clusters were supplied than preregistered.
     InsufficientIndependentClusters,
 }
@@ -139,6 +141,7 @@ impl std::fmt::Display for ClusteredAdvantageError {
             Self::InvalidResource => "resource values must be finite and strictly positive",
             Self::InvalidQuality => "quality values and paired differences must be finite",
             Self::InvalidConfig => "invalid margin, tolerance or minimum-cluster configuration",
+            Self::InvalidStressConfig => "invalid cluster-null stress configuration",
             Self::InsufficientIndependentClusters => "fewer independent clusters than preregistered",
         };
         f.write_str(message)
@@ -384,6 +387,209 @@ fn leave_one_cluster_out_range(values: &[f64]) -> (f64, f64) {
     }
     medians.sort_by(f64::total_cmp);
     (medians[0], medians[medians.len() - 1])
+}
+
+/// Configuration for a reproducible cluster-dependence null stress experiment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterNullStressConfig {
+    /// Independent workload families generated per replicate.
+    pub independent_clusters: usize,
+    /// Paired workload instances nested within each family.
+    pub instances_per_cluster: usize,
+    /// Intraclass correlations to evaluate, each in [0, 1].
+    pub intraclass_correlations: Vec<f64>,
+    /// Independent null replicates per ICC cell.
+    pub replicates: usize,
+    /// Deterministic Mulberry32 seed.
+    pub seed: u32,
+    /// One-sided test rejection threshold, in (0, 1).
+    pub significance_level: f64,
+}
+
+/// Wilson score interval for a Monte Carlo rejection probability.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WilsonRateInterval {
+    /// Lower 95% Wilson score bound.
+    pub lower: f64,
+    /// Upper 95% Wilson score bound.
+    pub upper: f64,
+}
+
+/// Empirical null rejection rates for one intraclass-correlation cell.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterNullStressPoint {
+    /// Intraclass correlation used to generate nested observations.
+    pub intraclass_correlation: f64,
+    /// Number of null simulation replicates.
+    pub replicates: usize,
+    /// Number of naive instance-level sign-test rejections.
+    pub naive_instance_rejections: usize,
+    /// Number of cluster-median sign-test rejections.
+    pub cluster_level_rejections: usize,
+    /// Naive instance-level empirical type-I error rate.
+    pub naive_instance_type_i_rate: f64,
+    /// Cluster-level empirical type-I error rate.
+    pub cluster_level_type_i_rate: f64,
+    /// Monte Carlo uncertainty interval for naive instance-level rate.
+    pub naive_instance_wilson_95: WilsonRateInterval,
+    /// Monte Carlo uncertainty interval for cluster-level rate.
+    pub cluster_level_wilson_95: WilsonRateInterval,
+}
+
+/// Reproducible null-stress result. The model is synthetic, not an empirical ICC estimate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterNullStressReport {
+    /// Seed used for deterministic pseudorandom draws.
+    pub seed: u32,
+    /// Independent clusters in each replicate.
+    pub independent_clusters: usize,
+    /// Instances nested within each cluster.
+    pub instances_per_cluster: usize,
+    /// One-sided rejection threshold.
+    pub significance_level: f64,
+    /// Results in the same order as the preregistered ICC input.
+    pub points: Vec<ClusterNullStressPoint>,
+}
+
+/// Compare naive instance-level and cluster-median sign tests under a null.
+///
+/// Each cluster receives a latent success probability
+/// 0.5 +/- 0.5 * sqrt(ICC) with equal probability. Conditional instance signs
+/// are Bernoulli draws from that probability, giving marginal success
+/// probability 0.5 and within-cluster Bernoulli ICC equal to the configured
+/// value. Independent clusters receive independent latent probabilities.
+/// Random continuous magnitudes avoid deterministic median ties.
+///
+/// The naive test treats every nested instance as independent. The cluster
+/// test first takes one median signed effect per cluster. This stress harness
+/// estimates type-I error for this particular synthetic exchangeable model; it
+/// does not establish performance for every dependence structure.
+pub fn run_cluster_null_stress(
+    config: &ClusterNullStressConfig,
+) -> Result<ClusterNullStressReport, ClusteredAdvantageError> {
+    if config.independent_clusters < 2
+        || config.instances_per_cluster < 2
+        || config.replicates == 0
+        || !config.significance_level.is_finite()
+        || !(0.0..1.0).contains(&config.significance_level)
+        || config.intraclass_correlations.is_empty()
+        || config.intraclass_correlations.iter().any(|icc| {
+            !icc.is_finite() || !(0.0..=1.0).contains(icc)
+        })
+    {
+        return Err(ClusteredAdvantageError::InvalidStressConfig);
+    }
+
+    let mut random = Mulberry32::new(config.seed);
+    let mut points = Vec::with_capacity(config.intraclass_correlations.len());
+    for &icc in &config.intraclass_correlations {
+        let mut naive_rejections = 0usize;
+        let mut cluster_rejections = 0usize;
+        let total_instances = config.independent_clusters * config.instances_per_cluster;
+
+        for _ in 0..config.replicates {
+            let mut total_instance_wins = 0usize;
+            let mut cluster_median_wins = 0usize;
+            for _ in 0..config.independent_clusters {
+                let latent_direction = if random.next_f64() < 0.5 { 1.0 } else { -1.0 };
+                let instance_win_probability = 0.5 + 0.5 * icc.sqrt() * latent_direction;
+                let mut signed_effects = Vec::with_capacity(config.instances_per_cluster);
+                for _ in 0..config.instances_per_cluster {
+                    let is_win = random.next_f64() < instance_win_probability;
+                    if is_win {
+                        total_instance_wins += 1;
+                    }
+                    let magnitude = 0.5 + random.next_f64();
+                    signed_effects.push(if is_win { magnitude } else { -magnitude });
+                }
+                signed_effects.sort_by(f64::total_cmp);
+                let cluster_median = median_pair(
+                    signed_effects[config.instances_per_cluster / 2 - 1],
+                    signed_effects[config.instances_per_cluster / 2],
+                    config.instances_per_cluster,
+                );
+                if cluster_median > 0.0 {
+                    cluster_median_wins += 1;
+                }
+            }
+
+            let naive_p = exact_one_sided_sign_test_p_value(
+                total_instance_wins,
+                total_instances,
+            );
+            let cluster_p = exact_one_sided_sign_test_p_value(
+                cluster_median_wins,
+                config.independent_clusters,
+            );
+            if naive_p <= config.significance_level {
+                naive_rejections += 1;
+            }
+            if cluster_p <= config.significance_level {
+                cluster_rejections += 1;
+            }
+        }
+
+        points.push(ClusterNullStressPoint {
+            intraclass_correlation: icc,
+            replicates: config.replicates,
+            naive_instance_rejections: naive_rejections,
+            cluster_level_rejections: cluster_rejections,
+            naive_instance_type_i_rate: naive_rejections as f64 / config.replicates as f64,
+            cluster_level_type_i_rate: cluster_rejections as f64 / config.replicates as f64,
+            naive_instance_wilson_95: wilson_interval(naive_rejections, config.replicates),
+            cluster_level_wilson_95: wilson_interval(cluster_rejections, config.replicates),
+        });
+    }
+
+    Ok(ClusterNullStressReport {
+        seed: config.seed,
+        independent_clusters: config.independent_clusters,
+        instances_per_cluster: config.instances_per_cluster,
+        significance_level: config.significance_level,
+        points,
+    })
+}
+
+fn median_pair(lower: f64, upper: f64, count: usize) -> f64 {
+    if count % 2 == 0 {
+        lower * 0.5 + upper * 0.5
+    } else {
+        upper
+    }
+}
+
+fn wilson_interval(successes: usize, trials: usize) -> WilsonRateInterval {
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let denominator = 1.0 + z * z / n;
+    let center = (p + z * z / (2.0 * n)) / denominator;
+    let half_width = z
+        * (p * (1.0 - p) / n + z * z / (4.0 * n * n)).sqrt()
+        / denominator;
+    WilsonRateInterval {
+        lower: (center - half_width).max(0.0),
+        upper: (center + half_width).min(1.0),
+    }
+}
+
+struct Mulberry32 {
+    state: u32,
+}
+
+impl Mulberry32 {
+    fn new(seed: u32) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_f64(&mut self) -> f64 {
+        self.state = self.state.wrapping_add(0x6D2B_79F5);
+        let mut value = self.state;
+        value = (value ^ (value >> 15)).wrapping_mul(value | 1);
+        value ^= value.wrapping_add((value ^ (value >> 7)).wrapping_mul(value | 61));
+        let output = value ^ (value >> 14);
+        output as f64 / 4_294_967_296.0
+    }
 }
 
 #[cfg(test)]
