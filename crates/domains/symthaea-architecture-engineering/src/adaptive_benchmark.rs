@@ -21,6 +21,7 @@ const PACKET_DOMAIN: &[u8] = b"symthaea.adaptive-benchmark.packet.v0.1\0";
 const ORACLE_DOMAIN: &[u8] = b"symthaea.adaptive-benchmark.oracle.v0.1\0";
 const REFINE_DOMAIN: &[u8] = b"symthaea.adaptive-benchmark.refinement.v0.1\0";
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.adaptive-benchmark.receipt.v0.1\0";
+const RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"symthaea.adaptive-benchmark.receipt-signature.v0.1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdaptiveBenchmarkError {
@@ -434,8 +435,12 @@ impl VerifierReceipt {
             tool_calls: self.tool_calls,
             candidate_executions: self.candidate_executions,
         };
-        serde_json::to_vec(&payload)
-            .map_err(|e| AdaptiveBenchmarkError::new("receipt.signing_payload", e.to_string()))
+        let json = serde_json::to_vec(&payload)
+            .map_err(|e| AdaptiveBenchmarkError::new("receipt.signing_payload", e.to_string()))?;
+        let mut bytes = Vec::with_capacity(RECEIPT_SIGNATURE_DOMAIN.len() + json.len());
+        bytes.extend_from_slice(RECEIPT_SIGNATURE_DOMAIN);
+        bytes.extend_from_slice(&json);
+        Ok(bytes)
     }
 
     /// Verify an Ed25519 signature and key validity against an independently managed registry.
