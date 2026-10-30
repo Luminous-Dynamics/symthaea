@@ -1,0 +1,373 @@
+{
+  "schema_version": "qarch-010-rid-ablation/1",
+  "fixture_id": "QARCH-010-RIDA-TOY-REGIME-SHIFT-001",
+  "evidence_class": "synthetic_analytic_fixture",
+  "purpose": "Known-answer benchmark for transparent representativeness/informativeness/de-amplification proxy components and ablations.",
+  "prohibited_claims": [
+    "This is not a reproduction of the published R-IDeA acquisition function.",
+    "The de-amplification component is a validation-error distribution-gap proxy, not a generalization guarantee.",
+    "This fixture is not calibrated physical, photonic, hardware, or quantum-advantage evidence.",
+    "The single toy ranking does not establish that the full policy is generally superior."
+  ],
+  "decision_problem": {
+    "hypotheses": [
+      "H0",
+      "H1"
+    ],
+    "prior": [
+      0.5,
+      0.5
+    ],
+    "actions": [
+      "choose-H0",
+      "choose-H1"
+    ],
+    "utilities_by_action_and_hypothesis": [
+      [
+        2,
+        0
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    "utility_unit": "utility_points",
+    "measurement_cost_unit": "measurement_seconds",
+    "candidate_accuracy": {
+      "A-high-info-out-of-distribution": 0.95,
+      "B-representative-low-info": 0.65,
+      "C-balanced-rid": 0.8,
+      "D-alternative-mix": 0.725
+    },
+    "implied_evsi_per_cost": {
+      "A-high-info-out-of-distribution": 0.9,
+      "B-representative-low-info": 0.3,
+      "C-balanced-rid": 0.6,
+      "D-alternative-mix": 0.45
+    }
+  },
+  "target_regimes": {
+    "labels": [
+      "lab-nominal",
+      "warm-drift",
+      "low-count"
+    ],
+    "probabilities": [
+      0.5,
+      0.3,
+      0.2
+    ],
+    "validation_artifact_digest": "synthetic-validation-regimes-sha256-v1",
+    "evaluation_artifact_digest": "synthetic-evaluator-only-regimes-sha256-v1"
+  },
+  "profiles": [
+    {
+      "experiment_id": "A-high-info-out-of-distribution",
+      "sampling_regime_probabilities": [
+        0.05,
+        0.05,
+        0.9
+      ],
+      "validation_error_by_regime": [
+        0.1,
+        0.1,
+        0.9
+      ]
+    },
+    {
+      "experiment_id": "B-representative-low-info",
+      "sampling_regime_probabilities": [
+        0.5,
+        0.3,
+        0.2
+      ],
+      "validation_error_by_regime": [
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "experiment_id": "C-balanced-rid",
+      "sampling_regime_probabilities": [
+        0.4,
+        0.4,
+        0.2
+      ],
+      "validation_error_by_regime": [
+        0.1,
+        0.7,
+        0.2
+      ]
+    },
+    {
+      "experiment_id": "D-alternative-mix",
+      "sampling_regime_probabilities": [
+        0.2,
+        0.4,
+        0.4
+      ],
+      "validation_error_by_regime": [
+        0.4,
+        0.1,
+        0.1
+      ]
+    }
+  ],
+  "component_formulae": {
+    "representativeness": "R = 1 - 0.5 * sum_r |target_r - sampling_r|",
+    "target_validation_error": "E_target = sum_r target_r * validation_error_r",
+    "sampling_validation_error": "E_sampling = sum_r sampling_r * validation_error_r",
+    "error_distribution_gap": "G = abs(E_target - E_sampling)",
+    "de_amplification_proxy": "D = 1 - G",
+    "informativeness": "I = EVSI_per_cost / max_candidate(EVSI_per_cost)",
+    "paired_ablation": "sqrt(component_a * component_b)",
+    "full_proxy": "cuberoot(R * I * D)"
+  },
+  "expected_component_scores": [
+    {
+      "experiment_id": "A-high-info-out-of-distribution",
+      "nominal_evsi_per_cost": 0.9,
+      "information_gain_per_cost": null,
+      "informativeness_score": 1,
+      "representativeness_score": 0.30000000000000004,
+      "target_weighted_validation_error": 0.26,
+      "sampling_weighted_validation_error": 0.8200000000000001,
+      "validation_error_distribution_gap": 0.56,
+      "de_amplification_score": 0.43999999999999995,
+      "policy_scores": {
+        "representativeness_only": 0.30000000000000004,
+        "informativeness_only": 1,
+        "de_amplification_only": 0.43999999999999995,
+        "representativeness_and_informativeness": 0.5477225575051662,
+        "representativeness_and_de_amplification": 0.363318042491699,
+        "informativeness_and_de_amplification": 0.6633249580710799,
+        "full_rid_proxy": 0.5091643369659489
+      }
+    },
+    {
+      "experiment_id": "B-representative-low-info",
+      "nominal_evsi_per_cost": 0.3,
+      "information_gain_per_cost": null,
+      "informativeness_score": 0.3333333333333333,
+      "representativeness_score": 1,
+      "target_weighted_validation_error": 0.2,
+      "sampling_weighted_validation_error": 0.2,
+      "validation_error_distribution_gap": 0,
+      "de_amplification_score": 1,
+      "policy_scores": {
+        "representativeness_only": 1,
+        "informativeness_only": 0.3333333333333333,
+        "de_amplification_only": 1,
+        "representativeness_and_informativeness": 0.5773502691896257,
+        "representativeness_and_de_amplification": 1,
+        "informativeness_and_de_amplification": 0.5773502691896257,
+        "full_rid_proxy": 0.6933612743506347
+      }
+    },
+    {
+      "experiment_id": "C-balanced-rid",
+      "nominal_evsi_per_cost": 0.6,
+      "information_gain_per_cost": null,
+      "informativeness_score": 0.6666666666666666,
+      "representativeness_score": 0.9,
+      "target_weighted_validation_error": 0.30000000000000004,
+      "sampling_weighted_validation_error": 0.36,
+      "validation_error_distribution_gap": 0.05999999999999994,
+      "de_amplification_score": 0.9400000000000001,
+      "policy_scores": {
+        "representativeness_only": 0.9,
+        "informativeness_only": 0.6666666666666666,
+        "de_amplification_only": 0.9400000000000001,
+        "representativeness_and_informativeness": 0.7745966692414834,
+        "representativeness_and_de_amplification": 0.9197825830053535,
+        "informativeness_and_de_amplification": 0.7916228058025279,
+        "full_rid_proxy": 0.8262149225665352
+      }
+    },
+    {
+      "experiment_id": "D-alternative-mix",
+      "nominal_evsi_per_cost": 0.45,
+      "information_gain_per_cost": null,
+      "informativeness_score": 0.5,
+      "representativeness_score": 0.7,
+      "target_weighted_validation_error": 0.25,
+      "sampling_weighted_validation_error": 0.16000000000000003,
+      "validation_error_distribution_gap": 0.08999999999999997,
+      "de_amplification_score": 0.91,
+      "policy_scores": {
+        "representativeness_only": 0.7,
+        "informativeness_only": 0.5,
+        "de_amplification_only": 0.91,
+        "representativeness_and_informativeness": 0.5916079783099616,
+        "representativeness_and_de_amplification": 0.7981227975693966,
+        "informativeness_and_de_amplification": 0.6745368781616021,
+        "full_rid_proxy": 0.6829199694432901
+      }
+    }
+  ],
+  "expected_policy_rankings": {
+    "representativeness_only": [
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 1,
+        "rank": 1
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.9,
+        "rank": 2
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.7,
+        "rank": 3
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.30000000000000004,
+        "rank": 4
+      }
+    ],
+    "informativeness_only": [
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 1,
+        "rank": 1
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.6666666666666666,
+        "rank": 2
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.5,
+        "rank": 3
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 0.3333333333333333,
+        "rank": 4
+      }
+    ],
+    "de_amplification_only": [
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 1,
+        "rank": 1
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.9400000000000001,
+        "rank": 2
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.91,
+        "rank": 3
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.43999999999999995,
+        "rank": 4
+      }
+    ],
+    "representativeness_and_informativeness": [
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.7745966692414834,
+        "rank": 1
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.5916079783099616,
+        "rank": 2
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 0.5773502691896257,
+        "rank": 3
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.5477225575051662,
+        "rank": 4
+      }
+    ],
+    "representativeness_and_de_amplification": [
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 1,
+        "rank": 1
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.9197825830053535,
+        "rank": 2
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.7981227975693966,
+        "rank": 3
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.363318042491699,
+        "rank": 4
+      }
+    ],
+    "informativeness_and_de_amplification": [
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.7916228058025279,
+        "rank": 1
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.6745368781616021,
+        "rank": 2
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.6633249580710799,
+        "rank": 3
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 0.5773502691896257,
+        "rank": 4
+      }
+    ],
+    "full_rid_proxy": [
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.8262149225665352,
+        "rank": 1
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 0.6933612743506347,
+        "rank": 2
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.6829199694432901,
+        "rank": 3
+      },
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.5091643369659489,
+        "rank": 4
+      }
+    ]
+  },
+  "interpretation": {
+    "informative_only_winner": "A-high-info-out-of-distribution",
+    "representative_only_winner": "B-representative-low-info",
+    "de_amplification_only_winner": "B-representative-low-info",
+    "full_rid_proxy_winner": "C-balanced-rid",
+    "conclusion": "This synthetic design checks that the transparent three-component proxy can select a balanced candidate while one-component baselines expose different tradeoffs. It does not demonstrate superior real-world experiment selection."
+  }
+}
