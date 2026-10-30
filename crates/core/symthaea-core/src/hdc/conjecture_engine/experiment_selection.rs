@@ -439,9 +439,7 @@ pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E, S>(
         }
 
         let score = worst_case_information_gain / experiment_cost;
-        if score.is_finite()
-            && score > 0.0
-            && best.is_none_or(|(_, best_score)| score > best_score)
+        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score)
         {
             best = Some((experiment, score));
         }
@@ -799,15 +797,17 @@ mod tests {
         let hypotheses = [0_usize, 1];
         let candidates = ["fragile", "robust"];
         let scenarios = ["nominal", "boundary_shift"];
-        let predict = |hypothesis: &usize, candidate: &&str, scenario: &&str| {
-            match (*candidate, *scenario, *hypothesis) {
-                ("fragile", "nominal", 0) => Some(0.0),
-                ("fragile", "nominal", 1) => Some(5.0),
-                ("fragile", "boundary_shift", _) => Some(2.0),
-                ("robust", _, 0) => Some(0.0),
-                ("robust", _, 1) => Some(1.0),
-                _ => None,
-            }
+        let predict = |hypothesis: &usize, candidate: &&str, scenario: &&str| match (
+            *candidate,
+            *scenario,
+            *hypothesis,
+        ) {
+            ("fragile", "nominal", 0) => Some(0.0),
+            ("fragile", "nominal", 1) => Some(5.0),
+            ("fragile", "boundary_shift", _) => Some(2.0),
+            ("robust", _, 0) => Some(0.0),
+            ("robust", _, 1) => Some(1.0),
+            _ => None,
         };
         let nominal = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
             &candidates,
@@ -838,18 +838,20 @@ mod tests {
     fn robust_selector_fails_closed_on_empty_scenario_set_or_incomplete_scenario() {
         let hypotheses = [0_usize, 1];
         let candidates = [0_usize, 1];
-        assert!(select_experiment_by_worst_case_information_gain_per_cost(
-            &candidates,
-            &hypotheses,
-            &[],
-            |_| true,
-            |_| 1.0,
-            |hypothesis, candidate, _scenario: &usize| {
-                Some((*hypothesis * (*candidate + 1)) as f64)
-            },
-            |_| 1.0,
-        )
-        .is_none());
+        assert!(
+            select_experiment_by_worst_case_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &[],
+                |_| true,
+                |_| 1.0,
+                |hypothesis, candidate, _scenario: &usize| {
+                    Some((*hypothesis * (*candidate + 1)) as f64)
+                },
+                |_| 1.0,
+            )
+            .is_none()
+        );
 
         let scenarios = [0_usize, 1];
         let selected = select_experiment_by_worst_case_information_gain_per_cost(
