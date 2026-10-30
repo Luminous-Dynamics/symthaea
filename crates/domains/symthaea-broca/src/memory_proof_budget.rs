@@ -414,6 +414,7 @@ struct ProofPacketPayload<'a> {
     tokenizer_version: &'a str,
     tokenizer_sha256: &'a str,
     packet_renderer_sha256: &'a str,
+    fixed_packet_overhead_tokens: u64,
     selected_proofs: &'a [SelectedProof],
     evidence: &'a [ProofPacketEvidenceRef],
     total_token_cost: u64,
@@ -503,7 +504,7 @@ impl<'a> ExactSearch<'a> {
         if obligation_index == self.request.obligations.len() {
             let mut evidence_ids: Vec<_> = selected_evidence_ids.iter().cloned().collect();
             evidence_ids.sort();
-            let Some(total_token_cost) = self.cost_of_set(selected_evidence_ids) else {
+            let Some(total_token_cost) = self.cost_of_plan(selected_evidence_ids, selected_proofs) else {
                 self.budget_blocked = true;
                 return;
             };
@@ -577,25 +578,23 @@ impl<'a> ExactSearch<'a> {
                 });
                 continue;
             }
-            let Some(next_cost) = self.cost_of_set(&next_evidence) else {
-                self.budget_blocked = true;
-                continue;
-            };
-            // Do not prune partial over-budget branches here. Only a complete
-            // admissible proof combination can establish BudgetInsufficient;
-            // a partial branch may still fail a later proof obligation entirely.
-            if self.best.as_ref()
-                .is_some_and(|best| next_cost > best.total_token_cost)
-            {
-                continue;
-            }
-
+            // Do not prune partial over-budget branches. Only a complete
+            // admissible proof combination can establish BudgetInsufficient.
             let mut next_proofs = selected_proofs.to_vec();
             next_proofs.push(SelectedProof {
                 conclusion_id: conclusion_id.clone(),
                 justification_id: alternative.justification_id.clone(),
                 evidence_dependencies: alternative.evidence_dependencies.clone(),
             });
+            let Some(next_cost) = self.cost_of_plan(&next_evidence, &next_proofs) else {
+                self.budget_blocked = true;
+                continue;
+            };
+            if self.best.as_ref()
+                .is_some_and(|best| next_cost > best.total_token_cost)
+            {
+                continue;
+            }
             self.explore(obligation_index + 1, &next_evidence, &next_proofs);
         }
     }
@@ -617,6 +616,21 @@ impl<'a> ExactSearch<'a> {
             let candidate = self.candidate_by_id.get(id.as_str())?;
             total.checked_add(candidate.token_cost as u64)
         })
+    }
+
+    fn cost_of_plan(
+        &self,
+        evidence_ids: &BTreeSet<String>,
+        selected_proofs: &[SelectedProof],
+    ) -> Option<u64> {
+        let mut total = self.request.fixed_packet_overhead_tokens
+            .checked_add(self.cost_of_set(evidence_ids)?)?;
+        for selected in selected_proofs {
+            let obligation = self.request.obligations.iter()
+                .find(|obligation| obligation.conclusion_id == selected.conclusion_id)?;
+            total = total.checked_add(obligation.selection_overhead_tokens as u64)?;
+        }
+        Some(total)
     }
 
     fn consider(&mut self, candidate: CandidatePlan) {
@@ -726,6 +740,7 @@ pub fn solve_proof_budget(
         tokenizer_version: &request.tokenizer_version,
         tokenizer_sha256: &request.tokenizer_sha256,
         packet_renderer_sha256: &request.packet_renderer_sha256,
+        fixed_packet_overhead_tokens: request.fixed_packet_overhead_tokens,
         selected_proofs: &plan.selected_proofs,
         evidence: &evidence,
         total_token_cost: plan.total_token_cost,
@@ -834,7 +849,7 @@ pub fn verify_proof_packet(
     }
 
     let mut expected_evidence = Vec::new();
-    let mut total_token_cost = 0u64;
+    let mut total_token_cost = request.fixed_packet_overhead_tokens;
     for evidence_id in &selected_evidence_ids {
         let candidate = candidate_by_id
             .get(evidence_id.as_str())
@@ -861,6 +876,15 @@ pub fn verify_proof_packet(
     if result.evidence != expected_evidence {
         return Err("proof packet evidence set or source digests do not match selected proofs".into());
     }
+    for selected in &result.selected_proofs {
+        let obligation = request.obligations.iter()
+            .find(|obligation| obligation.conclusion_id == selected.conclusion_id)
+            .ok_or_else(|| format!("unknown selected conclusion {:?}", selected.conclusion_id))?;
+        total_token_cost = total_token_cost
+            .checked_add(obligation.selection_overhead_tokens as u64)
+            .ok_or_else(|| "proof envelope token cost overflow".to_string())?;
+    }
+
     if result.total_token_cost != total_token_cost {
         return Err("proof packet token cost does not match its unique evidence set".into());
     }
@@ -881,6 +905,7 @@ pub fn verify_proof_packet(
         tokenizer_version: &request.tokenizer_version,
         tokenizer_sha256: &request.tokenizer_sha256,
         packet_renderer_sha256: &request.packet_renderer_sha256,
+        fixed_packet_overhead_tokens: request.fixed_packet_overhead_tokens,
         selected_proofs: &result.selected_proofs,
         evidence: &result.evidence,
         total_token_cost,
@@ -1325,6 +1350,7 @@ mod tests {
             tokenizer_version: &canonical.tokenizer_version,
             tokenizer_sha256: &canonical.tokenizer_sha256,
             packet_renderer_sha256: &canonical.packet_renderer_sha256,
+            fixed_packet_overhead_tokens: canonical.fixed_packet_overhead_tokens,
             selected_proofs: &non_minimal.selected_proofs,
             evidence: &non_minimal.evidence,
             total_token_cost: non_minimal.total_token_cost,
