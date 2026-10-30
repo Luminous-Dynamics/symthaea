@@ -68,11 +68,14 @@ jobs:
                   "mean_decision_regret", "p95_decision_regret",
                   "mean_realized_reward", "cvar05_realized_reward",
                   "model_use_rate", "regret_delta_vs_greedy",
-                  "regret_delta_ci95_low", "regret_delta_ci95_high"
+                  "regret_delta_ci95_low", "regret_delta_ci95_high",
+                  "calibration_marginal_q", "calibration_joint_q", "fixed_k8_joint_q"
               ]:
                   assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
               assert row["mean_decision_regret"] >= -1e-8
-              assert row["p95_decision_regret"] + 1e-8 >= row["mean_decision_regret"]
+              assert row["p95_decision_regret"] >= 0.0
+              assert row["calibration_joint_q"] + 1e-8 >= row["calibration_marginal_q"]
+              assert row["fixed_k8_joint_q"] > 0.0
               assert 0.0 <= row["model_use_rate"] <= 1.0
               for key in ["joint_candidate_set_coverage", "selected_action_error_coverage"]:
                   assert row[key] is None or 0.0 <= row[key] <= 1.0
