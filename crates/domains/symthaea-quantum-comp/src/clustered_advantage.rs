@@ -1039,6 +1039,118 @@ mod tests {
     }
 
     #[test]
+    fn exact_power_tails_match_hand_computed_values() {
+        assert_eq!(critical_cluster_wins(5, 0.05), Some(5));
+        assert_eq!(critical_cluster_wins(10, 0.05), Some(9));
+        assert!(
+            (binomial_upper_tail_probability(5, 5, 0.75) - 0.75_f64.powi(5)).abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn joint_power_planner_returns_minimum_independent_cluster_count() {
+        let config = ClusterSignPowerPlanConfig {
+            alpha: 0.05,
+            desired_joint_power: 0.80,
+            minimum_independent_clusters: 2,
+            maximum_independent_clusters: 100,
+            cases: vec![ClusterSignPowerCase {
+                case_id: "both-components-75pct".to_owned(),
+                quality_cluster_win_probability: 0.75,
+                resource_cluster_win_probability: 0.75,
+            }],
+        };
+        let plan = plan_cluster_sign_test_power(&config).unwrap();
+        assert_eq!(plan[0].required_independent_clusters, Some(33));
+        assert_eq!(plan[0].quality_critical_wins, Some(22));
+        assert!(
+            plan[0].joint_power_lower_bound.unwrap() >= 0.80
+        );
+    }
+
+    #[test]
+    fn weaker_family_effect_requires_more_independent_clusters() {
+        let config = ClusterSignPowerPlanConfig {
+            alpha: 0.05,
+            desired_joint_power: 0.80,
+            minimum_independent_clusters: 2,
+            maximum_independent_clusters: 150,
+            cases: vec![
+                ClusterSignPowerCase {
+                    case_id: "moderate".to_owned(),
+                    quality_cluster_win_probability: 0.65,
+                    resource_cluster_win_probability: 0.65,
+                },
+                ClusterSignPowerCase {
+                    case_id: "large".to_owned(),
+                    quality_cluster_win_probability: 0.75,
+                    resource_cluster_win_probability: 0.75,
+                },
+            ],
+        };
+        let plan = plan_cluster_sign_test_power(&config).unwrap();
+        assert_eq!(plan[0].required_independent_clusters, Some(93));
+        assert_eq!(plan[1].required_independent_clusters, Some(33));
+        assert!(plan[0].required_independent_clusters > plan[1].required_independent_clusters);
+    }
+
+    #[test]
+    fn power_planner_returns_none_when_search_limit_is_too_small() {
+        let config = ClusterSignPowerPlanConfig {
+            alpha: 0.05,
+            desired_joint_power: 0.80,
+            minimum_independent_clusters: 2,
+            maximum_independent_clusters: 10,
+            cases: vec![ClusterSignPowerCase {
+                case_id: "small-cap".to_owned(),
+                quality_cluster_win_probability: 0.75,
+                resource_cluster_win_probability: 0.75,
+            }],
+        };
+        let plan = plan_cluster_sign_test_power(&config).unwrap();
+        assert_eq!(plan[0].required_independent_clusters, None);
+    }
+
+    #[test]
+    fn power_planner_rejects_invalid_or_duplicate_cases() {
+        let duplicate = ClusterSignPowerPlanConfig {
+            alpha: 0.05,
+            desired_joint_power: 0.80,
+            minimum_independent_clusters: 2,
+            maximum_independent_clusters: 100,
+            cases: vec![
+                ClusterSignPowerCase {
+                    case_id: "same".to_owned(),
+                    quality_cluster_win_probability: 0.75,
+                    resource_cluster_win_probability: 0.75,
+                },
+                ClusterSignPowerCase {
+                    case_id: "same".to_owned(),
+                    quality_cluster_win_probability: 0.65,
+                    resource_cluster_win_probability: 0.65,
+                },
+            ],
+        };
+        assert_eq!(
+            plan_cluster_sign_test_power(&duplicate).unwrap_err(),
+            ClusteredAdvantageError::InvalidPowerCaseId
+        );
+        let invalid = ClusterSignPowerPlanConfig {
+            cases: vec![ClusterSignPowerCase {
+                case_id: "bad-probability".to_owned(),
+                quality_cluster_win_probability: 1.1,
+                resource_cluster_win_probability: 0.75,
+            }],
+            ..duplicate
+        };
+        assert_eq!(
+            plan_cluster_sign_test_power(&invalid).unwrap_err(),
+            ClusteredAdvantageError::InvalidPowerPlanConfig
+        );
+    }
+
+    #[test]
     fn exact_cluster_resource_boundary_is_not_a_win() {
         let observations = (0..5)
             .map(|cluster| row(cluster, 0, 9.0, 10.0, 0.995, 0.99))
