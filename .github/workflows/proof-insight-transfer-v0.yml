@@ -15,6 +15,8 @@ on:
       - "docs/research/pitb-exact-artifact-content-audit-2026-10-30.md"
       - "scripts/research/pitb_missingness_bounds_v0.py"
       - "docs/research/pitb-missingness-bounds-2026-10-29.md"
+      - "scripts/research/pitb_support_antichain_v0.py"
+      - "docs/research/pitb-support-antichain-2026-10-30.md"
       - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
       - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
@@ -3829,6 +3831,13 @@ jobs:
               raise SystemExit("missing frozen target row was accepted")
           print("PITB_MISSINGNESS_BOUNDS_PASS: sharp bounds, fixed denominator, 7 unit tests, confirmatory blocked")
           PY
+      - name: Validate exhaustive support-antichain analyzer and controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_support_antichain_v0.py"
+          python3 -m py_compile "$script"
+          python3 "$script" --self-test
       - name: Upload exact-source index and receipts
         uses: actions/upload-artifact@v4
         with:
