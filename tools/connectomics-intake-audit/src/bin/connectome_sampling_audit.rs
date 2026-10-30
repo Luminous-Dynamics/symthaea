@@ -106,7 +106,7 @@ struct ClusterTotals {
     signed_net_reduction: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct Estimate {
     total: f64,
     design_variance: f64,
@@ -292,6 +292,7 @@ fn validate(
 
     let mut frame = BTreeMap::<String, StratumFrame>::new();
     let mut frame_ids = BTreeSet::new();
+    let mut cluster_owners = BTreeMap::<String, String>::new();
     for unit in &audit.population_frame {
         if unit.candidate_id.trim().is_empty()
             || unit.stratum_id.trim().is_empty()
@@ -301,6 +302,16 @@ fn validate(
         }
         if !frame_ids.insert(unit.candidate_id.clone()) {
             return Err(format!("duplicate candidate in population frame: {}", unit.candidate_id));
+        }
+        if let Some(existing_stratum) = cluster_owners.get(&unit.cluster_id) {
+            if existing_stratum != &unit.stratum_id {
+                return Err(format!(
+                    "cluster {} appears in multiple strata: {} and {}",
+                    unit.cluster_id, existing_stratum, unit.stratum_id
+                ));
+            }
+        } else {
+            cluster_owners.insert(unit.cluster_id.clone(), unit.stratum_id.clone());
         }
         let stratum = frame.entry(unit.stratum_id.clone()).or_insert_with(|| StratumFrame {
             candidate_ids: Vec::new(),
@@ -845,6 +856,25 @@ mod tests {
             signed_query_error_reduction_if_applied: Some(0.1),
         });
         assert!(validate(&proposal,&audit,&proposal_hash,&"9".repeat(64)).unwrap_err().contains("outside the reproducibly"));
+    }
+
+
+    #[test]
+    fn rejects_cluster_identity_split_across_strata() {
+        let (proposal, mut audit, proposal_hash, _) = fixture();
+        audit.population_frame[4].cluster_id = "k1".into();
+        assert!(validate(&proposal, &audit, &proposal_hash, &"9".repeat(64))
+            .unwrap_err().contains("multiple strata"));
+    }
+
+    #[test]
+    fn rejects_determinate_outcome_without_oracle_query_delta() {
+        let (proposal, mut audit, proposal_hash, _) = fixture();
+        let outcome = &mut audit.sampled_outcomes[0];
+        outcome.adjudication = Adjudication::Correct;
+        outcome.signed_query_error_reduction_if_applied = None;
+        assert!(validate(&proposal, &audit, &proposal_hash, &"9".repeat(64))
+            .unwrap_err().contains("requires an oracle query delta"));
     }
 
     #[test]
