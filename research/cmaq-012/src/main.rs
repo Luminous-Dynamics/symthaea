@@ -616,18 +616,18 @@ mod tests {
             aleatoric_std: 0.1,
             realized_reward: 0.5,
         };
-        assert_eq!(
-            interval_for_action(&action, Policy::MarginalConformalLcb, calibration, fixed),
-            Some(0.1)
-        );
-        assert_eq!(
-            interval_for_action(&action, Policy::MatchedKJointConformalLcb, calibration, fixed),
-            Some(0.2)
-        );
-        assert_eq!(
-            interval_for_action(&action, Policy::FixedKJointConformalLcb, calibration, fixed),
-            Some(0.3)
-        );
+        let marginal = interval_for_action(
+            &action, Policy::MarginalConformalLcb, calibration, fixed
+        ).unwrap();
+        let matched = interval_for_action(
+            &action, Policy::MatchedKJointConformalLcb, calibration, fixed
+        ).unwrap();
+        let fixed_k8 = interval_for_action(
+            &action, Policy::FixedKJointConformalLcb, calibration, fixed
+        ).unwrap();
+        assert!((marginal - 0.1).abs() < 1e-12);
+        assert!((matched - 0.2).abs() < 1e-12);
+        assert!((fixed_k8 - 0.3).abs() < 1e-12);
     }
 
     #[test]
