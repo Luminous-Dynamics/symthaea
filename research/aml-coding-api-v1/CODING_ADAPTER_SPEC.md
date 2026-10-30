@@ -120,6 +120,26 @@ These are competition-specific constraints, even though the core Broca architect
 
 The backend must still implement durable idempotency, correct user partitioning, source-order retention, ranking, and lifecycle deletion. The contract trait is not evidence that any of those have been implemented.
 
+## 5A. Local persistent lexical baseline
+
+The stacked research PR adds `memory_challenge_sled.rs`, a local Sled-backed implementation of the `AmlMemoryBackend` trait:
+- Each Add request is stored as one immutable batch containing the exact ordered request, payload digest, stable evidence IDs, source pointers, session provenance, and insertion timestamp.
+- A single-key Sled compare-and-swap binds each request ID to one payload; reusing an ID with different content is rejected.
+- Add builds a candidate EvidenceIndex, verifies every new record is retrievable with its content query, commits the serialized batch, calls Sled `flush()`, then swaps in the candidate index before the executor can return success.
+- Startup verifies each persisted batch against its canonical request digest, generated evidence records, and canonical request-derived storage key before rebuilding the lexical index.
+- Search uses deterministic BM25 with `user_id` as the only scope. Different sessions for the same user are searchable together; the same session label for a different user does not share evidence.
+- Explicit cutoff and full-purge methods remove persisted batches and rebuild the index.
+
+This is only a **local research baseline**. It is not a deployment-ready competition entry:
+- it uses BM25 rather than the required `text-embedding-v4` embedding component for Open-source Methods;
+- it does not provide the required competition model configuration, HTTP/TLS/auth, a public endpoint, horizontal scaling, or hosted operations;
+- it is a single-process in-memory lexical index over a local Sled store; use one active backend owner per store;
+- lifecycle retractions, policy/use-validity checks at Search time, and proof packet compilation are not yet integrated into this backend;
+- the retention purge is an explicit operator call, not a scheduled job, and logical deletion does not prove forensic media erasure;
+- Sled 0.34 is documented as beta; its own docs recommend SQLite when reliability is the primary constraint. Do not claim production durability without a production database and crash/recovery qualification.
+
+The local test suite exercises persistence across reopen, immediate BM25 retrieval, idempotent replay, conflicting ID reuse, user isolation, cross-session visibility for one user, top_k, purge, corrupt batch rejection, and non-canonical key rejection. The tests are authored but must be compiled and executed at the exact stacked PR head.
+
 ## 6. Conformance artifacts
 
 - [JSON Schema](./coding-api-schema.json)
