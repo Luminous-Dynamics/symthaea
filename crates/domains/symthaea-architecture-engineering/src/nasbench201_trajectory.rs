@@ -1306,10 +1306,12 @@ mod tests {
             let score = -((ones as isize - 1).abs() as f64);
             let mut proxy_scores = BTreeMap::new();
             proxy_scores.insert("landscape".into(), score);
+            let mut proxy_times_seconds = BTreeMap::new();
+            proxy_times_seconds.insert("landscape".into(), 0.001);
             features.push(ArchitectureFeatures {
                 architecture_id: format!("arch-{mask:02}"),
                 proxy_scores,
-                proxy_times_seconds: BTreeMap::new(),
+                proxy_times_seconds,
                 topology_encoding: topology,
             });
         }
@@ -1364,6 +1366,30 @@ mod tests {
             ProxyDirection::Maximize,
             3,
         ).is_err());
+    }
+
+    #[test]
+    fn trajectory_promotion_plan_converts_to_common_initial_pool() {
+        let features = binary_catalog();
+        let archive = build_trajectory_archive(&features, &config(43)).unwrap();
+        let mix = PromotionMix {
+            promotion_count: 12,
+            proxy_elite_quota: 3,
+            trajectory_quota: 5,
+            topology_diversity_quota: 4,
+        };
+        let plan = plan_promotions(&features, &archive, &mix).unwrap();
+        let pool = trajectory_candidate_pool(&plan).unwrap();
+        assert_eq!(pool.strategy, InitialPoolStrategy::TrajectoryPortfolio);
+        assert_eq!(
+            pool.candidate_ids,
+            plan.candidates
+                .iter()
+                .map(|candidate| candidate.architecture_id.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(pool.source_evidence_sha256, plan.plan_sha256);
+        assert_eq!(pool.pool_sha256.len(), 64);
     }
 
     #[test]
