@@ -526,6 +526,53 @@ mod tests {
     }
 
     #[test]
+    fn published_result_with_unknown_run_statistics_is_retained_but_not_ranked() {
+        let observation = physical_observation(
+            "published-neuromorphic",
+            ComputeArchitectureFamily::NeuromorphicDigital,
+            (0.4, 0.5),
+        );
+        let mut published = receipt(
+            &observation,
+            ArchitectureEvidenceOrigin::PublishedResult,
+        );
+        published.runner_artifact_sha256 = None;
+        published.toolchain_identity = None;
+        published.repeat_count = None;
+        published.failed_run_count = None;
+        published.interval_method_id = None;
+        published.aggregation_method_id = None;
+        let record = ArchitectureEvidenceRecord {
+            observation,
+            receipt: published,
+        };
+        assert_eq!(validate_architecture_evidence_record(&record), Ok(()));
+        assert_eq!(
+            validate_architecture_evidence_record_for_comparison(&record),
+            Err(ArchitectureEvidenceError::UnspecifiedRunCounts)
+        );
+    }
+
+    #[test]
+    fn run_count_fields_must_be_reported_as_a_pair() {
+        let observation = physical_observation(
+            "published-neuromorphic",
+            ComputeArchitectureFamily::NeuromorphicDigital,
+            (0.4, 0.5),
+        );
+        let mut published = receipt(
+            &observation,
+            ArchitectureEvidenceOrigin::PublishedResult,
+        );
+        published.repeat_count = Some(10);
+        published.failed_run_count = None;
+        assert_eq!(
+            validate_architecture_evidence_receipt(&observation, &published),
+            Err(ArchitectureEvidenceError::InvalidRepeatCounts)
+        );
+    }
+
+    #[test]
     fn observation_record_identity_must_match_receipt() {
         let observation = physical_observation(
             "cpu-baseline",
