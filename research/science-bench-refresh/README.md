@@ -23,6 +23,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/reference_assurance.rs: strict typed reference-package commitment/verification, cross-record validation, disagreement accounting and explicit claim-boundary report.
 - schema/reference-assurance-package.schema.json and fixtures/reference-assurance-package.example.json: strict v1 package schema and non-scoring example with intentionally preserved rater disagreement.
 - tools/test_reference_assurance.py: independent standard-library Python commitment/structure oracle and adversarial unit tests; test-only, not a production validator.
+- docs/research/SCI-METAMORPHIC-EVALUATOR-001.md: intervention-based evaluator consistency benchmark across invariance, directional sensitivity, locality, order equivariance, provenance non-duplication, cross-mode consistency and counterfactual relations.
+- schema/metamorphic-evaluator-plan.schema.json and schema/metamorphic-evaluator-receipt.schema.json: strict preregistered pair-plan and observed-outcome receipt contracts.
+- tools/metamorphic_evaluator_audit.py: deterministic paired-outcome relation checker; no judge execution or causal identification claim.
+- tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: eight-pair/seven-family synthetic fixture generator and hostile relation/receipt controls.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -33,6 +37,20 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Audit intervention-based evaluator consistency
+
+The metamorphic auditor checks whether paired evaluator outcomes obey predeclared invariance, directional sensitivity, locality, order-swap, provenance non-duplication, cross-mode and counterfactual relations. Receipts must echo the baseline/variant input digests committed by each plan pair; directional evidence pairs declare their exact expected variant decisions.
+
+```sh
+python3 research/science-bench-refresh/tools/metamorphic_evaluator_fixture.py /tmp/metamorphic-example
+python3 research/science-bench-refresh/tools/metamorphic_evaluator_audit.py \
+  /tmp/metamorphic-example/metamorphic-plan.example.json \
+  /tmp/metamorphic-example/metamorphic-receipt.example.json
+python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_metamorphic_evaluator_audit.py' -v
+```
+
+A structurally valid receipt can still fail a declared relation. Missing/extra/duplicate observations are rejected. The report does not authenticate evaluator execution or receipt provenance, identify causal effects, estimate generalization or grant scoring eligibility. See [SCI-METAMORPHIC-EVALUATOR-001](../../docs/research/SCI-METAMORPHIC-EVALUATOR-001.md).
 
 ## Audit a structured rubric specification
 

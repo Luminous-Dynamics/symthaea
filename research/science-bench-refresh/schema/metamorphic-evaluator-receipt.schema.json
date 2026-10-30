@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/metamorphic-evaluator-receipt.schema.json",
+  "title": "Symthaea Metamorphic Evaluator Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "run_id",
+    "plan_sha256",
+    "evaluator_source_revision",
+    "evaluator_prompt_sha256",
+    "rubric_sha256",
+    "observations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_metamorphic_receipt.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "evaluator_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluator_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "supported_within_scope",
+        "contradicted_within_scope",
+        "mixed_or_contested",
+        "insufficient_evidence",
+        "scope_ambiguous",
+        "temporally_stale",
+        "not_applicable",
+        "not_evaluable",
+        "abstain"
+      ]
+    },
+    "criterion_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "score_millionths"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "score_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "candidate_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "score_millionths"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "score_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "criterion_scores",
+        "hard_veto_active",
+        "selected_candidate_id",
+        "selected_position",
+        "unique_source_group_count",
+        "pointwise_candidate_scores",
+        "pairwise_preferred_candidate_id"
+      ],
+      "properties": {
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "criterion_scores": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/criterion_score"
+          }
+        },
+        "hard_veto_active": {
+          "type": "boolean"
+        },
+        "selected_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "selected_position": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            0,
+            1,
+            null
+          ]
+        },
+        "unique_source_group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pointwise_candidate_scores": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/candidate_score"
+          }
+        },
+        "pairwise_preferred_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "baseline_input_sha256",
+        "variant_input_sha256",
+        "baseline",
+        "variant"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseline": {
+          "$ref": "#/$defs/outcome"
+        },
+        "variant": {
+          "$ref": "#/$defs/outcome"
+        },
+        "baseline_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_input_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "evaluator_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "evaluator_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
