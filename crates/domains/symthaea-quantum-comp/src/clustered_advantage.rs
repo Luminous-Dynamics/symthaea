@@ -802,6 +802,44 @@ mod tests {
     }
 
     #[test]
+    fn cluster_null_stress_is_deterministic_and_reports_intervals() {
+        let config = ClusterNullStressConfig {
+            independent_clusters: 5,
+            instances_per_cluster: 6,
+            intraclass_correlations: vec![0.0, 0.6],
+            replicates: 200,
+            seed: 0x516016,
+            significance_level: 0.05,
+        };
+        let first = run_cluster_null_stress(&config).unwrap();
+        let second = run_cluster_null_stress(&config).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.points.len(), 2);
+        for point in &first.points {
+            assert!((0.0..=1.0).contains(&point.naive_instance_type_i_rate));
+            assert!((0.0..=1.0).contains(&point.cluster_level_type_i_rate));
+            assert!(point.naive_instance_wilson_95.lower <= point.naive_instance_wilson_95.upper);
+            assert!(point.cluster_level_wilson_95.lower <= point.cluster_level_wilson_95.upper);
+        }
+    }
+
+    #[test]
+    fn cluster_null_stress_rejects_invalid_icc() {
+        let config = ClusterNullStressConfig {
+            independent_clusters: 5,
+            instances_per_cluster: 6,
+            intraclass_correlations: vec![-0.1],
+            replicates: 10,
+            seed: 1,
+            significance_level: 0.05,
+        };
+        assert_eq!(
+            run_cluster_null_stress(&config).unwrap_err(),
+            ClusteredAdvantageError::InvalidStressConfig
+        );
+    }
+
+    #[test]
     fn exact_cluster_resource_boundary_is_not_a_win() {
         let observations = (0..5)
             .map(|cluster| row(cluster, 0, 9.0, 10.0, 0.995, 0.99))
