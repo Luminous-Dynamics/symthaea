@@ -21,6 +21,8 @@ pub struct StateAuditReport {
     pub run_id: Option<String>,
     pub input_digest: String,
     pub final_state_digest: Option<String>,
+    /// Always false until authenticated runner coverage receipts are independently verified.
+    pub confirmatory_eligible: bool,
     pub valid: bool,
     pub counts: StateAuditCounts,
     pub evidence: Vec<EvidenceAssessment>,
@@ -41,7 +43,7 @@ pub struct StateAuditCounts {
     pub evidence_stale_transitive: usize,
     pub evidence_incomplete_dependency_coverage: usize,
     pub evidence_invalidated_by_unknown_dependency_change: usize,
-    pub evidence_usable_passes: usize,
+    pub evidence_eligible_under_declared_coverage: usize,
     pub reverification_required: usize,
 }
 
@@ -63,7 +65,7 @@ pub struct EvidenceAssessment {
     pub unresolved_inputs: Vec<String>,
     pub invalidated_by_unknown_dependency_change: bool,
     pub requires_reverification: bool,
-    pub usable_for_success: bool,
+    pub eligible_under_declared_coverage: bool,
     pub stale_resources: Vec<String>,
     pub stale_ancestor_evidence_ids: Vec<String>,
     pub invalidation_event_ids: Vec<String>,
@@ -286,6 +288,7 @@ pub fn audit_bytes(bytes: &[u8]) -> StateAuditReport {
         run_id: None,
         input_digest,
         final_state_digest: None,
+        confirmatory_eligible: false,
         valid: false,
         counts: StateAuditCounts::default(),
         evidence: Vec::new(),
@@ -599,7 +602,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                         stale_ancestors.extend(parent.assessment.stale_ancestor_evidence_ids.iter().cloned());
                         inherited_events.extend(parent.assessment.invalidation_event_ids.iter().cloned());
                     }
-                    if !parent.assessment.usable_for_success {
+                    if !parent.assessment.eligible_under_declared_coverage {
                         blocked_by.insert(parent_id.clone());
                         blocked_by.extend(parent.assessment.blocked_by_evidence_ids.iter().cloned());
                     }
@@ -620,7 +623,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     unresolved_inputs: unresolved_inputs.clone(),
                     invalidated_by_unknown_dependency_change: false,
                     requires_reverification: false,
-                    usable_for_success: freshness == EvidenceFreshness::Fresh
+                    eligible_under_declared_coverage: freshness == EvidenceFreshness::Fresh
                         && *dependency_coverage == DependencyCoverage::Complete
                         && *outcome == EvidenceOutcome::Pass
                         && blocked_by.is_empty(),
@@ -741,8 +744,8 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
             EvidenceFreshness::StaleDirect => counts.evidence_stale_direct += 1,
             EvidenceFreshness::StaleTransitive => counts.evidence_stale_transitive += 1,
         }
-        if assessment.usable_for_success {
-            counts.evidence_usable_passes += 1;
+        if assessment.eligible_under_declared_coverage {
+            counts.evidence_eligible_under_declared_coverage += 1;
         }
         assessments.push(assessment);
     }
@@ -786,7 +789,7 @@ fn invalidate_dependents(
                 }
                 state.assessment.invalidation_event_ids.push(event_id.to_string());
                 state.assessment.freshness = EvidenceFreshness::StaleDirect;
-                state.assessment.usable_for_success = false;
+                state.assessment.eligible_under_declared_coverage = false;
                 queue.push_back(evidence_id.clone());
                 state.pinned_resource_ids.clone()
             }
@@ -830,7 +833,7 @@ fn invalidate_dependents(
                 }
                 if child.assessment.freshness == EvidenceFreshness::Fresh {
                     child.assessment.freshness = EvidenceFreshness::StaleTransitive;
-                    child.assessment.usable_for_success = false;
+                    child.assessment.eligible_under_declared_coverage = false;
                     queue.push_back(child_id.clone());
                     child.pinned_resource_ids.clone()
                 } else {
@@ -881,6 +884,7 @@ mod tests {
     fn synthetic_timeline_reports_direct_and_transitive_invalidation() {
         let report = audit_bytes(EXAMPLE.as_bytes());
         assert!(report.valid, "{:?}", report.errors);
+        assert!(!report.confirmatory_eligible);
         assert_eq!(report.counts.evidence_total, 6);
         assert_eq!(report.counts.evidence_stale_direct, 3);
         assert_eq!(report.counts.evidence_stale_transitive, 1);
@@ -896,7 +900,7 @@ mod tests {
         assert_eq!(freshness(&report, "lint-before-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "build-after-change"), EvidenceFreshness::Fresh);
         assert_eq!(freshness(&report, "tests-after-change"), EvidenceFreshness::Fresh);
-        assert!(report.evidence.iter().find(|item| item.evidence_id == "tests-after-change").unwrap().usable_for_success);
+        assert!(report.evidence.iter().find(|item| item.evidence_id == "tests-after-change").unwrap().eligible_under_declared_coverage);
     }
 
     #[test]
@@ -948,7 +952,7 @@ mod tests {
         let tests = report.evidence.iter().find(|item| item.evidence_id == "tests-after-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::Fresh);
         assert_eq!(tests.freshness, EvidenceFreshness::Fresh);
-        assert!(build.usable_for_success && tests.usable_for_success);
+        assert!(build.eligible_under_declared_coverage && tests.eligible_under_declared_coverage);
         assert!(!tests.blocked_by_evidence_ids.iter().any(|id| id == "build-before-change"));
     }
 
@@ -1070,13 +1074,13 @@ mod tests {
     }
 
     #[test]
-    fn evidence_with_nonpassing_parent_is_not_usable_for_success() {
+    fn evidence_with_nonpassing_parent_is_not_eligible_under_declared_coverage() {
         let mut value = parsed_example();
         value["entries"][0]["outcome"] = Value::String("fail".into());
         let report = audit_value(&value);
         assert!(report.valid, "{:?}", report.errors);
         let child = report.evidence.iter().find(|item| item.evidence_id == "tests-before-change").unwrap();
-        assert!(!child.usable_for_success);
+        assert!(!child.eligible_under_declared_coverage);
         assert!(child.blocked_by_evidence_ids.iter().any(|id| id == "build-before-change"));
     }
 
@@ -1116,7 +1120,7 @@ mod tests {
         let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::Fresh);
         assert_eq!(build.dependency_coverage, DependencyCoverage::Incomplete);
-        assert!(!build.usable_for_success);
+        assert!(!build.eligible_under_declared_coverage);
         assert!(build.requires_reverification);
         assert_eq!(report.counts.evidence_incomplete_dependency_coverage, 1);
         assert!(report.reverification_plan.iter().any(|id| id == "build-before-change"));
