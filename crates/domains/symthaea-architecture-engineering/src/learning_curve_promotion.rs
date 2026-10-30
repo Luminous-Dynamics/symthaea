@@ -249,8 +249,11 @@ impl LearningCurveCalibrator {
     /// Recompute and verify the frozen model and interval-calibration digest.
     pub fn verify_integrity(&self) -> Result<(), LearningCurvePromotionError> {
         validate_config(&self.config)?;
-        if self.model_fit_data_sha256.len() != 64
-            || self.residual_calibration_data_sha256.len() != 64
+        let valid_digest = |value: &str| {
+            value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+        };
+        if !valid_digest(&self.model_fit_data_sha256)
+            || !valid_digest(&self.residual_calibration_data_sha256)
             || self.rung_models.len() + 1 != self.config.fidelity_levels.len()
         {
             return Err(LearningCurvePromotionError::new(
