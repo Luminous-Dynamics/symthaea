@@ -23,3 +23,8 @@ sha2 = { version = "=0.10.9", optional = true }
 name = "hardsec_design_lineage_audit"
 path = "../../examples/hardsec_design_lineage_audit.rs"
 required-features = ["hardsec-design-audit"]
+
+[[example]]
+name = "hardsec_partition_path_audit"
+path = "../../examples/hardsec_partition_path_audit.rs"
+required-features = ["hardsec-design-audit"]
