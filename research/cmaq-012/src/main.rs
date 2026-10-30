@@ -204,7 +204,9 @@ fn build_actions(rng: &mut SplitMix64, scenario: Scenario, count: usize) -> Vec<
             let reward_noise = rng.centered_normal_approx() * aleatoric_std;
             let realized_reward = (true_value + reward_noise).clamp(0.0, 1.0);
             let ensemble_values = std::array::from_fn(|_| {
-                (true_value + rng.centered_normal_approx() * scenario.actual_epistemic_std())
+                (true_value
+                    + rng.centered_normal_approx() * scenario.actual_epistemic_std()
+                    + optimism_bias)
                     .clamp(0.0, 1.0)
             });
 
@@ -528,6 +530,7 @@ fn render_report(rows: &[Summary]) -> String {
     writeln!(&mut output, "  \"target_coverage\": {TARGET_COVERAGE:.4},").unwrap();
     writeln!(&mut output, "  \"reported_epistemic_std\": {REPORTED_EPISTEMIC_STD:.4},").unwrap();
     writeln!(&mut output, "  \"fallback_value\": {FALLBACK_VALUE:.4},").unwrap();
+    writeln!(&mut output, "  \"ensemble_heads\": {ENSEMBLE_HEADS},").unwrap();
     writeln!(&mut output, "  \"calibration_seed_family\": \"{CALIBRATION_SEED:016x}\",").unwrap();
     writeln!(&mut output, "  \"qualification_seed_family\": \"{QUALIFICATION_SEED:016x}\",").unwrap();
     writeln!(&mut output, "  \"candidate_counts\": [8,16,32,64],").unwrap();
