@@ -20,6 +20,10 @@ use science_bench_refresh_validator::judge_robustness::{
     compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
     verify_judge_robustness_plan, verify_judge_robustness_report,
 };
+use science_bench_refresh_validator::imperfect_judge_certification::{
+    analyze_imperfect_judge_certification, compute_certification_plan_commitment,
+    verify_certification_plan,
+};
 use science_bench_refresh_validator::rubric_commensurability::{
     audit_rubric_commensurability, compute_rubric_commensurability_plan_commitment,
     compute_rubric_construct_ontology_commitment, verify_rubric_commensurability_plan,
@@ -70,6 +74,9 @@ fn usage(program: &str) {
             "  {program} commit-rubric-commensurability-plan PLAN_FIELDS.json\n",
             "  {program} verify-rubric-commensurability-plan PLAN.json\n",
             "  {program} audit-rubric-commensurability PLAN.json\n",
+            "  {program} commit-imperfect-judge-certification-plan PLAN_FIELDS.json\n",
+            "  {program} verify-imperfect-judge-certification-plan PLAN.json\n",
+            "  {program} analyze-imperfect-judge-certification PLAN.json RECEIPT.json\n",
             "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
             "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
@@ -301,6 +308,97 @@ fn run(args: &[String]) -> ExitCode {
                         "{}",
                         serde_json::to_string_pretty(&report)
                             .expect("rubric commensurability report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-imperfect-judge-certification-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "imperfect-judge certification plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_certification_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_imperfect_judge_certification_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("imperfect-judge certification plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-imperfect-judge-certification-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "imperfect-judge certification plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_certification_plan(&plan_bytes) {
+                Ok((plan, plan_sha256)) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_imperfect_judge_certification_plan_verification.v1",
+                            "valid": true,
+                            "plan_sha256": plan_sha256,
+                            "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
+                            "study_id": plan.study_id,
+                            "stratum_count": plan.strata.len(),
+                            "calibration_item_count": plan.calibration_items.len(),
+                            "test_item_count": plan.test_items.len(),
+                            "scoring_eligible": false,
+                            "external_anchor_required": true
+                        }))
+                        .expect("imperfect-judge certification plan verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "analyze-imperfect-judge-certification" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "imperfect-judge certification plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let receipt_bytes = match read(&args[2], "imperfect-judge certification receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match analyze_imperfect_judge_certification(&plan_bytes, &receipt_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("imperfect-judge certification report serializes")
                     );
                     ExitCode::SUCCESS
                 }
