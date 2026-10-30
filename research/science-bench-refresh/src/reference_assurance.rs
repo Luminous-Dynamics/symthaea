@@ -835,7 +835,10 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                             (target_date, source.publication_date.as_deref())
                             && published > target
                         {
-                            issues.push(format!("resolution {} uses a source published after the claim target date", resolution.resolution_id));
+                            issues.push(format!(
+                                "resolution {} uses a source published after the claim target date",
+                                resolution.resolution_id
+                            ));
                         }
                     }
                 }
