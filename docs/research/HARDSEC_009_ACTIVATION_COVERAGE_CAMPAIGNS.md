@@ -92,11 +92,11 @@ The current JSON contract is `hardsec-activation-campaign-v1`. It binds:
 - stimulus mode, sampling model, caller independence rationale, tool/version, configuration digest and random-distribution digest;
 - window length and strictly increasing predeclared budget points;
 - observation-boundary identity/type/description;
-- ordered trial records containing unique trial ID, per-condition trial index, active/inactive-control condition, sequence digest, trigger outcome/cycle/witness, payload outcome/cycle/witness, outcome-trace digest, and formal result/bound only for formal-cover campaigns.
+- ordered trial records containing unique trial ID, per-condition trial index, active/inactive-control condition, explicit `pair_id` when matched controls are supplied, sequence digest, trigger outcome/cycle/witness, payload outcome/cycle/witness, outcome-trace digest, and formal result/bound only for formal-cover campaigns.
 
-Trials within each condition must have contiguous ordered indices. If an inactive-control set is included, it must have the same number of trials and pair by index. Sequence duplicates are reported, not silently deduplicated; the receipt preserves the total trial count and unique-sequence count separately.
+Trials within each condition must have contiguous ordered indices. If an inactive-control set is included, it must have the same number of trials and every `pair_id` must map to exactly one active and one inactive-control trial. Pairing is never inferred from row order alone. Sequence duplicates are reported, not silently deduplicated; the receipt preserves the total trial count and unique-sequence count separately.
 
-The campaign file is hashed exactly. The output receipt is unsigned, created with no-overwrite semantics, and must be outside the campaign directory.
+The campaign file is read from one open file handle, with before/after file metadata checks and a no-symlink path check, then hashed exactly. Trial sequence hashes remain caller-supplied references; this utility does not dereference or re-hash raw stimulus files. The output receipt is unsigned, created with no-overwrite semantics, and must be outside the campaign directory.
 
 ## 5. Rust implementation
 
@@ -136,7 +136,7 @@ The unit tests cover:
 - digest validation and formal metadata misuse;
 - active/inactive descriptive comparison without causal wording.
 
-The suite currently contains 28 authored tests. Compilation and CI execution remain pending for this newly created branch; no test is described as passed until the focused workflow confirms it.
+The suite currently contains 31 authored tests, including explicit matched-pair identity and discordance tests. Compilation and CI execution remain pending for this newly created branch; no test is described as passed until the focused workflow confirms it.
 
 ## 7. Claim ceiling
 
