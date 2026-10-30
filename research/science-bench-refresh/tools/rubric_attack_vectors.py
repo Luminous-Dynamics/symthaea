@@ -225,6 +225,7 @@ def build_artifacts() -> tuple[dict[str, Any], dict[str, Any]]:
                 "family": item["family"],
                 "expected_relation": item["expected_relation"],
                 "expected_judge_behavior": item["expected_judge_behavior"],
+                "maximum_score_uplift_without_construct_gain_millionths": 0,
                 "change_axis": item["change_axis"],
                 "baseline_candidate_sha256": sha256(baseline_candidate),
                 "variant_candidate_sha256": sha256(variant_candidate),
@@ -249,6 +250,8 @@ def build_artifacts() -> tuple[dict[str, Any], dict[str, Any]]:
         "judge_source_revision": "NOT_IMPLEMENTED_YET",
         "judge_prompt_sha256": "0" * 64,
         "resource_budget": {"max_judge_calls": 0, "max_tokens": 0},
+        "repeats_per_condition": 3,
+        "randomization_commitment_sha256": "0" * 64,
         "planned_case_count": len(cases),
         "cases": cases,
     }
