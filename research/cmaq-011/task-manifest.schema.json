@@ -14,7 +14,8 @@
     "budget",
     "baselines",
     "metrics_required",
-    "claim_ceiling"
+    "claim_ceiling",
+    "integrity"
   ],
   "properties": {
     "schema_version": {
@@ -220,6 +221,107 @@
     },
     "claim_ceiling": {
       "type": "string"
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "network_access",
+        "allowed_network_domains",
+        "available_agent_tools",
+        "hidden_qualification",
+        "agent_can_access_hidden_targets",
+        "agent_can_write_scoring_artifacts",
+        "task_prompt_sha256",
+        "evaluator_source_sha256",
+        "scoring_verifier_sha256",
+        "independent_verifier_id",
+        "outcome_verification",
+        "transcript_audit",
+        "negative_controls"
+      ],
+      "properties": {
+        "network_access": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "unrestricted"
+          ]
+        },
+        "allowed_network_domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "available_agent_tools": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "hidden_qualification": {
+          "type": "boolean"
+        },
+        "agent_can_access_hidden_targets": {
+          "type": "boolean"
+        },
+        "agent_can_write_scoring_artifacts": {
+          "type": "boolean"
+        },
+        "task_prompt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "evaluator_source_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "scoring_verifier_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-fA-F0-9]{64})$|^$"
+        },
+        "independent_verifier_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome_verification": {
+          "enum": [
+            "environment_side",
+            "human",
+            "mixed",
+            "self_reported"
+          ]
+        },
+        "transcript_audit": {
+          "enum": [
+            "disabled",
+            "sampled",
+            "all",
+            "risk_triggered"
+          ]
+        },
+        "negative_controls": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
