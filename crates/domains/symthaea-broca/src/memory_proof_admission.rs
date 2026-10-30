@@ -542,14 +542,18 @@ mod tests {
             evidence_dependencies: vec!["A".into(), "B".into()],
         }];
 
-        let hit_a = hit("A", "evidence from first session", 1.0);
+        let mut hit_a = hit("A", "evidence from first session", 1.0);
+        hit_a.source.trajectory_id = "session-1".into();
         let mut hit_b = hit("B", "evidence from second session", 0.9);
-        hit_b.source.trajectory_id = "trajectory-2".into();
+        hit_b.source.trajectory_id = "session-2".into();
 
+        // AML ingestion binds trajectory_id to the Add request's session_id.
+        // The trusted admission envelope must preserve that exact mapping.
         let mut admission_a = admission("A");
+        admission_a.source_trajectory_id = hit_a.source.trajectory_id.clone();
         admission_a.source_session_id = Some("session-1".into());
         let mut admission_b = admission("B");
-        admission_b.source_trajectory_id = "trajectory-2".into();
+        admission_b.source_trajectory_id = "session-2".into();
         admission_b.source_sha256 = hit_b.source.source_sha256.clone();
         admission_b.source_pointer = hit_b.source.source_pointer.clone();
         admission_b.source_step_id = hit_b.source.step_id.clone();
