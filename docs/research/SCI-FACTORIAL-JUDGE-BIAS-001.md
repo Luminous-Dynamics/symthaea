@@ -80,7 +80,9 @@ The current analyzer reports:
 - selected score-option display-position effect;
 - candidate-A choice-rate effect, excluding ties and abstentions from the decisive-choice denominator;
 - per-criterion score changes under criterion ordering;
-- completed/ineligible/planned counts at each factor level.
+- completed/ineligible/planned counts at each factor level;
+- fully balanced repeats used for effects and incomplete repeats excluded from effects;
+- completed observations excluded by balanced-repeat filtering, separate from genuinely ineligible observations.
 
 For each factor pair (a,b), the analyzer reports the raw difference-in-differences:
 
@@ -89,7 +91,7 @@ I_{ab} = overline{Y}_{11} - overline{Y}_{10}
         - overline{Y}_{01} + overline{Y}_{00}
 ]
 
-There are ten pairwise factor interactions in a five-factor study. The report includes all four cell denominators and counts ineligible observations across those cells.
+There are ten pairwise factor interactions in a five-factor study. The report includes all four cell denominators and counts excluded observations across those cells. Main effects, criterion-order effects and interactions use only fully completed 32-cell block/repeat units. A repeat with even one timed-out/blocked/invalid/not-started condition is excluded as a whole from effect estimation; all its planned cells remain in the full denominator. The report separately counts ineligible observations and otherwise completed observations excluded because their repeat was incomplete.
 
 This v1 analysis is deliberately descriptive. It does not calculate p-values, confidence intervals, randomization-inference tests, cluster-robust standard errors or multiplicity corrections. Missing outcomes remain explicit; effects computed from incomplete cells are not qualification evidence. A future inferential layer must respect task/judge clustering and the preregistered assignment mechanism.
 
