@@ -384,7 +384,7 @@ fn weighted_triad_motif_count(graph: &Graph, motif: &TriadMotif) -> f64 {
                     TriadMotif::DirectedThreeCycle => (*target, *source),
                 };
                 if let Some(closing_weight) = graph.get(&closing_edge) {
-                    total += first_weight * second_weight * closing_weight;
+                    total += *first_weight * *second_weight * *closing_weight;
                 }
             }
         }
