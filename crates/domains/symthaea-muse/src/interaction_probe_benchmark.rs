@@ -200,10 +200,10 @@ fn report_digest_valid(
 /// truth. total_frames and support intervals use the same frame domain as the
 /// source-isolated signals supplied to EVAL-020.
 ///
-/// Candidate metrics exclude the independently sampled audit pairs. The
-/// measured metrics include both. Neither metric treats an unprobed pair as
-/// a negative example; its status is known only because this synthetic
-/// benchmark has the EVAL-020 exhaustive oracle.
+/// Candidate metrics exclude the independently sampled audit pairs. Selected-plan
+/// metrics include both candidate and audit pairs. Neither treats an unprobed pair as
+/// a negative example; its status is known only because this synthetic benchmark has
+/// the EVAL-020 exhaustive oracle.
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_interaction_probe_plan(
     factorial_report: &FactorialGroundTruthReport,
@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn pairwise_probe_report_exposes_a_pure_higher_order_blind_spot() {
+    fn contextual_pair_probes_detect_three_way_effect_without_global_pair_terms() {
         let events = vec![
             source_event(0, 0.2),
             source_event(1, 0.3),
@@ -632,7 +632,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result.ground_truth_interacting_pair_count, 0);
         assert_eq!(result.ground_truth_interacting_pair_count, 3);
         assert_eq!(result.candidate_pair_count, 3);
         assert_eq!(result.candidate_true_positive_count, 3);
