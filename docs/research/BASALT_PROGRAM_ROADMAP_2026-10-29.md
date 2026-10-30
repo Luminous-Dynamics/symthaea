@@ -145,11 +145,11 @@ Use external suites as complementing reference points rather than combine incomp
 
 - [SWE-bench Multilingual](https://www.swebench.com/multilingual): 300 curated tasks, 42 repositories and 9 languages.
 - [Artificial Analysis Coding Agent Index methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking): v2.0 documents 290 tasks across repository engineering, terminal workflows and repository Q&A, with published cost, token, time and integrity methods.
-- [Terminal-Bench](https://www.tbench.ai/): terminal and tool-use tasks.
+- [Terminal-Bench](https://www.tbench.ai/): terminal and tool-use tasks. Use the Vals AI common Mini-SWE-agent Terminal-Bench 4.0 board as a matched-harness reference; the 29 October 2026 snapshot lists Opus 5.5 at 65.15%, Sonnet 5.5 at 64.14%, Kimi K3.1 Pro at 63.64%, and GPT-6 Astra at 59.60%, with per-test cost and duration.
 - [AgentSuite/COBA](https://proceedings.mlr.press/v306/suh26a.html): benchmark validity methods.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196): clean-to-shifted execution evaluation.
 - [TestJack](https://arxiv.org/abs/2610.10619): requirement-grounded evaluator evolution and executable witness tests for apparently passing patches.
-- BASALT suite-manifest v3: frozen atomic requirement ledger with source-span bounds, expectation, ambiguity, and bidirectional blocking-check coverage commitments.
+- BASALT suite-manifest v3: frozen atomic requirement ledger with source-span bounds, expectation, ambiguity, and bidirectional blocking-check coverage commitments. The validator resolves every span against the exact digest-pinned UTF-8 specification artifact and recomputes its statement digest; confirmatory specifications remain evaluator-only.
 - [OpenAI SWE-bench Pro audit (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/): task, ground-truth and grading quality audit.
 - [Epoch AI Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review): reviewer findings about scoring defects.
 - [HypeCodeNet / The Natural Geometry of Code](https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html): motivation for evaluating hyperbolic structural representations.
@@ -215,6 +215,7 @@ Public leaderboard percentages are properties of a full evaluation configuration
 - [SWE-Shift](https://arxiv.org/abs/2610.32196), published 23 October 2026, evaluates 120 scenarios across 12 change families and nine intervention positions. All 17 evaluated systems had lower shifted than clean success; GPT-6 Astra is reported at 67.35% clean versus 24.79% shifted, with 20.34% paired success. Tool/session changes and stale-evidence scenarios had zero paired success across that evaluated cohort.
 - [TestJack](https://arxiv.org/abs/2610.10619), published 7 October 2026, audited 4,487 trials previously marked as passing across five coding-agent benchmarks and reported 1,545 requirement-violating trials (34.4%). Its reported overall resolution rate fell from 50.6% to 33.2% after evaluator evolution. A lightweight randomized-audit / witness-sharing variant recovered 72.4% of the refutations at 15.4% of the cost on three studied benchmarks. These are paper-specific results, not a universal prevalence estimate or a BASALT result.
 - [SWE-bench Multilingual](https://www.swebench.com/multilingual) supplies a cross-language reference of 300 tasks from 42 repositories across nine languages.
+- [Vals AI Terminal-Bench 4.0 common-harness leaderboard](https://vals-ai.com/benchmarks/terminal-bench-4), updated 29 October 2026, supplies a common Mini-SWE-agent comparison: Opus 5.5 65.15% ($13.20/test), Sonnet 5.5 64.14% ($16.51/test), Kimi K3.1 Pro 63.64% ($4.57/test), and GPT-6 Astra 59.60% ($9.58/test). This is not a direct BASALT comparison, but it is a more controlled external anchor than comparing different vendor agent harnesses.
 
 These are not matched head-to-head comparisons. BASALT should reproduce selected public setups where permitted, match budgets and execution identities, publish per-task results and uncertainty, and measure the differentiated capabilities separately.
 
