@@ -161,7 +161,7 @@ struct Summary {
     cvar95_return: f64,
     success_rate: f64,
     mean_conditional_regret_per_step: f64,
-    action_disagreement_rate: f64,
+    action_deviation_from_direct_rate: f64,
     mean_prediction_mae: f64,
     action_rank_accuracy: f64,
     mean_model_queries_per_episode: f64,
@@ -397,7 +397,7 @@ fn summarize(
             .map(|item| item.conditional_regret)
             .sum::<f64>()
             / (outcomes.len() * HORIZON) as f64,
-        action_disagreement_rate: outcomes
+        action_deviation_from_direct_rate: outcomes
             .iter()
             .map(|item| item.action_disagreement)
             .sum::<f64>()
@@ -484,7 +484,7 @@ fn report_json(rows: &[Summary]) -> String {
                 "\"delta_ci95_low\":{:.8},\"delta_ci95_high\":{:.8},",
                 "\"cvar95_return\":{:.8},\"success_rate\":{:.8},",
                 "\"mean_conditional_regret_per_step\":{:.8},",
-                "\"action_disagreement_rate\":{:.8},\"mean_prediction_mae\":{:.8},",
+                "\"action_deviation_from_direct_rate\":{:.8},\"mean_prediction_mae\":{:.8},",
                 "\"action_rank_accuracy\":{:.8},\"mean_model_queries_per_episode\":{:.4},",
                 "\"model_prediction_evaluable\":{}}}{}"
             ),
@@ -497,7 +497,7 @@ fn report_json(rows: &[Summary]) -> String {
             row.cvar95_return,
             row.success_rate,
             row.mean_conditional_regret_per_step,
-            row.action_disagreement_rate,
+            row.action_deviation_from_direct_rate,
             row.mean_prediction_mae,
             row.action_rank_accuracy,
             row.mean_model_queries_per_episode,
