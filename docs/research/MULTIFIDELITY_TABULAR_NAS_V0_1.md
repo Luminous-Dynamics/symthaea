@@ -188,7 +188,7 @@ The new Rust primitive is `nasbench201_trajectory.rs` and its tracking issue is 
 
 The archive's target-metric ID is explicit and must differ from the proxy ID. The planner verifies that it receives the same feature catalog and archive content that generated the trajectory, rejects unknown candidates and rejects quota overcommit. The resulting IDs feed the same multi-fidelity Successive Halving runner. Random search can now run with an empty proxy feature map, so the evaluator no longer requires a fake proxy column for a genuine no-proxy baseline.
 
-This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. Fourteen Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, archive/runtime binding, partial-catalog honesty, deterministic random pools, single-proxy ranking, trajectory-pool conversion and invalid inputs. They have not been compiled or executed.
+This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. Fifteen Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, archive/runtime binding, partial-catalog honesty, deterministic random pools, single-proxy ranking, trajectory-pool conversion, promotion-plan tamper rejection and invalid inputs. They have not been compiled or executed.
 
 ## 9. Target-free multi-proxy consensus prior (CoRA-inspired)
 
