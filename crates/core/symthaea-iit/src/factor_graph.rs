@@ -1,0 +1,481 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Exact binary sum-product elimination for sparse causal factor graphs.
+//!
+//! This module is deliberately independent of IIT scoring. It provides the
+//! numerical primitive needed to replace global-state enumeration in the
+//! IIT 4.0 Eq. 4 background-posterior contraction. The dense TPM implementation
+//! remains the correctness oracle until differential tests cover that integration.
+//!
+//! Variable indices are global model-unit indices. Within a factor's table,
+//! variables[0] is the least-significant assignment bit.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use thiserror::Error;
+
+/// Failures while constructing or eliminating binary factors.
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum FactorGraphError {
+    #[error("factor variable scope must be strictly ascending; found {left} before {right}")]
+    ScopeNotStrictlyAscending { left: usize, right: usize },
+
+    #[error("factor with {variables} variables cannot be represented by this platform")]
+    ScopeTooWide { variables: usize },
+
+    #[error("factor table length mismatch: expected {expected}, got {actual}")]
+    TableLengthMismatch { expected: usize, actual: usize },
+
+    #[error("factor table value at index {index} must be finite and nonnegative; got {value}")]
+    InvalidFactorValue { index: usize, value: f64 },
+
+    #[error("factor graph must contain at least one factor")]
+    EmptyFactorGraph,
+
+    #[error("elimination variable {variable} was requested more than once")]
+    DuplicateEliminationVariable { variable: usize },
+
+    #[error("variable {variable} is not present in the factor scope")]
+    VariableNotInFactor { variable: usize },
+
+    #[error("factor intermediate has {entries} entries, exceeding the configured limit {limit}")]
+    IntermediateTooLarge { entries: usize, limit: usize },
+
+    #[error("factor-table index arithmetic overflow")]
+    IndexOverflow,
+}
+
+/// A nonnegative function over a sorted set of binary variables.
+///
+/// The table has 2^variables.len() entries. Assignment bits follow the
+/// variable order, with the first scope variable in the least-significant bit.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BinaryFactor {
+    variables: Vec<usize>,
+    values: Vec<f64>,
+}
+
+impl BinaryFactor {
+    /// Construct a factor. The scope must already be strictly ascending.
+    pub fn new(
+        variables: Vec<usize>,
+        values: Vec<f64>,
+    ) -> Result<Self, FactorGraphError> {
+        for pair in variables.windows(2) {
+            if pair[0] >= pair[1] {
+                return Err(FactorGraphError::ScopeNotStrictlyAscending {
+                    left: pair[0],
+                    right: pair[1],
+                });
+            }
+        }
+        let expected = assignment_count(variables.len())?;
+        if values.len() != expected {
+            return Err(FactorGraphError::TableLengthMismatch {
+                expected,
+                actual: values.len(),
+            });
+        }
+        for (index, value) in values.iter().copied().enumerate() {
+            if !value.is_finite() || value < 0.0 {
+                return Err(FactorGraphError::InvalidFactorValue { index, value });
+            }
+        }
+        Ok(Self { variables, values })
+    }
+
+    /// Construct a scalar factor, which has an empty variable scope.
+    pub fn scalar(value: f64) -> Result<Self, FactorGraphError> {
+        Self::new(Vec::new(), vec![value])
+    }
+
+    pub fn variables(&self) -> &[usize] {
+        &self.variables
+    }
+
+    pub fn values(&self) -> &[f64] {
+        &self.values
+    }
+
+    /// Read a table entry by local assignment index.
+    pub fn value_at(&self, assignment_index: usize) -> Option<f64> {
+        self.values.get(assignment_index).copied()
+    }
+
+    /// Multiply two factors, enforcing the intermediate-entry budget before
+    /// allocating the joint table.
+    pub fn multiply(
+        &self,
+        other: &Self,
+        max_factor_entries: usize,
+    ) -> Result<Self, FactorGraphError> {
+        let variables = sorted_union(&self.variables, &other.variables);
+        let entries = assignment_count(variables.len())?;
+        check_budget(entries, max_factor_entries)?;
+        let mut values = Vec::with_capacity(entries);
+        for assignment in 0..entries {
+            let left_index = project_assignment(assignment, &variables, &self.variables)?;
+            let right_index = project_assignment(assignment, &variables, &other.variables)?;
+            values.push(self.values[left_index] * other.values[right_index]);
+        }
+        Self::new(variables, values)
+    }
+
+    /// Sum out one variable. If the variable is not in this factor, this
+    /// operation is an error rather than a silent no-op.
+    pub fn sum_out(
+        &self,
+        variable: usize,
+        max_factor_entries: usize,
+    ) -> Result<Self, FactorGraphError> {
+        let variable_slot = self
+            .variables
+            .binary_search(&variable)
+            .map_err(|_| FactorGraphError::VariableNotInFactor { variable })?;
+        let mut variables = self.variables.clone();
+        variables.remove(variable_slot);
+        let entries = assignment_count(variables.len())?;
+        check_budget(entries, max_factor_entries)?;
+        let mut values = Vec::with_capacity(entries);
+        for assignment in 0..entries {
+            let zero_index = insert_assignment_bit(assignment, variable_slot, false)?;
+            let one_index = insert_assignment_bit(assignment, variable_slot, true)?;
+            values.push(self.values[zero_index] + self.values[one_index]);
+        }
+        Self::new(variables, values)
+    }
+}
+
+/// Telemetry for one completed deterministic min-fill contraction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FactorEliminationReport {
+    /// Product of remaining factors after all requested variables are summed out.
+    pub factor: BinaryFactor,
+    /// Deterministic min-fill order actually used.
+    pub elimination_order: Vec<usize>,
+    /// Maximum number of active neighbours at the point of elimination.
+    pub induced_width: usize,
+    /// Largest input or intermediate factor table observed.
+    pub peak_factor_entries: usize,
+    /// Number of binary factor multiplications performed.
+    pub factor_multiplications: usize,
+    /// Number of variables summed out.
+    pub variables_summed_out: usize,
+}
+
+/// Eliminate the requested variables using deterministic min-fill ordering.
+///
+/// The routine is exact (ordinary floating-point sum/product), bounded by
+/// max_factor_entries, and reports induced width and peak table size. Variables
+/// absent from every input factor are independent fair binary variables; summing
+/// one out contributes the correct scalar multiplier of two.
+pub fn min_fill_sum_product(
+    factors: &[BinaryFactor],
+    eliminate: &[usize],
+    max_factor_entries: usize,
+) -> Result<FactorEliminationReport, FactorGraphError> {
+    if factors.is_empty() {
+        return Err(FactorGraphError::EmptyFactorGraph);
+    }
+    let mut seen = BTreeSet::new();
+    for variable in eliminate.iter().copied() {
+        if !seen.insert(variable) {
+            return Err(FactorGraphError::DuplicateEliminationVariable { variable });
+        }
+    }
+
+    let mut work = factors.to_vec();
+    let mut peak_factor_entries = 1usize;
+    for factor in &work {
+        check_budget(factor.values.len(), max_factor_entries)?;
+        peak_factor_entries = peak_factor_entries.max(factor.values.len());
+    }
+
+    let (elimination_order, induced_width) = min_fill_order(factors, eliminate)?;
+    let mut factor_multiplications = 0usize;
+    let mut variables_summed_out = 0usize;
+
+    for variable in elimination_order.iter().copied() {
+        let mut involved = Vec::new();
+        let mut remaining = Vec::with_capacity(work.len());
+        for factor in work.drain(..) {
+            if factor.variables.binary_search(&variable).is_ok() {
+                involved.push(factor);
+            } else {
+                remaining.push(factor);
+            }
+        }
+
+        if involved.is_empty() {
+            // An unrepresented binary variable has a unit prior and sums to 2.
+            remaining.push(BinaryFactor::scalar(2.0)?);
+            work = remaining;
+            variables_summed_out += 1;
+            continue;
+        }
+
+        let mut product = involved.remove(0);
+        for factor in involved {
+            product = product.multiply(&factor, max_factor_entries)?;
+            factor_multiplications += 1;
+            peak_factor_entries = peak_factor_entries.max(product.values.len());
+        }
+        let reduced = product.sum_out(variable, max_factor_entries)?;
+        peak_factor_entries = peak_factor_entries.max(reduced.values.len());
+        remaining.push(reduced);
+        work = remaining;
+        variables_summed_out += 1;
+    }
+
+    let mut remaining = work.into_iter();
+    let mut result = remaining.next().ok_or(FactorGraphError::EmptyFactorGraph)?;
+    for factor in remaining {
+        result = result.multiply(&factor, max_factor_entries)?;
+        factor_multiplications += 1;
+        peak_factor_entries = peak_factor_entries.max(result.values.len());
+    }
+
+    Ok(FactorEliminationReport {
+        factor: result,
+        elimination_order,
+        induced_width,
+        peak_factor_entries,
+        factor_multiplications,
+        variables_summed_out,
+    })
+}
+
+/// Compute the deterministic min-fill order and its induced width.
+fn min_fill_order(
+    factors: &[BinaryFactor],
+    eliminate: &[usize],
+) -> Result<(Vec<usize>, usize), FactorGraphError> {
+    let mut adjacency: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+    for variable in eliminate.iter().copied() {
+        adjacency.entry(variable).or_default();
+    }
+    for factor in factors {
+        for variable in factor.variables.iter().copied() {
+            adjacency.entry(variable).or_default();
+        }
+        for left in 0..factor.variables.len() {
+            for right in left + 1..factor.variables.len() {
+                let a = factor.variables[left];
+                let b = factor.variables[right];
+                adjacency.entry(a).or_default().insert(b);
+                adjacency.entry(b).or_default().insert(a);
+            }
+        }
+    }
+
+    let mut active: BTreeSet<usize> = eliminate.iter().copied().collect();
+    let mut order = Vec::with_capacity(active.len());
+    let mut induced_width = 0usize;
+
+    while !active.is_empty() {
+        let mut best: Option<(usize, usize, usize)> = None;
+        for variable in active.iter().copied() {
+            let neighbours = adjacency
+                .get(&variable)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|neighbour| adjacency.contains_key(neighbour))
+                .collect::<Vec<_>>();
+            let mut fill_edges = 0usize;
+            for left in 0..neighbours.len() {
+                for right in left + 1..neighbours.len() {
+                    if !adjacency[&neighbours[left]].contains(&neighbours[right]) {
+                        fill_edges += 1;
+                    }
+                }
+            }
+            let candidate = (fill_edges, neighbours.len(), variable);
+            if best.map(|current| candidate < current).unwrap_or(true) {
+                best = Some(candidate);
+            }
+        }
+
+        let (_, degree, variable) = best.ok_or(FactorGraphError::EmptyFactorGraph)?;
+        let neighbours = adjacency
+            .get(&variable)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|neighbour| adjacency.contains_key(neighbour))
+            .collect::<Vec<_>>();
+        induced_width = induced_width.max(degree);
+
+        // Elimination makes the active neighbours a clique.
+        for left in 0..neighbours.len() {
+            for right in left + 1..neighbours.len() {
+                let a = neighbours[left];
+                let b = neighbours[right];
+                adjacency.entry(a).or_default().insert(b);
+                adjacency.entry(b).or_default().insert(a);
+            }
+        }
+        for neighbour in &neighbours {
+            if let Some(edges) = adjacency.get_mut(neighbour) {
+                edges.remove(&variable);
+            }
+        }
+        adjacency.remove(&variable);
+        active.remove(&variable);
+        order.push(variable);
+    }
+
+    Ok((order, induced_width))
+}
+
+fn sorted_union(left: &[usize], right: &[usize]) -> Vec<usize> {
+    let mut output = Vec::with_capacity(left.len() + right.len());
+    let mut left_index = 0usize;
+    let mut right_index = 0usize;
+    while left_index < left.len() || right_index < right.len() {
+        let next = match (left.get(left_index), right.get(right_index)) {
+            (Some(&a), Some(&b)) if a < b => {
+                left_index += 1;
+                a
+            }
+            (Some(&a), Some(&b)) if b < a => {
+                right_index += 1;
+                b
+            }
+            (Some(&a), Some(_)) => {
+                left_index += 1;
+                right_index += 1;
+                a
+            }
+            (Some(&a), None) => {
+                left_index += 1;
+                a
+            }
+            (None, Some(&b)) => {
+                right_index += 1;
+                b
+            }
+            (None, None) => break,
+        };
+        output.push(next);
+    }
+    output
+}
+
+fn assignment_count(variable_count: usize) -> Result<usize, FactorGraphError> {
+    1usize
+        .checked_shl(variable_count as u32)
+        .ok_or(FactorGraphError::ScopeTooWide {
+            variables: variable_count,
+        })
+}
+
+fn check_budget(entries: usize, limit: usize) -> Result<(), FactorGraphError> {
+    if entries > limit {
+        Err(FactorGraphError::IntermediateTooLarge { entries, limit })
+    } else {
+        Ok(())
+    }
+}
+
+fn project_assignment(
+    assignment: usize,
+    joint_scope: &[usize],
+    local_scope: &[usize],
+) -> Result<usize, FactorGraphError> {
+    let mut local = 0usize;
+    for (local_slot, variable) in local_scope.iter().copied().enumerate() {
+        let joint_slot = joint_scope
+            .binary_search(&variable)
+            .map_err(|_| FactorGraphError::IndexOverflow)?;
+        if ((assignment >> joint_slot) & 1) != 0 {
+            local |= 1usize << local_slot;
+        }
+    }
+    Ok(local)
+}
+
+fn insert_assignment_bit(
+    assignment: usize,
+    bit_slot: usize,
+    bit: bool,
+) -> Result<usize, FactorGraphError> {
+    let lower_mask = (1usize << bit_slot)
+        .checked_sub(1)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    let low = assignment & lower_mask;
+    let high = assignment & !lower_mask;
+    let inserted = high
+        .checked_shl(1)
+        .ok_or(FactorGraphError::IndexOverflow)?;
+    Ok(inserted | low | (usize::from(bit) << bit_slot))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn close(left: f64, right: f64) {
+        assert!((left - right).abs() <= 1e-12, "{left} != {right}");
+    }
+
+    #[test]
+    fn min_fill_sum_product_matches_brute_force_on_binary_chain() {
+        // f0(x0,x1) with x0 as the low bit; f1(x1,x2) with x1 as low bit.
+        let f0 = BinaryFactor::new(vec![0, 1], vec![0.9, 0.1, 0.2, 0.8]).unwrap();
+        let f1 = BinaryFactor::new(vec![1, 2], vec![0.7, 0.3, 0.4, 0.6]).unwrap();
+        let report = min_fill_sum_product(&[f0.clone(), f1.clone()], &[0, 1], 8).unwrap();
+
+        let mut expected = vec![0.0; 2]; // retain x2
+        for x0 in 0..2 {
+            for x1 in 0..2 {
+                for x2 in 0..2 {
+                    let left_index = x0 | (x1 << 1);
+                    let right_index = x1 | (x2 << 1);
+                    expected[x2] += f0.values[left_index] * f1.values[right_index];
+                }
+            }
+        }
+        close(report.factor.values[0], expected[0]);
+        close(report.factor.values[1], expected[1]);
+        assert_eq!(report.factor.variables, vec![2]);
+        assert_eq!(report.induced_width, 1);
+        assert_eq!(report.peak_factor_entries, 4);
+        assert_eq!(report.variables_summed_out, 2);
+    }
+
+    #[test]
+    fn min_fill_order_is_deterministic_and_avoids_chain_cliques() {
+        let factors = vec![
+            BinaryFactor::new(vec![0, 1], vec![1.0; 4]).unwrap(),
+            BinaryFactor::new(vec![1, 2], vec![1.0; 4]).unwrap(),
+            BinaryFactor::new(vec![2, 3], vec![1.0; 4]).unwrap(),
+            BinaryFactor::new(vec![3, 4], vec![1.0; 4]).unwrap(),
+        ];
+        let first = min_fill_sum_product(&factors, &[0, 1, 2, 3], 16).unwrap();
+        let second = min_fill_sum_product(&factors, &[0, 1, 2, 3], 16).unwrap();
+        assert_eq!(first.elimination_order, second.elimination_order);
+        assert_eq!(first.induced_width, 1);
+        assert_eq!(first.factor.variables, vec![4]);
+        assert_eq!(first.factor.values, vec![16.0, 16.0]);
+    }
+
+    #[test]
+    fn min_fill_respects_memory_budget_before_large_allocation() {
+        let factor = BinaryFactor::new(vec![0, 1, 2], vec![1.0; 8]).unwrap();
+        assert!(matches!(
+            min_fill_sum_product(&[factor], &[0], 4),
+            Err(FactorGraphError::IntermediateTooLarge { entries: 8, limit: 4 })
+        ));
+    }
+
+    #[test]
+    fn absent_elimination_variable_contributes_binary_sum_factor() {
+        let factor = BinaryFactor::new(vec![0], vec![0.25, 0.75]).unwrap();
+        let report = min_fill_sum_product(&[factor], &[1], 2).unwrap();
+        assert_eq!(report.factor.variables, vec![0]);
+        close(report.factor.values[0], 0.5);
+        close(report.factor.values[1], 1.5);
+    }
+}
