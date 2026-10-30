@@ -26,6 +26,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
+}
+
 fn require_non_empty(value: &str, field: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.trim() != value {
         return Err(format!("{field} must be non-empty and trimmed"));
@@ -68,7 +72,7 @@ pub struct ProofEvidenceCandidate {
     pub source_family_id: String,
     /// Trusted session identity; distinct from source-family independence.
     /// Required for any obligation with minimum_distinct_sessions > 0.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
     pub scope_id: String,
     pub payload_sha256: String,
@@ -210,7 +214,7 @@ pub struct ProofObligation {
     /// Require evidence from this many distinct trusted conversation sessions.
     /// Zero disables the session constraint; it never changes source-family checks.
     /// Defaults to zero when deserializing legacy proof requests.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub minimum_distinct_sessions: u32,
     /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
@@ -409,7 +413,7 @@ pub struct ProofPacketEvidenceRef {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
