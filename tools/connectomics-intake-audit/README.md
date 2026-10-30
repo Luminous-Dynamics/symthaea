@@ -130,12 +130,12 @@ Per-group deltas help stop strong pooled scores from hiding a weak species × er
 The `connectome-query-impact` binary evaluates proposed weighted-edge mutations independently against one immutable directed weighted graph and a preregistered set of scientific queries. It reports each query's baseline value, counterfactual value, delta, normalized absolute delta, and weighted contribution. The candidate score is
 
 ```text
-weighted_query_impact =
+weighted_query_sensitivity =
     sum(query_weight * min(abs(query_delta) / normalization_scale, 1))
     / sum(query_weight)
 
-expected_query_impact_per_review_minute =
-    estimated_error_probability * weighted_query_impact / review_minutes
+probability_weighted_query_sensitivity_per_review_minute =
+    estimated_error_probability * weighted_query_sensitivity / review_minutes
 ```
 
 Supported query metrics in schema v1 are directed edge weight, weighted in-degree, weighted out-degree, and directed path existence. Supported candidate mutations are adding/removing positive edge weight. Duplicate graph edges must be aggregated by the producer. The query bundle's weights and scales are scientific-policy choices and must be frozen before evaluation. Candidate error probabilities must come from an independently calibrated model/policy; this tool does not train or calibrate them.
