@@ -589,6 +589,23 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                         for (index, estimator) in Estimator::ALL.iter().enumerate() {
                             let result = estimate(&rows, policy, logger, *estimator, q_model)?;
                             aggregates[index].add(result, truth);
+                            let error = result.value - truth;
+                            output.push_str(&format!(
+                                "REPLICATE\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\tidentified_full_support\\n",
+                                scenario.name(),
+                                sample_size,
+                                logger_kind.name(),
+                                policy.id,
+                                estimator.name(),
+                                replicate,
+                                result.value,
+                                truth,
+                                error,
+                                error * error,
+                                result.standard_error,
+                                result.value - 1.96 * result.standard_error,
+                                result.value + 1.96 * result.standard_error,
+                            ));
                         }
                         mean_w += weight;
                         mean_reward += realized_logger_reward;
@@ -669,8 +686,9 @@ mod tests {
     #[test]
     fn empirical_shrinkage_weights_are_bounded_and_shrinkage_preserves_probability_range() {
         let rows = sample_dataset(64, Logger { p1: [0.5, 0.5] }, [0.5, 0.5], SOURCE_REWARD, 17).unwrap();
+        let calibration = sample_dataset(64, Logger { p1: [0.5, 0.5] }, [0.5, 0.5], SOURCE_REWARD, 18).unwrap();
         let model = fit_reward_model(&rows).unwrap();
-        let w = calibration_shrinkage_weight(model, &rows).unwrap();
+        let w = calibration_shrinkage_weight(model, &calibration).unwrap();
         assert!((0.0..=1.0).contains(&w));
         let shrunk = shrink_model(model, w).unwrap();
         assert!(shrunk.iter().flatten().all(|q| q.is_finite() && (0.0..=1.0).contains(q)));
@@ -690,8 +708,13 @@ mod tests {
         let b = benchmark(3).unwrap();
         assert_eq!(a, b);
         assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 5 * 2 * 5 * 4 * 6);
+        assert_eq!(a.lines().filter(|line| line.starts_with("REPLICATE\t")).count(), 3 * 5 * 2 * 5 * 4 * 6);
         for line in a.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 16);
+            assert!(line.contains("identified_full_support"));
+        }
+        for line in a.lines().filter(|line| line.starts_with("REPLICATE\t")) {
+            assert_eq!(line.split('\t').count(), 15);
             assert!(line.contains("identified_full_support"));
         }
         assert_eq!(a.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
