@@ -12,8 +12,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, DirectedSystemPartition,
-    FactorGraphError, ModelError, PartitionApplyError, MAX_DENSE_UNITS,
+    min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, CausalDirection,
+    DirectedSystemPartition, FactorGraphError, ModelError, PartitionApplyError,
+    SystemPhiDirectionScore, SystemPhiPartitionScore, MAX_DENSE_UNITS,
 };
 
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
@@ -128,6 +129,14 @@ pub enum SparseCausalError {
     DenseConversionLimit { units: usize, maximum: usize },
     #[error("partition cut-matrix size overflows for {candidate_count} candidate units")]
     PartitionCutMatrixSizeOverflow { candidate_count: usize },
+    #[error("specified {direction:?} state has {actual} bits, expected {expected}")]
+    SpecifiedStateLength {
+        direction: CausalDirection,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("system partition cuts no connections and has no EdgeCut normalization")]
+    ZeroSeveredConnections,
     #[error("dense model target {target} is not a function of its declared parent scope at full state {state}")]
     DenseModelNotLocal { target: usize, state: usize },
     #[error(transparent)]
@@ -448,6 +457,116 @@ impl SparseBinaryCausalModel {
             )?);
         }
         Self::new(self.n_units, transformed)
+    }
+
+    /// Score one IIT 4.0 (2023) system partition using sparse local CPTs.
+    ///
+    /// This uses Eq. 4 cause inference with the uncut substrate posterior,
+    /// Eq. 3 effect conditioning, the sparse maximum-entropy partition transform,
+    /// and the dense reference score convention (minimum cause/effect, positive
+    /// part, and inverse severed-edge normalization).
+    pub fn score_iit4_system_partition(
+        &self,
+        partition: &DirectedSystemPartition,
+        current_state: &[bool],
+        system_state: &crate::Iit4SystemState,
+        max_factor_entries: usize,
+    ) -> Result<SystemPhiPartitionScore, SparseCausalError> {
+        self.check_state(current_state)?;
+        let candidate = partition.candidate_system();
+        if system_state.cause_specified_state.len() != candidate.len() {
+            return Err(SparseCausalError::SpecifiedStateLength {
+                direction: CausalDirection::Cause,
+                expected: candidate.len(),
+                actual: system_state.cause_specified_state.len(),
+            });
+        }
+        if system_state.effect_specified_state.len() != candidate.len() {
+            return Err(SparseCausalError::SpecifiedStateLength {
+                direction: CausalDirection::Effect,
+                expected: candidate.len(),
+                actual: system_state.effect_specified_state.len(),
+            });
+        }
+        let severed_connections = partition.cut_matrix().iter().filter(|cut| **cut).count();
+        if severed_connections == 0 {
+            return Err(SparseCausalError::ZeroSeveredConnections);
+        }
+
+        let cause_forward_report = self.forward_cause_likelihood_iit4(
+            candidate,
+            current_state,
+            max_factor_entries,
+        )?;
+        let cause_mass = cause_forward_report.forward_likelihood.iter().sum::<f64>();
+        if !cause_mass.is_finite() || cause_mass <= 0.0 {
+            return Err(SparseCausalError::UndefinedBackgroundPosterior);
+        }
+        let cause_selectivity = cause_forward_report.forward_likelihood
+            .iter()
+            .map(|value| value / cause_mass)
+            .collect::<Vec<_>>();
+        let effect_selectivity = self.effect_repertoire_iit4(
+            candidate,
+            candidate,
+            current_state,
+            candidate,
+            max_factor_entries,
+        )?;
+
+        let cut_model = self.apply_partition(partition)?;
+        let cause_partitioned = self.partitioned_forward_cause_likelihood_iit4(
+            partition,
+            current_state,
+            max_factor_entries,
+        )?;
+        let effect_partitioned = cut_model.effect_repertoire_iit4(
+            candidate,
+            candidate,
+            current_state,
+            candidate,
+            max_factor_entries,
+        )?;
+
+        let cause_state_index = system_state.cause_specified_state
+            .iter()
+            .enumerate()
+            .fold(0usize, |index, (unit, on)| {
+                if *on { index | (1usize << unit) } else { index }
+            });
+        let effect_state_index = system_state.effect_specified_state
+            .iter()
+            .enumerate()
+            .fold(0usize, |index, (unit, on)| {
+                if *on { index | (1usize << unit) } else { index }
+            });
+
+        let cause = sparse_direction_score(
+            CausalDirection::Cause,
+            cause_selectivity[cause_state_index],
+            cause_forward_report.forward_likelihood[cause_state_index],
+            cause_partitioned.forward_likelihood[cause_state_index],
+        );
+        let effect = sparse_direction_score(
+            CausalDirection::Effect,
+            effect_selectivity[effect_state_index],
+            effect_selectivity[effect_state_index],
+            effect_partitioned[effect_state_index],
+        );
+        let signed_phi = cause.signed_phi.min(effect.signed_phi);
+        let normalization_factor = 1.0 / severed_connections as f64;
+        let signed_normalized_phi = signed_phi * normalization_factor;
+
+        Ok(SystemPhiPartitionScore {
+            cause,
+            effect,
+            signed_phi,
+            phi: signed_phi.max(0.0),
+            normalization_factor,
+            signed_normalized_phi,
+            normalized_phi: signed_normalized_phi.max(0.0),
+            severed_connections,
+        })
     }
 
     /// Versioned SHA-256 identity in a namespace distinct from dense TPM digests.
@@ -913,6 +1032,26 @@ impl SparseBinaryCausalModel {
     }
 }
 
+fn sparse_direction_score(
+    direction: CausalDirection,
+    selectivity: f64,
+    forward_probability: f64,
+    partitioned_forward_probability: f64,
+) -> SystemPhiDirectionScore {
+    let signed_phi = if forward_probability == 0.0 || partitioned_forward_probability == 0.0 {
+        0.0
+    } else {
+        selectivity * (forward_probability / partitioned_forward_probability).log2()
+    };
+    SystemPhiDirectionScore {
+        direction,
+        selectivity,
+        forward_probability,
+        partitioned_forward_probability,
+        signed_phi,
+    }
+}
+
 fn sparse_hex_digest(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut output = String::with_capacity(digest.len() * 2);
@@ -1130,6 +1269,38 @@ mod tests {
                     "candidate={candidate:?}, index={index}: dense={expected:.17}, sparse={actual:.17}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn sparse_partition_score_matches_dense_reference_for_embedded_systems() {
+        let dense = dense_ring_model(5);
+        let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
+        let candidate = [0, 1, 3];
+        let current_state = [true, false, true, false, true];
+        let system_state = crate::Iit4SystemState {
+            cause_specified_state: vec![true, false, true],
+            effect_specified_state: vec![false, true, false],
+        };
+        let partitions = enumerate_iit4_system_partitions(&candidate, 5, true, 100)
+            .unwrap();
+        for partition in &partitions {
+            let dense_score = dense
+                .score_iit4_system_partition(&partition, &current_state, &system_state)
+                .unwrap();
+            let sparse_score = sparse
+                .score_iit4_system_partition(
+                    &partition,
+                    &current_state,
+                    &system_state,
+                    1 << 16,
+                )
+                .unwrap();
+            assert_eq!(dense_score.severed_connections, sparse_score.severed_connections);
+            assert!((dense_score.cause.signed_phi - sparse_score.cause.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.effect.signed_phi - sparse_score.effect.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.signed_phi - sparse_score.signed_phi).abs() <= 1e-12);
+            assert!((dense_score.normalized_phi - sparse_score.normalized_phi).abs() <= 1e-12);
         }
     }
 
