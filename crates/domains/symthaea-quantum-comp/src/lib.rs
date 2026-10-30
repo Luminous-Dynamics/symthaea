@@ -180,6 +180,7 @@ pub use architecture_portfolio::{
 pub use architecture_evidence::{
     compare_architecture_evidence_records, select_architecture_candidate_from_evidence,
     validate_architecture_evidence_receipt, validate_architecture_evidence_record,
+    validate_architecture_evidence_record_for_comparison,
     ArchitectureBenchmarkSuite, ArchitectureEvidenceError, ArchitectureEvidenceOrigin,
     ArchitectureEvidenceReceipt, ArchitectureEvidenceRecord,
 };
