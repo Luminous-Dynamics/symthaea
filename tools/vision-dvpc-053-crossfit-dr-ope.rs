@@ -621,6 +621,8 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                                     format!("{:.10}", result.value + 1.96 * result.standard_error),
                                     "score_based_normal_interval_empirical_only",
                                 )
+                            } else if estimator == Estimator::DmPilot {
+                                ("NA".to_string(), "NA".to_string(), "model_uncertainty_not_in_score_ci")
                             } else {
                                 ("NA".to_string(), "NA".to_string(), "same_sample_nuisance_ci_unavailable")
                             };
@@ -655,10 +657,10 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                         let (bias, variance, mse, coverage, width) = aggregates[index].metrics()?;
                         let coverage_text = coverage.map(|v| format!("{v:.6}")).unwrap_or_else(|| "NA".to_string());
                         let width_text = width.map(|v| format!("{v:.8}")).unwrap_or_else(|| "NA".to_string());
-                        let inference_status = if coverage.is_some() {
-                            "score_based_normal_interval_empirical_only"
-                        } else {
-                            "same_sample_nuisance_ci_unavailable"
+                        let inference_status = match estimator {
+                            Estimator::DmPilot => "model_uncertainty_not_in_score_ci",
+                            Estimator::DmInSample | Estimator::DrInSample => "same_sample_nuisance_ci_unavailable",
+                            _ => "score_based_normal_interval_empirical_only",
                         };
                         output.push_str(&format!(
                             "RESULT\t{}\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{:.10}\t{:.10}\t{:.10}\t{}\t{}\tidentified_full_support\t{}\n",
