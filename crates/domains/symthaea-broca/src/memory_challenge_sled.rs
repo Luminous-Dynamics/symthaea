@@ -216,6 +216,12 @@ impl SledAmlMemoryBackend {
         )?;
         match retry {
             AmlAddRetryDecision::ReplayIdenticalRequest => {
+                // A previous attempt may have written the CAS value but returned
+                // an error during flush. Flush it again before treating this
+                // retry as durable success. This also closes the CAS-loser path.
+                self.batches
+                    .flush()
+                    .map_err(|error| format!("AML replay durability flush failed: {error}"))?;
                 // Rebuild to pick up a durable write made by another backend
                 // instance that won the compare-and-swap race.
                 self.rebuild_index()?;
@@ -523,6 +529,35 @@ mod tests {
         let changed = add_request("request-1", "user-1", "session-1", &["Different root cause and fix."]);
         assert!(execute_aml_add(&mut backend, changed).is_err());
         assert_eq!(backend.persisted_batch_count(), 1);
+    }
+
+    #[test]
+    fn identical_retry_after_restart_flushes_and_reuses_existing_batch() {
+        let root = tempdir().unwrap();
+        let request = add_request(
+            "request-1",
+            "user-1",
+            "session-1",
+            &["Reproduced stale evidence after index restart."],
+        );
+        {
+            let mut backend = open_backend(root.path());
+            execute_aml_add(&mut backend, request.clone()).unwrap();
+            assert_eq!(backend.persisted_batch_count(), 1);
+        }
+        {
+            let mut reopened = open_backend(root.path());
+            let response = execute_aml_add(&mut reopened, request.clone()).unwrap();
+            response.validate_echo(&request).unwrap();
+            assert_eq!(reopened.persisted_batch_count(), 1);
+            let hits = execute_aml_search(&reopened, AmlSearchRequest {
+                query: "stale evidence index restart".into(),
+                options: None,
+                user_id: "user-1".into(),
+                top_k: 10,
+            }).unwrap();
+            assert_eq!(hits.data.len(), 1);
+        }
     }
 
     #[test]
