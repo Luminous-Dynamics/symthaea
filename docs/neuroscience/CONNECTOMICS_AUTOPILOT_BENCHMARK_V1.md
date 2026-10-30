@@ -507,3 +507,6 @@ A pooled pass cannot override a failed critical-family, false-correction, false-
 Replace a global "proofread / not proofread" flag with a scoped certificate for each scientific question. Each certificate binds the exact query, code, data revisions, dependency closure, corrections, sampling evidence, family-specific coverage, rater disagreement, null models, and uncertainty. A relevant edit or source revision invalidates the certificate; provably unrelated edits need not.
 
 The certificate must explicitly distinguish observed evidence, design-based sampling uncertainty, in-pool risk, multi-list unseen-error sensitivity, correction interactions, and query-model uncertainty. It may not convert these components into one aggregate confidence score unless a validated joint model exists. Its state is CERTIFIED_WITHIN_DECLARED_SCOPE, CONDITIONAL, NOT_CERTIFIED, or INVALIDATED_BY_REVISION. A digest establishes evidence identity, not biological truth.
+
+
+- Machine-readable certificate contract: [schema](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json) and [synthetic fixture](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json). The fixture is explicitly conditional and synthetic; it is not a biological certification.
