@@ -81,6 +81,14 @@ The `data` array is mandatory; return `{"data":[]}` for no results. Each item re
 
 **Search returns evidence, never a generated final answer.** It must not receive or return gold answers, hidden labels, evaluator data, or prompt-injection instructions designed to manipulate the scoring pipeline.
 
+## 2A. Official scored Coding benchmark
+
+The current AML Coding scored suite is **CAMBench Coding**: 150 software-engineering tasks are run under relevant and noisy memory conditions, for 300 scored attempts. The documentation lists SWEContextBench as a reference catalog, not the current scored Coding benchmark. Do not substitute a SWEContextBench score or a Textual leaderboard score for CAMBench Coding.
+
+The relevant/noisy pair is especially important for Broca: measure the score on relevant memories, the score under noisy memories, and the paired degradation. The public evaluation remains the official result; internal diagnostics should additionally record gold-evidence Recall@K / nDCG@K where licenses permit, stale-memory use, distractor intrusion, correct-repository attribution, relevant-to-noisy task-success delta, Search p50/p95 latency, returned evidence bytes/tokens, and storage/update cost. Keep each metric distinct; do not invent a blended score.
+
+Before attempting a SOTA claim, establish the released CAMBench version, official evaluator, fixed answer model/prompt, model restrictions for the submission division, and exact task population. The official Cycle 2 results are scheduled for mid-November; as of 2026-10-30 there is no verified Cycle 2 public Coding result to beat.
+
 ## 3. Runtime, authentication, and privacy requirements
 
 - Add/Search endpoints must be publicly reachable over HTTPS; do not embed credentials in endpoint URLs.
