@@ -1563,6 +1563,30 @@ mod tests {
     fn schema_v2_lifecycle_store_migrates_event_digest_column() {
         let root = tempdir().unwrap();
         let path = root.path().join("v2.sqlite3");
+        let request = add_request(
+            "v2-request",
+            "user-1",
+            "session-v2",
+            &["historical revocation should replay after schema migration"],
+        );
+        let payload_sha256 = request.payload_sha256().unwrap();
+        let records = build_evidence_records(&request, &payload_sha256).unwrap();
+        let evidence_id = records[0].evidence_id.clone();
+        let stored_at = current_unix_ms().unwrap();
+        let batch = PersistedAmlAddBatch {
+            request: request.clone(),
+            payload_sha256: payload_sha256.clone(),
+            stored_at_unix_ms: stored_at,
+            records,
+        };
+        let batch_body = serde_json::to_vec(&batch).unwrap();
+        let event = PersistedEvidenceLifecycleEvent {
+            event_id: "v2-revoke-event".into(),
+            recorded_at_unix_ms: stored_at + 1,
+            operation: EvidenceLifecycleOperation::Revoke { evidence_id },
+        };
+        let event_body = serde_json::to_vec(&event).unwrap();
+
         {
             let connection = Connection::open(&path).unwrap();
             connection.execute_batch(
@@ -1580,7 +1604,20 @@ mod tests {
                 );
                 PRAGMA user_version = 2;"
             ).unwrap();
+            connection.execute(
+                "INSERT INTO aml_add_batches
+                    (request_id, payload_sha256, stored_at_unix_ms, body_json)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![request.request_id, payload_sha256, stored_at as i64, batch_body],
+            ).unwrap();
+            connection.execute(
+                "INSERT INTO aml_evidence_lifecycle_events
+                    (event_id, recorded_at_unix_ms, body_json)
+                 VALUES (?1, ?2, ?3)",
+                params![event.event_id, (stored_at + 1) as i64, event_body],
+            ).unwrap();
         }
+
         let backend = SqliteAmlMemoryBackend::open(&path, root.path()).unwrap();
         let version: i64 = backend.connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
@@ -1593,8 +1630,35 @@ mod tests {
         ).unwrap();
         assert_eq!(version, SQLITE_SCHEMA_VERSION);
         assert_eq!(digest_column, 1);
-    }
+        assert_eq!(backend.persisted_batch_count().unwrap(), 1);
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
 
+        let migrated_digest: String = backend.connection.query_row(
+            "SELECT event_sha256 FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+            params!["v2-revoke-event"],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(migrated_digest, sha256_hex(&event_body));
+
+        let query = AmlSearchRequest {
+            query: "historical revocation schema migration".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        };
+        let before_retraction = backend.search_as_known_at(
+            &query,
+            stored_at + 2,
+            stored_at,
+        ).unwrap();
+        let after_retraction = backend.search_as_known_at(
+            &query,
+            stored_at + 2,
+            stored_at + 1,
+        ).unwrap();
+        assert_eq!(before_retraction.data.len(), 1);
+        assert!(after_retraction.data.is_empty());
+    }
     #[test]
     fn lifecycle_event_payload_tampering_is_rejected_before_replay() {
         let root = tempdir().unwrap();
