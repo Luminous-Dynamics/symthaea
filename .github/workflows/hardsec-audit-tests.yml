@@ -50,10 +50,67 @@ jobs:
       - name: Test claim-scoped evidence packet auditor
         run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
 
-      - name: Audit pinned SeqCube witness-validation packet
+      - name: Fetch pinned SeqCube witness package and verify publisher checksums
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/seqcube-ht-e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/archive/e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz" \
+            --output "$archive"
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          package_root="$RUNNER_TEMP/seqcube-ht-witness-validation-artifact-e5acac37af6dbe1fa53b0be93199bb81a62c5320"
+          test -f "$package_root/manifest.json"
+          test -f "$package_root/netlists/seqctrl_infected.v"
+          (cd "$package_root" && sha256sum -c checksums/SHA256SUMS) | tee "$RUNNER_TEMP/seqcube-checksums.stdout"
+          echo "SEQCUBE_PACKAGE_ROOT=$package_root" >> "$GITHUB_ENV"
+
+      - name: Set up Python for upstream SeqCube verifier
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Z3 and Icarus Verilog
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes iverilog
+          python -m venv "$RUNNER_TEMP/seqcube-venv"
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --requirement "$SEQCUBE_PACKAGE_ROOT/verify/requirements.txt"
+          {
+            python --version
+            "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip freeze
+            iverilog -V
+            vvp -V
+          } > "$RUNNER_TEMP/seqcube-toolchain.txt" 2>&1
+
+      - name: Independently replay upstream SeqCube package verifier
+        run: |
+          set -euo pipefail
+          set +e
+          "$RUNNER_TEMP/seqcube-venv/bin/python" \
+            "$SEQCUBE_PACKAGE_ROOT/verify/verify_package.py" \
+            --package "$SEQCUBE_PACKAGE_ROOT" --require-iverilog \
+            > "$RUNNER_TEMP/seqcube-verifier.stdout" \
+            2> "$RUNNER_TEMP/seqcube-verifier.stderr"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/seqcube-verifier.stdout"
+          cat "$RUNNER_TEMP/seqcube-verifier.stderr" >&2
+          test "$status" -eq 0
+          test -f "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json"
+          mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
+          cp "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-checksums.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-toolchain.txt" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Audit pinned SeqCube witness-validation packet and local bytes
         run: |
           cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
             --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+            --evidence-root "$SEQCUBE_PACKAGE_ROOT" \
             --receipt "$RUNNER_TEMP/seqcube-evidence-audit.json"
           python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
           import json
@@ -76,16 +133,19 @@ jobs:
           assert receipt["evidence_count"] == 5, receipt
           assert actual == expected, (actual, expected)
           assert all(claim["status"] == "supported" for claim in receipt["claims"]), receipt
+          assert receipt["byte_integrity"]["status"] == "verified", receipt
+          assert receipt["byte_integrity"]["verified_file_count"] == 9, receipt
           assert receipt["security_verdict"] is None, receipt
-          print("SeqCube packet receipt: PASS (5 bounded/observed claims, detector-free)")
+          print("SeqCube packet receipt: PASS (5 bounded/observed claims, 9 source bytes verified, detector-free)")
           PY
+          cp "$RUNNER_TEMP/seqcube-evidence-audit.json" "$RUNNER_TEMP/hardsec-seqcube/"
 
-      - name: Upload SeqCube witness packet audit receipt
+      - name: Upload SeqCube witness packet and replay receipts
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: hardsec-seqcubewitness-validation-receipt
-          path: "${{ runner.temp }}/seqcube-evidence-audit.json"
+          path: "${{ runner.temp }}/hardsec-seqcube/"
 
       - name: Record resolved harness dependency lock
         if: always()
