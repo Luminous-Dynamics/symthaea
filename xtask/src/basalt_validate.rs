@@ -81,6 +81,7 @@ struct ManifestTask {
     paired_transform_id: RequiredNullable<String>,
     quality_audit: QualityAudit,
     required_checks: Vec<RequiredCheck>,
+    quality_rubric: QualityRubric,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,6 +90,71 @@ struct RequiredCheck {
     check_id: String,
     kind: String,
     blocking: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QualityRubric {
+    rubric_id: String,
+    version: String,
+    total_weight_basis_points: u32,
+    criteria: Vec<QualityCriterion>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QualityCriterion {
+    criterion_id: String,
+    dimension: QualityCriterionDimension,
+    applicability: QualityCriterionApplicability,
+    weight_basis_points: u32,
+    applicability_rationale: String,
+    evidence_sources: Vec<QualityEvidenceSource>,
+    reviewer_guidance: String,
+    anchors: Vec<QualityAnchor>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum QualityCriterionDimension {
+    Maintainability,
+    ScopeDiscipline,
+    ApiCompatibility,
+    TestQuality,
+    Documentation,
+    Performance,
+    ErrorHandling,
+    IdiomaticDesign,
+    SecurityHardening,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum QualityCriterionApplicability {
+    Scored,
+    NotApplicable,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+enum QualityEvidenceSource {
+    Diff,
+    TestResults,
+    ApiAnalysis,
+    StaticAnalysis,
+    DocumentationReview,
+    PerformanceMeasurements,
+    HumanReview,
+    SecurityScan,
+    RuntimeLogs,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QualityAnchor {
+    score: u8,
+    description: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -707,8 +773,8 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
 
 
 fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], report: &mut ValidationReport) {
-    if manifest.schema_version != 1 {
-        error(report, "E_MANIFEST_VERSION", "manifest.schema_version", "only suite-manifest schema_version=1 is supported");
+    if manifest.schema_version != 2 {
+        error(report, "E_MANIFEST_VERSION", "manifest.schema_version", "only suite-manifest schema_version=2 is supported");
     }
     if manifest.program != "BASALT" {
         error(report, "E_MANIFEST_PROGRAM", "manifest.program", "manifest program must be BASALT");
@@ -790,6 +856,11 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
                 error(report, "E_MANIFEST_REQUIRED_CHECK_NONBLOCKING", format!("{check_path}.blocking"), "required verifier obligations must be blocking");
             }
         }
+        validate_quality_rubric(
+            report,
+            &format!("{task_path}.quality_rubric"),
+            &task.quality_rubric,
+        );
     }
 
     if manifest.tasks.len() != run.task_records.len() {
@@ -816,6 +887,136 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
                 }
             }
         }
+    }
+}
+
+fn validate_quality_rubric(report: &mut ValidationReport, path: &str, rubric: &QualityRubric) {
+    if rubric.rubric_id.trim().is_empty() || rubric.version.trim().is_empty() {
+        error(report, "E_QUALITY_RUBRIC_ID", path, "rubric_id and version must be non-empty");
+    }
+    if rubric.total_weight_basis_points != 10_000 {
+        error(
+            report,
+            "E_QUALITY_RUBRIC_TOTAL",
+            format!("{path}.total_weight_basis_points"),
+            "the declared rubric total must be exactly 10000 basis points",
+        );
+    }
+    if rubric.criteria.is_empty() {
+        error(report, "E_QUALITY_RUBRIC_EMPTY", format!("{path}.criteria"), "at least one predeclared criterion is required");
+    }
+
+    let mut criterion_ids = BTreeSet::new();
+    let mut scored_weight = 0u64;
+    let mut scored_criteria = 0usize;
+    for (index, criterion) in rubric.criteria.iter().enumerate() {
+        let criterion_path = format!("{path}.criteria[{index}]");
+        if criterion.criterion_id.trim().is_empty()
+            || !criterion_ids.insert(criterion.criterion_id.as_str())
+        {
+            error(
+                report,
+                "E_QUALITY_CRITERION_ID",
+                format!("{criterion_path}.criterion_id"),
+                "criterion IDs must be non-empty and unique within a task rubric",
+            );
+        }
+        if criterion.applicability_rationale.trim().is_empty() {
+            error(
+                report,
+                "E_QUALITY_APPLICABILITY_RATIONALE",
+                format!("{criterion_path}.applicability_rationale"),
+                "every criterion requires a pre-run applicability rationale",
+            );
+        }
+        if criterion.evidence_sources.is_empty() {
+            error(
+                report,
+                "E_QUALITY_EVIDENCE_SOURCES",
+                format!("{criterion_path}.evidence_sources"),
+                "every criterion must predeclare at least one admissible evidence source",
+            );
+        } else {
+            let mut sources = BTreeSet::new();
+            for source in &criterion.evidence_sources {
+                if !sources.insert(*source) {
+                    error(
+                        report,
+                        "E_QUALITY_EVIDENCE_SOURCE_DUPLICATE",
+                        format!("{criterion_path}.evidence_sources"),
+                        "evidence sources must be unique within a criterion",
+                    );
+                    break;
+                }
+            }
+        }
+        if criterion.reviewer_guidance.trim().is_empty() {
+            error(
+                report,
+                "E_QUALITY_REVIEWER_GUIDANCE",
+                format!("{criterion_path}.reviewer_guidance"),
+                "reviewer guidance must be non-empty and frozen before the run",
+            );
+        }
+        if criterion.anchors.len() != 5 {
+            error(
+                report,
+                "E_QUALITY_ANCHOR_COUNT",
+                format!("{criterion_path}.anchors"),
+                "each criterion must define exactly five ordered anchors for scores 0 through 4",
+            );
+        }
+        for (anchor_index, anchor) in criterion.anchors.iter().enumerate() {
+            if anchor.score as usize != anchor_index {
+                error(
+                    report,
+                    "E_QUALITY_ANCHOR_ORDER",
+                    format!("{criterion_path}.anchors[{anchor_index}].score"),
+                    "anchor scores must be ordered and contiguous from 0 through 4",
+                );
+            }
+            if anchor.description.trim().is_empty() {
+                error(
+                    report,
+                    "E_QUALITY_ANCHOR_DESCRIPTION",
+                    format!("{criterion_path}.anchors[{anchor_index}].description"),
+                    "every score anchor requires a concrete description",
+                );
+            }
+        }
+
+        match criterion.applicability {
+            QualityCriterionApplicability::Scored => {
+                scored_criteria += 1;
+                if criterion.weight_basis_points == 0 || criterion.weight_basis_points > 10_000 {
+                    error(
+                        report,
+                        "E_QUALITY_CRITERION_WEIGHT",
+                        format!("{criterion_path}.weight_basis_points"),
+                        "a scored criterion must have a weight in 1..=10000 basis points",
+                    );
+                }
+                scored_weight += criterion.weight_basis_points as u64;
+            }
+            QualityCriterionApplicability::NotApplicable => {
+                if criterion.weight_basis_points != 0 {
+                    error(
+                        report,
+                        "E_QUALITY_NOT_APPLICABLE_WEIGHT",
+                        format!("{criterion_path}.weight_basis_points"),
+                        "a not_applicable criterion must have zero weight; explain the exclusion in applicability_rationale",
+                    );
+                }
+            }
+        }
+    }
+    if scored_criteria == 0 || scored_weight != rubric.total_weight_basis_points as u64 {
+        error(
+            report,
+            "E_QUALITY_WEIGHT_SUM",
+            format!("{path}.criteria"),
+            "the weights of scored criteria must sum exactly to the declared total; not_applicable criteria carry zero weight",
+        );
     }
 }
 
@@ -1526,5 +1727,80 @@ mod tests {
         assert!(has_code(&report, "E_MANIFEST_TASK_COUNT"));
         assert!(has_code(&report, "E_TASK_SET_MISMATCH"));
     }
+
+    #[test]
+    fn quality_rubric_requires_exact_weight_sum() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][1]["weight_basis_points"] = Value::from(2_999);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_WEIGHT_SUM"));
+    }
+
+    #[test]
+    fn quality_rubric_rejects_duplicate_criterion_ids() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            let first = manifest["tasks"][0]["quality_rubric"]["criteria"][0]["criterion_id"].clone();
+            manifest["tasks"][0]["quality_rubric"]["criteria"][1]["criterion_id"] = first;
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_CRITERION_ID"));
+    }
+
+    #[test]
+    fn quality_rubric_rejects_weight_on_not_applicable_criterion() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["applicability"] = Value::String("not_applicable".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_NOT_APPLICABLE_WEIGHT"));
+    }
+
+    #[test]
+    fn quality_rubric_rejects_unordered_score_anchors() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["anchors"][0]["score"] = Value::from(1);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_ANCHOR_ORDER"));
+    }
+
+    #[test]
+    fn quality_rubric_requires_admissible_evidence_sources() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["evidence_sources"] = Value::Array(Vec::new());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_EVIDENCE_SOURCES"));
+    }
+
+    #[test]
+    fn quality_rubric_requires_nonempty_pre_run_reviewer_guidance() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["reviewer_guidance"] = Value::String("  ".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_QUALITY_REVIEWER_GUIDANCE"));
+    }
+
+    #[test]
+    fn quality_rubric_accepts_explicit_not_applicable_criterion_at_zero_weight() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["applicability"] = Value::String("not_applicable".into());
+            manifest["tasks"][0]["quality_rubric"]["criteria"][0]["weight_basis_points"] = Value::from(0);
+            manifest["tasks"][0]["quality_rubric"]["criteria"][1]["weight_basis_points"] = Value::from(7_000);
+        });
+        assert!(report.valid, "{:?}", report.errors);
+    }
+
+    #[test]
+    fn manifest_schema_version_one_is_not_silently_interpreted_as_version_two() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["schema_version"] = Value::from(1);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_MANIFEST_VERSION"));
+    }
+
 
 }
