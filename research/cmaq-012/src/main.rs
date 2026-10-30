@@ -238,7 +238,7 @@ fn summarize_slice(key: SliceKey, episodes: &[Episode]) -> SliceSummary {
     } else if n_pairs < MIN_QUALIFICATION_PAIRS {
         "below the minimum of 20 paired episodes; smoke-only"
     } else {
-        "qualification eligible subject to held-out task-family and preregistration checks"
+        "mechanical sample-count floor met; held-out split and preregistration must be independently verified"
     }.to_string();
     let mut arms = BTreeMap::new();
     for arm in Arm::all() { arms.insert(arm, summarize_arm(episodes, arm)); }
@@ -344,7 +344,7 @@ fn render_report(input: &str, slices: &BTreeMap<SliceKey, Vec<Episode>>) -> Stri
     format!(
         concat!("{{\n  \"schema_version\":\"{}\",\n  \"auditor_version\":\"{}\",\n",
         "  \"input_sha256\":\"{}\",\n  \"minimum_qualification_pairs\":{},\n",
-        "  \"bootstrap_replicates\":{},\n  \"slice_count\":{},\n  \"slices\":[\n    {}\n  ]\n}}\n"),
+        "  \"bootstrap_replicates\":{},\n  \"claim_ceiling\":\"scoring_contract_only_not_environment_performance\",\n  \"slice_count\":{},\n  \"slices\":[\n    {}\n  ]\n}}\\n"),
         SCHEMA, AUDITOR_VERSION, sha256_hex(input.as_bytes()), MIN_QUALIFICATION_PAIRS,
         BOOTSTRAP_REPLICATES, summaries.len(), summary_json
     )
