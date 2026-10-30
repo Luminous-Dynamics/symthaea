@@ -27,10 +27,10 @@ v0 uses two contexts, three actions and three annotation sources, with a global 
 The estimator is DM+IS / annotated DR:
 
 \[
-\\widehat V(\\pi)=\\frac1N\\sum_{i=1}^N\\left[
-\\sum_a\\pi(a\\mid X_i)\\widehat q(X_i,a)
-+\\frac{\\pi(A_i\\mid X_i)}{\\mu(A_i\\mid X_i)}
-\\{R_i-\\widehat q(X_i,A_i)\\}\\right].
+\widehat V(\pi)=\frac1N\sum_{i=1}^N\left[
+\sum_a\pi(a\mid X_i)\widehat q(X_i,a)
++\frac{\pi(A_i\mid X_i)}{\mu(A_i\mid X_i)}
+\{R_i-\widehat q(X_i,A_i)\}\right].
 \]
 
 Counterfactual annotations may improve q-hat. They do not replace the factual logged reward R, do not replace the exact behavior propensity mu, and do not establish factual action support. The importance-sampling residual still uses the action actually selected by the logger.
@@ -42,10 +42,10 @@ A zero behavior propensity for an action with positive target-policy mass remain
 For a cell with nf independent factual fit observations and nk annotations from source k, let n = nf + sum_k nk. Under independent source errors:
 
 \[
-B_{xa}=\\frac{\\sum_k n_k\\epsilon_k(x,a)}{n},
-\\qquad
-W_{xa}=\\frac{n_f\\sigma_{xa}^2+
-\\sum_k n_k\\{\\sigma_{xa}^2+\\Delta_k(x,a)\\}}{n^2}.
+B_{xa}=\frac{\sum_k n_k\epsilon_k(x,a)}{n},
+\qquad
+W_{xa}=\frac{n_f\sigma_{xa}^2+
+\sum_k n_k\{\sigma_{xa}^2+\Delta_k(x,a)\}}{n^2}.
 \]
 
 If n=0, the registered default reward estimate is used; in the current worlds factual fit counts are positive in every cell.
@@ -53,13 +53,13 @@ If n=0, the registered default reward estimate is used; in the current worlds fa
 For a fixed context, after integrating over reward-model fit noise and the factual logged action/reward, the exact variance of the annotated DM+IS score is:
 
 \[
-\\begin{aligned}
-\\operatorname{Var}(Z\\mid X=x)
-={}&\\sum_a\\frac{\\pi_a^2}{\\mu_a}\\sigma_a^2
-+\\sum_a\\pi_a^2\\left(\\frac1{\\mu_a}-1\\right)W_a\\\\
-&+\\sum_a\\frac{\\pi_a^2}{\\mu_a}B_a^2
--\\left(\\sum_a\\pi_a B_a\\right)^2.
-\\end{aligned}
+\begin{aligned}
+\operatorname{Var}(Z\mid X=x)
+={}&\sum_a\frac{\pi_a^2}{\mu_a}\sigma_a^2
++\sum_a\pi_a^2\left(\frac1{\mu_a}-1\right)W_a\\
+&+\sum_a\frac{\pi_a^2}{\mu_a}B_a^2
+-\left(\sum_a\pi_a B_a\right)^2.
+\end{aligned}
 \]
 
 The final term matters: source biases can cancel after target-policy weighting. Treating source bias magnitudes as independent penalties misses this interaction.
@@ -67,9 +67,9 @@ The final term matters: source biases can cancel after target-policy weighting. 
 Let Vx = sum_a pi(a|x) r(x,a). The full per-event variance also includes between-context variation:
 
 \[
-\\operatorname{Var}(Z)=
-\\operatorname{Var}_{X}(V_X)+
-\\mathbb E_X[\\operatorname{Var}(Z\\mid X)].
+\operatorname{Var}(Z)=
+\operatorname{Var}_{X}(V_X)+
+\mathbb E_X[\operatorname{Var}(Z\mid X)].
 \]
 
 For N independent evaluation events, exact expected MSE is Var(Z)/N. This is a fixed-profile objective under independent-error assumptions, not a universal formula for correlated annotators or adaptive acquisition.
@@ -87,8 +87,8 @@ Pairwise exchange is a local-search baseline, not a reproduction of Xiang et al.
 For factual sample size nf, reward variance sigma-squared, one-source excess variance Delta, squared annotation bias epsilon-squared, and eta=1-mu, the first-annotation condition is:
 
 \[
-\\epsilon^2\\leq
-\\eta\\left[\\frac{n_f+1}{n_f}\\sigma^2-\\Delta\\right].
+\epsilon^2\leq
+\eta\left[\frac{n_f+1}{n_f}\sigma^2-\Delta\right].
 \]
 
 Five frozen rows cover the four local regimes: (I) annotations harmful; (II) finite interior batch is best; (III) every feasible addition helps; (IVa) the first annotation hurts but a sufficiently large batch wins; (IVb) the first annotation hurts and the largest batch still loses. Tests check the threshold against the exact one-step objective difference and verify each registered regime's shape.
