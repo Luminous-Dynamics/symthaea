@@ -1279,9 +1279,12 @@ mod tests {
                     "arch-002".into(),
                     "arch-003".into(),
                 ],
-                &[4, 2, 2],
-            );
-        assert!(run.is_err()); // the ladder has three levels; schedule validation rejects two rungs
+                &[4, 2, 1],
+            )
+            .unwrap();
+        assert_eq!(run.receipt.final_fidelity_queries, 1);
+        assert_eq!(run.receipt.total_cost_units, 225);
+        assert_eq!(run.evaluation.proxy_feature_bank_total_seconds, 0.0);
     }
 
     #[test]
