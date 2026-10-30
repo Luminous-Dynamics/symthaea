@@ -328,18 +328,10 @@ b2\t-100\t-100\t0\t1000000\n";
     }
     #[test]
     fn mechanism_family_cannot_cross_development_and_qualification() {
-        let mixed = TRUTH.replace(
-            "d1\\tlawA\\tdevelopment",
-            "d1\\tlawA\\tdevelopment",
-        );
-        let mixed = if mixed == TRUTH {
-            TRUTH.replace("d1\\tdevLaw\\tdevelopment", "d1\\tlawA\\tdevelopment")
-        } else {
-            mixed
-        };
+        let mixed = TRUTH.replace("d1\tdevLaw\tdevelopment", "d1\tlawA\tdevelopment");
         let (truth, pred) = parsed(&mixed, EXACT);
         let error = score(&truth, &pred, "qualification").unwrap_err();
-        assert!(error.contains("mechanism family \\"lawA\\" appears in both qualification and development"));
+        assert!(error.contains("mechanism family \"lawA\" appears in both qualification and development"));
     }
     #[test]
     fn duplicate_prediction_fails_closed() {
