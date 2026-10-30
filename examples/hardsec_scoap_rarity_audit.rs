@@ -22,7 +22,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
@@ -95,6 +95,7 @@ struct Node {
     node_id: u64,
     score_milli: u128,
     label: NodeLabel,
+    metric_measured: bool,
     rarity_percentile_bps: u32,
 }
 
@@ -210,8 +211,20 @@ fn safe_relative_path(value: &str, field: &str) -> Result<(), String> {
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("read {}: {error}", path.display()))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    let mut file = File::open(path)
+        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| format!("read {}: {error}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
@@ -380,6 +393,7 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
                 node_id,
                 score_milli: 0,
                 label,
+                metric_measured: false,
                 rarity_percentile_bps: 0,
             },
         ));
@@ -415,59 +429,48 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
             node_id,
             score_milli,
             label,
+            metric_measured: true,
             rarity_percentile_bps: 0,
         },
     ))
 }
 
 fn rank_design(nodes: &mut [Node]) -> Result<usize, String> {
-    let unknown_metric_count = nodes
-        .iter()
-        .filter(|node| node.score_milli == 0 && node.label == NodeLabel::Unknown)
-        .count();
     nodes.sort_by_key(|node| node.node_id);
     for pair in nodes.windows(2) {
         if pair[0].node_id == pair[1].node_id {
             return Err(format!("duplicate node_id {}", pair[0].node_id));
         }
     }
-    let mut measured: Vec<Node> = nodes
+
+    let unknown_metric_count = nodes.iter().filter(|node| !node.metric_measured).count();
+    let mut order: Vec<usize> = nodes
         .iter()
-        .copied()
-        .filter(|node| !(node.score_milli == 0 && node.label == NodeLabel::Unknown))
+        .enumerate()
+        .filter_map(|(index, node)| node.metric_measured.then_some(index))
         .collect();
-    // A measured all-zero SCOAP record is valid, so unknown status is kept in
-    // a dedicated side table in the source stream; see parse_node metadata.
-    if measured.is_empty() {
-        return Ok(unknown_metric_count);
-    }
-    measured.sort_by(|left, right| {
-        left.score_milli
-            .cmp(&right.score_milli)
-            .then(left.node_id.cmp(&right.node_id))
+    order.sort_by(|left, right| {
+        nodes[*left]
+            .score_milli
+            .cmp(&nodes[*right].score_milli)
+            .then(nodes[*left].node_id.cmp(&nodes[*right].node_id))
     });
-    let total = measured.len() as u128;
+
+    let total = order.len() as u128;
     let mut start = 0usize;
-    while start < measured.len() {
-        let score = measured[start].score_milli;
+    while start < order.len() {
+        let score = nodes[order[start]].score_milli;
         let mut end = start + 1;
-        while end < measured.len() && measured[end].score_milli == score {
+        while end < order.len() && nodes[order[end]].score_milli == score {
             end += 1;
         }
+        // CDF percentile: ties share the upper rank of their score group.
+        // The same score therefore always receives the same percentile.
         let percentile_bps = ((end as u128) * 10_000 / total) as u32;
-        for node in &mut measured[start..end] {
-            node.rarity_percentile_bps = percentile_bps;
+        for index in &order[start..end] {
+            nodes[*index].rarity_percentile_bps = percentile_bps;
         }
         start = end;
-    }
-    let mut lookup = BTreeMap::new();
-    for node in measured {
-        lookup.insert(node.node_id, node.rarity_percentile_bps);
-    }
-    for node in nodes.iter_mut() {
-        if let Some(percentile) = lookup.get(&node.node_id) {
-            node.rarity_percentile_bps = *percentile;
-        }
     }
     Ok(unknown_metric_count)
 }
@@ -487,17 +490,18 @@ fn evaluate_tails(nodes: &[Node]) -> Vec<TailMetrics> {
             let selected: Vec<&Node> = nodes
                 .iter()
                 .filter(|node| {
-                    node.rarity_percentile_bps >= threshold_bps
+                    node.metric_measured
+                        && node.rarity_percentile_bps >= threshold_bps
                         && node.label != NodeLabel::Unknown
                 })
                 .collect();
             let trigger_total = nodes
                 .iter()
-                .filter(|node| node.label == NodeLabel::Trigger)
+                .filter(|node| node.metric_measured && node.label == NodeLabel::Trigger)
                 .count();
             let payload_total = nodes
                 .iter()
-                .filter(|node| node.label == NodeLabel::Payload)
+                .filter(|node| node.metric_measured && node.label == NodeLabel::Payload)
                 .count();
             let trigger_selected = selected
                 .iter()
@@ -510,7 +514,7 @@ fn evaluate_tails(nodes: &[Node]) -> Vec<TailMetrics> {
             let known_selected_nodes = selected.len();
             let selected_nodes = nodes
                 .iter()
-                .filter(|node| node.rarity_percentile_bps >= threshold_bps)
+                .filter(|node| node.metric_measured && node.rarity_percentile_bps >= threshold_bps)
                 .count();
             TailMetrics {
                 threshold_bps,
@@ -549,7 +553,7 @@ fn write_ranking(path: &Path, header: &Header, data: &BTreeMap<String, DesignDat
         let mut nodes = design_data.nodes.clone();
         nodes.sort_by_key(|node| node.node_id);
         for node in nodes {
-            if node.label == NodeLabel::Unknown && node.rarity_percentile_bps == 0 {
+            if !node.metric_measured {
                 writeln!(
                     output,
                     "{}\t{}\t{}\t{}\tunknown\tunknown\t{}",
@@ -842,6 +846,7 @@ mod tests {
             node_id,
             score_milli: max_cc * 1_000 + u128::from(co) * u128::from(alpha),
             label,
+            metric_measured: true,
             rarity_percentile_bps: 0,
         }
     }
@@ -951,6 +956,47 @@ mod tests {
         .unwrap();
         assert_eq!(value.rarity_percentile_bps, 0);
         assert_eq!(value.score_milli, 0);
+        assert!(!value.metric_measured);
+    }
+
+    #[test]
+    fn measured_zero_scoap_values_are_ranked_not_mistaken_for_unknown() {
+        let header = header(1_000);
+        let (_, value) = parse_node(
+            &json!({
+                "design_id": "design-a",
+                "node_id": 6,
+                "metric_status": "measured",
+                "cc0": 0,
+                "cc1": 0,
+                "co": 0,
+                "label": "unknown"
+            }),
+            &header,
+        )
+        .unwrap();
+        assert!(value.metric_measured);
+        let mut nodes = vec![value];
+        assert_eq!(rank_design(&mut nodes).unwrap(), 0);
+        assert_eq!(nodes[0].rarity_percentile_bps, 10_000);
+    }
+
+    #[test]
+    fn unknown_trigger_labels_do_not_enter_measured_recall_denominators() {
+        let mut nodes = vec![
+            Node {
+                node_id: 1,
+                score_milli: 0,
+                label: NodeLabel::Trigger,
+                metric_measured: false,
+                rarity_percentile_bps: 0,
+            },
+            node(2, 1, 2, 3, NodeLabel::Benign, 1_000),
+        ];
+        rank_design(&mut nodes).unwrap();
+        let tail = evaluate_tails(&nodes);
+        assert_eq!(tail[0].trigger_total, 0);
+        assert_eq!(tail[0].trigger_recall, None);
     }
 
     #[test]
