@@ -751,6 +751,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
         }
         assessment.requires_reverification = assessment.freshness != EvidenceFreshness::Fresh
             || assessment.dependency_coverage == DependencyCoverage::Incomplete
+            || matches!(assessment.outcome, EvidenceOutcome::Unresolved | EvidenceOutcome::NotRun)
             || !assessment.blocked_by_evidence_ids.is_empty();
         if assessment.requires_reverification {
             reverification_plan.push(assessment.evidence_id.clone());
@@ -1385,6 +1386,25 @@ mod tests {
         let report = audit_value(&value);
         assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_DEPENDENCY_COVERAGE_CONTRADICTION"));
+    }
+
+    #[test]
+    fn fresh_unresolved_and_not_run_evidence_are_scheduled() {
+        let mut value = parsed_example();
+        value["entries"][0]["outcome"] = Value::String("not_run".into());
+        value["entries"][3]["outcome"] = Value::String("unresolved".into());
+        let report = audit_value(&value);
+        assert!(report.structurally_valid, "{:?}", report.errors);
+
+        for evidence_id in ["build-before-change", "lint-before-change"] {
+            let assessment = report.evidence.iter()
+                .find(|item| item.evidence_id == evidence_id)
+                .unwrap();
+            assert_eq!(assessment.freshness, EvidenceFreshness::Fresh);
+            assert!(assessment.requires_reverification);
+            assert!(!assessment.eligible_under_declared_coverage);
+            assert!(report.reverification_plan.iter().any(|id| id == evidence_id));
+        }
     }
 
     #[test]
