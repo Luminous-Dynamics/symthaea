@@ -1482,4 +1482,218 @@ mod tests {
     }
 
 
+
+    fn interval_covers(interval: &ValidInterval, date: NaiveDate) -> bool {
+        let parsed = interval.parse().unwrap();
+        parsed.start <= date && parsed.end.is_none_or(|end| date < end)
+    }
+
+    fn assert_session_matches_full_recomputation(
+        session: &IncrementalSupportSession,
+        reference: &SupportGraph,
+        valid_at: NaiveDate,
+        seed: u64,
+    ) {
+        let point = session.snapshot();
+        let full = reference.support_snapshot().unwrap();
+        let date_text = valid_at.format("%Y-%m-%d").to_string();
+        assert_eq!(point.valid_at, date_text);
+
+        for proposition_id in reference.propositions.keys() {
+            assert_eq!(
+                point.supported_propositions.contains(proposition_id),
+                full.is_supported_at(proposition_id, &date_text).unwrap(),
+                "seed {seed}: incremental proposition mismatch for {proposition_id}"
+            );
+        }
+
+        let mut expected_active = BTreeSet::new();
+        let mut expected_counts = BTreeMap::new();
+        for proposition_id in reference.propositions.keys() {
+            let count = reference.justifications.values().filter(|justification| {
+                if justification.proposition_id != *proposition_id {
+                    return false;
+                }
+                full.justification_intervals
+                    .get(&justification.justification_id)
+                    .is_some_and(|intervals| {
+                        intervals.iter().any(|interval| interval_covers(interval, valid_at))
+                    })
+            }).count();
+            expected_counts.insert(proposition_id.clone(), count);
+        }
+        for (justification_id, intervals) in &full.justification_intervals {
+            if intervals.iter().any(|interval| interval_covers(interval, valid_at)) {
+                expected_active.insert(justification_id.clone());
+            }
+        }
+
+        assert_eq!(
+            point.active_justifications,
+            expected_active,
+            "seed {seed}: active justification mismatch"
+        );
+        assert_eq!(
+            point.active_justification_counts,
+            expected_counts,
+            "seed {seed}: support counts mismatch"
+        );
+        assert_eq!(
+            session.graph().state_sha256().unwrap(),
+            reference.state_sha256().unwrap(),
+            "seed {seed}: incremental and reference ledgers diverged"
+        );
+        assert_eq!(
+            point.supported_propositions,
+            oracle_supported_on_date(reference, valid_at),
+            "seed {seed}: incremental state disagrees with independent date oracle"
+        );
+    }
+
+    #[test]
+    fn incremental_sessions_match_full_recomputation_after_generated_deletions() {
+        const SOURCE_COUNT: usize = 10;
+        const PROPOSITION_COUNT: usize = 24;
+        let query_date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+
+        for seed in 101_u64..=124 {
+            let mut rng = seed;
+            let mut reference = SupportGraph::default();
+
+            for index in 0..SOURCE_COUNT {
+                let start = (next_random(&mut rng) >> 32) % 8;
+                let end = start + 12 + ((next_random(&mut rng) >> 32) % 12);
+                reference
+                    .register_source_event(
+                        format!("S{index:02}"),
+                        interval(&offset_date(start as i64), Some(&offset_date(end as i64))),
+                    )
+                    .unwrap();
+            }
+
+            for index in 0..PROPOSITION_COUNT {
+                reference
+                    .register_proposition(proposition(
+                        &format!("Q{index:02}"),
+                        "generated",
+                        "status",
+                        if index % 4 == 0 { "false" } else { "true" },
+                    ))
+                    .unwrap();
+            }
+
+            for index in 0..PROPOSITION_COUNT {
+                for alternative in 0..3 {
+                    let source_index = ((next_random(&mut rng) >> 32) as usize) % SOURCE_COUNT;
+                    let start = ((next_random(&mut rng) >> 32) % 8) as i64;
+                    let end = start + 18 + ((next_random(&mut rng) >> 32) % 8) as i64;
+                    let mut dependencies = BTreeSet::new();
+                    dependencies.insert(SupportDependency::SourceEvent(format!("S{source_index:02}")));
+                    if index > 0 && next_random(&mut rng) % 4 == 0 {
+                        let parent = ((next_random(&mut rng) >> 32) as usize) % index;
+                        dependencies.insert(SupportDependency::Proposition(format!("Q{parent:02}")));
+                    }
+
+                    let mut item = justification(
+                        &format!("K{index:02}-{alternative}"),
+                        &format!("Q{index:02}"),
+                        &offset_date(start),
+                        Some(&offset_date(end)),
+                        dependencies,
+                    );
+                    item.rule_id = if index % 2 == 0 { "policy-a" } else { "policy-b" }.into();
+                    item.rule_version = if alternative == 0 { "v1" } else { "v2" }.into();
+                    reference.add_justification(item).unwrap();
+                }
+            }
+
+            let mut incremental =
+                IncrementalSupportSession::new(&reference, "2026-01-15").unwrap();
+            assert_session_matches_full_recomputation(
+                &incremental,
+                &reference,
+                query_date,
+                seed,
+            );
+
+            for event_index in [seed as usize % SOURCE_COUNT, (seed as usize + 4) % SOURCE_COUNT] {
+                let event_id = format!("S{event_index:02}");
+                incremental.retract_source_event(&event_id).unwrap();
+                reference.retract_source_event(&event_id).unwrap();
+                assert_session_matches_full_recomputation(
+                    &incremental,
+                    &reference,
+                    query_date,
+                    seed,
+                );
+            }
+
+            incremental.invalidate_rule_version("policy-a", "v1").unwrap();
+            reference.invalidate_rule_version("policy-a", "v1").unwrap();
+            assert_session_matches_full_recomputation(
+                &incremental,
+                &reference,
+                query_date,
+                seed,
+            );
+        }
+    }
+
+    #[test]
+    fn losing_one_alternative_proof_does_not_recompute_downstream_propositions() {
+        let mut graph = SupportGraph::default();
+        source(&mut graph, "E1", "2026-01-01", None);
+        source(&mut graph, "E2", "2026-01-01", None);
+        graph.register_proposition(proposition("P", "x", "ready", "true")).unwrap();
+        graph.register_proposition(proposition("Q", "x", "release", "true")).unwrap();
+        graph.add_justification(justification(
+            "J1", "P", "2026-01-01", None,
+            [SupportDependency::SourceEvent("E1".into())],
+        )).unwrap();
+        graph.add_justification(justification(
+            "J2", "P", "2026-01-01", None,
+            [SupportDependency::SourceEvent("E2".into())],
+        )).unwrap();
+        graph.add_justification(justification(
+            "J3", "Q", "2026-01-01", None,
+            [SupportDependency::Proposition("P".into())],
+        )).unwrap();
+
+        let mut session = IncrementalSupportSession::new(&graph, "2026-01-15").unwrap();
+        session.reset_metrics();
+        let mutation = session.retract_source_event("E1").unwrap();
+        assert!(mutation.affected_propositions.is_empty());
+        assert_eq!(mutation.affected_justifications, vec!["J1"]);
+        assert_eq!(session.metrics().proposition_recomputations, 1);
+        assert_eq!(session.metrics().justification_evaluations, 2);
+        assert!(session.snapshot().supported_propositions.contains("P"));
+        assert!(session.snapshot().supported_propositions.contains("Q"));
+
+        session.reset_metrics();
+        let mutation = session.retract_source_event("E2").unwrap();
+        assert_eq!(mutation.affected_propositions, vec!["P", "Q"]);
+        assert_eq!(session.metrics().proposition_recomputations, 2);
+        assert_eq!(session.metrics().justification_evaluations, 3);
+        assert!(session.snapshot().supported_propositions.is_empty());
+    }
+
+    #[test]
+    fn retracting_an_unreferenced_source_performs_no_proposition_work() {
+        let mut graph = SupportGraph::default();
+        source(&mut graph, "E-used", "2026-01-01", None);
+        source(&mut graph, "E-unused", "2026-01-01", None);
+        graph.register_proposition(proposition("P", "x", "ready", "true")).unwrap();
+        graph.add_justification(justification(
+            "J1", "P", "2026-01-01", None,
+            [SupportDependency::SourceEvent("E-used".into())],
+        )).unwrap();
+
+        let mut session = IncrementalSupportSession::new(&graph, "2026-01-15").unwrap();
+        session.reset_metrics();
+        let mutation = session.retract_source_event("E-unused").unwrap();
+        assert_eq!(mutation, SupportMutation::default());
+        assert_eq!(session.metrics(), SupportWorkMetrics::default());
+        assert!(session.snapshot().supported_propositions.contains("P"));
+    }
+
 }
