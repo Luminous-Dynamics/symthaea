@@ -68,4 +68,4 @@ These are source-level assertions, not executed benchmark results.
 
 ## Validation boundary
 
-Four Rust tests are authored. They have not been compiled or executed in this environment. No CI pass, FluidSynth result, measured runtime speedup, confidence interval, or superiority over external systems is claimed. The evaluator's exact replay is limited to synthetic factorial scenes with 2–8 source events.
+Five Rust tests are authored. They have not been compiled or executed in this environment. No CI pass, FluidSynth result, measured runtime speedup, confidence interval, or superiority over external systems is claimed. The evaluator's exact replay is limited to synthetic factorial scenes with 2–8 source events.
