@@ -368,6 +368,7 @@ pub struct JudgeFactorialReportFieldsV1 {
     pub schema: String,
     pub study_id: String,
     pub analyzer_source_revision: String,
+    pub analyzer_worktree_clean: bool,
     pub balanced_repeat_count: u64,
     pub excluded_incomplete_repeat_count: u64,
     pub effects_use_only_fully_completed_repeats: bool,
@@ -468,6 +469,9 @@ pub fn validate_judge_factorial_plan_fields(
         || fields.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
     {
         issues.push("analyzer_source_revision must match the exact compiled validator revision".to_owned());
+    }
+    if fields.purpose.qualified() && crate::BUILT_GENERATOR_WORKTREE_CLEAN != "true" {
+        issues.push("qualified factorial plans require a clean analyzer worktree".to_owned());
     }
     if !nonempty(&fields.study_id, 128) {
         issues.push("study_id must be non-empty and at most 128 bytes".to_owned());
@@ -1033,6 +1037,7 @@ pub fn analyze_judge_factorial(
         schema: FACTORIAL_REPORT_SCHEMA.to_owned(),
         study_id: plan.study_id,
         analyzer_source_revision: plan.analyzer_source_revision,
+        analyzer_worktree_clean: crate::BUILT_GENERATOR_WORKTREE_CLEAN == "true",
         balanced_repeat_count,
         excluded_incomplete_repeat_count,
         effects_use_only_fully_completed_repeats: true,
