@@ -1549,10 +1549,11 @@ impl BinaryCausalModel {
             .collect::<Vec<_>>();
         let eliminate_posterior = (0..posterior_variable_count).collect::<Vec<_>>();
 
-        // Scaling each posterior likelihood factor by a positive scalar does
-        // not change q(B|observed), but prevents product underflow. The target
-        // factor added below remains unscaled because its absolute likelihood
-        // contributes to the Eq. 4 cause factor.
+        // Keep every posterior likelihood in log space. Products become
+        // additions and every eliminated variable uses log-sum-exp, so no
+        // per-factor scale constants or direct joint-probability products are
+        // needed. The target factor is also unscaled in log space; its absolute
+        // likelihood contributes to the Eq. 4 cause factor.
         let posterior_factors = (0..self.n_units)
             .map(|target| {
                 self.observation_log_factor_iit4(target, current_state, &x_map)
