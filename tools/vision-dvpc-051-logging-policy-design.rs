@@ -658,6 +658,26 @@ mod tests {
     }
 
     #[test]
+    fn wider_reward_envelopes_never_reduce_the_fixed_logger_second_moment_bound() {
+        let policy_set = policies(PortfolioRegime::Balanced, 8);
+        let logger = Logger { p1: [0.43, 0.61] };
+        let mut previous = 0.0_f64;
+        for scale in REWARD_ENVELOPE_SCALES {
+            let envelope = scaled_reward_envelope(scale).unwrap();
+            validate_reward_envelope(envelope, frozen_reward_mean_table()).unwrap();
+            let current = worst_reward_envelope_second_moment_with(
+                &policy_set,
+                logger,
+                envelope,
+            ).1;
+            assert!(current + EPS >= previous, "scale={scale}, current={current}, previous={previous}");
+            previous = current;
+        }
+        assert!(scaled_reward_envelope(0.99).is_err());
+        assert!(scaled_reward_envelope(f64::NAN).is_err());
+    }
+
+    #[test]
     fn weight_only_minimax_can_worsen_reward_weighted_variance() {
         let policy_set = policies(PortfolioRegime::Balanced, 8);
         let uniform = Logger { p1: [0.5, 0.5] };
