@@ -395,6 +395,14 @@ pub fn proxy_ranked_candidate_pool(
         ));
     }
     for (index, candidate) in candidates.iter().enumerate() {
+        if candidate.proxy_scores.contains_key(target_metric_id)
+            || candidate.proxy_times_seconds.contains_key(target_metric_id)
+        {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}]"),
+                "target metric cannot appear in a target-free initial pool feature table",
+            ));
+        }
         let Some(score) = candidate.proxy_scores.get(proxy_id) else {
             return Err(TrajectorySearchError::new(
                 format!("candidates[{index}].proxy_scores"),
@@ -405,6 +413,18 @@ pub fn proxy_ranked_candidate_pool(
             return Err(TrajectorySearchError::new(
                 format!("candidates[{index}].proxy_scores.{proxy_id}"),
                 "proxy score must be finite",
+            ));
+        }
+        let Some(runtime) = candidate.proxy_times_seconds.get(proxy_id) else {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].proxy_times_seconds"),
+                format!("missing runtime for proxy {proxy_id:?}"),
+            ));
+        };
+        if !runtime.is_finite() || *runtime < 0.0 {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].proxy_times_seconds.{proxy_id}"),
+                "proxy runtime must be finite and non-negative",
             ));
         }
     }
@@ -1322,6 +1342,30 @@ mod tests {
         assert!(proxy_ranked_candidate_pool(
             &candidates,
             "validation_accuracy",
+            "validation_accuracy",
+            ProxyDirection::Maximize,
+            3,
+        ).is_err());
+    }
+
+    #[test]
+    fn proxy_ranked_pool_rejects_target_metric_and_missing_runtime() {
+        let mut candidates = binary_catalog();
+        candidates[0].proxy_scores.insert("validation_accuracy".into(), 1.0);
+        candidates[0].proxy_times_seconds.insert("validation_accuracy".into(), 0.0);
+        assert!(proxy_ranked_candidate_pool(
+            &candidates,
+            "landscape",
+            "validation_accuracy",
+            ProxyDirection::Maximize,
+            3,
+        ).is_err());
+
+        let mut candidates = binary_catalog();
+        candidates[0].proxy_times_seconds.clear();
+        assert!(proxy_ranked_candidate_pool(
+            &candidates,
+            "landscape",
             "validation_accuracy",
             ProxyDirection::Maximize,
             3,
