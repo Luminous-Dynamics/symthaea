@@ -374,6 +374,8 @@ pub struct SelectedProof {
     pub justification_id: String,
     /// Conjunctive dependency edges carried in the packet, not inferred later.
     pub evidence_dependencies: Vec<String>,
+    /// Exact pinned-renderer token overhead for this conclusion and proof edges.
+    pub selection_overhead_tokens: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -420,6 +422,7 @@ struct ProofPacketPayload<'a> {
     tokenizer_sha256: &'a str,
     packet_renderer_sha256: &'a str,
     fixed_packet_overhead_tokens: u64,
+    token_budget: u64,
     selected_proofs: &'a [SelectedProof],
     evidence: &'a [ProofPacketEvidenceRef],
     total_token_cost: u64,
@@ -592,6 +595,7 @@ impl<'a> ExactSearch<'a> {
                 conclusion_id: conclusion_id.clone(),
                 justification_id: alternative.justification_id.clone(),
                 evidence_dependencies: alternative.evidence_dependencies.clone(),
+                selection_overhead_tokens: self.request.obligations[obligation_index].selection_overhead_tokens,
             });
             let Some(next_cost) = self.cost_of_plan(&next_evidence, &next_proofs) else {
                 self.arithmetic_error = true;
@@ -751,6 +755,7 @@ pub fn solve_proof_budget(
         tokenizer_sha256: &request.tokenizer_sha256,
         packet_renderer_sha256: &request.packet_renderer_sha256,
         fixed_packet_overhead_tokens: request.fixed_packet_overhead_tokens,
+        token_budget: request.token_budget,
         selected_proofs: &plan.selected_proofs,
         evidence: &evidence,
         total_token_cost: plan.total_token_cost,
@@ -820,6 +825,12 @@ pub fn verify_proof_packet(
         if selected.evidence_dependencies != justification.evidence_dependencies {
             return Err(format!(
                 "selected proof {:?} does not carry its exact conjunctive dependency edges",
+                selected.justification_id
+            ));
+        }
+        if selected.selection_overhead_tokens != obligation.selection_overhead_tokens {
+            return Err(format!(
+                "selected proof {:?} has incorrect rendered-envelope token overhead",
                 selected.justification_id
             ));
         }
@@ -916,6 +927,7 @@ pub fn verify_proof_packet(
         tokenizer_sha256: &request.tokenizer_sha256,
         packet_renderer_sha256: &request.packet_renderer_sha256,
         fixed_packet_overhead_tokens: request.fixed_packet_overhead_tokens,
+        token_budget: request.token_budget,
         selected_proofs: &result.selected_proofs,
         evidence: &result.evidence,
         total_token_cost,
@@ -1362,6 +1374,7 @@ mod tests {
             conclusion_id: "claim-1".into(),
             justification_id: "proof-valid-but-costlier".into(),
             evidence_dependencies: vec!["B-valid".into()],
+            selection_overhead_tokens: 0,
         }];
         non_minimal.evidence = vec![ProofPacketEvidenceRef {
             evidence_id: candidate.evidence_id.clone(),
