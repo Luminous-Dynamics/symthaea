@@ -1,17 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! A small, explicit causal-model substrate and bounded IIT 4.0 (2023) system-search core.
+//! A causal-model substrate, bounded IIT 4.0 (2023) system-search core, and exact factor-graph kernel.
 //!
 //! # Scope
 //!
-//! The crate validates a dense, binary, factored transition-probability model,
-//! implements repertoire/GID primitives, exact-quotiented directed system cuts,
-//! specified-state selection, and an exhaustive Integration-level system phi_s
-//! search for the full substrate under IIT 4.0 (2023). Proper-subsystem Eq. 3/Eq. 4
-//! background marginalization, Composition-level big-Phi tie resolution, the
-//! complete cause-effect structure, and the IIT 4.0 (2026) intrinsic-information
-//! cap remain unimplemented. Unsupported proper-subsystem system scoring fails
-//! closed. No output is a consciousness determination.
+//! The crate validates a dense binary factored TPM; implements repertoire/GID
+//! primitives, directed system cuts, specified-state selection, and bounded
+//! Integration-level system \u{03c6}s searches under IIT 4.0 (2023), including
+//! embedded proper subsystems with Eq. 3/Eq. 4 background handling. Composition-level
+//! big-Phi tie resolution, the complete cause-effect structure, and the IIT 4.0
+//! (2026) intrinsic-information cap remain unimplemented. A separate binary
+//! factor-graph module provides exact bounded min-fill sum-product elimination;
+//! it is not yet wired into the dense IIT scorer. No output is a consciousness
+//! determination.
 //!
 //! # Model contract
 //!
@@ -35,6 +36,11 @@
 
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+
+mod factor_graph;
+pub use factor_graph::{
+    min_fill_sum_product, BinaryFactor, FactorEliminationReport, FactorGraphError,
+};
 
 /// Maximum dense binary units accepted by this in-memory v0.1 representation.
 ///
