@@ -2779,8 +2779,9 @@ fn fluidsynth_candidate_wav(
             "spec": spec,
             "state": state,
         })).ok()?;
+        let render_id = format!("muse-fluid-{}", unique_temp_suffix());
         let receipt = RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
-            render_id: format!("muse-fluid-{}", unique_temp_suffix()),
+            render_id: &render_id,
             backend: RendererBackend::FluidSynth,
             score_bytes: &score_bytes,
             render_config_bytes: &render_config_bytes,
