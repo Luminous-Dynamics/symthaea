@@ -21,6 +21,10 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | SciValidityBench | Decision-use validity | +9.2 to +18.8 pp vs generic event graph | Primary paper | 64 TaskSpecs, 5 validity modules, 6 scientific domains |
 | Vera-Life | Vera-Life-Eval | 62.3% LifeEM (1,500 subset); 61.1% full | Peer-reviewed workshop paper | Qwen3-8B; action-conditioned lifecycle decisions; 8,500 questions / 41,203 evidence pieces |
 | AgentMemory BM25 | LongMemEval-S | 84.7% strict recall-all@5 (398/470) | Project component report with per-question receipts | Retrieval only; no answer model, no abstention score; multi-session strict recall 71.1% |
+| past.dev | BEAM | 92.08% / 89.63% / 90.65% / 85.03% at 100K / 500K / 1M / 10M | Vendor self-report / published leaderboard | 10M multi-session reasoning 28.17% (20 questions); 10M overall 85.03% (200 questions, 10 conversations) |
+| Exabase M-1 | BEAM | 76.9% / 75.0% / 68.0% at 100K / 1M / 10M | Vendor-published result aggregated by leaderboard | 500K not published; separate vendor run, not common harness |
+| Hindsight | BEAM | 86.2% / 80.1% / 79.1% / 64.1% at 100K / 500K / 1M / 10M | Vendor-published result aggregated by leaderboard | Separate vendor run; model/judge/configuration differ |
+| Mem0 Platform | BEAM | 64.1% at 1M; 48.6% at 10M | Vendor self-report | Managed platform; top-200 retrieval budget; separate run |
 | HALT | Three multi-hop QA benchmarks | Redundant search reduced; exact match largely preserved | Peer-reviewed Findings paper | Stops on expected claim-evidence coverage; no percentage pooled here |
 | Active RAG utility evaluation | Multi-hop QA / HotpotQA | Nominal 50% retrieval budget overshot in 40–100% of splits for common triggers | Primary research preprint | Measures marginal correctness change, threshold transfer, realized budget, retrieval harm and all-in cost |
 | Cost-aware additional-retrieval router | QASPER | 78.70% evidence Hit@10; 24.5% routed to hybrid retrieval | 27 Oct 2026 preprint | 188 questions / 60 held-out articles; paired bootstrap does not establish reliable utility advantage; answer-level review provisional |
@@ -60,6 +64,41 @@ A result may be called a direct comparison only when it matches:
 
 Store paired per-question results, confidence intervals and raw receipts. Do not tune on held-out splits. Do not conflate evidence recall with answer accuracy, nor combine LoCoMo, LongMemEval and LongMemEval-V2.
 
+
+
+
+## Beyond LongMemEval: BEAM tests long-horizon multi-session memory
+
+BEAM (ICLR 2026) contains 100 generated conversations and 2,000 validated questions across history sizes from 100K to 10M tokens. It exercises ten abilities: abstention, contradiction resolution, event ordering, information extraction, instruction following, knowledge update, multi-session reasoning, preference following, summarization and temporal reasoning. This is a more demanding scale-and-ability target than a single aggregate LongMemEval score.
+
+### Published BEAM provider results
+
+| Provider | 100K | 500K | 1M | 10M |
+|---|---:|---:|---:|---:|
+| past.dev | 92.08% | 89.63% | 90.65% | 85.03% |
+| Hindsight | 86.2% | 80.1% | 79.1% | 64.1% |
+| Exabase M-1 | 76.9% | Not published | 75.0% | 68.0% |
+| Mem0 Platform | Not published | Not published | 64.1% | 48.6% |
+| Honcho | 63.0% | 64.9% | 63.1% | 40.6% |
+
+**These are not common-harness head-to-head results.** The BEAM comparison page aggregates separately published provider runs; reader models, judges and configurations differ. Treat the table as a published industry landscape, not a controlled ranking. The past.dev values above are from its 29 September 2026 run; its comparison page describes competitor values as public results published by 2 October 2026.
+
+### The diagnostic gap: multi-session reasoning at 10M
+
+The past.dev 10M run reports 85.03% overall across 200 questions and 10 conversations, but only **28.17% multi-session reasoning** across 20 questions. On the same 10M slice it reports 100% abstention and event ordering, 73.13% contradiction resolution, 92.5% knowledge update and 93.75% temporal reasoning. The aggregate therefore conceals a severe cross-session integration weakness. The small per-ability sample sizes (20 questions at 10M) mean these values are diagnostics, not precise population estimates.
+
+The BEAM paper introduces LIGHT, an episodic memory + working memory + scratchpad architecture, and reports 3.5–12.69 percentage-point gains over its strongest baselines depending on backbone. Broca should compete on the same task families, not dismiss this as simply an index-size problem.
+
+### Broca's BEAM programme
+
+1. **Cross-session evidence closure:** express each question as explicit required claim IDs; retrieve source revisions from multiple sessions; prove complete coverage before answering. Target strict recall-all@k and proof coverage separately.
+2. **Event-time / knowledge-time replay:** evaluate what was true at valid_at and what the system knew at known_at; score retroactive correction, delayed updates, retractions and source supersession independently.
+3. **Multi-session contradiction graph:** retain competing source-family IDs, temporal edges and claim-level conflict sets. Report contradiction precision/recall and false conflict suppression, not merely answer exact match.
+4. **Episodic-to-working-memory compression:** retrieve only the evidence required for outstanding claims; quantify what information is omitted, proof coverage retained, packet token cost and query latency. This is the fair comparison to LIGHT-style working memory/scratchpad mechanisms.
+5. **Action faithfulness:** score ANSWER / WARN_STALE / EXPLAIN_CONFLICT / RETRIEVE_MORE / ABSTAIN per question. Report stale/contradiction/multi-hop subtotals, not just aggregate accuracy.
+6. **Scale curve:** rerun the exact official 100K, 500K, 1M and 10M slices; add 20M/50M as clearly labelled Broca stress tests, never mix them into official BEAM scores.
+
+**Prospective targets, not results:** replicate the official BEAM split and score protocol first; then target at least 85% aggregate at 10M with a substantial multi-session improvement over the published 28.17% diagnostic baseline, while keeping answerable abstention, stale-use and contradiction errors near zero under the matching action rubric. A credible release gate should require a pre-registered multi-session threshold (for example ≥70% on the same official 10M ability split), zero invalid proof certificates in deterministic conformance tests, and no statistically significant loss in other ability slices. The 70% target is an engineering ambition, not a published competitor result.
 
 ## Lifecycle faithfulness: a first-class benchmark axis
 
@@ -145,6 +184,8 @@ The comparison must hold generator, reader prompt, memory corpus, proof checker,
 - AgentAbstain, NeurIPS 2026 Evaluations & Datasets Track: https://agentabstain.github.io/
 - Evidence Sufficiency Benchmark, *Do LLMs Know When Evidence is Insufficient?* (13 August 2026): https://doi.org/10.32604/cmc.2026.086343
 - AgentMemory 0.9.31 BM25 LongMemEval-S component report (28 October 2026): https://www.agent-memory.dev/benchmarks
+- BEAM official ICLR 2026 paper: https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html
+- BEAM provider comparison and ability breakdown (past.dev, 29 September / retrieved 2 October 2026): https://www.past.dev/benchmarks/beam
 
 - QEMem, *From Relevant Memories to Sufficient Evidence* (15 October 2026): https://arxiv.org/abs/2610.22668
 - Zep research and vendor methodology: https://www.getzep.com/research/
