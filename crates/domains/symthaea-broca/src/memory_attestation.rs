@@ -21,6 +21,10 @@ const POLICY_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/AUTHORITY-POLICY/V1";
 const POLICY_INGESTION_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/POLICY-INGESTION-RECEIPT/V1";
 const EVENT_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/LEDGER-EVENT/V1";
 const INGESTION_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/INGESTION-RECEIPT/V1";
+const ROLE_SCOPE_POLICY_SCHEMA_V1: &str = "BROCA-ROLE-SCOPE-POLICY-V1";
+const ROLE_SCOPE_POLICY_DOMAIN: &str = "LUMINOUS-DYNAMICS/BROCA/ROLE-SCOPE-POLICY/V1";
+const ROLE_SCOPE_INGESTION_DOMAIN: &str =
+    "LUMINOUS-DYNAMICS/BROCA/ROLE-SCOPE-POLICY-INGESTION-RECEIPT/V1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -124,6 +128,238 @@ impl VerifiedLedgerBatch {
 
     pub fn into_ledger(self) -> Result<PolicyPinnedLedger, String> {
         PolicyPinnedLedger::from_verified(self)
+    }
+}
+
+
+/// Signed role-to-scope access policy. This is separate from source-authority
+/// policy: an agent role is the principal, and each readable scope is an
+/// explicitly granted resource namespace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleScopePolicyDocument {
+    pub policy_version: u64,
+    /// Must equal signed_at. Trusted activation time is the ingress receipt.
+    pub recorded_at: String,
+    /// Mandatory exclusive expiry; a role grant cannot be timeless.
+    pub valid_until: String,
+    pub readable_scopes: BTreeMap<String, BTreeSet<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignedRoleScopePolicy {
+    pub schema_version: String,
+    pub signer_key_id: String,
+    pub signed_at: String,
+    pub policy: RoleScopePolicyDocument,
+    pub signature_hex: String,
+    pub ingestion_receipt: Option<RoleScopePolicyIngestionReceipt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleScopePolicyIngestionReceipt {
+    pub schema_version: String,
+    pub ingester_key_id: String,
+    /// Trusted receiver time, assigned at policy acceptance.
+    pub accepted_at: String,
+    pub signature_hex: String,
+}
+
+#[derive(Serialize)]
+struct RoleScopePolicySigningPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    signer_key_id: String,
+    signed_at: String,
+    policy: RoleScopePolicyDocument,
+}
+
+#[derive(Serialize)]
+struct RoleScopePolicyIngestionPayload {
+    domain: &'static str,
+    schema_version: &'static str,
+    ingester_key_id: String,
+    accepted_at: String,
+    policy_version: u64,
+    policy_signer_key_id: String,
+    policy_signature_sha256: String,
+}
+
+/// Unforgeable result of signature, signer-role, ingress-receipt, grant-shape,
+/// validity-window, and anti-rollback checks. Fields are private so callers
+/// cannot turn an unsigned map into an authenticated authorization policy.
+#[derive(Debug, Clone)]
+pub struct VerifiedRoleScopePolicy {
+    policy_version: u64,
+    accepted_at: String,
+    not_before_unix_ms: u64,
+    valid_until_unix_ms: u64,
+    policy_sha256: String,
+    readable_scopes: BTreeMap<String, BTreeSet<String>>,
+}
+
+impl VerifiedRoleScopePolicy {
+    pub fn policy_version(&self) -> u64 {
+        self.policy_version
+    }
+
+    pub fn accepted_at(&self) -> &str {
+        &self.accepted_at
+    }
+
+    pub fn not_before_unix_ms(&self) -> u64 {
+        self.not_before_unix_ms
+    }
+
+    pub fn valid_until_unix_ms(&self) -> u64 {
+        self.valid_until_unix_ms
+    }
+
+    pub fn policy_sha256(&self) -> &str {
+        &self.policy_sha256
+    }
+
+    pub fn readable_scopes(&self) -> &BTreeMap<String, BTreeSet<String>> {
+        &self.readable_scopes
+    }
+}
+
+fn role_scope_policy_for_signing(
+    policy: &RoleScopePolicyDocument,
+) -> Result<RoleScopePolicyDocument, String> {
+    let mut normalized = policy.clone();
+    normalized.recorded_at = normalize_time(&normalized.recorded_at, "role policy.recorded_at")?;
+    normalized.valid_until = normalize_time(&normalized.valid_until, "role policy.valid_until")?;
+    if normalized.policy_version == 0 {
+        return Err("role-scope policy version must be positive".into());
+    }
+    let recorded_at = parse_utc(&normalized.recorded_at, "role policy.recorded_at")?;
+    let valid_until = parse_utc(&normalized.valid_until, "role policy.valid_until")?;
+    if valid_until <= recorded_at {
+        return Err("role-scope policy valid_until must be after recorded_at".into());
+    }
+    if normalized.readable_scopes.is_empty() {
+        return Err("role-scope policy must contain at least one role".into());
+    }
+    for (role_id, scopes) in &normalized.readable_scopes {
+        if role_id.trim().is_empty() || role_id.trim() != role_id {
+            return Err("role ID must be non-empty and trimmed".into());
+        }
+        if scopes.is_empty() {
+            return Err(format!("role {role_id:?} must have at least one readable scope"));
+        }
+        for scope in scopes {
+            if scope.trim().is_empty() || scope.trim() != scope {
+                return Err(format!("role {role_id:?} has an empty or untrimmed scope"));
+            }
+            if scope == "*" {
+                return Err("wildcard scope grants are not supported".into());
+            }
+        }
+    }
+    Ok(normalized)
+}
+
+fn role_scope_policy_payload_bytes(
+    schema_version: &str,
+    signer_key_id: &str,
+    signed_at: &str,
+    policy: &RoleScopePolicyDocument,
+) -> Result<Vec<u8>, String> {
+    if schema_version != ROLE_SCOPE_POLICY_SCHEMA_V1 {
+        return Err("unsupported role-scope policy schema".into());
+    }
+    if signer_key_id.trim().is_empty() {
+        return Err("role-scope policy signer_key_id must not be empty".into());
+    }
+    let signed_at = normalize_time(signed_at, "role policy signed_at")?;
+    let policy = role_scope_policy_for_signing(policy)?;
+    if signed_at != policy.recorded_at {
+        return Err("role policy signed_at must equal policy.recorded_at".into());
+    }
+    serde_json::to_vec(&RoleScopePolicySigningPayload {
+        domain: ROLE_SCOPE_POLICY_DOMAIN,
+        schema_version: ROLE_SCOPE_POLICY_SCHEMA_V1,
+        signer_key_id: signer_key_id.to_owned(),
+        signed_at,
+        policy,
+    })
+    .map_err(|error| format!("cannot canonicalize role-scope policy: {error}"))
+}
+
+impl SignedRoleScopePolicy {
+    pub fn sign(
+        signer_key_id: impl Into<String>,
+        policy: RoleScopePolicyDocument,
+        signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let signer_key_id = signer_key_id.into();
+        let policy = role_scope_policy_for_signing(&policy)?;
+        let signed_at = policy.recorded_at.clone();
+        let schema_version = ROLE_SCOPE_POLICY_SCHEMA_V1.to_owned();
+        let bytes = role_scope_policy_payload_bytes(
+            &schema_version,
+            &signer_key_id,
+            &signed_at,
+            &policy,
+        )?;
+        let signature = signing_key.sign(&bytes);
+        Ok(Self {
+            schema_version,
+            signer_key_id,
+            signed_at,
+            policy,
+            signature_hex: hex::encode(signature.to_bytes()),
+            ingestion_receipt: None,
+        })
+    }
+
+    /// Attach a second, independently provisioned receipt that anchors the
+    /// policy to trusted acceptance time. The policy signer cannot self-issue
+    /// this receipt because the trust store requires distinct key material.
+    pub fn with_ingestion_receipt(
+        mut self,
+        ingester_key_id: impl Into<String>,
+        accepted_at: impl Into<String>,
+        ingestion_signing_key: &SigningKey,
+    ) -> Result<Self, String> {
+        let ingester_key_id = ingester_key_id.into();
+        let accepted_at = normalize_time(&accepted_at.into(), "role policy receipt.accepted_at")?;
+        if ingester_key_id.trim().is_empty() {
+            return Err("role policy ingester_key_id must not be empty".into());
+        }
+        let signature_bytes = hex::decode(&self.signature_hex)
+            .map_err(|error| format!("invalid role policy signature hex: {error}"))?;
+        let payload = RoleScopePolicyIngestionPayload {
+            domain: ROLE_SCOPE_INGESTION_DOMAIN,
+            schema_version: ROLE_SCOPE_POLICY_SCHEMA_V1,
+            ingester_key_id: ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            policy_version: self.policy.policy_version,
+            policy_signer_key_id: self.signer_key_id.clone(),
+            policy_signature_sha256: format!("{:x}", Sha256::digest(signature_bytes)),
+        };
+        let bytes = serde_json::to_vec(&payload)
+            .map_err(|error| format!("cannot canonicalize role policy receipt: {error}"))?;
+        let signature = ingestion_signing_key.sign(&bytes);
+        self.ingestion_receipt = Some(RoleScopePolicyIngestionReceipt {
+            schema_version: ROLE_SCOPE_POLICY_SCHEMA_V1.to_owned(),
+            ingester_key_id,
+            accepted_at,
+            signature_hex: hex::encode(signature.to_bytes()),
+        });
+        Ok(self)
+    }
+
+    fn signing_bytes(&self) -> Result<Vec<u8>, String> {
+        role_scope_policy_payload_bytes(
+            &self.schema_version,
+            &self.signer_key_id,
+            &self.signed_at,
+            &self.policy,
+        )
     }
 }
 
@@ -579,6 +815,105 @@ impl EvidenceTrustStore {
         // timestamp from the policy's signed payload.
         policy.recorded_at = accepted_at;
         Ok(policy)
+    }
+
+    /// Verify an independently signed agent role-to-scope policy.
+    ///
+    /// minimum_policy_version_exclusive must be loaded from trusted,
+    /// rollback-resistant state. Supplying zero is suitable only for first
+    /// enrollment; a long-running worker must persist the last accepted
+    /// version and pass it on every reload.
+    pub fn verify_role_scope_policy(
+        &self,
+        envelope: &SignedRoleScopePolicy,
+        minimum_policy_version_exclusive: u64,
+    ) -> Result<VerifiedRoleScopePolicy, String> {
+        let signing_bytes = envelope.signing_bytes()?;
+        let receipt = envelope
+            .ingestion_receipt
+            .as_ref()
+            .ok_or_else(|| "role-scope policy lacks trusted-ingress receipt".to_string())?;
+        if receipt.schema_version != ROLE_SCOPE_POLICY_SCHEMA_V1 {
+            return Err("unsupported role-scope policy ingestion receipt schema".into());
+        }
+        let accepted_at = normalize_time(&receipt.accepted_at, "role policy receipt.accepted_at")?;
+        let accepted_time = parse_utc(&accepted_at, "role policy receipt.accepted_at")?;
+
+        let signer = self.signer_at(&envelope.signer_key_id, accepted_time)?;
+        if !signer.can_sign_policies {
+            return Err(format!(
+                "key {:?} lacks policy-signing role",
+                envelope.signer_key_id
+            ));
+        }
+        Self::verify_signature(signer, &envelope.signature_hex, &signing_bytes)?;
+
+        let ingester = self.signer_at(&receipt.ingester_key_id, parse_utc(
+            &accepted_at,
+            "role policy receipt.accepted_at",
+        )?)?;
+        if !ingester.can_sign_ingestion_receipts {
+            return Err(format!(
+                "key {:?} lacks ingestion-receipt signing role",
+                receipt.ingester_key_id
+            ));
+        }
+        let signature_bytes = hex::decode(&envelope.signature_hex)
+            .map_err(|error| format!("invalid role policy signature hex: {error}"))?;
+        let receipt_payload = RoleScopePolicyIngestionPayload {
+            domain: ROLE_SCOPE_INGESTION_DOMAIN,
+            schema_version: ROLE_SCOPE_POLICY_SCHEMA_V1,
+            ingester_key_id: receipt.ingester_key_id.clone(),
+            accepted_at: accepted_at.clone(),
+            policy_version: envelope.policy.policy_version,
+            policy_signer_key_id: envelope.signer_key_id.clone(),
+            policy_signature_sha256: format!("{:x}", Sha256::digest(signature_bytes)),
+        };
+        let receipt_bytes = serde_json::to_vec(&receipt_payload)
+            .map_err(|error| format!("cannot canonicalize role policy receipt: {error}"))?;
+        Self::verify_signature(ingester, &receipt.signature_hex, &receipt_bytes)?;
+
+        let policy = role_scope_policy_for_signing(&envelope.policy)?;
+        if policy.policy_version <= minimum_policy_version_exclusive {
+            return Err(format!(
+                "role-scope policy version {} is not newer than persisted version {}",
+                policy.policy_version,
+                minimum_policy_version_exclusive
+            ));
+        }
+        let accepted_time = parse_utc(&accepted_at, "role policy receipt.accepted_at")?;
+        let expiry = parse_utc(&policy.valid_until, "role policy.valid_until")?;
+        if expiry <= accepted_time {
+            return Err("role-scope policy was expired before trusted acceptance".into());
+        }
+        let not_before_unix_ms = u64::try_from(accepted_time.timestamp_millis())
+            .map_err(|_| "role-scope policy acceptance predates Unix epoch".to_string())?;
+        let valid_until_unix_ms = u64::try_from(expiry.timestamp_millis())
+            .map_err(|_| "role-scope policy expiry predates Unix epoch".to_string())?;
+
+        // Digest covers the complete signed envelope, including the independent
+        // ingress receipt, while canonicalizing order and RFC3339 timestamps.
+        let mut canonical_envelope = envelope.clone();
+        canonical_envelope.policy = policy.clone();
+        canonical_envelope.signed_at =
+            normalize_time(&canonical_envelope.signed_at, "role policy signed_at")?;
+        if let Some(canonical_receipt) = canonical_envelope.ingestion_receipt.as_mut() {
+            canonical_receipt.accepted_at = normalize_time(
+                &canonical_receipt.accepted_at,
+                "role policy receipt.accepted_at",
+            )?;
+        }
+        let canonical_bytes = serde_json::to_vec(&canonical_envelope)
+            .map_err(|error| format!("cannot serialize verified role-scope envelope: {error}"))?;
+
+        Ok(VerifiedRoleScopePolicy {
+            policy_version: policy.policy_version,
+            accepted_at,
+            not_before_unix_ms,
+            valid_until_unix_ms,
+            policy_sha256: format!("{:x}", Sha256::digest(canonical_bytes)),
+            readable_scopes: policy.readable_scopes,
+        })
     }
 
     pub fn verify_event(&self, envelope: &SignedLedgerEvent) -> Result<LedgerEvent, String> {
@@ -1172,4 +1507,119 @@ mod tests {
         let no_source = trust_config("event", None, &k, false, true, false, "2026-01-01T00:00:00Z", None);
         assert!(EvidenceTrustStore::new(vec![no_source]).unwrap_err().contains("must bind to a source"));
     }
+    fn role_policy(version: u64, recorded_at: &str, valid_until: &str) -> RoleScopePolicyDocument {
+        RoleScopePolicyDocument {
+            policy_version: version,
+            recorded_at: recorded_at.into(),
+            valid_until: valid_until.into(),
+            readable_scopes: BTreeMap::from([
+                ("security-agent".to_string(), BTreeSet::from(["security".to_string()])),
+                ("finance-agent".to_string(), BTreeSet::from(["finance".to_string(), "reports".to_string()])),
+            ]),
+        }
+    }
+
+    fn sign_role_policy(
+        policy: RoleScopePolicyDocument,
+        policy_key: &SigningKey,
+        accepted_at: &str,
+        ingestion_key: &SigningKey,
+    ) -> SignedRoleScopePolicy {
+        SignedRoleScopePolicy::sign("policy-root", policy, policy_key)
+            .unwrap()
+            .with_ingestion_receipt("ingest-root", accepted_at, ingestion_key)
+            .unwrap()
+    }
+
+    #[test]
+    fn verified_role_scope_policy_requires_policy_and_independent_ingress_signatures() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let signed = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        let verified = store.verify_role_scope_policy(&signed, 3).unwrap();
+        assert_eq!(verified.policy_version(), 4);
+        assert_eq!(verified.accepted_at(), "2026-01-02T00:00:00Z");
+        assert_eq!(verified.readable_scopes()["security-agent"], BTreeSet::from(["security".to_string()]));
+        assert_eq!(verified.policy_sha256().len(), 64);
+        assert!(verified.valid_until_unix_ms() > verified.not_before_unix_ms());
+    }
+
+    #[test]
+    fn role_scope_policy_rejects_rollback_and_expiry_before_activation() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let signed = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        assert!(store.verify_role_scope_policy(&signed, 4).unwrap_err().contains("not newer"));
+
+        let expired = sign_role_policy(
+            role_policy(5, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
+            &policy_key,
+            "2026-01-03T00:00:00Z",
+            &ingestion_key,
+        );
+        assert!(store.verify_role_scope_policy(&expired, 4).unwrap_err().contains("expired before trusted acceptance"));
+    }
+
+    #[test]
+    fn role_scope_policy_rejects_payload_and_receipt_tampering() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let mut changed_policy = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        changed_policy.policy.readable_scopes.get_mut("security-agent").unwrap().insert("finance".into());
+        assert!(store.verify_role_scope_policy(&changed_policy, 0).unwrap_err().contains("signature verification failed"));
+
+        let mut changed_receipt = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        changed_receipt.ingestion_receipt.as_mut().unwrap().accepted_at = "2026-01-04T00:00:00Z".into();
+        assert!(store.verify_role_scope_policy(&changed_receipt, 0).unwrap_err().contains("signature verification failed"));
+    }
+
+    #[test]
+    fn role_scope_policy_rejects_missing_ingress_receipt_and_wrong_signer_role() {
+        let (store, _, ops_key, ingestion_key) = store();
+        let unsigned = SignedRoleScopePolicy::sign(
+            "ops-key-1",
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &ops_key,
+        ).unwrap();
+        assert!(store.verify_role_scope_policy(&unsigned, 0).unwrap_err().contains("lacks trusted-ingress receipt"));
+
+        let wrong_role = SignedRoleScopePolicy::sign(
+            "ops-key-1",
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &ops_key,
+        ).unwrap().with_ingestion_receipt(
+            "ingest-root", "2026-01-02T00:00:00Z", &ingestion_key,
+        ).unwrap();
+        assert!(store.verify_role_scope_policy(&wrong_role, 0).unwrap_err().contains("lacks policy-signing role"));
+    }
+
+    #[test]
+    fn role_scope_policy_rejects_wildcard_and_ambiguous_grants() {
+        let (store, policy_key, _, _) = store();
+        let mut wildcard = role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
+        wildcard.readable_scopes.get_mut("security-agent").unwrap().insert("*".into());
+        assert!(SignedRoleScopePolicy::sign("policy-root", wildcard, &policy_key).unwrap_err().contains("wildcard"));
+        let mut empty = role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
+        empty.readable_scopes.insert("empty-agent".into(), BTreeSet::new());
+        assert!(SignedRoleScopePolicy::sign("policy-root", empty, &policy_key).unwrap_err().contains("at least one readable scope"));
+    }
+
+
 }
