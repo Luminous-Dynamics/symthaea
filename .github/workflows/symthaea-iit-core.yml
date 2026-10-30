@@ -61,5 +61,8 @@ jobs:
       - name: Benchmark sparse local-CPT Eq4 across growing substrates
         run: cargo run --locked -p symthaea-iit --example sparse_eq4_scale_sweep -- --repeats 3
 
+      - name: Benchmark sparse fixed-state partition scoring
+        run: cargo run --locked -p symthaea-iit --example sparse_partition_score_sweep -- --repeats 1
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings
