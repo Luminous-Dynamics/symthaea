@@ -525,3 +525,11 @@ Do not force one model to replace image segmentation, mesh decomposition, skelet
 7. **Human review interface:** adopt useful neuron-centric navigation patterns and log real interaction time, decisions, reversals, and cognitive load.
 
 No stage receives production write credentials. Only an accepted, independently validated correction may enter a reversible annotation branch. Every stage must have an independently tested contract and a kill condition.
+
+
+### Executable query-certificate consistency gate
+
+- [Certificate protocol](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE_V1.md)
+- [Schema](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json)
+- [Synthetic example](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json)
+- `connectome-query-cert-audit` validates cross-field state, dependency, digest, correction-order, and invalidation invariants. The expected synthetic result is `PASS` for a `CONDITIONAL` certificate; this is not biological evidence.
