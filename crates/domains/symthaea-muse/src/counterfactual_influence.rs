@@ -1439,7 +1439,7 @@ mod tests {
         cursor.into_inner()
     }
 
-    fn process_observation() -> RendererProcessObservation {
+    fn process_observation(render_id: &str) -> RendererProcessObservation {
         let executable = sha256_hex(b"fixture-fluidsynth-binary");
         let soundfont = sha256_hex(b"fixture-soundfont");
         RendererProcessObservation {
@@ -1454,6 +1454,13 @@ mod tests {
                 "0.8".into(),
                 "-T".into(),
                 "wav".into(),
+                "-F".into(),
+                format!("/tmp/{render_id}.wav"),
+                "-r".into(),
+                "48000".into(),
+                "-ni".into(),
+                "/fixture/soundfont.sf2".into(),
+                format!("/tmp/{render_id}.mid"),
             ],
             environment_sha256: sha256_hex(b"fixture-environment"),
             stdout_sha256: sha256_hex(b"FluidSynth fixture"),
@@ -1494,7 +1501,7 @@ mod tests {
         )
         .unwrap();
         let map_bytes = serde_json::to_vec(&map).unwrap();
-        let process = process_observation();
+        let process = process_observation(render_id);
         let executable = process.executable_sha256_after.clone();
         let soundfont = process.soundfont_sha256_after.clone();
         // Studio only includes this receipt field after full-score coverage
@@ -1637,6 +1644,29 @@ mod tests {
             )
             .unwrap_err(),
             CounterfactualInfluenceError::CalibrationReplayMismatch
+        );
+    }
+
+    #[test]
+    fn renderer_profile_normalizes_only_temporary_input_and_output_paths() {
+        let samples = vec![0.0f32; 128];
+        let midi = baseline_midi();
+        let first = build_render("first-temp-path", &midi, &samples);
+        let second = build_render("second-temp-path", &midi, &samples);
+        let first_evidence = verify_bound_render(&first, &samples, None);
+        let second_evidence = verify_bound_render(&second, &samples, None);
+
+        assert_ne!(
+            first_evidence.receipt_sha256(),
+            second_evidence.receipt_sha256()
+        );
+        assert_eq!(
+            first_evidence.renderer_identity_sha256(),
+            second_evidence.renderer_identity_sha256()
+        );
+        assert_eq!(
+            first_evidence.renderer_config_sha256(),
+            second_evidence.renderer_config_sha256()
         );
     }
 
