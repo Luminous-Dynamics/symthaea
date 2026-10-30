@@ -764,7 +764,7 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
     use std::io::Cursor;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::AtomicUsize;
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
@@ -811,7 +811,6 @@ mod tests {
         represented: PathBuf,
         exclusions: PathBuf,
         paths: PathBuf,
-        receipt_dir: PathBuf,
         receipt: PathBuf,
     }
 
@@ -842,7 +841,6 @@ mod tests {
                 represented: represented_path,
                 exclusions: exclusions_path,
                 paths: paths_path,
-                receipt_dir,
                 receipt,
             }
         }
