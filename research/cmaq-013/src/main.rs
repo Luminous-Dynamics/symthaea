@@ -98,7 +98,7 @@ fn normal(rng: &mut SplitMix64) -> f64 {
     (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct ActionSample {
     predicted: f64,
     actual: f64,
@@ -116,7 +116,7 @@ fn draw_action(rng: &mut SplitMix64, drift: f64) -> ActionSample {
     ActionSample { predicted, actual, nonconformity: predicted - actual }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Observation {
     selected: ActionSample,
     random_action: ActionSample,
@@ -258,8 +258,8 @@ fn evaluate_method(
             let covered = selected.actual >= lower_bound;
             let random_lower_bound = random.predicted - q;
             let random_is_covered = random.actual >= random_lower_bound;
-            selected_covered += usize::from(covered);
-            random_covered += usize::from(random_is_covered);
+            selected_covered += if covered { 1 } else { 0 };
+            random_covered += if random_is_covered { 1 } else { 0 };
             interval_width_sum += q;
 
             let take_action = lower_bound >= SAFE_VALUE_THRESHOLD;
@@ -462,27 +462,19 @@ mod tests {
     }
 
     #[test]
-    fn report_contains_all_scenario_width_method_cells() {
+    fn benchmark_has_all_cells_and_calibration_controls_are_measurable() {
         let cells = run_benchmark();
         assert_eq!(cells.len(), 9);
         assert!(cells.iter().all(|cell| cell.methods.len() == 6));
         assert!(cells.iter().all(|cell| cell.episode_count == 512));
-    }
 
-    #[test]
-    fn stationary_selected_split_is_near_nominal_coverage() {
-        let cells = run_benchmark();
-        let cell = cells.iter().find(|c| c.scenario == "stationary" && c.search_width == 32).unwrap();
-        let method = cell.methods.iter().find(|m| m.method == "selected_action_split_conformal").unwrap();
-        assert!(method.selected_action_coverage >= 0.86);
-        assert!(method.selected_action_coverage <= 0.96);
-    }
+        let stationary = cells.iter().find(|c| c.scenario == "stationary" && c.search_width == 32).unwrap();
+        let selected = stationary.methods.iter().find(|m| m.method == "selected_action_split_conformal").unwrap();
+        assert!(selected.selected_action_coverage >= 0.86);
+        assert!(selected.selected_action_coverage <= 0.96);
 
-    #[test]
-    fn oracle_selected_quantile_is_a_useful_upper_bound() {
-        let cells = run_benchmark();
-        let cell = cells.iter().find(|c| c.scenario == "abrupt_shift" && c.search_width == 128).unwrap();
-        let oracle = cell.methods.iter().find(|m| m.method == "oracle_selected_quantile").unwrap();
+        let shifted = cells.iter().find(|c| c.scenario == "abrupt_shift" && c.search_width == 128).unwrap();
+        let oracle = shifted.methods.iter().find(|m| m.method == "oracle_selected_quantile").unwrap();
         assert!(oracle.selected_action_coverage >= 0.88);
     }
 }
