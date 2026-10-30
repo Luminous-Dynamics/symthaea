@@ -76,13 +76,20 @@ These are proposed pilot thresholds, not industry norms or claimed results.
 
 The compatibility EIG selectors still use a uniform prior over hypothesis instances; weighted variants are available, but prior calibration and equivalence-class construction remain caller-owned. All variants still assume independent Gaussian observation noise. The robustness envelope is a finite set, not an adversarial continuous model class. It does not model correlated metrology errors, Bayesian posterior weights over equivalence classes, inferential error distributions, representativeness weighting, or explicit error de-amplification.
 
+Implemented follow-on work:
+
+- Prior-weighted EIG variants normalize caller-supplied prior mass; representation duplication is tested when probability is split across equivalent instances.
+- Candidate-specific observation noise and external hard eligibility are applied before ranking.
+- Finite-scenario maximin EIG ranks only candidates that retain information across all declared scenarios.
+- A representative/de-amplifying finite-scenario selector consumes independent representativeness and amplification-risk audit values.
+- Decision-aware expected value of sample information (EVSI) now ranks experiments by expected improvement in approved action utility rather than hypothesis entropy alone. Its robust selector applies the same finite scenario floor and external eligibility gate. See [DECISION_AWARE_MANUFACTURING_EVSI_V0_1.md](DECISION_AWARE_MANUFACTURING_EVSI_V0_1.md).
+
 Next research steps:
 
-- Add prior-weighted EIG over equivalence classes rather than a uniform prior over raw hypotheses.
+- Integrate a versioned, evidence-verified Symtropy action×outcome utility policy; the current cross-repository policy fixture is synthetic.
 - Add correlated and non-Gaussian measurement error, including shared calibration bias and drift.
-- Add a representativeness/de-amplification metric, with an ablation against the maximin baseline.
-- Add sequential posterior updates after each real measurement; the present selector is a one-step ranking function.
-- Calibrate scenario-set coverage on independent manufacturer/lot/station holdouts.
+- Add sequential posterior updates after each real measurement; the current EVSI/EIG selectors are one-step ranking functions.
+- Calibrate scenario-set coverage on independent manufacturer/lot/station holdouts and test against robust Bayesian decision baselines.
 - Keep all physical acceptance, safety and release authority outside the cognitive selector.
 
 ## Research position
