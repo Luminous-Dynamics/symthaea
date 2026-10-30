@@ -42,7 +42,7 @@ For each task/capability/split, the tool computes paired episode differences:
 
 Each contrast reports a paired mean and deterministic 95% percentile-bootstrap interval for both return and success rate. Each arm reports mean return, success rate, p50/p95 latency and complete/failed/timeout counts.
 
-A qualification slice is eligible for consideration only when it has at least 20 paired episodes and is labelled qualification. This does not prove that the task family was held out or that the experiment was preregistered; those still require external protocol evidence and artifact digests. Development slices are never qualification-eligible.
+A qualification *sample-count floor* is reported separately: a split labelled qualification with at least 20 paired episodes sets `qualification_floor_met=true`. This is not qualification eligibility. The auditor cannot establish that the family was held out, that tuning was excluded, or that the experiment was preregistered; those require external split manifests, preregistration and artifact digests. A development slice always has `qualification_floor_met=false`.
 
 The auditor does not pool tasks or capabilities into a single headline number.
 
@@ -50,10 +50,10 @@ The auditor does not pool tasks or capabilities into a single headline number.
 
 ```sh
 cargo test --locked
-cargo run --quiet --locked -- fixtures/qualification.tsv
+cargo run --quiet --locked -- fixtures/smoke.tsv
 ```
 
-The checked-in fixture demonstrates schema and scoring mechanics only. Its numbers are synthetic and cannot be cited as Symthaea performance.
+The checked-in `fixtures/smoke.tsv` is explicitly a development/smoke fixture. It demonstrates parsing, paired scoring, bootstrap intervals, timeout retention and negative-control behaviour only. Its numbers are synthetic and cannot be cited as Symthaea performance or qualification evidence.
 
 ## Next integration
 
