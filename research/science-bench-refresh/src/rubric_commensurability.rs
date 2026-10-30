@@ -15,6 +15,7 @@ pub const RUBRIC_COMMENSURABILITY_REPORT_SCHEMA: &str =
     "symthaea.science_bench_refresh_rubric_commensurability_report.v1";
 
 const PLAN_DOMAIN: &[u8] = b"symthaea.rubric_commensurability.plan.v1\0";
+const ONTOLOGY_DOMAIN: &[u8] = b"symthaea.rubric_commensurability.ontology.v1\0";
 const REPORT_DOMAIN: &[u8] = b"symthaea.rubric_commensurability.report.v1\0";
 const MAX_CONSTRUCTS: usize = 256;
 const MAX_CRITERIA: usize = 512;
@@ -405,6 +406,36 @@ fn validate_instrument(
     issues
 }
 
+fn construct_ontology_commitment(constructs: &[ConstructDefinitionV1]) -> Result<String, String> {
+    let mut canonical = constructs.to_vec();
+    canonical.sort_by(|left, right| left.construct_id.cmp(&right.construct_id));
+    let payload = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("cannot serialize construct ontology: {error}"))?;
+    domain_digest(ONTOLOGY_DOMAIN, &payload)
+}
+
+/// Commit to the exact normalized construct ontology supplied for a study.
+/// Sorting by construct_id makes the commitment independent of display order.
+pub fn compute_rubric_construct_ontology_commitment(constructs_bytes: &[u8]) -> Result<String, String> {
+    let constructs: Vec<ConstructDefinitionV1> = serde_json::from_slice(constructs_bytes)
+        .map_err(|error| format!("construct ontology JSON invalid: {error}"))?;
+    if constructs.is_empty() || constructs.len() > MAX_CONSTRUCTS {
+        return Err(format!("construct ontology must contain 1..={MAX_CONSTRUCTS} rows"));
+    }
+    let mut ids = BTreeSet::new();
+    for construct in &constructs {
+        if !nonempty(&construct.construct_id, 128) || !ids.insert(construct.construct_id.as_str()) {
+            return Err("construct IDs must be non-empty, bounded and unique".to_owned());
+        }
+        if !valid_digest(&construct.definition_sha256, false)
+            || !valid_digest(&construct.scope_sha256, false)
+        {
+            return Err(format!("construct {} has invalid definition/scope digest", construct.construct_id));
+        }
+    }
+    construct_ontology_commitment(&constructs)
+}
+
 pub fn validate_rubric_commensurability_plan_fields(
     fields: &RubricCommensurabilityPlanFieldsV1,
 ) -> Result<(), Vec<String>> {
@@ -426,6 +457,11 @@ pub fn validate_rubric_commensurability_plan_fields(
     }
     if !valid_digest(&fields.construct_ontology_sha256, allow_zero) {
         issues.push("construct_ontology_sha256 is invalid".to_owned());
+    }
+    match construct_ontology_commitment(&fields.constructs) {
+        Ok(expected) if expected == fields.construct_ontology_sha256 => {}
+        Ok(_) => issues.push("construct_ontology_sha256 does not commit to the declared construct set".to_owned()),
+        Err(error) => issues.push(error),
     }
     if fields.constructs.is_empty() || fields.constructs.len() > MAX_CONSTRUCTS {
         issues.push(format!("constructs must contain 1..={MAX_CONSTRUCTS} rows"));
@@ -870,6 +906,19 @@ mod tests {
         };
         let bytes = serde_json::to_vec_pretty(&plan).unwrap();
         (plan, bytes)
+    }
+
+    #[test]
+    fn construct_ontology_commitment_is_order_independent_but_content_sensitive() {
+        let fields = make_fields();
+        let first = construct_ontology_commitment(&fields.constructs).unwrap();
+        let mut reordered = fields.constructs.clone();
+        reordered.reverse();
+        let second = construct_ontology_commitment(&reordered).unwrap();
+        assert_eq!(first, second);
+        reordered[0].scope_sha256 = digest("changed scope");
+        let changed = construct_ontology_commitment(&reordered).unwrap();
+        assert_ne!(first, changed);
     }
 
     #[test]
