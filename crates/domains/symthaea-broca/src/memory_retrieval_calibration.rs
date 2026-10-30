@@ -314,7 +314,13 @@ pub fn audit_retrieval_value_estimator(
         });
     }
 
-    let passed = lower_coverage >= request.target_lower_bound_coverage;
+    let target_coverage_ppm =
+        (request.target_lower_bound_coverage * 1_000_000.0).ceil() as u32;
+    let lower_coverage_ppm = (lower_coverage * 1_000_000.0).floor() as u32;
+    // Do not mint a capability when micro-unit quantization would weaken the
+    // exact floating-point target comparison.
+    let passed = lower_coverage >= request.target_lower_bound_coverage
+        && lower_coverage_ppm >= target_coverage_ppm;
     let mut report = RetrievalCalibrationAuditReport {
         policy_version: RETRIEVAL_CALIBRATION_POLICY_VERSION.to_string(),
         estimator_id: request.estimator_id,
@@ -345,8 +351,8 @@ pub fn audit_retrieval_value_estimator(
             estimator_sha256: report.estimator_sha256.clone(),
             calibration_split_sha256: report.calibration_split_sha256.clone(),
             report_sha256: report.report_sha256.clone(),
-            target_lower_bound_coverage_ppm: (report.target_lower_bound_coverage * 1_000_000.0).ceil() as u32,
-            lower_confidence_bound_coverage_ppm: (report.lower_confidence_bound_coverage * 1_000_000.0).floor() as u32,
+            target_lower_bound_coverage_ppm: target_coverage_ppm,
+            lower_confidence_bound_coverage_ppm: lower_coverage_ppm,
         })
     } else {
         None
