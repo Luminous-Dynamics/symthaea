@@ -7,6 +7,7 @@ on:
       - "Cargo.lock"
       - "examples/hardsec_design_lineage_audit.rs"
       - "examples/hardsec_partition_path_audit.rs"
+      - "docs/research/HARDSEC_010_PATH_PRESERVING_SCALE_PROTOCOL.md"
       - "tools/hardsec-design-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-design-lineage-tests.yml"
   workflow_dispatch:
