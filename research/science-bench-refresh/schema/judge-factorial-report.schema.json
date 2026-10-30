@@ -276,7 +276,13 @@
         "selected_option_position_delta_millionths",
         "candidate_a_choice_rate_delta_millionths",
         "decisive_low_count",
-        "decisive_high_count"
+        "decisive_high_count",
+        "tie_rate_delta_millionths",
+        "abstention_rate_delta_millionths",
+        "tie_low_count",
+        "tie_high_count",
+        "abstention_low_count",
+        "abstention_high_count"
       ],
       "properties": {
         "factor": {
@@ -316,6 +322,24 @@
           "$ref": "#/$defs/count"
         },
         "decisive_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_rate_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "abstention_rate_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "tie_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_high_count": {
           "$ref": "#/$defs/count"
         }
       }
@@ -371,7 +395,17 @@
         "decisive_10_count",
         "decisive_11_count",
         "candidate_a_choice_interaction_millionths",
-        "excluded_conditions_across_four_cells"
+        "excluded_conditions_across_four_cells",
+        "tie_00_count",
+        "tie_01_count",
+        "tie_10_count",
+        "tie_11_count",
+        "abstention_00_count",
+        "abstention_01_count",
+        "abstention_10_count",
+        "abstention_11_count",
+        "tie_rate_interaction_millionths",
+        "abstention_rate_interaction_millionths"
       ],
       "properties": {
         "factor_a": {
@@ -415,6 +449,36 @@
         },
         "excluded_conditions_across_four_cells": {
           "$ref": "#/$defs/count"
+        },
+        "tie_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_rate_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "abstention_rate_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
         }
       }
     },
