@@ -278,10 +278,10 @@ impl Rk45Integrator {
         }
     }
 
-    /// Take one adaptive step, returning (new_state, actual_dt, error_estimate).
+    /// Attempt one adaptive substep, returning (new_state, accepted_dt, error_estimate).
     ///
-    /// This is the core method; the `Integrator` trait's `step` wraps it with
-    /// a fixed-dt interface for compatibility with `simulate()`.
+    /// The returned duration may be shorter than `dt` after rejected trials.
+    /// The caller is responsible for advancing time by exactly `accepted_dt`.
     pub fn adaptive_step(
         &self,
         system: &dyn DynamicalSystem,
