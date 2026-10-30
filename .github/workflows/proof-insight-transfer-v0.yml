@@ -11,6 +11,8 @@ on:
       - "scripts/research/pitb_component_allocation_sensitivity_v0.py"
       - "scripts/research/pitb_build_coverage_review_docket_v0.py"
       - "docs/research/pitb-coverage-review-docket-2026-10-30.md"
+      - "scripts/research/pitb_exact_artifact_content_audit_v0.py"
+      - "docs/research/pitb-exact-artifact-content-audit-2026-10-30.md"
       - "scripts/research/pitb_missingness_bounds_v0.py"
       - "docs/research/pitb-missingness-bounds-2026-10-29.md"
       - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
@@ -27,6 +29,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout exact upstream math artifact snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: openai/math
+          ref: 1581d4cbdd69a0faf34b2089614fe2a814316a6a
+          path: _pitb-openai-math
+          lfs: true
+          persist-credentials: false
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -168,6 +178,37 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install --disable-pip-version-check --no-input "jsonschema[format]==4.26.0"
+
+      - name: Run exact-byte audit over the pinned upstream source artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_exact_artifact_content_audit_v0.py"
+          manifest="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json"
+          source_root="$GITHUB_WORKSPACE/_pitb-openai-math"
+          python "$script" --self-test
+          set +e
+          python "$script" --manifest "$manifest" --source-root "$source_root" --out "$RUNNER_TEMP/pitb-exact-artifact-content-audit-a.json"
+          status_a=$?
+          python "$script" --manifest "$manifest" --source-root "$source_root" --out "$RUNNER_TEMP/pitb-exact-artifact-content-audit-b.json"
+          status_b=$?
+          set -e
+          if [[ -f "$RUNNER_TEMP/pitb-exact-artifact-content-audit-a.json" && -f "$RUNNER_TEMP/pitb-exact-artifact-content-audit-b.json" ]]; then
+            cmp "$RUNNER_TEMP/pitb-exact-artifact-content-audit-a.json" "$RUNNER_TEMP/pitb-exact-artifact-content-audit-b.json"
+            cp "$RUNNER_TEMP/pitb-exact-artifact-content-audit-a.json" "$RUNNER_TEMP/pitb-exact-artifact-content-audit.json"
+          fi
+          if (( status_a != 0 || status_b != 0 )); then
+            echo "PITB exact-byte artifact scan failed or was incomplete; any emitted report is retained for diagnosis." >&2
+            exit 1
+          fi
+
+      - name: Retain exact-byte artifact audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-exact-artifact-content-audit
+          path: ${{ runner.temp }}/pitb-exact-artifact-content-audit*.json
+          if-no-files-found: warn
       - name: Validate primary analysis-report v1 schema and qualification negative controls
         shell: bash
         run: |
