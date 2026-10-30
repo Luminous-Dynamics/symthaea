@@ -55,16 +55,6 @@ enum Commands {
         #[arg(long = "case-id", action = clap::ArgAction::Append, required = true)]
         case_ids: Vec<String>,
     },
-    /// Internal child-process task used by the counterfactual oracle harness.
-    #[command(hide = true)]
-    BasaltObserverFixtureWorker {
-        /// Task mode: consume or ignore.
-        #[arg(long)]
-        mode: String,
-        /// Fixture resource path.
-        #[arg(long)]
-        input: PathBuf,
-    },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
         /// Path to the run-record JSON file.
@@ -166,10 +156,6 @@ fn main() -> anyhow::Result<()> {
         } => {
             let report = basalt_fixture::run(&catalog, &out_dir, &case_ids)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
-        }
-        Commands::BasaltObserverFixtureWorker { mode, input } => {
-            let output = basalt_fixture::run_worker_command(&mode, &input)?;
-            println!("{}", serde_json::to_string(&output)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
