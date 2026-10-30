@@ -96,10 +96,15 @@ impl ActionMode {
     }
 
     fn action(self, state: &[f32]) -> Vec<f32> {
-        state.iter().map(|value| match self {
-            Self::Zero => 0.0,
-            Self::CancelSource => -0.75 * value.signum(),
-            Self::ReverseSource => 0.75 * value.signum(),
+        state.iter().map(|value| {
+            if value.abs() <= f32::EPSILON {
+                return 0.0;
+            }
+            match self {
+                Self::Zero => 0.0,
+                Self::CancelSource => -0.75 * value.signum(),
+                Self::ReverseSource => 0.75 * value.signum(),
+            }
         }).collect()
     }
 }
