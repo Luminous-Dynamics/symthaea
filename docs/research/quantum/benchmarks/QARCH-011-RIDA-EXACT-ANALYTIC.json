@@ -1,0 +1,341 @@
+{
+  "schema_version": "qarch-011-rida-exact-primitives/1",
+  "fixture_id": "QARCH-011-RIDA-EXACT-ANALYTIC-001",
+  "evidence_class": "analytic_reference",
+  "deployment_allowed": false,
+  "source": {
+    "paper": "Tang, Sloman & Kaski, Representative, Informative, and De-Amplifying: Requirements for Robust Bayesian Active Learning under Model Misspecification",
+    "venue": "AISTATS 2026 / PMLR 300",
+    "camera_ready": "https://arxiv.org/html/2506.07805v3",
+    "sections": [
+      "Proposition 1",
+      "Equations 10-12",
+      "Theorem 2",
+      "Appendix D"
+    ]
+  },
+  "reference_implementation": {
+    "repository": "https://github.com/TrbingWY/robust-boed",
+    "commit": "a72868b4a00f43945ba724b8f71be9181f97865e",
+    "files": [
+      {
+        "path": "pk/scripts/plotting.py",
+        "blob": "bd9c376ec4fdc0b1dc397dda51ddb561ba8cb4f5",
+        "function": "compute_mmd"
+      },
+      {
+        "path": "pk/scripts/boed_experiment.py",
+        "blob": "fca7718afe074eafa451fdafce5e80f99b21178f5",
+        "functions": [
+          "fit_g_mle_with_margin_like_model",
+          "_disagreement_weight"
+        ]
+      }
+    ],
+    "audited_observation": "The reference compute_mmd function computes the biased empirical squared RBF-MMD; DeA uses a sigmoid over the absolute predictor/proxy gap."
+  },
+  "conventions": {
+    "mmd_estimator": "biased_empirical_squared_mmd",
+    "mmd_kernel": "exp(-||x-y||^2/(2*sigma^2))",
+    "paper_experiment_sigma": 1,
+    "r_i_ratio": "squared_MMD_after_over_squared_MMD_before",
+    "empty_history": "unsupported; initialize with a declared design before evaluating R-I",
+    "zero_baseline_mmd": "reject; robust ratio is undefined",
+    "signed_diagnostic": "evaluator-only; true function values must not be passed into deployed policy selection"
+  },
+  "mmd_cases": [
+    {
+      "id": "mmd-singleton-distance-one",
+      "input": {
+        "left": [
+          [
+            0
+          ]
+        ],
+        "right": [
+          [
+            1
+          ]
+        ],
+        "sigma": 1
+      },
+      "expected": {
+        "squared_mmd": 0.7869386805747332
+      }
+    },
+    {
+      "id": "mmd-identical-empirical-distribution",
+      "input": {
+        "left": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "right": [
+          [
+            0
+          ],
+          [
+            1
+          ]
+        ],
+        "sigma": 1
+      },
+      "expected": {
+        "squared_mmd": 0
+      }
+    },
+    {
+      "id": "mmd-duplicate-weight-invariance",
+      "input": {
+        "left": [
+          [
+            0
+          ],
+          [
+            0
+          ]
+        ],
+        "right": [
+          [
+            1
+          ]
+        ],
+        "sigma": 1
+      },
+      "expected": {
+        "squared_mmd": 0.7869386805747332
+      }
+    }
+  ],
+  "r_i_case": {
+    "id": "ri-append-one-candidate",
+    "input": {
+      "history": [
+        [
+          0
+        ]
+      ],
+      "candidate": [
+        1.5
+      ],
+      "target_distribution_samples": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "expected_information_gain": 0.7,
+      "lambda": 0.5,
+      "sigma": 1
+    },
+    "expected": {
+      "baseline_squared_mmd": 0.19673467014368318,
+      "candidate_squared_mmd": 0.05875154870770216,
+      "robust_ratio": 0.2986334267609952,
+      "representativeness_factor": 0.8506832866195024,
+      "score": 0.5954783006336517
+    }
+  },
+  "dea_case": {
+    "id": "dea-sigmoid",
+    "input": {
+      "current_prediction": 2,
+      "proxy_prediction": 0,
+      "tau": 1,
+      "kappa": 1
+    },
+    "expected": {
+      "absolute_gap": 2,
+      "standardized_gap": 1,
+      "weight": 0.7310585786300049
+    }
+  },
+  "threshold_cases": [
+    {
+      "id": "finite-threshold",
+      "input": {
+        "tau0": 0.5,
+        "b_infinity": 2,
+        "c": 2,
+        "tau2": 0.25
+      },
+      "expected": {
+        "tau1": 4.25,
+        "tau": 4.5,
+        "status": "finite"
+      }
+    },
+    {
+      "id": "well-specified-neutral-branch",
+      "input": {
+        "tau0": 0.5,
+        "b_infinity": 0,
+        "c": 2,
+        "tau2": 0.25
+      },
+      "expected": {
+        "status": "well_specified",
+        "gate_weight": 1
+      }
+    }
+  ],
+  "proxy_objective_case": {
+    "id": "proxy-objective-eq11",
+    "input": {
+      "current_predictions": [
+        2,
+        2
+      ],
+      "proxy_predictions": [
+        1,
+        4
+      ],
+      "observed_targets": [
+        1,
+        3
+      ],
+      "tau": 2
+    },
+    "expected": {
+      "mean_squared_error": 0.5,
+      "disagreement_hinge": 0.5,
+      "total": 1
+    }
+  },
+  "signed_gate_negative_control": {
+    "id": "same-magnitude-opposite-signed-interaction",
+    "input": {
+      "f_star": 0.5,
+      "bar_f": 1,
+      "b_infinity": 0.6,
+      "tau0": 0,
+      "c": 2,
+      "tau2": 0,
+      "kappa": 1
+    },
+    "derived_threshold": 1.2,
+    "candidates": [
+      {
+        "id": "offsetting-L",
+        "f_hat": -1,
+        "absolute_predictor_bar_gap": 2,
+        "signed_interaction_A": -1,
+        "decomposition_cross_term": -2,
+        "component_sum": 4.25,
+        "actual_squared_error": 2.25,
+        "interaction_direction": "offsetting",
+        "expected_dea_weight": 0.7310585786300049,
+        "pointwise_error_at_x0": 2.25,
+        "pointwise_error_at_x1": 0.36,
+        "target_expected_squared_error": 0.8325
+      },
+      {
+        "id": "reinforcing-H",
+        "f_hat": 3,
+        "absolute_predictor_bar_gap": 2,
+        "signed_interaction_A": 1,
+        "decomposition_cross_term": 2,
+        "component_sum": 4.25,
+        "actual_squared_error": 6.25,
+        "interaction_direction": "reinforcing",
+        "expected_dea_weight": 0.7310585786300049,
+        "pointwise_error_at_x0": 6.25,
+        "pointwise_error_at_x1": 0.36,
+        "target_expected_squared_error": 1.8325
+      }
+    ],
+    "conclusion": "The printed absolute-gap DeA gate cannot identify the sign of the squared-error interaction. The two candidates receive identical DeA weights despite different signed interactions and different true squared errors. This is a mathematical negative control, not a correction claim.",
+    "model_class_witness": {
+      "design_domain": [
+        "x0",
+        "x1"
+      ],
+      "true_function_values": [
+        0.5,
+        -0.1
+      ],
+      "test_distribution_probabilities": [
+        0.25,
+        0.75
+      ],
+      "finite_model_class": [
+        {
+          "model_id": "constant-minus-one-at-x0",
+          "predictions": [
+            -1,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            2.25,
+            0.36
+          ],
+          "target_expected_squared_error": 0.8325
+        },
+        {
+          "model_id": "best-in-class",
+          "predictions": [
+            1,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            0.25,
+            0.36
+          ],
+          "target_expected_squared_error": 0.3325,
+          "best_in_class": true
+        },
+        {
+          "model_id": "constant-three-at-x0",
+          "predictions": [
+            3,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            6.25,
+            0.36
+          ],
+          "target_expected_squared_error": 1.8325
+        }
+      ],
+      "misspecification_sup_bound": 0.6,
+      "tested_point_misspecification_error": 0.5,
+      "strict_bound_at_tested_point": true,
+      "outcome_model": "At x0, y equals f_star(x0)=0.5 plus symmetric noise of +/-2.5. Observations -2 and 3 are within y_infinity=3. At x1, f_star=-0.1. The target/test distribution weights x0=0.25 and x1=0.75 make the middle predictor uniquely best-in-class among the three functions.",
+      "empirical_erm_witnesses": [
+        {
+          "observed_target_at_x0": -2,
+          "empirical_squared_losses": {
+            "constant-minus-one-at-x0": 1,
+            "best-in-class": 9,
+            "constant-three-at-x0": 25
+          },
+          "erm": "constant-minus-one-at-x0"
+        },
+        {
+          "observed_target_at_x0": 3,
+          "empirical_squared_losses": {
+            "constant-minus-one-at-x0": 16,
+            "best-in-class": 4,
+            "constant-three-at-x0": 0
+          },
+          "erm": "constant-three-at-x0"
+        }
+      ],
+      "interpretation": "The point x0 has misspecification error 0.5 which is strictly below the global B_infinity=0.6 attained at x1. Both extreme predictors are ERMs for admissible one-point training observations at x0, while the best-in-class predictor remains the minimizer under the target test distribution."
+    },
+    "prohibited_claim": "This is a counterexample to the stated subset implication under the declared finite-class assumptions, not evidence against unrelated parts of R-IDeA."
+  },
+  "prohibited_claims": [
+    "The primitive module does not implement or optimize the proxy predictor g.",
+    "The module does not certify the supplied tau2 proxy-error bound.",
+    "The published magnitude-only DeA gate is not treated here as a signed de-amplification certificate.",
+    "All values in this fixture are analytic/synthetic; no physical photonic device was measured.",
+    "This fixture does not establish a quantum advantage or state-of-the-art result."
+  ]
+}
