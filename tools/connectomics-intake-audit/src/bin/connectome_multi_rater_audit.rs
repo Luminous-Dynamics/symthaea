@@ -164,7 +164,7 @@ struct DecisionMetrics {
     accepted_count: usize,
     rejected_count: usize,
     abstained_count: usize,
-    determinate_gold_review_count: usize,
+    determinate_adjudication_reference_review_count: usize,
     actionable_determinate_review_count: usize,
     correct_action_count: usize,
     actionable_decision_accuracy: Option<f64>,
@@ -214,7 +214,7 @@ struct ReviewObservation {
     decision: ReviewerDecision,
     confidence: Option<f64>,
     minutes: f64,
-    gold: Option<Adjudication>,
+    adjudication_reference: Option<Adjudication>,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -364,12 +364,12 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
             ReviewerDecision::Abstain => abstained += 1,
         }
 
-        let Some(gold) = observation.gold.filter(|value| value.is_determinate()) else {
+        let Some(reference) = observation.adjudication_reference.filter(|value| value.is_determinate()) else {
             continue;
         };
         determinate_gold += 1;
 
-        match gold {
+        match reference {
             Adjudication::Incorrect => {
                 incorrect_gold_reviews += 1;
                 if observation.decision == ReviewerDecision::Accept {
@@ -385,7 +385,7 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
             Adjudication::Indeterminate => {}
         }
 
-        if let Some(is_correct) = decision_is_correct(observation.decision, gold) {
+        if let Some(is_correct) = decision_is_correct(observation.decision, reference) {
             actionable_determinate += 1;
             if is_correct {
                 correct_actions += 1;
@@ -436,7 +436,7 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
         accepted_count: accepted,
         rejected_count: rejected,
         abstained_count: abstained,
-        determinate_gold_review_count: determinate_gold,
+        determinate_adjudication_reference_review_count: determinate_gold,
         actionable_determinate_review_count: actionable_determinate,
         correct_action_count: correct_actions,
         actionable_decision_accuracy: (actionable_determinate > 0)
@@ -580,7 +580,7 @@ fn evaluate(
             row.adjudicator_votes.iter().map(|vote| vote.adjudication).collect();
         let reviewer_values: Vec<ReviewerDecision> =
             row.reviewer_reviews.iter().map(|review| review.reviewer_decision).collect();
-        let (gold_consensus, gold_fraction) = majority(&adjudication_values);
+        let (adjudication_reference_consensus, adjudication_majority_fraction) = majority(&adjudication_values);
         let (review_consensus, review_fraction) = majority(&reviewer_values);
 
         adjudicator_units.push(adjudication_values.iter().map(|value| value.label().to_string()).collect());
@@ -594,7 +594,7 @@ fn evaluate(
                 decision: review.reviewer_decision,
                 confidence: review.decision_confidence,
                 minutes: review.actual_review_minutes,
-                gold: gold_consensus,
+                adjudication_reference: adjudication_reference_consensus,
             };
             per_reviewer
                 .entry(review.reviewer_id.clone())
@@ -604,7 +604,7 @@ fn evaluate(
         }
         total_panel_review_minutes += panel_minutes;
 
-        let reviewer_consensus_correct = match (gold_consensus, review_consensus) {
+        let reviewer_consensus_correct = match (adjudication_reference_consensus, review_consensus) {
             (Some(Adjudication::Correct), Some(ReviewerDecision::Accept))
             | (Some(Adjudication::Incorrect), Some(ReviewerDecision::Reject)) => Some(true),
             (Some(Adjudication::Correct), Some(ReviewerDecision::Reject))
@@ -616,8 +616,8 @@ fn evaluate(
             candidate_id: proposal_candidate.candidate_id.clone(),
             adjudicator_count: row.adjudicator_votes.len(),
             adjudication_votes: vote_counts(&adjudication_values, Adjudication::label),
-            adjudication_consensus: gold_consensus.map(|value| value.label().to_string()),
-            adjudication_majority_fraction: gold_fraction,
+            adjudication_consensus: adjudication_reference_consensus.map(|value| value.label().to_string()),
+            adjudication_majority_fraction,
             reviewer_count: row.reviewer_reviews.len(),
             reviewer_decision_votes: vote_counts(&reviewer_values, ReviewerDecision::label),
             reviewer_consensus_decision: review_consensus.map(|value| value.label().to_string()),
