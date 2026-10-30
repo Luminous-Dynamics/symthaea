@@ -418,6 +418,29 @@ fn audit_groups(samples: &[Sample], protocol: SplitProtocol) -> Result<BTreeMap<
     Ok(counts)
 }
 
+fn audit_exact_source_hash_splits(samples: &[Sample], protocol: SplitProtocol) -> Result<usize, String> {
+    let mut hash_to_splits: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for sample in samples {
+        hash_to_splits
+            .entry(sample.source_sha256.clone())
+            .or_default()
+            .insert(sample.split.clone());
+    }
+    let overlapping = hash_to_splits
+        .iter()
+        .filter(|(_, splits)| splits.len() > 1)
+        .map(|(digest, _)| digest.clone())
+        .collect::<Vec<_>>();
+    if protocol != SplitProtocol::RandomGate {
+        if let Some(digest) = overlapping.first() {
+            return Err(format!(
+                "exact source artifact hash leakage across splits for sha256={digest}"
+            ));
+        }
+    }
+    Ok(overlapping.len())
+}
+
 fn lineage_overlap_counts(samples: &[Sample], field: &str) -> BTreeMap<String, usize> {
     let mut group_splits: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for sample in samples {
@@ -488,6 +511,7 @@ fn run(args: Args) -> Result<(), String> {
         source_records.insert((sample.source_artifact_id.clone(), sample.source_path.clone(), actual));
     }
 
+    let cross_split_source_hash_count = audit_exact_source_hash_splits(&samples, protocol)?;
     let group_counts = audit_groups(&samples, protocol)?;
     let mut split_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut label_counts: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
@@ -526,6 +550,7 @@ fn run(args: Args) -> Result<(), String> {
         "split_label_counts": label_counts,
         "audited_group_sample_counts": group_counts,
         "cross_split_lineage_group_counts": overlaps,
+        "cross_split_source_hash_count": cross_split_source_hash_count,
         "verified_source_artifact_count": source_records.len(),
         "verified_source_file_count": source_hash_cache.len(),
         "verified_source_artifacts": source_records
@@ -610,31 +635,35 @@ mod tests {
             let base = env::temp_dir().join(format!("hardsec-design-audit-{}-{id}", std::process::id()));
             let root = base.join("dataset");
             fs::create_dir_all(&root).unwrap();
-            let source = root.join("design.v");
-            fs::write(&source, b"module fixture; endmodule\n").unwrap();
-            let source_hash = sha256_file_stable(&source).unwrap();
             let manifest = base.join("manifest.tsv");
             let receipt = base.join("out").join("receipt.json");
             fs::create_dir_all(receipt.parent().unwrap()).unwrap();
 
             let mut text = format!("{}\n", HEADER.join("\t"));
             for (sample_id, split, family, trojan_family) in rows {
-                text.push_str(&[
-                    "fixture-dataset",
-                    "src-1",
-                    "design.v",
-                    &source_hash,
-                    sample_id,
-                    "design-1",
-                    family,
-                    &format!("netlist-{sample_id}"),
-                    trojan_family,
-                    "synth-v1",
-                    "lib-v1",
-                    protocol,
-                    split,
-                    if trojan_family.is_empty() { "benign" } else { "trojan" },
-                ].join("\t"));
+                let source_name = format!("design-{sample_id}.v");
+                let source = root.join(&source_name);
+                let source_bytes = format!("module fixture_{sample_id}; endmodule\\n");
+                fs::write(&source, source_bytes.as_bytes()).unwrap();
+                let source_hash = sha256_file_stable(&source).unwrap();
+                let source_artifact_id = format!("src-{sample_id}");
+                let fields = vec![
+                    "fixture-dataset".to_owned(),
+                    source_artifact_id,
+                    source_name,
+                    source_hash,
+                    (*sample_id).to_owned(),
+                    "design-1".to_owned(),
+                    (*family).to_owned(),
+                    format!("netlist-{sample_id}"),
+                    (*trojan_family).to_owned(),
+                    "synth-v1".to_owned(),
+                    "lib-v1".to_owned(),
+                    protocol.to_owned(),
+                    (*split).to_owned(),
+                    if trojan_family.is_empty() { "benign" } else { "trojan" }.to_owned(),
+                ];
+                text.push_str(&fields.join("\t"));
                 text.push('\n');
             }
             fs::write(&manifest, text).unwrap();
@@ -731,7 +760,7 @@ mod tests {
                 ("s3", "test", "host-c", "trojan-c"),
             ],
         );
-        fs::write(fixture.root.join("design.v"), b"tampered design\n").unwrap();
+        fs::write(fixture.root.join("design-s1.v"), b"tampered design\n").unwrap();
         let error = run(fixture.args()).unwrap_err();
         assert!(error.contains("source hash mismatch"));
     }
@@ -748,7 +777,7 @@ mod tests {
         );
         let text = fs::read_to_string(&fixture.manifest)
             .unwrap()
-            .replace("design.v", "../design.v");
+            .replace("design-s1.v", "../design-s1.v");
         fs::write(&fixture.manifest, text).unwrap();
         let error = run(fixture.args()).unwrap_err();
         assert!(error.contains("unsafe source_path"));
@@ -765,12 +794,12 @@ mod tests {
                 ("s3", "test", "host-c", "trojan-c"),
             ],
         );
-        let real = fixture.root.join("design.v");
-        let link = fixture.root.join("linked.v");
+        let real = fixture.root.join("design-s1.v");
+        let link = fixture.root.join("linked-s1.v");
         std::os::unix::fs::symlink(&real, &link).unwrap();
         let text = fs::read_to_string(&fixture.manifest)
             .unwrap()
-            .replace("design.v", "linked.v");
+            .replace("design-s1.v", "linked-s1.v");
         fs::write(&fixture.manifest, text).unwrap();
         let error = run(fixture.args()).unwrap_err();
         assert!(error.contains("symlink source path"));
