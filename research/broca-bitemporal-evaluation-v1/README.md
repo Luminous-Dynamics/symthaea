@@ -67,7 +67,7 @@ Treat memory as a **temporal evidence ledger**, not a mutable string store:
 - Make downstream retrieval consume only the evidence state that is valid for the requested intent.
 - Preserve an auditable “why this answer” trace, including what was visible, selected, and shadowed.
 
-The immediate integration experiment should be a Rust implementation behind a feature gate, then transactional updates/replay/reindexing against the same golden cases. Do not replace the existing retrieval path until the Rust implementation has exact semantic parity and rollback/rebuild tests.
+A research-only Rust reference graph is now authored in `crates/domains/symthaea-broca/src/memory_derivation.rs`. It provides dependency-aware derivation records, reverse-index rebuilding, transitive invalidation from source retractions or explicit derived-fact/rule-version changes, current-state filtering and a deterministic state digest. Its unit tests have not been compiled or executed in the current environment. The immediate integration experiment is to run these tests on the exact PR head, then add feature-gated transactional persistence and replay/reindex parity against the same golden cases. Do not replace the existing retrieval path until semantic parity and rollback/rebuild tests pass.
 
 ## Benchmark plan and gates
 

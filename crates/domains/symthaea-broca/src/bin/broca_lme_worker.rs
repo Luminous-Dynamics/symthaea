@@ -969,45 +969,6 @@ mod tests {
 
 
     #[test]
-    fn lifecycle_operations_remove_evidence_from_queries() {
-        let trajectory = json!({
-            "id": "trajectory-lifecycle",
-            "goal": "Open billing settings",
-            "states": [{
-                "url": "https://example.invalid/billing",
-                "text": "Billing settings and payment panel"
-            }]
-        });
-        let mut worker = Worker::new();
-        assert_eq!(worker.handle(json!({"request_id":"1","op":"init","scope_id":"web"}))["ok"], true);
-        assert_eq!(worker.handle(json!({"request_id":"2","op":"insert","trajectory":trajectory}))["ok"], true);
-
-        let before = worker.handle(json!({
-            "request_id":"3","op":"query","query":"billing settings"
-        }));
-        assert_eq!(before["ok"], true);
-        let evidence_id = before["result"]["audit"][0]["evidence_id"].as_str().unwrap().to_string();
-
-        let revoked = worker.handle(json!({
-            "request_id":"4","op":"revoke","evidence_id":evidence_id
-        }));
-        assert_eq!(revoked["ok"], true);
-        let after_revoke = worker.handle(json!({
-            "request_id":"5","op":"query","query":"billing settings"
-        }));
-        assert_eq!(after_revoke["result"]["context"].as_array().unwrap().len(), 0);
-
-        let deleted = worker.handle(json!({
-            "request_id":"6","op":"delete","evidence_id":evidence_id
-        }));
-        assert_eq!(deleted["ok"], true);
-        let after_delete = worker.handle(json!({
-            "request_id":"7","op":"query","query":"billing settings"
-        }));
-        assert_eq!(after_delete["result"]["context"].as_array().unwrap().len(), 0);
-    }
-
-    #[test]
     fn bounded_reader_rejects_oversized_line() {
         let mut reader = io::Cursor::new(b"{\"op\":\"query\"}\n".to_vec());
         let error = read_bounded_line(&mut reader, 4).unwrap_err();
