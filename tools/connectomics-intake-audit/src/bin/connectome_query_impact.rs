@@ -29,7 +29,7 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Input {
     schema_version: u32,
@@ -42,7 +42,7 @@ struct Input {
     candidates: Vec<Candidate>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Edge {
     source: u64,
@@ -50,7 +50,7 @@ struct Edge {
     weight: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Query {
     query_id: String,
@@ -68,7 +68,7 @@ enum QueryMetric {
     PathExists { source: u64, target: u64 },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Candidate {
     candidate_id: String,
