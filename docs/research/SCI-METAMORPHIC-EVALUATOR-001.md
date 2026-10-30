@@ -124,11 +124,11 @@ python3 research/science-bench-refresh/tools/metamorphic_evaluator_audit.py \
 python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_metamorphic_evaluator_audit.py' -v
 ```
 
-The plan commits to the evaluator revision, prompt digest, rubric digest, criterion set, score tolerance, per-pair input digests and relation rule. The receipt binds the exact plan bytes and contains both baseline and variant structured outputs.
+The plan commits to the evaluator revision, prompt digest, rubric digest, criterion set, score tolerance, per-pair input digests, expected directional decision and relation rule. The receipt binds the exact plan bytes, echoes both input digests for every pair, and contains baseline and variant structured outputs. Directional pairs require an exact expected variant decision, affected criterion direction, and stability of declared unaffected criteria.
 
 The report preserves pair-level failures, criterion deltas, per-family denominators and maximum observed drift. Structural receipt validity is separate from relation success: a correctly formed receipt can fail a metamorphic relation. Missing, extra or duplicate pair receipts are rejected rather than treated as omitted observations.
 
-The example contains seven clean synthetic pairs, one per relation family. It is generated deterministically and explicitly declares no evaluator execution or scoring qualification.
+The example contains eight clean synthetic pairs across seven relation families, including both evidence withdrawal and decisive evidence addition. Each receipt observation echoes the baseline/variant input digests committed by its pair plan; mismatch is rejected. This verifies plan-to-receipt digest consistency, not raw input-byte custody or evaluator execution. The example is generated deterministically and explicitly declares no evaluator execution or scoring qualification.
 
 ## 5. Metrics and targets
 
@@ -144,7 +144,7 @@ Report:
 - later: verified failure discoveries per mutation budget, semantic-validity precision and evaluation cost per unique failure.
 
 Engineering qualification targets for the tool:
-- 100% acceptance of the clean seven-relation synthetic fixture;
+- 100% acceptance of the clean eight-pair/seven-family synthetic fixture;
 - 100% detection of the enumerated hostile relation mutations;
 - 100% rejection of malformed, duplicate, missing, extra and plan-tampered receipts;
 - deterministic report bytes for identical plan/receipt bytes;
