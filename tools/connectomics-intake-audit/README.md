@@ -60,6 +60,31 @@ Every `input_files[].path` is relative to `--root`. Absolute paths, parent-direc
 - Single-segment geometry declares `geometry_preprocessing_profile=single_segment_zero_mask_channels` to mirror the reference loader's defensive mask-zeroing step. Dual geometry declares `dual_segment_native`.
 - If EM slices are inputs, the preprocessing profile must declare A/B fusion and zeroing B for single-segment input, or native dual masks for dual-segment input.
 
+## ConnectomeBench2 V2 metadata lineage and split audit
+
+The `connectome-dataset-audit` binary audits the metadata-only sidecars before training or scoring. It consumes JSONL exported from the three V2 Parquet sidecars, so no image payloads are read and no Python runtime is added to the Rust toolchain.
+
+From the ConnectomeBench2 V2 dataset root, export only the identity, labels, route, mask, modality, and metadata columns with DuckDB:
+
+```sh
+duckdb -c ".read /path/to/symthaea/tools/connectomics-intake-audit/export_connectomebench2_metadata.sql"
+```
+
+Then run the Rust auditor from the Symthaea checkout:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-dataset-audit -- \\
+  --input /path/to/connectomebench2_metadata.jsonl \\
+  --cube-edge-nm 50000 \\
+  --output connectomebench2-lineage-audit.json
+```
+
+The export SQL reads `metadata/train.parquet`, `metadata/val.parquet`, and `metadata/test.parquet`, and deliberately excludes geometry and EM bytes. The auditor fails closed on malformed/unknown sidecar fields, bad sample-hash composition, duplicate combined IDs, sample-type/strategy mismatches, incorrect `same_neuron` or derived label values, mask-flag drift, task-routing drift, missing source split-group keys, operation-group reuse across splits, and spatial-cube reuse across splits. It reconstructs the upstream grouping key by archive bank: `operation_id` for edit/adjacent-control rows, `source_operation_id` for junction controls, and the pre/post root plus synapse coordinate for synapse controls. It normalizes the source-side `val` spelling to `validation`.
+
+Cross-split root identity is reported as a warning, not a hard failure. A neuron may span multiple 50 µm cubes; such overlap creates a dependence and possible leakage risk that needs a neuron-grouped sensitivity evaluation, but the overlap alone does not prove that train/test samples are duplicates. Missing spatial coordinates are also reported and never assigned fabricated cube IDs. A PASS is limited to the checks above; it does not prove biological independence, ground-truth correctness, or model performance.
+
+The synthetic fixture `docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl` has one fake row per sample type. It is not a substitute for running the audit on the exact downloaded V2 revision. The V2 revision commit SHA still must be recorded in the intake manifest; this offline binary does not resolve the Hugging Face branch to a commit or prove that the downloaded bytes came from that branch.
+
 ## Frozen prediction scorer
 
 A second binary, `proofreading-score`, evaluates **frozen** predictions and independently adjudicated labels. It is deliberately separate from the runtime model/ranker. It currently consumes JSONL so metrics can be unit-tested without downloading raw EM or decoding Parquet.
