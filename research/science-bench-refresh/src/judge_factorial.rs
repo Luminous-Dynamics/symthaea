@@ -586,6 +586,22 @@ pub fn validate_judge_factorial_plan_fields(
             }
         }
     }
+    if let Some(reference_block) = fields.blocks.first() {
+        for block in fields.blocks.iter().skip(1) {
+            if block.criterion_ids != reference_block.criterion_ids {
+                issues.push(format!(
+                    "block {} criterion IDs/order differ from the study rubric",
+                    block.block_id
+                ));
+            }
+            if block.score_options != reference_block.score_options {
+                issues.push(format!(
+                    "block {} score options differ from the study rubric",
+                    block.block_id
+                ));
+            }
+        }
+    }
     if issues.is_empty() { Ok(()) } else { Err(issues) }
 }
 
@@ -1270,6 +1286,30 @@ mod tests {
         let altered = serde_json::to_vec(&value).unwrap();
         assert!(analyze_judge_factorial(&plan, &altered).unwrap_err()
             .contains("exact compiled validator revision"));
+    }
+
+    #[test]
+    fn rejects_criterion_or_score_scale_drift_across_study_blocks() {
+        let (plan, _, _) = make_plan();
+        let mut fields = plan.fields();
+        let mut second = fields.blocks[0].clone();
+        second.block_id = "block-002".to_owned();
+        let mut remapped_ids = BTreeMap::new();
+        for condition in &mut second.conditions {
+            let old_id = condition.condition_id.clone();
+            let new_id = condition_id(&second.block_id, condition.repeat_index, condition.factors).unwrap();
+            remapped_ids.insert(old_id, new_id.clone());
+            condition.condition_id = new_id;
+        }
+        for condition_id in &mut second.execution_order {
+            *condition_id = remapped_ids.get(condition_id).unwrap().clone();
+        }
+        second.criterion_ids.push("style".to_owned());
+        second.score_options[0].score_millionths = 10_000;
+        fields.blocks.push(second);
+        let issues = validate_judge_factorial_plan_fields(&fields).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("criterion IDs/order differ")));
+        assert!(issues.iter().any(|issue| issue.contains("score options differ")));
     }
 
     #[test]
