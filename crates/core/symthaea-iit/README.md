@@ -453,8 +453,8 @@ The test suite retains a deliberately simple brute-force reference generator tha
 uses the original block-membership definition and all three directions per block.
 It compares the complete matrix set—not merely counts—against the canonical
 enumerator for 2–6 units. This is exact-set equality, not a heuristic or approximate
-search. The six-unit fixture reduces the equivalent direction space from 12,348
-raw labelings to 7,896 canonical representatives, pruning 4,452 redundant
+search. The seven-unit fixture reduces the equivalent direction space from 88,560
+raw labelings to 61,888 canonical representatives, pruning 26,672 redundant
 labelings before matrix construction.
 
 The analytical matrix-loop comparison below contrasts the previous implementation
@@ -469,6 +469,7 @@ or a claim of end-to-end speedup:
 | 4 | 306 | 14,976 | 2,400 | 6.24× |
 | 5 | 1,863 | 168,750 | 26,525 | 6.36× |
 | 6 | 12,348 | 1,854,252 | 284,256 | 6.52× |
+| 7 | 88,560 | 20,392,722 | 3,032,512 | 6.72× |
 
 These figures count matrix-cell loop work only. They exclude set-partition recursion,
 direction-subset generation, allocation, and output storage. Release benchmarks must
