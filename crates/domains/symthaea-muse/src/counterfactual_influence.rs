@@ -1193,9 +1193,17 @@ mod tests {
     fn calibration_requires_three_noop_rerenders_and_replays() {
         let base = vec![0.0f32; 256];
         let anchor = audio(&base);
-        let anchor_evidence = test_binding(&anchor, b"baseline-render-receipt");
+        let anchor_evidence = test_binding(
+            &anchor,
+            b"baseline-render-receipt",
+            b"schedule-with-event-17",
+        );
         let one = [audio(&base)];
-        let one_evidence = [test_binding(&one[0], b"noop-render-receipt-0")];
+        let one_evidence = [test_binding(
+            &one[0],
+            b"noop-render-receipt-0",
+            b"schedule-with-event-17",
+        )];
         assert_eq!(
             calibrate_repeatability(
                 &anchor,
