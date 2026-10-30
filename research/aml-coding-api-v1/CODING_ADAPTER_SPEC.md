@@ -155,6 +155,16 @@ Its contract:
 
 The SQLite implementation has 10 authored tests covering persistence/reopen, immediate retrieval, cross-connection idempotency, conflicting request-ID reuse, user isolation, cross-session retrieval, top_k, WAL/FULL PRAGMA verification, retention purge, malformed rows, and failed-batch atomicity.
 
+The SQLite backend also records lifecycle changes in `aml_evidence_lifecycle_events`:
+- caller-supplied `event_id` provides idempotency; same event ID/same operation is a replay, and same ID/different operation is rejected;
+- Revoke, Delete, and Supersede are append-only events ordered by SQLite sequence;
+- restart rebuilds Add batches first, then replays every lifecycle event before Search;
+- invalid events or dangling source references fail startup closed;
+- retention cleanup removes expired Add batches and dependent lifecycle events in one SQLite transaction;
+- full purge clears both Add and lifecycle tables.
+
+This preserves current-index lifecycle state across process restarts. It is not yet a full bitemporal query interface: event time is stored, but Search exposes only the current admissible index and does not accept a caller-supplied `known_at`. It also does not independently propagate a source revocation through the derived proof graph or decision-use certificates; those integrations remain tracked by #9075, #9077, and #9112.
+
 ### SQLite backend deployment boundaries
 
 SQLite WAL is a local/same-host storage mode, not a multi-host database: the SQLite documentation states that WAL does not work over a network filesystem and all processes using the database must be on the same host. The implementation therefore remains a **single-node local baseline** with a process-local EvidenceIndex cache and one active cache owner. It is not an HTTP deployment, distributed store, or substitute for service-level authentication, access control, backups, secret management, monitoring, and operator-run retention/erasure controls.
