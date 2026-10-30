@@ -289,6 +289,17 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         _ => {}
     }
 
+    if let Some(count) = payload_effects_observed {
+        let opportunities = stimuli_count.ok_or_else(|| {
+            format!("evidence {id}: payload_effects_observed requires stimuli_count")
+        })?;
+        if count > opportunities {
+            return Err(format!(
+                "evidence {id}: payload_effects_observed cannot exceed stimuli_count"
+            ));
+        }
+    }
+
     if let Some(count) = activation_count {
         if stimuli_count.is_none() {
             return Err(format!(
@@ -409,6 +420,19 @@ fn validate_supported_claim(
             if !observed {
                 return Err(format!(
                     "claim {claim_type}: requires a passing payload_effect_trace with observed effect count and witness_sha256"
+                ));
+            }
+        }
+        "payload_effect_not_observed_under_budget" => {
+            let not_observed = selected.iter().any(|item| {
+                item.kind == "payload_effect_trace"
+                    && item.status == "pass"
+                    && item.stimuli_count.unwrap_or(0) > 0
+                    && item.payload_effects_observed == Some(0)
+            });
+            if !not_observed {
+                return Err(format!(
+                    "claim {claim_type}: requires a passing payload_effect_trace with positive observation budget and zero observed effects"
                 ));
             }
         }
@@ -552,6 +576,7 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
             "localization_provided",
             "trigger_activated",
             "payload_effect_observed",
+            "payload_effect_not_observed_under_budget",
             "trigger_not_observed_under_budget",
             "bounded_reachability_not_found",
             "trigger_unreachable_under_assumptions",
