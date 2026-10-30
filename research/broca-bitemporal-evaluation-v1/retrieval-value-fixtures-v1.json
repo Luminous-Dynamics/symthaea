@@ -4,7 +4,7 @@
   "created_at": "2026-10-30",
   "utility_unit": "micro-utility units defined by utility_schema_sha256",
   "source_protocol": "Synthetic deterministic fixtures for conservative retrieval continuation: expected correctness gain LCB plus lifecycle risk-reduction LCB minus retrieval harm UCB and retrieval cost.",
-  "case_count": 9,
+  "case_count": 10,
   "cases": [
     {
       "id": "positive_gain",
@@ -148,6 +148,22 @@
       "expected_net_value_micro": 300,
       "expected_action": "stop",
       "expected_reason": "net_value_below_minimum_margin"
+    },
+    {
+      "case_id": "exact_budget_positive_net",
+      "correctness_gain_lcb_micro": 2500,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 1000,
+      "remaining_calls": 1,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C10"
+      ],
+      "expected_net_value_micro": 1900,
+      "expected_action": "retrieve_more",
+      "expected_reason": "positive_conservative_net_value"
     }
   ]
 }
