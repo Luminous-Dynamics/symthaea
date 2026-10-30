@@ -151,7 +151,7 @@ pub fn build_proxy_consensus(
     let mut selected: BTreeSet<String> = raw_agreements
         .iter()
         .filter_map(|(proxy_id, alpha)| {
-            if alpha.is_some_and(|value| value >= config.anti_correlation_threshold) {
+            if (*alpha).is_some_and(|value| value >= config.anti_correlation_threshold) {
                 Some(proxy_id.clone())
             } else {
                 None
@@ -183,7 +183,7 @@ pub fn build_proxy_consensus(
             let retained = selected.contains(proxy_id);
             let reason = if proxy_ids.len() == 1 {
                 ProxyGateReason::SingleProxyNoAgreementTest
-            } else if retained && alpha.is_some_and(|value| value >= config.anti_correlation_threshold) {
+            } else if retained && (*alpha).is_some_and(|value| value >= config.anti_correlation_threshold) {
                 ProxyGateReason::PassedAgreementThreshold
             } else if retained {
                 ProxyGateReason::RetainedByMinimumFallback
@@ -272,7 +272,7 @@ pub fn apply_consensus_prior(
     result: &ProxyConsensusResult,
     derived_proxy_id: &str,
 ) -> Result<Vec<ArchitectureFeatures>, ProxyConsensusError> {
-    if derived_proxy_id.trim().is_empty() || derived_proxy_id == result.config.target_metric_id {
+    if derived_proxy_id.trim().is_empty() || derived_proxy_id == result.config.target_metric_id.as_str() {
         return Err(ProxyConsensusError::new(
             "derived_proxy_id",
             "must be non-empty and distinct from the target metric ID",
@@ -395,6 +395,14 @@ fn validate_inputs(
             return Err(ProxyConsensusError::new(
                 format!("features[{index}].proxy_scores.{}", config.target_metric_id),
                 "target metric is forbidden in the target-free proxy feature table",
+            ));
+        }
+        if feature.topology_encoding.len() != 6
+            || feature.topology_encoding.iter().any(|operation| *operation >= 5)
+        {
+            return Err(ProxyConsensusError::new(
+                format!("features[{index}].topology_encoding"),
+                "NAS-Bench-201 topology must contain six operation IDs in 0..5",
             ));
         }
         for proxy_id in config.proxy_directions.keys() {
@@ -629,7 +637,7 @@ mod tests {
                         ("proxy_c".into(), 0.03),
                         ("proxy_flip".into(), 0.04),
                     ]),
-                    topology_encoding: vec![0, 0, 0, 0, 0, (index % 5) as u8],
+                    topology_encoding: vec![(index / 5) as u8, (index % 5) as u8, 0, 0, 0, 0],
                 }
             })
             .collect()
