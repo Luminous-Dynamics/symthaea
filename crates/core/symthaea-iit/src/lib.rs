@@ -316,6 +316,8 @@ pub enum SystemPhiError {
     ZeroSeveredConnections,
     #[error("candidate system must be in strictly ascending unit-index order")]
     CandidateSystemNotCanonical,
+    #[error("proper-subsystem IIT 4.0 scoring is not qualified: Eq. 3/Eq. 4 external-background marginals are not implemented")]
+    UnsupportedSubsystemBackground,
     #[error("numeric decimal precision {precision} is outside the supported range 0..=15")]
     InvalidNumericalPrecision { precision: u32 },
     #[error("intrinsic-specification GID became non-finite at state index {state_index}")]
@@ -1236,6 +1238,10 @@ impl BinaryCausalModel {
 
     /// Select the system's intrinsically specified past/future state in one direction.
     ///
+    /// The current qualified path requires the full substrate as the candidate
+    /// system. Proper-subsystem Eq. 3/Eq. 4 external-background marginalization
+    /// is not yet implemented and is rejected explicitly.
+    ///
     /// This implements PyPhi IIT 4.0's composite intrinsic-specification path:
     /// pointwise GID(forward, unconstrained-forward) weighted by the current
     /// cause/effect selectivity repertoire, maximized over all candidate states.
@@ -1263,6 +1269,9 @@ impl BinaryCausalModel {
         self.validate_subset(candidate_system, "candidate_system")?;
         if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(SystemPhiError::CandidateSystemNotCanonical);
+        }
+        if !candidate_system.iter().copied().eq(0..self.n_units) {
+            return Err(SystemPhiError::UnsupportedSubsystemBackground);
         }
 
         let state_count = 1usize << candidate_system.len();
@@ -1306,7 +1315,10 @@ impl BinaryCausalModel {
                 0.0
             } else {
                 let ratio = f / u;
-                if ratio == 0.0 || !ratio.is_finite() {
+                if !ratio.is_finite() {
+                    return Err(SystemPhiError::NonFiniteIntrinsicSpecification { state_index });
+                }
+                if ratio == 0.0 {
                     0.0
                 } else {
                     selectivity[state_index] * ratio.log2()
@@ -1388,8 +1400,10 @@ impl BinaryCausalModel {
     /// followed by the positive-part convention and EdgeCut normalization.
     ///
     /// The candidate system is taken from the supplied DirectedSystemPartition;
-    /// the current state is in model-global unit order. Cause and effect use
-    /// separate specified states, as required by IIT 4.0. This function deliberately
+    /// the current state is in model-global unit order. The qualified implementation
+    /// currently requires the candidate to be the full substrate; proper-subsystem
+    /// Eq. 3/Eq. 4 external-background marginals are not yet implemented. Cause and
+    /// effect use separate specified states, as required by IIT 4.0. This function deliberately
     /// does not choose either state, resolve state ties, filter non-disconnecting
     /// cuts, resolve partition ties, or search for the MIP.
     pub fn score_iit4_system_partition(
@@ -1415,6 +1429,9 @@ impl BinaryCausalModel {
             });
         }
         self.validate_subset(candidate, "candidate_system")?;
+        if !candidate.iter().copied().eq(0..self.n_units) {
+            return Err(SystemPhiError::UnsupportedSubsystemBackground);
+        }
         let cut_edges = partition.cut_matrix().iter().filter(|cut| **cut).count();
         if cut_edges == 0 {
             return Err(SystemPhiError::ZeroSeveredConnections);
