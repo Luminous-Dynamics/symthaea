@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          report="$(cargo run --quiet --locked -- score fixtures/answer-key-smoke.tsv fixtures/candidate-trace-smoke.tsv fixtures/outcome-receipt-smoke.tsv)"
+          report="$(cargo run --quiet --locked --bin cmaq-001 -- score fixtures/answer-key-smoke.tsv fixtures/candidate-trace-smoke.tsv fixtures/outcome-receipt-smoke.tsv)"
           printf '%s\n' "$report"
           grep -F '"schema_version": "cmaq-001-report-v0.1"' <<< "$report"
           grep -F '"receipt_mismatches": 0' <<< "$report"
