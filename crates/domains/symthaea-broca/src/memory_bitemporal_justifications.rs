@@ -142,7 +142,7 @@ impl BitemporalJustificationRuntime {
                         let source_event = self.ledger.events().iter().find(|event| {
                             event.revision_id == *source_id
                                 && matches!(
-                                    event.operation,
+                                    &event.operation,
                                     SourceEventOperation::Assert { .. }
                                         | SourceEventOperation::Supersede { .. }
                                 )
@@ -154,7 +154,12 @@ impl BitemporalJustificationRuntime {
                         }
                         if self.ledger.events().iter().any(|event| {
                             event.recorded_at <= recorded_at
-                                && event.operation.target_revision_id() == Some(source_id.as_str())
+                                && matches!(
+                                    &event.operation,
+                                    SourceEventOperation::Supersede { target_revision_id, .. }
+                                        | SourceEventOperation::Retract { target_revision_id, .. }
+                                        if target_revision_id == source_id
+                                )
                         }) {
                             return Err(format!(
                                 "source revision {source_id:?} was already superseded or retracted at derived-fact recorded_at"
@@ -506,7 +511,7 @@ mod tests {
             }])
             .unwrap();
         runtime
-            .derive(conclusion(
+            .derive_at(conclusion(
                 "C",
                 [justification("via-window", [source("WINDOW")])],
             ), instant(1))
@@ -536,7 +541,7 @@ mod tests {
             ])
             .unwrap();
         runtime
-            .derive(conclusion(
+            .derive_at(conclusion(
                 "C",
                 [justification("via-A", [source("A")])],
             ), instant(1))
@@ -575,7 +580,7 @@ mod tests {
         };
         runtime.append_source_events([event_a, event_b]).unwrap();
         runtime
-            .derive(conclusion(
+            .derive_at(conclusion(
                 "C",
                 [justification("both-tenants", [source("A"), source("B")])],
             ), instant(1))
