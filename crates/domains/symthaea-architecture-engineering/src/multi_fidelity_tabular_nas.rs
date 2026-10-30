@@ -512,6 +512,165 @@ impl MultiFidelityTabularBenchmark {
         MultiFidelityTabularRun { receipt, evaluation }
     }
 
+    /// Run deterministic Successive Halving over a target-free initial candidate pool.
+    ///
+    /// `rung_populations[r]` is the number of candidates evaluated at fidelity rung r.
+    /// Counts must be positive and strictly decrease after each rung. Candidates advance
+    /// only after ranking the observations returned at the previous rung. The full target
+    /// table is not passed to the policy; the only observed target values are those returned
+    /// by the query oracle.
+    ///
+    /// This is a baseline schedule, not Hyperband/BOHB/DEHB. It is intended to provide a
+    /// reproducible SH comparator for trajectory/consensus-selected initial pools.
+    pub fn run_successive_halving(
+        self,
+        initial_candidate_ids: Vec<String>,
+        rung_populations: &[usize],
+    ) -> Result<MultiFidelityTabularRun, MultiFidelityFirewallError> {
+        let rung_count = self.manifest.fidelity_levels.len();
+        if rung_populations.len() != rung_count {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "must contain one population count for every fidelity rung",
+            ));
+        }
+        if rung_populations.is_empty() || rung_populations[0] != initial_candidate_ids.len() {
+            return Err(MultiFidelityFirewallError::new(
+                "initial_candidate_ids",
+                "initial candidate count must equal the first rung population",
+            ));
+        }
+        if rung_populations.iter().any(|count| *count == 0) {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "every fidelity rung must evaluate at least one candidate",
+            ));
+        }
+        if rung_populations.windows(2).any(|pair| pair[1] >= pair[0]) {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "successive-halving populations must strictly decrease at every rung",
+            ));
+        }
+        let final_population = *rung_populations.last().unwrap_or(&0);
+        if final_population > self.manifest.base.max_unique_queries {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "final rung exceeds the declared final-fidelity query cap",
+            ));
+        }
+
+        let mut known_ids = HashSet::with_capacity(self.features.len());
+        for feature in &self.features {
+            known_ids.insert(feature.architecture_id.as_str());
+        }
+        let mut initial_ids = HashSet::with_capacity(initial_candidate_ids.len());
+        for (index, architecture_id) in initial_candidate_ids.iter().enumerate() {
+            if architecture_id.trim().is_empty() || !known_ids.contains(architecture_id.as_str()) {
+                return Err(MultiFidelityFirewallError::new(
+                    format!("initial_candidate_ids[{index}]"),
+                    "candidate ID must identify a known architecture",
+                ));
+            }
+            if !initial_ids.insert(architecture_id.as_str()) {
+                return Err(MultiFidelityFirewallError::new(
+                    format!("initial_candidate_ids[{index}]"),
+                    "initial candidate IDs must be unique",
+                ));
+            }
+        }
+
+        // Preflight the exact schedule cost before requesting the first observation.
+        let mut planned_cost = 0u64;
+        for (fidelity_index, population) in rung_populations.iter().copied().enumerate() {
+            let cumulative = self.manifest.fidelity_levels[fidelity_index].cumulative_cost_units;
+            let incremental_per_candidate = match (
+                self.manifest.fidelity_cost_model,
+                fidelity_index.checked_sub(1),
+            ) {
+                (_, None) => cumulative,
+                (FidelityCostModel::ResumablePrefix, Some(previous_index)) => {
+                    cumulative - self.manifest.fidelity_levels[previous_index].cumulative_cost_units
+                }
+                (FidelityCostModel::IndependentRuns, Some(_)) => cumulative,
+            };
+            let rung_cost = incremental_per_candidate
+                .checked_mul(population as u64)
+                .ok_or_else(|| {
+                    MultiFidelityFirewallError::new(
+                        "rung_populations",
+                        "resource cost multiplication overflow",
+                    )
+                })?;
+            planned_cost = planned_cost.checked_add(rung_cost).ok_or_else(|| {
+                MultiFidelityFirewallError::new(
+                    "rung_populations",
+                    "total resource cost overflow",
+                )
+            })?;
+        }
+        if planned_cost > self.manifest.max_total_cost_units {
+            return Err(MultiFidelityFirewallError::new(
+                "max_total_cost_units",
+                format!(
+                    "successive-halving schedule requires {planned_cost} {}, budget is {}",
+                    self.manifest.resource_unit, self.manifest.max_total_cost_units
+                ),
+            ));
+        }
+
+        let metric_direction = self.manifest.base.metric_direction;
+        let mut query_error: Option<FidelityQueryError> = None;
+        let run = self.run_search(|_features, oracle| {
+            let mut current_candidates = initial_candidate_ids;
+            for fidelity_index in 0..rung_count {
+                let mut scored = Vec::with_capacity(current_candidates.len());
+                for architecture_id in &current_candidates {
+                    match oracle.query(architecture_id, fidelity_index) {
+                        Ok(observation) => {
+                            scored.push((architecture_id.clone(), observation.value));
+                        }
+                        Err(error) => {
+                            query_error = Some(error);
+                            return;
+                        }
+                    }
+                }
+                if fidelity_index + 1 < rung_count {
+                    scored.sort_by(|(left_id, left_value), (right_id, right_value)| {
+                        let order = match metric_direction {
+                            MetricDirection::Maximize => right_value.total_cmp(left_value),
+                            MetricDirection::Minimize => left_value.total_cmp(right_value),
+                        };
+                        order.then_with(|| left_id.cmp(right_id))
+                    });
+                    scored.truncate(rung_populations[fidelity_index + 1]);
+                    current_candidates = scored
+                        .into_iter()
+                        .map(|(architecture_id, _)| architecture_id)
+                        .collect();
+                }
+            }
+        });
+
+        if let Some(error) = query_error {
+            return Err(MultiFidelityFirewallError::new(
+                "successive_halving_query",
+                error.to_string(),
+            ));
+        }
+        if run.receipt.total_cost_units != planned_cost {
+            return Err(MultiFidelityFirewallError::new(
+                "successive_halving_receipt",
+                format!(
+                    "observed cost {} does not reconcile with preflight cost {planned_cost}",
+                    run.receipt.total_cost_units
+                ),
+            ));
+        }
+        Ok(run)
+    }
+
     fn make_receipt(&self, parts: OracleParts) -> MultiFidelityQueryReceipt {
         let query_trace_sha256 = digest_query_trace(&self.manifest, &self.canonical_import_sha256, &parts);
         MultiFidelityQueryReceipt {
@@ -838,6 +997,61 @@ mod tests {
 
     fn make_benchmark(model: FidelityCostModel, budget: u64) -> MultiFidelityTabularBenchmark {
         MultiFidelityTabularBenchmark::new(manifest(model, budget), features(12), labels(12)).unwrap()
+    }
+
+    #[test]
+    fn successive_halving_promotes_observed_best_candidates_and_reconciles_cost() {
+        let mut benchmark_manifest = manifest(FidelityCostModel::ResumablePrefix, 500);
+        benchmark_manifest.base.max_unique_queries = 3;
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            benchmark_manifest,
+            features(12),
+            labels(12),
+        )
+        .unwrap();
+        let initial = (0..8).map(|index| format!("arch-{index:03}")).collect();
+        let run = benchmark
+            .run_successive_halving(initial, &[8, 4, 2])
+            .unwrap();
+
+        assert_eq!(run.receipt.unique_architectures_touched, 8);
+        assert_eq!(run.receipt.final_fidelity_queries, 2);
+        assert_eq!(run.evaluation.intermediate_observation_count, 12);
+        assert_eq!(run.receipt.total_cost_units, 450);
+        assert_eq!(
+            run.receipt.final_fidelity_architecture_ids,
+            vec!["arch-007".to_string(), "arch-006".to_string()]
+        );
+        assert_eq!(run.evaluation.best_final_metric, Some(87.0));
+    }
+
+    #[test]
+    fn successive_halving_rejects_invalid_or_over_budget_schedule_before_querying() {
+        let mut benchmark_manifest = manifest(FidelityCostModel::ResumablePrefix, 500);
+        benchmark_manifest.base.max_unique_queries = 3;
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            benchmark_manifest,
+            features(12),
+            labels(12),
+        )
+        .unwrap();
+        let initial = (0..8).map(|index| format!("arch-{index:03}")).collect::<Vec<_>>();
+
+        assert!(benchmark
+            .run_successive_halving(initial.clone(), &[8, 8, 2])
+            .is_err());
+
+        let mut budget_manifest = manifest(FidelityCostModel::ResumablePrefix, 100);
+        budget_manifest.base.max_unique_queries = 3;
+        let budgeted = MultiFidelityTabularBenchmark::new(
+            budget_manifest,
+            features(12),
+            labels(12),
+        )
+        .unwrap();
+        assert!(budgeted
+            .run_successive_halving(initial, &[8, 4, 2])
+            .is_err());
     }
 
     #[test]
