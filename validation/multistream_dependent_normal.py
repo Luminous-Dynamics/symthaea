@@ -140,6 +140,8 @@ def run_dependent_normal_benchmark(
     sum_sup_fdp = {m: np.zeros(timepoints, dtype=np.float64) for m in methods}
     sum_power = {m: np.zeros(timepoints, dtype=np.float64) for m in methods}
     sum_rejections = {m: np.zeros(timepoints, dtype=np.float64) for m in methods}
+    # Replicate-level totals allow Monte Carlo standard errors for final FDR,
+    # time-sup FDP, and power rather than reporting point estimates alone.
     moments = {m: {metric: [0.0, 0.0] for metric in ("final_fdp", "sup_fdp", "final_power")}
                for m in methods}
     processed = 0
