@@ -18,13 +18,16 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 - Deterministic lexicographic routing: admissibility, mandatory-work priority, consequence priority, number of actionable obligations, work cost, operation family, and stable ID.
 - Mandatory work reserve that competitive operations cannot consume.
 - Repeat guard keyed by operation ID and the relevant pre-operation state identity.
-- Separate operation and verifier receipts.
-- Exact operation/obligation binding checks before a verifier can discharge an obligation.
-- Tests for no-progress stopping, changed-state retry, source revocation, mismatched proof bindings, budget boundaries, deterministic choice, and non-promotion on failed/unverified work.
+- Duplicate obligation/operation/target identity rejection before scheduling.
+- Mandatory reserve and fail-closed mandatory-work exhaustion.
+- Separate operation and verifier receipts, bound to the exact operation, obligation set, and pre-operation state key.
+- A declared producer/verifier identity distinction (not cryptographic proof of independence).
+- Receipt validation is transactional: duplicate state IDs or mismatched receipt bindings leave the obligation state unchanged.
+- 21 authored unit tests covering routing, budget boundaries, no-progress stopping, changed-state retry, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
 
 ## Deliberate limits
 
-This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt.
+This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt. Evidence admissibility is given by the fixture; it is not source authentication. The verifier/proposer distinction is only checked by declared IDs and does not establish true organizational or implementation independence.
 
 The lab does not yet compute obligations from Symthaea's production ProofGraph because the #5469 inventory and #5470 typed-contract ownership sequence remains open. It also does not estimate learned value-of-computation. The first version uses a deterministic baseline so scheduler mechanics can be checked before adding a predictor.
 
