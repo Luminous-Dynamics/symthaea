@@ -656,6 +656,15 @@ mod tests {
     }
 
     #[test]
+    fn estimated_component_requires_a_point_estimate() {
+        let mut certificate = fixture();
+        certificate.uncertainty_components[0].status = "ESTIMATED".into();
+        certificate.uncertainty_components[0].estimate = None;
+        certificate.uncertainty_components[0].interval_95 = Some([0.1, 0.9]);
+        assert!(validate(&certificate).iter().any(|error| error.contains("must include a point estimate")));
+    }
+
+    #[test]
     fn invalidated_state_requires_a_revision_event() {
         let mut certificate = fixture();
         certificate.state = "INVALIDATED_BY_REVISION".into();
