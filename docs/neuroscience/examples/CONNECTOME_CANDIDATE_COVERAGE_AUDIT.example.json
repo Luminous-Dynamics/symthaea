@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_ranking_report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "sampling_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "sample_seed": "fixed-candidate-coverage-seed-2026-10-30",
+  "sample_seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "strata": [
+    { "stratum_id": "region-a", "sampled_psu_count": 2 },
+    { "stratum_id": "region-b", "sampled_psu_count": 2 }
+  ],
+  "population_frame": [
+    { "psu_id": "block-a1", "stratum_id": "region-a" },
+    { "psu_id": "block-a2", "stratum_id": "region-a" },
+    { "psu_id": "block-b1", "stratum_id": "region-b" },
+    { "psu_id": "block-b2", "stratum_id": "region-b" }
+  ],
+  "sampled_units": [
+    {
+      "psu_id": "block-a1",
+      "exhaustive_search_completed": true,
+      "audit_panel_person_minutes": 18.5,
+      "errors": [
+        {
+          "verified_error_id": "err-a1",
+          "error_family": "merge",
+          "impact_weight": 2.0,
+          "proposal_candidate_ids": ["candidate-1"]
+        },
+        {
+          "verified_error_id": "err-a2",
+          "error_family": "synapse_missing",
+          "impact_weight": 1.0,
+          "proposal_candidate_ids": []
+        }
+      ]
+    },
+    {
+      "psu_id": "block-a2",
+      "exhaustive_search_completed": true,
+      "audit_panel_person_minutes": 15.0,
+      "errors": []
+    },
+    {
+      "psu_id": "block-b1",
+      "exhaustive_search_completed": true,
+      "audit_panel_person_minutes": 21.0,
+      "errors": [
+        {
+          "verified_error_id": "err-b1",
+          "error_family": "split",
+          "impact_weight": 3.0,
+          "proposal_candidate_ids": ["candidate-2"]
+        }
+      ]
+    },
+    {
+      "psu_id": "block-b2",
+      "exhaustive_search_completed": true,
+      "audit_panel_person_minutes": 17.0,
+      "errors": [
+        {
+          "verified_error_id": "err-b2",
+          "error_family": "merge",
+          "impact_weight": 4.0,
+          "proposal_candidate_ids": []
+        }
+      ]
+    }
+  ]
+}
