@@ -178,7 +178,7 @@ fn contextual_pair_interaction_l2_norm(
         .zip(without_right)
         .zip(without_both)
         .map(|(((full, without_left), without_right), without_both)| {
-            let residual = full - without_left - without_right + without_both;
+            let residual = *full - *without_left - *without_right + *without_both;
             residual * residual
         })
         .sum::<f64>();
@@ -646,7 +646,10 @@ mod tests {
 
     #[test]
     fn benchmark_receipt_rejects_report_tampering() {
-        let events = vec![source_event(0, 0.2), source_event(1, 0.3)];
+        let events = vec![
+            source_event_window(0, 0.2, 0, 20),
+            source_event_window(1, 0.3, 16, 30),
+        ];
         let effect = SyntheticEffect::Polynomial {
             quadratic_coefficient: 0.5,
             cubic_coefficient: 0.0,
