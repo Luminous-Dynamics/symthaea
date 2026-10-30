@@ -453,6 +453,78 @@
       "evidence_grade": "preprint-with-explicit-held-out-study-and-bootstrap-limitations",
       "comparison_notes": "The policy routes 46/188 questions to hybrid retrieval (24.5%) and reports evidence Hit@10 of 78.70% versus 76.92% for always-keep; paper-cluster paired bootstrap intervals do not establish a reliable utility advantage. Answer-level comparisons with quantized Qwen3-4B were provisional/model-assisted and lacked independent human validation. This is a cautionary comparator, not proof of answer-quality improvement or a headline SOTA result.",
       "source": "https://arxiv.org/abs/2610.37358"
+    },
+    {
+      "id": "pastdev-beam-multiscale-full-split-2026-09-29",
+      "system": "past.dev",
+      "category": "vendor-self-report-linked-public-leaderboard",
+      "benchmark": "BEAM",
+      "benchmark_revision": "Provider's complete BEAM splits; 100K/500K/1M/10M history buckets; 2,000 benchmark questions over 100 conversations overall",
+      "metric": "answer accuracy by history size",
+      "value_percent": 85.03,
+      "reported_date": "2026-09-29",
+      "sample_size": 200,
+      "secondary_metrics": {
+        "accuracy_100k_percent": 92.08,
+        "accuracy_500k_percent": 89.63,
+        "accuracy_1m_percent": 90.65,
+        "accuracy_10m_percent": 85.03,
+        "questions_10m": 200,
+        "conversations_10m": 10,
+        "abstention_10m_percent": 100,
+        "contradiction_resolution_10m_percent": 73.13,
+        "event_ordering_10m_percent": 100,
+        "information_extraction_10m_percent": 68.75,
+        "instruction_following_10m_percent": 95,
+        "knowledge_update_10m_percent": 92.5,
+        "multi_session_reasoning_10m_percent": 28.17,
+        "preference_following_10m_percent": 100,
+        "summarization_10m_percent": 99,
+        "temporal_reasoning_10m_percent": 93.75
+      },
+      "evidence_grade": "vendor-self-report-with-public-ability-breakdown",
+      "comparison_notes": "Past.dev's published run reports complete provider splits and separate ability scores; its BEAM 10M bucket is 200 questions over 10 conversations. The same page notes that competitor figures come from separately published vendor runs, not one common harness, so answer models, judges and configurations differ. It reports GPT-5.6-Luna as both answer model and judge for its own run. The 28.17% 10M multi-session score is more diagnostic for Broca than the 85.03% aggregate. This is a vendor benchmark claim, not independently reproduced by Broca.",
+      "source": "https://www.past.dev/benchmarks"
+    },
+    {
+      "id": "mem0-beam-multiscale-managed-2026",
+      "system": "Mem0 Platform",
+      "category": "vendor-self-report",
+      "benchmark": "BEAM",
+      "benchmark_revision": "BEAM 1M and 10M history buckets; managed platform, top-200 retrieval budget",
+      "metric": "answer accuracy by history size",
+      "value_percent": 48.6,
+      "reported_date": "2026-04",
+      "sample_size": null,
+      "secondary_metrics": {
+        "accuracy_1m_percent": 64.1,
+        "accuracy_10m_percent": 48.6,
+        "average_tokens_per_query_1m": 6719,
+        "average_tokens_per_query_10m": 6914
+      },
+      "evidence_grade": "vendor-self-report-managed-platform",
+      "comparison_notes": "Mem0 publishes 64.1% at 1M and 48.6% at 10M with its managed platform and top-200 retrieval budget. It is a scale reference, not a head-to-head result against past.dev or Broca; model/judge and deployment configurations differ.",
+      "source": "https://mem0.ai/research"
+    },
+    {
+      "id": "honcho-beam-multiscale-vendor-report-2026",
+      "system": "Honcho",
+      "category": "vendor-self-report",
+      "benchmark": "BEAM",
+      "benchmark_revision": "100K/500K/1M/10M vendor-reported full splits",
+      "metric": "answer accuracy by history size",
+      "value_percent": 40.6,
+      "reported_date": "2026-10-30",
+      "sample_size": null,
+      "secondary_metrics": {
+        "accuracy_100k_percent": 63,
+        "accuracy_500k_percent": 64.9,
+        "accuracy_1m_percent": 63.1,
+        "accuracy_10m_percent": 40.6
+      },
+      "evidence_grade": "vendor-self-report-methodology-published",
+      "comparison_notes": "Honcho publishes BEAM values alongside its own LoCoMo/LongMemEval results. The methodology page reports Gemini 2.5 Flash Lite as deriver and Claude Haiku 4.5 as dreamer/dialectic. The figures are vendor results and are not directly comparable to other providers' independently run BEAM figures.",
+      "source": "https://honcho.dev/evals/"
     }
   ],
   "broca_targets": {
