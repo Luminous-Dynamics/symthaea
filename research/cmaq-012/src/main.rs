@@ -426,13 +426,9 @@ mod tests {
 
     #[test]
     fn failed_and_timed_out_rows_are_retained_in_the_denominator() {
-        let mut lines: Vec<String> = smoke_input().lines().map(str::to_string).collect();
-        let mut fields: Vec<String> = lines[1].split('\t').map(str::to_string).collect();
-        fields[6] = "false".to_string();
-        fields[7] = "timeout".to_string();
-        fields[5] = "-1.0".to_string();
-        lines[1] = fields.join("\t");
-        let slices = parse_and_validate(&lines.join("\n")).unwrap();
+        // The checked-in smoke fixture already contains one explicit timeout
+        // with its finite penalty. Retain it in the exact paired denominator.
+        let slices = parse_and_validate(smoke_input()).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert_eq!(slice.arms[&Arm::D0].timeout, 1);
         assert_eq!(slice.n_pairs, 20);
