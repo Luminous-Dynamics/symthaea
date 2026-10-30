@@ -24,6 +24,8 @@ const SELECTION_DOMAIN: &[u8] = b"symthaea.learning-curve-promotion-selection.v0
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CurveFidelityLevel {
     pub id: String,
+    /// One-based epoch milestone used when exporting audit evidence to the task gate.
+    pub prefix_epochs: u32,
     pub cumulative_cost_units: u64,
 }
 
@@ -49,6 +51,15 @@ pub struct LearningCurveCalibrationSample {
     /// One observed metric value for every declared rung, including the final rung.
     pub curve_values: Vec<f64>,
     /// Must agree with the final curve value.
+    pub final_value: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCurveAuditSample {
+    pub task_id: String,
+    pub architecture_id: String,
+    pub seed: u64,
+    pub curve_values: Vec<f64>,
     pub final_value: f64,
 }
 
@@ -502,6 +513,95 @@ pub fn select_curve_promotions(
     })
 }
 
+/// Convert predictions on a third, task-disjoint audit set into the existing
+/// CrossTaskTransferGate evidence format. The target must be normalized regret (minimize),
+/// because the gate audits non-negative regret coverage task by task. This adapter does not
+/// qualify the predictor itself; the caller must pass the result to
+/// CrossTaskTransferGate::qualify_learning_curve_forecast and honor its abstention receipt.
+pub fn build_cross_task_forecast_evidence(
+    calibrator: &LearningCurveCalibrator,
+    audit_samples: &[LearningCurveAuditSample],
+) -> Result<super::cross_task_transfer_gate::LearningCurveForecastEvidence, LearningCurvePromotionError> {
+    calibrator.verify_integrity()?;
+    if calibrator.config.target_metric_id != "normalized_regret_percent"
+        || calibrator.config.metric_direction != ProxyDirection::Minimize
+    {
+        return Err(LearningCurvePromotionError::new(
+            "calibrator.target_metric_id",
+            "cross-task curve audit requires normalized_regret_percent with minimize direction",
+        ));
+    }
+    if audit_samples.is_empty() {
+        return Err(LearningCurvePromotionError::new(
+            "audit_samples",
+            "at least one task-disjoint audit sample is required",
+        ));
+    }
+
+    let mut task_ids = BTreeSet::new();
+    let mut sample_keys = HashSet::with_capacity(audit_samples.len());
+    let mut observations = Vec::new();
+    for (sample_index, sample) in audit_samples.iter().enumerate() {
+        if sample.task_id.trim().is_empty()
+            || sample.architecture_id.trim().is_empty()
+            || !sample_keys.insert((sample.task_id.as_str(), sample.architecture_id.as_str(), sample.seed))
+        {
+            return Err(LearningCurvePromotionError::new(
+                format!("audit_samples[{sample_index}]"),
+                "task/architecture/seed identity must be non-empty and unique",
+            ));
+        }
+        if sample.curve_values.len() != calibrator.config.fidelity_levels.len()
+            || sample.curve_values.iter().any(|value| !value.is_finite())
+            || !sample.final_value.is_finite()
+            || sample.final_value < 0.0
+            || (sample.curve_values.last().copied().unwrap_or(f64::NAN) - sample.final_value).abs() > 1e-8
+        {
+            return Err(LearningCurvePromotionError::new(
+                format!("audit_samples[{sample_index}]"),
+                "audit curve must be complete, finite and end at a non-negative final regret",
+            ));
+        }
+        task_ids.insert(sample.task_id.clone());
+        for fidelity_index in 0..(sample.curve_values.len() - 1) {
+            let prediction = calibrator.predict_final(
+                &sample.architecture_id,
+                &sample.curve_values[..=fidelity_index],
+            )?;
+            if prediction.predicted_final_value < 0.0
+                || prediction.upper_bound < 0.0
+            {
+                return Err(LearningCurvePromotionError::new(
+                    format!("audit_samples[{sample_index}]"),
+                    "predicted normalized regret and upper bound must be non-negative for task-gate auditing",
+                ));
+            }
+            observations.push(
+                super::cross_task_transfer_gate::LearningCurveForecastObservation {
+                    task_id: sample.task_id.clone(),
+                    seed: sample.seed,
+                    prefix_epochs: calibrator.config.fidelity_levels[fidelity_index].prefix_epochs,
+                    predicted_final_regret_percent: prediction.predicted_final_value,
+                    lower_prediction_bound_percent: prediction.lower_bound.max(0.0),
+                    upper_prediction_bound_percent: prediction.upper_bound,
+                    observed_final_regret_percent: sample.final_value,
+                },
+            );
+        }
+    }
+    if task_ids.len() < 2 {
+        return Err(LearningCurvePromotionError::new(
+            "audit_samples.task_id",
+            "cross-task forecast qualification requires at least two distinct audit tasks",
+        ));
+    }
+    Ok(super::cross_task_transfer_gate::LearningCurveForecastEvidence {
+        predictor_sha256: calibrator.calibration_sha256.clone(),
+        calibration_task_ids: task_ids.into_iter().collect(),
+        observations,
+    })
+}
+
 fn selected_candidate(
     prediction: &CurvePrediction,
     reason: PromotionReason,
@@ -567,7 +667,7 @@ fn validate_config(
             "at least two fidelity levels are required",
         ));
     }
-    if config.fidelity_levels.iter().any(|level| level.id.trim().is_empty()) {
+    if config.fidelity_levels.iter().any(|level| level.id.trim().is_empty() || level.prefix_epochs == 0) {
         return Err(LearningCurvePromotionError::new(
             "fidelity_levels",
             "every level ID must be non-empty",
@@ -587,7 +687,10 @@ fn validate_config(
     if config
         .fidelity_levels
         .windows(2)
-        .any(|pair| pair[1].cumulative_cost_units <= pair[0].cumulative_cost_units)
+        .any(|pair| {
+            pair[1].cumulative_cost_units <= pair[0].cumulative_cost_units
+                || pair[1].prefix_epochs <= pair[0].prefix_epochs
+        })
     {
         return Err(LearningCurvePromotionError::new(
             "fidelity_levels",
@@ -840,6 +943,7 @@ fn digest_calibrator(
     hasher.update((config.fidelity_levels.len() as u64).to_be_bytes());
     for level in &config.fidelity_levels {
         update_string(&mut hasher, &level.id);
+        hasher.update(level.prefix_epochs.to_be_bytes());
         hasher.update(level.cumulative_cost_units.to_be_bytes());
     }
     update_string(&mut hasher, fit_data_sha256);
@@ -945,14 +1049,17 @@ mod tests {
             fidelity_levels: vec![
                 CurveFidelityLevel {
                     id: "epoch_5".into(),
+                    prefix_epochs: 5,
                     cumulative_cost_units: 5,
                 },
                 CurveFidelityLevel {
                     id: "epoch_15".into(),
+                    prefix_epochs: 15,
                     cumulative_cost_units: 15,
                 },
                 CurveFidelityLevel {
                     id: "epoch_200".into(),
+                    prefix_epochs: 200,
                     cumulative_cost_units: 200,
                 },
             ],
@@ -1133,6 +1240,66 @@ mod tests {
         let second = fitted();
         assert_eq!(first.calibration_sha256, second.calibration_sha256);
         assert!(first.predict_final("final", &[1.0, 2.0, 3.0]).is_err());
+    }
+
+    #[test]
+    fn exports_task_disjoint_regret_forecasts_for_existing_transfer_gate() {
+        let mut cfg = config();
+        cfg.target_metric_id = "normalized_regret_percent".into();
+        cfg.metric_direction = ProxyDirection::Minimize;
+        let fit = samples("fit", 60, 0.0);
+        let calibration = samples("cal", 60, 0.3);
+        let predictor =
+            LearningCurveCalibrator::fit(cfg, &fit, &calibration).unwrap();
+        let audit_samples = (0..2)
+            .flat_map(|task| {
+                (0..4).map(move |index| {
+                    let initial = 10.0 + index as f64;
+                    let slope = 0.4 + index as f64 * 0.1;
+                    let middle = initial + slope * 10.0;
+                    let final_value = 14.0 + 2.0 * middle + 4.0 * slope;
+                    LearningCurveAuditSample {
+                        task_id: format!("audit-task-{task}"),
+                        architecture_id: format!("audit-{task}-{index}"),
+                        seed: index as u64,
+                        curve_values: vec![initial, middle, final_value],
+                        final_value,
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        let evidence =
+            build_cross_task_forecast_evidence(&predictor, &audit_samples).unwrap();
+        assert_eq!(evidence.predictor_sha256, predictor.calibration_sha256);
+        assert_eq!(evidence.calibration_task_ids.len(), 2);
+        assert_eq!(evidence.observations.len(), 16);
+        assert!(evidence.observations.iter().all(|observation| {
+            observation.prefix_epochs == 5 || observation.prefix_epochs == 15
+        }));
+    }
+
+    #[test]
+    fn cross_task_adapter_rejects_non_regret_metric_and_single_task_audit() {
+        let predictor = fitted();
+        let sample = LearningCurveAuditSample {
+            task_id: "audit-task".into(),
+            architecture_id: "audit-arch".into(),
+            seed: 1,
+            curve_values: vec![10.0, 20.0, 30.0],
+            final_value: 30.0,
+        };
+        assert!(build_cross_task_forecast_evidence(&predictor, &[sample.clone()]).is_err());
+
+        let mut cfg = config();
+        cfg.target_metric_id = "normalized_regret_percent".into();
+        cfg.metric_direction = ProxyDirection::Minimize;
+        let predictor = LearningCurveCalibrator::fit(
+            cfg,
+            &samples("fit", 60, 0.0),
+            &samples("cal", 60, 0.3),
+        )
+        .unwrap();
+        assert!(build_cross_task_forecast_evidence(&predictor, &[sample]).is_err());
     }
 
     #[test]
