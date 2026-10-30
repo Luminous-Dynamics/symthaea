@@ -507,7 +507,8 @@
         "decision",
         "prior_record_ids",
         "evidence_span_ids",
-        "rationale_sha256"
+        "rationale_sha256",
+        "adjudicator_id_sha256"
       ],
       "properties": {
         "resolution_id": {
@@ -543,6 +544,9 @@
           }
         },
         "rationale_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "adjudicator_id_sha256": {
           "$ref": "#/$defs/digest"
         }
       }
