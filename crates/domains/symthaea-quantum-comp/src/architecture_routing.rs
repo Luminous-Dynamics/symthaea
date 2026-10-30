@@ -515,6 +515,54 @@ mod tests {
     }
 
     #[test]
+    fn energy_ceiling_requires_the_full_interval_to_fit() {
+        let mut candidate = two_candidates().remove(0);
+        candidate.resources.as_mut().unwrap().energy_joules = interval(9.5, 10.5);
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::EnergyNotProven]
+        );
+    }
+
+    #[test]
+    fn monetary_cost_ceiling_is_a_hard_constraint() {
+        let mut candidate = two_candidates().remove(0);
+        candidate.resources.as_mut().unwrap().monetary_cost_usd = interval(0.11, 0.12);
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::MonetaryCostLimitExceeded]
+        );
+    }
+
+    #[test]
+    fn peak_memory_ceiling_is_a_hard_constraint() {
+        let mut candidate = two_candidates().remove(0);
+        candidate.resources.as_mut().unwrap().peak_memory = MemoryInterval {
+            lower_bytes: 4_500,
+            upper_bytes: 5_000,
+        };
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::PeakMemoryLimitExceeded]
+        );
+    }
+
+    #[test]
     fn workload_mismatch_is_never_routed() {
         let mut candidate = two_candidates().remove(0);
         candidate.workload_fingerprint = "different-event-stream".to_owned();
