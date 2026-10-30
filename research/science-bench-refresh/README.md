@@ -35,6 +35,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/intervention_quality.rs: census-based candidate and blinded-panel receipt validator, semantic validity precision/recall, raw pairwise agreement, Fleiss' kappa, unique test yield and cost metrics.
 - schema/intervention-quality-plan.schema.json, schema/intervention-quality-receipt.schema.json and schema/intervention-quality-report.schema.json: strict plan, fixed-panel blinded adjudication and quality report contracts.
 - tools/intervention_quality_fixture.py: deterministic seven-candidate synthetic census with valid, invalid and ambiguous panel outcomes; not a human study.
+- docs/research/SCI-ADAPTIVE-TEST-ALLOCATION-001.md: proposed cost-aware adaptive candidate allocation with randomized exploration, propensity receipts, hard-control coverage, sequential inference and untouched confirmatory lockbox; protocol only, no scheduler implementation yet.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
