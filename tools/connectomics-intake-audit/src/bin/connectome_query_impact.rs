@@ -559,6 +559,7 @@ enum RankingPolicy {
     QuerySensitivity,
     ErrorProbability,
     Uncertainty,
+    LocalDegreeDelta,
     SensitivityOnly,
     DeterministicRandom,
 }
@@ -569,6 +570,7 @@ impl RankingPolicy {
             Self::QuerySensitivity => "query_sensitivity_per_minute",
             Self::ErrorProbability => "error_probability_per_minute",
             Self::Uncertainty => "uncertainty_per_minute",
+            Self::LocalDegreeDelta => "local_weighted_degree_delta_per_minute",
             Self::SensitivityOnly => "query_sensitivity_only_per_minute",
             Self::DeterministicRandom => "deterministic_random",
         }
@@ -578,6 +580,38 @@ impl RankingPolicy {
 fn deterministic_random_score(input_hash: &str, candidate_id: &str) -> u64 {
     let digest = Sha256::digest(format!("{input_hash}:{candidate_id}").as_bytes());
     u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 has at least eight bytes"))
+}
+
+fn weighted_degree_signature(graph: &Graph) -> BTreeMap<u64, (f64, f64)> {
+    let mut degrees = BTreeMap::<u64, (f64, f64)>::new();
+    for ((source, target), weight) in graph {
+        degrees.entry(*source).or_default().1 += *weight;
+        degrees.entry(*target).or_default().0 += *weight;
+    }
+    degrees
+}
+
+fn local_weighted_degree_delta(graph: &Graph, candidate: &Candidate) -> Result<f64, String> {
+    let counterfactual = apply_candidate(graph, candidate)?;
+    let before = weighted_degree_signature(graph);
+    let after = weighted_degree_signature(&counterfactual);
+    let nodes: BTreeSet<u64> = before.keys().chain(after.keys()).copied().collect();
+    let mut total_delta = 0.0;
+    for node in nodes {
+        let before_degree = before.get(&node).copied().unwrap_or_default();
+        let after_degree = after.get(&node).copied().unwrap_or_default();
+        total_delta += (after_degree.0 - before_degree.0).abs();
+        total_delta += (after_degree.1 - before_degree.1).abs();
+    }
+    Ok(total_delta)
+}
+
+fn local_weighted_degree_delta_from_evaluation(
+    _candidate: &Candidate,
+    _evaluation: &CandidateEvaluation,
+) -> f64 {
+    // Placeholder is replaced below by graph-aware policy ranking.
+    0.0
 }
 
 fn policy_score(
@@ -595,6 +629,10 @@ fn policy_score(
         }
         RankingPolicy::Uncertainty => {
             (1.0 - (2.0 * candidate.estimated_error_probability - 1.0).abs())
+                / candidate.review_minutes
+        }
+        RankingPolicy::LocalDegreeDelta => {
+            local_weighted_degree_delta_from_evaluation(candidate, evaluation)
                 / candidate.review_minutes
         }
         RankingPolicy::SensitivityOnly => {
