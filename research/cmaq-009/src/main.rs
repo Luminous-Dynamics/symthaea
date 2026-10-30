@@ -4,6 +4,9 @@ const REPORT_SCHEMA: &str = "cmaq-009-active-diagnostic-probes-v0.2";
 const EPISODES: usize = 512;
 const HORIZON: usize = 128;
 const CHANGE_DETECTION_THRESHOLD: f64 = 5.0;
+const PAGE_HINKLEY_DELTA: f64 = 0.08;
+const PAGE_HINKLEY_THRESHOLD: f64 = 2.0;
+const PAGE_HINKLEY_BURN_IN: usize = 8;
 const NULL_ACTION_UNSUPPORTED_RATE: f64 = 0.01;
 const SHIFTED_ACTION_UNSUPPORTED_RATE: f64 = 0.25;
 const NULL_PROBE_FAILURE_RATE: f64 = 0.01;
@@ -123,6 +126,7 @@ enum Policy {
     DirectFallback,
     FixedGate,
     PassiveCusum,
+    PageHinkleyPassive,
     PeriodicProbe8,
     PeriodicProbe16,
     PeriodicProbe32,
@@ -132,11 +136,12 @@ enum Policy {
 }
 
 impl Policy {
-    fn all() -> [Self; 9] {
+    fn all() -> [Self; 10] {
         [
             Self::DirectFallback,
             Self::FixedGate,
             Self::PassiveCusum,
+            Self::PageHinkleyPassive,
             Self::PeriodicProbe8,
             Self::PeriodicProbe16,
             Self::PeriodicProbe32,
@@ -151,6 +156,7 @@ impl Policy {
             Self::DirectFallback => "direct_fallback",
             Self::FixedGate => "fixed_gate",
             Self::PassiveCusum => "passive_cusum",
+            Self::PageHinkleyPassive => "page_hinkley_passive",
             Self::PeriodicProbe8 => "periodic_probe_8",
             Self::PeriodicProbe16 => "periodic_probe_16",
             Self::PeriodicProbe32 => "periodic_probe_32",
@@ -174,6 +180,7 @@ impl Policy {
         matches!(
             self,
             Self::PassiveCusum
+                | Self::PageHinkleyPassive
                 | Self::PeriodicProbe8
                 | Self::PeriodicProbe16
                 | Self::PeriodicProbe32
@@ -219,6 +226,26 @@ fn probe_requested(policy: Policy, step: usize, adaptive_armed: bool, used: usiz
         Policy::AdaptiveProbe => adaptive_armed,
         Policy::ZeroInformationProbeEvery4 => step % 4 == 0,
         _ => false,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PageHinkleyState {
+    observations: usize,
+    mean: f64,
+    cumulative: f64,
+    minimum: f64,
+}
+
+impl PageHinkleyState {
+    fn observe(&mut self, signal: bool) -> bool {
+        let value = signal as u8 as f64;
+        self.observations += 1;
+        self.mean += (value - self.mean) / self.observations as f64;
+        self.cumulative += value - self.mean - PAGE_HINKLEY_DELTA;
+        self.minimum = self.minimum.min(self.cumulative);
+        self.observations >= PAGE_HINKLEY_BURN_IN
+            && self.cumulative - self.minimum > PAGE_HINKLEY_THRESHOLD
     }
 }
 
@@ -273,10 +300,12 @@ fn simulate_episode_with_envelope(
     let onset = scenario.shift_onset();
     let mut outcome = EpisodeOutcome::default();
     let mut evidence_score = 0.0_f64;
+    let mut page_hinkley = PageHinkleyState::default();
     let mut adaptive_armed = false;
     let mut revoked = false;
 
     for step in 0..HORIZON {
+        let mut page_hinkley_triggered = false;
         // Passive feedback from an action arrives four steps later, with a
         // declared drop rate and sensitivity/specificity. The current candidate
         // never receives the hidden shift label or true unsupported outcome.
@@ -289,7 +318,11 @@ fn simulate_episode_with_envelope(
                 } else {
                     feedback_noise[source_step] < (1.0 - FEEDBACK_SPECIFICITY)
                 };
-                evidence_score = (evidence_score + feedback_likelihood_increment(observed_signal)).max(0.0);
+                if policy == Policy::PageHinkleyPassive {
+                    page_hinkley_triggered = page_hinkley.observe(observed_signal);
+                } else if policy.has_detector() {
+                    evidence_score = (evidence_score + feedback_likelihood_increment(observed_signal)).max(0.0);
+                }
             }
         }
 
@@ -336,7 +369,12 @@ fn simulate_episode_with_envelope(
             && evidence_score >= 1.0
             && outcome.probe_count < policy.probe_cap();
 
-        if policy.has_detector() && evidence_score >= CHANGE_DETECTION_THRESHOLD {
+        let detector_triggered = if policy == Policy::PageHinkleyPassive {
+            page_hinkley_triggered
+        } else {
+            policy.has_detector() && evidence_score >= CHANGE_DETECTION_THRESHOLD
+        };
+        if detector_triggered {
             // The triggering action/probe has already incurred its utility/cost.
             revoked = true;
             outcome.revocation_step = Some(step);
