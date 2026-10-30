@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema",
+    "analyzer_source_revision",
     "purpose",
     "run_id",
     "plan_sha256",
@@ -53,6 +54,10 @@
       "items": {
         "$ref": "#/$defs/observation"
       }
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
     }
   },
   "$defs": {
@@ -277,6 +282,11 @@
           "rubric_sha256": {
             "not": {
               "pattern": "^0{64}$"
+            }
+          },
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
             }
           }
         }
