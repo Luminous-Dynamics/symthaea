@@ -34,9 +34,11 @@ pub struct AcousticSupportInterval {
 
 /// Caller-supplied, event-indexed evidence used to construct a probe plan.
 ///
-/// `support_evidence_sha256` must identify the exact replay-verified EVAL-017
-/// report from which non-empty support intervals were derived. This planner
-/// commits that digest but intentionally does not re-verify the EVAL-017 report.
+/// `support_evidence_sha256` is required for every event, including an empty
+/// interval list. For empty support it identifies a replay-verified EVAL-017
+/// whole-output scan that found no windows above its declared measurement floor;
+/// it does not prove zero physical influence or rule out every possible interaction.
+/// This planner commits the digest but intentionally does not re-verify EVAL-017.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventInteractionSupport {
     pub source_event_index: usize,
@@ -277,16 +279,10 @@ fn normalize_inputs(
         if total_support_intervals > MAX_TOTAL_SUPPORT_INTERVALS {
             return Err(InteractionProbePlanError::TooManySupportIntervals);
         }
-        if !event.acoustic_support.is_empty() {
-            let digest = event.support_evidence_sha256.as_deref()
-                .ok_or(InteractionProbePlanError::MissingSupportEvidence)?;
-            if !is_sha256(digest) {
-                return Err(InteractionProbePlanError::InvalidSupportEvidenceDigest);
-            }
-        } else if let Some(digest) = event.support_evidence_sha256.as_deref() {
-            if !is_sha256(digest) {
-                return Err(InteractionProbePlanError::InvalidSupportEvidenceDigest);
-            }
+        let support_digest = event.support_evidence_sha256.as_deref()
+            .ok_or(InteractionProbePlanError::MissingSupportEvidence)?;
+        if !is_sha256(support_digest) {
+            return Err(InteractionProbePlanError::InvalidSupportEvidenceDigest);
         }
         if event.routing_domains.len() > MAX_ROUTING_DOMAINS_PER_EVENT {
             return Err(InteractionProbePlanError::TooManyRoutingDomains);
@@ -725,7 +721,7 @@ mod tests {
             acoustic_support: intervals.iter().map(|(start_frame, end_frame)| AcousticSupportInterval { start_frame: *start_frame, end_frame: *end_frame }).collect(),
             routing_domains: domains.iter().map(|domain| (*domain).to_owned()).collect(),
             routing_complete,
-            support_evidence_sha256: if intervals.is_empty() { None } else { Some(digest(&format!("support-{index}"))) },
+            support_evidence_sha256: Some(digest(&format!("support-{index}"))),
         }
     }
 
@@ -858,6 +854,36 @@ mod tests {
             build_interaction_probe_plan(&digest("score"), &digest("renderer"), 100, &bad_evidence, &config()).unwrap_err(),
             InteractionProbePlanError::MissingSupportEvidence
         );
+
+        let mut empty_missing = event(0, &[], &[], true);
+        empty_missing.support_evidence_sha256 = None;
+        let empty_without_evidence = vec![empty_missing, event(1, &[], &[], true)];
+        assert_eq!(
+            build_interaction_probe_plan(
+                &digest("score"),
+                &digest("renderer"),
+                100,
+                &empty_without_evidence,
+                &config(),
+            ).unwrap_err(),
+            InteractionProbePlanError::MissingSupportEvidence
+        );
+    }
+
+    #[test]
+    fn verified_empty_support_is_distinct_from_missing_measurement() {
+        let events = vec![event(0, &[], &[], true), event(1, &[], &[], true)];
+        let result = plan(&events, &config());
+        assert_eq!(result.temporal_candidate_pair_count, 0);
+        assert!(result.candidate_pairs_selected.is_empty());
+        assert!(verify_interaction_probe_plan(
+            &result,
+            &digest("score"),
+            &digest("renderer"),
+            10_000,
+            &events,
+            &config(),
+        ).unwrap());
     }
 
     #[test]
