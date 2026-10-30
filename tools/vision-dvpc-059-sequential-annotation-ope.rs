@@ -155,6 +155,9 @@ struct Metrics {
     mse: f64,
     analytic_mse: f64,
     expected_labels: f64,
+    mean_lambda1: f64,
+    mean_lambda12_low: f64,
+    mean_lambda12_high: f64,
     mean_pilot_stage1: f64,
     mean_pilot_stage2_low: f64,
     mean_pilot_stage2_high: f64,
@@ -324,7 +327,7 @@ fn pooled_two_batch_design(target: PrefixDesign, kappa: f64, pilot_p: f64, floor
     Ok(pooled)
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct PilotEstimate {
     profile: VarianceProfile,
     stage1_count: usize,
@@ -441,6 +444,9 @@ fn evaluate_design(
         mse,
         analytic_mse,
         expected_labels: total_labels / (n * evaluation_n as f64),
+        mean_lambda1: design.lambda1,
+        mean_lambda12_low: design.lambda12[0],
+        mean_lambda12_high: design.lambda12[1],
         mean_pilot_stage1: 0.0,
         mean_pilot_stage2_low: 0.0,
         mean_pilot_stage2_high: 0.0,
@@ -462,6 +468,9 @@ fn evaluate_batch_adaptive(
     let mut estimates = Vec::with_capacity(replicates);
     let mut analytic_mse = 0.0;
     let mut expected_labels = 0.0;
+    let mut pooled_lambda1 = 0.0;
+    let mut pooled_lambda12_low = 0.0;
+    let mut pooled_lambda12_high = 0.0;
     let mut stage1_estimates = 0.0;
     let mut stage2_low_estimates = 0.0;
     let mut stage2_high_estimates = 0.0;
@@ -485,6 +494,9 @@ fn evaluate_batch_adaptive(
             objective(world.variance, pooled, world.branch_probability) / evaluation_n as f64;
         analytic_mse += analytic_for_design;
         expected_labels += expected_label_cost(pooled, world.branch_probability);
+        pooled_lambda1 += pooled.lambda1;
+        pooled_lambda12_low += pooled.lambda12[0];
+        pooled_lambda12_high += pooled.lambda12[1];
         stage1_estimates += pilot.profile.stage1;
         stage2_low_estimates += pilot.profile.stage2[0];
         stage2_high_estimates += pilot.profile.stage2[1];
@@ -515,6 +527,9 @@ fn evaluate_batch_adaptive(
         mse,
         analytic_mse: analytic_mse / n,
         expected_labels: expected_labels / n,
+        mean_lambda1: pooled_lambda1 / n,
+        mean_lambda12_low: pooled_lambda12_low / n,
+        mean_lambda12_high: pooled_lambda12_high / n,
         mean_pilot_stage1: stage1_estimates / n,
         mean_pilot_stage2_low: stage2_low_estimates / n,
         mean_pilot_stage2_high: stage2_high_estimates / n,
@@ -601,7 +616,6 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         }
 
         let batch_design_metrics = adaptive;
-        let lambda_design = oracle.design;
         let actual_design_analytic =
             batch_design_metrics.analytic_mse * EVALUATION_N as f64;
         let gap = ((actual_design_analytic - oracle.objective) / oracle.objective.max(EPS)).max(0.0);
@@ -612,10 +626,10 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             batch_design_metrics.replicates,
             EVALUATION_N,
             world.budget,
+            batch_design_metrics.mean_lambda1,
+            batch_design_metrics.mean_lambda12_low,
+            batch_design_metrics.mean_lambda12_high,
             batch_design_metrics.expected_labels,
-            lambda_design.lambda1,
-            lambda_design.lambda12[0],
-            lambda_design.lambda12[1],
             batch_design_metrics.analytic_mse,
             batch_design_metrics.bias,
             batch_design_metrics.variance,
