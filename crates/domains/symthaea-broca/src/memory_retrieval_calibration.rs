@@ -361,6 +361,7 @@ pub fn audit_retrieval_value_estimator(
         report_sha256: String::new(),
     };
     report.report_sha256 = retrieval_calibration_report_digest(&report)?;
+    report.verify_internal_consistency()?;
 
     let capability = if passed {
         Some(ValidatedRetrievalCalibration {
