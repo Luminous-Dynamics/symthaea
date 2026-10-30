@@ -31,8 +31,10 @@ Activation begins at the receipt's `accepted_at`, not the source-controlled `rec
 
 1. Provision an `EvidenceTrustStore` from trusted configuration. Do not load signer keys from the policy being verified.
 2. Sign a `RoleScopePolicyDocument` with a policy key and attach a receipt from a distinct ingress key.
-3. Call `EvidenceTrustStore::verify_role_scope_policy(envelope, minimum_policy_version_exclusive)`.
-4. Persist the highest accepted policy version in rollback-resistant state. Supply that value on every subsequent verification. A version less than or equal to it is rejected.
+3. Verify the envelope and advance a durable version floor:
+   - `verify_role_scope_policy(envelope, minimum_policy_version_exclusive)` is the lower-level API for integrations that own the version-floor transaction.
+   - `verify_role_scope_policy_and_advance(envelope, version_store)` loads the high-water mark, verifies against it, then calls an atomic compare-and-advance before returning the token.
+4. Implement `RoleScopePolicyVersionStore` with a durable compare-and-swap shared across every worker/process. If another worker advances the floor during verification, the wrapper fails closed and returns no token. A process-local map or eventually consistent write is insufficient. A version less than or equal to the stored floor is rejected.
 5. Convert the unforgeable result with `RoleScopePolicy::from_verified`.
 6. Use `EvidenceIndex::search_bm25_for_role` or `resolve_for_role`. Both check the grant and policy activity window before retrieval/materialization.
 7. Keep the `AuthorizedEvidenceContext` provenance outside the model prompt. Pass only its `context` field to the language model.
@@ -45,6 +47,7 @@ The new unit tests cover:
 
 - valid policy signature plus independent ingress receipt;
 - stale/rolled-back policy versions;
+- atomic version-floor advancement, replay rejection, concurrent floor-update failure, and no version advancement after an invalid policy;
 - policy expiry before trusted acceptance;
 - policy payload tampering;
 - ingress receipt timestamp tampering;
@@ -58,7 +61,7 @@ These are authored tests only. They have not been compiled or executed in this e
 ## Explicit limits and production requirements
 
 - The `requesting_role` argument must be obtained from an authenticated runtime principal. The retrieval API does not authenticate caller-supplied role strings.
-- The caller must persist the highest accepted policy version in rollback-resistant storage. The in-memory token cannot prevent a process from deliberately verifying an old policy with a reset minimum version.
+- The caller must implement `RoleScopePolicyVersionStore` with durable, cross-worker atomic compare-and-swap semantics (or correctly own the version-floor transaction when using the lower-level verifier). Resetting the version floor permits rollback.
 - A cached, already verified policy does not receive instantaneous revocation when a signer key is later retired. Workers must reload the current policy, advance the version floor, and/or enforce a trusted revocation feed.
 - The evidence index is process-local. Persistent lifecycle/tombstone state must commit atomically with any durable HDC/vector index.
 - Existing low-level `search_bm25` and `resolve` methods remain available for compatibility. Multi-agent workers must use the role-authorized entry points and must not expose the low-level methods as their memory API.
