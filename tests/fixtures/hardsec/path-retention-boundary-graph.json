@@ -1,0 +1,113 @@
+{
+  "schema_version": "hardsec-path-retention-v1",
+  "fixture_id": "two-level-boundary-path-retention-0001",
+  "description": "Generic directed graph with one intra-partition path and one five-edge path crossing two partition boundaries. All source/target nodes are retained but the local-only graph omits both cross-partition edges.",
+  "nodes": [
+    {
+      "node_id": "a",
+      "partition_id": "P0"
+    },
+    {
+      "node_id": "b",
+      "partition_id": "P0"
+    },
+    {
+      "node_id": "c",
+      "partition_id": "P1"
+    },
+    {
+      "node_id": "d",
+      "partition_id": "P1"
+    },
+    {
+      "node_id": "e",
+      "partition_id": "P2"
+    },
+    {
+      "node_id": "f",
+      "partition_id": "P2"
+    },
+    {
+      "node_id": "x",
+      "partition_id": "P0"
+    },
+    {
+      "node_id": "y",
+      "partition_id": "P0"
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "e_ab",
+      "from": "a",
+      "to": "b"
+    },
+    {
+      "edge_id": "e_bc",
+      "from": "b",
+      "to": "c"
+    },
+    {
+      "edge_id": "e_cd",
+      "from": "c",
+      "to": "d"
+    },
+    {
+      "edge_id": "e_de",
+      "from": "d",
+      "to": "e"
+    },
+    {
+      "edge_id": "e_ef",
+      "from": "e",
+      "to": "f"
+    },
+    {
+      "edge_id": "e_xy",
+      "from": "x",
+      "to": "y"
+    }
+  ],
+  "critical_paths": [
+    {
+      "path_id": "path-local",
+      "source": "x",
+      "target": "y",
+      "edge_ids": [
+        "e_xy"
+      ]
+    },
+    {
+      "path_id": "path-long",
+      "source": "a",
+      "target": "f",
+      "edge_ids": [
+        "e_ab",
+        "e_bc",
+        "e_cd",
+        "e_de",
+        "e_ef"
+      ]
+    }
+  ],
+  "retained_node_ids": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "x",
+    "y"
+  ],
+  "retained_edge_ids": [
+    "e_ab",
+    "e_cd",
+    "e_ef",
+    "e_xy"
+  ],
+  "boundary_edge_ids": [
+    "e_bc",
+    "e_de"
+  ]
+}
