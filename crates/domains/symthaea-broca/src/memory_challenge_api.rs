@@ -465,9 +465,9 @@ mod tests {
                 data: vec![result("rank-1", "best evidence", 0.95), result("rank-2", "next evidence", 0.7)],
             },
         };
-        let result = execute_aml_search(&backend, search_request(2)).unwrap();
-        assert_eq!(result.data[0].id, "rank-1");
-        assert_eq!(result.data[1].id, "rank-2");
+        let response = execute_aml_search(&backend, search_request(2)).unwrap();
+        assert_eq!(response.data[0].id, "rank-1");
+        assert_eq!(response.data[1].id, "rank-2");
 
         backend.search_response.data.push(result("rank-3", "over top_k", 0.1));
         assert!(execute_aml_search(&backend, search_request(2)).unwrap_err().contains("exceeding top_k"));
