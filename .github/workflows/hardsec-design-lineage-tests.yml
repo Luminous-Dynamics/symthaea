@@ -51,6 +51,24 @@ jobs:
           cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_partition_path_audit
           cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_partition_path_stream
 
+      - name: Measure 1M-edge streaming fixture peak RSS
+        run: |
+          /usr/bin/time -v -o "$RUNNER_TEMP/hardsec-path-stream-resource.txt" \
+            cargo test --locked \
+              --manifest-path tools/hardsec-design-audit-harness/Cargo.toml \
+              --features hardsec-design-audit \
+              --example hardsec_partition_path_stream \
+              streams_large_edge_sets_with_small_witness_ledger -- --nocapture
+          cat "$RUNNER_TEMP/hardsec-path-stream-resource.txt"
+
+      - name: Upload streaming resource measurement
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-path-stream-resource-measurement
+          path: ${{ runner.temp }}/hardsec-path-stream-resource.txt
+          if-no-files-found: ignore
+
       - name: Record resolved dependency lock
         if: always()
         run: sha256sum tools/hardsec-design-audit-harness/Cargo.lock || true
