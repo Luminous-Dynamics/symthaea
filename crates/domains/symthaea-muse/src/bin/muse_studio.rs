@@ -2804,7 +2804,8 @@ fn fluidsynth_candidate_wav(
             "config_version": "muse-fluidsynth-render-config-v1",
             "renderer_path": binary.to_string_lossy(),
             "soundfont_path": soundfont.to_string_lossy(),
-            "input_midi_path": path.to_string_lossy(),
+            // The exact input MIDI bytes are bound separately by the receipt.
+            // Do not put the nonce-bearing temporary path in stable render config.
             "gain": 0.8,
             "output_format": "wav",
             "sample_rate_hz": SAMPLE_RATE,

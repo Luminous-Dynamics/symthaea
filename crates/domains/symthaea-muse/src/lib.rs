@@ -42,6 +42,7 @@ pub mod analysis_crosscheck;
 pub mod analyst;
 pub mod audio_analyzer;
 pub mod audio_preservation;
+pub mod counterfactual_influence;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
 pub mod performed_event_map;
