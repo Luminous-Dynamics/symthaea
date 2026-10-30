@@ -81,10 +81,12 @@ Reviewers must be blind to generator identity, pipeline disposition and evaluato
 
 A relation is adjudicated only when one verdict reaches the preregistered consensus threshold. A 666-permille threshold permits a two-of-three panel majority. A tie or insufficient consensus yields `ambiguous`.
 
-The report does not turn ambiguous labels into valid transformations. For accepted cases:
+The report does not turn ambiguous labels into valid transformations. Accepted, rejected and abstained candidates are each split by adjudicated semantic class. A valid candidate that the pipeline abstains on is different from an ambiguous candidate, and both differ from an invalid candidate that is correctly rejected. For accepted cases:
 - **accepted-valid** means the panel supports the intended relation;
 - **accepted-invalid** means the panel supports the opposite semantic relation;
 - **accepted-ambiguous** means the panel cannot support either conclusion.
+
+The same valid/invalid/ambiguous breakdown is retained for rejected and abstained candidates. This makes false rejection, justified rejection and unresolved abstention separately auditable.
 
 The fixed panel size enables both raw pairwise agreement and Fleiss' κ. The chance-adjusted statistic is descriptive, not evidence of independence or correctness. A panel can agree and still be wrong.
 
