@@ -211,7 +211,34 @@ The full target-free chain is now composable in the tests:
 
 The composite prior is still only a hypothesis for allocating training resources. The pipeline tests verify composition both up to promotion planning and through the multi-fidelity Successive Halving query oracle, without exposing target labels to consensus or trajectory generation; this does not establish that the composite strategy improves NAS performance. Sixteen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection in both value and runtime columns, malformed/duplicate topology, tamper detection and end-to-end composition. They have not been compiled or executed.
 
-## 10. External benchmark and data limitations
+## 10. Metered proxy acquisition (end-to-end compute fairness)
+
+The evaluator previously received the entire precomputed proxy feature table and reported its full feature-bank runtime. That does not establish how much proxy compute a specific search policy actually requested. Charging every method the same complete bank is conservative but can hide the distinction between a random baseline, a single-proxy policy and a consensus policy that needs many proxies.
+
+The new Rust module is `proxy_acquisition.rs`, tracked by [#9211](https://github.com/Luminous-Dynamics/symthaea/issues/9211). It introduces a second capability boundary before target training:
+- policy receives architecture IDs and topology encodings only;
+- one `query(architecture_id, proxy_id)` reveals one proxy score and charges its measured per-pair runtime;
+- duplicate pair queries, unknown architecture/proxy IDs, pair-query budget exhaustion and compute-time budget exhaustion reveal nothing and are recorded;
+- independent limits exist for unique architecture/proxy pairs and total proxy seconds;
+- receipt binds source artifact, disjoint calibration/evaluation splits, source proxy-catalog digest, every query attempt, every observation digest, cumulative proxy time and both budgets;
+- a materializer creates an `ArchitectureFeatures` table only when every candidate has every declared proxy successfully queried; partial data is rejected rather than filled with hidden source values or sentinels;
+- the materializer verifies receipt metadata, receipt digest, per-observation digest, cumulative/remaining time and exact proxy schema before producing the table.
+
+Thirteen Rust tests are authored for candidate metadata isolation, runtime charging, duplicate pair rejection, independent budgets, unknown IDs, deterministic receipts, exact feature schema, target-leak rejection, provenance, topology uniqueness, budget limits, complete table materialization and tamper rejection. They have not been compiled or executed.
+
+This capability boundary is still for trusted in-process policy code; a closure could capture the original feature table externally. For adversarial policy evaluation, the proxy oracle must run in a separate process/container and be the only process able to access source proxy values. The receipt makes the intended capability interface testable; it is not a security sandbox by itself.
+
+### Correct total-cost comparison
+
+Every method must now report at least two separate ledgers:
+1. **Proxy acquisition:** number of unique architecture/proxy pairs and measured proxy seconds, with the source feature-bank digest.
+2. **Target training:** fidelity requests and cumulative training-resource units, with resumable-prefix versus independent-restart cost model.
+
+The outer execution harness must later add process startup, optimizer CPU/GPU time, failed evaluations, retries, timeouts, energy, memory and accelerator utilization. Until those execution receipts exist, call the combined numbers *proxy seconds + synthetic/declared training units*, not total compute or end-to-end cost.
+
+For equal-budget experiments, run random, single-best-proxy, consensus, trajectory and combined policies through the same proxy acquisition ledger and the same multi-fidelity query oracle. Compare (a) equal proxy seconds, (b) equal training resource and (c) equal combined declared resource as separate tracks. This prevents proxy-heavy methods from receiving free evidence and prevents target-query count from being mistaken for compute cost.
+
+## 11. External benchmark and data limitations
 
 The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201, CoRA-NAS or R-MF-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
 
@@ -227,6 +254,6 @@ Nine standard-library Python tests are authored in `scripts/research/test_import
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
-## 11. Claim ceiling
+## 12. Claim ceiling
 
 This module makes multi-fidelity resource use auditable. It does not implement ZAPS, CoRA, Hyperband, BOHB, DEHB or an optimizer. Passing its synthetic tests would qualify only the evaluator contract, not NAS search quality, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
