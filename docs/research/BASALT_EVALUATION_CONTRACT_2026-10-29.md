@@ -72,6 +72,14 @@ The filesystem loader canonicalizes the supplied specification root, rejects sym
 
 The synthetic specification is public only because it is a deliberately fabricated development fixture. The same file layout does not imply that holdout specifications should be committed to a public repository.
 
+## Event-sourced evidence freshness audit
+
+The separate `xtask basalt-state-audit --input STATE-TIMELINE.json` command audits ordered resource changes and evidence records. It starts resources at generation zero, requires every evidence record to pin the exact current resource digest and generation, and uses prior evidence IDs as explicit dependency edges. A resource change increments generation and invalidates direct evidence dependents plus their transitive descendants. Unrelated evidence is retained; digest reversion does not resurrect old evidence. The report distinguishes fresh, directly stale, and transitively stale evidence, and emits a topological re-verification queue.
+
+See [the evidence freshness protocol](BASALT_EVIDENCE_FRESHNESS_2026-10-30.md), the [state timeline schema](../../benchmarks/basalt/schema/state-timeline.schema.json), and the [synthetic timeline](../../benchmarks/basalt/examples/state-timeline.example.json).
+
+This auditor establishes consistency relative to the supplied timeline; it does not authenticate event issuers, prove that a runner observed every real change, or establish that recorded checks executed honestly. Event/evidence receipt verification and isolated runner delivery remain mandatory before confirmatory scoring.
+
 ## Frozen requirement-to-verifier coverage ledger
 
 Suite-manifest schema version 3 adds a per-task requirement ledger. Each atomic requirement has a unique ID, a content-addressed source span into the pinned task specification (UTF-8 byte offsets, half-open range bounded by the frozen specification byte length), a statement digest, a pre-run expectation digest, explicit/inferred origin, ambiguity disposition, and one or more mapped blocking check IDs. Inferred requirements additionally require a content-addressed rationale; explicit requirements must not carry an inference rationale.
