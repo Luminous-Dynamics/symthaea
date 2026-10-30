@@ -19,7 +19,7 @@ Three lanes set the prior probability of a fragile asset to:
 - mixed assets: 20%;
 - fragile assets: 60%.
 
-The true per-episode fragility is not exposed to non-oracle policies. Probe modes trade signal accuracy against direct cost and disturbance:
+The true per-episode fragility is not exposed to non-oracle policies. Probe modes trade signal accuracy (and its corresponding binary mutual information under a 50/50 prior) against direct cost and disturbance:
 
 | Probe | Signal accuracy | Cost | Disturbance if robust | Disturbance if fragile |
 |---|---:|---:|---:|---:|
@@ -36,7 +36,7 @@ Disturbance at or above 0.12 causes terminal task failure. The risk-constrained 
 1. **No probe:** random prior decision; no sensing cost or disturbance.
 2. **Visual only:** low-information, non-contact measurement.
 3. **Information greedy:** chooses the most accurate probe without accounting for physical disturbance.
-4. **Cost only:** maximizes signal accuracy minus direct probe cost, still ignoring collateral disturbance.
+4. **Cost only:** maximizes mutual-information bits minus direct probe cost, still ignoring collateral disturbance.
 5. **Disturbance aware:** chooses the probe with the highest expected terminal utility under the lane's public fragility prior, including damage probability and disturbance penalty.
 6. **Risk constrained:** maximizes expected terminal utility subject to a hard 5% probability limit on crossing the damage threshold.
 7. **Oracle fragility aware:** evaluator-only upper bound that knows the hidden per-episode fragility.
@@ -52,7 +52,7 @@ Per lane and policy, report:
 - damage rate and declared risk-budget violation rate;
 - probe accuracy and counts by probe type.
 
-Decision accuracy and task success are intentionally separate. The information-greedy policy may infer the hidden state correctly but still damage a fragile target enough to make the task fail.
+Mean binary mutual information (bits) is reported separately from empirical accuracy. Decision accuracy and task success are intentionally separate. The information-greedy policy may infer the hidden state correctly but still damage a fragile target enough to make the task fail.
 
 ## Prior art and research connection
 
