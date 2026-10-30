@@ -22,7 +22,7 @@ use science_bench_refresh_validator::judge_robustness::{
 };
 use science_bench_refresh_validator::rubric_commensurability::{
     audit_rubric_commensurability, compute_rubric_commensurability_plan_commitment,
-    verify_rubric_commensurability_plan,
+    compute_rubric_construct_ontology_commitment, verify_rubric_commensurability_plan,
 };
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
@@ -66,6 +66,7 @@ fn usage(program: &str) {
             "  {program} commit-judge-factorial-plan PLAN_FIELDS.json\n",
             "  {program} verify-judge-factorial-plan PLAN.json\n",
             "  {program} analyze-judge-factorial PLAN.json RECEIPT.json\n",
+            "  {program} commit-rubric-construct-ontology CONSTRUCTS.json\n",
             "  {program} commit-rubric-commensurability-plan PLAN_FIELDS.json\n",
             "  {program} verify-rubric-commensurability-plan PLAN.json\n",
             "  {program} audit-rubric-commensurability PLAN.json\n",
@@ -185,6 +186,33 @@ fn run(args: &[String]) -> ExitCode {
                         "{}",
                         serde_json::to_string_pretty(&report)
                             .expect("judge factorial analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-rubric-construct-ontology" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let constructs_bytes = match read(&args[1], "construct ontology rows") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_rubric_construct_ontology_commitment(&constructs_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_rubric_construct_ontology_commitment.v1",
+                            "construct_ontology_sha256": commitment
+                        }))
+                        .expect("construct ontology commitment serializes")
                     );
                     ExitCode::SUCCESS
                 }
