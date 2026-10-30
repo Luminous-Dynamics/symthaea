@@ -907,6 +907,75 @@ mod tests {
     }
 
     #[test]
+    fn accepts_cover_witness_with_explicit_property_and_trace_digest() {
+        let mut packet = base_packet();
+        let cover = evidence("cover_witness", "pass");
+        add_evidence(&mut packet, cover);
+        set_claim(
+            &mut packet,
+            "trigger_activated",
+            "supported",
+            vec!["cover_witness-1"],
+        );
+        validate_packet(&packet, "0".repeat(64)).unwrap();
+    }
+
+    #[test]
+    fn accepts_functional_equivalence_with_explicit_equivalence_result() {
+        let mut packet = base_packet();
+        let mut eq = evidence("equivalence_report", "pass");
+        eq["proof_scope"] = json!("unbounded");
+        add_evidence(&mut packet, eq);
+        set_claim(
+            &mut packet,
+            "functional_equivalence",
+            "supported",
+            vec!["equivalence_report-1"],
+        );
+        validate_packet(&packet, "0".repeat(64)).unwrap();
+    }
+
+    #[test]
+    fn rejects_formal_result_that_disagrees_with_evidence_status() {
+        let mut packet = base_packet();
+        let mut formal = evidence("formal_proof", "pass");
+        formal["formal_result"] = json!("unknown");
+        add_evidence(&mut packet, formal);
+        set_claim(
+            &mut packet,
+            "bounded_reachability_not_found",
+            "supported",
+            vec!["formal_proof-1"],
+        );
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("requires status unknown"));
+    }
+
+    #[test]
+    fn rejects_unknown_claim_type_even_when_status_is_unknown() {
+        let mut packet = base_packet();
+        packet["claims"] = json!([{
+            "claim_type": "invented_security_claim",
+            "status": "unknown",
+            "scope": "not evaluated",
+            "evidence_ids": []
+        }]);
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("unsupported claim_type"));
+    }
+
+    #[test]
+    fn rejects_evidence_without_a_locator() {
+        let mut packet = base_packet();
+        packet["evidence"][0]["uri"] = Value::Null;
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("uri must be a string"));
+    }
+
+    #[test]
     fn accepts_trigger_not_observed_under_finite_budget() {
         let mut packet = base_packet();
         packet["evidence"][0]["activation_count"] = json!(0);
