@@ -19,6 +19,8 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | AgentRunbook-C | LongMemEval-V2 | 74.9% Small / 70.1% Medium | Benchmark reference | Separate V2 protocol, latency 108.3s / 139.9s |
 | MemDerive | Derived-state tasks | 30.41–48.30% evaluated memory systems | Primary paper | 10 scenarios, 4,692 events, 1,503 queries; BM25 58.28%, oracle support 96.01% |
 | SciValidityBench | Decision-use validity | +9.2 to +18.8 pp vs generic event graph | Primary paper | 64 TaskSpecs, 5 validity modules, 6 scientific domains |
+| Vera-Life | Vera-Life-Eval | 62.3% LifeEM (1,500 subset); 61.1% full | Peer-reviewed workshop paper | Qwen3-8B; action-conditioned lifecycle decisions; 8,500 questions / 41,203 evidence pieces |
+| AgentMemory BM25 | LongMemEval-S | 84.7% strict recall-all@5 (398/470) | Project component report with per-question receipts | Retrieval only; no answer model, no abstention score; multi-session strict recall 71.1% |
 
 Zep's and Mem0's published results are strong commercial reference points. They are **not direct head-to-head comparisons** with QEMem or Broca. Their models and evaluation setups differ.
 
@@ -52,7 +54,55 @@ A result may be called a direct comparison only when it matches:
 
 Store paired per-question results, confidence intervals and raw receipts. Do not tune on held-out splits. Do not conflate evidence recall with answer accuracy, nor combine LoCoMo, LongMemEval and LongMemEval-V2.
 
+
+## Lifecycle faithfulness: a first-class benchmark axis
+
+Vera-Life-Eval is the most relevant new comparator for Broca's bitemporal/proof line. It tests whether the system takes the right action when evidence changes over time, not merely whether the answer text resembles a reference answer.
+
+| Vera-Life-Eval dimension | Reported result | What it tests |
+|---|---:|---|
+| LifeEM, 1,500-question stratified subset | 62.3% | Correct answer or lifecycle-aware action under the paper's scoring rules |
+| LifeEM, full 8,500 questions | 61.1% | Full benchmark performance |
+| Best prompt-only baseline, same Qwen3-8B generator | 37.4% | Prompting without the full lifecycle controller |
+| Timestamp-only metadata regime | 58.4% | Loss of richer lifecycle relations |
+| Text-only metadata regime | 50.4% | Loss of structured time/lifecycle metadata |
+| Lifecycle-graph ablation | 31.7% | Dependence on explicit update/supersede/conflict/expiry relations |
+| Stale rejection rate, full metadata | 100% | Avoiding stale-only evidence as if it were current |
+| Over-abstention rate, full metadata | 0% | Avoiding unnecessary refusal when evidence is sufficient |
+
+**Do not compare LifeEM numerically with LoCoMo or LongMemEval answer accuracy.** LifeEM is action-conditioned: appropriate `WARN_STALE`, `EXPLAIN_CONFLICT`, `RETRIEVE_MORE` or `ABSTAIN` behavior can be credited when a direct answer is not justified. The paper uses Qwen3-8B and deterministic gold constraints rather than an LLM judge. Its 62.3% result is the 1,500-question stratified subset; the full-set result is 61.1%.
+
+This directly motivates a Broca evaluation contract with five explicit actions: `ANSWER`, `WARN_STALE`, `EXPLAIN_CONFLICT`, `RETRIEVE_MORE`, `ABSTAIN`. Each action should be accompanied by a claim-level lifecycle ledger tying the decision to exact source revisions, valid-time intervals, transaction-time cutoff, supersession/retraction state, conflict edges and authorization evidence.
+
+### Broca lifecycle scorecard
+
+Broca should reproduce the Vera-Life protocol under the same generator, metadata regimes and scoring rules before claiming superiority. Proposed gates:
+
+- **Safety conformance:** zero `ANSWER` actions supported only by stale, retracted, unauthorized, cross-scope or contested evidence in the deterministic fixture suite.
+- **Stale handling:** match the paper's 100% stale rejection under the full-metadata regime; report warning/abstention calibration separately from false stale warnings.
+- **Over-abstention:** target at or below the published 0% full-metadata result on the exact same test split; always report answerable abstentions separately.
+- **Action quality:** LifeEM at least 62.3% on the stratified subset and 61.1% on the full set as replication gates, then seek statistically significant improvement with paired per-item outputs and fixed Qwen3-8B generator/judge protocol.
+- **Ablations:** removing the lifecycle graph, bitemporal metadata, proof verifier or action policy must be measured independently; never rely on a single aggregate score.
+- **Transfer:** use the paper's source-disjoint REAL-mini-style domains as external validation; report each domain and action rather than only a pooled mean.
+
+These are prospective targets, not Broca results. Vera-Life's own paper reports that lifecycle metadata and graph structure drive much of the gain; Broca must demonstrate this under the exact protocol, not infer it from the architecture.
+
+## Retrieval is not the same as proof sufficiency
+
+The AgentMemory 0.9.31 BM25 component report gives a useful retrieval-only comparator on LongMemEval-S: 398/470 answerable questions with *all* required source sessions in the top five (84.7% strict recall-all@5), fractional recall@5 of 91.7%, any-hit@5 of 96.2%, and only 71.1% strict recall on the 121 multi-session questions. Its report includes 30 unanswerable questions but does not score abstention and does not run an answer model.
+
+Broca should therefore publish three independent stages:
+
+1. **Candidate recall:** required source/session recall@k (including strict recall-all@k), MRR/nDCG, multi-hop coverage, stale-source retrieval rate and cross-scope candidate rate.
+2. **Admissible evidence:** fraction of retrieved candidates accepted after bitemporal, lifecycle, authorization and contradiction checks; proof sufficiency rate; false proof-certificate rate; support-family diversity; exact packet cost.
+3. **Reader outcome:** answer/action accuracy, lifecycle LifeEM, abstention calibration, unsupported assertion rate, citation/proof completeness and task success.
+
+Do not collapse these into one number. A retriever can have high recall and still select stale evidence; a verifier can be sound but starved by low recall; an answerer can be accurate while using an invalid proof. Report per-stage latency and tokens so the Pareto trade-off is visible.
+
 ## External sources
+
+- Vera-Life, *Lifecycle Faithfulness for Grounded Retrieval-Augmented Generation* (GroundLM 2026, 29 October 2026): https://aclanthology.org/2026.groundlm-1.18/
+- AgentMemory 0.9.31 BM25 LongMemEval-S component report (28 October 2026): https://www.agent-memory.dev/benchmarks
 
 - QEMem, *From Relevant Memories to Sufficient Evidence* (15 October 2026): https://arxiv.org/abs/2610.22668
 - Zep research and vendor methodology: https://www.getzep.com/research/
