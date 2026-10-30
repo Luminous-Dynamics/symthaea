@@ -173,6 +173,8 @@ struct ResourceVersion {
 
 #[derive(Serialize)]
 struct ResourceChangeCommitment<'a> {
+    domain: &'static str,
+    schema_version: u32,
     run_id: &'a str,
     sequence: u64,
     event_id: &'a str,
@@ -192,6 +194,8 @@ fn resource_change_digest(
     after_digest: &str,
 ) -> Result<String, String> {
     let commitment = ResourceChangeCommitment {
+        domain: "basalt.resource-change.v1",
+        schema_version: 1,
         run_id,
         sequence,
         event_id,
