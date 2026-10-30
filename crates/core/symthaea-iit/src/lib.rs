@@ -1829,13 +1829,12 @@ mod tests {
 
     #[test]
     fn three_unit_directed_set_partition_count_matches_bell_partition_expansion() {
-        // Bell(3) has four unordered set partitions; removing the trivial block
-        // leaves 3 two-block partitions and one three-block partition:
-        // 3 * 3^2 + 1 * 3^3 = 54 block-direction assignments.
-        let without_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, false, 54).unwrap();
-        assert_eq!(without_total.len(), 22); // Deduplicated matrices, not raw assignments.
+        // The raw direction space has 3 * 3^2 + 1 * 3^3 = 54 labelings.
+        // Quotienting equal cut matrices produces exactly 22 representatives.
+        let without_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, false, 22).unwrap();
+        assert_eq!(without_total.len(), 22);
         assert!(without_total.iter().all(|p| !p.is_total_cut()));
-        let with_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, true, 54).unwrap();
+        let with_total = enumerate_iit4_system_partitions(&[0, 1, 2], 3, true, 22).unwrap();
         assert_eq!(with_total.len(), 23);
         assert!(with_total[0].is_total_cut());
     }
@@ -1906,27 +1905,25 @@ mod tests {
     }
 
     #[test]
-    fn four_and_five_unit_partition_counts_pin_combinatorial_growth() {
-        // Raw assignments are sum_k S(n,k) * (3^k), excluding the one-block
-        // partition: n=4 gives 306, n=5 gives 1,863, and n=6 gives 12,348.
-        // Deduplication reduces these to 150, 1,061, and 7,896 cut matrices.
-        let four = enumerate_iit4_system_partitions(&[0, 1, 2, 3], 4, false, 306).unwrap();
+    fn four_through_six_unit_partition_counts_pin_combinatorial_growth() {
+        // Raw 3^k labelings are quotiented to one representative per cut matrix.
+        let four = enumerate_iit4_system_partitions(&[0, 1, 2, 3], 4, false, 150).unwrap();
         assert_eq!(four.len(), 150);
 
-        let five = enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_863).unwrap();
+        let five = enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_061).unwrap();
         assert_eq!(five.len(), 1_061);
 
         let six = enumerate_iit4_system_partitions(
             &[0, 1, 2, 3, 4, 5],
             6,
             false,
-            12_348,
+            7_896,
         ).unwrap();
         assert_eq!(six.len(), 7_896);
 
         assert!(matches!(
-            enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_862),
-            Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1_862 })
+            enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_060),
+            Err(PartitionEnumerationError::BudgetExceeded { max_combinations: 1_060 })
         ));
     }
 
@@ -2034,28 +2031,31 @@ mod tests {
     }
 
     #[test]
-    fn partition_enumeration_report_distinguishes_work_from_unique_cuts() {
-        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, false, 54).unwrap();
-        assert_eq!(report.block_direction_assignments_evaluated, 54);
+    fn partition_enumeration_report_separates_raw_and_canonical_work() {
+        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, false, 22).unwrap();
+        assert_eq!(report.canonical_direction_assignments_evaluated, 22);
+        assert_eq!(report.raw_direction_assignments_equivalent, 54);
+        assert_eq!(report.redundant_direction_assignments_pruned, 32);
         assert_eq!(report.unique_non_total_cuts, 22);
-        assert_eq!(report.duplicate_cut_matrices_suppressed, 32);
         assert!(!report.total_cut_included);
         assert_eq!(report.partitions.len(), 22);
 
-        let with_total = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, true, 54).unwrap();
-        assert_eq!(with_total.block_direction_assignments_evaluated, 54);
+        let with_total = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2], 3, true, 22).unwrap();
+        assert_eq!(with_total.canonical_direction_assignments_evaluated, 22);
+        assert_eq!(with_total.raw_direction_assignments_equivalent, 54);
+        assert_eq!(with_total.redundant_direction_assignments_pruned, 32);
         assert_eq!(with_total.unique_non_total_cuts, 22);
-        assert_eq!(with_total.duplicate_cut_matrices_suppressed, 32);
         assert!(with_total.total_cut_included);
         assert_eq!(with_total.partitions.len(), 23);
     }
 
     #[test]
-    fn partition_enumeration_report_counts_large_duplicate_pressure() {
-        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2, 3, 4], 5, false, 1_863).unwrap();
-        assert_eq!(report.block_direction_assignments_evaluated, 1_863);
+    fn partition_enumeration_report_counts_pruned_direction_equivalents() {
+        let report = enumerate_iit4_system_partitions_with_stats(&[0, 1, 2, 3, 4], 5, false, 1_061).unwrap();
+        assert_eq!(report.canonical_direction_assignments_evaluated, 1_061);
+        assert_eq!(report.raw_direction_assignments_equivalent, 1_863);
+        assert_eq!(report.redundant_direction_assignments_pruned, 802);
         assert_eq!(report.unique_non_total_cuts, 1_061);
-        assert_eq!(report.duplicate_cut_matrices_suppressed, 802);
     }
 
     #[test]
@@ -2096,17 +2096,18 @@ mod tests {
 
     #[test]
     fn optimized_partition_cut_matrices_match_the_block_definition() {
-        for units in 2..=5 {
+        for units in 2..=6 {
             let candidate: Vec<usize> = (0..units).collect();
             let report = enumerate_iit4_system_partitions_with_stats(
                 &candidate,
                 units,
                 false,
                 match units {
-                    2 => 9,
-                    3 => 54,
-                    4 => 306,
-                    5 => 1_863,
+                    2 => 3,
+                    3 => 22,
+                    4 => 150,
+                    5 => 1_061,
+                    6 => 7_896,
                     _ => unreachable!(),
                 },
             ).unwrap();
@@ -2151,11 +2152,11 @@ mod tests {
         for units in 2..=6 {
             let candidate: Vec<usize> = (0..units).collect();
             let budget = match units {
-                2 => 9,
-                3 => 54,
-                4 => 306,
-                5 => 1_863,
-                6 => 12_348,
+                2 => 3,
+                3 => 22,
+                4 => 150,
+                5 => 1_061,
+                6 => 7_896,
                 _ => unreachable!(),
             };
             let expected = reference_directed_cut_matrices(units);
