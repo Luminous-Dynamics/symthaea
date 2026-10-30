@@ -270,6 +270,17 @@ Use official task/evaluator versions and keep benchmark-specific scores separate
 
 - **LongCoT:** long dependency and state retention; POAR should not be presented as LongCoT replacement.
 - **GRACE:** whether the final natural-language explanation is supported by the actual proof graph; separately label grounding versus inference errors.
+- **FaithCoT-Bench (ICLR 2026):** add instance-level CoT unfaithfulness detection. Its release describes more than 1,000 expert-annotated trajectories from four models and four domains, with more than 300 unfaithful instances. This tests whether an apparently plausible CoT faithfully reflects the decision process; it complements rather than replaces GRACE's step-level grounding and inference labels: https://proceedings.iclr.cc/paper_files/paper/2026/hash/6c7154e394e24c69409256ccf8bf0804-Abstract-Conference.html
+- **LongMemEval-V2:** use the official evaluator for long-horizon agent memory. It consumes long histories of multimodal web-agent trajectories and tests whether a memory system returns compact evidence for downstream answers; report answer accuracy and query latency: https://github.com/xiaowu0162/LongMemEval-V2
+- **TimlMemBench:** retain canonical-pool and raw-native modes separately. It tests memory revocation, supersession, restriction, and activation/usage decisions; its published package reports 208 reviewed samples, 1,566 sessions, 1,715 questions, and 1,821 governance/activation cases: https://aclanthology.org/2026.findings-emnlp.507/
+- **Faithfulness survey:** use *The Mirage of Explainability* for its taxonomy of post-hoc rationalization, sycophancy, internal alignment and external consistency. It motivates intervention-based trace tests; it is not itself a benchmark result: https://aclanthology.org/2026.emnlp-main.614/
+- **Formal proof suites:** require acceptance by an independent kernel (for example, Lean) for theorem-proving tasks; keep theorem proving separate from source-grounded empirical reasoning.
+
+### Benchmark comparability rule
+
+Do not use a single composite leaderboard as the primary SOTA claim. Public leaderboards mix different model snapshots, benchmark coverage, evaluation protocols, and sometimes provisional versus source-verified evidence. Pin each benchmark's official dataset revision, evaluator, model/checkpoint, context and inference budgets, and evaluation date. Report a separate score and cost vector for each suite. Missing results are not zero, and scores from different benchmark definitions must not be averaged into one "reasoning" number.
+
+Use leaderboard tables as discovery aids only. Promotion requires a reproducible run against the named official evaluator and a paired comparison under matched inputs and resources.
 - **TimlMemBench:** governed memory use, revocation, scope, and restraint; run canonical-pool and raw-native modes separately.
 - **LongMemEval-S / V2:** multi-session recall, temporal updates and answerable/unanswerable restraint. Report strict evidence recall-all and end-answer correctness separately.
 - **MemDerive / evolving-state tasks:** intermediate derivation and support graph correctness, including incremental updates.
