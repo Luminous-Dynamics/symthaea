@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact revision
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -111,7 +111,7 @@ jobs:
           } > target/lep-benchmark-results/reproducibility.txt
 
       - name: Upload advisory benchmark results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: lep-perf-${{ github.sha }}
           path: target/lep-benchmark-results/
