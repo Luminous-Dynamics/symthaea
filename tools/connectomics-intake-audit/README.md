@@ -282,3 +282,5 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 Then pass the exact report bytes to candidate coverage with `--spatial-frame-report spatial-frame-report.json`. The coverage audit rejects any report whose SHA-256, complete lattice digest, eligible population digest, or exact PSU/stratum export does not match the audit input. A frame pass proves tiling only inside the declared box; source-volume and eligibility-mask completeness must be independently verified.
+
+The verifier permits NOT_APPLICABLE only for a non-critical gate with a documented scope note. A critical NOT_APPLICABLE gate blocks full certification. Every uncertainty component must declare assumptions; estimated components need a point estimate, and non-estimable components cannot carry one or an interval.
