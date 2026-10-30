@@ -39,6 +39,8 @@ pub struct StateAuditCounts {
     pub evidence_fresh: usize,
     pub evidence_stale_direct: usize,
     pub evidence_stale_transitive: usize,
+    pub evidence_incomplete_dependency_coverage: usize,
+    pub evidence_invalidated_by_unknown_dependency_change: usize,
     pub evidence_usable_passes: usize,
     pub reverification_required: usize,
 }
@@ -57,6 +59,10 @@ pub struct EvidenceAssessment {
     pub evidence_kind: EvidenceKind,
     pub outcome: EvidenceOutcome,
     pub freshness: EvidenceFreshness,
+    pub dependency_coverage: DependencyCoverage,
+    pub unresolved_inputs: Vec<String>,
+    pub invalidated_by_unknown_dependency_change: bool,
+    pub requires_reverification: bool,
     pub usable_for_success: bool,
     pub stale_resources: Vec<String>,
     pub stale_ancestor_evidence_ids: Vec<String>,
@@ -84,6 +90,13 @@ pub enum EvidenceOutcome {
     Fail,
     Unresolved,
     NotRun,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DependencyCoverage {
+    Complete,
+    Incomplete,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -143,6 +156,8 @@ enum TimelineEntry {
         evidence_kind: EvidenceKind,
         outcome: EvidenceOutcome,
         evidence_digest: String,
+        dependency_coverage: DependencyCoverage,
+        unresolved_inputs: Vec<String>,
         resource_pins: Vec<ResourcePin>,
         evidence_dependencies: Vec<String>,
     },
@@ -381,6 +396,9 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
     let mut evidence_order = Vec::<String>::new();
     let mut reverse_resources = BTreeMap::<String, BTreeSet<String>>::new();
     let mut resources_with_evidence = BTreeSet::<String>::new();
+    // Fresh evidence with incomplete dependency observation is conservatively
+    // invalidated by every subsequent resource change, not treated as unrelated.
+    let mut incomplete_coverage_evidence = BTreeSet::<String>::new();
     let mut reverse_evidence = BTreeMap::<String, BTreeSet<String>>::new();
     let mut total_edges = 0_usize;
     let mut counts = StateAuditCounts {
@@ -463,10 +481,12 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     },
                 );
 
-                let direct_dependents = reverse_resources
+                let mut direct_dependents = reverse_resources
                     .get(resource_id)
                     .cloned()
                     .unwrap_or_default();
+                let unknown_coverage_dependents = incomplete_coverage_evidence.clone();
+                direct_dependents.extend(unknown_coverage_dependents.iter().cloned());
                 if !resources_with_evidence.contains(resource_id) {
                     counts.unrelated_resource_changes += 1;
                 }
@@ -477,8 +497,12 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     event_id,
                     &mut reverse_resources,
                     &reverse_evidence,
+                    &unknown_coverage_dependents,
                     &mut evidence,
                 );
+                for evidence_id in unknown_coverage_dependents {
+                    incomplete_coverage_evidence.remove(&evidence_id);
+                }
             }
             TimelineEntry::EvidenceRecorded {
                 evidence_id,
@@ -486,6 +510,8 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                 evidence_kind,
                 outcome,
                 evidence_digest,
+                dependency_coverage,
+                unresolved_inputs,
                 resource_pins,
                 evidence_dependencies,
                 ..
@@ -507,6 +533,24 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                 }
                 if evidence_dependencies.len() > MAX_EVIDENCE_PARENTS {
                     return Err(failure("E_EVIDENCE_PARENTS_LIMIT", format!("{path}.evidence_dependencies"), "evidence dependency count exceeds 4096"));
+                }
+                if unresolved_inputs.len() > MAX_EVIDENCE_PARENTS {
+                    return Err(failure("E_UNRESOLVED_INPUTS_LIMIT", format!("{path}.unresolved_inputs"), "unresolved input count exceeds 4096"));
+                }
+                let mut unresolved_input_ids = BTreeSet::new();
+                for unresolved_input in unresolved_inputs {
+                    if !valid_identifier(unresolved_input) || !unresolved_input_ids.insert(unresolved_input.clone()) {
+                        return Err(failure("E_UNRESOLVED_INPUT_ID", format!("{path}.unresolved_inputs"), "unresolved input IDs must be valid and unique"));
+                    }
+                }
+                match dependency_coverage {
+                    DependencyCoverage::Complete if !unresolved_inputs.is_empty() => {
+                        return Err(failure("E_DEPENDENCY_COVERAGE_CONTRADICTION", format!("{path}.unresolved_inputs"), "complete dependency coverage cannot declare unresolved inputs"));
+                    }
+                    DependencyCoverage::Incomplete if unresolved_inputs.is_empty() => {
+                        return Err(failure("E_DEPENDENCY_COVERAGE_EMPTY", format!("{path}.unresolved_inputs"), "incomplete dependency coverage must identify at least one unresolved input"));
+                    }
+                    _ => {}
                 }
 
                 let mut pin_ids = BTreeSet::new();
@@ -566,7 +610,12 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     evidence_kind: *evidence_kind,
                     outcome: *outcome,
                     freshness,
+                    dependency_coverage: *dependency_coverage,
+                    unresolved_inputs: unresolved_inputs.clone(),
+                    invalidated_by_unknown_dependency_change: false,
+                    requires_reverification: false,
                     usable_for_success: freshness == EvidenceFreshness::Fresh
+                        && *dependency_coverage == DependencyCoverage::Complete
                         && *outcome == EvidenceOutcome::Pass
                         && blocked_by.is_empty(),
                     stale_resources: Vec::new(),
@@ -577,6 +626,9 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
 
                 for pin in resource_pins {
                     resources_with_evidence.insert(pin.resource_id.clone());
+                }
+                if *dependency_coverage == DependencyCoverage::Incomplete {
+                    incomplete_coverage_evidence.insert(evidence_id.clone());
                 }
 
                 // Only current evidence belongs in reverse invalidation indexes.
@@ -662,8 +714,17 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
         let state = evidence
             .remove(&evidence_id)
             .expect("every ordered evidence record remains in the evidence map");
-        let assessment = state.assessment;
-        if assessment.freshness != EvidenceFreshness::Fresh {
+        let mut assessment = state.assessment;
+        if assessment.dependency_coverage == DependencyCoverage::Incomplete {
+            counts.evidence_incomplete_dependency_coverage += 1;
+        }
+        if assessment.invalidated_by_unknown_dependency_change {
+            counts.evidence_invalidated_by_unknown_dependency_change += 1;
+        }
+        assessment.requires_reverification = assessment.freshness != EvidenceFreshness::Fresh
+            || assessment.dependency_coverage == DependencyCoverage::Incomplete
+            || !assessment.blocked_by_evidence_ids.is_empty();
+        if assessment.requires_reverification {
             reverification_plan.push(assessment.evidence_id.clone());
             counts.reverification_required += 1;
         }
@@ -698,6 +759,7 @@ fn invalidate_dependents(
     event_id: &str,
     reverse_resources: &mut BTreeMap<String, BTreeSet<String>>,
     reverse_evidence: &BTreeMap<String, BTreeSet<String>>,
+    unknown_coverage_dependents: &BTreeSet<String>,
     evidence: &mut BTreeMap<String, EvidenceState>,
 ) {
     let mut queue = VecDeque::<String>::new();
@@ -707,7 +769,11 @@ fn invalidate_dependents(
             if state.assessment.freshness != EvidenceFreshness::Fresh {
                 Vec::new()
             } else {
-                state.assessment.stale_resources.push(resource_id.to_string());
+                if unknown_coverage_dependents.contains(evidence_id) {
+                    state.assessment.invalidated_by_unknown_dependency_change = true;
+                } else {
+                    state.assessment.stale_resources.push(resource_id.to_string());
+                }
                 state.assessment.invalidation_event_ids.push(event_id.to_string());
                 state.assessment.freshness = EvidenceFreshness::StaleDirect;
                 state.assessment.usable_for_success = false;
