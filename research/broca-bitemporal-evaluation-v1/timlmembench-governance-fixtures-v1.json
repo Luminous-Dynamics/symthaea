@@ -1,0 +1,756 @@
+{
+  "schema_version": "timlmembench-governed-memory-extension/v1",
+  "status": "synthetic_seed_fixtures_not_official_dataset",
+  "source": {
+    "title": "TimlMemBench: A Diagnostic Benchmark for Governed Use of Long-Term Memory in Dialogue Agents",
+    "url": "https://aclanthology.org/2026.findings-emnlp.507/",
+    "venue": "Findings of EMNLP 2026",
+    "doi": "10.18653/2026.findings-emnlp.507"
+  },
+  "note": "These six deterministic cases are a Broca extension inspired by TimlMemBench's published task categories. They are not TimlMemBench samples, official annotations, or a reproduction of its evaluator. Confirm official data access/licensing before a full benchmark run.",
+  "published_package": {
+    "reviewed_samples": 208,
+    "sessions": 1566,
+    "questions": 1715,
+    "governance_activation_cases": 1821,
+    "languages": [
+      "Chinese",
+      "English"
+    ]
+  },
+  "evaluation_modes": [
+    {
+      "mode": "canonical_pool_control",
+      "purpose": "Compare QA readers with the same reviewed sample-local memory pool; isolates downstream use when memory construction is held constant."
+    },
+    {
+      "mode": "raw_native",
+      "purpose": "Require each system to ingest raw sessions and build governed memory before answering; primary measure of full memory pipeline behavior."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "D32",
+      "name": "revoked_memory_is_not_used_after_known_retraction",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "source.retracted_at",
+        "invariant_path": "presentation.note_color"
+      },
+      "variants": [
+        {
+          "variant_id": "D32-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "source": {
+              "revision_id": "r1",
+              "scope_id": "user-1",
+              "retracted_at": null,
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "note_color": "blue"
+            }
+          },
+          "oracle": {
+            "status": "admissible",
+            "action": "use_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D32-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "source": {
+              "revision_id": "r1",
+              "scope_id": "user-1",
+              "retracted_at": "2026-02-01T00:00:00Z",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "note_color": "blue"
+            }
+          },
+          "oracle": {
+            "status": "retracted",
+            "action": "suppress_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D32-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "source": {
+              "revision_id": "r1",
+              "scope_id": "user-1",
+              "retracted_at": null,
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "note_color": "amber"
+            }
+          },
+          "oracle": {
+            "status": "admissible",
+            "action": "use_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D32-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "source": {
+              "revision_id": "r1",
+              "scope_id": "user-1",
+              "retracted_at": null,
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "note_color": "blue"
+            }
+          },
+          "oracle": {
+            "status": "admissible",
+            "action": "use_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D32-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "source": {
+              "revision_id": "r1",
+              "scope_id": "user-1",
+              "retracted_at": "2026-02-01T00:00:00Z",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "note_color": "amber"
+            }
+          },
+          "oracle": {
+            "status": "retracted",
+            "action": "suppress_revision_r1"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D33",
+      "name": "supersession_respects_as_known_time",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "query.known_at",
+        "invariant_path": "presentation.format"
+      },
+      "variants": [
+        {
+          "variant_id": "D33-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "history": {
+              "revision_r1": "plan-A",
+              "revision_r2": "plan-B",
+              "r2_supersedes_r1_at": "2026-02-01T00:00:00Z"
+            },
+            "presentation": {
+              "format": "verbose"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_revision": "r1",
+            "value": "plan-A",
+            "action": "use_historical_revision"
+          }
+        },
+        {
+          "variant_id": "D33-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-02-02T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "history": {
+              "revision_r1": "plan-A",
+              "revision_r2": "plan-B",
+              "r2_supersedes_r1_at": "2026-02-01T00:00:00Z"
+            },
+            "presentation": {
+              "format": "verbose"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_revision": "r2",
+            "value": "plan-B",
+            "action": "use_current_revision"
+          }
+        },
+        {
+          "variant_id": "D33-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "history": {
+              "revision_r1": "plan-A",
+              "revision_r2": "plan-B",
+              "r2_supersedes_r1_at": "2026-02-01T00:00:00Z"
+            },
+            "presentation": {
+              "format": "compact"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_revision": "r1",
+            "value": "plan-A",
+            "action": "use_historical_revision"
+          }
+        },
+        {
+          "variant_id": "D33-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-01-31T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "history": {
+              "revision_r1": "plan-A",
+              "revision_r2": "plan-B",
+              "r2_supersedes_r1_at": "2026-02-01T00:00:00Z"
+            },
+            "presentation": {
+              "format": "verbose"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_revision": "r1",
+            "value": "plan-A",
+            "action": "use_historical_revision"
+          }
+        },
+        {
+          "variant_id": "D33-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "known_at": "2026-02-02T00:00:00Z",
+              "valid_at": "2026-01-15"
+            },
+            "history": {
+              "revision_r1": "plan-A",
+              "revision_r2": "plan-B",
+              "r2_supersedes_r1_at": "2026-02-01T00:00:00Z"
+            },
+            "presentation": {
+              "format": "compact"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_revision": "r2",
+            "value": "plan-B",
+            "action": "use_current_revision"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D34",
+      "name": "private_scope_does_not_cross_user_boundary",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "request.scope_id",
+        "invariant_path": "presentation.section_order"
+      },
+      "variants": [
+        {
+          "variant_id": "D34-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "request": {
+              "scope_id": "user-1"
+            },
+            "source": {
+              "scope_id": "user-1",
+              "revision_id": "r1",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "section_order": "source"
+            }
+          },
+          "oracle": {
+            "status": "in_scope",
+            "action": "may_retrieve_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D34-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "request": {
+              "scope_id": "user-2"
+            },
+            "source": {
+              "scope_id": "user-1",
+              "revision_id": "r1",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "section_order": "source"
+            }
+          },
+          "oracle": {
+            "status": "out_of_scope",
+            "action": "do_not_retrieve_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D34-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "request": {
+              "scope_id": "user-1"
+            },
+            "source": {
+              "scope_id": "user-1",
+              "revision_id": "r1",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "section_order": "reverse"
+            }
+          },
+          "oracle": {
+            "status": "in_scope",
+            "action": "may_retrieve_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D34-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "request": {
+              "scope_id": "user-1"
+            },
+            "source": {
+              "scope_id": "user-1",
+              "revision_id": "r1",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "section_order": "source"
+            }
+          },
+          "oracle": {
+            "status": "in_scope",
+            "action": "may_retrieve_revision_r1"
+          }
+        },
+        {
+          "variant_id": "D34-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "request": {
+              "scope_id": "user-2"
+            },
+            "source": {
+              "scope_id": "user-1",
+              "revision_id": "r1",
+              "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "presentation": {
+              "section_order": "reverse"
+            }
+          },
+          "oracle": {
+            "status": "out_of_scope",
+            "action": "do_not_retrieve_revision_r1"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D35",
+      "name": "derived_memory_requires_resolvable_source_provenance",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "provenance.source_span_digest_matches",
+        "invariant_path": "presentation.filename_style"
+      },
+      "variants": [
+        {
+          "variant_id": "D35-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "provenance": {
+              "source_revision_id": "r1",
+              "source_pointer": "/messages/3/content",
+              "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_span_digest_matches": true
+            },
+            "presentation": {
+              "filename_style": "full"
+            }
+          },
+          "oracle": {
+            "status": "provenance_verified",
+            "action": "allow_evidence_use"
+          }
+        },
+        {
+          "variant_id": "D35-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "provenance": {
+              "source_revision_id": "r1",
+              "source_pointer": "/messages/3/content",
+              "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_span_digest_matches": false
+            },
+            "presentation": {
+              "filename_style": "full"
+            }
+          },
+          "oracle": {
+            "status": "provenance_invalid",
+            "action": "reject_derived_memory"
+          }
+        },
+        {
+          "variant_id": "D35-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "provenance": {
+              "source_revision_id": "r1",
+              "source_pointer": "/messages/3/content",
+              "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_span_digest_matches": true
+            },
+            "presentation": {
+              "filename_style": "short"
+            }
+          },
+          "oracle": {
+            "status": "provenance_verified",
+            "action": "allow_evidence_use"
+          }
+        },
+        {
+          "variant_id": "D35-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "provenance": {
+              "source_revision_id": "r1",
+              "source_pointer": "/messages/3/content",
+              "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_span_digest_matches": true
+            },
+            "presentation": {
+              "filename_style": "full"
+            }
+          },
+          "oracle": {
+            "status": "provenance_verified",
+            "action": "allow_evidence_use"
+          }
+        },
+        {
+          "variant_id": "D35-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "provenance": {
+              "source_revision_id": "r1",
+              "source_pointer": "/messages/3/content",
+              "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "source_span_digest_matches": false
+            },
+            "presentation": {
+              "filename_style": "short"
+            }
+          },
+          "oracle": {
+            "status": "provenance_invalid",
+            "action": "reject_derived_memory"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D36",
+      "name": "memory_activation_requires_current_request_relevance",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "request.goal_matches_memory",
+        "invariant_path": "presentation.language"
+      },
+      "variants": [
+        {
+          "variant_id": "D36-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "request": {
+              "goal_matches_memory": true,
+              "current_goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "memory": {
+              "goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "active": true,
+              "source_revision_id": "r1"
+            },
+            "presentation": {
+              "language": "zh"
+            }
+          },
+          "oracle": {
+            "status": "relevant",
+            "action": "activate_memory_r1"
+          }
+        },
+        {
+          "variant_id": "D36-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "request": {
+              "goal_matches_memory": false,
+              "current_goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "memory": {
+              "goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "active": true,
+              "source_revision_id": "r1"
+            },
+            "presentation": {
+              "language": "zh"
+            }
+          },
+          "oracle": {
+            "status": "irrelevant",
+            "action": "do_not_activate_memory_r1"
+          }
+        },
+        {
+          "variant_id": "D36-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "request": {
+              "goal_matches_memory": true,
+              "current_goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "memory": {
+              "goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "active": true,
+              "source_revision_id": "r1"
+            },
+            "presentation": {
+              "language": "en"
+            }
+          },
+          "oracle": {
+            "status": "relevant",
+            "action": "activate_memory_r1"
+          }
+        },
+        {
+          "variant_id": "D36-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "request": {
+              "goal_matches_memory": true,
+              "current_goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "memory": {
+              "goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "active": true,
+              "source_revision_id": "r1"
+            },
+            "presentation": {
+              "language": "zh"
+            }
+          },
+          "oracle": {
+            "status": "relevant",
+            "action": "activate_memory_r1"
+          }
+        },
+        {
+          "variant_id": "D36-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "request": {
+              "goal_matches_memory": false,
+              "current_goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "memory": {
+              "goal_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "active": true,
+              "source_revision_id": "r1"
+            },
+            "presentation": {
+              "language": "en"
+            }
+          },
+          "oracle": {
+            "status": "irrelevant",
+            "action": "do_not_activate_memory_r1"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D37",
+      "name": "restraint_when_memory_does_not_support_claim",
+      "decision": "governed_memory_use",
+      "intervention_contract": {
+        "decisive_path": "evidence.supports_requested_claim",
+        "invariant_path": "presentation.citation_style"
+      },
+      "variants": [
+        {
+          "variant_id": "D37-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "request": {
+              "claim_id": "claim-7"
+            },
+            "evidence": {
+              "revision_id": "r1",
+              "claim_id": "claim-7",
+              "supports_requested_claim": true
+            },
+            "presentation": {
+              "citation_style": "author-date"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "action": "emit_claim_with_source_r1"
+          }
+        },
+        {
+          "variant_id": "D37-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "request": {
+              "claim_id": "claim-7"
+            },
+            "evidence": {
+              "revision_id": "r1",
+              "claim_id": "claim-7",
+              "supports_requested_claim": false
+            },
+            "presentation": {
+              "citation_style": "author-date"
+            }
+          },
+          "oracle": {
+            "status": "unsupported",
+            "action": "abstain_from_claim"
+          }
+        },
+        {
+          "variant_id": "D37-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "request": {
+              "claim_id": "claim-7"
+            },
+            "evidence": {
+              "revision_id": "r1",
+              "claim_id": "claim-7",
+              "supports_requested_claim": true
+            },
+            "presentation": {
+              "citation_style": "numeric"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "action": "emit_claim_with_source_r1"
+          }
+        },
+        {
+          "variant_id": "D37-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "request": {
+              "claim_id": "claim-7"
+            },
+            "evidence": {
+              "revision_id": "r1",
+              "claim_id": "claim-7",
+              "supports_requested_claim": true
+            },
+            "presentation": {
+              "citation_style": "author-date"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "action": "emit_claim_with_source_r1"
+          }
+        },
+        {
+          "variant_id": "D37-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "request": {
+              "claim_id": "claim-7"
+            },
+            "evidence": {
+              "revision_id": "r1",
+              "claim_id": "claim-7",
+              "supports_requested_claim": false
+            },
+            "presentation": {
+              "citation_style": "numeric"
+            }
+          },
+          "oracle": {
+            "status": "unsupported",
+            "action": "abstain_from_claim"
+          }
+        }
+      ]
+    }
+  ],
+  "invariants": [
+    "Oracle labels never enter reader-visible input or runtime index.",
+    "A raw-native result must never be substituted with canonical-pool QA performance.",
+    "Revoked/superseded revisions remain historically auditable but cannot be silently selected for a query whose known_at includes the governing event.",
+    "Scope, provenance, relevance and support are separate gates.",
+    "Abstention/restraint and activation are scored as positive governed behavior, not as missing recall."
+  ]
+}
