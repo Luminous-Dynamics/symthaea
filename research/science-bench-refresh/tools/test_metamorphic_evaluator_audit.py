@@ -90,6 +90,7 @@ class MetamorphicEvaluatorAuditTests(unittest.TestCase):
     def test_evidence_withdrawal_cannot_increase_support_or_affected_score(self) -> None:
         receipt = copy.deepcopy(self.receipt)
         target = next(row for row in receipt["observations"] if row["pair_id"] == "evidence-withdrawal-001")
+        target["baseline"]["decision"] = "insufficient_evidence"
         target["variant"]["decision"] = "supported_within_scope"
         target["variant"]["criterion_scores"][1]["score_millionths"] = 950_000
         report = self.run_audit(receipt=receipt)
