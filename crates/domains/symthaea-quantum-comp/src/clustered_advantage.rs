@@ -218,7 +218,9 @@ pub fn analyze_clustered_advantage(
         }
 
         match cluster_fingerprints.get(observation.cluster_fingerprint.as_str()) {
-            Some(existing_id) if *existing_id != observation.independent_cluster_id => {
+            Some(existing_id)
+                if *existing_id != observation.independent_cluster_id.as_str() =>
+            {
                 return Err(ClusteredAdvantageError::DuplicateClusterFingerprint);
             }
             Some(_) => {}
@@ -485,7 +487,10 @@ pub fn run_cluster_null_stress(
     for &icc in &config.intraclass_correlations {
         let mut naive_rejections = 0usize;
         let mut cluster_rejections = 0usize;
-        let total_instances = config.independent_clusters * config.instances_per_cluster;
+        let total_instances = config
+            .independent_clusters
+            .checked_mul(config.instances_per_cluster)
+            .ok_or(ClusteredAdvantageError::InvalidStressConfig)?;
 
         for _ in 0..config.replicates {
             let mut total_instance_wins = 0usize;
