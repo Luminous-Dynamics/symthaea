@@ -1159,13 +1159,20 @@ mod tests {
             {
                 candidate_a_score += 40_000;
             }
+            let decision = if condition.factors.candidate_order == CandidateOrderV1::CandidateAFirst
+                || condition.factors.provenance_cue == ProvenanceCueV1::Displayed
+            {
+                FactorialDecisionV1::CandidateA
+            } else {
+                FactorialDecisionV1::CandidateB
+            };
             observations.push(JudgeFactorialObservationV1 {
                 condition_id: condition.condition_id.clone(),
                 execution_ordinal: *execution_ordinals.get(condition.condition_id.as_str()).unwrap(),
                 input_sha256: condition.input_sha256.clone(),
                 status: FactorialExecutionStatusV1::Completed,
                 judge_receipt_sha256: Some(digest(&format!("receipt-{}", condition.condition_id))),
-                decision: Some(FactorialDecisionV1::CandidateA),
+                decision: Some(decision),
                 candidate_a_score_millionths: Some(candidate_a_score),
                 candidate_b_score_millionths: Some(600_000),
                 criterion_scores: block.criterion_ids.iter().map(|criterion_id| CriterionOutcomeV1 {
@@ -1209,16 +1216,28 @@ mod tests {
         let candidate = report.fields.main_effects.iter()
             .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
         assert_eq!(candidate.candidate_score_gap_delta_millionths, Some(-30_000.0));
+        assert_eq!(candidate.candidate_a_choice_rate_delta_millionths, Some(-500_000.0));
         let option = report.fields.main_effects.iter()
             .find(|effect| effect.factor == JudgeNuisanceFactorV1::ScoreOptionOrder).unwrap();
         assert!(option.criterion_score_delta_millionths.unwrap() > 0.0);
         let provenance = report.fields.main_effects.iter()
             .find(|effect| effect.factor == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
         assert_eq!(provenance.candidate_score_gap_delta_millionths, Some(20_000.0));
+        assert_eq!(provenance.candidate_a_choice_rate_delta_millionths, Some(500_000.0));
         let interaction = report.fields.pairwise_interactions.iter()
             .find(|effect| effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
                 && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
         assert_eq!(interaction.candidate_score_gap_interaction_millionths, Some(40_000.0));
+        assert_eq!(interaction.candidate_a_choice_interaction_millionths, Some(1_000_000.0));
+        assert_eq!(
+            [
+                interaction.decisive_00_count,
+                interaction.decisive_01_count,
+                interaction.decisive_10_count,
+                interaction.decisive_11_count,
+            ],
+            [16, 16, 16, 16]
+        );
     }
 
     #[test]
