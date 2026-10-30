@@ -700,7 +700,16 @@ mod tests {
         );
         assert!(execute_aml_add(&mut backend, request).is_err());
         assert_eq!(backend.persisted_batch_count().unwrap(), 0);
-        assert_eq!(backend.indexed_evidence_count(), 0);
+        let hits = execute_aml_search(
+            &backend,
+            AmlSearchRequest {
+                query: "valid evidence message".into(),
+                options: None,
+                user_id: "user-1".into(),
+                top_k: 10,
+            },
+        ).unwrap();
+        assert!(hits.data.is_empty());
     }
 
     #[test]
