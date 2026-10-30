@@ -159,6 +159,80 @@ impl TransferQualificationReceipt {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurveForecastCalibrationConfig {
+    pub minimum_calibration_tasks: usize,
+    pub minimum_forecasts_per_task: usize,
+    pub minimum_interval_coverage: f64,
+    pub maximum_interval_coverage: f64,
+    pub maximum_mean_absolute_error_pp: f64,
+    pub maximum_mean_interval_width_pp: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCurveForecastObservation {
+    pub task_id: String,
+    pub seed: u64,
+    pub prefix_epochs: u32,
+    pub predicted_final_regret_percent: f64,
+    pub lower_prediction_bound_percent: f64,
+    pub upper_prediction_bound_percent: f64,
+    pub observed_final_regret_percent: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCurveForecastEvidence {
+    pub predictor_sha256: String,
+    pub calibration_task_ids: Vec<String>,
+    pub observations: Vec<LearningCurveForecastObservation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurveForecastCalibrationDecision {
+    Calibrated,
+    AbstainInsufficientCalibration,
+    AbstainUndercoverage,
+    AbstainOverconservativeIntervals,
+    AbstainHighForecastError,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskCurveForecastStatistics {
+    pub task_id: String,
+    pub forecast_count: usize,
+    pub empirical_interval_coverage: Option<f64>,
+    pub mean_absolute_error_pp: Option<f64>,
+    pub mean_interval_width_pp: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CurveForecastCalibrationReceipt {
+    pub target_task_id: String,
+    pub target_artifact_sha256: String,
+    pub predictor_sha256: String,
+    pub calibration_task_ids: Vec<String>,
+    pub minimum_interval_coverage: f64,
+    pub maximum_interval_coverage: f64,
+    pub maximum_mean_absolute_error_pp: f64,
+    pub maximum_mean_interval_width_pp: f64,
+    pub task_statistics: Vec<TaskCurveForecastStatistics>,
+    pub calibration_evidence_sha256: String,
+    pub decision: CurveForecastCalibrationDecision,
+    pub decision_reason: String,
+    pub receipt_sha256: String,
+}
+
+impl CurveForecastCalibrationReceipt {
+    pub fn verify_digest(&self) -> bool {
+        digest_curve_forecast_receipt(self) == self.receipt_sha256
+    }
+
+    pub fn forecast_may_guide_fidelity(&self) -> bool {
+        self.decision == CurveForecastCalibrationDecision::Calibrated
+            && self.verify_digest()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskTransferGateError {
     pub field: String,
@@ -491,6 +565,214 @@ impl CrossTaskTransferGate {
         receipt.receipt_sha256 = digest_receipt(&receipt);
         Ok(receipt)
     }
+
+    /// Qualify a learning-curve predictor on disjoint transfer-calibration tasks before its
+    /// forecast is allowed to influence fidelity allocation on an EvaluationTarget task.
+    /// Coverage, error and interval width are checked per task so a good pooled MAE cannot
+    /// conceal a severely miscalibrated task family.
+    pub fn qualify_learning_curve_forecast(
+        &self,
+        target_task_id: &str,
+        evidence: &LearningCurveForecastEvidence,
+        config: &CurveForecastCalibrationConfig,
+    ) -> Result<CurveForecastCalibrationReceipt, TaskTransferGateError> {
+        validate_curve_forecast_config(config)?;
+        let target = self.tasks.get(target_task_id).ok_or_else(|| {
+            TaskTransferGateError::new(
+                "target_task_id",
+                "target task is not in the task registry",
+            )
+        })?;
+        if target.role != TaskRole::EvaluationTarget {
+            return Err(TaskTransferGateError::new(
+                "target_task_id",
+                "curve forecast target must have EvaluationTarget role",
+            ));
+        }
+        validate_sha256(&evidence.predictor_sha256, "evidence.predictor_sha256")?;
+        let no_historical_sources: HashSet<&str> = HashSet::new();
+        let calibration_ids = validate_calibration_task_ids(
+            &self.tasks,
+            target,
+            &no_historical_sources,
+            &HashSet::new(),
+            &TransferCalibrationEvidence {
+                model_sha256: evidence.predictor_sha256.clone(),
+                calibration_task_ids: evidence.calibration_task_ids.clone(),
+                outcomes: Vec::new(),
+            },
+        )?;
+        let calibration_set: HashSet<&str> =
+            calibration_ids.iter().map(String::as_str).collect();
+
+        let mut observations_by_task: BTreeMap<String, Vec<&LearningCurveForecastObservation>> =
+            BTreeMap::new();
+        let mut unique_prefixes: HashSet<(&str, u64, u32)> = HashSet::new();
+        for (index, observation) in evidence.observations.iter().enumerate() {
+            if !calibration_set.contains(observation.task_id.as_str()) {
+                return Err(TaskTransferGateError::new(
+                    format!("evidence.observations[{index}].task_id"),
+                    "forecast observation is not from a declared calibration task",
+                ));
+            }
+            if observation.prefix_epochs == 0 {
+                return Err(TaskTransferGateError::new(
+                    format!("evidence.observations[{index}].prefix_epochs"),
+                    "must be a positive one-based epoch count",
+                ));
+            }
+            for (field, value) in [
+                ("predicted_final_regret_percent", observation.predicted_final_regret_percent),
+                ("lower_prediction_bound_percent", observation.lower_prediction_bound_percent),
+                ("upper_prediction_bound_percent", observation.upper_prediction_bound_percent),
+                ("observed_final_regret_percent", observation.observed_final_regret_percent),
+            ] {
+                if !value.is_finite() || value < 0.0 {
+                    return Err(TaskTransferGateError::new(
+                        format!("evidence.observations[{index}].{field}"),
+                        "must be finite and non-negative",
+                    ));
+                }
+            }
+            if observation.lower_prediction_bound_percent
+                > observation.predicted_final_regret_percent
+                || observation.predicted_final_regret_percent
+                    > observation.upper_prediction_bound_percent
+            {
+                return Err(TaskTransferGateError::new(
+                    format!("evidence.observations[{index}]"),
+                    "prediction mean must lie inside the declared interval",
+                ));
+            }
+            if !unique_prefixes.insert((
+                observation.task_id.as_str(),
+                observation.seed,
+                observation.prefix_epochs,
+            )) {
+                return Err(TaskTransferGateError::new(
+                    format!("evidence.observations[{index}]"),
+                    "duplicate task/seed/prefix-epoch forecast",
+                ));
+            }
+            observations_by_task
+                .entry(observation.task_id.clone())
+                .or_default()
+                .push(observation);
+        }
+
+        let mut statistics = Vec::with_capacity(calibration_ids.len());
+        let mut insufficient =
+            calibration_ids.len() < config.minimum_calibration_tasks;
+        for task_id in &calibration_ids {
+            let observations = observations_by_task
+                .get(task_id)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let count = observations.len();
+            insufficient |= count < config.minimum_forecasts_per_task;
+            let coverage = if count == 0 {
+                None
+            } else {
+                let covered = observations
+                    .iter()
+                    .filter(|observation| {
+                        observation.observed_final_regret_percent
+                            >= observation.lower_prediction_bound_percent
+                            && observation.observed_final_regret_percent
+                                <= observation.upper_prediction_bound_percent
+                    })
+                    .count();
+                Some(covered as f64 / count as f64)
+            };
+            let absolute_errors: Vec<f64> = observations
+                .iter()
+                .map(|observation| {
+                    (observation.predicted_final_regret_percent
+                        - observation.observed_final_regret_percent)
+                        .abs()
+                })
+                .collect();
+            let interval_widths: Vec<f64> = observations
+                .iter()
+                .map(|observation| {
+                    observation.upper_prediction_bound_percent
+                        - observation.lower_prediction_bound_percent
+                })
+                .collect();
+            statistics.push(TaskCurveForecastStatistics {
+                task_id: task_id.clone(),
+                forecast_count: count,
+                empirical_interval_coverage: coverage,
+                mean_absolute_error_pp: mean(&absolute_errors),
+                mean_interval_width_pp: mean(&interval_widths),
+            });
+        }
+
+        let any_undercoverage = statistics.iter().any(|stats| {
+            stats.empirical_interval_coverage.is_some_and(|coverage| {
+                coverage < config.minimum_interval_coverage
+            })
+        });
+        let any_overconservative = statistics.iter().any(|stats| {
+            stats.empirical_interval_coverage.is_some_and(|coverage| {
+                coverage > config.maximum_interval_coverage
+            }) || stats.mean_interval_width_pp.is_some_and(|width| {
+                width > config.maximum_mean_interval_width_pp
+            })
+        });
+        let any_high_error = statistics.iter().any(|stats| {
+            stats.mean_absolute_error_pp.is_some_and(|error| {
+                error > config.maximum_mean_absolute_error_pp
+            })
+        });
+
+        let (decision, reason) = if insufficient {
+            (
+                CurveForecastCalibrationDecision::AbstainInsufficientCalibration,
+                "calibration task/forecast minimum not met; forecast cannot guide fidelity".to_string(),
+            )
+        } else if any_undercoverage {
+            (
+                CurveForecastCalibrationDecision::AbstainUndercoverage,
+                "at least one calibration task has interval coverage below the required floor".to_string(),
+            )
+        } else if any_overconservative {
+            (
+                CurveForecastCalibrationDecision::AbstainOverconservativeIntervals,
+                "at least one calibration task has excessively wide or over-covering intervals".to_string(),
+            )
+        } else if any_high_error {
+            (
+                CurveForecastCalibrationDecision::AbstainHighForecastError,
+                "at least one calibration task exceeds the mean forecast-error limit".to_string(),
+            )
+        } else {
+            (
+                CurveForecastCalibrationDecision::Calibrated,
+                "all calibration tasks meet forecast coverage, error and interval-width limits".to_string(),
+            )
+        };
+
+        let calibration_evidence_sha256 =
+            digest_curve_forecast_evidence(evidence, &calibration_ids);
+        let mut receipt = CurveForecastCalibrationReceipt {
+            target_task_id: target.task_id.clone(),
+            target_artifact_sha256: target.artifact_sha256.clone(),
+            predictor_sha256: evidence.predictor_sha256.clone(),
+            calibration_task_ids: calibration_ids,
+            minimum_interval_coverage: config.minimum_interval_coverage,
+            maximum_interval_coverage: config.maximum_interval_coverage,
+            maximum_mean_absolute_error_pp: config.maximum_mean_absolute_error_pp,
+            maximum_mean_interval_width_pp: config.maximum_mean_interval_width_pp,
+            task_statistics: statistics,
+            calibration_evidence_sha256,
+            decision,
+            decision_reason: reason,
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 = digest_curve_forecast_receipt(&receipt);
+        Ok(receipt)
+    }
 }
 
 fn validate_config(config: &TransferGateConfig) -> Result<(), TaskTransferGateError> {
@@ -518,6 +800,41 @@ fn validate_config(config: &TransferGateConfig) -> Result<(), TaskTransferGateEr
         return Err(TaskTransferGateError::new(
             "confidence_z",
             "must be finite and positive",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_curve_forecast_config(
+    config: &CurveForecastCalibrationConfig,
+) -> Result<(), TaskTransferGateError> {
+    if config.minimum_calibration_tasks < 2
+        || config.minimum_forecasts_per_task < 2
+    {
+        return Err(TaskTransferGateError::new(
+            "curve_forecast_config",
+            "minimum calibration task and forecast counts must each be at least two",
+        ));
+    }
+    if !config.minimum_interval_coverage.is_finite()
+        || !config.maximum_interval_coverage.is_finite()
+        || config.minimum_interval_coverage < 0.0
+        || config.maximum_interval_coverage > 1.0
+        || config.minimum_interval_coverage > config.maximum_interval_coverage
+    {
+        return Err(TaskTransferGateError::new(
+            "curve_forecast_config.interval_coverage",
+            "coverage limits must satisfy 0 <= minimum <= maximum <= 1",
+        ));
+    }
+    if !config.maximum_mean_absolute_error_pp.is_finite()
+        || config.maximum_mean_absolute_error_pp < 0.0
+        || !config.maximum_mean_interval_width_pp.is_finite()
+        || config.maximum_mean_interval_width_pp <= 0.0
+    {
+        return Err(TaskTransferGateError::new(
+            "curve_forecast_config.error_or_width",
+            "maximum error must be finite/non-negative and maximum interval width finite/positive",
         ));
     }
     Ok(())
@@ -765,6 +1082,80 @@ fn decision_byte(decision: TransferGateDecision) -> u8 {
         TransferGateDecision::AbstainUncertainBenefit => 2,
         TransferGateDecision::AbstainNoDemonstratedBenefit => 3,
         TransferGateDecision::RejectNegativeTransfer => 4,
+    }
+}
+
+fn digest_curve_forecast_evidence(
+    evidence: &LearningCurveForecastEvidence,
+    calibration_task_ids: &[String],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nas.curve-forecast-calibration-evidence.v0.1");
+    update_string(&mut hasher, &evidence.predictor_sha256);
+    hasher.update((calibration_task_ids.len() as u64).to_be_bytes());
+    for task_id in calibration_task_ids {
+        update_string(&mut hasher, task_id);
+    }
+    let mut observations: Vec<&LearningCurveForecastObservation> =
+        evidence.observations.iter().collect();
+    observations.sort_by(|left, right| {
+        left.task_id
+            .cmp(&right.task_id)
+            .then_with(|| left.seed.cmp(&right.seed))
+            .then_with(|| left.prefix_epochs.cmp(&right.prefix_epochs))
+    });
+    hasher.update((observations.len() as u64).to_be_bytes());
+    for observation in observations {
+        update_string(&mut hasher, &observation.task_id);
+        hasher.update(observation.seed.to_be_bytes());
+        hasher.update(observation.prefix_epochs.to_be_bytes());
+        hasher.update(observation.predicted_final_regret_percent.to_bits().to_be_bytes());
+        hasher.update(observation.lower_prediction_bound_percent.to_bits().to_be_bytes());
+        hasher.update(observation.upper_prediction_bound_percent.to_bits().to_be_bytes());
+        hasher.update(observation.observed_final_regret_percent.to_bits().to_be_bytes());
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
+fn digest_curve_forecast_receipt(
+    receipt: &CurveForecastCalibrationReceipt,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nas.curve-forecast-calibration-receipt.v0.1");
+    update_string(&mut hasher, &receipt.target_task_id);
+    update_string(&mut hasher, &receipt.target_artifact_sha256);
+    update_string(&mut hasher, &receipt.predictor_sha256);
+    update_string(&mut hasher, &receipt.calibration_evidence_sha256);
+    hasher.update(receipt.minimum_interval_coverage.to_bits().to_be_bytes());
+    hasher.update(receipt.maximum_interval_coverage.to_bits().to_be_bytes());
+    hasher.update(receipt.maximum_mean_absolute_error_pp.to_bits().to_be_bytes());
+    hasher.update(receipt.maximum_mean_interval_width_pp.to_bits().to_be_bytes());
+    hasher.update([curve_forecast_decision_byte(receipt.decision)]);
+    update_string(&mut hasher, &receipt.decision_reason);
+    hasher.update((receipt.calibration_task_ids.len() as u64).to_be_bytes());
+    for task_id in &receipt.calibration_task_ids {
+        update_string(&mut hasher, task_id);
+    }
+    hasher.update((receipt.task_statistics.len() as u64).to_be_bytes());
+    for stats in &receipt.task_statistics {
+        update_string(&mut hasher, &stats.task_id);
+        hasher.update((stats.forecast_count as u64).to_be_bytes());
+        update_optional_f64(&mut hasher, stats.empirical_interval_coverage);
+        update_optional_f64(&mut hasher, stats.mean_absolute_error_pp);
+        update_optional_f64(&mut hasher, stats.mean_interval_width_pp);
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
+fn curve_forecast_decision_byte(
+    decision: CurveForecastCalibrationDecision,
+) -> u8 {
+    match decision {
+        CurveForecastCalibrationDecision::Calibrated => 0,
+        CurveForecastCalibrationDecision::AbstainInsufficientCalibration => 1,
+        CurveForecastCalibrationDecision::AbstainUndercoverage => 2,
+        CurveForecastCalibrationDecision::AbstainOverconservativeIntervals => 3,
+        CurveForecastCalibrationDecision::AbstainHighForecastError => 4,
     }
 }
 
@@ -1052,6 +1443,155 @@ mod tests {
         let mut e = evidence([-2.0, -2.0, -2.0]);
         e.model_sha256 = "8".repeat(64);
         assert!(gate().qualify(&proposal(), &e).is_err());
+    }
+
+    fn curve_forecast_config() -> CurveForecastCalibrationConfig {
+        CurveForecastCalibrationConfig {
+            minimum_calibration_tasks: 3,
+            minimum_forecasts_per_task: 30,
+            minimum_interval_coverage: 0.90,
+            maximum_interval_coverage: 1.0,
+            maximum_mean_absolute_error_pp: 1.0,
+            maximum_mean_interval_width_pp: 5.0,
+        }
+    }
+
+    fn curve_forecast_evidence(
+        prediction_error_pp: f64,
+        interval_half_width_pp: f64,
+    ) -> LearningCurveForecastEvidence {
+        let task_ids = [
+            "calibration-nb101",
+            "calibration-nats",
+            "calibration-fcnet",
+        ];
+        let mut observations = Vec::new();
+        for task_id in task_ids {
+            for seed in 0..30 {
+                let actual = 10.0 + (seed % 4) as f64 * 0.1;
+                let predicted = actual + prediction_error_pp;
+                observations.push(LearningCurveForecastObservation {
+                    task_id: task_id.into(),
+                    seed,
+                    prefix_epochs: 15,
+                    predicted_final_regret_percent: predicted,
+                    lower_prediction_bound_percent: (predicted - interval_half_width_pp).max(0.0),
+                    upper_prediction_bound_percent: predicted + interval_half_width_pp,
+                    observed_final_regret_percent: actual,
+                });
+            }
+        }
+        LearningCurveForecastEvidence {
+            predictor_sha256: "8".repeat(64),
+            calibration_task_ids: task_ids.iter().map(|task_id| (*task_id).into()).collect(),
+            observations,
+        }
+    }
+
+    #[test]
+    fn accepts_curve_forecast_when_each_task_has_calibrated_narrow_intervals() {
+        let receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &curve_forecast_evidence(0.2, 1.0),
+                &curve_forecast_config(),
+            )
+            .unwrap();
+        assert_eq!(receipt.decision, CurveForecastCalibrationDecision::Calibrated);
+        assert!(receipt.forecast_may_guide_fidelity());
+        assert_eq!(receipt.task_statistics.len(), 3);
+    }
+
+    #[test]
+    fn rejects_undercovered_learning_curve_forecasts() {
+        let receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &curve_forecast_evidence(2.0, 0.1),
+                &curve_forecast_config(),
+            )
+            .unwrap();
+        assert_eq!(receipt.decision, CurveForecastCalibrationDecision::AbstainUndercoverage);
+        assert!(!receipt.forecast_may_guide_fidelity());
+    }
+
+    #[test]
+    fn rejects_overwide_learning_curve_intervals() {
+        let receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &curve_forecast_evidence(0.0, 10.0),
+                &curve_forecast_config(),
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.decision,
+            CurveForecastCalibrationDecision::AbstainOverconservativeIntervals
+        );
+    }
+
+    #[test]
+    fn rejects_high_forecast_error_even_when_intervals_cover() {
+        let mut config = curve_forecast_config();
+        config.maximum_mean_interval_width_pp = 20.0;
+        let receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &curve_forecast_evidence(3.0, 5.0),
+                &config,
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.decision,
+            CurveForecastCalibrationDecision::AbstainHighForecastError
+        );
+    }
+
+    #[test]
+    fn curve_forecast_gate_abstains_on_insufficient_task_or_seed_count() {
+        let mut evidence = curve_forecast_evidence(0.2, 1.0);
+        evidence.calibration_task_ids.pop();
+        evidence
+            .observations
+            .retain(|observation| observation.task_id != "calibration-fcnet");
+        let receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &evidence,
+                &curve_forecast_config(),
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.decision,
+            CurveForecastCalibrationDecision::AbstainInsufficientCalibration
+        );
+    }
+
+    #[test]
+    fn curve_forecast_gate_rejects_evaluation_task_in_calibration() {
+        let mut evidence = curve_forecast_evidence(0.2, 1.0);
+        evidence.calibration_task_ids[0] = "target-nb201-imagenet16".into();
+        assert!(gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &evidence,
+                &curve_forecast_config(),
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn curve_forecast_receipt_detects_tampering() {
+        let mut receipt = gate()
+            .qualify_learning_curve_forecast(
+                "target-nb201-imagenet16",
+                &curve_forecast_evidence(0.2, 1.0),
+                &curve_forecast_config(),
+            )
+            .unwrap();
+        assert!(receipt.verify_digest());
+        receipt.task_statistics[0].mean_absolute_error_pp = Some(99.0);
+        assert!(!receipt.verify_digest());
     }
 
     #[test]
