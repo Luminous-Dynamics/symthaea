@@ -1014,7 +1014,14 @@ mod tests {
             "trial_id": id,
             "trial_index": index,
             "condition": condition,
-            "sequence_sha256": format!("{:064x}", index),
+            "sequence_sha256": format!(
+                "{:064x}",
+                if condition == "active" {
+                    index
+                } else {
+                    index + 1000
+                }
+            ),
             "trigger_status": trigger,
             "payload_status": payload
         });
@@ -1206,6 +1213,68 @@ mod tests {
             trial.as_object_mut().unwrap().remove("formal_bound_cycles");
         }
         assert!(parse_campaign(&value).unwrap_err().contains("formal_cover requires formal_result"));
+    }
+
+    #[test]
+    fn rejects_bounded_no_counterexample_when_trial_claims_activation() {
+        let mut value = fixture();
+        value["stimulus"]["mode"] = json!("formal_cover");
+        value["stimulus"]["sampling_model"] = json!("deterministic_enumeration");
+        value["trials"][0]["formal_result"] = json!("bounded_no_counterexample");
+        value["trials"][0]["formal_bound_cycles"] = json!(8);
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("bounded_no_counterexample requires trigger_status=not_observed"));
+    }
+
+    #[test]
+    fn rejects_cover_reached_without_trigger_witness_digest() {
+        let mut value = fixture();
+        value["stimulus"]["mode"] = json!("formal_cover");
+        value["stimulus"]["sampling_model"] = json!("deterministic_enumeration");
+        value["trials"][0]["formal_result"] = json!("cover_reached");
+        value["trials"][0]["formal_bound_cycles"] = json!(8);
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("cover_reached requires observed trigger and trigger_witness_sha256"));
+    }
+
+    #[test]
+    fn iid_campaign_with_unknown_trigger_outcomes_does_not_receive_interval() {
+        let mut value = fixture();
+        value["trials"][1]["trigger_status"] = json!("unknown");
+        let campaign = parse_campaign(&value).unwrap();
+        let receipt = summarize(&campaign, "0".repeat(64));
+        let active = &receipt["budget_curve"][2]["conditions"][0];
+        assert_eq!(active["trigger"]["unknown_outcomes"], 1);
+        assert!(active["trigger"]["wilson_interval"].is_null());
+    }
+
+    #[test]
+    fn rejects_non_observed_trigger_with_witness_digest() {
+        let mut value = fixture();
+        value["trials"][1]["trigger_witness_sha256"] = json!(WITNESS);
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("non-observed trigger must not include trigger_witness_sha256"));
+    }
+
+    #[test]
+    fn rejects_observed_trigger_without_output_trace_digest() {
+        let mut value = fixture();
+        value["trials"][0].as_object_mut().unwrap().remove("outcome_trace_sha256");
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("observed trigger requires outcome_trace_sha256"));
+    }
+
+    #[test]
+    fn rejects_campaign_without_full_budget_point() {
+        let mut value = fixture();
+        value["budget_points"] = json!([1, 2]);
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("include the full active trial count"));
     }
 
     #[test]
