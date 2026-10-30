@@ -1319,9 +1319,9 @@ mod tests {
                 residual_calibration_split_id: "development-b".into(),
                 evaluation_split_id: "challenge-a".into(),
                 fidelity_levels: vec![
-                    CurveFidelityLevel { id: "epoch-5".into(), cumulative_cost_units: 5 },
-                    CurveFidelityLevel { id: "epoch-15".into(), cumulative_cost_units: 15 },
-                    CurveFidelityLevel { id: "full-200".into(), cumulative_cost_units: 200 },
+                    CurveFidelityLevel { id: "epoch-5".into(), prefix_epochs: 5, cumulative_cost_units: 5 },
+                    CurveFidelityLevel { id: "epoch-15".into(), prefix_epochs: 15, cumulative_cost_units: 15 },
+                    CurveFidelityLevel { id: "full-200".into(), prefix_epochs: 200, cumulative_cost_units: 200 },
                 ],
                 alpha: 0.1,
                 minimum_model_fit_samples: 20,
