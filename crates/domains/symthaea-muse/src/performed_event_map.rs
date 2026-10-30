@@ -723,8 +723,15 @@ impl PerformedEventMap {
                 }
             }
         }
-        let expected_primary_count = expected_midi_by_score_index.len()
-            - usize::from(excluded_source_event_index.is_some());
+        let excluded_count = if excluded_source_event_index.is_some() {
+            1usize
+        } else {
+            0usize
+        };
+        let expected_primary_count = expected_midi_by_score_index
+            .len()
+            .checked_sub(excluded_count)
+            .ok_or(PerformedEventMapError::InvalidExpectedEventCount)?;
         if primary.len() != expected_primary_count {
             return Err(PerformedEventMapError::MissingSourceEvent);
         }
