@@ -50,9 +50,9 @@ The ledger accepts:
 - the promoted cohort's complete target-fidelity scores;
 - a private `PruningAuditSample` prepared by the existing sampling module;
 - exactly one target-fidelity score per committed sentinel;
-- a named fidelity ID.
+- a named fidelity ID mapped to a frozen, ordered fidelity ladder in the ledger configuration.
 
-The ledger itself calls `audit_pruning`, so a caller cannot substitute an arbitrary aggregate report. It verifies the committed sample, recomputes the exact hypergeometric upper bound, and consumes the raw sentinel outcomes. The public event receipt contains aggregate statistics only.
+The ledger itself calls `audit_pruning`, so a caller cannot substitute an arbitrary aggregate report. It verifies the committed sample and fidelity, recomputes the exact hypergeometric upper bound, and reads the raw sentinel outcomes without returning candidate-level values or IDs. The caller may still retain its input buffers; this API is not a memory-erasure or OS isolation boundary. The public event receipt contains aggregate statistics only.
 
 Each receipt binds:
 - run and event identity and sequence index;
@@ -65,7 +65,7 @@ Each receipt binds:
 - pre-registered risk threshold and disposition;
 - previous receipt digest and current receipt digest.
 
-The seed binding is a provenance digest. It is not a cryptographic random-number generator, proof of entropy, proof of pre-outcome commitment, or process isolation.
+The seed binding is a provenance digest. It is not a cryptographic random-number generator, proof of entropy, proof of pre-outcome commitment, or process isolation. The ordered fidelity ladder is included in the ledger genesis digest, and every receipt checks that the fidelity name maps to the recorded numeric fidelity index.
 
 ## 5. Fail-closed behavior
 
@@ -92,13 +92,13 @@ The scheduler must treat model-based expected value-of-computation as an acquisi
 
 ## 7. Authored Rust tests
 
-Ten tests are authored for:
+Eleven tests are authored for:
 - predictable uniform alpha spending and max-event enforcement;
 - a valid census audit and receipt-chain verification;
 - cumulative confidence spend;
 - observed-risk fail-closed behavior;
 - insufficient-sample fail-closed behavior;
-- invalid/mismatched-fidelity evidence;
+- invalid/mismatched-fidelity evidence and fidelity-name/index mismatch;
 - duplicate event IDs;
 - receipt tamper detection;
 - order-invariant promoted-frontier digests;
