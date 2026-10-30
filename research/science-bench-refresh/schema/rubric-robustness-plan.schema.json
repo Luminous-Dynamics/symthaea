@@ -12,6 +12,8 @@
     "judge_source_revision",
     "judge_prompt_sha256",
     "resource_budget",
+    "repeats_per_condition",
+    "randomization_commitment_sha256",
     "planned_case_count",
     "cases",
     "plan_commitment_sha256"
@@ -75,6 +77,14 @@
     },
     "plan_commitment_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "repeats_per_condition": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1000
+    },
+    "randomization_commitment_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
@@ -119,7 +129,8 @@
         "baseline_candidate_sha256",
         "variant_candidate_sha256",
         "baseline_rubric_sha256",
-        "variant_rubric_sha256"
+        "variant_rubric_sha256",
+        "maximum_score_uplift_without_construct_gain_millionths"
       ],
       "properties": {
         "case_id": {
@@ -152,6 +163,11 @@
         },
         "variant_rubric_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "maximum_score_uplift_without_construct_gain_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
         }
       }
     }
@@ -227,6 +243,21 @@
                     "pattern": "^0{64}$"
                   }
                 }
+              }
+            }
+          },
+          "randomization_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "resource_budget": {
+            "properties": {
+              "max_judge_calls": {
+                "minimum": 1
+              },
+              "max_tokens": {
+                "minimum": 1
               }
             }
           }
