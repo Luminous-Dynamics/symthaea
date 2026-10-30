@@ -506,8 +506,10 @@ fn main() {
         let claim_sum = summarize(scenario, Policy::ClaimSum, 0.0);
         let baseline = claim_sum.mean_utility;
         rows.push(claim_sum);
-        for policy in Policy::all().into_iter().skip(1) {
-            rows.push(summarize(scenario, policy, baseline));
+        for policy in Policy::all() {
+            if policy != Policy::ClaimSum {
+                rows.push(summarize(scenario, policy, baseline));
+            }
         }
     }
     print!("{}", report_json(&rows));
