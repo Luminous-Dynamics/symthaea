@@ -624,6 +624,7 @@ fn run(args: Args) -> Result<(), String> {
         "trojan_family_id",
         "synthesis_config_id",
         "cell_library_id",
+        "benchmark_source_id",
     ];
     let mut overlaps = BTreeMap::new();
     for field in overlap_fields {
