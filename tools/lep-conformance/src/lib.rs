@@ -1729,7 +1729,8 @@ mod tests {
 
     #[test]
     fn target_identity_mismatch_is_detected_component_by_component() {
-        let cases: [(&str, fn(&mut Value)); 4] = [
+        type TargetIdentityMutation = (&'static str, fn(&mut Value));
+        let cases: [TargetIdentityMutation; 4] = [
             ("repository", |statement| {
                 statement["predicate"]["verification"]["checkedTarget"]["source"]["repository"] =
                     json!("https://example.invalid/other-repository");
