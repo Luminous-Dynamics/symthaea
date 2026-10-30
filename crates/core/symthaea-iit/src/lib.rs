@@ -242,16 +242,16 @@ pub fn enumerate_iit4_system_partitions_with_stats(
 
     let mut blocks = Vec::<Vec<usize>>::new();
     let mut visited_combinations = 0usize;
-    enumerate_set_partitions_recursive(
-        0,
-        n,
-        &canonical_system,
-        &mut blocks,
-        &mut output,
-        &mut seen_cuts,
-        &mut visited_combinations,
-        max_combinations,
-    )?;
+    {
+        let mut context = PartitionEnumerationContext {
+            candidate_system: &canonical_system,
+            output: &mut output,
+            seen_cuts: &mut seen_cuts,
+            visited_combinations: &mut visited_combinations,
+            max_combinations,
+        };
+        enumerate_set_partitions_recursive(0, n, &mut blocks, &mut context)?;
+    }
     let unique_non_total_cuts = output.iter().filter(|partition| !partition.is_total_cut()).count();
     let total_cut_included = output.iter().any(DirectedSystemPartition::is_total_cut);
     Ok(PartitionEnumerationReport {
@@ -263,16 +263,24 @@ pub fn enumerate_iit4_system_partitions_with_stats(
     })
 }
 
+/// Mutable state shared by the two nested partition-recursion stages.
+///
+/// Keeping the enumeration state together makes the recursion signatures small
+/// and makes it explicit which buffers/counters form one bounded search.
+struct PartitionEnumerationContext<'a> {
+    candidate_system: &'a [usize],
+    output: &'a mut Vec<DirectedSystemPartition>,
+    seen_cuts: &'a mut std::collections::HashSet<Vec<bool>>,
+    visited_combinations: &'a mut usize,
+    max_combinations: usize,
+}
+
 /// Restricted-growth recursion enumerates each unordered set partition once.
 fn enumerate_set_partitions_recursive(
     position: usize,
     n: usize,
-    candidate_system: &[usize],
     blocks: &mut Vec<Vec<usize>>,
-    output: &mut Vec<DirectedSystemPartition>,
-    seen_cuts: &mut std::collections::HashSet<Vec<bool>>,
-    visited_combinations: &mut usize,
-    max_combinations: usize,
+    context: &mut PartitionEnumerationContext<'_>,
 ) -> Result<(), PartitionEnumerationError> {
     if position == n {
         if blocks.len() <= 1 {
@@ -286,8 +294,11 @@ fn enumerate_set_partitions_recursive(
         }
         let mut directions = Vec::with_capacity(blocks.len());
         return enumerate_block_directions_recursive(
-            0, candidate_system, blocks, &block_by_local_unit, &mut directions,
-            output, seen_cuts, visited_combinations, max_combinations,
+            0,
+            blocks,
+            &block_by_local_unit,
+            &mut directions,
+            context,
         );
     }
 
@@ -295,17 +306,11 @@ fn enumerate_set_partitions_recursive(
     for block_index in 0..=blocks.len() {
         if block_index == blocks.len() {
             blocks.push(vec![position]);
-            enumerate_set_partitions_recursive(
-                position + 1, n, candidate_system, blocks, output, seen_cuts,
-                visited_combinations, max_combinations,
-            )?;
+            enumerate_set_partitions_recursive(position + 1, n, blocks, context)?;
             blocks.pop();
         } else {
             blocks[block_index].push(position);
-            enumerate_set_partitions_recursive(
-                position + 1, n, candidate_system, blocks, output, seen_cuts,
-                visited_combinations, max_combinations,
-            )?;
+            enumerate_set_partitions_recursive(position + 1, n, blocks, context)?;
             blocks[block_index].pop();
         }
     }
@@ -314,22 +319,20 @@ fn enumerate_set_partitions_recursive(
 
 fn enumerate_block_directions_recursive(
     block_index: usize,
-    candidate_system: &[usize],
     blocks: &[Vec<usize>],
     block_by_local_unit: &[usize],
     directions: &mut Vec<PartitionDirection>,
-    output: &mut Vec<DirectedSystemPartition>,
-    seen_cuts: &mut std::collections::HashSet<Vec<bool>>,
-    visited_combinations: &mut usize,
-    max_combinations: usize,
+    context: &mut PartitionEnumerationContext<'_>,
 ) -> Result<(), PartitionEnumerationError> {
     if block_index == blocks.len() {
-        if *visited_combinations >= max_combinations {
-            return Err(PartitionEnumerationError::BudgetExceeded { max_combinations });
+        if *context.visited_combinations >= context.max_combinations {
+            return Err(PartitionEnumerationError::BudgetExceeded {
+                max_combinations: context.max_combinations,
+            });
         }
-        *visited_combinations += 1;
+        *context.visited_combinations += 1;
 
-        let n = candidate_system.len();
+        let n = context.candidate_system.len();
         let mut cuts_outgoing = Vec::with_capacity(directions.len());
         let mut cuts_incoming = Vec::with_capacity(directions.len());
         for direction in directions.iter().copied() {
@@ -359,12 +362,18 @@ fn enumerate_block_directions_recursive(
             }
         }
 
-        if seen_cuts.insert(cut_matrix.clone()) {
-            let parts = blocks.iter().map(|block| {
-                block.iter().map(|local| candidate_system[*local]).collect()
-            }).collect();
-            output.push(DirectedSystemPartition {
-                candidate_system: candidate_system.to_vec(),
+        if context.seen_cuts.insert(cut_matrix.clone()) {
+            let parts = blocks
+                .iter()
+                .map(|block| {
+                    block
+                        .iter()
+                        .map(|local| context.candidate_system[*local])
+                        .collect()
+                })
+                .collect();
+            context.output.push(DirectedSystemPartition {
+                candidate_system: context.candidate_system.to_vec(),
                 parts,
                 directions: directions.clone(),
                 cut_matrix,
@@ -381,14 +390,16 @@ fn enumerate_block_directions_recursive(
     ] {
         directions.push(direction);
         enumerate_block_directions_recursive(
-            block_index + 1, candidate_system, blocks, block_by_local_unit, directions,
-            output, seen_cuts, visited_combinations, max_combinations,
+            block_index + 1,
+            blocks,
+            block_by_local_unit,
+            directions,
+            context,
         )?;
         directions.pop();
     }
     Ok(())
 }
-
 
 /// Errors in probability-repertoire construction.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -720,10 +731,10 @@ impl BinaryCausalModel {
 
         let purview_state_count = 1usize << purview.len();
         let mut repertoire = vec![1.0; purview_state_count];
-        for future_state in 0..purview_state_count {
+        for (future_state, probability) in repertoire.iter_mut().enumerate() {
             for (slot, p_on) in per_unit_p_on.iter().copied().enumerate() {
                 let target_on = ((future_state >> slot) & 1) != 0;
-                repertoire[future_state] *= if target_on { p_on } else { 1.0 - p_on };
+                *probability *= if target_on { p_on } else { 1.0 - p_on };
             }
         }
         Ok(repertoire)
@@ -909,13 +920,11 @@ impl BinaryCausalModel {
         let mut tpm = self.transition_probabilities.clone();
         let mut connectivity = self.connectivity.clone();
 
-        for local_source in 0..n_candidate {
-            let source = candidate[local_source];
-            for local_target in 0..n_candidate {
+        for (local_source, source) in candidate.iter().copied().enumerate() {
+            for (local_target, target) in candidate.iter().copied().enumerate() {
                 if !partition.cut_matrix()[local_source * n_candidate + local_target] {
                     continue;
                 }
-                let target = candidate[local_target];
                 for state_without_source in 0..self.n_states() {
                     if ((state_without_source >> source) & 1) != 0 {
                         continue;
@@ -1043,18 +1052,18 @@ impl AnalysisQuantity {
     }
 
     fn compatible_with(self, formalism: FormalismProfile) -> bool {
-        match (self, formalism) {
-            (Self::Iit3SystemPhi, FormalismProfile::Iit3_0) => true,
-            (
-                Self::Iit4SystemPhiS
-                | Self::Iit4CausePhiC
-                | Self::Iit4EffectPhiE
-                | Self::Iit4CauseEffectStructure
-                | Self::Iit4StructureBigPhi,
-                FormalismProfile::Iit4_0_2023 | FormalismProfile::Iit4_0_2026,
-            ) => true,
-            _ => false,
-        }
+        matches!(
+            (self, formalism),
+            (Self::Iit3SystemPhi, FormalismProfile::Iit3_0)
+                | (
+                    Self::Iit4SystemPhiS
+                        | Self::Iit4CausePhiC
+                        | Self::Iit4EffectPhiE
+                        | Self::Iit4CauseEffectStructure
+                        | Self::Iit4StructureBigPhi,
+                    FormalismProfile::Iit4_0_2023 | FormalismProfile::Iit4_0_2026,
+                )
+        )
     }
 }
 
