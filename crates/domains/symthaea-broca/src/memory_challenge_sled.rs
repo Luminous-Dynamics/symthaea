@@ -361,6 +361,10 @@ fn build_evidence_records(
                 .map_err(|_| "failed to derive stable HDC ID".to_string())?,
         );
         let evidence_id = format!("aml-{}", sha256_hex(identity.as_bytes()));
+        let role_segment = match message.role {
+            crate::memory_challenge_api::AmlMessageRole::User => "user",
+            crate::memory_challenge_api::AmlMessageRole::Assistant => "assistant",
+        };
         records.push(EvidenceRecord {
             schema_version: EVIDENCE_SCHEMA_VERSION.to_owned(),
             evidence_id,
@@ -368,7 +372,7 @@ fn build_evidence_records(
             scope_id: request.user_id.clone(),
             source: EvidenceSource {
                 trajectory_id: request.session_id.clone(),
-                step_id: Some(format!("message-{index}")),
+                step_id: Some(format!("{role_segment}-{index}")),
                 step_index: Some(index as u64),
                 source_sha256: payload_sha256.to_owned(),
                 source_pointer: format!("/messages/{index}/content"),
