@@ -6,7 +6,7 @@
 
 Measure the quality/cost frontier of MEL-MR-EVAL-019 using MEL-MR-EVAL-020 as the exact small-scene oracle. Previous work implemented a planner and a reference renderer independently. This increment makes them answer one falsifiable question:
 
-> At a declared render budget, how many true pairwise PCM interactions does the sparse planner select, how many selected pairs are null, and what interaction mass exists above pairwise order?
+> At a declared render budget, how many non-null contextual pair effects does the sparse planner select, how many selected pairs are null, and what interaction mass exists above pairwise order?
 
 The evaluator is not allowed to treat an unprobed pair as a negative. That distinction is possible here only because the benchmark fixture includes EVAL-020's exhaustive coalition report.
 
