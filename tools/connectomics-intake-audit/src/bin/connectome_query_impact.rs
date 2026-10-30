@@ -242,6 +242,18 @@ fn validate_input(input: &Input) -> Result<(), String> {
     if input.candidates.is_empty() {
         return Err("candidates must contain at least one proposed correction".into());
     }
+    if input.review_budgets_minutes.is_empty() {
+        return Err("review_budgets_minutes must contain at least one matched-budget evaluation".into());
+    }
+    let mut unique_budgets = BTreeSet::new();
+    for budget in &input.review_budgets_minutes {
+        if !budget.is_finite() || *budget <= 0.0 {
+            return Err("review_budgets_minutes values must be finite and positive".into());
+        }
+        if !unique_budgets.insert(budget.to_bits()) {
+            return Err("review_budgets_minutes values must be unique".into());
+        }
+    }
 
     let mut graph_edges = BTreeSet::new();
     for edge in &input.graph {
@@ -540,6 +552,188 @@ fn evaluate_candidate(
         overlaps_with_candidates: overlaps.to_vec(),
         recommendation: "HUMAN_REVIEW_ONLY",
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+enum RankingPolicy {
+    QuerySensitivity,
+    ErrorProbability,
+    Uncertainty,
+    SensitivityOnly,
+    DeterministicRandom,
+}
+
+impl RankingPolicy {
+    fn id(self) -> &'static str {
+        match self {
+            Self::QuerySensitivity => "query_sensitivity_per_minute",
+            Self::ErrorProbability => "error_probability_per_minute",
+            Self::Uncertainty => "uncertainty_per_minute",
+            Self::SensitivityOnly => "query_sensitivity_only_per_minute",
+            Self::DeterministicRandom => "deterministic_random",
+        }
+    }
+}
+
+fn deterministic_random_score(input_hash: &str, candidate_id: &str) -> u64 {
+    let digest = Sha256::digest(format!("{input_hash}:{candidate_id}").as_bytes());
+    u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 has at least eight bytes"))
+}
+
+fn policy_score(
+    policy: RankingPolicy,
+    candidate: &Candidate,
+    evaluation: &CandidateEvaluation,
+    input_hash: &str,
+) -> f64 {
+    match policy {
+        RankingPolicy::QuerySensitivity => {
+            evaluation.probability_weighted_query_sensitivity_per_review_minute
+        }
+        RankingPolicy::ErrorProbability => {
+            candidate.estimated_error_probability / candidate.review_minutes
+        }
+        RankingPolicy::Uncertainty => {
+            (1.0 - (2.0 * candidate.estimated_error_probability - 1.0).abs())
+                / candidate.review_minutes
+        }
+        RankingPolicy::SensitivityOnly => {
+            evaluation.weighted_query_sensitivity / candidate.review_minutes
+        }
+        RankingPolicy::DeterministicRandom => {
+            deterministic_random_score(input_hash, &candidate.candidate_id) as f64
+        }
+    }
+}
+
+fn ranked_candidate_indices(
+    policy: RankingPolicy,
+    candidates: &[Candidate],
+    evaluations: &[CandidateEvaluation],
+    input_hash: &str,
+) -> Result<Vec<usize>, String> {
+    let evaluation_by_id: BTreeMap<&str, &CandidateEvaluation> = evaluations
+        .iter()
+        .map(|evaluation| (evaluation.candidate_id.as_str(), evaluation))
+        .collect();
+    let mut indices: Vec<usize> = (0..candidates.len()).collect();
+    let mut scored = Vec::with_capacity(candidates.len());
+    for index in indices.drain(..) {
+        let candidate = &candidates[index];
+        let evaluation = evaluation_by_id
+            .get(candidate.candidate_id.as_str())
+            .ok_or_else(|| format!("candidate {} has no sensitivity evaluation", candidate.candidate_id))?;
+        scored.push((
+            index,
+            policy_score(policy, candidate, evaluation, input_hash),
+            candidate.candidate_id.as_str(),
+        ));
+    }
+    scored.sort_by(|left, right| {
+        right.1.total_cmp(&left.1).then_with(|| left.2.cmp(right.2))
+    });
+    Ok(scored.into_iter().map(|(index, _, _)| index).collect())
+}
+
+fn weighted_query_error(graph: &Graph, queries: &[Query]) -> Result<Option<f64>, String> {
+    let mut weighted_error = 0.0;
+    let mut total_weight = 0.0;
+    for query in queries {
+        if let Some(reference) = query.reference_value {
+            let actual = query_value(graph, &query.metric);
+            if !actual.is_finite() {
+                return Err(format!("query {} produced a non-finite oracle-evaluation value", query.query_id));
+            }
+            let normalized_error = ((actual - reference).abs() / query.normalization_scale).min(1.0);
+            weighted_error += query.weight * normalized_error;
+            total_weight += query.weight;
+        }
+    }
+    if total_weight <= 0.0 {
+        Ok(None)
+    } else {
+        Ok(Some(weighted_error / total_weight))
+    }
+}
+
+fn replay_policy_budget(
+    graph: &Graph,
+    queries: &[Query],
+    candidates: &[Candidate],
+    evaluations: &[CandidateEvaluation],
+    policy: RankingPolicy,
+    budget: f64,
+    input_hash: &str,
+) -> Result<PolicyBudgetResult, String> {
+    let order = ranked_candidate_indices(policy, candidates, evaluations, input_hash)?;
+    let baseline_error = weighted_query_error(graph, queries)?;
+    let mut current_graph = graph.clone();
+    let mut actual_minutes = 0.0;
+    let mut reviewed_ids = Vec::new();
+    let mut applied_ids = Vec::new();
+    let mut rejected_ids = Vec::new();
+
+    for index in order {
+        let candidate = &candidates[index];
+        if actual_minutes + candidate.review_minutes > budget + 1e-9 {
+            continue;
+        }
+        actual_minutes += candidate.review_minutes;
+        reviewed_ids.push(candidate.candidate_id.clone());
+        match apply_candidate(&current_graph, candidate) {
+            Ok(next_graph) => {
+                current_graph = next_graph;
+                applied_ids.push(candidate.candidate_id.clone());
+            }
+            Err(_) => rejected_ids.push(candidate.candidate_id.clone()),
+        }
+    }
+
+    let final_error = weighted_query_error(&current_graph, queries)?;
+    let error_reduction = match (baseline_error, final_error) {
+        (Some(before), Some(after)) => Some(before - after),
+        _ => None,
+    };
+    Ok(PolicyBudgetResult {
+        policy: policy.id(),
+        review_budget_minutes: budget,
+        actual_review_minutes: actual_minutes,
+        reviewed_candidate_count: reviewed_ids.len(),
+        applied_candidate_count: applied_ids.len(),
+        rejected_conflict_count: rejected_ids.len(),
+        reviewed_candidate_ids: reviewed_ids,
+        applied_candidate_ids: applied_ids,
+        rejected_conflict_candidate_ids: rejected_ids,
+        baseline_weighted_query_error: baseline_error,
+        final_weighted_query_error: final_error,
+        weighted_query_error_reduction: error_reduction,
+    })
+}
+
+fn evaluate_policy_budgets(
+    graph: &Graph,
+    queries: &[Query],
+    candidates: &[Candidate],
+    evaluations: &[CandidateEvaluation],
+    budgets: &[f64],
+    input_hash: &str,
+) -> Result<Vec<PolicyBudgetResult>, String> {
+    let policies = [
+        RankingPolicy::QuerySensitivity,
+        RankingPolicy::ErrorProbability,
+        RankingPolicy::Uncertainty,
+        RankingPolicy::SensitivityOnly,
+        RankingPolicy::DeterministicRandom,
+    ];
+    let mut results = Vec::with_capacity(budgets.len() * policies.len());
+    for budget in budgets {
+        for policy in policies {
+            results.push(replay_policy_budget(
+                graph, queries, candidates, evaluations, policy, *budget, input_hash,
+            )?);
+        }
+    }
+    Ok(results)
 }
 
 fn score(input: &Input, input_hash: String) -> Result<Report, String> {
