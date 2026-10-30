@@ -24,6 +24,7 @@
 //! ABSTAIN (or ANSWER if a verified proof already exists).
 
 use crate::memory_evidence::EvidenceIndexSnapshotReceipt;
+use crate::memory_retrieval_calibration::ValidatedRetrievalCalibration;
 use crate::memory_lifecycle_policy::{
     ClaimLifecycleLedgerEntry, ClaimLifecycleState, LifecycleAction, LifecycleActionDecision,
     LifecyclePolicyRequest, LifecycleRetrievalProgress, ProofVerificationState,
@@ -55,6 +56,8 @@ pub struct RetrievalUtilityEstimate {
     pub estimator_version: String,
     pub estimator_sha256: String,
     pub calibration_split_sha256: String,
+    /// Digest of a passing held-out retrieval-calibration audit report.
+    pub calibration_report_sha256: String,
     pub feature_schema_sha256: String,
     /// Defines the utility unit and all cost conversion coefficients.
     pub utility_schema_sha256: String,
@@ -93,6 +96,7 @@ impl RetrievalUtilityEstimate {
             ("unresolved_claims_sha256", self.unresolved_claims_sha256.as_str()),
             ("estimator_sha256", self.estimator_sha256.as_str()),
             ("calibration_split_sha256", self.calibration_split_sha256.as_str()),
+            ("calibration_report_sha256", self.calibration_report_sha256.as_str()),
             ("feature_schema_sha256", self.feature_schema_sha256.as_str()),
             ("utility_schema_sha256", self.utility_schema_sha256.as_str()),
         ] {
@@ -271,6 +275,22 @@ pub fn evaluate_retrieval_value(
     Ok(decision)
 }
 
+/// Evaluate a VOI estimate only after matching a passing held-out calibration
+/// capability. Raw evaluate_retrieval_value remains useful for diagnostics and
+/// deterministic tests, but production lifecycle orchestration requires this
+/// calibrated entry point and carries the same capability to the final adapter.
+pub fn evaluate_calibrated_retrieval_value(
+    estimate: RetrievalUtilityEstimate,
+    calibration: &ValidatedRetrievalCalibration,
+) -> Result<RetrievalValueDecision, String> {
+    calibration.verify_estimate_binding(
+        &estimate.estimator_sha256,
+        &estimate.calibration_split_sha256,
+        &estimate.calibration_report_sha256,
+    )?;
+    evaluate_retrieval_value(estimate)
+}
+
 /// Canonical adapter from a calibrated VOI result into lifecycle action policy.
 ///
 /// It derives the unresolved claim set from the request ledger, binds the value
@@ -283,6 +303,7 @@ pub fn decide_lifecycle_action_with_voi(
     verified_proof: Option<&VerifiedLifecycleProofToken>,
     value_decision: &RetrievalValueDecision,
     evidence_index_snapshot: &EvidenceIndexSnapshotReceipt,
+    calibration: &ValidatedRetrievalCalibration,
 ) -> Result<LifecycleActionDecision, String> {
     let unresolved_claim_ids: BTreeSet<String> = request
         .required_claims
@@ -294,6 +315,11 @@ pub fn decide_lifecycle_action_with_voi(
     if evidence_index_snapshot.known_at_unix_ms != request.known_at_unix_ms {
         return Err("retrieval value snapshot known_at does not match lifecycle request".into());
     }
+    calibration.verify_estimate_binding(
+        &value_decision.estimate.estimator_sha256,
+        &value_decision.estimate.calibration_split_sha256,
+        &value_decision.estimate.calibration_report_sha256,
+    )?;
     value_decision.verify_request_binding(
         &request.decision_id,
         &request.principal_id,
