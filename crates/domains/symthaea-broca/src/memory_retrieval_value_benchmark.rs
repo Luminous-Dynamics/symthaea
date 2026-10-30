@@ -17,7 +17,6 @@
 use crate::memory_retrieval_value_calibration::RetrievalUtilityCalibrationObservation;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
@@ -348,6 +347,7 @@ fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
 
     fn digest(value: &str) -> String {
         format!("{:x}", Sha256::digest(value.as_bytes()))
