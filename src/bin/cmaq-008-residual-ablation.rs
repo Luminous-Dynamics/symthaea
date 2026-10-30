@@ -517,6 +517,7 @@ struct SeedResult {
     final_epoch_train_mse: f64,
     training_steps: u64,
     regimes: [Metrics; 2],
+    decisions: [DecisionMetrics; 2],
 }
 
 fn run_seed(seed: u64, objective: Objective) -> Result<SeedResult, String> {
@@ -558,16 +559,28 @@ fn run_seed(seed: u64, objective: Objective) -> Result<SeedResult, String> {
         final_epoch_loss /= TRAIN_SAMPLES as f64;
     }
 
+    let linear = LinearArxBaseline::fit(&training, LINEAR_RIDGE)?;
     let mut regimes = [Metrics::default(); 2];
+    let mut decisions = [DecisionMetrics::default(); 2];
     for (index, law) in Law::ALL.into_iter().enumerate() {
         regimes[index] = Metrics::evaluate(&model, &evaluations[index], objective)
             .map_err(|error| format!("{} evaluation failed: {error}", law.name()))?;
+        let goal_seed = TASK_GOAL_SEED ^ ((index as u64 + 1).wrapping_mul(0x9E37_79B9));
+        decisions[index] = evaluate_decision_tasks(
+            &model,
+            &linear,
+            objective,
+            &evaluations[index],
+            law,
+            goal_seed,
+        ).map_err(|error| format!("{} decision evaluation failed: {error}", law.name()))?;
     }
     Ok(SeedResult {
         seed,
         final_epoch_train_mse: final_epoch_loss,
         training_steps: model.training_steps,
         regimes,
+        decisions,
     })
 }
 
