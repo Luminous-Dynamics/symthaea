@@ -180,6 +180,8 @@ def validate_plan(plan: Any) -> dict[str, Any]:
             raise MetamorphicAuditError(f"pair {pair_id} affected/unaffected criteria overlap")
         if family == "locality" and (not affected or not unaffected):
             raise MetamorphicAuditError(f"locality pair {pair_id} requires affected and unaffected criteria")
+        if family == "directional_sensitivity" and not affected:
+            raise MetamorphicAuditError(f"directional pair {pair_id} requires affected criteria")
         expected_decision = row["expected_variant_decision"]
         if expected_decision is not None and (
             not isinstance(expected_decision, str) or expected_decision not in DECISIONS
