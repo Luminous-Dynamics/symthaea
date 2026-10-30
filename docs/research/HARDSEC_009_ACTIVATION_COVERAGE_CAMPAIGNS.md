@@ -94,6 +94,8 @@ The current JSON contract is `hardsec-activation-campaign-v1`. It binds:
 - observation-boundary identity/type/description;
 - ordered trial records containing unique trial ID, per-condition trial index, active/inactive-control condition, explicit `pair_id` when matched controls are supplied, sequence digest, trigger outcome/cycle/witness, payload outcome/cycle/witness, outcome-trace digest, and formal result/bound only for formal-cover campaigns.
 
+Any known trigger or payload outcome, including `not_observed`, must bind to an `outcome_trace_sha256`; a negative result without its trace cannot enter the known-outcome denominator.
+
 Trials within each condition must have contiguous ordered indices. If an inactive-control set is included, it must have the same number of trials and every `pair_id` must map to exactly one active and one inactive-control trial. Pairing is never inferred from row order alone. Sequence duplicates are reported, not silently deduplicated; the receipt preserves the total trial count and unique-sequence count separately.
 
 The campaign file is read from one open file handle, with before/after file metadata checks and a no-symlink path check, then hashed exactly. Trial sequence hashes remain caller-supplied references; this utility does not dereference or re-hash raw stimulus files. The output receipt is unsigned, created with no-overwrite semantics, and must be outside the campaign directory.
@@ -136,7 +138,7 @@ The unit tests cover:
 - digest validation and formal metadata misuse;
 - active/inactive descriptive comparison without causal wording.
 
-The suite currently contains 31 authored tests, including explicit matched-pair identity and discordance tests. Compilation and CI execution remain pending for this newly created branch; no test is described as passed until the focused workflow confirms it.
+The suite currently contains 36 authored tests, including explicit matched-pair identity/discordance, known-negative trace requirements, stable file-read/receipt checks, symlink rejection and overwrite/path-safety tests. Compilation and CI execution remain pending for this newly created branch; no test is described as passed until the focused workflow confirms it.
 
 ## 7. Claim ceiling
 
