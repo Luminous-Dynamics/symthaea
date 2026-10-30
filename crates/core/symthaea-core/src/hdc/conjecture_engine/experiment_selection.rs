@@ -916,7 +916,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
     if max_weight <= 0.0 {
         return None;
     }
-    let scaled_weights: Vec<f64> = prior_weights.iter().map(|weight| weight / max_weight).collect();
+    let scaled_weights: Vec<f64> = prior_weights.iter().map(|weight| *weight / max_weight).collect();
     let weight_sum: f64 = scaled_weights.iter().sum();
     if !weight_sum.is_finite() || weight_sum <= 0.0 {
         return None;
@@ -956,7 +956,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
         let expected = active
             .iter()
             .zip(action_utilities.iter())
-            .map(|((_, probability, _), value)| probability * value)
+             .map(|((_, probability, _), value)| *probability * *value)
             .sum::<f64>();
         if !expected.is_finite() {
             return None;
@@ -969,7 +969,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
         .iter()
         .map(|(_, _, prediction)| prediction.abs())
         .fold(observation_std_dev, f64::max);
-    let means: Vec<f64> = active.iter().map(|(_, _, mean)| mean / scale).collect();
+    let means: Vec<f64> = active.iter().map(|(_, _, mean)| *mean / scale).collect();
     let noise = observation_std_dev / scale;
 
     if noise == 0.0 {
@@ -1014,19 +1014,19 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
 
     let mut expected_after = 0.0;
     let mut log_joint = Vec::with_capacity(active.len());
-    for (true_index, (_, true_probability, true_mean)) in active.iter().enumerate() {
+    for (true_index, (_, true_probability, _)) in active.iter().enumerate() {
         let scaled_true_mean = means[true_index];
         for (z, raw_weight) in &quadrature {
             log_joint.clear();
             for (other_mean, (_, probability, _)) in means.iter().zip(active.iter()) {
-                let separation = (scaled_true_mean - other_mean) / noise;
+                let separation = (scaled_true_mean - *other_mean) / noise;
                 let standardized = separation + z;
                 let log_likelihood = if !standardized.is_finite() || standardized.abs() > 1.0e6 {
                     f64::NEG_INFINITY
                 } else {
                     -0.5 * standardized * standardized
                 };
-                log_joint.push(probability.ln() + log_likelihood);
+                log_joint.push((*probability).ln() + log_likelihood);
             }
             let log_normalizer = log_sum_exp(&log_joint);
             if !log_normalizer.is_finite() {
@@ -1042,18 +1042,17 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
                 let value = posterior
                     .iter()
                     .zip(action_utilities.iter())
-                    .map(|(probability, utility)| probability * utility)
+                    .map(|(probability, utility)| *probability * *utility)
                     .sum::<f64>();
                 if !value.is_finite() {
                     return None;
                 }
                 best_posterior_utility = best_posterior_utility.max(value);
             }
-            expected_after += true_probability
+            expected_after += *true_probability
                 * (*raw_weight / quadrature_weight_sum)
                 * best_posterior_utility;
         }
-        let _ = true_mean;
     }
 
     let evsi = expected_after - baseline;
