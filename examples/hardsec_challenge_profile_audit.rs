@@ -467,6 +467,9 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
                     .to_owned(),
             );
         }
+        if equivalence.get("reference_local_path").is_none() {
+            return Err("equivalence.reference_local_path is required".to_owned());
+        }
         let reference_path = required_string(equivalence, "reference_local_path")?.to_owned();
         safe_relative_path(&reference_path, "equivalence.reference_local_path")?;
 
