@@ -1,0 +1,3 @@
+candidate_id,heldout_decision_success_rate,high_confidence_wrong_rate,holdout_lot_count
+TX-CAND-REP-001,0.90,0.05,16
+TX-CAND-OOD-002,0.20,0.60,16
