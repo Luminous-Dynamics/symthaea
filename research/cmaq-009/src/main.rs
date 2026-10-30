@@ -1,6 +1,6 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-009-active-diagnostic-probes-v0.2";
+const REPORT_SCHEMA: &str = "cmaq-009-active-diagnostic-probes-v0.3";
 const EPISODES: usize = 512;
 const HORIZON: usize = 128;
 const CHANGE_DETECTION_THRESHOLD: f64 = 5.0;
@@ -523,6 +523,9 @@ fn render_report(rows: &[Summary]) -> String {
     out.push_str(&format!("  \"episode_count\": {EPISODES},\n"));
     out.push_str(&format!("  \"horizon\": {HORIZON},\n"));
     out.push_str(&format!("  \"change_detection_threshold\": {CHANGE_DETECTION_THRESHOLD:.4},\n"));
+    out.push_str(&format!("  \"page_hinkley_delta\": {PAGE_HINKLEY_DELTA:.4},\n"));
+    out.push_str(&format!("  \"page_hinkley_threshold\": {PAGE_HINKLEY_THRESHOLD:.4},\n"));
+    out.push_str(&format!("  \"page_hinkley_burn_in\": {PAGE_HINKLEY_BURN_IN},\n"));
     out.push_str(&format!("  \"probe_cost\": {PROBE_COST:.6},\n"));
     out.push_str(&format!("  \"feedback_delay_steps\": {FEEDBACK_DELAY_STEPS},\n"));
     out.push_str(&format!("  \"feedback_drop_rate\": {FEEDBACK_DROP_RATE:.4},\n"));
@@ -532,7 +535,7 @@ fn render_report(rows: &[Summary]) -> String {
     out.push_str(&format!("  \"probe_signal_shift_rate\": {SHIFTED_PROBE_FAILURE_RATE:.4},\n"));
     out.push_str(&format!("  \"adaptive_probe_cap\": {ADAPTIVE_PROBE_CAP},\n"));
     out.push_str("  \"scenarios\": [\"stationary\", \"abrupt_support_shift\", \"gradual_support_shift\"],\n");
-    out.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"passive_cusum\", \"periodic_probe_8\", \"periodic_probe_16\", \"periodic_probe_32\", \"adaptive_probe_32\", \"zero_info_probe_32\", \"oracle_changepoint\"],\n");
+    out.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"passive_cusum\", \"page_hinkley_passive\", \"periodic_probe_8\", \"periodic_probe_16\", \"periodic_probe_32\", \"adaptive_probe_32\", \"zero_info_probe_32\", \"oracle_changepoint\"],\n");
     out.push_str("  \"summary\": [\n");
     for (index, row) in rows.iter().enumerate() {
         out.push_str(&format!(
@@ -586,6 +589,17 @@ mod tests {
         assert_eq!(Scenario::AbruptSupportShift.probe_failure_probability(64), 0.60);
         assert_eq!(Scenario::GradualSupportShift.probe_failure_probability(32), 0.01);
         assert_eq!(Scenario::GradualSupportShift.probe_failure_probability(96), 0.60);
+    }
+
+    #[test]
+    fn page_hinkley_known_answer_detects_sustained_increase() {
+        let mut detector = PageHinkleyState::default();
+        for _ in 0..PAGE_HINKLEY_BURN_IN {
+            assert!(!detector.observe(false));
+        }
+        assert!(!detector.observe(true));
+        assert!(!detector.observe(true));
+        assert!(detector.observe(true));
     }
 
     #[test]
@@ -687,10 +701,10 @@ mod tests {
     #[test]
     fn benchmark_report_has_one_row_per_scenario_policy_pair() {
         let rows = run_benchmark();
-        assert_eq!(rows.len(), 3 * 9);
+        assert_eq!(rows.len(), 3 * 10);
         assert!(rows.iter().all(|row| row.episode_count == EPISODES));
         let rendered = render_report(&rows);
-        assert!(rendered.contains("\"schema_version\": \"cmaq-009-active-diagnostic-probes-v0.2\""));
+        assert!(rendered.contains("\"schema_version\": \"cmaq-009-active-diagnostic-probes-v0.3\""));
         assert!(rendered.contains("\"episode_count\": 512"));
         assert!(rendered.contains("\"horizon\": 128"));
     }
