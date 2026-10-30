@@ -305,6 +305,29 @@ fn min_fill_order(
             .filter(|neighbour| adjacency.contains_key(neighbour))
             .collect::<Vec<_>>();
 
+        // Fill edges among N(variable) can also change the fill score of a
+        // non-neighbour that is adjacent to two or more members of N(variable).
+        // Track those affected candidates before mutating the graph.
+        let mut affected = BTreeSet::new();
+        let mut neighbour_hits = BTreeMap::<usize, usize>::new();
+        for neighbour in &neighbours {
+            if active.contains(neighbour) {
+                affected.insert(*neighbour);
+            }
+            if let Some(edges) = adjacency.get(neighbour) {
+                for candidate in edges.iter().copied() {
+                    if candidate != variable && active.contains(&candidate) {
+                        *neighbour_hits.entry(candidate).or_default() += 1;
+                    }
+                }
+            }
+        }
+        for (candidate, hits) in neighbour_hits {
+            if hits >= 2 {
+                affected.insert(candidate);
+            }
+        }
+
         // Elimination makes the active neighbours a clique.
         for (left_index, a) in neighbours.iter().copied().enumerate() {
             for b in neighbours.iter().copied().skip(left_index + 1) {
@@ -321,21 +344,20 @@ fn min_fill_order(
         active.remove(&variable);
         order.push(variable);
 
-        // Only the eliminated variable's neighbours have changed adjacency.
-        // Refresh those still scheduled for elimination.
-        for neighbour in neighbours {
-            if !active.contains(&neighbour) {
+        // Refresh every remaining candidate whose degree or fill score changed.
+        for candidate in affected {
+            if !active.contains(&candidate) {
                 continue;
             }
             let version = versions
-                .get(&neighbour)
+                .get(&candidate)
                 .copied()
                 .unwrap_or(0)
                 .checked_add(1)
                 .ok_or(FactorGraphError::IndexOverflow)?;
-            versions.insert(neighbour, version);
-            let (fill_edges, degree) = fill_score(neighbour, &adjacency);
-            queue.push(Reverse((fill_edges, degree, neighbour, version)));
+            versions.insert(candidate, version);
+            let (fill_edges, degree) = fill_score(candidate, &adjacency);
+            queue.push(Reverse((fill_edges, degree, candidate, version)));
         }
     }
 
