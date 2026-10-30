@@ -1387,9 +1387,9 @@ async fn cognitive_sonata_return(
     } else {
         "native"
     };
-    let wav = match fluid_wav {
-        Some(bytes) => bytes,
-        None => wav_bytes(&composition.audio).map_err(internal)?,
+    let (wav, render_receipt) = match fluid_wav {
+        Some(render) => (render.wav_bytes, Some(render.receipt)),
+        None => (wav_bytes(&composition.audio).map_err(internal)?, None),
     };
 
     let mut renderer_recipe = RendererRecipe::new(
@@ -1503,7 +1503,7 @@ async fn cognitive_sonata_return(
                 created_at_unix_ms: unix_time_ms(),
                 score: selected.score,
                 spec,
-                render_receipt: None,
+                render_receipt,
                 state,
                 seed: intent.seed,
                 renderer,
@@ -2238,7 +2238,7 @@ fn rank(
         u64,
         symthaea_muse::Composition,
         Score,
-        Option<Vec<u8>>,
+        Option<FluidCandidateRender>,
         Option<symthaea_music_theory::Form>,
         Option<GrammarPlanEvidence>,
     )],
