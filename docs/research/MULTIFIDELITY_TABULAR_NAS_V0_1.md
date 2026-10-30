@@ -15,6 +15,14 @@ Two relevant 2026 methods make the gap concrete:
 
 This motivates a common evaluator that separates *candidate exposure*, *final confirmation* and *resource use*. A candidate touched at 5 epochs is not a model confirmed at 200 epochs.
 
+### What CoRA-NAS contributes to the benchmark design
+
+The CoRA-NAS preprint reports CoRA-Refine Spearman correlations of 0.946 (NAS-Bench-201), 0.715 (NAS-Bench-101), 0.786 (TransNAS-Bench-101) and 0.894 (NATS-SSS). The paper uses a stratified anchor set and early training curves; on NATS-SSS it reports a 2,800 epoch-equivalent budget (about 1% of the full 270,000 epoch-equivalent search-space training budget). Its result tables also show that coarse proxy rankings can already be very strong in capacity-dominated spaces, so residual refinement adds little in some conditions.
+
+The real-DARTS discussion is an especially important counterexample: CoRA-Refine improves rank correlation within a shared candidate pool, but incurs additional training compute and does not dominate faster gradient/training-free approaches on the overall accuracy/compute frontier. Our benchmark therefore must report final quality and resource Pareto points, not only proxy-vs-label Spearman correlation.
+
+Reference: [Yang et al., CoRA-NAS, arXiv:2609.11884](https://arxiv.org/abs/2609.11884). These are the preprint's reported results, not Symthaea measurements.
+
 ## 2. Information-flow and query contract
 
 The policy receives:
