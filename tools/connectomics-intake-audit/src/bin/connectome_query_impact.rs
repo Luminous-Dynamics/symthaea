@@ -1288,6 +1288,12 @@ mod tests {
         assert_eq!(report.policy_budget_results.len(), 18);
         for result in &report.policy_budget_results {
             assert!(result.actual_review_minutes <= result.review_budget_minutes + 1e-9);
+            assert_eq!(result.policy_order_candidate_ids.len(), input.candidates.len());
+            assert_eq!(
+                result.policy_order_candidate_ids.iter().collect::<BTreeSet<_>>().len(),
+                input.candidates.len(),
+                "frozen policy order must contain every candidate exactly once"
+            );
             assert_eq!(
                 result.reviewed_candidate_count,
                 result.applied_candidate_count + result.rejected_conflict_count
