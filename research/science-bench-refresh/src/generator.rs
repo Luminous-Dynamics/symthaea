@@ -934,7 +934,7 @@ mod tests {
 
     #[test]
     fn verify_regeneration_accepts_exact_replay_and_task_commitment() {
-        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let (manifest, seed, _config, generated) = complete_manifest_and_tasks();
         let final_manifest =
             manifest_with_task_commitment(&manifest, &generated);
         let report = verify_regeneration(&final_manifest, &seed, &config, &generated).unwrap();
