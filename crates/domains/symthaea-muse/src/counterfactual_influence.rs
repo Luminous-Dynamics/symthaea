@@ -1359,6 +1359,14 @@ mod tests {
         let process = process_observation();
         let executable = process.executable_sha256_after.clone();
         let soundfont = process.soundfont_sha256_after.clone();
+        // Studio only includes this receipt field after full-score coverage
+        // verifies. A counterfactual map deliberately excludes one source ID,
+        // so it must remain an explicit map artifact, not a complete-map claim.
+        let complete_map_digest = if map.events.len() == 2 {
+            Some(map.receipt_sha256.as_str())
+        } else {
+            None
+        };
         let receipt = RendererExecutionReceipt::from_successful_render(
             RendererReceiptInputs {
                 render_id,
@@ -1371,7 +1379,7 @@ mod tests {
                 soundfont_sha256: Some(&soundfont),
                 process_exit_code: Some(0),
                 process_observation: Some(process.clone()),
-                performed_event_map_sha256: Some(&map.receipt_sha256),
+                performed_event_map_sha256: complete_map_digest,
                 output_wav_bytes: &wav,
             },
         )
@@ -1406,7 +1414,7 @@ mod tests {
                 soundfont_sha256: Some(soundfont),
                 process_exit_code: Some(0),
                 process_observation: Some(render.process.clone()),
-                performed_event_map_sha256: Some(&render.map.receipt_sha256),
+                performed_event_map_sha256: render.receipt.performed_event_map_sha256.as_deref(),
                 output_wav_bytes: &render.wav,
             },
             &render.map_bytes,
