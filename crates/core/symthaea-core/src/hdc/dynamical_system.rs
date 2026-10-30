@@ -400,6 +400,10 @@ impl Rk45Integrator {
 impl Integrator for Rk45Integrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
         assert!(dt.is_finite() && dt > 0.0, "RK45 requires a finite positive interval");
+        assert!(
+            (t + dt).is_finite() && t + dt > t,
+            "RK45 requested interval is not representable at start time {t} (dt={dt})"
+        );
         assert!(self.tol.is_finite() && self.tol > 0.0, "RK45 tolerance must be finite and positive");
         assert!(
             self.dt_min.is_finite()
@@ -447,14 +451,27 @@ impl Integrator for Rk45Integrator {
             );
 
             current_state = next_state;
-            elapsed += actual_dt;
             accepted_steps += 1;
 
-            let remaining_after_step = dt - elapsed;
-            let time_slack = 16.0 * f64::EPSILON * dt.abs().max(1.0);
-            if remaining_after_step <= time_slack {
+            // Stop only when the accepted trial consumed the remaining
+            // interval. Do not discard a merely-small remainder: simulate()
+            // advances its external clock by the full requested dt.
+            if actual_dt >= remaining {
+                elapsed = dt;
                 break;
             }
+
+            let next_elapsed = elapsed + actual_dt;
+            assert!(
+                next_elapsed > elapsed && t + next_elapsed > t + elapsed,
+                "RK45 accepted substep {actual_dt} cannot advance representable time at t={} (elapsed={elapsed})",
+                t + elapsed
+            );
+            if next_elapsed >= dt {
+                elapsed = dt;
+                break;
+            }
+            elapsed = next_elapsed;
 
             let scale = if error > 1e-30 {
                 0.9 * (self.tol / error).powf(0.2)
