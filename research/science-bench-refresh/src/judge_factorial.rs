@@ -346,6 +346,10 @@ pub struct FactorialInteractionV1 {
     pub complete_01_count: u64,
     pub complete_10_count: u64,
     pub complete_11_count: u64,
+    pub decisive_00_count: u64,
+    pub decisive_01_count: u64,
+    pub decisive_10_count: u64,
+    pub decisive_11_count: u64,
     pub candidate_a_choice_interaction_millionths: Option<f64>,
     pub excluded_conditions_across_four_cells: u64,
 }
@@ -859,6 +863,15 @@ fn pairwise_interactions(
                 count_at(false, false), count_at(false, true),
                 count_at(true, false), count_at(true, true),
             ];
+            let decisive_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
+                metric.factors.level(factor_a) == a
+                    && metric.factors.level(factor_b) == b
+                    && metric.candidate_a_choice.is_some()
+            }).count() as u64;
+            let decisive_counts = [
+                decisive_at(false, false), decisive_at(false, true),
+                decisive_at(true, false), decisive_at(true, true),
+            ];
             let completed_in_four_cells = counts.iter().copied().sum::<u64>();
             let planned_per_cell = plan.blocks.len() as u64
                 * u64::from(plan.repeats_per_condition)
@@ -875,6 +888,10 @@ fn pairwise_interactions(
                 complete_01_count: counts[1],
                 complete_10_count: counts[2],
                 complete_11_count: counts[3],
+                decisive_00_count: decisive_counts[0],
+                decisive_01_count: decisive_counts[1],
+                decisive_10_count: decisive_counts[2],
+                decisive_11_count: decisive_counts[3],
                 candidate_a_choice_interaction_millionths: m11_choice.zip(m10_choice)
                     .zip(m01_choice.zip(m00_choice)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
                 excluded_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
