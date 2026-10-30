@@ -459,6 +459,28 @@ mod tests {
     }
 
     #[test]
+    fn weight_only_minimax_can_worsen_reward_weighted_variance() {
+        let policy_set = policies(PortfolioRegime::Balanced, 8);
+        let uniform = Logger { p1: [0.5, 0.5] };
+        let weight_minimax = minimax_logger(
+            &policy_set,
+            ACTION_PROPENSITY_FLOOR,
+            100,
+            GridObjective::WeightSecondMoment,
+        )
+        .unwrap();
+        let uniform_m2 = worst_weight_second_moment(&policy_set, uniform).1;
+        let minimax_m2 = worst_weight_second_moment(&policy_set, weight_minimax).1;
+        let uniform_variance = worst_ips_variance(&policy_set, uniform).1;
+        let minimax_variance = worst_ips_variance(&policy_set, weight_minimax).1;
+        assert!(minimax_m2 < uniform_m2 - 0.05);
+        assert!(
+            minimax_variance > uniform_variance + 0.02,
+            "variance proxy counterexample expected: logger={weight_minimax:?}, uniform={uniform_variance}, minimax={minimax_variance}"
+        );
+    }
+
+    #[test]
     fn minimax_grid_matches_independent_exhaustive_grid_oracle() {
         let policy_set = policies(PortfolioRegime::Action0Heavy, 4);
         let intervals = 12;
