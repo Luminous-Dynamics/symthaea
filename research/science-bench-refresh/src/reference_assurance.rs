@@ -833,10 +833,9 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                             .and_then(|claim| claim.scope.target_date.as_deref());
                         if let (Some(target), Some(published)) =
                             (target_date, source.publication_date.as_deref())
+                            && published > target
                         {
-                            if published > target {
-                                issues.push(format!("resolution {} uses a source published after the claim target date", resolution.resolution_id));
-                            }
+                            issues.push(format!("resolution {} uses a source published after the claim target date", resolution.resolution_id));
                         }
                     }
                 }
