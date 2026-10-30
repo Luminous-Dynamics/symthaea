@@ -904,7 +904,7 @@ mod tests {
         let (proposals, ranking, outcomes, proposal_hash, ranking_hash) = fixture();
         assert!(validate(&proposals, &ranking, &outcomes, &"0".repeat(64), &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("proposal SHA-256"));
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &"0".repeat(64))
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &"0".repeat(64), &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("ranking_report_sha256"));
     }
 
