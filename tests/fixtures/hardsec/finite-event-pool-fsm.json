@@ -1,0 +1,81 @@
+{
+  "schema_version": "hardsec-fsm-event-pool-v1",
+  "fixture_id": "finite-event-pool-rare-branch-0001",
+  "description": "Finite deterministic FSM with a sampled common path, two reachable rare events omitted by the trace pool, and one unreachable transition excluded from the denominator.",
+  "states": [
+    "reset",
+    "state_a",
+    "state_b",
+    "done",
+    "sink",
+    "unreachable"
+  ],
+  "initial_states": [
+    "reset"
+  ],
+  "max_states": 32,
+  "transitions": [
+    {
+      "transition_id": "t_reset_to_a",
+      "event_id": "event_alpha",
+      "from": "reset",
+      "input": "a",
+      "to": "state_a"
+    },
+    {
+      "transition_id": "t_reset_rare_prefix",
+      "event_id": "event_rare_prefix",
+      "from": "reset",
+      "input": "rare_prefix",
+      "to": "state_b"
+    },
+    {
+      "transition_id": "t_a_idle",
+      "event_id": "event_idle",
+      "from": "state_a",
+      "input": "idle",
+      "to": "state_a"
+    },
+    {
+      "transition_id": "t_a_to_done",
+      "event_id": "event_rare_suffix",
+      "from": "state_a",
+      "input": "rare_suffix",
+      "to": "done"
+    },
+    {
+      "transition_id": "t_b_to_done",
+      "event_id": "event_rare_completion",
+      "from": "state_b",
+      "input": "completion",
+      "to": "done"
+    },
+    {
+      "transition_id": "t_done_to_sink",
+      "event_id": "event_terminal",
+      "from": "done",
+      "input": "idle",
+      "to": "sink"
+    },
+    {
+      "transition_id": "t_unreachable_to_sink",
+      "event_id": "event_unreachable",
+      "from": "unreachable",
+      "input": "x",
+      "to": "sink"
+    }
+  ],
+  "trace_pool": [
+    {
+      "trace_id": "trace-common",
+      "initial_state": "reset",
+      "steps": [
+        "t_reset_to_a",
+        "t_a_idle",
+        "t_a_idle",
+        "t_a_to_done",
+        "t_done_to_sink"
+      ]
+    }
+  ]
+}
