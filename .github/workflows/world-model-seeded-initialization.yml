@@ -202,7 +202,7 @@ jobs:
               } for regime in ("source", "action_effect_reversal")
           }, sort_keys=True))
           PY
-- name: Test real CfC counterfactual action ranking
+      - name: Test real CfC counterfactual action ranking
         run: cargo test --bin cmaq-008-action-ranking
 
       - name: Run real CfC counterfactual action ranking
@@ -218,7 +218,7 @@ jobs:
           from pathlib import Path
 
           report = json.loads(Path("/tmp/cmaq-008-action-ranking.json").read_text())
-          assert report["schema_version"] == "cmaq-008-action-ranking-v0.1"
+          assert report["schema_version"] == "cmaq-008-action-ranking-v0.2"
           assert report["model"] == "HierarchicalCfCWorldModel"
           assert report["dimensions"] == {"hdc": 16, "hidden": 24}
           assert report["training"] == {
@@ -228,7 +228,7 @@ jobs:
           assert report["candidate_actions"] == ["zero", "cancel_source", "reverse_source"]
           assert report["model_forward_calls_per_decision"] == 3
           assert report["direct_policy"].startswith("best constant action transform selected from logged training outcomes")
-          assert set(report["regimes"]) == {"source_holdout", "action_effect_reversal"}
+          assert set(report["regimes"]) == {"source_holdout", "action_effect_reversal", "interaction_sign_reversal"}
           assert len(report["per_seed"]) == 10
 
           for regime, row in report["regimes"].items():
@@ -262,10 +262,11 @@ jobs:
               for key in (
                   "training_mse", "source_lift", "source_regret", "source_pairwise_accuracy",
                   "reversal_lift", "reversal_regret", "reversal_pairwise_accuracy",
+                  "interaction_lift", "interaction_regret", "interaction_pairwise_accuracy",
               ):
                   assert math.isfinite(seed[key]), (key, seed)
 
-          print("CMAQ-008 actual CfC counterfactual action ranking, logged direct baseline, oracle regret, paired seed interval and held-out action-effect reversal validated")
+          print("CMAQ-008 actual CfC counterfactual action ranking, logged direct baseline, oracle regret, paired seed interval and held-out action-effect and interaction shifts validated")
           print(json.dumps({
               regime: {
                   "model_lift_vs_direct": row["model_lift_vs_direct"],
