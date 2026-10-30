@@ -423,7 +423,7 @@ mod tests {
         let f1 = BinaryFactor::new(vec![1, 2], vec![0.7, 0.3, 0.4, 0.6]).unwrap();
         let report = min_fill_sum_product(&[f0.clone(), f1.clone()], &[0, 1], 8).unwrap();
 
-        let mut expected = vec![0.0; 2]; // retain x2
+        let mut expected = [0.0; 2]; // retain x2
         for (x2, expected_value) in expected.iter_mut().enumerate() {
             for x0 in 0..2 {
                 for x1 in 0..2 {
