@@ -168,6 +168,12 @@ pub fn admit_lexical_hits_for_proof_budget(
                 hit.evidence_id
             ));
         }
+        if hit.snapshot_receipt.as_ref() != Some(snapshot) {
+            return Err(format!(
+                "lexical hit {:?} is not bound to the supplied index snapshot receipt",
+                hit.evidence_id
+            ));
+        }
         if hit.scope_id != request.scope_id || hit.scope_id != admission.scope_id {
             return Err(format!(
                 "lexical hit {:?} scope does not match its request/admission",
@@ -353,6 +359,7 @@ mod tests {
             lifecycle: EvidenceLifecycle::Active,
             valid_from_unix_ms: Some(50),
             valid_until_unix_ms: Some(500),
+            snapshot_receipt: Some(snapshot_receipt()),
             bm25_score: rank_score,
             context: MemoryContextItem {
                 kind: MemoryContextType::Text,
@@ -481,11 +488,11 @@ mod tests {
         let mut index = EvidenceIndex::new();
         index.insert(record, &source_bytes).unwrap();
 
-        let snapshot = index.snapshot_receipt(200).unwrap();
-        let hits = index.search_bm25(
+        let (snapshot, hits) = index.search_bm25_at_snapshot(
             "verified evidence",
             "scope-1",
             250,
+            200,
             Path::new("."),
             Bm25Config::default(),
         ).unwrap();
@@ -519,6 +526,32 @@ mod tests {
             &EvidenceIndexSnapshotReceipt { known_at_unix_ms: 199, index_state_sha256: digest("index state") },
         ).unwrap_err();
         assert!(error.contains("snapshot known_at"));
+    }
+
+    #[test]
+    fn refuses_hits_without_a_matching_snapshot_receipt() {
+        let mut unsnapshotted = hit("A", "evidence", 1.0);
+        unsnapshotted.snapshot_receipt = None;
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[unsnapshotted],
+            &[admission("A")],
+            &snapshot_receipt(),
+        ).unwrap_err();
+        assert!(error.contains("not bound to the supplied index snapshot"));
+
+        let mut mismatched = hit("A", "evidence", 1.0);
+        mismatched.snapshot_receipt = Some(EvidenceIndexSnapshotReceipt {
+            known_at_unix_ms: 200,
+            index_state_sha256: digest("another index state"),
+        });
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[mismatched],
+            &[admission("A")],
+            &snapshot_receipt(),
+        ).unwrap_err();
+        assert!(error.contains("not bound to the supplied index snapshot"));
     }
 
     #[test]
