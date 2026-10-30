@@ -20,9 +20,9 @@ use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 const CLAIM_SCOPE: &str = "packet_schema_and_claim_evidence_consistency_only";
@@ -31,6 +31,7 @@ const CLAIM_SCOPE: &str = "packet_schema_and_claim_evidence_consistency_only";
 struct Args {
     packet: PathBuf,
     receipt: PathBuf,
+    evidence_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +42,9 @@ struct Evidence {
     subject_sha256: String,
     evidence_sha256: String,
     uri: String,
+    local_path: Option<String>,
+    witness_local_path: Option<String>,
+    assumptions_local_path: Option<String>,
     tool: String,
     tool_version: String,
     scope: String,
@@ -70,6 +74,7 @@ struct AuditSummary {
     packet_sha256: String,
     design_id: String,
     netlist_sha256: String,
+    subject_local_path: Option<String>,
     model_sha256: Option<String>,
     evidence_count: usize,
     evidence: Vec<Evidence>,
@@ -79,6 +84,7 @@ struct AuditSummary {
 fn parse_args() -> Result<Option<Args>, String> {
     let mut packet = None;
     let mut receipt = None;
+    let mut evidence_root = None;
     let mut args = env::args().skip(1);
 
     while let Some(flag) = args.next() {
@@ -91,6 +97,7 @@ fn parse_args() -> Result<Option<Args>, String> {
         match flag.as_str() {
             "--packet" => packet = Some(PathBuf::from(value)),
             "--receipt" => receipt = Some(PathBuf::from(value)),
+            "--evidence-root" => evidence_root = Some(PathBuf::from(value)),
             _ => return Err(format!("unknown argument: {flag}")),
         }
     }
@@ -98,12 +105,213 @@ fn parse_args() -> Result<Option<Args>, String> {
     Ok(Some(Args {
         packet: packet.ok_or("--packet is required")?,
         receipt: receipt.ok_or("--receipt is required")?,
+        evidence_root,
     }))
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     format!("{digest:x}")
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path)
+        .map_err(|error| format!("open evidence file {}: {error}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| format!("read evidence file {}: {error}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn validate_relative_path(value: &str, field: &str) -> Result<(), String> {
+    if value.contains('\\') || value.contains('\0') {
+        return Err(format!("{field} must use portable relative path separators"));
+    }
+    let path = Path::new(value);
+    if path.is_absolute() || path.as_os_str().is_empty() {
+        return Err(format!("{field} must be a non-empty relative path"));
+    }
+    let components = path.components().collect::<Vec<_>>();
+    if components.is_empty()
+        || components
+            .iter()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(format!(
+            "{field} must not contain '.', '..', root or prefix components"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_file_under_root(
+    canonical_root: &Path,
+    relative_path: &str,
+    expected_sha256: &str,
+    label: &str,
+) -> Result<(), String> {
+    validate_relative_path(relative_path, label)?;
+    let components = Path::new(relative_path).components().collect::<Vec<_>>();
+    let mut candidate = canonical_root.to_path_buf();
+
+    for (index, component) in components.iter().enumerate() {
+        let Component::Normal(name) = component else {
+            return Err(format!("{label} contains a non-normal path component"));
+        };
+        candidate.push(name);
+        let metadata = fs::symlink_metadata(&candidate)
+            .map_err(|error| format!("{label} {}: {error}", candidate.display()))?;
+        if metadata.file_type().is_symlink() {
+            return Err(format!("{label} {} must not be a symlink", candidate.display()));
+        }
+        if index + 1 == components.len() {
+            if !metadata.is_file() {
+                return Err(format!("{label} {} must be a regular file", candidate.display()));
+            }
+        } else if !metadata.is_dir() {
+            return Err(format!("{label} {} must be a directory", candidate.display()));
+        }
+    }
+
+    let resolved = fs::canonicalize(&candidate)
+        .map_err(|error| format!("canonicalize {label} {}: {error}", candidate.display()))?;
+    if !resolved.starts_with(canonical_root) {
+        return Err(format!("{label} {} escapes evidence root", relative_path));
+    }
+    let actual = sha256_file(&resolved)?;
+    if actual != expected_sha256 {
+        return Err(format!(
+            "{label} {relative_path}: SHA-256 mismatch (expected {expected_sha256}, got {actual})"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_evidence_bytes(root: &Path, summary: &AuditSummary) -> Result<Value, String> {
+    let root_meta = fs::symlink_metadata(root)
+        .map_err(|error| format!("stat evidence root {}: {error}", root.display()))?;
+    if root_meta.file_type().is_symlink() || !root_meta.is_dir() {
+        return Err("evidence root must be a regular non-symlink directory".to_owned());
+    }
+    let canonical_root = fs::canonicalize(root)
+        .map_err(|error| format!("canonicalize evidence root {}: {error}", root.display()))?;
+
+    let subject_path = summary
+        .subject_local_path
+        .as_deref()
+        .ok_or("subject.local_path is required when --evidence-root is used")?;
+    verify_file_under_root(
+        &canonical_root,
+        subject_path,
+        &summary.netlist_sha256,
+        "subject netlist",
+    )?;
+
+    let mut verified = vec![json!({
+        "role": "subject_netlist",
+        "evidence_id": null,
+        "path": subject_path,
+        "sha256": summary.netlist_sha256,
+    })];
+
+    for item in &summary.evidence {
+        let local_path = item
+            .local_path
+            .as_deref()
+            .ok_or_else(|| format!("evidence {}: local_path is required with --evidence-root", item.id))?;
+        verify_file_under_root(
+            &canonical_root,
+            local_path,
+            &item.evidence_sha256,
+            &format!("evidence {} artifact", item.id),
+        )?;
+        verified.push(json!({
+            "role": "evidence_artifact",
+            "evidence_id": item.id,
+            "path": local_path,
+            "sha256": item.evidence_sha256,
+        }));
+
+        match (&item.witness_sha256, &item.witness_local_path) {
+            (Some(digest), Some(path)) => {
+                verify_file_under_root(
+                    &canonical_root,
+                    path,
+                    digest,
+                    &format!("evidence {} witness", item.id),
+                )?;
+                verified.push(json!({
+                    "role": "witness",
+                    "evidence_id": item.id,
+                    "path": path,
+                    "sha256": digest,
+                }));
+            }
+            (Some(_), None) => {
+                return Err(format!(
+                    "evidence {}: witness_local_path is required to verify witness_sha256",
+                    item.id
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(format!(
+                    "evidence {}: witness_local_path is set without witness_sha256",
+                    item.id
+                ));
+            }
+            (None, None) => {}
+        }
+
+        match (&item.assumptions_sha256, &item.assumptions_local_path) {
+            (Some(digest), Some(path)) => {
+                verify_file_under_root(
+                    &canonical_root,
+                    path,
+                    digest,
+                    &format!("evidence {} assumptions", item.id),
+                )?;
+                verified.push(json!({
+                    "role": "assumptions",
+                    "evidence_id": item.id,
+                    "path": path,
+                    "sha256": digest,
+                }));
+            }
+            (Some(_), None) => {
+                return Err(format!(
+                    "evidence {}: assumptions_local_path is required to verify assumptions_sha256",
+                    item.id
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(format!(
+                    "evidence {}: assumptions_local_path is set without assumptions_sha256",
+                    item.id
+                ));
+            }
+            (None, None) => {}
+        }
+    }
+
+    Ok(json!({
+        "status": "verified",
+        "verified_file_count": verified.len(),
+        "root_binding": "relative_paths_under_canonical_non_symlink_root",
+        "files": verified,
+        "limitations": [
+            "This verifies bytes at the recorded local paths only.",
+            "It does not authenticate the upstream publisher, tool execution, signatures or provenance.",
+            "It is not resistant to an adversarial concurrent filesystem replacement between metadata checks and file open."
+        ]
+    }))
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -168,6 +376,18 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
     let subject_sha256 = required_string(value, "subject_sha256")?.to_ascii_lowercase();
     let evidence_sha256 = required_string(value, "evidence_sha256")?.to_ascii_lowercase();
     let uri = required_string(value, "uri")?;
+    let local_path = optional_string(value, "local_path")?;
+    let witness_local_path = optional_string(value, "witness_local_path")?;
+    let assumptions_local_path = optional_string(value, "assumptions_local_path")?;
+    for (field, path) in [
+        ("local_path", local_path.as_deref()),
+        ("witness_local_path", witness_local_path.as_deref()),
+        ("assumptions_local_path", assumptions_local_path.as_deref()),
+    ] {
+        if let Some(path) = path {
+            validate_relative_path(path, &format!("evidence {id}.{field}"))?;
+        }
+    }
 
     const KINDS: &[&str] = &[
         "stimulus_trace",
@@ -339,6 +559,9 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         subject_sha256,
         evidence_sha256,
         uri,
+        local_path,
+        witness_local_path,
+        assumptions_local_path,
         tool,
         tool_version,
         scope,
@@ -539,6 +762,10 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
     let design_id = required_string(&Value::Object(subject.clone()), "design_id")?;
     let netlist_sha256 =
         required_string(&Value::Object(subject.clone()), "netlist_sha256")?.to_ascii_lowercase();
+    let subject_local_path = optional_string(&Value::Object(subject.clone()), "local_path")?;
+    if let Some(path) = subject_local_path.as_deref() {
+        validate_relative_path(path, "subject.local_path")?;
+    }
     if !valid_sha256(&netlist_sha256) {
         return Err("subject.netlist_sha256 must be a valid SHA-256 digest".to_owned());
     }
@@ -701,6 +928,7 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
         packet_sha256,
         design_id,
         netlist_sha256,
+        subject_local_path,
         model_sha256,
         evidence_count: evidence_items.len(),
         evidence: evidence_items,
@@ -775,6 +1003,9 @@ fn run(args: Args) -> Result<(), String> {
             "subject_sha256": item.subject_sha256,
             "evidence_sha256": item.evidence_sha256,
             "uri": item.uri,
+            "local_path": item.local_path,
+            "witness_local_path": item.witness_local_path,
+            "assumptions_local_path": item.assumptions_local_path,
             "tool": item.tool,
             "tool_version": item.tool_version,
             "scope": item.scope,
