@@ -128,9 +128,11 @@ pub struct BenchmarkLineageAudit {
 }
 
 impl BenchmarkLineageAudit {
-    /// True only when every required identity and split invariant is satisfied.
+    /// True only when there are no reported violations and the audit receipt
+    /// still commits to the exposed fields. Call `verify_benchmark_lineage_audit`
+    /// as well to bind this receipt to the original manifest.
     pub fn is_clean(&self) -> bool {
-        self.violations.is_empty()
+        self.violations.is_empty() && self.audit_sha256 == audit_digest(self)
     }
 }
 
@@ -646,6 +648,7 @@ mod tests {
         let mut audit = audit_benchmark_lineage(&input);
         assert!(verify_benchmark_lineage_audit(&input, &audit));
         audit.unique_audio_asset_count += 1;
+        assert!(!audit.is_clean());
         assert!(!verify_benchmark_lineage_audit(&input, &audit));
     }
 }
