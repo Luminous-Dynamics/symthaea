@@ -28,9 +28,9 @@ class MetamorphicEvaluatorAuditTests(unittest.TestCase):
         report = audit_receipt(self.plan_bytes, self.receipt_bytes)
         self.assertTrue(report["valid"])
         self.assertTrue(report["all_relations_pass"], report["pair_results"])
-        self.assertEqual(report["planned_pair_count"], 7)
-        self.assertEqual(report["observed_pair_count"], 7)
-        self.assertEqual(report["passed_pair_count"], 7)
+        self.assertEqual(report["planned_pair_count"], 8)
+        self.assertEqual(report["observed_pair_count"], 8)
+        self.assertEqual(report["passed_pair_count"], 8)
         self.assertEqual(report["failed_pair_count"], 0)
         self.assertEqual(len(report["results_by_relation_family"]), 7)
         self.assertTrue(report["fixed_receipt_only"])
@@ -86,6 +86,19 @@ class MetamorphicEvaluatorAuditTests(unittest.TestCase):
         self.assertFalse(report["all_relations_pass"])
         failed = next(row for row in report["pair_results"] if row["pair_id"] == "invariance-format-001")
         self.assertTrue(any("score drift exceeded tolerance" in issue for issue in failed["failures"]))
+
+    def test_evidence_addition_must_increase_support_and_affected_score(self) -> None:
+        target = next(row for row in self.receipt["observations"] if row["pair_id"] == "evidence-addition-001")
+        self.assertEqual(target["variant"]["decision"], "supported_within_scope")
+        report = self.run_audit()
+        result = next(row for row in report["pair_results"] if row["pair_id"] == "evidence-addition-001")
+        self.assertTrue(result["passed"], result["failures"])
+
+    def test_observation_input_digests_must_match_committed_plan(self) -> None:
+        receipt = copy.deepcopy(self.receipt)
+        receipt["observations"][0]["baseline_input_sha256"] = "f" * 64
+        with self.assertRaisesRegex(MetamorphicAuditError, "differs from the committed plan"):
+            self.run_audit(receipt=receipt)
 
     def test_evidence_withdrawal_cannot_increase_support_or_affected_score(self) -> None:
         receipt = copy.deepcopy(self.receipt)
