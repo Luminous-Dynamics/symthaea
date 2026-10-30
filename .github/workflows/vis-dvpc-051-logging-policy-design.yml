@@ -6,7 +6,6 @@ on:
     paths:
       - "tools/vision-dvpc-051-logging-policy-design.rs"
       - "docs/research/VIS_DVPC_051_LOGGING_POLICY_DESIGN_V0.md"
-      - ".github/workflows/vis-dvpc-051-logging-policy-design.yml"
   push:
     branches: ["main"]
     paths:
