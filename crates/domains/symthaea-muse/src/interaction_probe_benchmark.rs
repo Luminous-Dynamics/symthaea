@@ -597,6 +597,49 @@ mod tests {
     }
 
     #[test]
+    fn independent_audit_finds_interaction_hidden_by_understated_support() {
+        // Deliberately hostile adapter fixture: source samples overlap for all
+        // 64 frames, while the supplied support claims are disjoint. The audit
+        // sample must expose the oracle-positive pair without crediting the
+        // candidate policy for having selected it.
+        let events = vec![source_event(0, 0.2), source_event(1, 0.3)];
+        let effect = SyntheticEffect::Polynomial {
+            quadratic_coefficient: 0.5,
+            cubic_coefficient: 0.0,
+        };
+        let supports = vec![support(0, 0, 32), support(1, 32, 64)];
+        let cfg = probe_config(1);
+        let (factorial, plan) = setup(&events, &effect, &supports, &cfg);
+        let factorial_config = FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
+            spectral_window_frames: 64,
+        };
+        let result = evaluate_interaction_probe_plan(
+            &factorial,
+            &events,
+            &effect,
+            &factorial_config,
+            &plan,
+            &digest("score"),
+            &digest("renderer"),
+            64,
+            &supports,
+            &cfg,
+            &InteractionProbeBenchmarkConfig::default(),
+        )
+        .unwrap();
+
+        assert_eq!(result.ground_truth_interacting_pair_count, 1);
+        assert_eq!(result.candidate_pair_count, 0);
+        assert_eq!(result.candidate_precision, None);
+        assert_eq!(result.candidate_recall, Some(0.0));
+        assert_eq!(result.audit_pair_count, 1);
+        assert_eq!(result.audit_true_positive_count, 1);
+        assert_eq!(result.audit_positive_rate, Some(1.0));
+        assert_eq!(result.selected_pair_recall, Some(1.0));
+    }
+
+    #[test]
     fn contextual_pair_probes_detect_three_way_effect_without_global_pair_terms() {
         let events = vec![
             source_event(0, 0.2),
