@@ -412,7 +412,7 @@ mod tests {
         assert_eq!(fixture.schema_version, "broca-retrieval-value-fixtures-v1");
         assert_eq!(fixture.policy_version, RETRIEVAL_UTILITY_POLICY_VERSION);
         assert_eq!(fixture.case_count, fixture.cases.len());
-        assert_eq!(fixture.case_count, 9);
+        assert_eq!(fixture.case_count, 10);
 
         for case in fixture.cases {
             let mut value = estimate();
@@ -542,6 +542,14 @@ mod tests {
             300,
             &different,
         ).unwrap_err().contains("claim set mismatch"));
+    }
+
+    #[test]
+    fn rejects_unresolved_claim_digest_tampering() {
+        let mut value = estimate();
+        value.unresolved_claims_sha256 = digest("different claim set");
+        let error = evaluate_retrieval_value(value).unwrap_err();
+        assert!(error.contains("unresolved-claim set digest mismatch"));
     }
 
     #[test]
