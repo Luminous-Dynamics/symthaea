@@ -209,6 +209,8 @@ pub struct ProofObligation {
     pub minimum_independent_families: u32,
     /// Require evidence from this many distinct trusted conversation sessions.
     /// Zero disables the session constraint; it never changes source-family checks.
+    /// Defaults to zero when deserializing legacy proof requests.
+    #[serde(default)]
     pub minimum_distinct_sessions: u32,
     /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
