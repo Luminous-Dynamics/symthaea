@@ -66,6 +66,14 @@ impl BitemporalJustificationRuntime {
             return Err("an append batch must contain at least one source event".into());
         }
 
+        let transaction_time = revisions[0].recorded_at;
+        if self.derived_known_at.values().any(|derived_at| *derived_at >= transaction_time) {
+            return Err(
+                "source event transaction time must be strictly later than every committed derived conclusion"
+                    .into(),
+            );
+        }
+
         let mut candidate_ledger = self.ledger.clone();
         candidate_ledger.append_batch(revisions.clone())?;
         let mut candidate_graph = self.justifications.clone();
@@ -131,6 +139,18 @@ impl BitemporalJustificationRuntime {
         recorded_at: DateTime<Utc>,
     ) -> Result<(), String> {
         self.verify_consistency()?;
+        if self.ledger.events().last().is_some_and(|event| event.recorded_at > recorded_at) {
+            return Err(
+                "derived conclusion recorded_at cannot precede the latest committed source event"
+                    .into(),
+            );
+        }
+        if self.derived_known_at.values().any(|known_at| *known_at > recorded_at) {
+            return Err(
+                "derived conclusion recorded_at cannot precede an existing derived conclusion"
+                    .into(),
+            );
+        }
         if self.derived_known_at.contains_key(&conclusion.fact_id) {
             return Err(format!("duplicate derived fact ID {:?}", conclusion.fact_id));
         }
@@ -644,6 +664,34 @@ mod tests {
                 .unwrap(),
             AsOfSupportStatus::Supported { .. }
         ));
+    }
+
+    #[test]
+    fn source_event_batch_cannot_be_backdated_before_a_derived_commit() {
+        let mut runtime = base_runtime();
+        let before = runtime.state_sha256().unwrap();
+        let error = runtime
+            .append_source_events([assert_event("LATE-BACKDATED", 1, "bronze")])
+            .unwrap_err();
+        assert!(error.contains("strictly later than every committed derived"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
+    }
+
+    #[test]
+    fn derived_conclusion_cannot_be_backdated_before_a_source_commit() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 2, "gold")])
+            .unwrap();
+        let before = runtime.state_sha256().unwrap();
+        let error = runtime
+            .derive_at(
+                conclusion("C", [justification("via-A", [source("A")])]),
+                instant(1),
+            )
+            .unwrap_err();
+        assert!(error.contains("cannot precede the latest committed source event"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
     }
 
     #[test]
