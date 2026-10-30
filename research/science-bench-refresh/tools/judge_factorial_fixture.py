@@ -154,13 +154,19 @@ def generate(output_dir: Path) -> dict[str, Any]:
             }
             for criterion_id in criteria
         ]
+        decision = (
+            "candidate_a"
+            if factors["candidate_order"] == "candidate_a_first"
+            or factors["provenance_cue"] == "displayed"
+            else "candidate_b"
+        )
         observations.append({
             "condition_id": row["condition_id"],
             "execution_ordinal": execution_ordinals[row["condition_id"]],
             "input_sha256": row["input_sha256"],
             "status": "completed",
             "judge_receipt_sha256": digest(("synthetic-judge-receipt:" + row["condition_id"]).encode()),
-            "decision": "candidate_a",
+            "decision": decision,
             "candidate_a_score_millionths": a_score,
             "candidate_b_score_millionths": 600_000,
             "criterion_scores": criterion_scores,
