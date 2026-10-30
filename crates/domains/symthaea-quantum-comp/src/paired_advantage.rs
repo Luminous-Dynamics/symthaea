@@ -47,7 +47,7 @@ pub struct ExactSignTest {
     pub losses: usize,
     /// Number of observations within the tie tolerance.
     pub ties: usize,
-    /// Number of non-tied observations used by the exact test.
+    /// Number of independent blocks in the exact test; ties are non-wins.
     pub effective_n: usize,
     /// P[X >= wins] for X ~ Binomial(effective_n, 0.5).
     pub p_value_one_sided: f64,
@@ -330,7 +330,9 @@ fn exact_margin_sign_test(values: &[f64], margin: f64, tolerance: f64) -> ExactS
             ties += 1;
         }
     }
-    let effective_n = wins + losses;
+    // Ties remain in the denominator as non-wins. This is conservative when
+    // the null permits probability mass exactly at the practical margin.
+    let effective_n = values.len();
     ExactSignTest {
         wins,
         losses,
