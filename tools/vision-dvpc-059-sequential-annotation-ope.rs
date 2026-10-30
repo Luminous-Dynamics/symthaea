@@ -633,10 +633,24 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let oracle = exact_history_adaptive(*world, world.variance)?;
         let static_plan = exact_history_blind(*world, world.variance)?;
         let uniform = uniform_prefix_design(*world);
+        let pilot_p = PILOT_ANNOTATION_PROBABILITY;
+        let kappa = PILOT_FRACTION;
+        let adaptive_budget = adaptive_batch_budget(world.budget, kappa, pilot_p)?;
+        let mut adaptive_world = *world;
+        adaptive_world.budget = adaptive_budget;
+        let two_batch_oracle =
+            exact_history_adaptive(adaptive_world, world.variance)?;
+        let two_batch_oracle_objective = two_batch_variance_objective(
+            world.variance,
+            pilot_p,
+            two_batch_oracle.design,
+            world.branch_probability,
+            kappa,
+        )?;
         let adaptive = evaluate_batch_adaptive(
             *world,
             replicates,
-            EVALUATION_N,
+            ADAPTIVE_BATCH_N,
             PILOT_N,
             seed ^ (world_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
         )?;
@@ -688,7 +702,9 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let batch_design_metrics = adaptive;
         let actual_design_analytic =
             batch_design_metrics.analytic_mse * EVALUATION_N as f64;
-        let gap = ((actual_design_analytic - oracle.objective) / oracle.objective.max(EPS)).max(0.0);
+        let gap = ((actual_design_analytic - two_batch_oracle_objective)
+            / two_batch_oracle_objective.max(EPS))
+            .max(0.0);
         writeln!(
             output,
             "RESULT\t{}\ttwo_batch_adaptive_plugin\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}",
@@ -704,12 +720,27 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             batch_design_metrics.bias,
             batch_design_metrics.variance,
             batch_design_metrics.mse,
-            oracle.objective,
+            two_batch_oracle_objective,
             gap,
             batch_design_metrics.mean_pilot_stage1,
             batch_design_metrics.mean_pilot_stage2_low,
             batch_design_metrics.mean_pilot_stage2_high,
             batch_design_metrics.prefix_violations,
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "TWO_BATCH_ORACLE\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.10}\t{}\t{}",
+            world.name,
+            "pilot_plus_exact_adaptive_grid",
+            two_batch_oracle.design.lambda1,
+            two_batch_oracle.design.lambda12[0],
+            two_batch_oracle.design.lambda12[1],
+            two_batch_oracle_objective,
+            two_batch_oracle.candidates_checked,
+            (kappa * expected_label_cost(pilot_design(pilot_p)?, world.branch_probability)
+                + (1.0 - kappa) * expected_label_cost(two_batch_oracle.design, world.branch_probability))
+                <= world.budget + EPS,
         )
         .unwrap();
         writeln!(
