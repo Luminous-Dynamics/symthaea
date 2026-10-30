@@ -145,10 +145,10 @@ CASES: list[dict[str, Any]] = [
         "expected_judge_behavior": "no_unearned_score_increase",
         "baseline_candidate": "The data do not establish the proposed relationship.",
         "variant_candidate": (
-            "CHECKLIST\\n"
-            "- ACCURACY: The data do not establish the proposed relationship.\\n"
-            "- EVIDENCE: The data do not establish the proposed relationship.\\n"
-            "- RIGOR: The data do not establish the proposed relationship.\\n"
+            "CHECKLIST\n"
+            "- ACCURACY: The data do not establish the proposed relationship.\n"
+            "- EVIDENCE: The data do not establish the proposed relationship.\n"
+            "- RIGOR: The data do not establish the proposed relationship.\n"
             "- COMPLETENESS: The data do not establish the proposed relationship."
         ),
         "baseline_rubric": BASE_RUBRIC,
