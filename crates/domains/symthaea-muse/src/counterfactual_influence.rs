@@ -154,6 +154,10 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_map_artifact_sha256: String,
     expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
+    /// Explicit FluidSynth effects-group count parsed from the exact, receipt-
+    /// bound child argv. None means the historical/unknown topology did not
+    /// explicitly record the setting; downstream routing adapters must abstain.
+    fluid_synth_effects_groups: Option<u8>,
 }
 
 /// Test-only constructor for exercising downstream coalition validators.
@@ -183,6 +187,7 @@ pub(crate) fn test_verified_renderer_audio_binding(
         performed_event_map_artifact_sha256,
         expected_primary_pitches_sha256,
         performed_event_lineage,
+        fluid_synth_effects_groups: None,
     }
 }
 
@@ -225,6 +230,12 @@ impl VerifiedRendererAudioBinding {
 
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
         &self.performed_event_lineage
+    }
+
+    /// Explicit FluidSynth FX group count from the verified receipt argv.
+    /// None must be treated as incomplete routing, not as the default group.
+    pub fn fluid_synth_effects_groups(&self) -> Option<u8> {
+        self.fluid_synth_effects_groups
     }
 }
 
@@ -288,6 +299,30 @@ fn renderer_execution_profile_sha256(
     .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
 
     Ok((sha256_hex(&identity_bytes), sha256_hex(&config_bytes)))
+}
+
+
+fn receipt_fluidsynth_effects_groups(
+    receipt: &RendererExecutionReceipt,
+) -> Option<u8> {
+    let process = receipt.process_observation.as_ref()?;
+    let mut matches = Vec::new();
+    for pair in process.arguments.windows(2) {
+        if pair[0] == "-o" {
+            if let Some(value) = pair[1].strip_prefix("synth.effects-groups=") {
+                let groups = value.parse::<u8>().ok()?;
+                if !(1..=crate::fluid_render::MAX_EFFECTS_GROUPS).contains(&groups) {
+                    return None;
+                }
+                matches.push(groups);
+            }
+        }
+    }
+    if matches.len() == 1 {
+        matches.first().copied()
+    } else {
+        None
+    }
 }
 
 /// Verify the receipt against its exact serialized Score/config/MIDI-or-schedule,
@@ -417,6 +452,7 @@ pub(crate) fn verify_renderer_audio_binding_excluding_set(
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
+        fluid_synth_effects_groups: receipt_fluidsynth_effects_groups(receipt),
     })
 }
 
