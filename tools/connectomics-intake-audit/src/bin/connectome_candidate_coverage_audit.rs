@@ -1039,7 +1039,7 @@ mod tests {
         assert_eq!(report.estimated_covered_errors.total, 2.0);
         assert_eq!(report.estimated_uncovered_errors.total, 2.0);
         assert!((report.candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
-        assert!((report.impact_weighted_candidate_generation_recall.ratio.unwrap() - (5.0 / 10.0)).abs() < 1e-12);
+        assert!((report.impact_weighted_candidate_generation_recall.ratio.unwrap() - (5.0 / 14.0)).abs() < 1e-12);
         assert_eq!(report.candidate_generation_recall.normal_approx_95_interval, Some([0.5, 0.5]));
         assert_eq!(report.sampled_psu_count, 4);
         assert_eq!(report.sampled_error_count, 4);
@@ -1328,7 +1328,9 @@ mod tests {
         assert!((report.candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
         assert!((report.impact_weighted_candidate_generation_recall.ratio.unwrap() - (5.0 / 14.0)).abs() < 1e-12);
         assert_eq!(report.error_family_coverage["merge"].estimated_total_errors.total, 2.0);
-        assert!((report.error_family_coverage["merge"].candidate_generation_recall.ratio.unwrap() - 0.2).abs() < 1e-12);
+        assert!((report.error_family_coverage["merge"].candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
+        assert_eq!(report.error_family_coverage["merge"].estimated_total_impact_weight.total, 10.0);
+        assert!((report.error_family_coverage["merge"].impact_weighted_candidate_generation_recall.ratio.unwrap() - 0.2).abs() < 1e-12);
     }
 
     #[test]
