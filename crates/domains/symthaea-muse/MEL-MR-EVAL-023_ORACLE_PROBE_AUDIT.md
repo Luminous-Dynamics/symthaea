@@ -54,7 +54,8 @@ The cost ratio is planned renders divided by exhaustive renders. Pair counts des
 
 1. **Sparse pair case:** eight events; only events 0 and 1 interact through a quadratic shared processor. Their nonzero source samples exactly match their overlapping synthetic acoustic supports; all other event supports are disjoint. The expected result is one true pair found, no candidate false positives, candidate precision/recall 1.0, and 10 planned renders versus 37 exhaustive pairwise renders (10/37 ≈ 27.0%). These are asserted source-level expectations, not executed results.
 2. **Context versus order:** three co-supported events with a pure third-order product. Every contextual pair finite difference is nonzero while all unconditional order-2 Harsanyi dividends are zero and the order-3 dividend is nonzero. The planner should select all three pair probes; the report must show contextual recall separately from the global interaction-order decomposition.
-3. **Receipt hard negative:** changing a report count without recomputing the receipt must be rejected.
+3. **Support-omission audit:** an intentionally understated support map hides a real contextual interaction from the candidate policy. The independent audit sample should detect it; candidate recall remains zero while selected-plan recall becomes one.
+4. **Receipt hard negative:** changing a report count without recomputing the receipt must be rejected.
 
 ## Proposed benchmark targets — not achieved results
 
@@ -70,4 +71,4 @@ Thresholds must be frozen per fixture family before comparing policies. Confiden
 
 ## Validation boundary
 
-Three Rust tests are authored for sparse pair recall/cost, the distinction between contextual pair effects and a pure third-order Harsanyi term, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
+Four Rust tests are authored for sparse pair recall/cost, an independent audit catching a support omission, the distinction between contextual pair effects and a pure third-order Harsanyi term, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
