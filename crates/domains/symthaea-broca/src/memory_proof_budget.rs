@@ -61,6 +61,8 @@ pub struct ProofEvidenceCandidate {
     pub source_span_sha256: String,
     /// Digest recomputed by the trusted source-span resolver.
     pub resolved_span_sha256: String,
+    /// Symmetric conflict edges from a trusted contradiction resolver.
+    pub conflicts_with: BTreeSet<String>,
     /// Transaction/knowledge time at which this exact revision was admitted.
     pub recorded_at_unix_ms: u64,
     /// Transaction time at which this revision was retracted, if any.
@@ -93,6 +95,12 @@ impl ProofEvidenceCandidate {
         valid_sha256(&self.payload_sha256, "payload_sha256")?;
         valid_sha256(&self.source_span_sha256, "source_span_sha256")?;
         valid_sha256(&self.resolved_span_sha256, "resolved_span_sha256")?;
+        if self.conflicts_with.contains(&self.evidence_id) {
+            return Err("evidence cannot conflict with itself".into());
+        }
+        for conflicting_id in &self.conflicts_with {
+            require_non_empty(conflicting_id, "conflicting evidence ID")?;
+        }
         valid_sha256(
             &self.authorization_receipt_sha256,
             "authorization_receipt_sha256",
@@ -183,6 +191,12 @@ pub struct ProofBudgetRequest {
     pub policy_sha256: String,
     pub token_budget: u64,
     pub max_search_nodes: u64,
+    /// Tokenizer identity/version/digest used to calculate token_cost.
+    pub tokenizer_id: String,
+    pub tokenizer_version: String,
+    pub tokenizer_sha256: String,
+    /// Digest of the packet serialization/rendering implementation.
+    pub packet_renderer_sha256: String,
     pub candidates: Vec<ProofEvidenceCandidate>,
     pub obligations: Vec<ProofObligation>,
 }
@@ -194,10 +208,14 @@ impl ProofBudgetRequest {
             ("principal_id", self.principal_id.as_str()),
             ("scope_id", self.scope_id.as_str()),
             ("policy_id", self.policy_id.as_str()),
+            ("tokenizer_id", self.tokenizer_id.as_str()),
+            ("tokenizer_version", self.tokenizer_version.as_str()),
         ] {
             require_non_empty(value, field)?;
         }
         valid_sha256(&self.policy_sha256, "policy_sha256")?;
+        valid_sha256(&self.tokenizer_sha256, "tokenizer_sha256")?;
+        valid_sha256(&self.packet_renderer_sha256, "packet_renderer_sha256")?;
         if self.token_budget == 0 {
             return Err("token_budget must be greater than zero".into());
         }
@@ -216,6 +234,26 @@ impl ProofBudgetRequest {
             candidate.validate()?;
             if !evidence_ids.insert(candidate.evidence_id.as_str()) {
                 return Err(format!("duplicate evidence ID {:?}", candidate.evidence_id));
+            }
+        }
+
+        let candidate_ids: BTreeSet<&str> = self.candidates.iter()
+            .map(|candidate| candidate.evidence_id.as_str())
+            .collect();
+        for candidate in &self.candidates {
+            for conflicting_id in &candidate.conflicts_with {
+                if !candidate_ids.contains(conflicting_id.as_str()) {
+                    return Err(format!("conflict edge references unknown evidence ID {conflicting_id:?}"));
+                }
+                let conflicting = self.candidates.iter()
+                    .find(|item| item.evidence_id == *conflicting_id)
+                    .expect("candidate ID set was built from this vector");
+                if !conflicting.conflicts_with.contains(&candidate.evidence_id) {
+                    return Err(format!(
+                        "conflict relation between {:?} and {:?} must be symmetric",
+                        candidate.evidence_id, conflicting_id
+                    ));
+                }
             }
         }
 
@@ -282,6 +320,7 @@ pub enum JustificationRejectionReason {
     MissingEvidenceReference,
     CandidateIneligible,
     IndependentFamilyCountInsufficient,
+    ContradictoryEvidence,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -339,6 +378,10 @@ struct ProofPacketPayload<'a> {
     known_at_unix_ms: u64,
     policy_id: &'a str,
     policy_sha256: &'a str,
+    tokenizer_id: &'a str,
+    tokenizer_version: &'a str,
+    tokenizer_sha256: &'a str,
+    packet_renderer_sha256: &'a str,
     selected_proofs: &'a [SelectedProof],
     evidence: &'a [ProofPacketEvidenceRef],
     total_token_cost: u64,
@@ -494,6 +537,14 @@ impl<'a> ExactSearch<'a> {
 
             let mut next_evidence = selected_evidence_ids.clone();
             next_evidence.extend(alternative.evidence_dependencies.iter().cloned());
+            if self.has_internal_conflict(&next_evidence) {
+                self.justification_rejections.insert(JustificationRejection {
+                    conclusion_id: conclusion_id.clone(),
+                    justification_id: alternative.justification_id.clone(),
+                    reason: JustificationRejectionReason::ContradictoryEvidence,
+                });
+                continue;
+            }
             let Some(next_cost) = self.cost_of_set(&next_evidence) else {
                 self.budget_blocked = true;
                 continue;
@@ -514,6 +565,18 @@ impl<'a> ExactSearch<'a> {
             });
             self.explore(obligation_index + 1, &next_evidence, &next_proofs);
         }
+    }
+
+    fn has_internal_conflict(&self, evidence_ids: &BTreeSet<String>) -> bool {
+        for evidence_id in evidence_ids {
+            let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
+                return true;
+            };
+            if candidate.conflicts_with.iter().any(|other| evidence_ids.contains(other)) {
+                return true;
+            }
+        }
+        false
     }
 
     fn cost_of_set(&self, evidence_ids: &BTreeSet<String>) -> Option<u64> {
@@ -618,6 +681,10 @@ pub fn solve_proof_budget(
         known_at_unix_ms: request.known_at_unix_ms,
         policy_id: &request.policy_id,
         policy_sha256: &request.policy_sha256,
+        tokenizer_id: &request.tokenizer_id,
+        tokenizer_version: &request.tokenizer_version,
+        tokenizer_sha256: &request.tokenizer_sha256,
+        packet_renderer_sha256: &request.packet_renderer_sha256,
         selected_proofs: &plan.selected_proofs,
         evidence: &evidence,
         total_token_cost: plan.total_token_cost,
@@ -747,6 +814,10 @@ pub fn verify_proof_packet(
         known_at_unix_ms: request.known_at_unix_ms,
         policy_id: &request.policy_id,
         policy_sha256: &request.policy_sha256,
+        tokenizer_id: &request.tokenizer_id,
+        tokenizer_version: &request.tokenizer_version,
+        tokenizer_sha256: &request.tokenizer_sha256,
+        packet_renderer_sha256: &request.packet_renderer_sha256,
         selected_proofs: &result.selected_proofs,
         evidence: &result.evidence,
         total_token_cost,
@@ -790,6 +861,7 @@ mod tests {
             payload_sha256: digest('a'),
             source_span_sha256: digest('b'),
             resolved_span_sha256: digest('b'),
+            conflicts_with: BTreeSet::new(),
             recorded_at_unix_ms: 100,
             retracted_at_unix_ms: None,
             valid_from_unix_ms: Some(10),
@@ -830,6 +902,10 @@ mod tests {
             known_at_unix_ms: 200,
             policy_id: "policy-v1".into(),
             policy_sha256: digest('d'),
+            tokenizer_id: "broca-tokenizer".into(),
+            tokenizer_version: "2026-10-30".into(),
+            tokenizer_sha256: digest('e'),
+            packet_renderer_sha256: digest('f'),
             token_budget: budget,
             max_search_nodes: 10_000,
             candidates,
@@ -1166,6 +1242,10 @@ mod tests {
             known_at_unix_ms: canonical.known_at_unix_ms,
             policy_id: &canonical.policy_id,
             policy_sha256: &canonical.policy_sha256,
+            tokenizer_id: &canonical.tokenizer_id,
+            tokenizer_version: &canonical.tokenizer_version,
+            tokenizer_sha256: &canonical.tokenizer_sha256,
+            packet_renderer_sha256: &canonical.packet_renderer_sha256,
             selected_proofs: &non_minimal.selected_proofs,
             evidence: &non_minimal.evidence,
             total_token_cost: non_minimal.total_token_cost,
