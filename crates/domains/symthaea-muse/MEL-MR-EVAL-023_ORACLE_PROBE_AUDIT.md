@@ -25,7 +25,7 @@ The new src/interaction_probe_benchmark.rs module:
 - Requires the support frame domain to match the EVAL-020 source frame count.
 - Derives the probe target from EVAL-018's *contextual four-coalition finite difference*: for each pair A/B, retain all other events and compare full, without A, without B, and without both. This makes the evaluator measure the same contextual effect that a real EVAL-018 probe measures.
 - Computes candidate-only precision/recall and false-positive/false-negative counts.
-- Reports audit-only discoveries separately; measured recall includes candidates plus audit pairs.
+- Reports audit-only discoveries separately; selected-plan recall includes candidate pairs plus audit pairs.
 - Separately reports contextual pair-effect magnitude, unconditional global order-2 Harsanyi structure, and order-3+ Harsanyi structure. These are not interchangeable: a three-way effect can induce nonzero contextual pair probes while its global order-2 Harsanyi terms remain exactly zero.
 - Checks selected-pair and render accounting against the exhaustive all-pairs cost.
 - Seals the result in a domain-separated SHA-256 receipt and supports full replay/tamper verification.
@@ -34,7 +34,11 @@ The feature intentionally does not infer topology from MIDI notes, verify a Flui
 
 ## Metrics
 
-For N events, all-pairs truth contains N(N-1)/2 pairs. The EVAL-019 plan uses:
+For N events, the contextual pairwise reference contains N(N-1)/2 pair tests. For pair A/B, with all other events C retained, the PCM residual is:
+
+    J_AB|C = Y_all - Y_(all without A) - Y_(all without B) + Y_(all without A and B)
+
+The global Harsanyi decomposition remains a separate diagnostic: order-2 terms are unconditional pair structure, and order-3+ terms capture higher-order coalition structure. The EVAL-019 plan uses:
 
     planned_renders = 1 baseline + N single removals + selected pair removals
 
@@ -42,7 +46,7 @@ The exhaustive reference cost is:
 
     exhaustive_renders = 1 + N + N(N-1)/2
 
-Candidate recall is candidate true positives / exact pairwise positives. Candidate precision is candidate true positives / candidate pairs. Selected-plan recall combines candidate-policy pairs and the separately identified audit sample. Empty denominators are None, not 1.0.
+Candidate recall is candidate true positives / exact contextual-positive pairs. Candidate precision is candidate true positives / candidate pairs. Selected-plan recall combines candidate-policy pairs and the separately identified audit sample. Empty denominators are None, not 1.0.
 
 The cost ratio is planned renders divided by exhaustive renders. Pair counts describe selected probes, not completed renderer measurements. It is an exact synthetic accounting comparison; it is not a measured wall-clock speedup.
 
