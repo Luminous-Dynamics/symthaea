@@ -294,7 +294,7 @@ fn scan_mask<R: Read>(frame: &FrameInput, mut reader: R) -> Result<MaskScan, Str
                 return Err("eligibility mask has non-zero padding bits after the declared voxel extent".into());
             }
             for bit in 0..valid_bits {
-                if byte & (1_u8 << bit) == 0 {
+                if *byte & (1_u8 << bit) == 0 {
                     continue;
                 }
                 let linear_index = linear_start + u128::from(bit);
@@ -817,14 +817,75 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_synthetic_fixture_is_valid_and_reproducible() {
+    fn checked_in_synthetic_fixture_verifies_geometry_and_mask_bytes() {
         let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME.example.json");
+        let mask = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex");
         let frame: FrameInput = serde_json::from_slice(bytes).expect("fixture JSON should parse");
-        let report = validate(&frame).expect("checked-in synthetic frame should pass");
+        let mut report = validate(&frame).expect("checked-in synthetic frame geometry should pass");
         assert_eq!(report.status, "FRAME_GEOMETRY_PASS_MASK_UNVERIFIED");
         assert_eq!(report.eligible_grid_cells, 3);
         assert_eq!(report.excluded_grid_cells, 1);
         assert_eq!(report.population_frame.len(), 3);
+        validate_mask_bytes(&frame, mask, &mut report).expect("checked-in eligibility mask should bind to PSU dispositions");
+        assert_eq!(report.status, "PASS");
+        assert!(report.eligibility_mask_verified);
+        assert_eq!(report.eligibility_foreground_voxel_count, "3");
+        assert_eq!(report.mask_tile_counts.iter().map(|tile| tile.eligible_voxel_count.as_str()).collect::<Vec<_>>(), vec!["1", "1", "1", "0"]);
+    }
+
+    fn valid_packed_mask() -> Vec<u8> {
+        let mut mask = vec![0_u8; 57];
+        mask[0] = 0x41; // x=0 and x=6 at y=0,z=0.
+        mask[50] = 0x01; // x=0,y=0,z=8.
+        mask
+    }
+
+    #[test]
+    fn packed_mask_uses_lsb_first_x_fastest_voxel_order() {
+        let mut frame = fixture();
+        frame.eligibility_mask.encoding = "packed_bitset_lsb0_x_fastest_v1".into();
+        let mask = valid_packed_mask();
+        frame.eligibility_mask.artifact_sha256 = sha256(&mask);
+        let scan = scan_mask(&frame, Cursor::new(mask)).unwrap();
+        assert_eq!(scan.foreground_voxels, 3);
+        assert_eq!(scan.tile_foreground_counts, vec![1, 1, 1, 0]);
+    }
+
+    #[test]
+    fn eligibility_mask_cannot_disagree_with_eligible_or_excluded_psus() {
+        let mut frame = fixture();
+        let mut mask = valid_packed_mask();
+        // Move the only selected voxel from the second PSU to the excluded fourth PSU.
+        mask[0] = 0x01;
+        mask[50] = 0x41;
+        frame.eligibility_mask.artifact_sha256 = sha256(&mask);
+        let scan = scan_mask(&frame, Cursor::new(mask)).unwrap();
+        assert!(mask_tile_counts(&frame, &scan).unwrap_err().contains("marked excluded"));
+    }
+
+    #[test]
+    fn mask_padding_bits_and_trailing_bytes_are_rejected() {
+        let mut frame = fixture();
+        let mut mask = valid_packed_mask();
+        mask[56] = 0x04; // only two high-level voxels remain in the final byte
+        frame.eligibility_mask.artifact_sha256 = sha256(&mask);
+        assert!(scan_mask(&frame, Cursor::new(mask)).unwrap_err().contains("padding bits"));
+
+        let mut mask = valid_packed_mask();
+        mask.push(0);
+        assert!(scan_mask(&frame, Cursor::new(mask)).unwrap_err().contains("trailing bytes"));
+    }
+
+    #[test]
+    fn mask_artifact_digest_and_exact_length_are_required() {
+        let mut frame = fixture();
+        let mask = valid_packed_mask();
+        frame.eligibility_mask.artifact_sha256 = "0".repeat(64);
+        assert!(validate_mask_bytes(&frame, &mask, &mut validate(&frame).unwrap()).unwrap_err().contains("SHA-256"));
+        frame.eligibility_mask.artifact_sha256 = sha256(&mask);
+        let mut extra = mask.clone();
+        extra.push(0);
+        assert!(validate_mask_bytes(&frame, &extra, &mut validate(&frame).unwrap()).unwrap_err().contains("expected"));
     }
 
     #[test]
