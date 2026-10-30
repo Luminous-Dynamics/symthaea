@@ -173,6 +173,7 @@ struct OracleLedger {
 struct HarnessIdentity {
     harness_id: String,
     binary_digest: String,
+    worker_binary_digest: String,
     fixture_digest: String,
 }
 
@@ -703,6 +704,7 @@ fn validate_envelopes(
     }
     if !valid_digest(&oracle.catalog_digest)
         || !valid_digest(&oracle.harness.binary_digest)
+        || !valid_digest(&oracle.harness.worker_binary_digest)
         || !valid_digest(&oracle.harness.fixture_digest)
         || !valid_digest(&receipts.catalog_digest)
         || !valid_digest(&receipts.observer_binary_digest)
@@ -727,7 +729,7 @@ fn validate_envelopes(
         );
     }
     for record in &oracle.records {
-        if record.execution_witness.worker_binary_digest != oracle.harness.binary_digest {
+        if record.execution_witness.worker_binary_digest != oracle.harness.worker_binary_digest {
             push_error(
                 report,
                 Some(&record.case_id),
@@ -1528,6 +1530,7 @@ mod tests {
             "harness": {
                 "harness_id": "basalt-fixture-harness-v1",
                 "binary_digest": format!("sha256:{}", "c".repeat(64)),
+                "worker_binary_digest": format!("sha256:{}", "f".repeat(64)),
                 "fixture_digest": format!("sha256:{}", "d".repeat(64))
             },
             "records": [
@@ -1543,7 +1546,7 @@ mod tests {
                     "witness_kind": "controlled_read",
                     "independent_replay": "confirmed",
                     "execution_witness": {
-                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "worker_binary_digest": format!("sha256:{}", "f".repeat(64)),
                         "baseline_output_digest": before,
                         "mutated_output_digest": after,
                         "baseline_bytes_read": 8,
@@ -1868,7 +1871,7 @@ mod tests {
         let mut oracle_value: Value =
             serde_json::from_slice(&oracle).expect("oracle fixture parses");
         oracle_value["records"][0]["execution_witness"]["worker_binary_digest"] =
-            json!(format!("sha256:{}", "f".repeat(64)));
+            json!(format!("sha256:{}", "a".repeat(64)));
         let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
         let report = audit_bytes(&catalog, &oracle, &receipts);
         assert!(!report.adjudication_passed);
