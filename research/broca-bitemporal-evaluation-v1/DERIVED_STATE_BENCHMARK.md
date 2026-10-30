@@ -333,6 +333,20 @@ These are project targets, not external standards:
 - Report canonical-pool and raw-native scores separately with paired task-level uncertainty.
 - The full official TimlMemBench dataset and evaluator must be obtained under its published license before claiming reproduction or direct score comparisons.
 
+## 8D. Bitemporal query semantics (D38-D40)
+
+The companion [bitemporal-query-fixtures-v1.json](./bitemporal-query-fixtures-v1.json) adds 3 synthetic cases / 15 variants for the two-clock query API now implemented in the SQLite research backend.
+
+| Case | Independent coordinate | Required result |
+|---|---|---|
+| D38: late-arriving evidence | `known_at` crosses the Add commit time while `valid_at` remains fixed | A historical fact ingested late is absent from earlier knowledge views and present only after ingestion is known |
+| D39: delayed retraction | `known_at` crosses the retraction transaction time while `valid_at` remains fixed | Earlier as-known views retain the then-eligible source; later views suppress it |
+| D40: world validity | `valid_at` crosses a source's valid-from boundary while `known_at` remains fixed | A source can be known but not yet valid; the two coordinates cannot be collapsed |
+
+The implementation stores monotonic transaction coordinates across Add and lifecycle events. The query reconstructs the ledger view by selecting Add batches whose transaction time is no later than `known_at`, replaying only lifecycle events recorded by `known_at`, then evaluating valid-time bounds at `valid_at`.
+
+This is a current-state reference slice, not a complete general bitemporal database: it uses millisecond coordinates, does not yet model correction chains for arbitrary source events, and does not provide multi-clock interval joins. The public competition Search ABI remains unchanged and exposes the current view; historical query is a separate internal method.
+
 ## 9. Implementation sequence
 
 1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
