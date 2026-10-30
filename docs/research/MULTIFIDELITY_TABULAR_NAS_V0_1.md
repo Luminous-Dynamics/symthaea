@@ -95,10 +95,12 @@ Required methods:
 1. full-fidelity random search (ZAPS-style unique architecture query baseline);
 2. ZAPS paper-protocol reproduction and a separate strict no-oracle variant;
 3. CoRA-Rank and CoRA-Refine, with the exact anchor sampling, early training prefixes, proxy/curve feature construction and residual learner pinned;
-4. Successive Halving / Hyperband with pinned implementation and bracket/schedule;
-5. BOHB or DEHB, or a pinned TPE multi-fidelity implementation where dependencies and fidelity interface are reproducible;
-6. random + early stopping;
-7. Symthaea proxy-only, Symthaea anchor/curve-informed and Symthaea audit-budgeted promotion variants.
+4. R-MF-NAS with the paper's trajectory archive, first-improvement/escape procedure and successive-halving injection protocol pinned;
+5. HiP-BO (published online 16 October 2026), with its relevance-weighted task-prior GP and pretrained learning-curve predictor, when code/data are available;
+6. Successive Halving / Hyperband with pinned implementation and bracket/schedule;
+7. BOHB or DEHB, or a pinned TPE multi-fidelity implementation where dependencies and fidelity interface are reproducible;
+8. random + early stopping;
+9. Symthaea proxy-only, Symthaea anchor/curve-informed and Symthaea audit-budgeted promotion variants.
 
 ### Equal-cost and equal-query comparisons
 
