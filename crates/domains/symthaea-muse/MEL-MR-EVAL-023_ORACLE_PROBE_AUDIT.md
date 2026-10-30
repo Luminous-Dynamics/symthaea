@@ -42,9 +42,9 @@ The exhaustive reference cost is:
 
     exhaustive_renders = 1 + N + N(N-1)/2
 
-Candidate recall is candidate true positives / exact pairwise positives. Candidate precision is candidate true positives / candidate pairs. Measured recall adds the separately identified audit sample to the numerator and denominator of measured pairs. Empty denominators are None, not 1.0.
+Candidate recall is candidate true positives / exact pairwise positives. Candidate precision is candidate true positives / candidate pairs. Selected-plan recall combines candidate-policy pairs and the separately identified audit sample. Empty denominators are None, not 1.0.
 
-The cost ratio is planned renders divided by exhaustive renders. It is an exact synthetic accounting comparison; it is not a measured wall-clock speedup.
+The cost ratio is planned renders divided by exhaustive renders. Pair counts describe selected probes, not completed renderer measurements. It is an exact synthetic accounting comparison; it is not a measured wall-clock speedup.
 
 ## Known-answer fixtures authored
 
