@@ -3001,6 +3001,199 @@ mod tests {
     }
 
     #[test]
+    fn coherent_uncertainty_scenarios_apply_global_source_transforms_and_remain_valid() {
+        for base in correlated_stress_worlds() {
+            let scenarios = coherent_profile_scenarios(&base).unwrap();
+            assert_eq!(scenarios.len(), 4);
+            for scenario in scenarios {
+                scenario.world.validate().unwrap();
+            }
+            let nominal = scenarios[0].world;
+            let high = scenarios[2].world;
+            for source in 0..SOURCES {
+                let ratio_a = high.source_excess_variance[0][0][source]
+                    / nominal.source_excess_variance[0][0][source].max(EPS);
+                let ratio_b = high.source_excess_variance[1][2][source]
+                    / nominal.source_excess_variance[1][2][source].max(EPS);
+                assert!((ratio_a - 1.35).abs() < 1e-10);
+                assert!((ratio_b - 1.35).abs() < 1e-10);
+
+                let bias_delta_a = scenarios[3].world.source_bias[0][0][source]
+                    - 1.10 * nominal.source_bias[0][0][source];
+                let bias_delta_b = scenarios[3].world.source_bias[1][2][source]
+                    - 1.10 * nominal.source_bias[1][2][source];
+                assert!((bias_delta_a - bias_delta_b).abs() < 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn singleton_coherent_uncertainty_set_matches_nominal_portfolio_oracle() {
+        let world = correlated_stress_worlds()[1];
+        let portfolio = policy_portfolio(&world);
+        let singleton = [ProfileScenario {
+            name: "nominal_only",
+            world,
+        }];
+        for (nominal_objective, robust_objective) in [
+            (
+                PortfolioObjective::PriorWeighted,
+                RobustPortfolioObjective::WorstProfilePriorWeighted,
+            ),
+            (
+                PortfolioObjective::WorstPolicy,
+                RobustPortfolioObjective::WorstProfileWorstPolicy,
+            ),
+        ] {
+            let nominal =
+                exact_portfolio_allocation(&world, &portfolio, nominal_objective).unwrap();
+            let robust = exact_robust_portfolio_allocation(
+                &world,
+                &singleton,
+                &portfolio,
+                robust_objective,
+            )
+            .unwrap();
+            assert!((nominal.objective - robust.objective).abs() < 1e-12);
+            assert_eq!(nominal.allocation, robust.allocation);
+        }
+    }
+
+    #[test]
+    fn robust_portfolio_exact_oracles_match_independent_brute_force_enumeration() {
+        let world = correlated_stress_worlds()[0];
+        let portfolio = policy_portfolio(&world);
+        let profiles = coherent_profile_scenarios(&world).unwrap();
+        let robust_prior = exact_robust_portfolio_allocation(
+            &world,
+            &profiles,
+            &portfolio,
+            RobustPortfolioObjective::WorstProfilePriorWeighted,
+        )
+        .unwrap();
+        let robust_worst = exact_robust_portfolio_allocation(
+            &world,
+            &profiles,
+            &portfolio,
+            RobustPortfolioObjective::WorstProfileWorstPolicy,
+        )
+        .unwrap();
+        let left = enumerate_context_options(&world, 0, [true; SOURCES]);
+        let right = enumerate_context_options(&world, 1, [true; SOURCES]);
+        let mut brute_prior = f64::INFINITY;
+        let mut brute_worst = f64::INFINITY;
+        let mut combinations = 0usize;
+        for left_option in &left {
+            for right_option in &right {
+                if left_option.cost + right_option.cost > world.budget {
+                    continue;
+                }
+                let mut allocation = Allocation::default();
+                allocation.counts[0] = left_option.counts;
+                allocation.counts[1] = right_option.counts;
+                combinations += 1;
+                brute_prior = brute_prior.min(robust_portfolio_objective(
+                    &allocation,
+                    &profiles,
+                    &portfolio,
+                    RobustPortfolioObjective::WorstProfilePriorWeighted,
+                ).unwrap());
+                brute_worst = brute_worst.min(robust_portfolio_objective(
+                    &allocation,
+                    &profiles,
+                    &portfolio,
+                    RobustPortfolioObjective::WorstProfileWorstPolicy,
+                ).unwrap());
+            }
+        }
+        assert_eq!(robust_prior.combinations_checked, combinations);
+        assert_eq!(robust_worst.combinations_checked, combinations);
+        assert!((robust_prior.objective - brute_prior).abs() < 1e-12);
+        assert!((robust_worst.objective - brute_worst).abs() < 1e-12);
+    }
+
+    #[test]
+    fn coherent_robust_plans_are_no_worse_than_nominal_plugin_on_declared_scenarios() {
+        for world in correlated_stress_worlds() {
+            let portfolio = policy_portfolio(&world);
+            let profiles = coherent_profile_scenarios(&world).unwrap();
+            let plugin_world = independent_profile(&world);
+            let plugin = exact_portfolio_allocation(
+                &plugin_world,
+                &portfolio,
+                PortfolioObjective::PriorWeighted,
+            )
+            .unwrap()
+            .allocation;
+            let robust_prior = exact_robust_portfolio_allocation(
+                &world,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfilePriorWeighted,
+            )
+            .unwrap();
+            let robust_worst = exact_robust_portfolio_allocation(
+                &world,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfileWorstPolicy,
+            )
+            .unwrap();
+            let plugin_prior = robust_portfolio_objective(
+                &plugin,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfilePriorWeighted,
+            ).unwrap();
+            let robust_prior_value = robust_portfolio_objective(
+                &robust_prior.allocation,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfilePriorWeighted,
+            ).unwrap();
+            let plugin_worst = robust_portfolio_objective(
+                &plugin,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfileWorstPolicy,
+            ).unwrap();
+            let robust_worst_value = robust_portfolio_objective(
+                &robust_worst.allocation,
+                &profiles,
+                &portfolio,
+                RobustPortfolioObjective::WorstProfileWorstPolicy,
+            ).unwrap();
+            assert!(robust_prior_value <= plugin_prior + 1e-12);
+            assert!(robust_worst_value <= plugin_worst + 1e-12);
+            assert!(robust_prior.allocation.feasible(&world));
+            assert!(robust_worst.allocation.feasible(&world));
+        }
+    }
+
+    #[test]
+    fn robust_portfolio_outputs_are_deterministic_and_have_exact_schemas() {
+        let first = robust_portfolio_benchmark_rows(2, 0x0580_01).unwrap();
+        let second = robust_portfolio_benchmark_rows(2, 0x0580_01).unwrap();
+        assert_eq!(first, second);
+        let configs: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("ROBUST_CONFIG\t"))
+            .collect();
+        let results: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("ROBUST_PROFILE_RESULT\t"))
+            .collect();
+        assert_eq!(configs.len(), 12);
+        assert_eq!(results.len(), 72);
+        for row in configs {
+            assert_eq!(row.split('\t').count(), 5);
+        }
+        for row in results {
+            assert_eq!(row.split('\t').count(), 20);
+        }
+    }
+
+    #[test]
     fn output_includes_deterministic_policy_portfolio_rows() {
         let first = policy_portfolio_benchmark_rows(2, 789).unwrap();
         let second = policy_portfolio_benchmark_rows(2, 789).unwrap();
@@ -3088,6 +3281,20 @@ mod tests {
                 .filter(|line| line.starts_with("PORTFOLIO_CONFIG\t"))
                 .count(),
             9
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("ROBUST_CONFIG\t"))
+                .count(),
+            12
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("ROBUST_PROFILE_RESULT\t"))
+                .count(),
+            72
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
