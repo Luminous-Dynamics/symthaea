@@ -20,7 +20,9 @@ const PACKAGE_DOMAIN: &[u8] = b"package.v1\0";
 const MAX_CLAIMS: usize = 100_000;
 const MAX_SOURCES: usize = 100_000;
 const MAX_SPANS: usize = 500_000;
+const MAX_ADJUDICATORS: usize = 500_000;
 const MAX_ADJUDICATIONS: usize = 500_000;
+const MAX_RESOLUTIONS: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -216,6 +218,8 @@ pub struct ReferenceAssuranceReportV1 {
     pub claims_with_disagreement: u64,
     pub abstention_count: u64,
     pub referenced_source_ancestry_groups: u64,
+    pub referenced_sources_with_unknown_ancestry: u64,
+    pub material_claims_without_cited_evidence: u64,
     pub fixed_reference_package_only: bool,
     pub adjudicator_independence_proven: bool,
     pub source_authenticity_proven: bool,
@@ -353,6 +357,12 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     if fields.spans.len() > MAX_SPANS {
         issues.push(format!("spans must contain at most {MAX_SPANS} items"));
     }
+    if fields.adjudicators.len() > MAX_ADJUDICATORS {
+        issues.push(format!("adjudicators must contain at most {MAX_ADJUDICATORS} items"));
+    }
+    if fields.resolutions.len() > MAX_RESOLUTIONS {
+        issues.push(format!("resolutions must contain at most {MAX_RESOLUTIONS} items"));
+    }
     if fields.initial_adjudications.len() > MAX_ADJUDICATIONS {
         issues.push(format!("initial_adjudications must contain at most {MAX_ADJUDICATIONS} items"));
     }
@@ -403,12 +413,16 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     }
 
     let mut sources = BTreeMap::new();
+    let mut source_snapshot_digests = BTreeSet::new();
     for source in &fields.sources {
         if source.source_id.trim().is_empty() || source.source_id.len() > 128 {
             issues.push("source_id must be non-empty and at most 128 bytes".to_owned());
         }
         if sources.insert(source.source_id.as_str(), source).is_some() {
             issues.push(format!("duplicate source_id {}", source.source_id));
+        }
+        if !source_snapshot_digests.insert(source.snapshot_sha256.as_str()) {
+            issues.push(format!("source {} repeats an exact snapshot digest already assigned to another source", source.source_id));
         }
         for (name, value) in [
             ("snapshot_sha256", source.snapshot_sha256.as_str()),
@@ -594,7 +608,11 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                 None => issues.push(format!("resolution {} references unknown adjudication {}", resolution.resolution_id, record_id)),
             }
         }
+        let mut seen_resolution_spans = BTreeSet::new();
         for span_id in &resolution.evidence_span_ids {
+            if !seen_resolution_spans.insert(span_id.as_str()) {
+                issues.push(format!("resolution {} repeats evidence span {}", resolution.resolution_id, span_id));
+            }
             if !spans.contains_key(span_id.as_str()) {
                 issues.push(format!("resolution {} references unknown span {}", resolution.resolution_id, span_id));
             }
@@ -676,7 +694,10 @@ pub fn verify_reference_assurance_package(
     let mut decisions_by_claim: BTreeMap<&str, BTreeSet<ReferenceDecisionV1>> = BTreeMap::new();
     let mut missing_panels = 0_u64;
     let mut disagreement_claims = 0_u64;
+    let mut material_claims_without_evidence = 0_u64;
     let mut referenced_ancestry_groups = BTreeSet::new();
+    let mut referenced_unknown_ancestry_sources = BTreeSet::new();
+    let mut claims_with_cited_spans = BTreeSet::new();
     let sources: BTreeMap<&str, &ReferenceSourceV1> = package.sources.iter()
         .map(|source| (source.source_id.as_str(), source))
         .collect();
@@ -695,17 +716,25 @@ pub fn verify_reference_assurance_package(
             decisions_by_claim.entry(record.claim_id.as_str()).or_default().insert(record.decision);
         }
         panel_counts.entry(record.claim_id.as_str()).or_default().insert(record.adjudicator_id_sha256.as_str());
+        if !record.evidence_span_ids.is_empty() {
+            claims_with_cited_spans.insert(record.claim_id.as_str());
+        }
         for span_id in &record.evidence_span_ids {
             if let Some(span) = spans.get(span_id.as_str()) {
                 if let Some(source) = sources.get(span.source_id.as_str()) {
                     if let Some(group) = &source.ancestry_group_sha256 {
                         referenced_ancestry_groups.insert(group.as_str());
+                    } else {
+                        referenced_unknown_ancestry_sources.insert(source.source_id.as_str());
                     }
                 }
             }
         }
     }
     for claim in package.claims.iter().filter(|claim| claim.material) {
+        if !claims_with_cited_spans.contains(claim.claim_id.as_str()) {
+            material_claims_without_evidence += 1;
+        }
         if panel_counts.get(claim.claim_id.as_str()).map_or(0, |set| set.len()) < 3 {
             missing_panels += 1;
         }
@@ -731,6 +760,8 @@ pub fn verify_reference_assurance_package(
         claims_with_disagreement: disagreement_claims,
         abstention_count,
         referenced_source_ancestry_groups: referenced_ancestry_groups.len() as u64,
+        referenced_sources_with_unknown_ancestry: referenced_unknown_ancestry_sources.len() as u64,
+        material_claims_without_cited_evidence: material_claims_without_evidence,
         fixed_reference_package_only: true,
         adjudicator_independence_proven: false,
         source_authenticity_proven: false,
