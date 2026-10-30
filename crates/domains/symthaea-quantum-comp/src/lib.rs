@@ -28,6 +28,7 @@ pub mod robust_experiment;
 pub mod predictive_adequacy;
 pub mod experiment_policy_benchmark;
 pub mod representative_experiment;
+pub mod rida_exact;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -183,6 +184,12 @@ pub use representative_experiment::{
     ExperimentEligibilityStatus, ExperimentRegimeProfile, RepresentativeExperimentContext,
     RidaAblationError, RidaAblationPolicy, RidaAblationReport, RidaExperimentComponentScore,
     RidaIneligibleCandidate, RidaPolicyRanking, RidaPolicyScore, rank_rida_ablations,
+};
+
+pub use rida_exact::{
+    DeAmplificationThreshold, ProxyTrainingObjective, RidaExactError, RideaAcquisitionScore,
+    RiAcquisitionScore, derive_de_amplification_threshold, empirical_squared_mmd_rbf,
+    evaluate_proxy_training_objective, score_de_amplification, score_r_i, score_r_idea,
 };
 
 pub use robust_experiment::{
