@@ -258,13 +258,13 @@ fn validate_record_contract(
                 ));
                 valid = false;
             }
-            if record.match_method == "exact_digest" {
-                if record.match_score_micros != MAX_SCORE_MICROS {
-                    issues.push(format!(
-                        "records[{index}] exact_digest must carry score 1,000,000"
-                    ));
-                    valid = false;
-                }
+            if record.match_method == "exact_digest"
+                && record.match_score_micros != MAX_SCORE_MICROS
+            {
+                issues.push(format!(
+                    "records[{index}] exact_digest must carry score 1,000,000"
+                ));
+                valid = false;
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
