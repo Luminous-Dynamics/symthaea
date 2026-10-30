@@ -8,6 +8,7 @@
     "schema",
     "study_id",
     "analyzer_source_revision",
+    "analyzer_worktree_clean",
     "balanced_repeat_count",
     "excluded_incomplete_repeat_count",
     "effects_use_only_fully_completed_repeats",
@@ -184,6 +185,9 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "analyzer_worktree_clean": {
+      "type": "boolean"
     }
   },
   "$defs": {
