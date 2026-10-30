@@ -181,12 +181,14 @@ def validate_plan(plan: Any) -> dict[str, Any]:
         if family == "locality" and (not affected or not unaffected):
             raise MetamorphicAuditError(f"locality pair {pair_id} requires affected and unaffected criteria")
         expected_decision = row["expected_variant_decision"]
-        if expected_decision is not None and expected_decision not in DECISIONS:
+        if expected_decision is not None and (
+            not isinstance(expected_decision, str) or expected_decision not in DECISIONS
+        ):
             raise MetamorphicAuditError(f"pair {pair_id} has unsupported expected_variant_decision")
         expected_candidate = row["expected_selected_candidate_id"]
         if expected_candidate is not None and (not isinstance(expected_candidate, str) or not expected_candidate.strip()):
             raise MetamorphicAuditError(f"pair {pair_id} expected_selected_candidate_id must be null or non-empty")
-        if rule == "variant_decision_equals_declared" and expected_decision is None:
+            if rule == "variant_decision_equals_declared" and expected_decision is None:
             raise MetamorphicAuditError(f"counterfactual pair {pair_id} requires expected_variant_decision")
         if rule == "candidate_identity_invariant_position_changes" and expected_candidate is None:
             raise MetamorphicAuditError(f"order-equivariance pair {pair_id} requires expected_selected_candidate_id")
@@ -242,7 +244,10 @@ def _validate_outcome(outcome: Any, pair_id: str, criteria: list[str]) -> dict[s
         if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 1_000_000:
             raise MetamorphicAuditError(f"outcome[{pair_id}] has invalid pointwise score")
         candidate_map[candidate_id] = score
-    if row["pairwise_preferred_candidate_id"] is not None and row["pairwise_preferred_candidate_id"] not in candidate_map:
+    preferred = row["pairwise_preferred_candidate_id"]
+    if preferred is not None and (
+        not isinstance(preferred, str) or preferred not in candidate_map
+    ):
         raise MetamorphicAuditError(f"outcome[{pair_id}] pairwise preference names unknown candidate")
     return {"raw": row, "criterion_scores": score_map, "candidate_scores": candidate_map}
 
@@ -279,9 +284,15 @@ def _check_pair(pair: dict[str, Any], observation: dict[str, Any], tolerance: in
     elif rule == "support_non_decreasing":
         if _decision_support(after["decision"]) < _decision_support(before["decision"]):
             failures.append("support decreased after a positive evidence intervention")
+        for criterion in pair["affected_criterion_ids"]:
+            if deltas[criterion] < -tolerance:
+                failures.append(f"affected criterion {criterion} score decreased after positive evidence")
     elif rule == "support_non_increasing":
         if _decision_support(after["decision"]) > _decision_support(before["decision"]):
             failures.append("support increased after evidence withdrawal or weakening")
+        for criterion in pair["affected_criterion_ids"]:
+            if deltas[criterion] > tolerance:
+                failures.append(f"affected criterion {criterion} score increased after evidence withdrawal")
     elif rule == "only_unaffected_scores_invariant":
         affected = set(pair["affected_criterion_ids"])
         unaffected = set(pair["unaffected_criterion_ids"])
