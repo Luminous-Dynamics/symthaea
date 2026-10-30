@@ -1601,34 +1601,6 @@ mod tests {
         let rk45 = Rk45Integrator::new(1e-12);
         let initial = [1.0, 0.0];
 
-        // A large requested interval and tight tolerance force RK45 to reject
-        // the first trial. The wrapper must integrate all of [0, 10], not
-        // return a state for a shorter accepted substep while simulate()
-        // advances time by the original one-second interval.
-        let result = simulate(&osc, &rk45, &initial, 0.0, 10.0, 1.0);
-        let exact_x = 10.0_f64.cos();
-        let exact_v = -10.0_f64.sin();
-        let state = result.final_state();
-
-        assert_eq!(result.times.last().copied(), Some(10.0));
-        assert!(
-            (state[0] - exact_x).abs() < 1e-9,
-            "RK45 position must correspond to t=10: got {}, expected {exact_x}",
-            state[0]
-        );
-        assert!(
-            (state[1] - exact_v).abs() < 1e-9,
-            "RK45 velocity must correspond to t=10: got {}, expected {exact_v}",
-            state[1]
-        );
-    }
-
-    #[test]
-    fn test_rk45_rejected_substeps_preserve_requested_time_interval() {
-        let osc = HarmonicOscillator::simple(1.0);
-        let rk45 = Rk45Integrator::new(1e-12);
-        let initial = [1.0, 0.0];
-
         // The one-second macro interval initially exceeds the accepted step
         // under this tolerance. The integrator must consume the full interval
         // internally, so the state returned to simulate() corresponds to the
