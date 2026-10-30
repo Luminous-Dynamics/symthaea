@@ -12,7 +12,7 @@ CMAQ-001 measures memory-to-action scoring; CMAQ-002 tests closed-loop model exp
 
 Evaluator truth rows contain an opaque case ID, evaluator-only mechanism family, split (development or qualification), outcome under do(X=0) and do(X=1), and actual safety under both interventions.
 
-Candidate predictions contain only case ID, predicted outcomes under the two interventions, and predicted safety probabilities. The candidate schema explicitly rejects mechanism labels and has no field for hidden mechanism family or true outcomes. Qualification cases must be generated/evaluated separately from development cases; this scorer fails closed if predictions include a case from the wrong split, a duplicate ID, an unknown ID, or omit any selected case.
+Candidate predictions contain only case ID, predicted outcomes under the two interventions, and predicted safety probabilities. The candidate schema explicitly rejects mechanism labels and has no field for hidden mechanism family or true outcomes. Qualification cases must be generated/evaluated separately from development cases; this scorer fails closed if predictions include a case from the wrong split, a duplicate ID, an unknown ID, or omit any selected case. It also rejects any mechanism family that appears in both development and qualification, so a case-level split cannot accidentally masquerade as a held-out-mechanism split.
 
 The outcomes under both interventions exist only because the current lane is a synthetic simulator. For a real-world intervention, never fabricate unchosen outcomes: evaluate observed interventions with logged propensities/identification assumptions or a validated simulator and label the evidence source.
 
