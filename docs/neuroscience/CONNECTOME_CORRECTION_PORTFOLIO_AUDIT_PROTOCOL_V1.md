@@ -38,7 +38,7 @@ The JSON contract is `CONNECTOME_CORRECTION_PORTFOLIO.schema.json`. Inputs bind 
 3. `uncertainty_per_minute`: binary probability uncertainty / review minutes.
 4. `deterministic_random`: SHA-256 keyed candidate order using the exact input digest.
 
-Ranking uses no oracle reference values. The evaluator uses references only for query error, pairwise interactions, regret, and exact optimum. The exact optimum is an evaluation ceiling and must never be made available to the ranker during model selection or lockbox evaluation.
+Ranking uses no oracle reference values. The ranker function receives only candidate fields, the baseline graph, and a reduced query-ranking view containing query metric, weight, and normalization scale; the reference-value field is absent from its type-level inputs. The evaluator uses references only for query error, pairwise interactions, regret, and exact optimum. The exact optimum is an evaluation ceiling and must never be made available to the ranker during model selection or lockbox evaluation.
 
 The report includes per-budget policy utility and regret to the exact candidate-pool optimum; selected IDs and canonical application order; baseline/final query error; reverse-order error and order sensitivity; plus pairwise interaction estimates:
 
