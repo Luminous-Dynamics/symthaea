@@ -149,6 +149,15 @@ The output schema is `family-leakage-candidate-discovery.schema.json`. Candidate
 
 Every row is forced to `artifact_path_similarity_only` and `unreviewed`. Path slugs are metadata, not artifact bytes: overlap does not prove that two families share a source document or a mathematical dependency. The path channel has its own thresholds, output and reproducibility check; do not combine its scores with the title channel without a preregistered calibration.
 
+### Exact-byte artifact-content audit
+
+`scripts/research/pitb_exact_artifact_content_audit_v0.py` is a separate source-provenance channel. It checks out the exact pinned OpenAI Math commit and hashes the raw bytes of all 961 frozen linked artifact paths. Identical byte digests owned by different families become `exact_byte_identity_only` candidate pairs with source paths and evidence hashes. Every candidate remains `unreviewed`; it is not automatically a hard dependency edge or a contamination finding.
+
+Unlike the metadata-only title/path screens, this scan records a per-artifact digest and explicitly fails on missing or unreadable artifacts, non-regular files, symlinks, unsafe paths, and unmaterialized Git-LFS pointers. The workflow runs it twice, compares the full reports byte-for-byte, and retains the report artifact. See the [exact artifact-content audit protocol](../../../docs/research/pitb-exact-artifact-content-audit-2026-10-30.md).
+
+A complete scan with zero exact matches is **not** evidence of independence: distinct PDFs or source files can encode the same mathematics or share proof dependencies without having identical bytes. The full two-pass relationship review, expert adjudication, and signed external coverage receipt remain mandatory.
+
+
 ## Simulation-based power planning
 
 `crates/bridges/symthaea-proof-insights/src/bin/plan_pitb_power.rs` is a deterministic planning simulator for the registered paired, family-clustered exact-target success gate. It accepts the observed or proposed component-size vector instead of treating all theorem families as equally sized, models shared family difficulty with a beta-binomial sensitivity parameter, and reports estimated probability of meeting the preregistered gate:
