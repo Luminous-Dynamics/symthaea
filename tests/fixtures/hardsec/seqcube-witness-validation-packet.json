@@ -5,7 +5,8 @@
   "evaluation_mode": "witness_validation",
   "subject": {
     "design_id": "seqctrl_infected",
-    "netlist_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de"
+    "netlist_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+    "local_path": "netlists/seqctrl_infected.v"
   },
   "evidence": [
     {
@@ -14,6 +15,8 @@
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
       "evidence_sha256": "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/active.csv",
+      "local_path": "replay/active.csv",
+      "witness_local_path": "replay/active.csv",
       "status": "pass",
       "tool": "SeqCube-HT reference verifier (publisher-reported)",
       "tool_version": "1.0",
@@ -32,6 +35,8 @@
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
       "evidence_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
+      "local_path": "replay/expected_boundary.json",
+      "witness_local_path": "replay/expected_boundary.json",
       "status": "pass",
       "tool": "SeqCube-HT reference verifier (publisher-reported)",
       "tool_version": "1.0",
@@ -46,6 +51,7 @@
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
       "evidence_sha256": "3d7cf845a7d530a2d4356aa264ec4b3fea13308f9dc2b3e4fe5295f50c4f9359",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/inactive.csv",
+      "local_path": "replay/inactive.csv",
       "status": "pass",
       "tool": "SeqCube-HT reference verifier (publisher-reported)",
       "tool_version": "1.0",
@@ -72,6 +78,8 @@
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
       "evidence_sha256": "b93fddb6a38e1ef148e8a259bf26634d031c44dccbc168c50161c1e50846379f",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/audit/inactive.smt2",
+      "local_path": "audit/inactive.smt2",
+      "assumptions_local_path": "metadata/config.json",
       "status": "pass",
       "tool": "Z3 Boolean API (publisher-reported)",
       "tool_version": "4.x",
