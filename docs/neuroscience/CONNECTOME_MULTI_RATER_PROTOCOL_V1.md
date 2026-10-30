@@ -26,7 +26,7 @@ The executable validator checks full candidate-pool coverage, duplicate/orphan I
 
 A candidate consensus is emitted only when one category has a **strict majority** of all votes. A tie or a plurality without a strict majority remains unresolved. `indeterminate` is a valid adjudicator category, not a synonym for missing data.
 
-The audit reports separate pair-count-weighted nominal Krippendorff alpha estimates for reviewer decisions and adjudicator labels. For each candidate, observed disagreement is the fraction of disagreeing unordered rater pairs; expected disagreement is computed from all pooled ratings. Alpha is not estimable when there are no within-candidate pairs or when expected disagreement is zero. This calculation and its denominators are emitted explicitly.
+The audit reports separate nominal Krippendorff alpha estimates for reviewer decisions and adjudicator labels using the finite-sample coincidence formulation. For candidate i with n_i ratings and d_i disagreeing unordered pairs, observed disagreement is Do = sum_i(2*d_i/(n_i-1))/N, where N is the total number of ratings. Expected disagreement is De = 2*D/(N*(N-1)), where D is the number of disagreeing unordered pairs in the pooled category counts. Alpha is 1 - Do/De and is not estimable when there are no within-candidate pairs or expected disagreement is zero. This calculation and its denominators are emitted explicitly.
 
 The tool also reports:
 - per-candidate raw vote counts, strict-majority labels, majority fractions, reviewer consensus correctness when determinable, and total/mean panel review minutes;
