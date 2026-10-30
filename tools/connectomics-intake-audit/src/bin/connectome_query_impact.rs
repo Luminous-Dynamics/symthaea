@@ -611,6 +611,15 @@ mod tests {
         })).expect("fixture deserializes")
     }
 
+    fn fixture_with_oracle() -> Input {
+        let mut input = fixture();
+        input.queries[0].reference_value = Some(0.0);
+        input.queries[1].reference_value = Some(3.0);
+        input.queries[2].reference_value = Some(4.0);
+        input.queries[3].reference_value = Some(1.0);
+        input
+    }
+
     #[test]
     fn fixture_passes_schema_and_scoring() {
         let input = fixture();
@@ -830,6 +839,49 @@ mod tests {
         let graph = graph_from_edges(&input.graph);
         let after = apply_candidate(&graph, &input.candidates[0]).unwrap();
         assert_ne!(canonical_graph_sha256(&graph), canonical_graph_sha256(&after));
+    }
+
+    #[test]
+    fn oracle_separates_query_improvement_from_query_sensitivity() {
+        let input = fixture_with_oracle();
+        let graph = graph_from_edges(&input.graph);
+        let total_weight: f64 = input.queries.iter().map(|query| query.weight).sum();
+        let helpful = evaluate_candidate(&graph, &input.queries, &input.candidates[0], total_weight, &[]).unwrap();
+        let harmful = evaluate_candidate(&graph, &input.queries, &input.candidates[1], total_weight, &[]).unwrap();
+        assert_eq!(helpful.reference_query_count, 4);
+        assert!(helpful.weighted_query_impact > 0.0);
+        assert!(helpful.weighted_query_error_reduction.unwrap() > 0.0);
+        assert!(harmful.weighted_query_impact > 0.0);
+        assert!(harmful.weighted_query_error_reduction.unwrap() < 0.0);
+    }
+
+    #[test]
+    fn absence_of_oracle_values_is_explicitly_not_estimable() {
+        let input = fixture();
+        let graph = graph_from_edges(&input.graph);
+        let total_weight: f64 = input.queries.iter().map(|query| query.weight).sum();
+        let evaluation = evaluate_candidate(&graph, &input.queries, &input.candidates[0], total_weight, &[]).unwrap();
+        assert_eq!(evaluation.reference_query_count, 0);
+        assert_eq!(evaluation.weighted_query_error_reduction, None);
+        assert!(evaluation.query_impacts.iter().all(|impact| impact.normalized_query_error_reduction.is_none()));
+    }
+
+    #[test]
+    fn oracle_reference_values_do_not_change_candidate_priority() {
+        let without_oracle = fixture();
+        let with_oracle = fixture_with_oracle();
+        let plain = score(&without_oracle, "a".repeat(64)).unwrap();
+        let evaluated = score(&with_oracle, "b".repeat(64)).unwrap();
+        let plain_order: Vec<_> = plain.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.expected_query_impact_per_review_minute)).collect();
+        let oracle_order: Vec<_> = evaluated.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.expected_query_impact_per_review_minute)).collect();
+        assert_eq!(plain_order, oracle_order);
+    }
+
+    #[test]
+    fn rejects_non_finite_query_reference_values() {
+        let mut input = fixture();
+        input.queries[0].reference_value = Some(f64::INFINITY);
+        assert!(validate_input(&input).unwrap_err().contains("reference_value"));
     }
 
 }
