@@ -1,0 +1,258 @@
+{
+  "schema_version": "qarch-013-ledger-fixtures/1",
+  "fixtures": [
+    {
+      "schema_version": "qarch-013-result-ledger/1",
+      "record_id": "QARCH-013-PHOTONIC-CONDITIONAL-REFERENCE-001",
+      "comparison_status": "not_comparable",
+      "external_mapping": {
+        "suite_id": "PHOTONIC_COMPONENT_REFERENCE",
+        "suite_version": "Nature 2025 published component characterization",
+        "instance_id": "integrated-silicon-photonics-component-metrics",
+        "instance_digest": "doi:10.1038/s41586-025-08820-7",
+        "mapping_notes": "Published conditional component metrics only. Not a matched application workload, not an unconditional success rate, and not a complete resource ledger.",
+        "mapping_protocol_digest": null
+      },
+      "workload": {
+        "family": "photonic component characterization",
+        "workload_fingerprint": "paper-reported-component-metrics-only",
+        "objective_digest": "doi:10.1038/s41586-025-08820-7",
+        "target_distribution_id": null,
+        "output_quality_contract": {
+          "metric": "reported component fidelity / interference metric",
+          "unit": "probability",
+          "acceptance_predicate": "paper-defined conditional component metric",
+          "threshold": 0.99
+        },
+        "verifier": {
+          "verifier_id": "paper-reported experimental analysis",
+          "version": "published paper",
+          "independent_of_candidate": true
+        }
+      },
+      "platform": {
+        "candidate_id": "published-integrated-silicon-photonics-platform",
+        "candidate_class": "photonic_component_reference",
+        "architecture_family": "integrated silicon photonics",
+        "hardware_id": "paper-reported test platform",
+        "configuration_fingerprint": "doi:10.1038/s41586-025-08820-7",
+        "compiler_or_software_version": null,
+        "software_stack": []
+      },
+      "conditional_metrics": [
+        {
+          "metric": "state-preparation/readout fidelity",
+          "estimate": 0.9998,
+          "uncertainty_plus_minus": 0.0001,
+          "unit": "probability",
+          "conditioned_on": "photon detection",
+          "denominator_description": "conditional component characterization as reported by the paper",
+          "claim_scope": "conditional_component_only",
+          "source_locator": "Nature 641 (2025), doi:10.1038/s41586-025-08820-7"
+        },
+        {
+          "metric": "Hong-Ou-Mandel interference visibility",
+          "estimate": 0.995,
+          "uncertainty_plus_minus": 0.0025,
+          "unit": "probability",
+          "conditioned_on": "detected photon pairs",
+          "denominator_description": "two-photon coincidence events under the paper's measurement protocol",
+          "claim_scope": "conditional_component_only",
+          "source_locator": "Nature 641 (2025), doi:10.1038/s41586-025-08820-7"
+        },
+        {
+          "metric": "two-qubit fusion fidelity",
+          "estimate": 0.9922,
+          "uncertainty_plus_minus": 0.0012,
+          "unit": "probability",
+          "conditioned_on": "photon detection",
+          "denominator_description": "conditional fusion events as reported by the paper",
+          "claim_scope": "conditional_component_only",
+          "source_locator": "Nature 641 (2025), doi:10.1038/s41586-025-08820-7"
+        },
+        {
+          "metric": "chip-to-chip interconnect fidelity",
+          "estimate": 0.9972,
+          "uncertainty_plus_minus": 0.0004,
+          "unit": "probability",
+          "conditioned_on": "photon detection",
+          "denominator_description": "conditional interconnect characterization as reported by the paper",
+          "claim_scope": "conditional_component_only",
+          "source_locator": "Nature 641 (2025), doi:10.1038/s41586-025-08820-7"
+        }
+      ],
+      "end_to_end": {
+        "status": "not_reported",
+        "attempted_instances": null,
+        "verified_acceptable_answers": null,
+        "total_wall_clock_seconds": null,
+        "total_energy_joules": null,
+        "total_cost_usd": null,
+        "resource_scope_includes": [],
+        "missing_resource_terms": [
+          "unconditional source-to-verified-output probability",
+          "end-to-end photon loss and detection yield",
+          "setup/compile/feedforward/readout/post-processing/verification costs"
+        ],
+        "p50_wall_clock_seconds": null,
+        "p95_wall_clock_seconds": null,
+        "p99_wall_clock_seconds": null,
+        "uncertainty_method": "No end-to-end application ledger is supplied by this reference projection."
+      },
+      "quality": {
+        "metric": "application output-quality score",
+        "unit": "not reported",
+        "lower": 0,
+        "upper": 1,
+        "threshold": 0.99,
+        "gate": "not_evaluated"
+      },
+      "classical_baseline": null,
+      "evidence": {
+        "evidence_class": "paper_reported",
+        "source_revision": "published Nature 641 (2025) paper; DOI 10.1038/s41586-025-08820-7",
+        "artifact_digests": [
+          "doi:10.1038/s41586-025-08820-7"
+        ],
+        "calibration_status": "unknown",
+        "independent_reproduction": false,
+        "uncertainty_note": "These figures are paper-reported conditional component results. The paper states high conditional fidelities exclude photon loss; they must not be promoted to unconditional logical or application success.",
+        "source_url": "https://doi.org/10.1038/s41586-025-08820-7"
+      },
+      "claim_ceiling": [
+        "Paper-reported conditional photonic component metrics only",
+        "Not an unconditional success probability",
+        "Not a verified logical operation or application workload result",
+        "No SOTA claim and no quantum advantage claim from this record"
+      ]
+    },
+    {
+      "schema_version": "qarch-013-result-ledger/1",
+      "record_id": "QARCH-013-SYNTHETIC-MATCHED-APP-LEDGER-001",
+      "comparison_status": "matched_fixture_only",
+      "external_mapping": {
+        "suite_id": "INTERNAL_FIXTURE",
+        "suite_version": "qarch-013/1",
+        "instance_id": "synthetic-matched-workload-100-instances",
+        "instance_digest": "synthetic-workload-digest-v1",
+        "mapping_notes": "Synthetic matched-task example solely to check the ledger contract. No external benchmark submission or physical quantum run.",
+        "mapping_protocol_digest": "synthetic-protocol-digest-v1"
+      },
+      "workload": {
+        "family": "bounded binary decision workload",
+        "workload_fingerprint": "synthetic-workload-fingerprint-v1",
+        "objective_digest": "synthetic-objective-digest-v1",
+        "target_distribution_id": "synthetic-target-v1",
+        "output_quality_contract": {
+          "metric": "verified solution quality",
+          "unit": "normalized score",
+          "acceptance_predicate": "quality lower bound >= 0.90 and independent verifier accepts",
+          "threshold": 0.9
+        },
+        "verifier": {
+          "verifier_id": "independent-fixture-verifier",
+          "version": "1",
+          "independent_of_candidate": true
+        }
+      },
+      "platform": {
+        "candidate_id": "quantum-pipeline-example",
+        "candidate_class": "quantum",
+        "architecture_family": "synthetic-photonic-pipeline",
+        "hardware_id": null,
+        "configuration_fingerprint": "synthetic-q-config-v1",
+        "compiler_or_software_version": "synthetic-compiler-v1",
+        "software_stack": [
+          "synthetic-source-model",
+          "synthetic-fusion-controller",
+          "synthetic-verifier"
+        ]
+      },
+      "conditional_metrics": [
+        {
+          "metric": "conditional fusion fidelity",
+          "estimate": 0.995,
+          "uncertainty_plus_minus": 0.002,
+          "unit": "probability",
+          "conditioned_on": "successful photon detection",
+          "denominator_description": "conditional events only; not used as end-to-end accepted-answer probability",
+          "claim_scope": "conditional_component_only",
+          "source_locator": null
+        }
+      ],
+      "end_to_end": {
+        "status": "synthetic_fixture",
+        "attempted_instances": 100,
+        "verified_acceptable_answers": 92,
+        "total_wall_clock_seconds": 920,
+        "total_energy_joules": 4600,
+        "total_cost_usd": 100,
+        "resource_scope_includes": [
+          "setup",
+          "compilation",
+          "data_loading",
+          "encoding",
+          "source_preparation",
+          "optical_execution",
+          "feedforward",
+          "retries",
+          "readout",
+          "error_mitigation",
+          "post_processing",
+          "verification"
+        ],
+        "missing_resource_terms": [],
+        "p50_wall_clock_seconds": 9,
+        "p95_wall_clock_seconds": 14,
+        "p99_wall_clock_seconds": 18,
+        "uncertainty_method": "Exact synthetic counts and declared total-resource values; no sampling or hardware claim."
+      },
+      "quality": {
+        "metric": "verified solution quality",
+        "unit": "normalized score",
+        "lower": 0.94,
+        "upper": 0.97,
+        "threshold": 0.9,
+        "gate": "meets"
+      },
+      "classical_baseline": {
+        "candidate_id": "classical-baseline-example",
+        "method": "optimized classical branch-and-bound",
+        "software_version": "synthetic-classical-v1",
+        "configuration": "same host budget and same 100 problem instances",
+        "workload_fingerprint": "synthetic-workload-fingerprint-v1",
+        "quality": {
+          "metric": "verified solution quality",
+          "unit": "normalized score",
+          "lower": 0.93,
+          "upper": 0.96,
+          "threshold": 0.9,
+          "gate": "meets"
+        },
+        "end_to_end": {
+          "attempted_instances": 100,
+          "verified_acceptable_answers": 95,
+          "total_wall_clock_seconds": 1000,
+          "total_energy_joules": 3000,
+          "total_cost_usd": 90
+        }
+      },
+      "evidence": {
+        "evidence_class": "synthetic_analytic_fixture",
+        "source_revision": "synthetic-qarch013-fixture-v1",
+        "artifact_digests": [
+          "synthetic-qarch013-ledger-v1"
+        ],
+        "calibration_status": "not_applicable",
+        "independent_reproduction": false,
+        "uncertainty_note": "Illustrative deterministic inputs; not measured, calibrated or an external-suite result.",
+        "source_url": "https://github.com/Luminous-Dynamics/symthaea/issues/9099"
+      },
+      "claim_ceiling": [
+        "Synthetic contract fixture only",
+        "Do not infer real quantum speedup, energy advantage or cost advantage",
+        "Conditional fusion fidelity is not the 92/100 verified accepted-answer rate"
+      ]
+    }
+  ]
+}
