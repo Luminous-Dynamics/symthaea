@@ -1161,7 +1161,7 @@ mod tests {
     fn renderer_receipt_must_replay_and_match_the_exact_decoded_pcm_view() {
         let samples = [0.1f32, -0.2, 0.35, -0.4, 0.05, 0.0, 0.7, -0.1];
         let wav = float_wav(&samples);
-        let audio = audio(&samples);
+        let audio_view = audio(&samples);
         let receipt = RendererExecutionReceipt::from_successful_render(
             native_receipt_inputs(&wav),
         )
@@ -1170,10 +1170,10 @@ mod tests {
         let verified = verify_renderer_audio_binding(
             &receipt,
             native_receipt_inputs(&wav),
-            &audio,
+            &audio_view,
         )
         .unwrap();
-        assert_eq!(verified.audio_sha256(), audio_sha256(&audio));
+        assert_eq!(verified.audio_sha256(), audio_sha256(&audio_view));
         assert_eq!(verified.receipt_sha256(), receipt.receipt_sha256);
 
         let substituted_samples = [0.1f32, -0.2, 0.35, -0.4, 0.05, 0.0, 0.6, -0.1];
