@@ -15,8 +15,8 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -275,6 +275,41 @@ fn optional_digest(value: &Value, field: &str) -> Result<Option<String>, String>
 
 fn json_hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+fn read_stable_campaign(path: &Path) -> Result<Vec<u8>, String> {
+    let path_before = fs::symlink_metadata(path)
+        .map_err(|error| format!("stat campaign {}: {error}", path.display()))?;
+    if path_before.file_type().is_symlink() || !path_before.is_file() {
+        return Err("campaign input must be a regular non-symlink file".to_owned());
+    }
+
+    let mut file = File::open(path)
+        .map_err(|error| format!("open campaign {}: {error}", path.display()))?;
+    let before = file
+        .metadata()
+        .map_err(|error| format!("stat open campaign before reading: {error}"))?;
+    if !before.is_file() {
+        return Err("opened campaign handle is not a regular file".to_owned());
+    }
+
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .map_err(|error| format!("read campaign {}: {error}", path.display()))?;
+    let after = file
+        .metadata()
+        .map_err(|error| format!("stat open campaign after reading: {error}"))?;
+    let path_after = fs::symlink_metadata(path)
+        .map_err(|error| format!("stat campaign after reading: {error}"))?;
+    if path_after.file_type().is_symlink()
+        || !path_after.is_file()
+        || before.len() != after.len()
+        || before.modified().ok() != after.modified().ok()
+        || after.len() != bytes.len() as u64
+    {
+        return Err("campaign changed while being read".to_owned());
+    }
+    Ok(bytes)
 }
 
 fn wilson_interval(successes: u64, trials: u64) -> Option<Interval> {
@@ -954,21 +989,8 @@ fn receipt_path_outside_source(source: &Path, receipt: &Path) -> Result<PathBuf,
 }
 
 fn run(args: Args) -> Result<(), String> {
-    let metadata = fs::symlink_metadata(&args.campaign)
-        .map_err(|error| format!("stat campaign {}: {error}", args.campaign.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err("campaign input must be a regular non-symlink file".to_owned());
-    }
-    let campaign_bytes = fs::read(&args.campaign)
-        .map_err(|error| format!("read campaign {}: {error}", args.campaign.display()))?;
-    let before = fs::metadata(&args.campaign)
-        .map_err(|error| format!("stat campaign before hashing: {error}"))?;
+    let campaign_bytes = read_stable_campaign(&args.campaign)?;
     let campaign_sha256 = json_hash(&campaign_bytes);
-    let after = fs::metadata(&args.campaign)
-        .map_err(|error| format!("stat campaign after hashing: {error}"))?;
-    if before.len() != after.len() || before.modified().ok() != after.modified().ok() {
-        return Err("campaign changed while being read".to_owned());
-    }
 
     let value: Value = serde_json::from_slice(&campaign_bytes)
         .map_err(|error| format!("parse campaign JSON: {error}"))?;
