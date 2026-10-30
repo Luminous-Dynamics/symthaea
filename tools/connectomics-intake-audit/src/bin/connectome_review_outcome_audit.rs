@@ -1001,4 +1001,44 @@ mod tests {
     }
 
 
+    #[test]
+    fn ranking_adapter_accepts_full_connectome_query_impact_report_shape() {
+        let raw = json!({
+            "schema_version": 1,
+            "tool": "connectome-query-impact",
+            "input_sha256": "1".repeat(64),
+            "dataset_id": "synthetic",
+            "dataset_revision_commit_sha": "a".repeat(40),
+            "source_graph_sha256": "b".repeat(64),
+            "baseline_graph_canonical_sha256": "c".repeat(64),
+            "query_bundle_sha256": "d".repeat(64),
+            "graph_edge_count": 3,
+            "query_count": 2,
+            "candidate_count": 1,
+            "scoring_semantics": "test",
+            "candidate_evaluations": [],
+            "policy_budget_results": [{
+                "policy": "policy_a",
+                "review_budget_minutes": 5.0,
+                "actual_review_minutes": 2.0,
+                "reviewed_candidate_count": 1,
+                "applied_candidate_count": 1,
+                "rejected_conflict_count": 0,
+                "policy_order_candidate_ids": ["candidate-1"],
+                "reviewed_candidate_ids": ["candidate-1"],
+                "applied_candidate_ids": ["candidate-1"],
+                "rejected_conflict_candidate_ids": [],
+                "baseline_weighted_query_error": 0.2,
+                "final_weighted_query_error": 0.1,
+                "weighted_query_error_reduction": 0.1
+            }],
+            "warnings": [],
+            "status": "RANKED_FOR_HUMAN_REVIEW_ONLY",
+            "scope_note": "test"
+        });
+        let parsed: FrozenRankingReport = serde_json::from_value(raw).unwrap();
+        assert_eq!(parsed.policy_budget_results[0].policy_order_candidate_ids, vec!["candidate-1"]);
+    }
+
+
 }
