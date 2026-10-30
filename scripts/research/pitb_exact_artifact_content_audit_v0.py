@@ -87,7 +87,10 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], dict[str, str], dict[str,
 
     if doc.get("schema_version") != "symthaea.proof-insight-transfer.splits.v0":
         raise AuditError("unexpected split-manifest schema version")
-    if doc.get("upstream", {}).get("repository") not in (None, UPSTREAM_REPOSITORY):
+    if doc.get("upstream", {}).get("repository") not in (
+        "https://github.com/openai/math",
+        UPSTREAM_REPOSITORY,
+    ):
         raise AuditError("manifest identifies an unexpected upstream repository")
     if doc.get("upstream", {}).get("commit") != UPSTREAM_COMMIT:
         raise AuditError("manifest does not pin the required upstream commit")
@@ -102,6 +105,14 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], dict[str, str], dict[str,
         raise AuditError("split algorithm differs from the frozen PITB v0 algorithm")
     if (plan.get("train_percent"), plan.get("validation_percent"), plan.get("test_percent")) != (70, 15, 15):
         raise AuditError("split percentages differ from the frozen PITB v0 partition")
+
+    claims = doc.get("catalogue_claims", {})
+    if (
+        claims.get("families") != EXPECTED_FAMILY_COUNT
+        or claims.get("parsed_family_headers") != EXPECTED_FAMILY_COUNT
+        or claims.get("linked_path_count") != EXPECTED_UNIQUE_ARTIFACT_PATH_COUNT
+    ):
+        raise AuditError("manifest catalogue claims differ from the frozen 372-family / 961-path census")
 
     rows = doc.get("families")
     if not isinstance(rows, list) or len(rows) != EXPECTED_FAMILY_COUNT:
