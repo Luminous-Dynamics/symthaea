@@ -66,8 +66,8 @@ def suitezero_fixture() -> dict:
 def curve_fixture() -> dict:
     return {
         "nb201_data": {
-            IDS[0]: {"cifar10-valid": {"eval_acc1es": [float(epoch) for epoch in range(1, 21)]}},
-            IDS[1]: {"cifar10-valid": {"eval_acc1es": [float(epoch + 1) for epoch in range(1, 21)]}},
+            IDS[0]: {"cifar10-valid": {"eval_acc1es": [float(epoch) for epoch in range(1, 20)] + [90.0]}},
+            IDS[1]: {"cifar10-valid": {"eval_acc1es": [float(epoch + 1) for epoch in range(1, 20)] + [91.0]}},
         }
     }
 
@@ -101,7 +101,7 @@ class NasBench201CurveImporterTests(unittest.TestCase):
         )
         self.assertEqual(len(canonical["target_labels"]), 6)
         self.assertEqual(canonical["target_labels"][0]["value"], 5.0)
-        self.assertEqual(canonical["target_labels"][2]["value"], 20.0)
+        self.assertEqual(canonical["target_labels"][2]["value"], 90.0)
         self.assertEqual(report["dataset_key"], "cifar10-valid")
         self.assertEqual(report["architecture_count"], 2)
 
