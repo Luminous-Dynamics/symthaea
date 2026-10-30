@@ -20,17 +20,25 @@ struct Fixture {
     height: usize,
 }
 
-const FIXTURES: [Fixture; 10] = [
+const FIXTURES: [Fixture; 18] = [
     Fixture { topology: "chain", variables: 32, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 64, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 128, width: 0, height: 0 },
     Fixture { topology: "chain", variables: 256, width: 0, height: 0 },
+    Fixture { topology: "chain", variables: 512, width: 0, height: 0 },
+    Fixture { topology: "chain", variables: 1_024, width: 0, height: 0 },
+    Fixture { topology: "chain", variables: 2_048, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 32, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 64, width: 0, height: 0 },
     Fixture { topology: "ring", variables: 128, width: 0, height: 0 },
+    Fixture { topology: "ring", variables: 256, width: 0, height: 0 },
+    Fixture { topology: "ring", variables: 512, width: 0, height: 0 },
     Fixture { topology: "grid", variables: 16, width: 4, height: 4 },
     Fixture { topology: "grid", variables: 36, width: 6, height: 6 },
     Fixture { topology: "grid", variables: 64, width: 8, height: 8 },
+    Fixture { topology: "grid", variables: 100, width: 10, height: 10 },
+    Fixture { topology: "grid", variables: 144, width: 12, height: 12 },
+    Fixture { topology: "grid", variables: 196, width: 14, height: 14 },
 ];
 
 const PAIR_FACTOR: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
