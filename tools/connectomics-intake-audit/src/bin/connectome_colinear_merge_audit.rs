@@ -7,7 +7,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -360,11 +360,16 @@ fn validate_truth(truth: &Truth, input_sha256: &str, input: &Input) -> Result<()
         if track.boundaries_nm.iter().any(|value| !value.is_finite()) {
             return Err(format!("truth track {} contains non-finite boundary", track.track_id));
         }
+        let mut boundaries = track.boundaries_nm.clone();
+        boundaries.sort_by(f64::total_cmp);
+        if boundaries.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(format!("truth track {} contains duplicate boundary positions", track.track_id));
+        }
         let input_track = input.tracks.iter().find(|candidate| candidate.track_id == track.track_id)
             .ok_or_else(|| format!("missing detector track {}", track.track_id))?;
         let min = input_track.samples.first().unwrap().distance_nm;
         let max = input_track.samples.last().unwrap().distance_nm;
-        if track.boundaries_nm.iter().any(|value| *value < min || *value > max) {
+        if boundaries.iter().any(|value| *value < min || *value > max) {
             return Err(format!("truth track {} has a boundary outside its sample extent", track.track_id));
         }
     }
@@ -412,11 +417,10 @@ fn evaluate(
     let mut matched_truth = BTreeSet::new();
     let mut localization_errors = Vec::new();
     for (error, proposal_index, truth_index) in pairs {
-        if matched_proposals.insert(proposal_index) && matched_truth.insert(truth_index) {
+        if !matched_proposals.contains(&proposal_index) && !matched_truth.contains(&truth_index) {
+            matched_proposals.insert(proposal_index);
+            matched_truth.insert(truth_index);
             localization_errors.push(error);
-        } else {
-            matched_proposals.remove(&proposal_index);
-            matched_truth.remove(&truth_index);
         }
     }
     localization_errors.sort_by(f64::total_cmp);
