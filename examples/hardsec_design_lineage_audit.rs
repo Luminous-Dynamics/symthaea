@@ -18,11 +18,14 @@
 //!   leave_trojan_family_out   trojan_family_id cannot cross splits for Trojan rows.
 //!   leave_toolchain_out       synthesis_config_id cannot cross splits.
 //!   leave_library_out         cell_library_id cannot cross splits.
+//!   leave_benchmark_source_out benchmark_source_id cannot cross splits; identical
+//!                              benign paired controls are counted and reported.
 //!
 //! TSV header (exact order):
 //! dataset_id, source_artifact_id, source_path, source_sha256, sample_id,
 //! design_id, base_design_family_id, netlist_id, trojan_family_id,
-//! synthesis_config_id, cell_library_id, split_protocol, split, label
+//! synthesis_config_id, cell_library_id, benchmark_source_id,
+//! split_protocol, split, label
 
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -32,7 +35,7 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-const HEADER: [&str; 14] = [
+const HEADER: [&str; 15] = [
     "dataset_id",
     "source_artifact_id",
     "source_path",
@@ -44,6 +47,7 @@ const HEADER: [&str; 14] = [
     "trojan_family_id",
     "synthesis_config_id",
     "cell_library_id",
+    "benchmark_source_id",
     "split_protocol",
     "split",
     "label",
@@ -59,6 +63,7 @@ enum SplitProtocol {
     LeaveTrojanFamilyOut,
     LeaveToolchainOut,
     LeaveLibraryOut,
+    LeaveBenchmarkSourceOut,
 }
 
 impl SplitProtocol {
@@ -70,6 +75,7 @@ impl SplitProtocol {
             "leave_trojan_family_out" => Ok(Self::LeaveTrojanFamilyOut),
             "leave_toolchain_out" => Ok(Self::LeaveToolchainOut),
             "leave_library_out" => Ok(Self::LeaveLibraryOut),
+            "leave_benchmark_source_out" => Ok(Self::LeaveBenchmarkSourceOut),
             _ => Err(format!("unsupported split_protocol: {value}")),
         }
     }
@@ -82,6 +88,7 @@ impl SplitProtocol {
             Self::LeaveTrojanFamilyOut => "leave_trojan_family_out",
             Self::LeaveToolchainOut => "leave_toolchain_out",
             Self::LeaveLibraryOut => "leave_library_out",
+            Self::LeaveBenchmarkSourceOut => "leave_benchmark_source_out",
         }
     }
 
@@ -93,6 +100,7 @@ impl SplitProtocol {
             Self::LeaveTrojanFamilyOut => Some("trojan_family_id"),
             Self::LeaveToolchainOut => Some("synthesis_config_id"),
             Self::LeaveLibraryOut => Some("cell_library_id"),
+            Self::LeaveBenchmarkSourceOut => Some("benchmark_source_id"),
         }
     }
 }
@@ -110,6 +118,7 @@ struct Sample {
     trojan_family_id: String,
     synthesis_config_id: String,
     cell_library_id: String,
+    benchmark_source_id: String,
     split_protocol: SplitProtocol,
     split: String,
     label: String,
@@ -123,6 +132,7 @@ impl Sample {
             "trojan_family_id" if self.label == "trojan" => Some(&self.trojan_family_id),
             "synthesis_config_id" => Some(&self.synthesis_config_id),
             "cell_library_id" => Some(&self.cell_library_id),
+            "benchmark_source_id" => Some(&self.benchmark_source_id),
             _ => None,
         }
     }
@@ -294,10 +304,11 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
         let trojan_family_id = get(8);
         let synthesis_config_id = get(9);
         let cell_library_id = get(10);
-        let row_protocol = SplitProtocol::parse(&get(11))
+        let benchmark_source_id = get(11);
+        let row_protocol = SplitProtocol::parse(&get(12))
             .map_err(|error| format!("line {line_number}: {error}"))?;
-        let split = get(12);
-        let label = get(13);
+        let split = get(13);
+        let label = get(14);
 
         for (name, value) in [
             ("dataset_id", &row_dataset),
@@ -346,6 +357,11 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
                     "line {line_number}: leave_library_out requires cell_library_id"
                 ));
             }
+            SplitProtocol::LeaveBenchmarkSourceOut if benchmark_source_id.is_empty() => {
+                return Err(format!(
+                    "line {line_number}: leave_benchmark_source_out requires benchmark_source_id"
+                ));
+            }
             _ => {}
         }
 
@@ -389,6 +405,7 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
             trojan_family_id,
             synthesis_config_id,
             cell_library_id,
+            benchmark_source_id,
             split_protocol: row_protocol,
             split,
             label,
@@ -444,30 +461,69 @@ fn audit_groups(
     Ok(counts)
 }
 
+#[derive(Debug, Clone, Default)]
+struct ExactHashAudit {
+    cross_split_source_hash_count: usize,
+    reused_benign_control_artifact_count: usize,
+    reused_benign_control_artifacts: Vec<serde_json::Value>,
+}
+
 fn audit_exact_source_hash_splits(
     samples: &[Sample],
     protocol: SplitProtocol,
-) -> Result<usize, String> {
-    let mut hash_to_splits: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+) -> Result<ExactHashAudit, String> {
+    let mut hash_to_samples: BTreeMap<String, Vec<&Sample>> = BTreeMap::new();
     for sample in samples {
-        hash_to_splits
+        hash_to_samples
             .entry(sample.source_sha256.clone())
             .or_default()
-            .insert(sample.split.clone());
+            .push(sample);
     }
-    let overlapping = hash_to_splits
-        .iter()
-        .filter(|(_, splits)| splits.len() > 1)
-        .map(|(digest, _)| digest.clone())
-        .collect::<Vec<_>>();
-    if protocol != SplitProtocol::RandomGate {
-        if let Some(digest) = overlapping.first() {
+
+    let mut audit = ExactHashAudit::default();
+    for (digest, rows) in hash_to_samples {
+        let labels = rows
+            .iter()
+            .map(|sample| sample.label.as_str())
+            .collect::<BTreeSet<_>>();
+        if labels.len() > 1 {
             return Err(format!(
-                "exact source artifact hash leakage across splits for sha256={digest}"
+                "identical evaluated artifact has inconsistent labels for sha256={digest}"
             ));
         }
+        let splits = rows
+            .iter()
+            .map(|sample| sample.split.as_str())
+            .collect::<BTreeSet<_>>();
+        if splits.len() <= 1 {
+            continue;
+        }
+
+        audit.cross_split_source_hash_count += 1;
+        if protocol == SplitProtocol::RandomGate {
+            continue;
+        }
+        if protocol == SplitProtocol::LeaveBenchmarkSourceOut
+            && labels.len() == 1
+            && labels.contains("benign")
+        {
+            audit.reused_benign_control_artifact_count += 1;
+            audit.reused_benign_control_artifacts.push(serde_json::json!({
+                "sha256": digest,
+                "label": "benign",
+                "sample_ids": rows.iter().map(|sample| sample.sample_id.clone()).collect::<BTreeSet<_>>(),
+                "benchmark_source_ids": rows.iter().map(|sample| sample.benchmark_source_id.clone()).collect::<BTreeSet<_>>(),
+                "splits": splits,
+            }));
+            continue;
+        }
+
+        return Err(format!(
+            "exact source artifact hash leakage across splits for sha256={digest}"
+        ));
     }
-    Ok(overlapping.len())
+
+    Ok(audit)
 }
 
 fn lineage_overlap_counts(samples: &[Sample], field: &str) -> BTreeMap<String, usize> {
@@ -480,6 +536,7 @@ fn lineage_overlap_counts(samples: &[Sample], field: &str) -> BTreeMap<String, u
             "trojan_family_id" if sample.label == "trojan" => &sample.trojan_family_id,
             "synthesis_config_id" => &sample.synthesis_config_id,
             "cell_library_id" => &sample.cell_library_id,
+            "benchmark_source_id" => &sample.benchmark_source_id,
             _ => continue,
         };
         if !value.is_empty() {
@@ -547,7 +604,7 @@ fn run(args: Args) -> Result<(), String> {
         ));
     }
 
-    let cross_split_source_hash_count = audit_exact_source_hash_splits(&samples, protocol)?;
+    let exact_hash_audit = audit_exact_source_hash_splits(&samples, protocol)?;
     let group_counts = audit_groups(&samples, protocol)?;
     let mut split_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut label_counts: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
@@ -586,7 +643,9 @@ fn run(args: Args) -> Result<(), String> {
         "split_label_counts": label_counts,
         "audited_group_sample_counts": group_counts,
         "cross_split_lineage_group_counts": overlaps,
-        "cross_split_source_hash_count": cross_split_source_hash_count,
+        "cross_split_source_hash_count": exact_hash_audit.cross_split_source_hash_count,
+        "reused_benign_control_artifact_count": exact_hash_audit.reused_benign_control_artifact_count,
+        "reused_benign_control_artifacts": exact_hash_audit.reused_benign_control_artifacts,
         "verified_source_artifact_count": source_records.len(),
         "verified_source_file_count": source_hash_cache.len(),
         "verified_source_artifacts": source_records
@@ -607,7 +666,9 @@ fn run(args: Args) -> Result<(), String> {
             "Design-lineage IDs are caller-declared metadata; ancestry is not inferred.",
             "Structural similarity and semantic netlist equivalence were not evaluated.",
             "A pass does not establish detector quality, Trojan absence, or design security.",
-            "random_gate is diagnostic only; overlaps are reported, not rejected."
+            "random_gate is diagnostic only; overlaps are reported, not rejected.",
+            "leave_benchmark_source_out allows only identical benign paired-control reuse; every such digest is enumerated.",
+            "benchmark_source_id is caller-declared cohort metadata and is not independently inferred or a model feature."
         ]
     });
 
@@ -700,6 +761,7 @@ mod tests {
                     (*trojan_family).to_owned(),
                     "synth-v1".to_owned(),
                     "lib-v1".to_owned(),
+                    format!("benchmark-{sample_id}"),
                     protocol.to_owned(),
                     (*split).to_owned(),
                     if trojan_family.is_empty() { "benign" } else { "trojan" }.to_owned(),
@@ -931,6 +993,127 @@ mod tests {
         fixture.receipt = fixture.root.join("receipt.json");
         let error = run(fixture.args()).unwrap_err();
         assert!(error.contains("receipt must be outside"));
+    }
+
+    fn set_manifest_field(fixture: &Fixture, row_index: usize, column_index: usize, value: &str) {
+        let mut lines: Vec<String> = fs::read_to_string(&fixture.manifest)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let mut fields: Vec<String> = lines[row_index]
+            .split('\t')
+            .map(str::to_owned)
+            .collect();
+        fields[column_index] = value.to_owned();
+        lines[row_index] = fields.join("\t");
+        fs::write(&fixture.manifest, lines.join("\n") + "\n").unwrap();
+    }
+
+    fn reuse_evaluated_artifact(fixture: &Fixture, source_row: usize, target_row: usize) {
+        let mut lines: Vec<String> = fs::read_to_string(&fixture.manifest)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let source: Vec<String> = lines[source_row].split('\t').map(str::to_owned).collect();
+        let mut target: Vec<String> = lines[target_row].split('\t').map(str::to_owned).collect();
+        target[2] = source[2].clone();
+        target[3] = source[3].clone();
+        lines[target_row] = target.join("\t");
+        fs::write(&fixture.manifest, lines.join("\n") + "\n").unwrap();
+    }
+
+    #[test]
+    fn accepts_leave_one_benchmark_source_out_and_records_source_groups() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", "trojan-a"),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        run(fixture.args()).unwrap();
+        let receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(&fixture.receipt).unwrap()).unwrap();
+        assert_eq!(receipt["split_protocol"], "leave_benchmark_source_out");
+        assert_eq!(receipt["audited_group_sample_counts"]["train"], 1);
+        assert_eq!(receipt["cross_split_lineage_group_counts"]["benchmark_source_id"], 0);
+    }
+
+    #[test]
+    fn rejects_benchmark_source_leakage_across_splits() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", "trojan-a"),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        let train_source = "benchmark-s1";
+        set_manifest_field(&fixture, 3, 11, train_source);
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("benchmark_source_id=benchmark-s1"));
+    }
+
+    #[test]
+    fn rejects_identical_trojan_artifact_across_source_splits() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", "trojan-a"),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        reuse_evaluated_artifact(&fixture, 1, 3);
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("exact source artifact hash leakage"));
+    }
+
+    #[test]
+    fn allows_and_reports_reused_benign_control_artifacts_for_source_holdout() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", ""),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", ""),
+            ],
+        );
+        reuse_evaluated_artifact(&fixture, 1, 3);
+        run(fixture.args()).unwrap();
+        let receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(&fixture.receipt).unwrap()).unwrap();
+        assert_eq!(receipt["reused_benign_control_artifact_count"], 1);
+        assert_eq!(
+            receipt["reused_benign_control_artifacts"][0]["label"],
+            "benign"
+        );
+        assert_eq!(
+            receipt["reused_benign_control_artifacts"][0]["benchmark_source_ids"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn rejects_identical_content_with_conflicting_labels() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", ""),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        reuse_evaluated_artifact(&fixture, 1, 3);
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("inconsistent labels"));
     }
 
     #[test]
