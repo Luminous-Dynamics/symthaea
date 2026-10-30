@@ -157,6 +157,7 @@ pub struct InitialAdjudicationV1 {
 pub struct ResolutionEventV1 {
     pub resolution_id: String,
     pub claim_id: String,
+    pub adjudicator_id_sha256: String,
     pub decision: ReferenceDecisionV1,
     pub prior_record_ids: Vec<String>,
     pub evidence_span_ids: Vec<String>,
@@ -588,6 +589,13 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         if !claims.contains_key(resolution.claim_id.as_str()) {
             issues.push(format!("resolution {} references unknown claim", resolution.resolution_id));
         }
+        let Some(resolving_adjudicator) = adjudicators.get(resolution.adjudicator_id_sha256.as_str()) else {
+            issues.push(format!("resolution {} references unknown resolving adjudicator", resolution.resolution_id));
+            continue;
+        };
+        if !valid_digest(&resolution.adjudicator_id_sha256, allow_zero) {
+            issues.push(format!("resolution {} has invalid resolving adjudicator digest", resolution.resolution_id));
+        }
         if !valid_digest(&resolution.rationale_sha256, allow_zero) {
             issues.push(format!("resolution {} has invalid rationale digest", resolution.resolution_id));
         }
@@ -598,15 +606,36 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
             issues.push(format!("resolution {} must reference at least two prior adjudications", resolution.resolution_id));
         }
         let mut seen = BTreeSet::new();
+        let mut prior_adjudicator_ids = BTreeSet::new();
+        let mut prior_independence_groups = BTreeSet::new();
         for record_id in &resolution.prior_record_ids {
             if !seen.insert(record_id.as_str()) {
                 issues.push(format!("resolution {} repeats prior record {}", resolution.resolution_id, record_id));
             }
             match adjudications.get(record_id.as_str()) {
-                Some(record) if record.claim_id == resolution.claim_id => {}
+                Some(record) if record.claim_id == resolution.claim_id => {
+                    prior_adjudicator_ids.insert(record.adjudicator_id_sha256.as_str());
+                    if let Some(prior_adjudicator) = adjudicators.get(record.adjudicator_id_sha256.as_str()) {
+                        prior_independence_groups.insert(prior_adjudicator.independence_group_sha256.as_str());
+                    }
+                }
                 Some(_) => issues.push(format!("resolution {} references adjudication for a different claim", resolution.resolution_id)),
                 None => issues.push(format!("resolution {} references unknown adjudication {}", resolution.resolution_id, record_id)),
             }
+        }
+        if prior_adjudicator_ids.len() < 2 {
+            issues.push(format!("resolution {} must preserve disagreement from at least two distinct adjudicators", resolution.resolution_id));
+        }
+        if prior_adjudicator_ids.contains(resolution.adjudicator_id_sha256.as_str()) {
+            issues.push(format!("resolution {} must be made by an adjudicator outside the initial voting set", resolution.resolution_id));
+        }
+        if fields.purpose.is_audit_candidate()
+            && prior_independence_groups.contains(resolving_adjudicator.independence_group_sha256.as_str())
+        {
+            issues.push(format!("resolution {} resolving adjudicator shares an initial panel independence group", resolution.resolution_id));
+        }
+        if resolution.decision.requires_evidence() && resolution.evidence_span_ids.is_empty() {
+            issues.push(format!("resolution {} requires at least one evidence span", resolution.resolution_id));
         }
         let mut seen_resolution_spans = BTreeSet::new();
         for span_id in &resolution.evidence_span_ids {
