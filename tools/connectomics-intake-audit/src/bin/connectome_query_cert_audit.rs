@@ -378,7 +378,9 @@ fn validate(certificate: &Certificate) -> Vec<String> {
         if gate.critical && gate.status == "FAIL" {
             critical_failure = true;
         }
-        if gate.status != "PASS" {
+        // A non-critical gate explicitly declared NOT_APPLICABLE does not
+        // weaken a scoped certificate; a critical NOT_APPLICABLE still does.
+        if gate.status != "PASS" && !(gate.status == "NOT_APPLICABLE" && !gate.critical) {
             all_gates_pass = false;
         }
     }
@@ -602,6 +604,25 @@ mod tests {
     #[test]
     fn synthetic_conditional_certificate_is_internally_consistent() {
         let certificate = fixture();
+        assert!(validate(&certificate).is_empty(), "{:?}", validate(&certificate));
+    }
+
+    #[test]
+    fn certified_state_allows_explicit_noncritical_not_applicable_gate() {
+        let mut certificate = fixture();
+        certificate.state = "CERTIFIED_WITHIN_DECLARED_SCOPE".into();
+        certificate.quality_gates[0].status = "PASS".into();
+        certificate.quality_gates[1].status = "PASS".into();
+        certificate.quality_gates.push(QualityGate {
+            gate_id: "optional-neurite-extension".into(),
+            status: "NOT_APPLICABLE".into(),
+            critical: false,
+            scope_note: "This certificate is for a query that does not depend on neurite extension.".into(),
+        });
+        for component in &mut certificate.uncertainty_components {
+            component.status = "ESTIMATED".into();
+            component.estimate = Some(0.5);
+        }
         assert!(validate(&certificate).is_empty(), "{:?}", validate(&certificate));
     }
 
