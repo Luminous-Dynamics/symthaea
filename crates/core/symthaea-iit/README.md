@@ -490,7 +490,7 @@ parts, direction vector, and severance matrix.
 The test suite retains a deliberately simple brute-force reference generator that
 uses the original block-membership definition and all three directions per block.
 It compares the complete matrix set—not merely counts—against the canonical
-enumerator for 2–6 units. This is exact-set equality, not a heuristic or approximate
+enumerator for 2–7 units. This is exact-set equality, not a heuristic or approximate
 search. The seven-unit fixture reduces the equivalent direction space from 88,560
 raw labelings to 61,888 canonical representatives, pruning 26,672 redundant
 labelings before matrix construction.
