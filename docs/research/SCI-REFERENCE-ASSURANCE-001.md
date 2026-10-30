@@ -105,7 +105,7 @@ A separate adjudicator may review disagreements after the initial votes are comm
 - remain blind to candidate/judge identity where feasible;
 - show the original evidence packet and rubric, not the model's preferred answer;
 - retain all original labels unchanged;
-- record a resolution event, the evidence/rule used, and whether uncertainty remains;
+- record a resolution event with a separately identified resolver outside the initial voting set, the evidence/rule used, and whether uncertainty remains;
 - permit unresolved disagreement and not-evaluable outcomes.
 
 Majority vote is a descriptive aggregation, not a truth oracle. A high agreement rate among raters sharing the same assumptions or source packet can still encode common error.
@@ -241,3 +241,60 @@ The first implementation should be limited to one domain and a small, fully insp
 This protocol can make reference construction more inspectable and test whether its declared process was followed. It cannot prove universal truth, eliminate shared human assumptions, infer independent expertise from pseudonyms, establish source independence from hashes alone, prove that a foundation model never saw a source during pretraining, or prove a runner withheld evaluator-only data without external execution evidence.
 
 A reference receipt can be valid while its reference is poor. Preserve that distinction just as #9065 preserves the distinction between a valid judge-audit receipt and a good judge.
+
+
+## 11. Executable v1 implementation slice
+
+The initial validator implementation is in `research/science-bench-refresh/src/reference_assurance.rs`, with:
+- strict serde types mirroring `schema/reference-assurance-package.schema.json`;
+- a domain-separated package commitment and exact package-byte digest;
+- referential checks for claim/source/span/adjudicator/initial-vote/resolution IDs;
+- byte-offset range shape checks, date/scope consistency, lifecycle checks, and source-publication-vs-target-date checks;
+- per-material-claim minimum three distinct adjudicators and declared independence groups for `audit_candidate` packages;
+- per-rater/per-claim and per-independence-group/per-claim duplicate-vote rejection;
+- required system/candidate/judge blinding and COI-disclosure declarations for audit-candidate packages;
+- disagreement and abstention counts without constructing a majority "gold" label;
+- a report that always sets `adjudicator_independence_proven=false`, `source_authenticity_proven=false`, `source_span_bytes_verified=false`, `runner_execution_proven=false`, `external_anchor_required=true`, and `scoring_eligible_declared=false`.
+
+CLI:
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-reference-assurance-package PACKAGE.json
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-reference-assurance-package-fields PACKAGE_FIELDS.json
+```
+
+The example fixture deliberately contains three initial votes with a disagreement (two support, one mixed/contested). This is a positive control for preservation, not a synthetic correctness label. Unit tests cover duplicate raters/groups, orphan spans, invalid byte ranges, stale/future sources, scope mismatch, abstention reasons, package mutation and deterministic output. `tools/test_reference_assurance.py` is a separate standard-library oracle that reconstructs the commitment serialization independently and checks mutation controls.
+
+### Implementation limits
+
+The v1 validator checks the *declared* span offset unit/range and span digest shape but does not read source snapshot bytes, so it cannot verify that an offset or span digest corresponds to actual content. It checks source lifecycle and ancestry declarations but cannot authenticate publisher identity, discover unrecorded syndication, or prove ancestry. Distinct pseudonymous identifiers and independence-group hashes do not prove actual annotator independence. These flags must not become true without separate evidence. The validator is evaluator-side and its output must remain outside the evaluated policy.
+
+## 12. 2026 research refinements and competitive targets
+
+The benchmark should now explicitly compare at least five distinct properties rather than optimizing a single human-agreement number:
+
+1. **Criteria transfer and rubric exploitability.** PReMISE (EMNLP 2026) treats policy rubrics as measurement specifications and reports that raw rubric sources can be reliable yet exploitable; high inter-rater agreement alone does not imply adversarial robustness. Add rubric attack suites, rubric dimensionality, applicability/specificity and adversarial score inflation measurements. https://aclanthology.org/2026.emnlp-main.2653/
+2. **Judge measurement reliability.** The ICML 2026 item-response-theory framework separates intrinsic consistency under prompt variations from human alignment and estimates interpretable item/judge effects. Compare simple agreement, mixed-effects/IRT models and judge-aware ranking. https://proceedings.mlr.press/v306/choi26n.html
+3. **Human-alignment geometry.** The EMNLP Findings 2026 judge-geometry study reports that inter-judge consensus can diverge from held-out human alignment, especially on subjective tasks. Report the judge-human-human agreement triple, matched-item score-vector spread/effective rank, and held-out-rater comparisons. https://aclanthology.org/2026.findings-emnlp.1696/
+4. **Evidence-grounded rubric execution.** RULERS (EMNLP 2026) freezes task-level rubric specifications, structures evidence-grounded judgments and calibrates to human score boundaries; compare criteria perturbation stability and score-distribution calibration. https://aclanthology.org/2026.emnlp-main.566/
+5. **Statistical generalization.** NIST AI 800-3 distinguishes fixed-benchmark accuracy from generalized accuracy and motivates GLMMs for task/item variance and uncertainty. Do not claim generalization from fixed-suite confidence intervals. https://www.nist.gov/publications/expanding-ai-evaluation-toolbox-statistical-models
+
+These findings lead to the following measurable targets, all to be treated as preregistered qualification objectives rather than current results:
+- 100% rejection of enumerated malformed/tampered/missing/duplicate/orphan synthetic controls, and 100% acceptance of clean negative/positive controls;
+- 100% of scored material claims have source-span and scope metadata or are explicitly excluded as contested/not-evaluable;
+- preserve 100% of initial votes, abstentions and dissenting evidence records;
+- zero forced binary references when the protocol state is mixed, insufficient, scope-ambiguous or stale;
+- report judge-human agreement against held-out raters separately from judge-judge agreement and panel consensus;
+- audit rubric exploitability separately from inter-rater reliability;
+- publish fixed-suite performance separately from population generalization, with task-family/item variance and uncertainty;
+- report cost, latency, tokens, retrieval and human-review effort without allowing cost to compensate for critical evidence failures.
+
+A meaningful competitive win is not simply a higher judge-human correlation. It is improved held-out human alignment and evidence correctness under adversarial rubric/source interventions, with no increase in unsupported false acceptance, and a better quality-versus-cost frontier at matched evaluation budgets.
+
+
+### Resolution-event enforcement refinement
+
+A resolution event now identifies its own `adjudicator_id_sha256`. The validator requires at least two distinct initial adjudicators among its predecessors, rejects a resolver who was in the initial voting set, and (for audit-candidate packages) requires a distinct declared independence group from all predecessor raters. A supported/contradicted/mixed resolution must cite evidence spans; temporal-staleness resolutions must point to a non-active source. The fixture includes three original votes (two support, one mixed/contested) and a fourth independently declared resolver whose separate outcome remains mixed/contested. All original votes remain present.
+
+This is a declared-process constraint, not proof that the resolver is actually independent or qualified. The report's independence flag remains false.

@@ -49,6 +49,45 @@ def manifest_for(seed: bytes = SEED_A) -> dict:
     }
 
 
+class ReferenceReplayDiagnosticTests(unittest.TestCase):
+    def test_equal_nested_structures_have_no_difference(self) -> None:
+        left = {"tasks": [{"policy_input": {"observations": [{"x": 1.25}]}}]}
+        self.assertIsNone(rr.first_difference(left, left))
+
+    def test_task_identity_is_reported_before_payload_when_order_differs(self) -> None:
+        expected = {"task_id": "task-a", "evaluator_only": {"common_cause": "z"}}
+        observed = {"task_id": "task-b", "evaluator_only": {"target_kind": "other"}}
+        difference = rr.first_difference(expected, observed)
+        self.assertTrue(difference.startswith("$.task_id:"))
+
+    def test_first_difference_reports_exact_json_path(self) -> None:
+        left = {"tasks": [{"policy_input": {"observations": [{"x": 1.25}]}}]}
+        right = {"tasks": [{"policy_input": {"observations": [{"x": 1.5}]}}]}
+        difference = rr.first_difference(left, right)
+        self.assertIsNotNone(difference)
+        self.assertTrue(difference.startswith("$.tasks[0].policy_input.observations[0].x:"))
+
+    def test_float_difference_reports_hex_values(self) -> None:
+        difference = rr.first_difference(0.1, 0.2)
+        self.assertIn("float", difference)
+        self.assertIn(float(0.1).hex(), difference)
+        self.assertIn(float(0.2).hex(), difference)
+
+    def test_boolean_is_not_treated_as_integer(self) -> None:
+        difference = rr.first_difference(True, 1)
+        self.assertIn("type bool != int", difference)
+
+    def test_array_length_and_object_key_differences_are_located(self) -> None:
+        self.assertIn("array length", rr.first_difference([1, 2], [1]))
+        self.assertIn("missing key", rr.first_difference({"a": 1}, {}))
+
+    def test_string_diagnostic_does_not_echo_raw_content(self) -> None:
+        secret = "synthetic-task-content-that-should-not-be-dumped"
+        difference = rr.first_difference(secret, secret + "changed")
+        self.assertNotIn(secret, difference)
+        self.assertIn("string length/hash", difference)
+
+
 class ReferenceReplayTests(unittest.TestCase):
     def test_same_seed_reproduces_identical_structure(self) -> None:
         manifest = manifest_for()

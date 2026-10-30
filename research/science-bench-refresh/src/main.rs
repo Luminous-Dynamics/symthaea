@@ -6,12 +6,6 @@ use science_bench_refresh_validator::evidence_behavior_contracts::{
     compute_evidence_behavior_contract_report_commitment, verify_evidence_behavior_contract_plan,
     verify_evidence_behavior_contract_report,
 };
-use science_bench_refresh_validator::judge_robustness::{
-    compute_judge_robustness_plan_commitment,
-    compute_judge_robustness_report_commitment,
-    verify_judge_robustness_plan,
-    verify_judge_robustness_report,
-};
 use science_bench_refresh_validator::evidence_outcomes::{
     compute_evidence_outcome_report_commitment, verify_evidence_outcome_report,
 };
@@ -19,9 +13,16 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
+use science_bench_refresh_validator::judge_robustness::{
+    compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
+    verify_judge_robustness_plan, verify_judge_robustness_report,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
+use science_bench_refresh_validator::reference_assurance::{
+    compute_reference_package_commitment, verify_reference_assurance_package,
+};
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
 use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
 use science_bench_refresh_validator::{
@@ -55,6 +56,8 @@ fn usage(program: &str) {
             "  {program} verify-judge-robustness-plan PLAN.json\n",
             "  {program} commit-judge-robustness-report PLAN.json REPORT_FIELDS.json\n",
             "  {program} verify-judge-robustness-report PLAN.json REPORT.json\n",
+            "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
+            "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
@@ -192,8 +195,7 @@ fn run(args: &[String]) -> ExitCode {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report)
-                    .expect("judge robustness report serializes")
+                serde_json::to_string_pretty(&report).expect("judge robustness report serializes")
             );
             if report.valid {
                 ExitCode::SUCCESS
@@ -938,6 +940,60 @@ fn run(args: &[String]) -> ExitCode {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::from(5)
+            }
+        }
+        "commit-reference-assurance-package-fields" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "reference assurance package fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_reference_package_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_reference_package_commitment.v1",
+                            "package_commitment_sha256": commitment
+                        }))
+                        .expect("reference package commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-reference-assurance-package" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let package_bytes = match read(&args[1], "reference assurance package") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_reference_assurance_package(&package_bytes) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("{error}");
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("reference assurance report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
             }
         }
         _ => run_manifest_mode(args),

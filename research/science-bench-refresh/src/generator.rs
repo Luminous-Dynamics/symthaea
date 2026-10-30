@@ -1237,7 +1237,7 @@ mod tests {
 
     #[test]
     fn generated_task_count_and_family_counts_match_manifest() {
-        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let (manifest, seed, _config, generated) = complete_manifest_and_tasks();
         let report = crate::verify_reveal(
             &manifest_with_task_commitment(&manifest, &generated),
             &seed,
