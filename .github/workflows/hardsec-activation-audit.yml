@@ -5,8 +5,9 @@ on:
     paths:
       - "Cargo.toml"
       - "examples/hardsec_activation_campaign_audit.rs"
-      - "tools/hardsec-audit-harness/Cargo.toml"
-      - "tools/hardsec-audit-harness/Cargo.lock"
+      - "docs/research/HARDSEC_009_ACTIVATION_COVERAGE_CAMPAIGNS.md"
+      - "tools/hardsec-activation-audit-harness/Cargo.toml"
+      - "tools/hardsec-activation-audit-harness/Cargo.lock"
       - ".github/workflows/hardsec-activation-audit.yml"
   workflow_dispatch:
 
@@ -41,7 +42,7 @@ jobs:
         run: rustfmt --edition 2024 --check examples/hardsec_activation_campaign_audit.rs
 
       - name: Verify isolated harness lockfile
-        run: cargo metadata --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --no-deps
+        run: cargo metadata --locked --manifest-path tools/hardsec-activation-audit-harness/Cargo.toml --no-deps
 
       - name: Test empirical activation campaign auditor
         run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-activation-audit --example hardsec_activation_campaign_audit
