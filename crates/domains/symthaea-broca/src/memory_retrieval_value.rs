@@ -426,6 +426,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::memory_retrieval_calibration::{
+        RetrievalCalibrationAuditReport, RetrievalCalibrationAuditRequest,
+        RetrievalCalibrationObservation, audit_retrieval_value_estimator,
+    };
+    use crate::memory_retrieval_calibration::{
         RetrievalCalibrationAuditRequest, RetrievalCalibrationAuditReport,
         RetrievalCalibrationObservation, ValidatedRetrievalCalibration,
         audit_retrieval_value_estimator,
