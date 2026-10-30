@@ -74,6 +74,8 @@ pub mod memory_use_validity;
 pub mod memory_challenge_api;
 pub mod memory_challenge_sled;
 pub mod memory_challenge_sqlite;
+#[cfg(feature = "aml-http-server")]
+pub mod memory_challenge_http;
 pub mod memory_bitemporal;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
