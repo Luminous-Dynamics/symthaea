@@ -30,7 +30,11 @@
         "true_function_interval_evidence_verified": true,
         "evaluator_artifact_digest": "evaluator-offsetting",
         "minimum_joint_coverage": 0.9,
-        "margin": 0
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-offsetting",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-offsetting",
+        "true_function_validation_split_id": "true-function-validation-split-offsetting",
+        "evaluator_split_id": "evaluator-only-split-offsetting"
       },
       "expected": {
         "best_in_class_proxy_interval": {
@@ -73,7 +77,11 @@
         "true_function_interval_evidence_verified": true,
         "evaluator_artifact_digest": "evaluator-reinforcing",
         "minimum_joint_coverage": 0.9,
-        "margin": 0
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-reinforcing",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-reinforcing",
+        "true_function_validation_split_id": "true-function-validation-split-reinforcing",
+        "evaluator_split_id": "evaluator-only-split-reinforcing"
       },
       "expected": {
         "best_in_class_proxy_interval": {
@@ -116,7 +124,11 @@
         "true_function_interval_evidence_verified": true,
         "evaluator_artifact_digest": "evaluator-ambiguous",
         "minimum_joint_coverage": 0.9,
-        "margin": 0
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-ambiguous",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-ambiguous",
+        "true_function_validation_split_id": "true-function-validation-split-ambiguous",
+        "evaluator_split_id": "evaluator-only-split-ambiguous"
       },
       "expected": {
         "best_in_class_proxy_interval": {
@@ -159,7 +171,11 @@
         "true_function_interval_evidence_verified": true,
         "evaluator_artifact_digest": "evaluator-coverage",
         "minimum_joint_coverage": 0.9,
-        "margin": 0
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-coverage",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-coverage",
+        "true_function_validation_split_id": "true-function-validation-split-coverage",
+        "evaluator_split_id": "evaluator-only-split-coverage"
       },
       "expected": {
         "best_in_class_proxy_interval": {
@@ -202,7 +218,11 @@
         "true_function_interval_evidence_verified": false,
         "evaluator_artifact_digest": "evaluator-unverified",
         "minimum_joint_coverage": 0.9,
-        "margin": 0
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-unverified",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-unverified",
+        "true_function_validation_split_id": "true-function-validation-split-unverified",
+        "evaluator_split_id": "evaluator-only-split-unverified"
       },
       "expected": {
         "best_in_class_proxy_interval": {
@@ -232,7 +252,8 @@
     "evaluator artifact digest equals validation artifact digest",
     "negative proxy error bound",
     "reversed true-function interval",
-    "NaN/Inf prediction, interval endpoint, coverage or margin"
+    "NaN/Inf prediction, interval endpoint, coverage or margin",
+    "overlapping proxy-fit, proxy-bound-validation, true-function-validation, or evaluator split IDs"
   ],
   "prohibited_claims": [
     "This gate does not reproduce the published R-IDeA DeA sigmoid.",
