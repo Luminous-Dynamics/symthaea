@@ -147,7 +147,7 @@ The initial module implements:
 - evaluator-only touched/final P@K and direction-aware final regret;
 - strict canonical JSON import with unknown-field rejection and order-invariant content digest.
 
-Seventeen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports, empty queries and the preflighted Successive Halving schedule. They have not been compiled or executed.
+Eighteen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports, empty queries, preflighted Successive Halving and a successful metadata-only no-proxy baseline. They have not been compiled or executed.
 
 ### Runnable Successive Halving comparator
 
@@ -181,12 +181,14 @@ The new Rust primitive is `nasbench201_trajectory.rs` and its tracking issue is 
 - local-optimum recording and bounded random 2-opt escapes;
 - preservation of starts, first-improvement candidates, local optima, escape candidates and all visited IDs;
 - feature-catalog digest over architecture IDs, six-op topology and selected proxy values;
-- archive digest over the frozen config, catalog digest, all candidate lists and ordered event trace;
-- final promotion planner with explicit proxy-elite, trajectory and topology-diversity quotas; remaining slots are labelled fallback, never silently counted as trajectory discoveries.
+- archive digest over the frozen config, catalog digest, all candidate lists, ordered event trace and catalog-completeness flag;
+- explicit `catalog_is_complete`: true only when all 5^6 = 15,625 distinct NAS-Bench-201 topologies are present; otherwise a local optimum is only relative to the supplied catalog;
+- promotion planner with explicit proxy-elite, trajectory and topology-diversity quotas; remaining slots are labelled fallback;
+- common initial-pool selectors for deterministic public-metadata-only random sampling, single-proxy ranking and trajectory-promotion plans; all return source-evidence and pool digests.
 
-The archive's target-metric ID is explicit and must differ from the proxy ID. The planner verifies that it receives the same feature catalog and archive content that generated the trajectory, rejects unknown candidates and rejects quota overcommit. It uses no target labels. The resulting IDs can be passed into the multi-fidelity query oracle to receive actual fidelity observations and final-confirmation credit.
+The archive's target-metric ID is explicit and must differ from the proxy ID. The planner verifies that it receives the same feature catalog and archive content that generated the trajectory, rejects unknown candidates and rejects quota overcommit. The resulting IDs feed the same multi-fidelity Successive Halving runner. Random search can now run with an empty proxy feature map, so the evaluator no longer requires a fake proxy column for a genuine no-proxy baseline.
 
-This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. It is an independently testable archive/promotion primitive inspired by the published finding. Nine Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, distinct quota accounting, digest binding and invalid inputs. They have not been compiled or executed.
+This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. Thirteen Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, archive binding, partial-catalog honesty, deterministic random pools, single-proxy ranking and invalid inputs. They have not been compiled or executed.
 
 ## 9. Target-free multi-proxy consensus prior (CoRA-inspired)
 
