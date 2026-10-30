@@ -540,6 +540,18 @@ mod tests {
         assert_eq!(result.total_token_cost, 15);
         let error = verify_minimum_cost_optimality(&req, &result).unwrap_err();
         assert!(error.contains("not the independently verified canonical optimum"));
+        let routed_error = crate::memory_proof_budget::verify_proof_budget_result(&req, &result)
+            .unwrap_err();
+        assert!(routed_error.contains("not the independently verified canonical optimum"));
+    }
+
+    #[test]
+    fn independent_verifier_fails_closed_when_its_own_search_budget_is_exhausted() {
+        let mut req = request();
+        req.max_search_nodes = 1;
+        let result = solve_proof_budget(request()).unwrap();
+        let error = verify_minimum_cost_optimality(&req, &result).unwrap_err();
+        assert!(error.contains("exhausted max_search_nodes=1"));
     }
 
     #[test]
