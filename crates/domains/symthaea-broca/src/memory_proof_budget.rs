@@ -777,6 +777,12 @@ pub fn verify_proof_packet(
     if seen_conclusions.len() != request.obligations.len() {
         return Err("proof packet omits one or more required conclusions".into());
     }
+    for evidence_id in &selected_evidence_ids {
+        let candidate = candidate_by_id[evidence_id.as_str()];
+        if candidate.conflicts_with.iter().any(|other| selected_evidence_ids.contains(other)) {
+            return Err(format!("proof packet combines contradictory evidence at {:?}", evidence_id));
+        }
+    }
 
     let mut expected_evidence = Vec::new();
     let mut total_token_cost = 0u64;
@@ -1313,6 +1319,61 @@ mod tests {
             result.selected_proofs.iter().map(|proof| proof.justification_id.as_str()).collect::<Vec<_>>(),
             vec!["p1-C", "p2-E"]
         );
+    }
+
+    #[test]
+    fn contradictory_candidates_cannot_be_combined_across_obligations() {
+        let mut first = candidate("A", "family-A", 1);
+        let mut second = candidate("B", "family-B", 1);
+        first.conflicts_with.insert("B".into());
+        second.conflicts_with.insert("A".into());
+        let req = request(
+            vec![first, second],
+            vec![
+                obligation("claim-1", vec![justification("p1", &["A"])]),
+                obligation("claim-2", vec![justification("p2", &["B"])]),
+            ],
+            5,
+        );
+        let result = solve_proof_budget(req).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|item| {
+            item.reason == JustificationRejectionReason::ContradictoryEvidence
+        }));
+    }
+
+    #[test]
+    fn conflict_graph_must_be_symmetric_and_reference_known_candidates() {
+        let mut first = candidate("A", "family-A", 1);
+        first.conflicts_with.insert("B".into());
+        let req = request(
+            vec![first, candidate("B", "family-B", 1)],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        assert!(solve_proof_budget(req).unwrap_err().contains("must be symmetric"));
+
+        let mut first = candidate("A", "family-A", 1);
+        first.conflicts_with.insert("missing".into());
+        let req = request(
+            vec![first],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        assert!(solve_proof_budget(req).unwrap_err().contains("unknown evidence ID"));
+    }
+
+    #[test]
+    fn packet_toolchain_digests_are_bound_into_request_and_packet() {
+        let req = request(
+            vec![candidate("A", "family-A", 1)],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let mut changed = req;
+        changed.tokenizer_sha256 = digest('9');
+        assert!(verify_proof_packet(&changed, &result).is_err());
     }
 
     #[test]
