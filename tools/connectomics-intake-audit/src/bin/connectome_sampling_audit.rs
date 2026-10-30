@@ -481,7 +481,7 @@ fn evaluate(
     outcomes_hash: String,
 ) -> AuditReport {
     let mut stratum_estimates = Vec::new();
-    let mut global_estimates: [Vec<Estimate>; 6] = std::array::from_fn(|_| Vec::new());
+    let mut global_estimates: [Vec<Estimate>; 7] = std::array::from_fn(|_| Vec::new());
     let mut population_cluster_count = 0usize;
     let mut sampled_cluster_count = 0usize;
     let mut sampled_candidate_count = 0usize;
@@ -642,6 +642,9 @@ fn run() -> Result<(), String> {
     let (frame, outcomes, selected) =
         validate(&proposals, &audit, &proposal_hash, &protocol_hash)?;
     let frame_hash = frame_sha256(&audit.population_frame);
+    let sampled_outcomes_bytes = serde_json::to_vec(&audit.sampled_outcomes)
+        .map_err(|error| format!("failed to serialize sampled outcomes: {error}"))?;
+    let sampled_outcomes_hash = sha256(&sampled_outcomes_bytes);
     let report = evaluate(
         &proposals,
         &audit,
@@ -652,6 +655,7 @@ fn run() -> Result<(), String> {
         protocol_hash,
         frame_hash,
         audit_hash,
+        sampled_outcomes_hash,
     );
     let json = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("failed to serialize sample audit report: {error}"))?
