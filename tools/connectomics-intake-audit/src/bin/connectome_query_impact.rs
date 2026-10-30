@@ -582,19 +582,22 @@ fn deterministic_random_score(input_hash: &str, candidate_id: &str) -> u64 {
     u64::from_be_bytes(digest[..8].try_into().expect("SHA-256 has at least eight bytes"))
 }
 
-fn weighted_degree_signature(graph: &Graph) -> BTreeMap<u64, (f64, f64)> {
+fn weighted_degree_signature(graph: &Graph) -> Result<BTreeMap<u64, (f64, f64)>, String> {
     let mut degrees = BTreeMap::<u64, (f64, f64)>::new();
     for ((source, target), weight) in graph {
         degrees.entry(*source).or_default().1 += *weight;
         degrees.entry(*target).or_default().0 += *weight;
     }
-    degrees
+    if degrees.values().any(|(in_degree, out_degree)| !in_degree.is_finite() || !out_degree.is_finite()) {
+        return Err("weighted degree accumulation overflowed".into());
+    }
+    Ok(degrees)
 }
 
 fn local_weighted_degree_delta(graph: &Graph, candidate: &Candidate) -> Result<f64, String> {
     let counterfactual = apply_candidate(graph, candidate)?;
-    let before = weighted_degree_signature(graph);
-    let after = weighted_degree_signature(&counterfactual);
+    let before = weighted_degree_signature(graph)?;
+    let after = weighted_degree_signature(&counterfactual)?;
     let nodes: BTreeSet<u64> = before.keys().chain(after.keys()).copied().collect();
     let mut total_delta = 0.0;
     for node in nodes {
@@ -603,24 +606,20 @@ fn local_weighted_degree_delta(graph: &Graph, candidate: &Candidate) -> Result<f
         total_delta += (after_degree.0 - before_degree.0).abs();
         total_delta += (after_degree.1 - before_degree.1).abs();
     }
+    if !total_delta.is_finite() {
+        return Err("local weighted-degree delta overflowed".into());
+    }
     Ok(total_delta)
 }
 
-fn local_weighted_degree_delta_from_evaluation(
-    _candidate: &Candidate,
-    _evaluation: &CandidateEvaluation,
-) -> f64 {
-    // Placeholder is replaced below by graph-aware policy ranking.
-    0.0
-}
-
 fn policy_score(
+    graph: &Graph,
     policy: RankingPolicy,
     candidate: &Candidate,
     evaluation: &CandidateEvaluation,
     input_hash: &str,
-) -> f64 {
-    match policy {
+) -> Result<f64, String> {
+    let score = match policy {
         RankingPolicy::QuerySensitivity => {
             evaluation.probability_weighted_query_sensitivity_per_review_minute
         }
@@ -632,8 +631,7 @@ fn policy_score(
                 / candidate.review_minutes
         }
         RankingPolicy::LocalDegreeDelta => {
-            local_weighted_degree_delta_from_evaluation(candidate, evaluation)
-                / candidate.review_minutes
+            local_weighted_degree_delta(graph, candidate)? / candidate.review_minutes
         }
         RankingPolicy::SensitivityOnly => {
             evaluation.weighted_query_sensitivity / candidate.review_minutes
@@ -641,10 +639,15 @@ fn policy_score(
         RankingPolicy::DeterministicRandom => {
             deterministic_random_score(input_hash, &candidate.candidate_id) as f64
         }
+    };
+    if !score.is_finite() {
+        return Err(format!("policy {} produced a non-finite score for {}", policy.id(), candidate.candidate_id));
     }
+    Ok(score)
 }
 
 fn ranked_candidate_indices(
+    graph: &Graph,
     policy: RankingPolicy,
     candidates: &[Candidate],
     evaluations: &[CandidateEvaluation],
@@ -663,7 +666,7 @@ fn ranked_candidate_indices(
             .ok_or_else(|| format!("candidate {} has no sensitivity evaluation", candidate.candidate_id))?;
         scored.push((
             index,
-            policy_score(policy, candidate, evaluation, input_hash),
+            policy_score(graph, policy, candidate, evaluation, input_hash)?,
             candidate.candidate_id.as_str(),
         ));
     }
@@ -703,7 +706,7 @@ fn replay_policy_budget(
     budget: f64,
     input_hash: &str,
 ) -> Result<PolicyBudgetResult, String> {
-    let order = ranked_candidate_indices(policy, candidates, evaluations, input_hash)?;
+    let order = ranked_candidate_indices(graph, policy, candidates, evaluations, input_hash)?;
     let baseline_error = weighted_query_error(graph, queries)?;
     let mut current_graph = graph.clone();
     let mut actual_minutes = 0.0;
@@ -760,6 +763,7 @@ fn evaluate_policy_budgets(
         RankingPolicy::QuerySensitivity,
         RankingPolicy::ErrorProbability,
         RankingPolicy::Uncertainty,
+        RankingPolicy::LocalDegreeDelta,
         RankingPolicy::SensitivityOnly,
         RankingPolicy::DeterministicRandom,
     ];
@@ -1278,7 +1282,7 @@ mod tests {
     fn matched_budget_policy_replay_never_exceeds_review_minutes() {
         let input = fixture_with_oracle();
         let report = score(&input, "a".repeat(64)).unwrap();
-        assert_eq!(report.policy_budget_results.len(), 15);
+        assert_eq!(report.policy_budget_results.len(), 18);
         for result in &report.policy_budget_results {
             assert!(result.actual_review_minutes <= result.review_budget_minutes + 1e-9);
             assert_eq!(
@@ -1338,6 +1342,37 @@ mod tests {
         assert!(validate_input(&input).unwrap_err().contains("unique"));
         input.review_budgets_minutes = vec![0.0];
         assert!(validate_input(&input).unwrap_err().contains("positive"));
+    }
+
+    #[test]
+    fn local_weighted_degree_delta_counts_source_and_target_effects() {
+        let input = fixture();
+        let graph = graph_from_edges(&input.graph);
+        let delta = local_weighted_degree_delta(&graph, &input.candidates[0]).unwrap();
+        assert_eq!(delta, 2.0);
+    }
+
+    #[test]
+    fn local_weighted_degree_policy_is_separate_from_query_sensitivity() {
+        let input = fixture_with_oracle();
+        let graph = graph_from_edges(&input.graph);
+        let evaluations = input.candidates.iter().map(|candidate| {
+            evaluate_candidate(
+                &graph,
+                &input.queries,
+                candidate,
+                input.queries.iter().map(|query| query.weight).sum(),
+                &[],
+            ).unwrap()
+        }).collect::<Vec<_>>();
+        let query_order = ranked_candidate_indices(
+            &graph, RankingPolicy::QuerySensitivity, &input.candidates, &evaluations, "seed"
+        ).unwrap();
+        let degree_order = ranked_candidate_indices(
+            &graph, RankingPolicy::LocalDegreeDelta, &input.candidates, &evaluations, "seed"
+        ).unwrap();
+        assert_eq!(query_order.len(), 3);
+        assert_eq!(degree_order.len(), 3);
     }
 
 }
