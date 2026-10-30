@@ -350,7 +350,7 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
                 cusum >= CUSUM_THRESHOLD
             }
             Policy::EieGammaBoundedBatch => {
-                max_evidence_updates = max_evidence_updates.max(reports.len());
+                max_evidence_updates = max_evidence_updates.max(reports.len().min(EIE_K as usize));
                 cusum = (cusum + eie_weighted_increment(reports, true)).max(0.0);
                 cusum >= CUSUM_THRESHOLD
             }
