@@ -12,9 +12,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, CausalDirection,
-    DirectedSystemPartition, FactorGraphError, ModelError, PartitionApplyError,
-    SystemPhiDirectionScore, SystemPhiPartitionScore, MAX_DENSE_UNITS,
+    enumerate_iit4_system_partitions_with_stats, min_fill_log_sum_product,
+    BinaryCausalModel, BinaryLogFactor, CausalDirection, DirectedSystemPartition,
+    FactorGraphError, FormalismProfile, Iit4IntrinsicSpecificationResult,
+    Iit4SystemIntrinsicSpecification, Iit4SystemPhiAnalysis,
+    Iit4SystemPhiPartitionSummary, Iit4SystemPhiSearchConfig,
+    Iit4SystemPhiStatePairResult, Iit4SystemPhiStatus, Iit4SystemState,
+    ModelError, PartitionApplyError, SystemPhiDirectionScore, SystemPhiError,
+    SystemPhiPartitionScore, MAX_DENSE_UNITS,
 };
 
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
@@ -22,6 +27,9 @@ const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0"
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
 const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.1\0";
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
+const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\\0v0.1\\0";
+pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
+    "symthaea-iit/sparse-iit4-2023-system-search/0.1.0";
 const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.1\0";
 pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.1.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
