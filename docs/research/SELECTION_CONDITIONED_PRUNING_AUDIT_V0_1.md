@@ -88,7 +88,32 @@ Comparisons must use the same total budget, including:
 
 Do not compare an audit-enabled method against a baseline that is charged only for successful promotions.
 
-## 5. Initial Rust primitive
+## 5. Audit economics: a useful safety gate can be too expensive
+
+A first-order cost calculation already exposes a serious risk: a statistically conservative audit at every rung may cost more than the work it is intended to protect.
+
+Consider the existing illustrative ladder with 256 candidates and promotion schedule 256 -> 64 -> 16 -> 4. The cumulative costs are 1, 4, 16 and 64 units, so incremental promotion costs are 3, 12 and 48 units. At each rung, suppose we audit enough of the discarded population to bound its false-pruned fraction to at most 5% with 95% confidence, assuming the most favorable observation of zero audited candidates beating the selected frontier.
+
+| Pruning step | Discarded population | Minimum audit sample | Audit fraction | Audit cost | Normal promotion cost | Audit / promotion |
+|---|---:|---:|---:|---:|---:|---:|
+| 256 -> 64 | 192 | 49 | 25.5% | 147 | 192 | 76.6% |
+| 64 -> 16 | 48 | 30 | 62.5% | 360 | 192 | 187.5% |
+| 16 -> 4 | 12 | 12 | 100% | 576 | 192 | 300.0% |
+
+The calculation is a finite-population inversion of the same 95% one-sided hypergeometric bound used by the primitive. It is an arithmetic scenario, not an experimental result. It also assumes every audit succeeds with zero observed false-prunes; observed misses can require a larger sample or force pruning to stop. A failed audit may additionally trigger fallback evaluation costs.
+
+Auditing every rung under this 5% criterion adds 1,083 units to the original 832-unit schedule, taking it to 1,915 units before any fallback work. That is more than the 832-unit full-fidelity-random reference budget. Therefore the audit cannot simply be bolted onto the current scheduler and assumed to improve efficiency.
+
+**New qualification requirement:** every audit-enabled policy must be evaluated under one fixed total budget that includes sentinel runs and fallback runs. The controller must choose where audits have positive value, possibly auditing only early/high-leverage rungs or using a looser pre-registered risk limit at low-impact rungs. A risk threshold must never be relaxed after seeing results.
+
+For any budget, compare three quantities together:
+- the upper confidence bound on false-pruned prevalence;
+- the incremental audit cost and fraction of the full budget it consumes;
+- the resulting full-fidelity regret/quality under the same total cost as baselines.
+
+The right research target is not “minimize false pruning at any cost.” It is “minimize final regret under a fixed resource budget while keeping pruning risk within a pre-registered ceiling.” A future budget allocator may use decision-theoretic value-of-information estimates, but must be benchmarked against static audit schedules and must charge every look/decision. Sequential or adaptive audits require an anytime-valid or pre-registered alpha-spending procedure; repeatedly checking ordinary fixed-sample bounds invalidates their nominal coverage.
+
+## 6. Initial Rust primitive
 
 The first code increment provides:
 
@@ -104,9 +129,9 @@ The first code increment provides:
 
 Fifteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
 
-Authored unit tests cover reproducible sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow.
+Independent mathematical validation remains separate from Rust execution: the hypergeometric inversion should also be checked against an independent high-precision/reference implementation over randomized larger populations, especially near confidence-bound transitions.
 
-## 6. Qualification experiment
+## 7. Qualification experiment
 
 The primitive should be integrated into a paired multi-fidelity benchmark before any performance claim. Compare at equal *total* cost:
 
@@ -139,7 +164,7 @@ Required negative controls:
 
 The random sample must be selected and frozen before its target-fidelity outcomes are read. The benchmark should hash the candidate population, selected IDs, pruned IDs, sample seed, sampled IDs, fidelity metadata and cost receipt. The evaluator may read raw audit records; the search policy should receive only the aggregate gate disposition.
 
-## 7. External benchmark and industry comparison
+## 8. External benchmark and industry comparison
 
 The 2025/2026 analytical multi-fidelity benchmark framework by Mainini et al. is a useful external mathematical suite because it spans high dimensionality, multimodality, discontinuities and noise. It should be a separate qualification target; this pruning-audit primitive does not reproduce that suite.
 
@@ -147,7 +172,7 @@ Reference: [Mainini et al., Analytical benchmark problems and methodological fra
 
 NAS-Bench-201 remains an immediate public validation target for queryable architecture outcomes. It is also the space used by the cited MF-NAS study, enabling a direct pinned comparison if licenses, artifact versions and exact evaluation APIs are verified. At least one additional held-out search space is required before claiming transfer.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 The current code is a research primitive, not a trained architecture searcher and not a benchmark result. The tests are authored but must still compile and pass at an exact commit. No claim is made that the audit gate is more accurate, faster, cheaper or better than Hyperband, MF-NAS, TPE, Bayesian optimization or any production NAS system.
 
