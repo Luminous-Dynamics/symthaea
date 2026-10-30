@@ -324,6 +324,14 @@ mod tests {
     }
 
     #[test]
+    fn mutual_information_is_monotone_in_symmetric_signal_accuracy() {
+        assert_eq!(Probe::None.information_gain_bits(), 0.0);
+        assert!(Probe::Visual.information_gain_bits() > 0.0);
+        assert!(Probe::GentleContact.information_gain_bits() > Probe::Visual.information_gain_bits());
+        assert!(Probe::Invasive.information_gain_bits() <= 1.0);
+    }
+
+    #[test]
     fn information_and_cost_greedy_ignore_fragility() {
         for lane in Lane::all() {
             assert_eq!(choose_probe(Policy::InformationGreedy,lane,None),Probe::Invasive);
