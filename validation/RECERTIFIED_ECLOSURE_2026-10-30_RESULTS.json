@@ -643,7 +643,10 @@
     "closed_eBH_exhaustive": "50 random instances for each K=1..9",
     "source_sha256": "edb1e657136c09290be490ed4c94491851562d02aea0b78279f54bb4d9636fe0",
     "tests": "11/11 pass",
-    "tests_sha256": "e5c07516e36a4e7f7e689acb3ef2d5b1e234eb7d2e5de50338d7fc64c56d4706"
+    "tests_sha256": "e5c07516e36a4e7f7e689acb3ef2d5b1e234eb7d2e5de50338d7fc64c56d4706",
+    "committed_source_git_blob": "8da86d3e6e83f9efb8ab15477a5cd9e32ab7576e",
+    "committed_tests_git_blob": "7f4c20cdd955c5b8fbb7d4309b94f6df44d5d70e",
+    "note": "The SHA-256 values identify the locally executed Python reference files; Git blob IDs identify the committed branch files. They use different hashing schemes."
   },
   "paper": "Bai & Ramdas (2026), arXiv:2610.35821",
   "reference_protocol": {
