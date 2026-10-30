@@ -102,7 +102,7 @@ jobs:
               } for regime, metrics in regimes.items()
           }, sort_keys=True))
           PY
-- name: Test identity-residual world-model methods
+      - name: Test identity-residual world-model methods
         run: cargo test --lib residual_
 
       - name: Test the absolute-vs-residual CfC ablation
