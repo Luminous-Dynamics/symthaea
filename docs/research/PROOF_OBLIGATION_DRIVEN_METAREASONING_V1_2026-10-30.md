@@ -160,6 +160,11 @@ Progress must be bound to the proof/query state, for example:
 
 Define a repeat key from the operation type, target obligation, relevant evidence-state digest, rule/profile identity and input-context digest. Repeating the same operation against the same state without a new receipt is not progress.
 
+
+### Receipt freshness and anti-replay invariant
+
+An operation receipt is valid only against the exact current obligation/evidence state, not merely because its embedded verifier receipt repeats the same caller-supplied key. Every targeted obligation must carry a current state identity equal to the operation's input `progress_key`. A state-changing verifier result must carry a distinct `result_state_identity`; applying the result advances the targeted obligations to that identity. This makes a previously valid receipt inapplicable after a later correction, revocation, scope change, or other state transition. Missing state identities fail closed. The research lab uses opaque synthetic strings for this mechanism; they are not cryptographic digests or authenticated evidence. A production adapter must derive identities from canonical content and all relevant proof/evidence/profile dependencies, and must authenticate the verifier receipt independently.
+
 Stop conditions must remain finite and typed:
 - all required obligations discharged under the declared profile;
 - no applicable operation can produce new admissible information;
@@ -238,6 +243,7 @@ Do not blend these into one intelligence score. Report each task family and proo
 
 These are hypotheses, not current Symthaea results:
 - 100% of conclusions labelled `SupportedUnderProfile` pass the independent verifier in deterministic formal fixtures.
+- 100% of state-changing receipts match the current obligation-state identity and advance to a distinct result-state identity; stale receipt replay never reverses a newer revocation/correction.
 - 0 revoked, unauthorized, out-of-scope, or future-known-at evidence references in emitted accepted proof packets.
 - 0 incomplete proof packets represented as complete.
 - At least 99% dependency-retraction recall and 99% unaffected-claim stability in the synthetic mutation suite.
@@ -285,6 +291,28 @@ Use leaderboard tables as discovery aids only. Promotion requires a reproducible
 - **MiniF2F / Lean or another formal checker:** formalizable theorem proof acceptance, kept separate from empirical source-grounded claims.
 
 A custom synthetic win establishes only that the scheduler handles the declared proof/task fragment. Generalization claims require official external datasets with their own licenses, splits and evaluators.
+
+
+## 6A. October 2026 frontier: what the scheduler must beat
+
+The latest latent-reasoning literature changes the fair baseline. A POD-Meta comparison must include adaptive iteration, not only fixed-depth latent reasoning:
+
+- **Think-at-Hard (ICML 2026):** selective latent iteration reports 3.8–4.4 percentage-point gains over always-iterate baselines at identical parameter counts while skipping iterations on 93% of tokens; its paper also reports higher gains with small additional parameter overhead. This makes per-token adaptive compute a mandatory comparator, not an optional future arm: https://proceedings.mlr.press/v306/fu26t.html
+- **Latent Recurrent Thoughts (Findings EMNLP 2026):** a small recurrent reasoner proposes/refines continuous latent thoughts while a large decoder remains frozen; the paper reports improvements over prior frozen-decoder methods and non-thinking CoT under its matched settings: https://aclanthology.org/2026.findings-emnlp.578/
+- **LOTUS (June 2026):** parallel supervision over latent thought blocks reports 2.5x–6.9x thought-phase latency reduction and closes the reported explicit-CoT gap at 3B in its evaluated tasks: https://www.microsoft.com/en-us/research/publication/bridging-the-gap-between-latent-and-explicit-reasoning-with-looped-transformers/
+- **Decoding Self-Knowledge from Latent Reasoning Models (Findings EMNLP 2026):** its probe results distinguish problem-level from rollout-level self-knowledge; it reports useful selective prediction/adaptive routing, but weak trajectory ranking among rollouts of the same problem. This is a warning against treating a model's own confidence as proof that a particular reasoning trajectory or token is correct: https://aclanthology.org/2026.findings-emnlp.1187/
+
+These are paper-reported results under each paper's own datasets, model sizes and protocols. They are not directly comparable to POAR and are not Symthaea measurements. Reproduce the official settings before ranking against them.
+
+### Updated matched arms and stretch targets
+
+Add two arms to the language-mediated comparison where code, model weights, license, and compute permit:
+- **D7: selective latent iteration** (Think-at-Hard-style token/step gating), with iteration decisions logged before outcomes;
+- **D8: latent self-knowledge adaptive routing**, reporting problem-level selective prediction separately from within-problem rollout selection.
+
+Add metrics for optional-iteration skip rate, iteration-induced regression rate (a correct pre-iteration result made incorrect by another loop), and decision-quality change per joule / wall-clock second. At matched answer accuracy, coverage and proof-integrity gates, target at least 90% optional-iteration avoidance on the predeclared easy/cached slice; treat this as a stretch target, not an expectation across hard cases. The key ablation is whether proof-obligation deltas improve *which* operation/iteration is chosen beyond latent confidence alone.
+
+The distinctive hypothesis is **proof-carrying adaptive computation**: latent dynamics may propose the next state or operation, but a versioned obligation/evidence graph determines whether an iteration is useful, and an independent verifier determines whether the resulting claim can be promoted. This aims to combine selective compute with grounded state transitions rather than compete on hidden-state depth alone.
 
 ## 7. Implementation sequence and ownership
 
