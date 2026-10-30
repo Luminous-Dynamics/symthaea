@@ -1,0 +1,1770 @@
+{
+  "schema_version": 1,
+  "dataset_id": "synthetic-colinear-boundary-bakeoff-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "detector": {
+    "half_window_samples": 4,
+    "score_threshold": 4,
+    "min_separation_nm": 400
+  },
+  "noise": {
+    "radius_nm": 5,
+    "tangent_degrees": 5,
+    "membrane_integrity": 1,
+    "synapse_density": 1
+  },
+  "tracks": [
+    {
+      "track_id": "hidden-colinear-merge",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 48,
+          "tangent_degrees": 5,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        }
+      ]
+    },
+    {
+      "track_id": "subtle-multifeature-merge",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 60,
+          "tangent_degrees": 28,
+          "membrane_integrity": 0,
+          "synapse_density": 1
+        }
+      ]
+    },
+    {
+      "track_id": "normal-linear-taper",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 90,
+          "tangent_degrees": 2,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 89,
+          "tangent_degrees": 3,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 88,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 87,
+          "tangent_degrees": 5,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 86,
+          "tangent_degrees": 6,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 85,
+          "tangent_degrees": 7,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 84,
+          "tangent_degrees": 8,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 83,
+          "tangent_degrees": 9,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 82,
+          "tangent_degrees": 10,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 81,
+          "tangent_degrees": 11,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 80,
+          "tangent_degrees": 12,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 79,
+          "tangent_degrees": 13,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 78,
+          "tangent_degrees": 14,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 77,
+          "tangent_degrees": 15,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 76,
+          "tangent_degrees": 16,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 75,
+          "tangent_degrees": 17,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 74,
+          "tangent_degrees": 18,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 73,
+          "tangent_degrees": 19,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 72,
+          "tangent_degrees": 20,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 71,
+          "tangent_degrees": 21,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 70,
+          "tangent_degrees": 22,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 69,
+          "tangent_degrees": 23,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 68,
+          "tangent_degrees": 24,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 67,
+          "tangent_degrees": 25,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 66,
+          "tangent_degrees": 26,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 65,
+          "tangent_degrees": 27,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 64,
+          "tangent_degrees": 28,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 63,
+          "tangent_degrees": 29,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 62,
+          "tangent_degrees": 30,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 61,
+          "tangent_degrees": 31,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 60,
+          "tangent_degrees": 32,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 59,
+          "tangent_degrees": 33,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 58,
+          "tangent_degrees": 34,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 57,
+          "tangent_degrees": 35,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 56,
+          "tangent_degrees": 36,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 55,
+          "tangent_degrees": 37,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 54,
+          "tangent_degrees": 38,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 53,
+          "tangent_degrees": 39,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 52,
+          "tangent_degrees": 40,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 51,
+          "tangent_degrees": 41,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 50,
+          "tangent_degrees": 42,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        }
+      ]
+    },
+    {
+      "track_id": "bouton-negative-control",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 80,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        }
+      ]
+    },
+    {
+      "track_id": "imaging-artifact-negative-control",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 0,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 0,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 0,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 0,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        }
+      ]
+    },
+    {
+      "track_id": "compartment-transition-negative-control",
+      "samples": [
+        {
+          "distance_nm": 0,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 1900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 0
+        },
+        {
+          "distance_nm": 2000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 2900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3100,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3200,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3300,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3400,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3500,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3600,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3700,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3800,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 3900,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        },
+        {
+          "distance_nm": 4000,
+          "radius_nm": 60,
+          "tangent_degrees": 4,
+          "membrane_integrity": 1,
+          "synapse_density": 1
+        }
+      ]
+    }
+  ]
+}
