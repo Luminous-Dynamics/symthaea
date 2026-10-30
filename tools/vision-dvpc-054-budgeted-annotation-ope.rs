@@ -39,6 +39,11 @@ struct World {
     factual_count: [[u8; ACTIONS]; CONTEXTS],
     source_bias: [[[f64; SOURCES]; ACTIONS]; CONTEXTS],
     source_excess_variance: [[[f64; SOURCES]; ACTIONS]; CONTEXTS],
+    /// Variances of low-rank shared annotation error factors.
+    shared_factor_variance: [f64; 2],
+    /// Source-specific loading on each shared factor. The induced covariance
+    /// matrix is a sum of rank-one PSD matrices.
+    source_shared_loadings: [[f64; 2]; SOURCES],
     source_cost: [u32; SOURCES],
     context_annotation_cap: [u8; CONTEXTS],
     budget: u32,
@@ -67,6 +72,8 @@ impl World {
                 ],
             ],
             source_excess_variance: [[[0.01, 0.08, 0.08]; ACTIONS], [[0.01, 0.08, 0.08]; ACTIONS]],
+            shared_factor_variance: [0.0; 2],
+            source_shared_loadings: [[1.0, 0.0]; SOURCES],
             source_cost: [3, 1, 2],
             context_annotation_cap: [ACTION_CAP_PER_CONTEXT; CONTEXTS],
             budget: BUDGET_TOKENS,
@@ -106,6 +113,10 @@ impl World {
                 }
             }
         }
+        // The simple plugin pilot deliberately assumes independent source
+        // errors. The hidden true shared-error factors remain in the evaluation
+        // world, making under-estimated dependence visible as allocation regret.
+        estimated.shared_factor_variance = [0.0; 2];
         estimated
     }
 
@@ -120,6 +131,18 @@ impl World {
         }
         if self.source_cost.iter().any(|cost| *cost == 0) {
             return Err("annotation source costs must be positive".into());
+        }
+        if self
+            .shared_factor_variance
+            .iter()
+            .any(|variance| !variance.is_finite() || *variance < 0.0)
+            || self
+                .source_shared_loadings
+                .iter()
+                .flatten()
+                .any(|loading| !loading.is_finite())
+        {
+            return Err("invalid shared annotation covariance factor".into());
         }
         for x in 0..CONTEXTS {
             if (self.target[x].iter().sum::<f64>() - 1.0).abs() > 1e-10
@@ -148,6 +171,18 @@ impl World {
                         || self.source_excess_variance[x][a][k] < 0.0
                     {
                         return Err("invalid annotation source profile".into());
+                    }
+                    let shared = (0..2)
+                        .map(|factor| {
+                            self.shared_factor_variance[factor]
+                                * self.source_shared_loadings[k][factor].powi(2)
+                        })
+                        .sum::<f64>();
+                    let marginal = reward_variance(r) + self.source_excess_variance[x][a][k];
+                    if shared > marginal + EPS {
+                        return Err(
+                            "shared covariance exceeds source marginal error variance".into()
+                        );
                     }
                 }
             }
@@ -311,6 +346,36 @@ fn reward_variance(mean: f64) -> f64 {
     mean * (1.0 - mean)
 }
 
+/// Sum of off-diagonal annotation covariances for one context-action
+/// cell. For each factor f, a shared latent shock creates pair covariance
+/// tau_f^2 * loading[k,f] * loading[l,f] between every distinct annotation
+/// draw. This is PSD by construction (diagonal residual covariance plus
+/// low-rank positive-semidefinite shared factors).
+fn shared_annotation_covariance_numerator(
+    world: &World,
+    allocation: &Allocation,
+    x: usize,
+    a: usize,
+) -> f64 {
+    let mut extra = 0.0;
+    for factor in 0..2 {
+        let weighted_sum = (0..SOURCES)
+            .map(|k| {
+                allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor]
+            })
+            .sum::<f64>();
+        let diagonal = (0..SOURCES)
+            .map(|k| {
+                allocation.count(x, a, k) as f64
+                    * world.source_shared_loadings[k][factor].powi(2)
+            })
+            .sum::<f64>();
+        extra += world.shared_factor_variance[factor]
+            * (weighted_sum * weighted_sum - diagonal);
+    }
+    extra
+}
+
 fn cell_bias_and_variance(
     world: &World,
     allocation: &Allocation,
@@ -336,7 +401,8 @@ fn cell_bias_and_variance(
                 allocation.count(x, a, k) as f64
                     * (reward_variance(reward_mean) + world.source_excess_variance[x][a][k])
             })
-            .sum::<f64>();
+            .sum::<f64>()
+        + shared_annotation_covariance_numerator(world, allocation, x, a);
     (weighted_bias / total, variance_numerator / (total * total))
 }
 
@@ -668,12 +734,33 @@ fn annotation_reward_model(
                 };
             }
             let mut count = factual_n;
+            let shared_draws: [f64; 2] = std::array::from_fn(|factor| {
+                if world.shared_factor_variance[factor] > 0.0 {
+                    rng.normal()
+                } else {
+                    0.0
+                }
+            });
             for k in 0..SOURCES {
                 let mean = world.reward_mean[x][a] + world.source_bias[x][a][k];
-                let variance = reward_variance(world.reward_mean[x][a])
+                let marginal_variance = reward_variance(world.reward_mean[x][a])
                     + world.source_excess_variance[x][a][k];
+                let shared_variance = (0..2)
+                    .map(|factor| {
+                        world.shared_factor_variance[factor]
+                            * world.source_shared_loadings[k][factor].powi(2)
+                    })
+                    .sum::<f64>();
+                let independent_variance = (marginal_variance - shared_variance).max(0.0);
+                let shared_error = (0..2)
+                    .map(|factor| {
+                        world.shared_factor_variance[factor].sqrt()
+                            * world.source_shared_loadings[k][factor]
+                            * shared_draws[factor]
+                    })
+                    .sum::<f64>();
                 for _ in 0..allocation.count(x, a, k) {
-                    sum += mean + variance.sqrt() * rng.normal();
+                    sum += mean + shared_error + independent_variance.sqrt() * rng.normal();
                     count += 1;
                 }
             }
