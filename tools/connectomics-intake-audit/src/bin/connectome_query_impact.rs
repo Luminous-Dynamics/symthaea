@@ -68,6 +68,14 @@ enum QueryMetric {
     InDegree { node: u64 },
     OutDegree { node: u64 },
     PathExists { source: u64, target: u64 },
+    TriadMotifCount { motif: TriadMotif },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TriadMotif {
+    FeedForwardLoop,
+    DirectedThreeCycle,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -357,6 +365,32 @@ fn path_exists(graph: &Graph, source: u64, target: u64) -> bool {
     false
 }
 
+fn weighted_triad_motif_count(graph: &Graph, motif: &TriadMotif) -> f64 {
+    let mut adjacency = BTreeMap::<u64, Vec<(u64, f64)>>::new();
+    for ((source, target), weight) in graph {
+        adjacency.entry(*source).or_default().push((*target, *weight));
+    }
+    let mut total = 0.0;
+    for ((source, middle), first_weight) in graph {
+        if let Some(second_edges) = adjacency.get(middle) {
+            for (target, second_weight) in second_edges {
+                let closing_edge = match motif {
+                    TriadMotif::FeedForwardLoop => (*source, *target),
+                    TriadMotif::DirectedThreeCycle => (*target, *source),
+                };
+                if let Some(closing_weight) = graph.get(&closing_edge) {
+                    total += first_weight * second_weight * closing_weight;
+                }
+            }
+        }
+    }
+    if matches!(motif, TriadMotif::DirectedThreeCycle) {
+        total / 3.0
+    } else {
+        total
+    }
+}
+
 fn query_value(graph: &Graph, metric: &QueryMetric) -> f64 {
     match metric {
         QueryMetric::EdgeWeight { source, target } => {
@@ -375,6 +409,7 @@ fn query_value(graph: &Graph, metric: &QueryMetric) -> f64 {
         QueryMetric::PathExists { source, target } => {
             if path_exists(graph, *source, *target) { 1.0 } else { 0.0 }
         }
+        QueryMetric::TriadMotifCount { motif } => weighted_triad_motif_count(graph, motif),
     }
 }
 
@@ -882,6 +917,42 @@ mod tests {
         let mut input = fixture();
         input.queries[0].reference_value = Some(f64::INFINITY);
         assert!(validate_input(&input).unwrap_err().contains("reference_value"));
+    }
+
+    #[test]
+    fn weighted_feed_forward_loop_count_is_product_of_edge_weights() {
+        let graph = BTreeMap::from([
+            ((1, 2), 2.0),
+            ((2, 3), 3.0),
+            ((1, 3), 4.0),
+        ]);
+        assert_eq!(
+            weighted_triad_motif_count(&graph, &TriadMotif::FeedForwardLoop),
+            24.0
+        );
+    }
+
+    #[test]
+    fn directed_three_cycle_count_corrects_three_rotations() {
+        let graph = BTreeMap::from([
+            ((1, 2), 2.0),
+            ((2, 3), 3.0),
+            ((3, 1), 4.0),
+        ]);
+        assert_eq!(
+            weighted_triad_motif_count(&graph, &TriadMotif::DirectedThreeCycle),
+            24.0
+        );
+    }
+
+    #[test]
+    fn feed_forward_loop_query_changes_when_a_closing_edge_is_removed() {
+        let input = fixture();
+        let graph = graph_from_edges(&input.graph);
+        let metric = QueryMetric::TriadMotifCount { motif: TriadMotif::FeedForwardLoop };
+        assert_eq!(query_value(&graph, &metric), 12.0);
+        let after = apply_candidate(&graph, &input.candidates[0]).unwrap();
+        assert_eq!(query_value(&after, &metric), 0.0);
     }
 
 }
