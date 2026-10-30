@@ -2987,6 +2987,7 @@ mod tests {
             vec![0],
             vec![0, 2],
             vec![1, 2, 4],
+            vec![4, 1, 0],
             vec![0, 1, 2, 3, 4],
         ];
         let states = [
