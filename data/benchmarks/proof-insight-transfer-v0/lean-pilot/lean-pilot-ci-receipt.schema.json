@@ -148,7 +148,8 @@
         "variant_structured_local_context_sha256",
         "snapshot_schema_version",
         "irrelevant_context_intervention",
-        "structured_snapshots"
+        "structured_snapshots",
+        "proof_term_support_receipts"
       ],
       "properties": {
         "operation": {
@@ -291,6 +292,27 @@
             },
             "irrelevant_variant": {
               "$ref": "#/$defs/state_snapshot"
+            }
+          }
+        },
+        "proof_term_support_receipts": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "receipt",
+              "evidence_sha256"
+            ],
+            "properties": {
+              "evidence_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "receipt": {
+                "$ref": "#/$defs/proof_term_support"
+              }
             }
           }
         }
@@ -489,6 +511,76 @@
                 "minLength": 1
               }
             }
+          }
+        }
+      }
+    },
+    "support_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fvar_id",
+        "declaration_index",
+        "user_name",
+        "type",
+        "is_let_declaration"
+      ],
+      "properties": {
+        "fvar_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declaration_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "user_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_let_declaration": {
+          "type": "boolean"
+        }
+      }
+    },
+    "proof_term_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "label",
+        "proof_term",
+        "direct_free_variable_support",
+        "transitive_local_dependency_closure"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "pitb.proof-term-support.v0"
+        },
+        "label": {
+          "enum": [
+            "alternate-route-after-required-hypothesis-withdrawal",
+            "original-route-after-irrelevant-context-removal"
+          ]
+        },
+        "proof_term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direct_free_variable_support": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/support_declaration"
+          }
+        },
+        "transitive_local_dependency_closure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/support_declaration"
           }
         }
       }
