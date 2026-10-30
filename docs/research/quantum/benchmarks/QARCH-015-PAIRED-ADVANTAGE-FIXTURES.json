@@ -1,0 +1,240 @@
+{
+  "schema_version": "qarch-015-paired-advantage/1",
+  "record_id": "QARCH-015-SYNTHETIC-16-BLOCK-EXAMPLE",
+  "evidence_class": "synthetic_fixture",
+  "claim_scope": "synthetic_fixture_only",
+  "comparison_contract": {
+    "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+    "target_population_fingerprint": "sha256:synthetic-target-population-demo",
+    "workload_family": "synthetic analytic optimization family",
+    "quality_metric": "independently verified objective quality",
+    "quality_unit": "normalized score",
+    "quality_higher_is_better": true,
+    "resource_metric": "energy",
+    "resource_unit": "joules per verified acceptable answer",
+    "resource_scope": [
+      "setup",
+      "compilation",
+      "encoding",
+      "execution",
+      "readout",
+      "verification"
+    ],
+    "verifier_id": "synthetic-independent-verifier",
+    "verifier_version": "1.0.0",
+    "classical_baseline_id": "synthetic-strong-classical-baseline"
+  },
+  "preregistration": {
+    "independent_unit_definition": "One independently sampled workload instance; each fingerprint appears once. Repeated seeds, attempts and timing samples are reduced within instance before analysis.",
+    "within_block_reduction": "Median end-to-end resource and median output quality across preregistered repeated runs.",
+    "minimum_relative_resource_gain": 0.1,
+    "quality_non_inferiority_margin": 0.02,
+    "resource_tie_tolerance_log_ratio": 1e-12,
+    "quality_tie_tolerance": 1e-12,
+    "family_wise_alpha": 0.05,
+    "claim_family_id": "qarch015-demo-family",
+    "sampling_plan": "Synthetic fixture only. Illustrates exact arithmetic and Holm correction; it is not a random sample of hardware runs or an inferential claim about any real device."
+  },
+  "observations": [
+    {
+      "independent_block_id": "block-01",
+      "workload_fingerprint": "sha256:synthetic-workload-01",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-02",
+      "workload_fingerprint": "sha256:synthetic-workload-02",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-03",
+      "workload_fingerprint": "sha256:synthetic-workload-03",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-04",
+      "workload_fingerprint": "sha256:synthetic-workload-04",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-05",
+      "workload_fingerprint": "sha256:synthetic-workload-05",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-06",
+      "workload_fingerprint": "sha256:synthetic-workload-06",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-07",
+      "workload_fingerprint": "sha256:synthetic-workload-07",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-08",
+      "workload_fingerprint": "sha256:synthetic-workload-08",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-09",
+      "workload_fingerprint": "sha256:synthetic-workload-09",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-10",
+      "workload_fingerprint": "sha256:synthetic-workload-10",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-11",
+      "workload_fingerprint": "sha256:synthetic-workload-11",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-12",
+      "workload_fingerprint": "sha256:synthetic-workload-12",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-13",
+      "workload_fingerprint": "sha256:synthetic-workload-13",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 8,
+      "classical_resource_per_accepted_answer": 10,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-14",
+      "workload_fingerprint": "sha256:synthetic-workload-14",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 10,
+      "classical_resource_per_accepted_answer": 8,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-15",
+      "workload_fingerprint": "sha256:synthetic-workload-15",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 10,
+      "classical_resource_per_accepted_answer": 8,
+      "quantum_quality": 0.9,
+      "classical_quality": 0.99
+    },
+    {
+      "independent_block_id": "block-16",
+      "workload_fingerprint": "sha256:synthetic-workload-16",
+      "contract_fingerprint": "sha256:synthetic-contract-qarch015",
+      "quantum_resource_per_accepted_answer": 10,
+      "classical_resource_per_accepted_answer": 8,
+      "quantum_quality": 0.9,
+      "classical_quality": 0.99
+    }
+  ],
+  "analysis": {
+    "independent_blocks": 16,
+    "median_quality_difference": 0.005,
+    "median_log_classical_over_quantum_resource": 0.22314355131420976,
+    "median_classical_over_quantum_resource_ratio": 1.25,
+    "quality_non_inferiority": {
+      "wins": 14,
+      "losses": 2,
+      "ties": 0,
+      "effective_n": 16,
+      "p_value_one_sided": 0.0020904541015625
+    },
+    "resource_superiority": {
+      "wins": 13,
+      "losses": 3,
+      "ties": 0,
+      "effective_n": 16,
+      "p_value_one_sided": 0.0106353759765625
+    },
+    "composite_claim_raw_p_value": 0.0106353759765625,
+    "claim_disposition": "fixture_only"
+  },
+  "claim_family": {
+    "method": "Holm",
+    "alpha": 0.05,
+    "hypotheses": [
+      {
+        "hypothesis_id": "aux-strong",
+        "raw_p_value": 0.003,
+        "adjusted_p_value": 0.012,
+        "rank": 1,
+        "reject_at_alpha": true
+      },
+      {
+        "hypothesis_id": "primary-energy",
+        "raw_p_value": 0.0106353759765625,
+        "adjusted_p_value": 0.0319061279296875,
+        "rank": 2,
+        "reject_at_alpha": true
+      },
+      {
+        "hypothesis_id": "secondary-time",
+        "raw_p_value": 0.04,
+        "adjusted_p_value": 0.08,
+        "rank": 3,
+        "reject_at_alpha": false
+      },
+      {
+        "hypothesis_id": "alternate-backend-energy",
+        "raw_p_value": 0.2,
+        "adjusted_p_value": 0.2,
+        "rank": 4,
+        "reject_at_alpha": false
+      }
+    ]
+  }
+}
