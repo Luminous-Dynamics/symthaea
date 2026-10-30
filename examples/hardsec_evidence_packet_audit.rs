@@ -133,7 +133,9 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 
 fn validate_relative_path(value: &str, field: &str) -> Result<(), String> {
     if value.contains('\\') || value.contains('\0') {
-        return Err(format!("{field} must use portable relative path separators"));
+        return Err(format!(
+            "{field} must use portable relative path separators"
+        ));
     }
     let path = Path::new(value);
     if path.is_absolute() || path.as_os_str().is_empty() {
@@ -170,14 +172,23 @@ fn verify_file_under_root(
         let metadata = fs::symlink_metadata(&candidate)
             .map_err(|error| format!("{label} {}: {error}", candidate.display()))?;
         if metadata.file_type().is_symlink() {
-            return Err(format!("{label} {} must not be a symlink", candidate.display()));
+            return Err(format!(
+                "{label} {} must not be a symlink",
+                candidate.display()
+            ));
         }
         if index + 1 == components.len() {
             if !metadata.is_file() {
-                return Err(format!("{label} {} must be a regular file", candidate.display()));
+                return Err(format!(
+                    "{label} {} must be a regular file",
+                    candidate.display()
+                ));
             }
         } else if !metadata.is_dir() {
-            return Err(format!("{label} {} must be a directory", candidate.display()));
+            return Err(format!(
+                "{label} {} must be a directory",
+                candidate.display()
+            ));
         }
     }
 
@@ -223,10 +234,12 @@ fn verify_evidence_bytes(root: &Path, summary: &AuditSummary) -> Result<Value, S
     })];
 
     for item in &summary.evidence {
-        let local_path = item
-            .local_path
-            .as_deref()
-            .ok_or_else(|| format!("evidence {}: local_path is required with --evidence-root", item.id))?;
+        let local_path = item.local_path.as_deref().ok_or_else(|| {
+            format!(
+                "evidence {}: local_path is required with --evidence-root",
+                item.id
+            )
+        })?;
         verify_file_under_root(
             &canonical_root,
             local_path,
@@ -1082,7 +1095,9 @@ fn main() -> ExitCode {
             }
         },
         Ok(None) => {
-            println!("usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE [--evidence-root DIR]");
+            println!(
+                "usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE [--evidence-root DIR]"
+            );
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -1449,9 +1464,11 @@ mod tests {
         )
         .unwrap();
         let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
-        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
-            .unwrap_err()
-            .contains("SHA-256 mismatch"));
+        assert!(
+            verify_evidence_bytes(&fixture.evidence_root, &summary)
+                .unwrap_err()
+                .contains("SHA-256 mismatch")
+        );
     }
 
     #[test]
@@ -1464,20 +1481,27 @@ mod tests {
         )
         .unwrap();
         let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
-        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
-            .unwrap_err()
-            .contains("subject netlist"));
+        assert!(
+            verify_evidence_bytes(&fixture.evidence_root, &summary)
+                .unwrap_err()
+                .contains("subject netlist")
+        );
     }
 
     #[test]
     fn rejects_missing_local_path_when_byte_verification_is_requested() {
         let fixture = Fixture::new(&base_packet());
         let mut packet = packet_with_hashed_local_evidence(&fixture);
-        packet["evidence"][0].as_object_mut().unwrap().remove("local_path");
+        packet["evidence"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("local_path");
         let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
-        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
-            .unwrap_err()
-            .contains("local_path is required"));
+        assert!(
+            verify_evidence_bytes(&fixture.evidence_root, &summary)
+                .unwrap_err()
+                .contains("local_path is required")
+        );
     }
 
     #[test]
@@ -1485,9 +1509,11 @@ mod tests {
         let fixture = Fixture::new(&base_packet());
         let mut packet = packet_with_hashed_local_evidence(&fixture);
         packet["evidence"][0]["local_path"] = json!("../outside/trace.json");
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("must not contain"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("must not contain")
+        );
     }
 
     #[cfg(unix)]
@@ -1504,9 +1530,11 @@ mod tests {
         packet["evidence"][0]["local_path"] = json!("traces/linked.json");
         packet["evidence"][0]["witness_local_path"] = json!("traces/activation.json");
         let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
-        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
-            .unwrap_err()
-            .contains("must not be a symlink"));
+        assert!(
+            verify_evidence_bytes(&fixture.evidence_root, &summary)
+                .unwrap_err()
+                .contains("must not be a symlink")
+        );
     }
 
     #[test]
