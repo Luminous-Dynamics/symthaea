@@ -2505,9 +2505,6 @@ fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<St
             PortfolioObjective::WorstPolicy,
         )?
         .allocation;
-        let pointwise_critical = normal_quantile(0.975)?;
-        let bonferroni_critical =
-            normal_quantile(1.0 - 0.05 / (2.0 * PORTFOLIO_POLICIES as f64))?;
         let true_values: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
             target_value(&world_with_target(world, portfolio.targets[policy]))
         });
