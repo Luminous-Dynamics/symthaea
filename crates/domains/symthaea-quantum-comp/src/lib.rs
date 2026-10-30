@@ -165,6 +165,8 @@ pub use paired_advantage::{
 pub use clustered_advantage::{
     ClusteredAdvantageConfig, ClusteredAdvantageError, ClusteredAdvantageReport,
     ClusteredBenchmarkObservation, ClusterEffectSummary, analyze_clustered_advantage,
+    ClusterNullStressConfig, ClusterNullStressPoint, ClusterNullStressReport,
+    WilsonRateInterval, run_cluster_null_stress,
 };
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
