@@ -21,6 +21,11 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | SciValidityBench | Decision-use validity | +9.2 to +18.8 pp vs generic event graph | Primary paper | 64 TaskSpecs, 5 validity modules, 6 scientific domains |
 | Vera-Life | Vera-Life-Eval | 62.3% LifeEM (1,500 subset); 61.1% full | Peer-reviewed workshop paper | Qwen3-8B; action-conditioned lifecycle decisions; 8,500 questions / 41,203 evidence pieces |
 | AgentMemory BM25 | LongMemEval-S | 84.7% strict recall-all@5 (398/470) | Project component report with per-question receipts | Retrieval only; no answer model, no abstention score; multi-session strict recall 71.1% |
+| HALT | Three multi-hop QA benchmarks | Redundant search reduced; exact match largely preserved | Peer-reviewed Findings paper | Stops on expected claim-evidence coverage; no percentage pooled here |
+| Active RAG utility evaluation | Multi-hop QA / HotpotQA | Nominal 50% retrieval budget overshot in 40–100% of splits for common triggers | Primary research preprint | Measures marginal correctness change, threshold transfer, realized budget, retrieval harm and all-in cost |
+| CONFRAG | Production RAG | 5–39% fewer retrieval calls; up to 800 ms P90 reduction | Peer-reviewed EMNLP Industry paper | Matched answer quality to always-on RAG in its reported system; confidence-based gate, not lifecycle proof |
+| AgentAbstain | 263 paired agent tasks | 59.5% best paired accuracy across 17 models | Peer-reviewed NeurIPS benchmark | 42 environments, 8 abstention scenarios; broader agent action benchmark, not memory QA |
+| Evidence Sufficiency Benchmark | Five-level L1–L5 evidence quality | 65–91% over-answer rate at L5 conflict | Peer-reviewed benchmark | Seven LLMs / five families; 200-sample human validation; evidence abstention, not lifecycle replay |
 
 Zep's and Mem0's published results are strong commercial reference points. They are **not direct head-to-head comparisons** with QEMem or Broca. Their models and evaluation setups differ.
 
@@ -99,9 +104,42 @@ Broca should therefore publish three independent stages:
 
 Do not collapse these into one number. A retriever can have high recall and still select stale evidence; a verifier can be sound but starved by low recall; an answerer can be accurate while using an invalid proof. Report per-stage latency and tokens so the Pareto trade-off is visible.
 
+## Retrieval stopping and epistemic restraint
+
+Recent work makes clear that deciding whether to retrieve more is its own benchmark problem. HALT uses expected claim–evidence coverage as a stopping condition and reports lower redundant search while largely preserving exact match. Active RAG utility work goes further: it measures marginal correctness change with versus without retrieval, and requires realized budget usage, threshold transfer, retrieval harm and total trigger/retrieval cost. CONFRAG provides an industry operating point with 5–39% fewer external retrievals and up to 800 ms P90 latency reduction while matching its own always-on RAG quality.
+
+AgentAbstain and the Evidence Sufficiency Benchmark expose the complementary stop/abstain failure: task completion does not imply that acting was justified. AgentAbstain's 263 paired tasks across 42 environments report 59.5% best paired accuracy; the Evidence Sufficiency Benchmark reports 65–91% over-answering under conflicting evidence for the evaluated models.
+
+### What Broca should measure
+
+1. **Claim coverage:** fraction of required claims with at least one admissible proof; uncovered-claim count at stop; multi-hop completeness.
+2. **Marginal utility:** paired correctness/action-loss delta with retrieval versus no retrieval; report how often retrieval helps, is neutral, or harms.
+3. **Calibration:** Brier/ECE, confidence intervals on utility gain, and lower-bound coverage; calibrate on one split and report realized usage on held-out splits.
+4. **Budget transfer:** target versus realized call/token/cost usage across domains and seeds; no nominal-budget claims without observed usage.
+5. **Retrieval harm:** stale/conflicting distractor rate, unsupported-claim increase, and fraction of retrieval calls that worsen the downstream decision.
+6. **All-in cost:** estimator compute, probe calls, retrieval calls, prompt tokens, p50/p95/p99 latency and cost per correct supported answer.
+
+Broca's conservative VOI gate combines a lower bound on correctness gain and lifecycle-risk reduction with an upper bound on retrieval harm and measured cost. It stops when the lower-bound net benefit does not exceed a policy margin, even when calls remain. This is a prospective architecture/benchmark target, not a measured advantage.
+
+### Direct baselines
+
+- Always-retrieve fixed top-k.
+- BM25-score threshold.
+- Confidence-only trigger (CONFRAG-like).
+- Claim–evidence coverage stop (HALT-like).
+- Broca lifecycle proof coverage plus calibrated VOI.
+
+The comparison must hold generator, reader prompt, memory corpus, proof checker, answer judge and total budget accounting constant. Report full utility/cost frontiers and paired per-question receipts; do not compare a retrieval-call reduction against an unmatched accuracy score.
+
+
 ## External sources
 
 - Vera-Life, *Lifecycle Faithfulness for Grounded Retrieval-Augmented Generation* (GroundLM 2026, 29 October 2026): https://aclanthology.org/2026.groundlm-1.18/
+- HALT, *Verification-Aware Stopping for Retrieval-Augmented Search Agents*, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.343/
+- Active RAG, *When Should Active RAG Retrieve? A Budget-Aware Evaluation of Utility, Calibration, and Cost* (27 July 2026): https://arxiv.org/abs/2607.24010
+- CONFRAG, *Confidence-Guided Retrieval-Augmented Generation*, EMNLP 2026 Industry Track: https://aclanthology.org/2026.emnlp-industry.171/
+- AgentAbstain, NeurIPS 2026 Evaluations & Datasets Track: https://agentabstain.github.io/
+- Evidence Sufficiency Benchmark, *Do LLMs Know When Evidence is Insufficient?* (13 August 2026): https://doi.org/10.32604/cmc.2026.086343
 - AgentMemory 0.9.31 BM25 LongMemEval-S component report (28 October 2026): https://www.agent-memory.dev/benchmarks
 
 - QEMem, *From Relevant Memories to Sufficient Evidence* (15 October 2026): https://arxiv.org/abs/2610.22668
