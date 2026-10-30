@@ -12,6 +12,7 @@
 //! This is not yet a persistent payload store, trajectory ingester, query-text
 //! encoder, or complete LongMemEval-V2 backend.
 
+use crate::memory_attestation::VerifiedRoleScopePolicy;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -302,10 +303,30 @@ impl EvidenceRecord {
 pub struct RoleScopePolicy {
     policy_version: u64,
     readable_scopes: BTreeMap<String, BTreeSet<String>>,
+    policy_sha256: String,
+    accepted_at: String,
+    not_before_unix_ms: u64,
+    valid_until_unix_ms: u64,
 }
 
 impl RoleScopePolicy {
-    pub fn new(
+    /// Convert only an unforgeable token emitted by EvidenceTrustStore into a
+    /// policy accepted by the role-scoped retrieval APIs.
+    pub fn from_verified(verified: VerifiedRoleScopePolicy) -> Self {
+        Self {
+            policy_version: verified.policy_version(),
+            readable_scopes: verified.readable_scopes().clone(),
+            policy_sha256: verified.policy_sha256().to_owned(),
+            accepted_at: verified.accepted_at().to_owned(),
+            not_before_unix_ms: verified.not_before_unix_ms(),
+            valid_until_unix_ms: verified.valid_until_unix_ms(),
+        }
+    }
+
+    /// Test-only constructor for unit tests; production callers must verify a
+    /// SignedRoleScopePolicy before obtaining a RoleScopePolicy.
+    #[cfg(test)]
+    fn new(
         policy_version: u64,
         readable_scopes: BTreeMap<String, BTreeSet<String>>,
     ) -> Result<Self, String> {
@@ -319,13 +340,17 @@ impl RoleScopePolicy {
             if role_id.trim().is_empty() {
                 return Err("role ID must be non-empty".into());
             }
-            if scopes.is_empty() || scopes.iter().any(|scope| scope.trim().is_empty()) {
-                return Err(format!("role {role_id:?} must have non-empty readable scopes"));
+            if scopes.is_empty() || scopes.iter().any(|scope| scope.trim().is_empty() || scope == "*") {
+                return Err(format!("role {role_id:?} must have explicit non-wildcard readable scopes"));
             }
         }
         Ok(Self {
             policy_version,
             readable_scopes,
+            policy_sha256: "test-fixture-only".into(),
+            accepted_at: "1970-01-01T00:00:00Z".into(),
+            not_before_unix_ms: 0,
+            valid_until_unix_ms: u64::MAX,
         })
     }
 
@@ -333,7 +358,27 @@ impl RoleScopePolicy {
         self.policy_version
     }
 
-    fn require_read_scope(&self, role_id: &str, scope_id: &str) -> Result<(), String> {
+    pub fn policy_sha256(&self) -> &str {
+        &self.policy_sha256
+    }
+
+    pub fn accepted_at(&self) -> &str {
+        &self.accepted_at
+    }
+
+    pub fn valid_until_unix_ms(&self) -> u64 {
+        self.valid_until_unix_ms
+    }
+
+    fn require_read_scope(
+        &self,
+        role_id: &str,
+        scope_id: &str,
+        now_ms: u64,
+    ) -> Result<(), String> {
+        if now_ms < self.not_before_unix_ms || now_ms >= self.valid_until_unix_ms {
+            return Err("role-scope policy is not active at the requested time".into());
+        }
         if role_id.trim().is_empty() {
             return Err("requesting role ID must be non-empty".into());
         }
@@ -360,6 +405,9 @@ impl RoleScopePolicy {
 pub struct AuthorizedEvidenceContext {
     pub requesting_role: String,
     pub access_policy_version: u64,
+    pub access_policy_sha256: String,
+    pub access_policy_accepted_at: String,
+    pub access_policy_valid_until_unix_ms: u64,
     pub evidence: EvidenceRecord,
     pub context: MemoryContextItem,
 }
@@ -736,7 +784,7 @@ impl EvidenceIndex {
         max_items: usize,
         policy: &RoleScopePolicy,
     ) -> Result<Vec<AuthorizedEvidenceContext>, String> {
-        policy.require_read_scope(requesting_role, scope_id)?;
+        policy.require_read_scope(requesting_role, scope_id, now_ms)?;
         if max_items == 0 {
             return Ok(Vec::new());
         }
@@ -762,6 +810,9 @@ impl EvidenceIndex {
             output.push(AuthorizedEvidenceContext {
                 requesting_role: requesting_role.to_owned(),
                 access_policy_version: policy.policy_version(),
+                access_policy_sha256: policy.policy_sha256().to_owned(),
+                access_policy_accepted_at: policy.accepted_at().to_owned(),
+                access_policy_valid_until_unix_ms: policy.valid_until_unix_ms(),
                 evidence: record.clone(),
                 context,
             });
@@ -782,7 +833,7 @@ impl EvidenceIndex {
         config: Bm25Config,
         policy: &RoleScopePolicy,
     ) -> Result<Vec<AuthorizedEvidenceContext>, String> {
-        policy.require_read_scope(requesting_role, scope_id)?;
+        policy.require_read_scope(requesting_role, scope_id, now_ms)?;
         let hits = self.search_bm25(query, scope_id, now_ms, payload_root, config)?;
         let hdc_ids: Vec<u64> = hits.iter().map(|hit| hit.hdc_id).collect();
         self.resolve_for_role(
