@@ -725,17 +725,17 @@ mod tests {
     }
 
     #[test]
-    fn derivation_rejects_a_source_that_arrived_after_its_recorded_at() {
+    fn derivation_rejects_an_unknown_source_revision() {
         let mut runtime = BitemporalJustificationRuntime::default();
         runtime
             .append_source_events([assert_event("A", 2, "gold")])
             .unwrap();
         let before = runtime.state_sha256().unwrap();
         let result = runtime.derive_at(
-            conclusion("C", [justification("via-A", [source("A")])]),
-            instant(1),
+            conclusion("C", [justification("via-missing", [source("MISSING")])]),
+            instant(3),
         );
-        assert!(result.unwrap_err().contains("was not known"));
+        assert!(result.unwrap_err().contains("unknown source revision"));
         assert_eq!(runtime.state_sha256().unwrap(), before);
     }
 
