@@ -284,7 +284,6 @@ pub struct JudgeFactorialReceiptV1 {
     pub judge_source_revision: String,
     pub judge_prompt_sha256: String,
     pub rubric_sha256: String,
-    pub blind_to_system_identity: bool,
     pub observations: Vec<JudgeFactorialObservationV1>,
 }
 
@@ -314,6 +313,9 @@ pub struct FactorialMainEffectV1 {
     pub criterion_score_delta_millionths: Option<f64>,
     /// Normalized selected display-position delta (high minus low).
     pub selected_option_position_delta_millionths: Option<f64>,
+    pub candidate_a_choice_rate_delta_millionths: Option<f64>,
+    pub decisive_low_count: u64,
+    pub decisive_high_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -337,6 +339,7 @@ pub struct FactorialInteractionV1 {
     pub complete_01_count: u64,
     pub complete_10_count: u64,
     pub complete_11_count: u64,
+    pub candidate_a_choice_interaction_millionths: Option<f64>,
     pub ineligible_conditions_across_four_cells: u64,
 }
 
@@ -365,7 +368,6 @@ pub struct JudgeFactorialReportFieldsV1 {
     pub all_blocks_present: bool,
     pub all_conditions_present: bool,
     pub all_conditions_completed: bool,
-    pub blind_to_system_identity: bool,
     pub level_counts: Vec<FactorialLevelCountsV1>,
     pub main_effects: Vec<FactorialMainEffectV1>,
     pub criterion_order_effects: Vec<CriterionOrderEffectV1>,
@@ -596,6 +598,7 @@ struct CompletedMetricV1 {
     candidate_score_gap: f64,
     mean_criterion_score: f64,
     mean_selected_option_position: f64,
+    candidate_a_choice: Option<f64>,
     criterion_scores: BTreeMap<String, f64>,
 }
 
@@ -647,6 +650,11 @@ fn metric_for_observation(
         candidate_score_gap: f64::from(candidate_a) - f64::from(candidate_b),
         mean_criterion_score: score_sum / criterion_count,
         mean_selected_option_position: position_sum / criterion_count,
+        candidate_a_choice: match observation.decision {
+            Some(FactorialDecisionV1::CandidateA) => Some(1_000_000.0),
+            Some(FactorialDecisionV1::CandidateB) => Some(0.0),
+            Some(FactorialDecisionV1::Tie | FactorialDecisionV1::Abstain) | None => None,
+        },
         criterion_scores: scores,
     })
 }
@@ -688,6 +696,8 @@ fn main_effects(
         let high_score = mean(high.iter().map(|metric| metric.mean_criterion_score));
         let low_position = mean(low.iter().map(|metric| metric.mean_selected_option_position));
         let high_position = mean(high.iter().map(|metric| metric.mean_selected_option_position));
+        let low_choice = mean(low.iter().filter_map(|metric| metric.candidate_a_choice));
+        let high_choice = mean(high.iter().filter_map(|metric| metric.candidate_a_choice));
 
         let mut planned_low = 0_u64;
         let mut planned_high = 0_u64;
@@ -719,6 +729,10 @@ fn main_effects(
             criterion_score_delta_millionths: high_score.zip(low_score).map(|(high, low)| high - low),
             selected_option_position_delta_millionths: high_position.zip(low_position)
                 .map(|(high, low)| (high - low) * 1_000_000.0),
+            candidate_a_choice_rate_delta_millionths: high_choice.zip(low_choice)
+                .map(|(high, low)| high - low),
+            decisive_low_count: low.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
+            decisive_high_count: high.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
         });
         counts.push(FactorialLevelCountsV1 {
             factor,
@@ -779,6 +793,15 @@ fn pairwise_interactions(
             let m01_score = mean_at(false, true, |metric| metric.mean_criterion_score);
             let m10_score = mean_at(true, false, |metric| metric.mean_criterion_score);
             let m11_score = mean_at(true, true, |metric| metric.mean_criterion_score);
+            let mean_choice_at = |a: bool, b: bool| {
+                mean(metrics.iter().filter(|metric| {
+                    metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
+                }).filter_map(|metric| metric.candidate_a_choice))
+            };
+            let m00_choice = mean_choice_at(false, false);
+            let m01_choice = mean_choice_at(false, true);
+            let m10_choice = mean_choice_at(true, false);
+            let m11_choice = mean_choice_at(true, true);
             let count_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
                 metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
             }).count() as u64;
@@ -802,6 +825,8 @@ fn pairwise_interactions(
                 complete_01_count: counts[1],
                 complete_10_count: counts[2],
                 complete_11_count: counts[3],
+                candidate_a_choice_interaction_millionths: m11_choice.zip(m10_choice)
+                    .zip(m01_choice.zip(m00_choice)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
                 ineligible_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
             });
         }
@@ -937,7 +962,6 @@ pub fn analyze_judge_factorial(
         all_blocks_present: block_summaries.len() == plan.blocks.len(),
         all_conditions_present: receipt.observations.len() == planned_count,
         all_conditions_completed: completed_total == planned_count,
-        blind_to_system_identity: receipt.blind_to_system_identity,
         level_counts,
         main_effects,
         criterion_order_effects,
@@ -1060,7 +1084,6 @@ mod tests {
             judge_source_revision: plan.judge_source_revision.clone(),
             judge_prompt_sha256: plan.judge_prompt_sha256.clone(),
             rubric_sha256: plan.rubric_sha256.clone(),
-            blind_to_system_identity: true,
             observations,
         };
         let receipt_bytes = serde_json::to_vec_pretty(&receipt).unwrap();
