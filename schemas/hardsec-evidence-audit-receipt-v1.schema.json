@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-evidence-audit-receipt-v1.schema.json",
+  "title": "HARDSEC Evidence Audit Receipt v1",
+  "description": "Unsigned receipt emitted by the packet auditor. It records schema/claim checking and optional local byte verification; it is not a security verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result",
+    "claim_scope",
+    "packet_id",
+    "evaluation_mode",
+    "packet_sha256",
+    "design_id",
+    "netlist_sha256",
+    "subject_local_path",
+    "model_sha256",
+    "evidence_count",
+    "evidence",
+    "claims",
+    "byte_integrity",
+    "signature",
+    "security_verdict",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-evidence-audit-receipt-v1"
+    },
+    "result": {
+      "const": "pass"
+    },
+    "claim_scope": {
+      "enum": [
+        "packet_schema_and_claim_evidence_consistency_only",
+        "packet_schema_claim_and_referenced_byte_integrity_only"
+      ]
+    },
+    "packet_id": {
+      "type": "string"
+    },
+    "evaluation_mode": {
+      "enum": [
+        "detector_alert",
+        "witness_validation"
+      ]
+    },
+    "packet_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "design_id": {
+      "type": "string"
+    },
+    "netlist_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "subject_local_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claim_type",
+          "status",
+          "evidence_count",
+          "scope"
+        ],
+        "properties": {
+          "claim_type": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "unknown",
+              "not_evaluated"
+            ]
+          },
+          "evidence_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scope": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "byte_integrity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "verified_file_count",
+            "files"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_requested"
+            },
+            "verified_file_count": {
+              "const": 0
+            },
+            "files": {
+              "type": "array",
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "verified_file_count",
+            "root_binding",
+            "files",
+            "limitations"
+          ],
+          "properties": {
+            "status": {
+              "const": "verified"
+            },
+            "verified_file_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "root_binding": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "signature": {
+      "type": "null"
+    },
+    "security_verdict": {
+      "type": "null"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    }
+  }
+}

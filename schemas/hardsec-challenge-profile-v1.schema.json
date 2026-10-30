@@ -1,0 +1,1063 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-challenge-profile-v1.schema.json",
+  "title": "HARDSEC Challenge Profile v1",
+  "description": "Evidence-bearing profile for a hardware-security benchmark challenge. Structural validity and evidence claim ceilings are semantic checks performed by the Rust auditor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "challenge_id",
+    "dataset_id",
+    "dataset_role",
+    "validity_status",
+    "subject",
+    "trigger",
+    "payload",
+    "structure",
+    "equivalence",
+    "provenance",
+    "resources",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-challenge-profile-v1"
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_role": {
+      "enum": [
+        "evaluation_corpus_member",
+        "reference_fixture_only",
+        "exploratory_only"
+      ]
+    },
+    "validity_status": {
+      "enum": [
+        "witness_validated",
+        "partially_evidenced",
+        "benign_equivalent",
+        "unknown_invalid"
+      ]
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "trigger": {
+      "$ref": "#/$defs/trigger"
+    },
+    "payload": {
+      "$ref": "#/$defs/payload"
+    },
+    "structure": {
+      "$ref": "#/$defs/structure"
+    },
+    "equivalence": {
+      "$ref": "#/$defs/equivalence"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "resources": {
+      "$ref": "#/$defs/resources"
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "(^/|\\\\\\\\|(^|/)\\\\.\\\\.?(/|$))"
+      }
+    },
+    "measurementStatus": {
+      "enum": [
+        "measured",
+        "not_measured",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/measurementStatus"
+        },
+        "value": {
+          "type": [
+            "number",
+            "integer",
+            "string",
+            "boolean",
+            "array",
+            "object",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "evidence_id": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "value",
+              "method"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_measured",
+                  "unknown",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "netlist_sha256",
+        "local_path"
+      ],
+      "properties": {
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "local_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activation",
+        "scoap",
+        "temporal"
+      ],
+      "properties": {
+        "activation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "observed",
+                "not_observed_under_budget",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "method": {
+              "enum": [
+                "random_simulation",
+                "directed_simulation",
+                "constrained_random",
+                "atpg",
+                "formal_cover",
+                "recorded_replay",
+                "other"
+              ]
+            },
+            "stimuli_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "activation_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "reset_model_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "trace_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "budget_cycles": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "witness_evidence_id": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "observed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "method",
+                  "stimuli_count",
+                  "activation_count",
+                  "trace_sha256",
+                  "witness_evidence_id"
+                ],
+                "properties": {
+                  "activation_count": {
+                    "minimum": 1
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "not_observed_under_budget"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "method",
+                  "stimuli_count",
+                  "budget_cycles"
+                ]
+              }
+            }
+          ]
+        },
+        "scoap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/measurementStatus"
+            },
+            "cc0": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cc1": {
+              "type": "number",
+              "minimum": 0
+            },
+            "co": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tool": {
+              "type": "string"
+            },
+            "tool_version": {
+              "type": "string"
+            },
+            "assumptions_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "measured"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "cc0",
+                  "cc1",
+                  "co",
+                  "tool",
+                  "tool_version"
+                ]
+              }
+            }
+          ]
+        },
+        "temporal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/measurementStatus"
+            },
+            "phase_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "interphase_gaps": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "state_depth_cycles": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "method": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "measured"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "phase_count",
+                  "method"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "paired_inactive_control"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "observed",
+            "not_observed_under_budget",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "observation_boundary": {
+          "type": "string"
+        },
+        "first_effect_cycle": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "witness_evidence_id": {
+          "type": "string"
+        },
+        "paired_inactive_control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "passed",
+                "failed",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "trace_evidence_id": {
+              "type": "string"
+            },
+            "budget_cycles": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "effect_observed": {
+              "type": "boolean"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "trace_evidence_id",
+                  "budget_cycles",
+                  "effect_observed"
+                ],
+                "properties": {
+                  "effect_observed": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "observation_boundary",
+              "first_effect_cycle",
+              "effect_sha256",
+              "witness_evidence_id"
+            ]
+          }
+        }
+      ]
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "netlist_metrics",
+        "graph_metrics"
+      ],
+      "properties": {
+        "netlist_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/measurementStatus"
+            },
+            "cell_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "state_bit_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gate_histogram": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "method": {
+              "type": "string"
+            },
+            "tool_version": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "measured"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "cell_count",
+                  "state_bit_count",
+                  "method"
+                ]
+              }
+            }
+          ]
+        },
+        "graph_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/measurementStatus"
+            },
+            "node_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "edge_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_fan_in": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_fan_out": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "topological_depth": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reconvergence_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "component_purity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "cone_overlap": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "method": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "measured"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "node_count",
+                  "edge_count",
+                  "method"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "equivalence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "proven",
+            "failed",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "checker": {
+          "type": "string"
+        },
+        "tool_version": {
+          "type": "string"
+        },
+        "assumptions_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "proof_evidence_id": {
+          "type": "string"
+        },
+        "counterexample_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assumptions_local_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "reference_local_path": {
+          "$ref": "#/$defs/relativePath"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "proven"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "checker",
+              "tool_version",
+              "assumptions_sha256",
+              "proof_evidence_id",
+              "reference_netlist_sha256",
+              "assumptions_local_path",
+              "reference_local_path"
+            ]
+          }
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_id",
+        "host_family_id",
+        "source_group_id",
+        "generator_id",
+        "split"
+      ],
+      "properties": {
+        "host_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation_seed": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ]
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "split_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/measurementStatus"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "cpu": {
+          "type": "string"
+        },
+        "gpu": {
+          "type": "string"
+        },
+        "parser_wall_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peak_rss_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "graph_build_wall_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "feature_wall_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "inference_p50_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "inference_p95_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "verification_wall_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "method": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "platform",
+              "method"
+            ]
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "kind",
+        "uri",
+        "sha256",
+        "scope",
+        "status"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "active_trace",
+            "inactive_trace",
+            "payload_effect",
+            "formal_proof",
+            "equivalence_report",
+            "netlist",
+            "graph",
+            "label_map",
+            "resource_log",
+            "split_receipt",
+            "manifest",
+            "review"
+          ]
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "proof_scope": {
+          "enum": [
+            "bounded",
+            "unbounded",
+            "assumption_scoped"
+          ]
+        },
+        "formal_result": {
+          "enum": [
+            "cover_reached",
+            "bounded_no_counterexample",
+            "assertion_proved",
+            "equivalence_proved",
+            "counterexample_found",
+            "timeout",
+            "unknown"
+          ]
+        },
+        "bound_cycles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "property_id": {
+          "type": "string"
+        },
+        "assumptions_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assumptions_local_path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "subject_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "equivalence_report"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "formal_result",
+              "property_id",
+              "proof_scope",
+              "assumptions_sha256",
+              "assumptions_local_path",
+              "subject_netlist_sha256",
+              "reference_netlist_sha256"
+            ],
+            "properties": {
+              "formal_result": {
+                "const": "equivalence_proved"
+              },
+              "proof_scope": {
+                "enum": [
+                  "unbounded",
+                  "assumption_scoped"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "validity_status": {
+            "const": "witness_validated"
+          }
+        },
+        "required": [
+          "validity_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_role": {
+            "const": "evaluation_corpus_member",
+            "enum": [
+              "evaluation_corpus_member",
+              "reference_fixture_only"
+            ]
+          },
+          "trigger": {
+            "properties": {
+              "activation": {
+                "properties": {
+                  "status": {
+                    "const": "observed"
+                  }
+                }
+              }
+            }
+          },
+          "payload": {
+            "properties": {
+              "status": {
+                "const": "observed"
+              },
+              "paired_inactive_control": {
+                "properties": {
+                  "status": {
+                    "const": "passed"
+                  }
+                }
+              }
+            }
+          },
+          "equivalence": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "proven",
+                  "not_applicable"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "validity_status": {
+            "const": "benign_equivalent"
+          }
+        },
+        "required": [
+          "validity_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "equivalence": {
+            "properties": {
+              "status": {
+                "const": "proven"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

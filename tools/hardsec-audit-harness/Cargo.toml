@@ -1,0 +1,34 @@
+[package]
+name = "hardsec-audit-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+autotests = false
+autoexamples = false
+
+# This nested workspace deliberately isolates these examples from the root
+# workspace manifest, whose member glob currently contains an absent crate.
+[workspace]
+
+[features]
+default = []
+hardsec-evidence-audit = ["dep:sha2"]
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = { version = "=0.10.9", optional = true }
+
+[[example]]
+name = "hardsec_trigger_budget"
+path = "../../examples/hardsec_trigger_budget.rs"
+
+[[example]]
+name = "hardsec_evidence_packet_audit"
+path = "../../examples/hardsec_evidence_packet_audit.rs"
+required-features = ["hardsec-evidence-audit"]
+
+[[example]]
+name = "hardsec_challenge_profile_audit"
+path = "../../examples/hardsec_challenge_profile_audit.rs"
+required-features = ["hardsec-evidence-audit"]

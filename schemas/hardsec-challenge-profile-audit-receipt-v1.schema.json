@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json",
+  "title": "HARDSEC Challenge Profile Audit Receipt v1",
+  "description": "Unsigned validation receipt for a challenge profile. It is not a detector verdict or design security certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result",
+    "claim_scope",
+    "challenge_id",
+    "dataset_id",
+    "dataset_role",
+    "validity_status",
+    "profile_sha256",
+    "netlist_sha256",
+    "evidence_count",
+    "evidence_ids",
+    "active_trace_sha256",
+    "payload_effect_sha256",
+    "byte_integrity",
+    "security_verdict",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-challenge-profile-audit-receipt-v1"
+    },
+    "result": {
+      "const": "pass"
+    },
+    "claim_scope": {
+      "const": "challenge_profile_schema_semantics_and_optional_referenced_byte_integrity"
+    },
+    "challenge_id": {
+      "type": "string"
+    },
+    "dataset_id": {
+      "type": "string"
+    },
+    "dataset_role": {
+      "enum": [
+        "evaluation_corpus_member",
+        "reference_fixture_only",
+        "exploratory_only"
+      ]
+    },
+    "validity_status": {
+      "enum": [
+        "witness_validated",
+        "partially_evidenced",
+        "benign_equivalent",
+        "unknown_invalid"
+      ]
+    },
+    "profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "netlist_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evidence_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "active_trace_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "payload_effect_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "byte_integrity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "verified_file_count",
+            "files"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_requested"
+            },
+            "verified_file_count": {
+              "const": 0
+            },
+            "files": {
+              "type": "array",
+              "maxItems": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "verified_file_count",
+            "root_binding",
+            "files",
+            "limitations"
+          ],
+          "properties": {
+            "status": {
+              "const": "verified"
+            },
+            "verified_file_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "root_binding": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "minItems": 1
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "security_verdict": {
+      "type": "null"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  }
+}

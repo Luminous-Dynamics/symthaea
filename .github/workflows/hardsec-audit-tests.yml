@@ -1,0 +1,726 @@
+name: HARDSEC Audit Examples
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "examples/hardsec_trigger_budget.rs"
+      - "examples/hardsec_evidence_packet_audit.rs"
+      - "examples/hardsec_challenge_profile_audit.rs"
+      - "tests/fixtures/hardsec/*.json"
+      - "schemas/hardsec-*.schema.json"
+      - "tools/hardsec-audit-harness/Cargo.toml"
+      - "tools/hardsec-audit-harness/Cargo.lock"
+      - "tools/hardsec-audit-harness/requirements-validation.txt"
+      - "tools/hardsec-audit-harness/actions.lock.json"
+      - ".github/workflows/hardsec-audit-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: hardsec-audit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test:
+    name: Focused HARDSEC Rust examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check HARDSEC example formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs
+
+      - name: Prepare evidence result directory
+        run: mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
+
+      - name: Verify pinned isolated harness lockfile
+        run: |
+          set -euo pipefail
+          expected="004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82"
+          actual="$(sha256sum tools/hardsec-audit-harness/Cargo.lock | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          cp tools/hardsec-audit-harness/Cargo.lock "$RUNNER_TEMP/hardsec-seqcube/Cargo.lock"
+          printf 'harness_lock_sha256=%s\n' "$actual" > "$RUNNER_TEMP/hardsec-seqcube/harness-lock.sha256"
+
+      - name: Verify challenge profile audit target registration
+        run: |
+          set -euo pipefail
+          grep -F 'name = "hardsec_challenge_profile_audit"' tools/hardsec-audit-harness/Cargo.toml
+          grep -F 'path = "../../examples/hardsec_challenge_profile_audit.rs"' tools/hardsec-audit-harness/Cargo.toml
+          test -f examples/hardsec_challenge_profile_audit.rs
+          test -f tests/fixtures/hardsec/seqcube-challenge-profile.json
+          test -f schemas/hardsec-challenge-profile-v1.schema.json
+          test -f schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json
+          grep -F 'reference_netlist_sha256' examples/hardsec_challenge_profile_audit.rs
+          grep -F 'assumption_scoped' examples/hardsec_challenge_profile_audit.rs
+          grep -F 'reference_local_path' schemas/hardsec-challenge-profile-v1.schema.json
+
+      - name: Test random-trigger sampling budget
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --example hardsec_trigger_budget 2>&1 | tee "$RUNNER_TEMP/hardsec-seqcube/trigger-budget-tests.log"
+
+      - name: Test claim-scoped evidence packet auditor
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit 2>&1 | tee "$RUNNER_TEMP/hardsec-seqcube/evidence-packet-tests.log"
+
+
+      - name: Test challenge profile auditor
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_challenge_profile_audit 2>&1 | tee "$RUNNER_TEMP/hardsec-seqcube/challenge-profile-tests.log"
+
+      - name: Fetch pinned SeqCube witness package and verify publisher checksums
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/seqcube-ht-e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/archive/e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz" \
+            --output "$archive"
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          package_root="$RUNNER_TEMP/seqcube-ht-witness-validation-artifact-e5acac37af6dbe1fa53b0be93199bb81a62c5320"
+          test -f "$package_root/manifest.json"
+          test -f "$package_root/netlists/seqctrl_infected.v"
+          archive_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
+          python3 - "$package_root" "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$archive_sha256" <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          archive_sha256 = sys.argv[3]
+          manifest = root / "checksums/SHA256SUMS"
+          entries = []
+          failures = []
+
+          for line_number, line in enumerate(manifest.read_text(encoding="ascii").splitlines(), 1):
+              if not line:
+                  continue
+              try:
+                  expected, relative_path = line.split("  ", 1)
+              except ValueError as error:
+                  raise SystemExit(f"invalid checksum manifest line {line_number}: {line!r}") from error
+              path = root / relative_path
+              raw = path.read_bytes()
+              raw_sha256 = hashlib.sha256(raw).hexdigest()
+              if raw_sha256 == expected:
+                  mode = "exact_bytes"
+              elif b"\r" not in raw and b"\n" in raw:
+                  crlf_sha256 = hashlib.sha256(raw.replace(b"\n", b"\r\n")).hexdigest()
+                  if crlf_sha256 == expected:
+                      mode = "lf_archive_matches_published_crlf_digest"
+                  else:
+                      failures.append({
+                          "path": relative_path,
+                          "expected": expected,
+                          "raw_sha256": raw_sha256,
+                          "crlf_sha256": crlf_sha256,
+                      })
+                      mode = "mismatch"
+              else:
+                  failures.append({
+                      "path": relative_path,
+                      "expected": expected,
+                      "raw_sha256": raw_sha256,
+                  })
+                  mode = "mismatch"
+              entries.append({
+                  "path": relative_path,
+                  "published_sha256": expected,
+                  "extracted_sha256": raw_sha256,
+                  "reconciliation": mode,
+              })
+
+          receipt = {
+              "schema_version": "seqcube-checksum-reconciliation-v1",
+              "upstream_commit": "e5acac37af6dbe1fa53b0be93199bb81a62c5320",
+              "archive_sha256": archive_sha256,
+              "manifest_path": "checksums/SHA256SUMS",
+              "manifest_entries": len(entries),
+              "exact_byte_matches": sum(item["reconciliation"] == "exact_bytes" for item in entries),
+              "line_ending_reconciled": sum(item["reconciliation"] == "lf_archive_matches_published_crlf_digest" for item in entries),
+              "mismatches": failures,
+              "entries": entries,
+              "rule": "Accept exact bytes or LF-only extracted bytes whose LF-to-CRLF representation matches the publisher digest; never rewrite source files.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "mismatches": len(failures),
+          }, indent=2))
+          if failures:
+              raise SystemExit("SeqCube publisher checksum mismatch beyond LF/CRLF representation")
+
+          canonical_root = root.parent / "seqcube-ht-canonical-crlf"
+          if canonical_root.exists():
+              shutil.rmtree(canonical_root)
+          shutil.copytree(root, canonical_root)
+          transformed = []
+          for item in entries:
+              target = canonical_root / item["path"]
+              raw = target.read_bytes()
+              if item["reconciliation"] == "lf_archive_matches_published_crlf_digest":
+                  if b"\r" in raw:
+                      raise SystemExit(f"unexpected existing CR byte in {item['path']}")
+                  raw = raw.replace(b"\n", b"\r\n")
+                  target.write_bytes(raw)
+                  transformed.append(item["path"])
+              canonical_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+              if canonical_sha256 != item["published_sha256"]:
+                  raise SystemExit(f"canonical CRLF copy still mismatches {item['path']}")
+              item["canonical_sha256"] = canonical_sha256
+          receipt["canonical_copy"] = {
+              "root_name": canonical_root.name,
+              "verified_manifest_entries": len(entries),
+              "transformed_files": transformed,
+              "transformed_file_count": len(transformed),
+              "source_archive_preserved": True,
+              "rule": "Only the copied files whose LF-to-CRLF digest matched the publisher checksum are converted; original extracted archive files remain untouched.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "canonical_manifest_entries_verified": receipt["canonical_copy"]["verified_manifest_entries"],
+              "canonical_files_transformed": receipt["canonical_copy"]["transformed_file_count"],
+              "mismatches": len(failures),
+          }, indent=2))
+          PY
+          echo "SEQCUBE_ARCHIVE_ROOT=$package_root" >> "$GITHUB_ENV"
+          echo "SEQCUBE_PACKAGE_ROOT=$RUNNER_TEMP/seqcube-ht-canonical-crlf" >> "$GITHUB_ENV"
+
+      - name: Set up Python for upstream SeqCube verifier
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.12"
+
+      - name: Validate evidence packet against published JSON Schema
+        run: |
+          set -euo pipefail
+          python -m pip install --requirement tools/hardsec-audit-harness/requirements-validation.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("schemas")
+          cases = [
+              ("hardsec-evidence-packet-v1.schema.json", "tests/fixtures/hardsec/seqcube-witness-validation-packet.json"),
+              ("hardsec-challenge-profile-v1.schema.json", "tests/fixtures/hardsec/seqcube-challenge-profile.json"),
+          ]
+          for schema_name, instance_name in cases:
+              schema = json.loads((root / schema_name).read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              instance = json.loads(Path(instance_name).read_text(encoding="utf-8"))
+              errors = list(Draft202012Validator(schema).iter_errors(instance))
+              if errors:
+                  raise SystemExit(
+                      f"{instance_name} failed {schema_name}: "
+                      + "; ".join(error.message for error in errors)
+                  )
+              print(f"JSON Schema PASS: {instance_name}")
+          PY
+
+      - name: Install Z3 and Icarus Verilog
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes iverilog
+          python -m venv "$RUNNER_TEMP/seqcube-venv"
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --requirement "$SEQCUBE_PACKAGE_ROOT/verify/requirements.txt"
+          {
+            python --version
+            "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip freeze
+            iverilog -V
+            vvp -V
+            rustc --version
+            cargo --version
+            rustfmt --version
+          } > "$RUNNER_TEMP/seqcube-toolchain.txt" 2>&1
+
+      - name: Independently replay upstream SeqCube package verifier
+        run: |
+          set -euo pipefail
+          set +e
+          "$RUNNER_TEMP/seqcube-venv/bin/python" \
+            "$SEQCUBE_PACKAGE_ROOT/verify/verify_package.py" \
+            --package "$SEQCUBE_PACKAGE_ROOT" --require-iverilog \
+            > "$RUNNER_TEMP/seqcube-verifier.stdout" \
+            2> "$RUNNER_TEMP/seqcube-verifier.stderr"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/seqcube-verifier.stdout"
+          cat "$RUNNER_TEMP/seqcube-verifier.stderr" >&2
+          test "$status" -eq 0
+          test -f "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json"
+          mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
+          cp "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-toolchain.txt" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Audit pinned SeqCube multi-axis challenge profile and local bytes
+        run: |
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_challenge_profile_audit -- \
+            --profile tests/fixtures/hardsec/seqcube-challenge-profile.json \
+            --evidence-root "$SEQCUBE_PACKAGE_ROOT" \
+            --receipt "$RUNNER_TEMP/seqcube-challenge-profile-audit.json"
+          python3 - "$RUNNER_TEMP/seqcube-challenge-profile-audit.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("challenge profile receipt schema failure: " + "; ".join(error.message for error in errors))
+          assert receipt["result"] == "pass", receipt
+          assert receipt["dataset_role"] == "reference_fixture_only", receipt
+          assert receipt["validity_status"] == "witness_validated", receipt
+          assert receipt["byte_integrity"]["status"] == "verified", receipt
+          assert receipt["byte_integrity"]["verified_file_count"] == 6, receipt
+          assert receipt["security_verdict"] is None, receipt
+          print("Challenge profile receipt: PASS (reference-only, 6 local bytes verified, no security verdict)")
+          PY
+          cp "$RUNNER_TEMP/seqcube-challenge-profile-audit.json" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Audit pinned SeqCube witness-validation packet and local bytes
+        run: |
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+            --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+            --evidence-root "$SEQCUBE_PACKAGE_ROOT" \
+            --receipt "$RUNNER_TEMP/seqcube-evidence-audit.json"
+          python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-evidence-audit-receipt-v1.schema.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("audit receipt schema failure: " + "; ".join(error.message for error in errors))
+          print("JSON Schema PASS: evidence audit receipt")
+          PY
+
+          python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              receipt = json.load(handle)
+
+          expected = {
+              "trigger_activated",
+              "payload_effect_observed",
+              "trigger_not_observed_under_budget",
+              "payload_effect_not_observed_under_budget",
+              "bounded_reachability_not_found",
+          }
+          actual = {claim["claim_type"] for claim in receipt["claims"]}
+          assert receipt["result"] == "pass", receipt
+          assert receipt["evaluation_mode"] == "witness_validation", receipt
+          assert receipt["model_sha256"] is None, receipt
+          assert receipt["evidence_count"] == 5, receipt
+          assert actual == expected, (actual, expected)
+          assert all(claim["status"] == "supported" for claim in receipt["claims"]), receipt
+          assert receipt["byte_integrity"]["status"] == "verified", receipt
+          assert receipt["byte_integrity"]["verified_file_count"] == 9, receipt
+          assert receipt["security_verdict"] is None, receipt
+          print("SeqCube packet receipt: PASS (5 bounded/observed claims, 9 source bytes verified, detector-free)")
+          PY
+          cp "$RUNNER_TEMP/seqcube-evidence-audit.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/challenge-profile-tests.log" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Reject independent SeqCube evidence mutations (negative controls)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hardsec-seqcube/negative-controls"
+          for mutation in active_vector observation_boundary inactive_smt; do
+            tampered_root="$RUNNER_TEMP/seqcube-tampered-$mutation"
+            cp -a "$SEQCUBE_PACKAGE_ROOT" "$tampered_root"
+
+            case "$mutation" in
+              active_vector)
+                python3 - "$tampered_root/replay/active.csv" <<'PY'
+          import csv
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+          targets = [row for row in rows if row["cycle"] == "2"]
+          if len(targets) != 1 or targets[0]["d1"] != "1":
+              raise SystemExit("expected exactly one active-vector cycle-2 d1=1 row")
+          targets[0]["d1"] = "0"
+          with path.open("w", newline="", encoding="utf-8") as handle:
+              writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\r\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+                relative_path="replay/active.csv"
+                ;;
+              observation_boundary)
+                python3 - "$tampered_root/replay/expected_boundary.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          value = json.loads(path.read_text(encoding="utf-8"))
+          if value["observation_cycle"] != 8 or value["active_first_difference_cycle"] != 8:
+              raise SystemExit("unexpected baseline observation-cycle metadata")
+          value["observation_cycle"] = 7
+          value["active_first_difference_cycle"] = 7
+          path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+          PY
+                relative_path="replay/expected_boundary.json"
+                ;;
+              inactive_smt)
+                printf '\n; deliberate inactive SMT query corruption\n' >> "$tampered_root/audit/inactive.smt2"
+                relative_path="audit/inactive.smt2"
+                ;;
+              *)
+                echo "unsupported mutation: $mutation" >&2
+                exit 2
+                ;;
+            esac
+
+            set +e
+            cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+              --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+              --evidence-root "$tampered_root" \
+              --receipt "$RUNNER_TEMP/$mutation-evidence-audit.json" \
+              > "$RUNNER_TEMP/$mutation-auditor.stdout" \
+              2> "$RUNNER_TEMP/$mutation-auditor.stderr"
+            auditor_status=$?
+            set -e
+            test "$auditor_status" -ne 0
+            grep -F "SHA-256 mismatch" "$RUNNER_TEMP/$mutation-auditor.stderr"
+
+            set +e
+            "$RUNNER_TEMP/seqcube-venv/bin/python" \
+              "$tampered_root/verify/verify_package.py" \
+              --package "$tampered_root" --require-iverilog \
+              > "$RUNNER_TEMP/$mutation-upstream.stdout" \
+              2> "$RUNNER_TEMP/$mutation-upstream.stderr"
+            upstream_status=$?
+            set -e
+            test "$upstream_status" -ne 0
+            grep -F "hash mismatch" "$RUNNER_TEMP/$mutation-upstream.stderr"
+
+            cp "$RUNNER_TEMP/$mutation-auditor.stdout" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-auditor.stderr" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-upstream.stdout" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-upstream.stderr" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            printf '%s\t%s\t%s\t%s\n' "$mutation" "$relative_path" "$auditor_status" "$upstream_status" \
+              >> "$RUNNER_TEMP/hardsec-seqcube/negative-controls/results.tsv"
+          done
+
+      - name: Build machine-readable run manifest
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/hardsec-seqcube" "$SEQCUBE_ARCHIVE_ROOT" "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$RUNNER_TEMP/seqcube-evidence-audit.json" "$RUNNER_TEMP/seqcube-challenge-profile-audit.json" <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          output = Path(sys.argv[1])
+          archive_root = Path(sys.argv[2])
+          checksums = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+          audit = json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
+          challenge_profile_audit = json.loads(Path(sys.argv[5]).read_text(encoding="utf-8"))
+          verification = json.loads((output / "verification_report.json").read_text(encoding="utf-8"))
+          upstream_manifest = json.loads((archive_root / "manifest.json").read_text(encoding="utf-8"))
+          negative_lines = [
+              line.split("\t")
+              for line in (output / "negative-controls/results.tsv").read_text(encoding="utf-8").splitlines()
+          ]
+          negative = [
+              {
+                  "mutation": mutation,
+                  "relative_path": relative_path,
+                  "evidence_auditor_exit": int(auditor_exit),
+                  "upstream_verifier_exit": int(upstream_exit),
+                  "both_rejected": int(auditor_exit) != 0 and int(upstream_exit) != 0,
+              }
+              for mutation, relative_path, auditor_exit, upstream_exit in negative_lines
+          ]
+          if len(negative) != 3 or not all(item["both_rejected"] for item in negative):
+              raise SystemExit(f"not all three independent negative controls rejected: {negative}")
+
+          def digest(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          def tests(path):
+              content = path.read_text(encoding="utf-8", errors="replace")
+              matches = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed", content)
+              if len(matches) != 1:
+                  raise SystemExit(f"expected one passing cargo test summary in {path}")
+              passed, failed = map(int, matches[0])
+              return {"passed": passed, "failed": failed, "result": "pass" if failed == 0 else "fail"}
+
+          source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          workflow_blob = subprocess.check_output(
+              ["git", "rev-parse", "HEAD:.github/workflows/hardsec-audit-tests.yml"], text=True
+          ).strip()
+          workflow_path = Path(".github/workflows/hardsec-audit-tests.yml")
+          workflow_text = workflow_path.read_text(encoding="utf-8")
+          action_lock_path = Path("tools/hardsec-audit-harness/actions.lock.json")
+          action_lock = json.loads(action_lock_path.read_text(encoding="utf-8"))
+          locked_actions = {
+              item["repository"]: item["commit"]
+              for item in action_lock["actions"]
+          }
+          workflow_actions = sorted(set(re.findall(
+              r"^\s*(?:-\s*)?uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([^\s]+)",
+              workflow_text,
+              flags=re.MULTILINE,
+          )))
+          if len(workflow_actions) != len(locked_actions):
+              raise SystemExit(
+                  f"workflow action count {len(workflow_actions)} != lock count {len(locked_actions)}"
+              )
+          for repository, reference in workflow_actions:
+              if not re.fullmatch(r"[a-f0-9]{40}", reference):
+                  raise SystemExit(f"workflow action {repository} is not pinned to a full commit SHA: {reference}")
+              if locked_actions.get(repository) != reference:
+                  raise SystemExit(
+                      f"workflow action pin for {repository} differs from actions.lock.json: {reference}"
+                  )
+          if set(locked_actions) != {repository for repository, _ in workflow_actions}:
+              raise SystemExit("actions.lock.json repositories differ from workflow uses references")
+          package_checksums = archive_root / "checksums/SHA256SUMS"
+
+          manifest = {
+              "schema_version": "hardsec-seqcubewitness-run-manifest-v1",
+              "run": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "source_commit": source_commit,
+                  "workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
+                  "workflow_file_blob": workflow_blob,
+                  "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+                  "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "event_name": os.environ["GITHUB_EVENT_NAME"],
+                  "ref": os.environ["GITHUB_REF"],
+              },
+              "workflow_actions": {
+                  "lock_path": str(action_lock_path),
+                  "lock_sha256": digest(action_lock_path),
+                  "actions": action_lock["actions"],
+                  "verification": "all_workflow_uses_refs_are_full_commit_shas_and_match_the_lock",
+              },
+              "upstream": {
+                  "repository": "kxiaud/seqcube-ht-witness-validation-artifact",
+                  "commit": checksums["upstream_commit"],
+                  "reported_corpus_member": upstream_manifest.get("reported_corpus_member"),
+                  "generator_included": upstream_manifest.get("generator_included"),
+                  "github_archive_sha256": checksums["archive_sha256"],
+                  "publisher_checksum_manifest_sha256": digest(package_checksums),
+                  "publisher_checksum_entries": checksums["manifest_entries"],
+                  "exact_byte_matches": checksums["exact_byte_matches"],
+                  "line_ending_reconciled_matches": checksums["line_ending_reconciled"],
+                  "mismatches": len(checksums["mismatches"]),
+                  "canonical_copy_manifest_entries_verified": checksums["canonical_copy"]["verified_manifest_entries"],
+                  "canonical_copy_files_transformed": checksums["canonical_copy"]["transformed_file_count"],
+              },
+              "tests": {
+                  "trigger_budget": tests(output / "trigger-budget-tests.log"),
+                  "evidence_packet": tests(output / "evidence-packet-tests.log"),
+                  "challenge_profile": tests(output / "challenge-profile-tests.log"),
+                  "rustfmt": "pass",
+                  "harness_lock_sha256": digest(Path("tools/hardsec-audit-harness/Cargo.lock")),
+              },
+              "replay": {
+                  "upstream_verifier": verification["result"],
+                  "active_audit": verification["audits"]["active"],
+                  "inactive_audit": verification["audits"]["inactive"],
+                  "icarus": verification["iverilog"]["status"],
+                  "active_trigger_phase_cycles": verification["replay"]["active_phase_cycles"],
+                  "active_first_payload_difference_cycle": verification["replay"]["active"]["first_difference_cycle"],
+                  "inactive_first_payload_difference_cycle": verification["replay"]["inactive"]["first_difference_cycle"],
+              },
+              "challenge_profile": {
+                  "challenge_id": challenge_profile_audit["challenge_id"],
+                  "dataset_role": challenge_profile_audit["dataset_role"],
+                  "validity_status": challenge_profile_audit["validity_status"],
+                  "profile_sha256": challenge_profile_audit["profile_sha256"],
+                  "receipt_sha256": digest(Path(sys.argv[5])),
+                  "verified_local_file_count": challenge_profile_audit["byte_integrity"]["verified_file_count"],
+                  "security_verdict": challenge_profile_audit["security_verdict"],
+              },
+              "evidence_packet": {
+                  "packet_id": audit["packet_id"],
+                  "packet_sha256": audit["packet_sha256"],
+                  "receipt_sha256": digest(Path(sys.argv[4])),
+                  "evaluation_mode": audit["evaluation_mode"],
+                  "model_sha256": audit["model_sha256"],
+                  "verified_local_file_count": audit["byte_integrity"]["verified_file_count"],
+                  "claims": audit["claims"],
+                  "security_verdict": audit["security_verdict"],
+              },
+              "negative_controls": {
+                  "expected_case_count": 3,
+                  "rejected_case_count": sum(item["both_rejected"] for item in negative),
+                  "cases": negative,
+              },
+              "claim_ceiling": [
+                  "This is one author-created reference design, not a reported SeqCube-HT corpus member.",
+                  "The inactive result is bounded to the recorded 10-cycle query and assumptions; it is not global unreachability.",
+                  "The artifact contains no model prediction and establishes no detector performance or Trojan prevalence.",
+                  "A signed attestation authenticates this workflow's statement and subject digest; it does not prove the research claim is true.",
+              ],
+          }
+
+          (output / "run-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "source_commit": source_commit,
+              "upstream_commit": checksums["upstream_commit"],
+              "checksum_entries": checksums["manifest_entries"],
+              "checksum_mismatches": len(checksums["mismatches"]),
+              "trigger_budget_tests": manifest["tests"]["trigger_budget"],
+              "evidence_packet_tests": manifest["tests"]["evidence_packet"],
+              "upstream_verifier": verification["result"],
+              "icarus": verification["iverilog"]["status"],
+              "byte_verified_files": audit["byte_integrity"]["verified_file_count"],
+              "negative_controls": manifest["negative_controls"],
+          }, indent=2))
+          PY
+
+      - name: Create deterministic evidence bundle
+        run: |
+          set -euo pipefail
+          tar --sort=name --format=gnu --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -cf - -C "$RUNNER_TEMP" hardsec-seqcube | gzip -n > "$RUNNER_TEMP/hardsec-seqcubewitness-validation-receipt.tar.gz"
+          sha256sum "$RUNNER_TEMP/hardsec-seqcubewitness-validation-receipt.tar.gz"
+
+      - name: Generate HARDSEC evidence attestation predicate
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/hardsec-seqcubewitness-validation-receipt.tar.gz" "$RUNNER_TEMP/hardsec-seqcubewitness-validation-predicate.json" "$RUNNER_TEMP/hardsec-seqcube/run-manifest.json" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          subject = Path(sys.argv[1])
+          manifest = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+          predicate = {
+              "schema_version": "hardsec-seqcubewitness-attestation-v1",
+              "subject": {
+                  "name": subject.name,
+                  "sha256": hashlib.sha256(subject.read_bytes()).hexdigest(),
+              },
+              "run": manifest["run"],
+              "workflow_actions": manifest["workflow_actions"],
+              "upstream": manifest["upstream"],
+              "tests": manifest["tests"],
+              "replay": manifest["replay"],
+              "challenge_profile": manifest["challenge_profile"],
+              "evidence_packet": manifest["evidence_packet"],
+              "negative_controls": manifest["negative_controls"],
+              "claim_ceiling": manifest["claim_ceiling"],
+          }
+          schema = json.loads(Path("schemas/hardsec-seqcubewitness-attestation-v1.schema.json").read_text(encoding="utf-8"))
+          from jsonschema import Draft202012Validator
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(predicate))
+          if errors:
+              raise SystemExit("attestation predicate schema failure: " + "; ".join(error.message for error in errors))
+          Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "subject": predicate["subject"],
+              "source_commit": manifest["run"]["source_commit"],
+              "predicate_type": "https://luminousdynamics.io/attestations/hardsec-seqcubewitness-validation/v1",
+              "schema_validation": "pass",
+          }, indent=2))
+          PY
+
+      - name: Sign HARDSEC evidence bundle with GitHub artifact attestation
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: "${{ runner.temp }}/hardsec-seqcubewitness-validation-receipt.tar.gz"
+          predicate-type: "https://luminousdynamics.io/attestations/hardsec-seqcubewitness-validation/v1"
+          predicate-path: "${{ runner.temp }}/hardsec-seqcubewitness-validation-predicate.json"
+
+      - name: Verify signed HARDSEC evidence bundle identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE_PATH: ${{ runner.temp }}/hardsec-seqcubewitness-validation-receipt.tar.gz
+          EXPECTED_PREDICATE: "https://luminousdynamics.io/attestations/hardsec-seqcubewitness-validation/v1"
+        run: |
+          set -euo pipefail
+          gh attestation verify "$BUNDLE_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/hardsec-audit-tests.yml" \
+            --predicate-type "$EXPECTED_PREDICATE" \
+            --format json > "$RUNNER_TEMP/hardsec-attestation-verification.json"
+          python3 - "$RUNNER_TEMP/hardsec-attestation-verification.json" "$EXPECTED_PREDICATE" <<'PY'
+          import json
+          import sys
+          data = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          expected = sys.argv[2]
+          if not data:
+              raise SystemExit("no verified artifact attestation was returned")
+          for entry in data:
+              statement = entry["verificationResult"]["statement"]
+              if statement["predicateType"] != expected:
+                  raise SystemExit(f"unexpected predicate type: {statement['predicateType']}")
+          print(f"verified {len(data)} signed attestation(s) with expected predicate type")
+          PY
+          mkdir -p "$RUNNER_TEMP/hardsec-attestation"
+          cp "$RUNNER_TEMP/hardsec-seqcubewitness-validation-predicate.json" "$RUNNER_TEMP/hardsec-attestation/"
+          cp "$RUNNER_TEMP/hardsec-attestation-verification.json" "$RUNNER_TEMP/hardsec-attestation/"
+          cp "${{ steps.attest.outputs.bundle-path }}" "$RUNNER_TEMP/hardsec-attestation/sigstore-bundle.json"
+
+      - name: Upload SeqCube witness packet, replay receipts, and signed bundle
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: hardsec-seqcubewitness-validation-receipt
+          path: |
+            ${{ runner.temp }}/hardsec-seqcube/
+            ${{ runner.temp }}/hardsec-seqcubewitness-validation-receipt.tar.gz
+            ${{ runner.temp }}/hardsec-attestation/
+
+
