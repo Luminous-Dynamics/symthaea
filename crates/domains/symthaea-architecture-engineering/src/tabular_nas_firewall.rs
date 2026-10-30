@@ -951,6 +951,25 @@ mod tests {
     }
 
     #[test]
+    fn canonical_import_digest_is_invariant_to_architecture_and_label_order() {
+        let forward = TabularNasBenchmark::new(manifest(), features(12), targets(12))
+            .unwrap()
+            .canonical_import_sha256;
+        let mut reversed_features = features(12);
+        reversed_features.reverse();
+        let mut reversed_targets = targets(12);
+        reversed_targets.reverse();
+        let reversed = TabularNasBenchmark::new(
+            manifest(),
+            reversed_features,
+            reversed_targets,
+        )
+        .unwrap()
+        .canonical_import_sha256;
+        assert_eq!(forward, reversed);
+    }
+
+    #[test]
     fn canonical_json_import_rejects_unknown_fields_and_wrong_outer_schema() {
         let imported = CanonicalTabularImport {
             schema: "wrong".into(),
@@ -1180,6 +1199,21 @@ mod tests {
             oracle.query("arch-000").unwrap();
         });
         assert_eq!(run.evaluation.top_1.queried_top_k_count, 1);
+        assert_eq!(run.evaluation.normalized_regret_percent, Some(0.0));
+    }
+
+    #[test]
+    fn zero_oracle_best_metric_has_no_normalized_regret_denominator() {
+        let mut labels = targets(12);
+        for target in &mut labels {
+            target.value = 0.0;
+        }
+        let benchmark = TabularNasBenchmark::new(manifest(), features(12), labels).unwrap();
+        let run = benchmark.run_search(|_, oracle| {
+            oracle.query("arch-000").unwrap();
+        });
+        assert_eq!(run.evaluation.global_best_metric, 0.0);
+        assert_eq!(run.evaluation.simple_regret, Some(0.0));
         assert_eq!(run.evaluation.normalized_regret_percent, None);
     }
 
