@@ -25,7 +25,7 @@ Binary: \`cargo run --bin cmaq-008-world-model-smoke\`
 - Establishes that the actual model API can be trained, replayed and scored by an
   independent deterministic evaluator.
 
-### v0.2 — counterfactual action ranking
+### v0.2 — counterfactual action ranking (three-regime panel)
 
 Binary: \`cargo run --bin cmaq-008-action-ranking\`
 
@@ -42,7 +42,7 @@ Binary: \`cargo run --bin cmaq-008-action-ranking\`
   regret, fraction of states harmed/improved, oracle-action agreement, pairwise
   action-ranking accuracy, reward prediction MAE, next-state MSE and policy override
   rate.
-- Runs source holdout and a held-out action-effect reversal with paired model seeds.
+- Runs source holdout, a held-out action-effect reversal, and a held-out interaction-sign reversal with paired model seeds. The latter preserves the main action coefficient while changing the state-action interaction from +0.06 to -0.12.
 
 The world-model policy makes three forward calls per decision in this panel. The
 direct baseline makes zero. This is a transparent query-count proxy, not a
