@@ -1,0 +1,81 @@
+name: HARDSEC Family Split Audit
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "examples/hardsec_family_split_audit.rs"
+      - "tests/fixtures/hardsec/hardsec-family-split-valid.json"
+      - "tools/hardsec-family-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-family-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-family-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  audit:
+    name: Family split integrity and known-answer fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check family split auditor formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_family_split_audit.rs
+
+      - name: Resolve isolated harness dependencies
+        run: cargo generate-lockfile --manifest-path tools/hardsec-family-audit-harness/Cargo.toml
+
+      - name: Run family lineage and split negative controls
+        run: cargo test --locked --manifest-path tools/hardsec-family-audit-harness/Cargo.toml --features hardsec-family-audit --example hardsec_family_split_audit
+
+      - name: Audit known-answer leave-one-family-out fixture
+        run: |
+          cargo run --locked --manifest-path tools/hardsec-family-audit-harness/Cargo.toml --features hardsec-family-audit --example hardsec_family_split_audit -- \
+            --manifest tests/fixtures/hardsec/hardsec-family-split-valid.json \
+            --receipt "$RUNNER_TEMP/hardsec-family-split-audit.json"
+          python3 - "$RUNNER_TEMP/hardsec-family-split-audit.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "pass", receipt
+          assert receipt["split_protocol"] == "leave_one_base_family_out", receipt
+          assert receipt["confirmatory_generalization_protocol"] is True, receipt
+          assert receipt["sample_count"] == 6, receipt
+          assert receipt["unique_host_families"] == 3, receipt
+          assert receipt["unique_trojan_insertion_sources"] == 3, receipt
+          assert all(item["samples"] == 2 for item in receipt["split_counts"]), receipt
+          assert all(item["clean"] == 1 and item["trojan"] == 1 for item in receipt["split_counts"]), receipt
+          print("HARDSEC-009 known-answer family holdout: PASS")
+          PY
+
+      - name: Upload exact family split receipt and dependency lock
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-family-split-audit-receipt
+          path: |
+            ${{ runner.temp }}/hardsec-family-split-audit.json
+            tools/hardsec-family-audit-harness/Cargo.lock
+
+      - name: Record lockfile digest on failure too
+        if: always()
+        run: sha256sum tools/hardsec-family-audit-harness/Cargo.lock || true
