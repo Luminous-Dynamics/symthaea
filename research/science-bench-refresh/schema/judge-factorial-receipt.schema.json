@@ -56,8 +56,17 @@
       }
     },
     "analyzer_source_revision": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
+      "allOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        {
+          "not": {
+            "pattern": "^0{40}$"
+          }
+        }
+      ]
     }
   },
   "$defs": {
