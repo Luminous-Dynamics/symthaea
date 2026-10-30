@@ -8,6 +8,7 @@ use std::path::Path;
 const MAX_RUN_RECORD_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_SUITE_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_TASK_SPEC_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_TOTAL_TASK_SPEC_BYTES: u64 = 128 * 1024 * 1024;
 
 /// A deterministic report about record validity. It is not a benchmark score.
 #[derive(Debug, Serialize)]
@@ -508,6 +509,7 @@ fn load_spec_artifacts(
     // Artifacts are keyed by their content identity, not task ID. This avoids
     // duplicate in-memory copies when multiple tasks intentionally share a spec.
     let mut artifacts = BTreeMap::new();
+    let mut total_artifact_bytes = 0_u64;
     for task in manifest.tasks {
         let Some(hex_digest) = task.spec_digest.strip_prefix("sha256:") else {
             continue;
@@ -559,9 +561,23 @@ fn load_spec_artifacts(
         }
 
         let bytes = read_bounded(&canonical_path, MAX_TASK_SPEC_BYTES)?;
+        total_artifact_bytes = checked_total_spec_bytes(total_artifact_bytes, bytes.len() as u64)?;
         artifacts.insert(task.spec_digest, bytes);
     }
     Ok(artifacts)
+}
+
+fn checked_total_spec_bytes(current: u64, additional: u64) -> anyhow::Result<u64> {
+    let total = current
+        .checked_add(additional)
+        .ok_or_else(|| anyhow::anyhow!("aggregate BASALT specification byte count overflow"))?;
+    if total > MAX_TOTAL_TASK_SPEC_BYTES {
+        anyhow::bail!(
+            "aggregate BASALT specification artifacts exceed the configured {} byte limit",
+            MAX_TOTAL_TASK_SPEC_BYTES
+        );
+    }
+    Ok(total)
 }
 
 fn read_bounded(path: &Path, max_bytes: u64) -> anyhow::Result<Vec<u8>> {
@@ -1790,6 +1806,20 @@ mod tests {
 
         let result = load_spec_artifacts(MANIFEST.as_bytes(), root.path());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn aggregate_specification_limit_accepts_exact_boundary() {
+        assert_eq!(
+            checked_total_spec_bytes(MAX_TOTAL_TASK_SPEC_BYTES - 1, 1).unwrap(),
+            MAX_TOTAL_TASK_SPEC_BYTES
+        );
+    }
+
+    #[test]
+    fn aggregate_specification_limit_rejects_overflow_and_excess() {
+        assert!(checked_total_spec_bytes(MAX_TOTAL_TASK_SPEC_BYTES, 1).is_err());
+        assert!(checked_total_spec_bytes(u64::MAX, 1).is_err());
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
