@@ -446,6 +446,16 @@ mod tests {
     }
 
     #[test]
+    fn refuses_to_label_a_different_joint_coverage_as_the_pinned_calibration() {
+        let mut bounds = calibrate_retrieval_utility_bounds(&calibration_rows()).unwrap();
+        bounds.calibration_joint_coverage_percent = 95;
+        assert!(bounds
+            .verify_internal_consistency()
+            .unwrap_err()
+            .contains("pinned 90% joint coverage target"));
+    }
+
+    #[test]
     fn applies_signed_bounds_and_split_receipt_to_runtime_estimate() {
         let rows = calibration_rows();
         let bounds = calibrate_retrieval_utility_bounds(&rows).unwrap();
