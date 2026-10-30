@@ -92,3 +92,7 @@ No calibration pass, retrieval-call reduction, LifeEM gain, deployment qualifica
 - Adaptive Learn-then-Test / e-process risk control: https://arxiv.org/abs/2504.07862
 - Active RAG, *When Should Active RAG Retrieve? A Budget-Aware Evaluation of Utility, Calibration, and Cost* (2026): https://arxiv.org/abs/2607.24010
 - HALT, *Verification-Aware Stopping for Retrieval-Augmented Search Agents*, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.343/
+
+## Versioned conformance fixtures
+
+The four synthetic scenarios in [retrieval-calibration-fixtures-v1.json](retrieval-calibration-fixtures-v1.json) cover perfect coverage, empirical under-coverage, Bonferroni family-size correction and insufficient sample size. The Rust test suite reads this fixture file and checks whether a capability is minted. These fixtures test the arithmetic and API boundary only; they are not evidence of real estimator calibration.
