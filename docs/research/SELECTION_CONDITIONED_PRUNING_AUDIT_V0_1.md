@@ -40,24 +40,14 @@ Let:
 - (x) be the number of sampled sentinels that beat the selected frontier;
 - (K) be the unknown number of candidates in the entire pruned population that would beat the frontier.
 
-Under simple random sampling without replacement,
+Under simple random sampling without replacement:
 
-[
-X sim \operatorname{Hypergeometric}(N,K,n).
-]
-
-For confidence level (1-\alpha), compute
-
-[
-K_U = \max\left\{K \in [x,N]:
-\Pr(X \leq x \mid N,K,n) \geq \alpha\right\}.
-]
-
-Then the conservative upper bound on the false-pruned fraction is
-
-[
-p_U = K_U/N.
-]
+```text
+X ~ Hypergeometric(N, K, n)
+alpha = 1 - confidence_level
+K_U = largest K in [x, N] with P(X <= x | N, K, n) >= alpha
+p_U = K_U / N
+```
 
 This is a discrete, conservative one-sided bound for the stated finite-population sampling design. It is preferable here to applying a binomial/Wilson interval mechanically to a sample drawn without replacement. The inversion is computed in log space to reduce underflow.
 
@@ -127,7 +117,7 @@ The first code increment provides:
 - exact one-outcome-per-sentinel enforcement, preventing silent omission of failed or missing audit results;
 - explicit cumulative-cost audit accounting.
 
-Fifteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
+Sixteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, pinned independent hypergeometric reference values, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
 
 A one-off independent mathematical check used a Python log-domain mirror of the inversion and compared its upper-bound decisions with SciPy's hypergeometric CDF: 8,900 cases passed (all configurations for N <= 35 at 95% confidence plus 500 randomized cases up to N = 100,000 at 90%, 95% and 99%). This is independent formula-level validation only; it is not execution of the Rust implementation, is not part of CI, and should be converted into pinned reference fixtures/tests before qualification.
 
