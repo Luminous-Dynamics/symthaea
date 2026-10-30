@@ -225,8 +225,10 @@ pub enum WorkloadRegimeError {
     WorkloadMismatch,
     /// Profile refers to a different comparison contract.
     ContractMismatch,
-    /// Workload family or holdout dataset group crosses evaluation partitions.
-    HoldoutLeakage,
+    /// Workload family appears in more than one evaluation partition.
+    WorkloadFamilyLeakage,
+    /// Holdout dataset/source group appears in more than one partition.
+    HoldoutGroupLeakage,
     /// A regime query contains an invalid interval or domain value.
     InvalidQuery,
     /// A required digest is not exactly 64 hexadecimal characters.
@@ -448,6 +450,8 @@ pub struct WorkloadRegimeQuery {
     pub temporal_pattern: Option<WorkloadTemporalPattern>,
     /// Event-rate operating region in events/s.
     pub event_rate_hz: Option<MetricInterval>,
+    /// Peak-to-mean event-rate operating region.
+    pub burst_peak_to_mean_ratio: Option<MetricInterval>,
     /// Active fraction operating region in [0, 1].
     pub active_fraction: Option<MetricInterval>,
     /// Temporal horizon operating region in seconds.
@@ -498,6 +502,7 @@ pub fn workload_regime_matches_query(
         };
     }
     metric_match!(event_rate_hz);
+    metric_match!(burst_peak_to_mean_ratio);
     metric_match!(active_fraction);
     metric_match!(temporal_horizon_seconds);
     metric_match!(state_update_rate_hz);
@@ -567,6 +572,10 @@ pub fn validate_workload_regime_query(
     query: &WorkloadRegimeQuery,
 ) -> Result<(), WorkloadRegimeError> {
     if !valid_non_negative(query.event_rate_hz)
+        || !valid_non_negative(query.burst_peak_to_mean_ratio)
+        || query
+            .burst_peak_to_mean_ratio
+            .is_some_and(|value| value.lower < 1.0)
         || !valid_non_negative(query.state_update_rate_hz)
         || !valid_non_negative(query.active_fraction)
     {
@@ -629,6 +638,9 @@ pub fn validate_workload_holdout_assignments(
 pub fn validate_regime_record_holdout_separation(
     records: &[(&RegimeBoundEvidenceRecord, ArchitectureEvaluationPartition)],
 ) -> Result<(), WorkloadRegimeError> {
+    for (record, _) in records {
+        validate_regime_bound_evidence_record(record)?;
+    }
     let assignments: Vec<WorkloadHoldoutAssignment> = records
         .iter()
         .map(|(record, partition)| WorkloadHoldoutAssignment {
@@ -639,9 +651,11 @@ pub fn validate_regime_record_holdout_separation(
         .collect();
     validate_workload_holdout_assignments(&assignments).map_err(|error| match error {
         WorkloadHoldoutError::EmptyIdentifier => WorkloadRegimeError::EmptyField,
-        WorkloadHoldoutError::WorkloadFamilyLeakage
-        | WorkloadHoldoutError::HoldoutGroupLeakage => {
-            WorkloadRegimeError::HoldoutLeakage
+        WorkloadHoldoutError::WorkloadFamilyLeakage => {
+            WorkloadRegimeError::WorkloadFamilyLeakage
+        }
+        WorkloadHoldoutError::HoldoutGroupLeakage => {
+            WorkloadRegimeError::HoldoutGroupLeakage
         }
     })
 }
@@ -853,6 +867,16 @@ mod tests {
             ..empty_query()
         };
         assert!(!workload_regime_matches_query(&profile, &query));
+    }
+
+    #[test]
+    fn query_can_slice_event_burstiness() {
+        let profile = regime();
+        let query = WorkloadRegimeQuery {
+            burst_peak_to_mean_ratio: Some(interval(4.0, 6.0)),
+            ..empty_query()
+        };
+        assert!(workload_regime_matches_query(&profile, &query));
     }
 
     #[test]
@@ -1112,6 +1136,7 @@ mod tests {
             execution_mode: None,
             temporal_pattern: None,
             event_rate_hz: None,
+            burst_peak_to_mean_ratio: None,
             active_fraction: None,
             temporal_horizon_seconds: None,
             working_set_bytes: None,
