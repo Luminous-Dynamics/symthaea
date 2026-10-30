@@ -16,8 +16,9 @@ The binary `connectome-colinear-merge-audit` consumes ordered 1D centreline feat
 - local synapse density.
 
 It compares:
-1. `radius_only_piecewise_linear`;
-2. `multifeature_piecewise_linear`.
+1. `no_proposal`, which estimates the miss rate when no candidate is generated;
+2. `radius_only_piecewise_linear`;
+3. `multifeature_piecewise_linear`.
 
 At each possible split location, it compares one linear fit over a symmetric local window with two independent linear fits on either side. The score is the square root of summed, noise-normalized residual reduction, less a two-parameter overfit penalty per feature. A threshold and spatial non-maximum suppression produce boundary proposals.
 
@@ -48,7 +49,7 @@ The checked-in fixture contains:
 - a temporary membrane-integrity acquisition artifact;
 - an abrupt synapse-density compartment transition.
 
-Only the first two tracks are labelled as hidden merge boundaries. The remaining four are explicit negative controls. The feature arrays are synthetic signals, not extracted EM or morphology data.
+Only the first two tracks are labelled as hidden merge boundaries. The remaining four are explicit negative controls. The feature arrays are synthetic signals, not extracted EM or morphology data. With the checked-in threshold and feature-noise scales, the expected synthetic fixture report is: no-proposal 0/2 true positives; radius-only 1/2 true positives, 1 false proposal; multifeature 2/2 true positives, 7 false proposals. These are deterministic synthetic test expectations, not measured biological metrics. The high multifeature false-positive burden is an intentional warning about confusing boutons, imaging artifacts, and genuine compartment transitions with cell-identity boundaries.
 
 ## Metrics
 
@@ -64,7 +65,7 @@ For biological evaluation, also report results by species, region, neurite class
 ## Required next comparisons
 
 Before promotion, benchmark against:
-- no-proposal and fixed radius-discontinuity baselines;
+- no-proposal and fixed radius-discontinuity baselines (the no-proposal comparator is included in V1);
 - skeleton branch/node rules;
 - NEURD morphology rules where the same data and adjudication are applicable;
 - mesh-only, skeleton-only, EM-only and fused feature variants;
