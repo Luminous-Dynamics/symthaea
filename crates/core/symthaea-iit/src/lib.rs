@@ -213,6 +213,90 @@ pub struct SystemPhiPartitionScore {
     pub severed_connections: usize,
 }
 
+/// Bounded, explicit policy for an exact IIT 4.0 (2023) system search.
+///
+/// The search is exhaustive within these declared limits. Exceeding either
+/// limit returns an error; no partial result is marked exact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Iit4SystemPhiSearchConfig {
+    pub decimal_precision: u32,
+    pub max_partition_combinations: usize,
+    pub max_state_pair_evaluations: usize,
+    pub include_total_cut: bool,
+}
+
+impl Default for Iit4SystemPhiSearchConfig {
+    fn default() -> Self {
+        Self {
+            decimal_precision: 6,
+            max_partition_combinations: 100_000,
+            max_state_pair_evaluations: 1_024,
+            include_total_cut: false,
+        }
+    }
+}
+
+/// Outcome of the IIT 4.0 (2023) Integration-level system search.
+///
+/// Composition-level state-pair tie resolution requires the cause-effect
+/// structure and its big-Phi value. This crate does not yet compute that
+/// structure, so it reports such ties rather than choosing an arbitrary pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Iit4SystemPhiStatus {
+    ExactUniqueStatePair,
+    UnresolvedCompositionTie,
+    UnresolvedCanonicalTie,
+    NullDisconnected,
+    NullNoCause,
+    NullNoEffect,
+    NullSingleUnit,
+}
+
+/// Selected minimum-information partition for one fixed system-state pair.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Iit4SystemPhiStatePairResult {
+    pub system_state: Iit4SystemState,
+    pub winning_partition: DirectedSystemPartition,
+    pub score: SystemPhiPartitionScore,
+    /// Gap in clamped normalized Phi to the nearest competing partition.
+    /// Zero records a tie under the default PyPhi SIA partition ranking.
+    pub partition_margin: Option<f64>,
+}
+
+/// Summary of the exact directed partition enumeration used by a system search.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Iit4SystemPhiPartitionSummary {
+    pub raw_direction_labelings_equivalent: usize,
+    pub canonical_direction_assignments_evaluated: usize,
+    pub redundant_direction_assignments_pruned: usize,
+    pub unique_non_total_cuts: usize,
+    pub total_cut_included: bool,
+}
+
+/// Auditable IIT 4.0 (2023) system-level search result.
+///
+/// phi_s is populated only when the state-pair cascade has a unique winner,
+/// or when every unresolved zero-Phi tie necessarily has the same exact value
+/// zero. A nonzero Composition-level tie leaves phi_s unset because the
+/// winning specified-state pair cannot be known without big Phi.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Iit4SystemPhiAnalysis {
+    pub formalism: FormalismProfile,
+    pub candidate_system: Vec<usize>,
+    pub request_sha256: String,
+    pub status: Iit4SystemPhiStatus,
+    pub phi_s: Option<f64>,
+    pub selected_state_pair_index: Option<usize>,
+    pub tied_state_pair_indices: Vec<usize>,
+    /// One MIP result for each member of the Cartesian cause/effect tie family.
+    pub state_pair_results: Vec<Iit4SystemPhiStatePairResult>,
+    pub partition_summary: Iit4SystemPhiPartitionSummary,
+    pub partition_score_evaluations: usize,
+    /// True means the declared exact search completed; null/short-circuit
+    /// results are complete under the documented PyPhi guard conditions.
+    pub complete: bool,
+}
+
 /// Errors while evaluating a fixed-state IIT 4.x system partition.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum SystemPhiError {
@@ -236,6 +320,19 @@ pub enum SystemPhiError {
     InvalidNumericalPrecision { precision: u32 },
     #[error("intrinsic-specification GID became non-finite at state index {state_index}")]
     NonFiniteIntrinsicSpecification { state_index: usize },
+    #[error("system partition enumeration failed: {0}")]
+    PartitionEnumeration(#[from] PartitionEnumerationError),
+    #[error("system partition enumeration exceeded its budget of {max_combinations} canonical representatives")]
+    PartitionBudgetExceeded { max_combinations: usize },
+    #[error("partition GID score became non-finite")]
+    NonFinitePartitionScore,
+    #[error("specified-state pair count {candidate_pairs} exceeds the configured budget of {max_state_pairs}")]
+    StatePairBudgetExceeded {
+        candidate_pairs: usize,
+        max_state_pairs: usize,
+    },
+    #[error("specified-state pair count overflow")]
+    StatePairCounterOverflow,
 }
 
 /// Errors while applying a directed partition to a causal model.
@@ -1378,6 +1475,248 @@ impl BinaryCausalModel {
         })
     }
 
+    /// Run the exhaustive IIT 4.0 (2023) system-level phi_s search.
+    ///
+    /// For each tied cause/effect intrinsic-specification state pair, this:
+    /// 1. evaluates every member of PyPhi's DIRECTED_SET_PARTITION family;
+    /// 2. selects the MIP by minimum normalized phi, then maximum nonnegative
+    ///    phi, then PyPhi's lexicographic induced-cut order;
+    /// 3. resolves the system-state pair by maximum phi_s.
+    ///
+    /// If the Integration-level state-pair maximum ties at nonzero phi, PyPhi
+    /// escalates to Composition and compares big Phi. Since this crate does
+    /// not yet compute the cause-effect structure, the result is explicitly
+    /// marked unresolved and phi_s remains None. No arbitrary representative
+    /// is chosen.
+    ///
+    /// Only IIT 4.0 (2023) is implemented here. The 2026 intrinsic-information
+    /// cap is intentionally not applied or implied by this API.
+    pub fn analyze_iit4_2023_system_phi_s(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        config: Iit4SystemPhiSearchConfig,
+    ) -> Result<Iit4SystemPhiAnalysis, SystemPhiError> {
+        self.check_state(current_state)?;
+        self.validate_subset(candidate_system, "candidate_system")?;
+        if candidate_system.is_empty() {
+            return Err(SystemPhiError::Model(ModelError::EmptyCandidateSystem));
+        }
+        if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(SystemPhiError::CandidateSystemNotCanonical);
+        }
+        if config.decimal_precision > 15 {
+            return Err(SystemPhiError::InvalidNumericalPrecision {
+                precision: config.decimal_precision,
+            });
+        }
+
+        let request = AnalysisRequest::new(
+            self,
+            current_state.to_vec(),
+            candidate_system.to_vec(),
+            FormalismProfile::Iit4_0_2023,
+            AnalysisQuantity::Iit4SystemPhiS,
+        )?;
+        let request_sha256 = request.request_sha256(self);
+
+        let empty_summary = Iit4SystemPhiPartitionSummary::default();
+        let null_result = |status, phi_s| Iit4SystemPhiAnalysis {
+            formalism: FormalismProfile::Iit4_0_2023,
+            candidate_system: candidate_system.to_vec(),
+            request_sha256: request_sha256.clone(),
+            status,
+            phi_s,
+            selected_state_pair_index: None,
+            tied_state_pair_indices: Vec::new(),
+            state_pair_results: Vec::new(),
+            partition_summary: empty_summary,
+            partition_score_evaluations: 0,
+            complete: true,
+        };
+
+        // PyPhi's default IIT 4.0 convention treats a single micro-unit system
+        // as zero-Phi, regardless of whether that unit has a self-loop.
+        if candidate_system.len() == 1 {
+            return Ok(null_result(Iit4SystemPhiStatus::NullSingleUnit, Some(0.0)));
+        }
+        if !self.candidate_is_strongly_connected(candidate_system) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullDisconnected, Some(0.0)));
+        }
+
+        let intrinsic = self.system_intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            config.decimal_precision,
+        )?;
+        let epsilon = 10.0_f64.powi(-(config.decimal_precision as i32));
+        if !pyphi_is_positive(intrinsic.cause.intrinsic_specification, epsilon) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullNoCause, Some(0.0)));
+        }
+        if !pyphi_is_positive(intrinsic.effect.intrinsic_specification, epsilon) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullNoEffect, Some(0.0)));
+        }
+
+        let state_pair_count = intrinsic
+            .cause
+            .specified_states
+            .len()
+            .checked_mul(intrinsic.effect.specified_states.len())
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        if state_pair_count > config.max_state_pair_evaluations {
+            return Err(SystemPhiError::StatePairBudgetExceeded {
+                candidate_pairs: state_pair_count,
+                max_state_pairs: config.max_state_pair_evaluations,
+            });
+        }
+
+        let mut enumeration = enumerate_iit4_system_partitions_with_stats(
+            candidate_system,
+            self.n_units,
+            config.include_total_cut,
+            config.max_partition_combinations,
+        )?;
+        let partition_summary = Iit4SystemPhiPartitionSummary {
+            raw_direction_labelings_equivalent: enumeration.raw_direction_assignments_equivalent,
+            canonical_direction_assignments_evaluated: enumeration.canonical_direction_assignments_evaluated,
+            redundant_direction_assignments_pruned: enumeration.redundant_direction_assignments_pruned,
+            unique_non_total_cuts: enumeration.unique_non_total_cuts,
+            total_cut_included: enumeration.total_cut_included,
+        };
+        // Move the canonical partition list out of the stats report so only
+        // one candidate vector remains live during the scoring pass.
+        let partitions = std::mem::take(&mut enumeration.partitions);
+        let partition_score_evaluations = partitions
+            .len()
+            .checked_mul(state_pair_count)
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+
+        let state_pairs = intrinsic.state_pairs();
+        let mut state_pair_results = Vec::with_capacity(state_pair_count);
+        for system_state in state_pairs {
+            let mut scores = Vec::with_capacity(partitions.len());
+            for partition in &partitions {
+                let score = self.score_iit4_system_partition(
+                    partition,
+                    current_state,
+                    &system_state,
+                )?;
+                if !score.signed_phi.is_finite()
+                    || !score.phi.is_finite()
+                    || !score.normalized_phi.is_finite()
+                {
+                    return Err(SystemPhiError::NonFinitePartitionScore);
+                }
+                scores.push(score);
+            }
+
+            if scores.is_empty() {
+                return Err(SystemPhiError::ZeroSeveredConnections);
+            }
+            let winner_index = select_pyphi_sia_partition(&partitions, &scores, epsilon);
+            let winner_score = scores[winner_index].clone();
+            let competing_normalized = scores
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != winner_index)
+                .map(|(_, score)| score.normalized_phi)
+                .min_by(f64::total_cmp);
+            let partition_margin = competing_normalized
+                .map(|runner_up| (runner_up - winner_score.normalized_phi).max(0.0));
+
+            state_pair_results.push(Iit4SystemPhiStatePairResult {
+                system_state,
+                winning_partition: partitions[winner_index].clone(),
+                score: winner_score,
+                partition_margin,
+            });
+        }
+
+        let maximum_phi = state_pair_results
+            .iter()
+            .map(|result| result.score.phi)
+            .max_by(f64::total_cmp)
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        let tied_state_pair_indices = state_pair_results
+            .iter()
+            .enumerate()
+            .filter(|(_, result)| pyphi_eq(result.score.phi, maximum_phi, epsilon))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        let (status, phi_s, selected_state_pair_index) =
+            if tied_state_pair_indices.len() == 1 {
+                (
+                    Iit4SystemPhiStatus::ExactUniqueStatePair,
+                    Some(maximum_phi),
+                    Some(tied_state_pair_indices[0]),
+                )
+            } else if tied_state_pair_indices
+                .iter()
+                .all(|index| state_pair_results[*index].score.phi == 0.0)
+            {
+                // PyPhi resolves a reducible all-zero state-pair tie by a
+                // canonical state representative. Retain the tie family;
+                // only the scalar zero is invariant without that choice.
+                (
+                    Iit4SystemPhiStatus::UnresolvedCanonicalTie,
+                    Some(0.0),
+                    None,
+                )
+            } else {
+                (
+                    Iit4SystemPhiStatus::UnresolvedCompositionTie,
+                    None,
+                    None,
+                )
+            };
+
+        Ok(Iit4SystemPhiAnalysis {
+            formalism: FormalismProfile::Iit4_0_2023,
+            candidate_system: candidate_system.to_vec(),
+            request_sha256,
+            status,
+            phi_s,
+            selected_state_pair_index,
+            tied_state_pair_indices,
+            state_pair_results,
+            partition_summary,
+            partition_score_evaluations,
+            complete: true,
+        })
+    }
+
+    /// Whether the declared candidate-subsystem connectivity is strongly connected.
+    fn candidate_is_strongly_connected(&self, candidate_system: &[usize]) -> bool {
+        if candidate_system.is_empty() {
+            return false;
+        }
+        let reaches_all = |reverse: bool| {
+            let mut visited = vec![false; candidate_system.len()];
+            let mut stack = vec![0usize];
+            visited[0] = true;
+            while let Some(source_local) = stack.pop() {
+                let source = candidate_system[source_local];
+                for (target_local, target) in candidate_system.iter().copied().enumerate() {
+                    if visited[target_local] {
+                        continue;
+                    }
+                    let edge = if reverse {
+                        self.connectivity[target * self.n_units + source]
+                    } else {
+                        self.connectivity[source * self.n_units + target]
+                    };
+                    if edge {
+                        visited[target_local] = true;
+                        stack.push(target_local);
+                    }
+                }
+            }
+            visited.into_iter().all(|seen| seen)
+        };
+        reaches_all(false) && reaches_all(true)
+    }
+
     /// SHA-256 of the v0.1 canonical binary model encoding.
     ///
     /// Encoding: magic/version bytes; n_units as little-endian u32; each TPM
@@ -1589,6 +1928,59 @@ impl AnalysisRequest {
         bytes.extend_from_slice(self.quantity.id().as_bytes());
         hex_digest(&bytes)
     }
+}
+
+/// PyPhi numerics.eq: symmetric relative tolerance with an absolute floor.
+fn pyphi_eq(left: f64, right: f64, epsilon: f64) -> bool {
+    if !left.is_finite() || !right.is_finite() {
+        return left == right;
+    }
+    let tolerance = (epsilon * left.abs().max(right.abs())).max(epsilon);
+    (left - right).abs() <= tolerance
+}
+
+/// PyPhi numerics.is_positive: positive and not tolerance-equal to zero.
+fn pyphi_is_positive(value: f64, epsilon: f64) -> bool {
+    value > 0.0 && !pyphi_eq(value, 0.0, epsilon)
+}
+
+/// Default PyPhi IIT 4.0 sia_tie_resolution:
+/// min NORMALIZED_PHI, then min NEGATIVE_PHI (max PHI), then PARTITION_LEX.
+fn select_pyphi_sia_partition(
+    partitions: &[DirectedSystemPartition],
+    scores: &[SystemPhiPartitionScore],
+    epsilon: f64,
+) -> usize {
+    debug_assert_eq!(partitions.len(), scores.len());
+    let minimum_normalized = scores
+        .iter()
+        .map(|score| score.normalized_phi)
+        .min_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    let normalized_ties = scores
+        .iter()
+        .enumerate()
+        .filter(|(_, score)| pyphi_eq(score.normalized_phi, minimum_normalized, epsilon))
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+
+    let maximum_phi = normalized_ties
+        .iter()
+        .map(|index| scores[*index].phi)
+        .max_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    normalized_ties
+        .into_iter()
+        .filter(|index| pyphi_eq(scores[*index].phi, maximum_phi, epsilon))
+        // PyPhi PARTITION_LEX compares row-major induced cut-matrix bytes.
+        // For one fixed ascending candidate subsystem, the local matrix has
+        // the same ordering as its zero-embedded substrate matrix.
+        .min_by(|left, right| {
+            partitions[*left]
+                .cut_matrix()
+                .cmp(partitions[*right].cut_matrix())
+        })
+        .unwrap_or(0)
 }
 
 fn system_phi_direction_score(
