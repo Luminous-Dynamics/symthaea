@@ -14,6 +14,12 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - schema/judge-robustness-plan.schema.json and schema/judge-robustness-report.schema.json plus non-scoring fixtures.
 - tools/judge_robustness_test_vectors.py: synthetic CLI positive controls and hostile mutations; not empirical judge evidence.
 - docs/research/SCI-REFERENCE-ASSURANCE-001.md: protocol for evidence-backed reference labels, independent adjudication, uncertainty preservation, source ancestry and external custody.
+- docs/research/SCI-RUBRIC-EXPLOITABILITY-001.md: protocol for rubric validity, meaning-preserving/meaning-changing interventions, score gaming, adaptive Goodhart tests and human-alignment comparisons; no empirical result is claimed.
+- schema/rubric-robustness-plan.schema.json: strict plan contract for meaning-preserving, surface-cue, meaning-changing and evidence-withdrawal interventions.
+- tools/rubric_attack_vectors.py: deterministic synthetic paired rubric/candidate corpus generator; no judge execution or scoring.
+- tools/test_rubric_attack_vectors.py: test-only checks for case coverage, digest binding and intervention semantics.
+- schema/rubric-specification.schema.json and fixtures/rubric-specification.example.json: strict rubric-specification contract and a four-criterion, non-scoring example with explicit evidence rules, exclusions, priorities, hard vetoes, anchors, counterexamples and planned adversarial coverage.
+- tools/rubric_specification_audit.py and tools/test_rubric_specification_audit.py: static rubric structure/coverage audit and hostile controls; reports declared coverage only, not empirical validity.
 - src/reference_assurance.rs: strict typed reference-package commitment/verification, cross-record validation, disagreement accounting and explicit claim-boundary report.
 - schema/reference-assurance-package.schema.json and fixtures/reference-assurance-package.example.json: strict v1 package schema and non-scoring example with intentionally preserved rater disagreement.
 - tools/test_reference_assurance.py: independent standard-library Python commitment/structure oracle and adversarial unit tests; test-only, not a production validator.
@@ -27,6 +33,29 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Audit a structured rubric specification
+
+The static audit checks that each criterion defines what counts as evidence, what is insufficient, exclusions, applicability, priority, hard-veto semantics where needed, score anchors, counterexamples and mapped positive/negative/edge/adversarial tests.
+
+```sh
+python3 research/science-bench-refresh/tools/rubric_specification_audit.py \
+  research/science-bench-refresh/fixtures/rubric-specification.example.json
+python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_rubric_specification_audit.py' -v
+```
+
+A passing structural audit does not establish construct validity, human preference fit, empirical dimensionality, judge behavior or adversarial robustness. Those require blinded experiments and held-out human references.
+
+## Generate rubric exploitability synthetic controls
+
+The test-only generator emits a precommitted, non-scoring plan and a paired artifact corpus containing rubric paraphrase/order changes, verbosity and keyword attacks, confidence/citation/formatting theater, criterion removal/priority changes, and evidence withdrawal.
+
+```sh
+python3 research/science-bench-refresh/tools/rubric_attack_vectors.py /tmp/rubric-attacks
+python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_rubric_attack_vectors.py' -v
+```
+
+The corpus does not call a judge or establish human preferences. Its expected relations are synthetic protocol controls; real scoring requires a blinded reference panel and frozen judge/rubric execution.
 
 ## Validate an evaluator-side reference package
 

@@ -1,0 +1,354 @@
+{
+  "schema": "symthaea.science_bench_refresh_rubric_specification.v1",
+  "purpose": "example_only",
+  "rubric_id": "evidence-grounded-scientific-claim-rubric-example-001",
+  "rubric_source_revision": "NOT_IMPLEMENTED_YET",
+  "rubric_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "hard_constraint_policy": "veto_not_average",
+  "score_scale": {
+    "minimum_millionths": 0,
+    "maximum_millionths": 1000000
+  },
+  "criteria": [
+    {
+      "criterion_id": "claim_accuracy",
+      "construct_dimension": "factual_correctness",
+      "definition": "Material factual claims must match the declared reference evidence and must not introduce unsupported or contradictory facts.",
+      "applicability": "Apply to every material factual assertion. Mark a claim not evaluable when the reference packet does not establish the relevant fact.",
+      "required_observable_evidence": [
+        "Each material assertion is mapped to an admissible reference or explicitly marked unsupported.",
+        "Contradictions with the reference packet are identified and resolved or preserved as contested."
+      ],
+      "insufficient_evidence": [
+        "Confident wording without admissible support.",
+        "A plausible explanation that does not establish the material fact."
+      ],
+      "exclusions": [
+        "Grammar and stylistic elegance do not establish factual correctness.",
+        "The number of citations does not establish correctness."
+      ],
+      "priority": 1,
+      "hard_constraint": true,
+      "veto_condition": "Any unsupported or contradicted material factual assertion prevents a top-level correctness pass.",
+      "score_anchors": [
+        {
+          "score_millionths": 0,
+          "description": "Material assertions are contradicted or unsupported."
+        },
+        {
+          "score_millionths": 500000,
+          "description": "Some material assertions are supported, but a substantive gap or contradiction remains."
+        },
+        {
+          "score_millionths": 1000000,
+          "description": "All material assertions are supported within the declared reference scope."
+        }
+      ],
+      "counterexamples": [
+        "A long confident explanation contains one invented material statistic.",
+        "A correct conclusion is reached using a source that actually contradicts the stated fact."
+      ],
+      "planned_test_ids": [
+        "accuracy-positive",
+        "accuracy-negative",
+        "accuracy-edge",
+        "accuracy-adversarial"
+      ]
+    },
+    {
+      "criterion_id": "evidence_support",
+      "construct_dimension": "evidence_entailment",
+      "definition": "Cited evidence must be authentic within the supplied packet, relevant to the claim, and strong enough to support the inference actually made.",
+      "applicability": "Apply to every cited source span used to justify a material claim. Distinguish citation presence from entailment and source independence.",
+      "required_observable_evidence": [
+        "The cited span directly supports or appropriately qualifies the associated claim.",
+        "The inference does not exceed the source's population, method, unit, or evidential strength."
+      ],
+      "insufficient_evidence": [
+        "A URL or citation without a relevant supporting span.",
+        "Multiple syndicated copies of one source presented as independent corroboration."
+      ],
+      "exclusions": [
+        "Citation count alone is not evidence quality.",
+        "A source's prestige does not repair a span that fails to support the claim."
+      ],
+      "priority": 2,
+      "hard_constraint": true,
+      "veto_condition": "A top-level evidence pass is blocked when a material claim relies on fabricated, irrelevant, or non-entailing citations.",
+      "score_anchors": [
+        {
+          "score_millionths": 0,
+          "description": "Citations are absent, fabricated, or materially non-supporting."
+        },
+        {
+          "score_millionths": 500000,
+          "description": "Some sources are relevant but scope or inferential strength is incomplete."
+        },
+        {
+          "score_millionths": 1000000,
+          "description": "Every material claim has directly relevant evidence with a justified inference."
+        }
+      ],
+      "counterexamples": [
+        "A response repeats the same source ID six times to imitate corroboration.",
+        "A source reports correlation but the response asserts causation."
+      ],
+      "planned_test_ids": [
+        "evidence-positive",
+        "evidence-negative",
+        "evidence-edge",
+        "evidence-adversarial"
+      ]
+    },
+    {
+      "criterion_id": "scope_alignment",
+      "construct_dimension": "scope_and_temporality",
+      "definition": "The response must preserve the source's relevant population, setting, jurisdiction, unit, version, and temporal validity.",
+      "applicability": "Apply wherever the claim or evidence depends on a time, population, location, measurement unit, or operating condition.",
+      "required_observable_evidence": [
+        "The response explicitly preserves material scope and target-time constraints.",
+        "Outdated or superseded evidence is not represented as current without a valid historical scope."
+      ],
+      "insufficient_evidence": [
+        "A measurement is transferred to a different population without justification.",
+        "A superseded source is used as current evidence."
+      ],
+      "exclusions": [
+        "A publication date alone does not establish continuing validity.",
+        "A matching topic does not establish matching population or jurisdiction."
+      ],
+      "priority": 3,
+      "hard_constraint": true,
+      "veto_condition": "A material scope or temporal mismatch blocks a supported-within-scope result.",
+      "score_anchors": [
+        {
+          "score_millionths": 0,
+          "description": "The conclusion is outside the source's scope or target time."
+        },
+        {
+          "score_millionths": 500000,
+          "description": "Some scope dimensions match, but a material qualifier is missing."
+        },
+        {
+          "score_millionths": 1000000,
+          "description": "All declared scope and temporal constraints are respected."
+        }
+      ],
+      "counterexamples": [
+        "A study of adults is cited as direct evidence about children.",
+        "A superseded policy is cited as if it remains current."
+      ],
+      "planned_test_ids": [
+        "scope-positive",
+        "scope-negative",
+        "scope-edge",
+        "scope-adversarial"
+      ]
+    },
+    {
+      "criterion_id": "clarity",
+      "construct_dimension": "communication_quality",
+      "definition": "The answer communicates the conclusion, uncertainty, and reasoning clearly without relying on presentation tricks.",
+      "applicability": "Apply only after correctness, evidence support and scope requirements are assessed; clarity cannot compensate for hard-constraint failures.",
+      "required_observable_evidence": [
+        "The conclusion and material qualifications can be identified without reconstructing the whole response.",
+        "Uncertainty and limitations are communicated in proportion to the available evidence."
+      ],
+      "insufficient_evidence": [
+        "A checklist or polished layout with no additional substantive information.",
+        "Length and assertiveness used in place of explanation."
+      ],
+      "exclusions": [
+        "Verbosity is not completeness.",
+        "Formatting similarity to the rubric is not criterion satisfaction."
+      ],
+      "priority": 4,
+      "hard_constraint": false,
+      "veto_condition": null,
+      "score_anchors": [
+        {
+          "score_millionths": 0,
+          "description": "The conclusion and key limitations are difficult to identify."
+        },
+        {
+          "score_millionths": 500000,
+          "description": "The main point is understandable but important qualifiers are poorly organized."
+        },
+        {
+          "score_millionths": 1000000,
+          "description": "The conclusion and material qualifications are concise, precise, and accessible."
+        }
+      ],
+      "counterexamples": [
+        "A verbose response repeats criteria without improving understanding.",
+        "A checklist restates the rubric but omits the actual result."
+      ],
+      "planned_test_ids": [
+        "clarity-positive",
+        "clarity-negative",
+        "clarity-edge",
+        "clarity-adversarial"
+      ]
+    }
+  ],
+  "dependency_rules": [
+    {
+      "from_criterion_id": "claim_accuracy",
+      "to_criterion_id": "clarity",
+      "relation": "overrides",
+      "rationale": "A materially incorrect answer cannot receive a passing overall result by being clear or persuasive."
+    },
+    {
+      "from_criterion_id": "evidence_support",
+      "to_criterion_id": "clarity",
+      "relation": "overrides",
+      "rationale": "Presentation quality cannot compensate for unsupported material claims."
+    }
+  ],
+  "tests": [
+    {
+      "test_id": "accuracy-positive",
+      "test_type": "positive",
+      "criterion_ids": [
+        "claim_accuracy"
+      ],
+      "expected_judge_behavior": "accept_supported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "accuracy-negative",
+      "test_type": "negative",
+      "criterion_ids": [
+        "claim_accuracy"
+      ],
+      "expected_judge_behavior": "reject_unsupported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "accuracy-edge",
+      "test_type": "edge_case",
+      "criterion_ids": [
+        "claim_accuracy"
+      ],
+      "expected_judge_behavior": "abstain_or_mark_scope_ambiguous",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "accuracy-adversarial",
+      "test_type": "adversarial",
+      "criterion_ids": [
+        "claim_accuracy"
+      ],
+      "expected_judge_behavior": "no_unearned_score_uplift",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "evidence-positive",
+      "test_type": "positive",
+      "criterion_ids": [
+        "evidence_support"
+      ],
+      "expected_judge_behavior": "accept_supported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "evidence-negative",
+      "test_type": "negative",
+      "criterion_ids": [
+        "evidence_support"
+      ],
+      "expected_judge_behavior": "reject_unsupported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "evidence-edge",
+      "test_type": "edge_case",
+      "criterion_ids": [
+        "evidence_support"
+      ],
+      "expected_judge_behavior": "abstain_or_mark_scope_ambiguous",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "evidence-adversarial",
+      "test_type": "adversarial",
+      "criterion_ids": [
+        "evidence_support"
+      ],
+      "expected_judge_behavior": "no_unearned_score_uplift",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "scope-positive",
+      "test_type": "positive",
+      "criterion_ids": [
+        "scope_alignment"
+      ],
+      "expected_judge_behavior": "accept_supported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "scope-negative",
+      "test_type": "negative",
+      "criterion_ids": [
+        "scope_alignment"
+      ],
+      "expected_judge_behavior": "reject_unsupported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "scope-edge",
+      "test_type": "edge_case",
+      "criterion_ids": [
+        "scope_alignment"
+      ],
+      "expected_judge_behavior": "abstain_or_mark_scope_ambiguous",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "scope-adversarial",
+      "test_type": "adversarial",
+      "criterion_ids": [
+        "scope_alignment"
+      ],
+      "expected_judge_behavior": "no_unearned_score_uplift",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "clarity-positive",
+      "test_type": "positive",
+      "criterion_ids": [
+        "clarity"
+      ],
+      "expected_judge_behavior": "accept_supported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "clarity-negative",
+      "test_type": "negative",
+      "criterion_ids": [
+        "clarity"
+      ],
+      "expected_judge_behavior": "reject_unsupported",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "clarity-edge",
+      "test_type": "edge_case",
+      "criterion_ids": [
+        "clarity"
+      ],
+      "expected_judge_behavior": "abstain_or_mark_scope_ambiguous",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "test_id": "clarity-adversarial",
+      "test_type": "adversarial",
+      "criterion_ids": [
+        "clarity"
+      ],
+      "expected_judge_behavior": "no_unearned_score_uplift",
+      "candidate_pair_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}
