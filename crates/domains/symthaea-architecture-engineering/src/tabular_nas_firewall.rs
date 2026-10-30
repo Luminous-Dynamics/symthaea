@@ -53,6 +53,8 @@ pub struct ArchitectureFeatures {
     pub architecture_id: String,
     /// Precomputed, permitted zero-cost proxy values. Every architecture has the same keys.
     pub proxy_scores: BTreeMap<String, f64>,
+    /// Per-architecture proxy runtime in seconds, keyed identically to proxy_scores.
+    pub proxy_times_seconds: BTreeMap<String, f64>,
     /// Canonical topology encoding, with the encoding version documented by the importer.
     pub topology_encoding: Vec<u8>,
 }
@@ -149,6 +151,9 @@ pub struct TabularNasEvaluation {
     pub unique_queries: usize,
     pub query_budget: usize,
     pub budget_utilization: f64,
+    /// One-time feature-bank compute represented by the imported proxy runtime measurements.
+    /// This is not multiplied by search seeds or confused with target-query budget.
+    pub proxy_feature_bank_total_seconds: f64,
     pub attempt_count: usize,
     pub duplicate_attempts: usize,
     pub unknown_architecture_attempts: usize,
@@ -290,6 +295,7 @@ pub struct TabularNasBenchmark {
     allowed_ids: HashSet<String>,
     true_top_k_ids: Vec<String>,
     global_best_metric: f64,
+    proxy_feature_bank_total_seconds: f64,
 }
 
 impl TabularNasBenchmark {
@@ -349,6 +355,14 @@ impl TabularNasBenchmark {
             }
             let proxy_names: BTreeSet<String> =
                 feature.proxy_scores.keys().cloned().collect();
+            let runtime_names: BTreeSet<String> =
+                feature.proxy_times_seconds.keys().cloned().collect();
+            if runtime_names != expected_proxy_names {
+                return Err(TabularNasError::new(
+                    format!("{field}.proxy_times_seconds"),
+                    "every architecture must contain runtime values for exactly the declared proxy keys",
+                ));
+            }
             if proxy_names != expected_proxy_names {
                 return Err(TabularNasError::new(
                     format!("{field}.proxy_scores"),
@@ -366,6 +380,13 @@ impl TabularNasBenchmark {
                     return Err(TabularNasError::new(
                         format!("{field}.proxy_scores.{proxy_id}"),
                         "proxy scores must be finite",
+                    ));
+                }
+                let runtime = feature.proxy_times_seconds.get(proxy_id).copied().unwrap_or(f64::NAN);
+                if !runtime.is_finite() || runtime < 0.0 {
+                    return Err(TabularNasError::new(
+                        format!("{field}.proxy_times_seconds.{proxy_id}"),
+                        "proxy runtimes must be finite and non-negative",
                     ));
                 }
             }
@@ -407,6 +428,17 @@ impl TabularNasBenchmark {
             ));
         }
 
+        let proxy_feature_bank_total_seconds = features
+            .iter()
+            .flat_map(|feature| feature.proxy_times_seconds.values().copied())
+            .sum::<f64>();
+        if !proxy_feature_bank_total_seconds.is_finite() {
+            return Err(TabularNasError::new(
+                "proxy_times_seconds",
+                "total proxy feature-bank runtime overflowed",
+            ));
+        }
+
         let mut ranked: Vec<(String, f64)> = labels
             .iter()
             .map(|(id, value)| (id.clone(), *value))
@@ -432,6 +464,7 @@ impl TabularNasBenchmark {
             allowed_ids,
             true_top_k_ids,
             global_best_metric,
+            proxy_feature_bank_total_seconds,
         })
     }
 
@@ -540,6 +573,7 @@ impl TabularNasBenchmark {
             query_budget: receipt.max_unique_queries,
             budget_utilization: receipt.unique_queries as f64
                 / receipt.max_unique_queries as f64,
+            proxy_feature_bank_total_seconds: self.proxy_feature_bank_total_seconds,
             attempt_count: receipt.attempts.len(),
             duplicate_attempts,
             unknown_architecture_attempts,
@@ -762,9 +796,13 @@ mod tests {
                 let mut proxies = BTreeMap::new();
                 proxies.insert("proxy_a".into(), index as f64 / count.max(1) as f64);
                 proxies.insert("proxy_b".into(), (count - index) as f64);
+                let mut proxy_times = BTreeMap::new();
+                proxy_times.insert("proxy_a".into(), 0.01);
+                proxy_times.insert("proxy_b".into(), 0.02);
                 ArchitectureFeatures {
                     architecture_id: format!("arch-{index:03}"),
                     proxy_scores: proxies,
+                    proxy_times_seconds: proxy_times,
                     topology_encoding: vec![index as u8, 1, 2, 3],
                 }
             })
@@ -973,6 +1011,10 @@ mod tests {
         let mut topology = features(12);
         topology[2].topology_encoding.clear();
         assert!(TabularNasBenchmark::new(manifest(), topology, targets(12)).is_err());
+
+        let mut runtime = features(12);
+        runtime[1].proxy_times_seconds.insert("proxy_b".into(), f64::NAN);
+        assert!(TabularNasBenchmark::new(manifest(), runtime, targets(12)).is_err());
     }
 
     #[test]
