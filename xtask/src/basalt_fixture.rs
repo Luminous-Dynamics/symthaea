@@ -1,0 +1,496 @@
+//! Deterministic counterfactual fixture runner for a narrow BASALT subset.
+//!
+//! This runner creates ground truth outside the observer under test. It launches
+//! a known task worker in separate child processes, mutates one fixture resource,
+//! and compares task outputs and bytes-read counters. It deliberately supports
+//! only paired filesystem controls currently implemented below; unsupported
+//! catalog scenarios are rejected rather than synthesized.
+
+use anyhow::{Context, bail};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const FIXTURE_CASES: &[&str] = &[
+    "hidden-untracked-read",
+    "unused-neighbor-change",
+    "irrelevant-docs-change",
+    "docs-consumed-positive-control",
+];
+const INDEPENDENT_TASK_OUTPUT: &[u8] = b"basalt-fixture-task-output:v1:input-independent";
+
+#[derive(Debug, Serialize)]
+pub struct FixtureRunReport {
+    pub report_version: u32,
+    pub run_id: String,
+    pub selected_case_ids: Vec<String>,
+    pub oracle_path: String,
+    pub evidence_path: String,
+    pub workspace_path: String,
+    pub oracle_digest: String,
+    pub fixture_digest: String,
+    pub worker_binary_digest: String,
+    pub qualification_eligible: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct FixtureEvidence {
+    format_version: u32,
+    suite_id: &'static str,
+    run_id: String,
+    catalog_digest: String,
+    selected_case_ids: Vec<String>,
+    harness_binary_digest: String,
+    worker_binary_digest: String,
+    workspace_relative_path: &'static str,
+    gitignore_content_digest: String,
+    executions: Vec<ExecutionEvidence>,
+    qualification_eligible: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ExecutionEvidence {
+    case_id: String,
+    resource_id: String,
+    relative_path: String,
+    task_mode: String,
+    before_input_digest: String,
+    after_input_digest: String,
+    baseline_output_digest: String,
+    mutated_output_digest: String,
+    baseline_bytes_read: u64,
+    mutated_bytes_read: u64,
+    baseline_process_id: u32,
+    mutated_process_id: u32,
+    counterfactual_check: String,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkerOutput {
+    format_version: u32,
+    task_mode: String,
+    output_digest: String,
+    bytes_read: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct CatalogCase {
+    case_id: String,
+    channel: String,
+    expected_disposition: String,
+    ground_truth_resource_id: Option<String>,
+    paired_case_ids: Vec<String>,
+}
+
+struct FixturePlan {
+    case_id: String,
+    resource_id: String,
+    relative_path: PathBuf,
+    mode: &'static str,
+    before_bytes: Vec<u8>,
+    after_bytes: Vec<u8>,
+}
+
+pub fn run(
+    catalog_path: &Path,
+    out_dir: &Path,
+    requested_case_ids: &[String],
+) -> anyhow::Result<FixtureRunReport> {
+    if requested_case_ids.is_empty() {
+        bail!("at least one --case-id is required");
+    }
+
+    let catalog_bytes = fs::read(catalog_path)
+        .with_context(|| format!("reading challenge catalog {}", catalog_path.display()))?;
+    let catalog_audit = crate::basalt_observer::audit_bytes(&catalog_bytes);
+    if !catalog_audit.structurally_valid {
+        bail!("challenge catalog failed structural validation");
+    }
+    let catalog: Value = serde_json::from_slice(&catalog_bytes)?;
+    let profile_id = catalog
+        .get("profile_id")
+        .and_then(Value::as_str)
+        .context("catalog.profile_id must be a string")?
+        .to_string();
+    let cases_value = catalog
+        .get("cases")
+        .and_then(Value::as_array)
+        .context("catalog.cases must be an array")?;
+    let cases: Vec<CatalogCase> = serde_json::from_value(Value::Array(cases_value.clone()))?;
+    let cases_by_id: BTreeMap<&str, &CatalogCase> =
+        cases.iter().map(|case| (case.case_id.as_str(), case)).collect();
+
+    let mut selected = BTreeSet::<String>::new();
+    for case_id in requested_case_ids {
+        if !cases_by_id.contains_key(case_id.as_str()) {
+            bail!("requested case ID is absent from catalog: {case_id}");
+        }
+        selected.insert(case_id.clone());
+    }
+
+    // Pair closure is automatic: a paired control is one indivisible experiment.
+    let initially_selected: Vec<String> = selected.iter().cloned().collect();
+    for case_id in initially_selected {
+        let case = cases_by_id
+            .get(case_id.as_str())
+            .copied()
+            .context("selected case disappeared from catalog index")?;
+        for paired_id in &case.paired_case_ids {
+            selected.insert(paired_id.clone());
+        }
+    }
+
+    let ordered_ids: Vec<String> = cases
+        .iter()
+        .filter(|case| selected.contains(&case.case_id))
+        .map(|case| case.case_id.clone())
+        .collect();
+
+    if ordered_ids.is_empty() {
+        bail!("fixture selection is empty");
+    }
+    for case_id in &ordered_ids {
+        if !FIXTURE_CASES.contains(&case_id.as_str()) {
+            bail!(
+                "fixture runner does not yet implement {case_id}; it will not manufacture ground truth for unsupported scenarios"
+            );
+        }
+    }
+
+    let binary_path = std::env::current_exe()
+        .context("resolving current xtask executable for isolated worker runs")?;
+    let worker_binary_digest = sha256_file(&binary_path)?;
+    let now_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX epoch")?
+        .as_nanos();
+    let run_id = format!("basalt-{}-{now_nanos}", std::process::id());
+    let run_dir = out_dir.join(&run_id);
+    let workspace = run_dir.join("workspace");
+    fs::create_dir_all(&workspace)
+        .with_context(|| format!("creating fixture workspace {}", workspace.display()))?;
+
+    // Make the untracked fixture visibly ignored by Git-based tooling.
+    let gitignore = b"unlisted-secret.txt\n";
+    fs::write(workspace.join(".gitignore"), gitignore)?;
+
+    let mut plans = Vec::new();
+    for case_id in &ordered_ids {
+        let case = cases_by_id
+            .get(case_id.as_str())
+            .copied()
+            .context("selected case missing")?;
+        if case.channel != "filesystem" {
+            bail!("only filesystem-channel fixtures are implemented; {case_id} is {}", case.channel);
+        }
+        let resource_id = case
+            .ground_truth_resource_id
+            .as_deref()
+            .context("supported fixture requires a concrete ground-truth resource ID")?;
+        let (relative_path, expected_resource_id) = fixture_resource(resource_id)?;
+        if expected_resource_id != resource_id {
+            bail!("fixture resource mapping mismatch for {case_id}");
+        }
+        let mode = match case.expected_disposition.as_str() {
+            "capture_dependency" => "consume",
+            "preserve_unrelated" => "ignore",
+            other => bail!("fixture runner does not synthesize disposition {other}"),
+        };
+        let before_bytes = format!(
+            "BASALT-ORACLE-FIXTURE-V1\nresource={resource_id}\nstate=baseline\n"
+        )
+        .into_bytes();
+        let after_bytes = format!(
+            "BASALT-ORACLE-FIXTURE-V1\nresource={resource_id}\nstate=mutated\n"
+        )
+        .into_bytes();
+        plans.push(FixturePlan {
+            case_id: case_id.clone(),
+            resource_id: resource_id.to_string(),
+            relative_path,
+            mode,
+            before_bytes,
+            after_bytes,
+        });
+    }
+
+    // A deterministic, machine-readable fixture plan is itself content-addressed.
+    let plan_bytes = serde_json::to_vec(&json!({
+        "catalog_digest": sha256_tagged(&catalog_bytes),
+        "selected_case_ids": ordered_ids,
+        "plans": plans.iter().map(|plan| json!({
+            "case_id": plan.case_id,
+            "resource_id": plan.resource_id,
+            "relative_path": plan.relative_path,
+            "mode": plan.mode,
+            "before_input_digest": sha256_tagged(&plan.before_bytes),
+            "after_input_digest": sha256_tagged(&plan.after_bytes)
+        })).collect::<Vec<_>>()
+    }))?;
+    let fixture_digest = sha256_tagged(&plan_bytes);
+
+    let mut oracle_records = Vec::new();
+    let mut executions = Vec::new();
+
+    for plan in &plans {
+        let resource_path = workspace.join(&plan.relative_path);
+        if let Some(parent) = resource_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        write_synced(&resource_path, &plan.before_bytes)?;
+        let (baseline, baseline_pid) =
+            run_worker(&binary_path, "consume", &resource_path)?;
+        let expected_baseline = if plan.mode == "consume" {
+            sha256_tagged(&plan.before_bytes)
+        } else {
+            sha256_tagged(INDEPENDENT_TASK_OUTPUT)
+        };
+        if baseline.output_digest != expected_baseline
+            || baseline.bytes_read != if plan.mode == "consume" { plan.before_bytes.len() as u64 } else { 0 }
+        {
+            bail!("baseline worker output disagrees with the parent-side fixture oracle for {}", plan.case_id);
+        }
+
+        write_synced(&resource_path, &plan.after_bytes)?;
+        let (mutated, mutated_pid) =
+            run_worker(&binary_path, "consume", &resource_path)?;
+        let expected_mutated = if plan.mode == "consume" {
+            sha256_tagged(&plan.after_bytes)
+        } else {
+            sha256_tagged(INDEPENDENT_TASK_OUTPUT)
+        };
+        if mutated.output_digest != expected_mutated
+            || mutated.bytes_read != if plan.mode == "consume" { plan.after_bytes.len() as u64 } else { 0 }
+        {
+            bail!("mutated worker output disagrees with the parent-side fixture oracle for {}", plan.case_id);
+        }
+
+        let counterfactual_ok = if plan.mode == "consume" {
+            baseline.output_digest != mutated.output_digest
+        } else {
+            baseline.output_digest == mutated.output_digest
+                && baseline.bytes_read == 0
+                && mutated.bytes_read == 0
+        };
+        if !counterfactual_ok {
+            bail!("counterfactual influence check failed for {}", plan.case_id);
+        }
+
+        let before_digest = sha256_tagged(&plan.before_bytes);
+        let after_digest = sha256_tagged(&plan.after_bytes);
+        let ground_truth = if plan.mode == "consume" {
+            "consumed"
+        } else {
+            "not_consumed"
+        };
+        let witness_kind = if plan.mode == "consume" {
+            "controlled_read"
+        } else {
+            "controlled_non_read"
+        };
+
+        oracle_records.push(json!({
+            "case_id": plan.case_id,
+            "ground_truth": ground_truth,
+            "injected_resource_id": plan.resource_id,
+            "mutation": {
+                "applied": true,
+                "before_digest": before_digest,
+                "after_digest": after_digest
+            },
+            "witness_kind": witness_kind,
+            "independent_replay": "confirmed",
+            "execution_witness": {
+                "worker_binary_digest": worker_binary_digest,
+                "baseline_output_digest": baseline.output_digest,
+                "mutated_output_digest": mutated.output_digest,
+                "baseline_bytes_read": baseline.bytes_read,
+                "mutated_bytes_read": mutated.bytes_read
+            }
+        }));
+
+        executions.push(ExecutionEvidence {
+            case_id: plan.case_id.clone(),
+            resource_id: plan.resource_id.clone(),
+            relative_path: plan.relative_path.to_string_lossy().into_owned(),
+            task_mode: plan.mode.to_string(),
+            before_input_digest: before_digest,
+            after_input_digest: after_digest,
+            baseline_output_digest: baseline.output_digest,
+            mutated_output_digest: mutated.output_digest,
+            baseline_bytes_read: baseline.bytes_read,
+            mutated_bytes_read: mutated.bytes_read,
+            baseline_process_id: baseline_pid,
+            mutated_process_id: mutated_pid,
+            counterfactual_check: if counterfactual_ok {
+                "confirmed".to_string()
+            } else {
+                "failed".to_string()
+            },
+        });
+    }
+
+    let catalog_digest = sha256_tagged(&catalog_bytes);
+    let oracle_value = json!({
+        "format_version": 1,
+        "suite_id": "basalt-observer-oracle-v1",
+        "run_id": run_id,
+        "catalog_digest": catalog_digest,
+        "profile_id": profile_id,
+        "selected_case_ids": ordered_ids,
+        "harness": {
+            "harness_id": "basalt-controlled-counterfactual-harness-v1",
+            "binary_digest": worker_binary_digest,
+            "fixture_digest": fixture_digest
+        },
+        "records": oracle_records
+    });
+    let oracle_bytes = serde_json::to_vec_pretty(&oracle_value)?;
+    let evidence = FixtureEvidence {
+        format_version: 1,
+        suite_id: "basalt-observer-fixture-evidence-v1",
+        run_id: run_id.clone(),
+        catalog_digest,
+        selected_case_ids: ordered_ids.clone(),
+        harness_binary_digest: worker_binary_digest.clone(),
+        worker_binary_digest: worker_binary_digest.clone(),
+        workspace_relative_path: "workspace",
+        gitignore_content_digest: sha256_tagged(gitignore),
+        executions,
+        qualification_eligible: false,
+    };
+    let evidence_bytes = serde_json::to_vec_pretty(&evidence)?;
+
+    let oracle_path = run_dir.join("oracle-ledger.v1.json");
+    let evidence_path = run_dir.join("fixture-evidence.v1.json");
+    write_new_synced(&oracle_path, &oracle_bytes)?;
+    write_new_synced(&evidence_path, &evidence_bytes)?;
+
+    Ok(FixtureRunReport {
+        report_version: 1,
+        run_id,
+        selected_case_ids: ordered_ids,
+        oracle_path: oracle_path.display().to_string(),
+        evidence_path: evidence_path.display().to_string(),
+        workspace_path: workspace.display().to_string(),
+        oracle_digest: sha256_tagged(&oracle_bytes),
+        fixture_digest,
+        worker_binary_digest,
+        qualification_eligible: false,
+    })
+}
+
+pub fn run_worker_command(mode: &str, input: &Path) -> anyhow::Result<WorkerOutput> {
+    if mode != "consume" && mode != "ignore" {
+        bail!("worker mode must be consume or ignore");
+    }
+    let (output_digest, bytes_read) = if mode == "consume" {
+        let bytes = fs::read(input)
+            .with_context(|| format!("fixture worker reading {}", input.display()))?;
+        (sha256_tagged(&bytes), bytes.len() as u64)
+    } else {
+        // Deliberately do not open or stat the fixture resource on this path.
+        (sha256_tagged(INDEPENDENT_TASK_OUTPUT), 0)
+    };
+    Ok(WorkerOutput {
+        format_version: 1,
+        task_mode: mode.to_string(),
+        output_digest,
+        bytes_read,
+    })
+}
+
+fn fixture_resource(resource_id: &str) -> anyhow::Result<(PathBuf, &str)> {
+    match resource_id {
+        "fixture:unlisted-secret.txt" => Ok((PathBuf::from("unlisted-secret.txt"), resource_id)),
+        "fixture:docs/unused.md" => Ok((PathBuf::from("docs/unused.md"), resource_id)),
+        _ => bail!("no deterministic fixture mapping exists for resource {resource_id}"),
+    }
+}
+
+fn run_worker(
+    binary_path: &Path,
+    mode: &str,
+    input: &Path,
+) -> anyhow::Result<(WorkerOutput, u32)> {
+    let mut child = Command::new(binary_path)
+        .arg("basalt-observer-fixture-worker")
+        .arg("--mode")
+        .arg(mode)
+        .arg("--input")
+        .arg(input)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("starting isolated BASALT fixture worker")?;
+    let process_id = child.id();
+    let output = child.wait_with_output()?;
+    if !output.status.success() {
+        bail!(
+            "fixture worker {process_id} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let worker: WorkerOutput = serde_json::from_slice(&output.stdout)
+        .context("fixture worker did not emit valid JSON on stdout")?;
+    if worker.format_version != 1 || worker.task_mode != mode {
+        bail!("fixture worker returned an unexpected output envelope");
+    }
+    Ok((worker, process_id))
+}
+
+fn write_synced(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+    use std::io::Write;
+    let mut file = fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+fn write_new_synced(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+    use std::io::Write;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+fn sha256_tagged(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    format!("sha256:{encoded}")
+}
+
+fn sha256_file(path: &Path) -> anyhow::Result<String> {
+    use std::io::Read;
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let digest = hasher.finalize();
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    Ok(format!("sha256:{encoded}"))
+}
