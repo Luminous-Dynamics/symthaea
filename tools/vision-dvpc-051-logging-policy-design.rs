@@ -50,17 +50,19 @@ enum LoggerKind {
     IncumbentMixture,
     PortfolioAverage,
     SecondMomentPseudoTargetProp6,
+    Prop3WorstCaseRewardLogger,
     MinimaxWeightSecondMoment,
     RewardEnvelopeMinimaxSecondMoment,
     OracleRewardAwareMinimaxVariance,
     RewardGreedyWithFloor,
 }
 impl LoggerKind {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 9] = [
         Self::Uniform,
         Self::IncumbentMixture,
         Self::PortfolioAverage,
         Self::SecondMomentPseudoTargetProp6,
+        Self::Prop3WorstCaseRewardLogger,
         Self::MinimaxWeightSecondMoment,
         Self::RewardEnvelopeMinimaxSecondMoment,
         Self::OracleRewardAwareMinimaxVariance,
@@ -72,6 +74,7 @@ impl LoggerKind {
             Self::IncumbentMixture => "incumbent_mixture",
             Self::PortfolioAverage => "portfolio_average",
             Self::SecondMomentPseudoTargetProp6 => "prop6_second_moment_pseudotarget_known_reward",
+            Self::Prop3WorstCaseRewardLogger => "prop3_unconstrained_target_worst_case_known_reward",
             Self::MinimaxWeightSecondMoment => "minimax_weight_second_moment_grid",
             Self::RewardEnvelopeMinimaxSecondMoment => "reward_envelope_minimax_ips_second_moment_grid",
             Self::OracleRewardAwareMinimaxVariance => "oracle_reward_aware_minimax_ope_variance_grid",
@@ -82,6 +85,7 @@ impl LoggerKind {
         matches!(
             self,
             Self::SecondMomentPseudoTargetProp6
+                | Self::Prop3WorstCaseRewardLogger
                 | Self::OracleRewardAwareMinimaxVariance
                 | Self::RewardGreedyWithFloor
         )
@@ -397,6 +401,89 @@ fn reward_greedy_logger(floor: f64) -> Logger {
     Logger { p1 }
 }
 
+/// Proposition 3 (Douglas, Persson & Provost, 2026): when the target policy
+/// class is unconstrained and reward means are known, the full-support minimax
+/// logger assigns mu(a|x)/(c + mu(a|x)^2), with c chosen to normalize actions.
+/// This helper solves the binary-action normalization equation by bisection.
+fn prop3_context_action1_probability(
+    reward_action0: f64,
+    reward_action1: f64,
+    floor: f64,
+) -> Result<f64, String> {
+    validate_floor(floor)?;
+    for reward in [reward_action0, reward_action1] {
+        if !reward.is_finite() || reward <= 0.0 || reward > 1.0 {
+            return Err("Proposition 3 requires finite reward means in (0, 1]".into());
+        }
+    }
+    let action_mass = |c: f64| {
+        reward_action0 / (c + reward_action0 * reward_action0)
+            + reward_action1 / (c + reward_action1 * reward_action1)
+    };
+    let mut lo = 0.0;
+    let mut hi = 1.0;
+    for _ in 0..1024 {
+        if action_mass(hi) <= 1.0 {
+            break;
+        }
+        hi *= 2.0;
+        if !hi.is_finite() {
+            return Err("failed to bracket Proposition 3 normalizer".into());
+        }
+    }
+    if action_mass(hi) > 1.0 {
+        return Err("failed to bracket Proposition 3 normalizer".into());
+    }
+    for _ in 0..100 {
+        let mid = lo + (hi - lo) * 0.5;
+        if action_mass(mid) > 1.0 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let c = lo + (hi - lo) * 0.5;
+    let action1 = reward_action1 / (c + reward_action1 * reward_action1);
+    let action0 = reward_action0 / (c + reward_action0 * reward_action0);
+    if !action1.is_finite()
+        || !action0.is_finite()
+        || (action0 + action1 - 1.0).abs() > 1e-9
+        || action1 < floor - EPS
+        || action1 > 1.0 - floor + EPS
+    {
+        return Err("Proposition 3 optimum violates the registered full-support floor".into());
+    }
+    Ok(action1)
+}
+
+fn prop3_worst_case_reward_logger(floor: f64) -> Result<Logger, String> {
+    let mut p1 = [0.0; 2];
+    for context in 0..2 {
+        p1[context] = prop3_context_action1_probability(
+            reward_mean(context, 0),
+            reward_mean(context, 1),
+            floor,
+        )?;
+    }
+    let logger = Logger { p1 };
+    validate_logger(logger, floor)?;
+    Ok(logger)
+}
+
+fn one_context_ips_variance(
+    target_action1: f64,
+    logger_action1: f64,
+    reward_action0: f64,
+    reward_action1: f64,
+) -> f64 {
+    let value = (1.0 - target_action1) * reward_action0
+        + target_action1 * reward_action1;
+    let second_moment = (1.0 - target_action1).powi(2) * reward_action0
+        / (1.0 - logger_action1)
+        + target_action1.powi(2) * reward_action1 / logger_action1;
+    (second_moment - value * value).max(0.0)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum GridObjective {
     WeightSecondMoment,
@@ -463,6 +550,7 @@ fn logger_for(
         LoggerKind::SecondMomentPseudoTargetProp6 => {
             second_moment_pseudotarget_logger(policy_set, floor)?
         }
+        LoggerKind::Prop3WorstCaseRewardLogger => prop3_worst_case_reward_logger(floor)?,
         LoggerKind::MinimaxWeightSecondMoment => minimax_logger(
             policy_set,
             floor,
@@ -710,6 +798,63 @@ mod tests {
     }
 
     #[test]
+    fn prop3_logger_matches_normalized_closed_form_on_frozen_contexts() {
+        let logger = prop3_worst_case_reward_logger(ACTION_PROPENSITY_FLOOR).unwrap();
+        let expected = [
+            0.75,
+            0.3063693840023253,
+        ];
+        for context in 0..2 {
+            assert!((logger.p1[context] - expected[context]).abs() < 1e-10);
+        }
+        for context in 0..2 {
+            let mu0 = reward_mean(context, 0);
+            let mu1 = reward_mean(context, 1);
+            let p1 = logger.p1[context];
+            let c0 = mu0 / (1.0 - p1) - mu0 * mu0;
+            let c1 = mu1 / p1 - mu1 * mu1;
+            // Both action-level normalized propensities recover the same c.
+            assert!((c0 - c1).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn prop3_logger_matches_dense_unconstrained_target_grid_minimax() {
+        let logger = prop3_worst_case_reward_logger(ACTION_PROPENSITY_FLOOR).unwrap();
+        for context in 0..2 {
+            let mu0 = reward_mean(context, 0);
+            let mu1 = reward_mean(context, 1);
+            let prop3_score = (0..=1000)
+                .map(|i| {
+                    one_context_ips_variance(i as f64 / 1000.0, logger.p1[context], mu0, mu1)
+                })
+                .fold(0.0_f64, f64::max);
+            let mut grid_score = f64::INFINITY;
+            let intervals = 2000;
+            for j in 0..=intervals {
+                let p = ACTION_PROPENSITY_FLOOR
+                    + (1.0 - 2.0 * ACTION_PROPENSITY_FLOOR) * j as f64
+                        / intervals as f64;
+                let worst = (0..=1000)
+                    .map(|i| one_context_ips_variance(i as f64 / 1000.0, p, mu0, mu1))
+                    .fold(0.0_f64, f64::max);
+                grid_score = grid_score.min(worst);
+            }
+            assert!(
+                prop3_score <= grid_score + 0.001,
+                "context={context}, prop3={prop3_score}, grid={grid_score}"
+            );
+        }
+    }
+
+    #[test]
+    fn prop3_refuses_invalid_rewards_and_infeasible_floors() {
+        assert!(prop3_context_action1_probability(0.0, 0.9, ACTION_PROPENSITY_FLOOR).is_err());
+        assert!(prop3_context_action1_probability(0.1, f64::NAN, ACTION_PROPENSITY_FLOOR).is_err());
+        assert!(prop3_context_action1_probability(0.01, 0.99, 0.2).is_err());
+    }
+
+    #[test]
     fn prop6_second_moment_pseudotarget_matches_independent_formula() {
         let policy_set = policies(PortfolioRegime::Action1Heavy, 8);
         let logger = second_moment_pseudotarget_logger(&policy_set, ACTION_PROPENSITY_FLOOR)
@@ -899,7 +1044,7 @@ mod tests {
         let a = benchmark(10).unwrap();
         let b = benchmark(10).unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 72);
+        assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 81);
         assert_eq!(
             a.lines()
                 .filter(|line| line.starts_with("ENVELOPE_SENSITIVITY\t"))
