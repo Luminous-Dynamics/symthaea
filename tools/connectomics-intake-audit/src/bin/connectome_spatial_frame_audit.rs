@@ -857,7 +857,7 @@ mod tests {
         let mut frame = fixture();
         let mut mask = valid_packed_mask();
         // Move the only selected voxel from the second PSU to the excluded fourth PSU.
-        mask[0] = 0x01;
+        mask[0] = 0x41;
         mask[50] = 0x41;
         frame.eligibility_mask.artifact_sha256 = sha256(&mask);
         let scan = scan_mask(&frame, Cursor::new(mask)).unwrap();
@@ -882,11 +882,13 @@ mod tests {
         let mut frame = fixture();
         let mask = valid_packed_mask();
         frame.eligibility_mask.artifact_sha256 = "0".repeat(64);
-        assert!(validate_mask_bytes(&frame, &mask, &mut validate(&frame).unwrap()).unwrap_err().contains("SHA-256"));
+        let mut report = validate(&frame).unwrap();
+        assert!(validate_mask_bytes(&frame, &mask, &mut report).unwrap_err().contains("SHA-256"));
         frame.eligibility_mask.artifact_sha256 = sha256(&mask);
         let mut extra = mask.clone();
         extra.push(0);
-        assert!(validate_mask_bytes(&frame, &extra, &mut validate(&frame).unwrap()).unwrap_err().contains("expected"));
+        let mut report = validate(&frame).unwrap();
+        assert!(validate_mask_bytes(&frame, &extra, &mut report).unwrap_err().contains("expected"));
     }
 
     #[test]
