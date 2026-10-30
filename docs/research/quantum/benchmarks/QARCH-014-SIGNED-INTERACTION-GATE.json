@@ -1,0 +1,264 @@
+{
+  "schema_version": "qarch-014-signed-interval-gate/1",
+  "fixture_id": "QARCH-014-INTERVAL-PRODUCT-AND-COVERAGE-001",
+  "evidence_class": "synthetic_analytic_fixture",
+  "method_status": "new_proposed_signed_interval_gate_not_published_R_IDeA",
+  "formulae": {
+    "proxy": "bar_f in [g-tau2, g+tau2]",
+    "estimation_error": "f_hat-bar_f in [f_hat-g-tau2, f_hat-g+tau2]",
+    "misspecification_error": "bar_f-f_star in [g-tau2-U, g+tau2-L]",
+    "signed_interaction": "A=(f_hat-bar_f)*(bar_f-f_star); interval is min/max of all four endpoint products",
+    "joint_coverage": "max(0, proxy_bound_coverage_lower + validation_interval_coverage_lower - 1)"
+  },
+  "cases": [
+    {
+      "id": "offsetting-exact",
+      "input": {
+        "design_id": "offsetting",
+        "domain_id": "synthetic-domain-v1",
+        "current_prediction": -1,
+        "proxy_prediction": 1,
+        "proxy_uniform_error_bound": 0,
+        "proxy_bound_coverage_lower": 0.99,
+        "proxy_fit_artifact_digest": "proxy-fit-offsetting",
+        "proxy_bound_artifact_digest": "proxy-bound-offsetting",
+        "proxy_bound_evidence_verified": true,
+        "true_function_interval_lower": 0.5,
+        "true_function_interval_upper": 0.5,
+        "true_function_interval_coverage_lower": 0.95,
+        "true_function_validation_artifact_digest": "validation-offsetting",
+        "true_function_interval_evidence_verified": true,
+        "evaluator_artifact_digest": "evaluator-offsetting",
+        "minimum_joint_coverage": 0.9,
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-offsetting",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-offsetting",
+        "true_function_validation_split_id": "true-function-validation-split-offsetting",
+        "evaluator_split_id": "evaluator-only-split-offsetting"
+      },
+      "expected": {
+        "best_in_class_proxy_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "estimation_error_interval": {
+          "lower": -2,
+          "upper": -2
+        },
+        "misspecification_error_interval": {
+          "lower": 0.5,
+          "upper": 0.5
+        },
+        "signed_interaction_interval": {
+          "lower": -1,
+          "upper": -1
+        },
+        "joint_coverage_lower_bound": 0.94,
+        "status": "CertifiedOffsetting"
+      },
+      "lesson": "A negative signed interaction is certified because the entire interval is below zero."
+    },
+    {
+      "id": "reinforcing-exact",
+      "input": {
+        "design_id": "reinforcing",
+        "domain_id": "synthetic-domain-v1",
+        "current_prediction": 3,
+        "proxy_prediction": 1,
+        "proxy_uniform_error_bound": 0,
+        "proxy_bound_coverage_lower": 0.99,
+        "proxy_fit_artifact_digest": "proxy-fit-reinforcing",
+        "proxy_bound_artifact_digest": "proxy-bound-reinforcing",
+        "proxy_bound_evidence_verified": true,
+        "true_function_interval_lower": 0.5,
+        "true_function_interval_upper": 0.5,
+        "true_function_interval_coverage_lower": 0.95,
+        "true_function_validation_artifact_digest": "validation-reinforcing",
+        "true_function_interval_evidence_verified": true,
+        "evaluator_artifact_digest": "evaluator-reinforcing",
+        "minimum_joint_coverage": 0.9,
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-reinforcing",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-reinforcing",
+        "true_function_validation_split_id": "true-function-validation-split-reinforcing",
+        "evaluator_split_id": "evaluator-only-split-reinforcing"
+      },
+      "expected": {
+        "best_in_class_proxy_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "estimation_error_interval": {
+          "lower": 2,
+          "upper": 2
+        },
+        "misspecification_error_interval": {
+          "lower": 0.5,
+          "upper": 0.5
+        },
+        "signed_interaction_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "joint_coverage_lower_bound": 0.94,
+        "status": "CertifiedReinforcing"
+      },
+      "lesson": "The same proxy and true-function interval distinguish a positive reinforcing interaction."
+    },
+    {
+      "id": "wide-interval-ambiguous",
+      "input": {
+        "design_id": "ambiguous",
+        "domain_id": "synthetic-domain-v1",
+        "current_prediction": 1,
+        "proxy_prediction": 1,
+        "proxy_uniform_error_bound": 0.1,
+        "proxy_bound_coverage_lower": 0.99,
+        "proxy_fit_artifact_digest": "proxy-fit-ambiguous",
+        "proxy_bound_artifact_digest": "proxy-bound-ambiguous",
+        "proxy_bound_evidence_verified": true,
+        "true_function_interval_lower": 0.4,
+        "true_function_interval_upper": 0.6,
+        "true_function_interval_coverage_lower": 0.95,
+        "true_function_validation_artifact_digest": "validation-ambiguous",
+        "true_function_interval_evidence_verified": true,
+        "evaluator_artifact_digest": "evaluator-ambiguous",
+        "minimum_joint_coverage": 0.9,
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-ambiguous",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-ambiguous",
+        "true_function_validation_split_id": "true-function-validation-split-ambiguous",
+        "evaluator_split_id": "evaluator-only-split-ambiguous"
+      },
+      "expected": {
+        "best_in_class_proxy_interval": {
+          "lower": 0.9,
+          "upper": 1.1
+        },
+        "estimation_error_interval": {
+          "lower": -0.10000000000000009,
+          "upper": 0.10000000000000009
+        },
+        "misspecification_error_interval": {
+          "lower": 0.30000000000000004,
+          "upper": 0.7000000000000001
+        },
+        "signed_interaction_interval": {
+          "lower": -0.07000000000000006,
+          "upper": 0.07000000000000008
+        },
+        "joint_coverage_lower_bound": 0.94,
+        "status": "Ambiguous"
+      },
+      "lesson": "A wide interval crossing zero is ambiguous even though the midpoint is exactly zero."
+    },
+    {
+      "id": "coverage-insufficient",
+      "input": {
+        "design_id": "coverage",
+        "domain_id": "synthetic-domain-v1",
+        "current_prediction": 3,
+        "proxy_prediction": 1,
+        "proxy_uniform_error_bound": 0,
+        "proxy_bound_coverage_lower": 0.95,
+        "proxy_fit_artifact_digest": "proxy-fit-coverage",
+        "proxy_bound_artifact_digest": "proxy-bound-coverage",
+        "proxy_bound_evidence_verified": true,
+        "true_function_interval_lower": 0.5,
+        "true_function_interval_upper": 0.5,
+        "true_function_interval_coverage_lower": 0.9,
+        "true_function_validation_artifact_digest": "validation-coverage",
+        "true_function_interval_evidence_verified": true,
+        "evaluator_artifact_digest": "evaluator-coverage",
+        "minimum_joint_coverage": 0.9,
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-coverage",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-coverage",
+        "true_function_validation_split_id": "true-function-validation-split-coverage",
+        "evaluator_split_id": "evaluator-only-split-coverage"
+      },
+      "expected": {
+        "best_in_class_proxy_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "estimation_error_interval": {
+          "lower": 2,
+          "upper": 2
+        },
+        "misspecification_error_interval": {
+          "lower": 0.5,
+          "upper": 0.5
+        },
+        "signed_interaction_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "joint_coverage_lower_bound": 0.85,
+        "status": "InsufficientCoverage"
+      },
+      "lesson": "A positive interval does not become a certificate when the union-bound joint coverage is below the preregistered minimum."
+    },
+    {
+      "id": "unverified-validation",
+      "input": {
+        "design_id": "unverified",
+        "domain_id": "synthetic-domain-v1",
+        "current_prediction": -1,
+        "proxy_prediction": 1,
+        "proxy_uniform_error_bound": 0,
+        "proxy_bound_coverage_lower": 0.99,
+        "proxy_fit_artifact_digest": "proxy-fit-unverified",
+        "proxy_bound_artifact_digest": "proxy-bound-unverified",
+        "proxy_bound_evidence_verified": true,
+        "true_function_interval_lower": 0.5,
+        "true_function_interval_upper": 0.5,
+        "true_function_interval_coverage_lower": 0.95,
+        "true_function_validation_artifact_digest": "validation-unverified",
+        "true_function_interval_evidence_verified": false,
+        "evaluator_artifact_digest": "evaluator-unverified",
+        "minimum_joint_coverage": 0.9,
+        "margin": 0,
+        "proxy_fit_split_id": "proxy-fit-split-unverified",
+        "proxy_bound_validation_split_id": "proxy-bound-validation-split-unverified",
+        "true_function_validation_split_id": "true-function-validation-split-unverified",
+        "evaluator_split_id": "evaluator-only-split-unverified"
+      },
+      "expected": {
+        "best_in_class_proxy_interval": {
+          "lower": 1,
+          "upper": 1
+        },
+        "estimation_error_interval": {
+          "lower": -2,
+          "upper": -2
+        },
+        "misspecification_error_interval": {
+          "lower": 0.5,
+          "upper": 0.5
+        },
+        "signed_interaction_interval": {
+          "lower": -1,
+          "upper": -1
+        },
+        "joint_coverage_lower_bound": 0.94,
+        "status": "EvidenceNotVerified"
+      },
+      "lesson": "Numerically strong intervals cannot produce a signed certificate if validation provenance has not been verified."
+    }
+  ],
+  "negative_controls": [
+    "proxy-fit artifact digest equals validation artifact digest",
+    "evaluator artifact digest equals validation artifact digest",
+    "negative proxy error bound",
+    "reversed true-function interval",
+    "NaN/Inf prediction, interval endpoint, coverage or margin",
+    "overlapping proxy-fit, proxy-bound-validation, true-function-validation, or evaluator split IDs"
+  ],
+  "prohibited_claims": [
+    "This gate does not reproduce the published R-IDeA DeA sigmoid.",
+    "This gate does not prove the proxy uniform error bound or validation interval.",
+    "A signed interaction at one design point is not a guarantee of improved global test error.",
+    "No synthetic fixture is photonic hardware measurement or quantum-advantage evidence."
+  ]
+}

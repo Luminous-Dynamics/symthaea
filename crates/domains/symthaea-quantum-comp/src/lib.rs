@@ -29,6 +29,7 @@ pub mod predictive_adequacy;
 pub mod experiment_policy_benchmark;
 pub mod representative_experiment;
 pub mod rida_exact;
+pub mod signed_interaction_gate;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -192,6 +193,12 @@ pub use rida_exact::{
     derive_de_amplification_threshold, empirical_squared_mmd_rbf,
     evaluate_proxy_training_objective, evaluate_signed_interaction_oracle,
     score_de_amplification, score_r_i, score_r_idea,
+};
+
+pub use signed_interaction_gate::{
+    SignedInteractionGateError, SignedInteractionGateInput, SignedInteractionGateReport,
+    SignedInteractionGateStatus, SignedProductInterval, assess_signed_interaction,
+    joint_coverage_lower_bound,
 };
 
 pub use robust_experiment::{
