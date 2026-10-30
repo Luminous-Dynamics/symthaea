@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "program": "BASALT",
+  "run_id": "example-paired-smoke-001",
+  "created_at": "2026-10-29T20:00:00Z",
+  "source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "base_revision": "0123456789abcdef0123456789abcdef01234567",
+    "candidate_revision": "89abcdef0123456789abcdef0123456789abcdef",
+    "manifest_digest": "sha256:1cc7eb326f42b0a8afa6f448e6a5440cc2b56813a17b372a0a19ee6cacae0297",
+    "orchestrator_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "verifier_bundle_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "environment": {
+    "image_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "os": "NixOS (illustrative)",
+    "architecture": "x86_64",
+    "network_policy": "disabled",
+    "workspace_policy": "clean_checkout"
+  },
+  "suite": {
+    "suite_id": "basalt-smoke",
+    "version": "0.1.0",
+    "split": "development",
+    "seed_policy": "fixed_paired",
+    "attempts_per_task": 1,
+    "expected_task_count": 1,
+    "oracle_policy": "independent_frozen"
+  },
+  "systems": [
+    {
+      "system_id": "baseline",
+      "role": "baseline",
+      "agent_name": "lexical-search-plus-editor",
+      "agent_version": "example-1",
+      "config_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "budget": {
+        "max_wall_ms": 60000,
+        "max_tool_calls": 30,
+        "max_cost_usd": 1
+      }
+    },
+    {
+      "system_id": "candidate",
+      "role": "candidate",
+      "agent_name": "symthaea-geodesic-candidate",
+      "agent_version": "example-1",
+      "config_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "budget": {
+        "max_wall_ms": 60000,
+        "max_tool_calls": 30,
+        "max_cost_usd": 1
+      }
+    }
+  ],
+  "task_records": [
+    {
+      "task_id": "rust-repair-0001",
+      "family": "compiler_repair",
+      "languages": [
+        "Rust"
+      ],
+      "base_tree_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "spec_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "paired_transform_id": null,
+      "quality_audit": {
+        "status": "accepted",
+        "audit_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "oracle_independent": true,
+        "ambiguity": "none",
+        "notes": "Synthetic example only; not an executed BASALT result."
+      },
+      "trials": [
+        {
+          "system_id": "baseline",
+          "attempt_index": 1,
+          "seed": 17,
+          "paired_group_id": "rust-repair-0001-seed-17",
+          "outcome": "fail",
+          "verifier": {
+            "status": "fail",
+            "bundle_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "isolated_from_agent": true,
+            "independent_of_generator": true,
+            "evaluated_tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "checks": [
+              {
+                "check_id": "cargo-test",
+                "kind": "test",
+                "blocking": true,
+                "status": "fail",
+                "evidence_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              {
+                "check_id": "scope",
+                "kind": "scope",
+                "blocking": true,
+                "status": "pass",
+                "evidence_digest": "sha256:abababababababababababababababababababababababababababababababab"
+              }
+            ]
+          },
+          "integrity": {
+            "status": "clean",
+            "solution_material_access": "not_detected",
+            "test_or_verifier_tampering": "not_detected",
+            "scope_violation": "not_detected",
+            "stale_evidence": "not_detected"
+          },
+          "usage": {
+            "wall_ms": 12000,
+            "tool_calls": 8,
+            "input_tokens": 1000,
+            "output_tokens": 200,
+            "reasoning_tokens": null,
+            "cost_usd": 0.02
+          },
+          "trajectory_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "patch_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "final_tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "system_id": "candidate",
+          "attempt_index": 1,
+          "seed": 17,
+          "paired_group_id": "rust-repair-0001-seed-17",
+          "outcome": "pass",
+          "verifier": {
+            "status": "pass",
+            "bundle_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "isolated_from_agent": true,
+            "independent_of_generator": true,
+            "evaluated_tree_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "checks": [
+              {
+                "check_id": "cargo-test",
+                "kind": "test",
+                "blocking": true,
+                "status": "pass",
+                "evidence_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+              },
+              {
+                "check_id": "scope",
+                "kind": "scope",
+                "blocking": true,
+                "status": "pass",
+                "evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ]
+          },
+          "integrity": {
+            "status": "clean",
+            "solution_material_access": "not_detected",
+            "test_or_verifier_tampering": "not_detected",
+            "scope_violation": "not_detected",
+            "stale_evidence": "not_detected"
+          },
+          "usage": {
+            "wall_ms": 15000,
+            "tool_calls": 10,
+            "input_tokens": 1300,
+            "output_tokens": 350,
+            "reasoning_tokens": null,
+            "cost_usd": 0.03
+          },
+          "trajectory_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "patch_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "final_tree_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    }
+  ],
+  "notes": "ILLUSTRATIVE FIXTURE ONLY. Synthetic revisions, digests, task, and outcomes. This is not a measured performance claim."
+}

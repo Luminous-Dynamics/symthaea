@@ -1,0 +1,190 @@
+{
+  "schema_version": 3,
+  "program": "BASALT",
+  "suite_id": "basalt-smoke",
+  "version": "0.1.0",
+  "split": "development",
+  "tasks": [
+    {
+      "task_id": "rust-repair-0001",
+      "family": "compiler_repair",
+      "languages": [
+        "Rust"
+      ],
+      "base_tree_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "spec_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
+      "paired_transform_id": null,
+      "quality_audit": {
+        "status": "accepted",
+        "audit_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "oracle_independent": true,
+        "ambiguity": "none",
+        "notes": "Synthetic example only; not an executed BASALT result."
+      },
+      "required_checks": [
+        {
+          "check_id": "cargo-test",
+          "kind": "test",
+          "blocking": true
+        },
+        {
+          "check_id": "scope",
+          "kind": "scope",
+          "blocking": true
+        }
+      ],
+      "quality_rubric": {
+        "rubric_id": "compiler-repair-quality-v1",
+        "version": "1.0.0",
+        "total_weight_basis_points": 10000,
+        "criteria": [
+          {
+            "criterion_id": "maintainability",
+            "dimension": "maintainability",
+            "applicability": "scored",
+            "weight_basis_points": 4000,
+            "applicability_rationale": "A compiler repair should leave the affected code understandable and maintainable.",
+            "evidence_sources": [
+              "diff",
+              "static_analysis",
+              "human_review"
+            ],
+            "reviewer_guidance": "Assess clarity, local reasoning burden, and avoidable complexity without rewarding line-count minimization.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "The change is opaque, misleading, or materially harder to maintain."
+              },
+              {
+                "score": 1,
+                "description": "The change works only through brittle special cases or substantial unnecessary complexity."
+              },
+              {
+                "score": 2,
+                "description": "The change is understandable but leaves notable avoidable complexity or unclear structure."
+              },
+              {
+                "score": 3,
+                "description": "The change is clear and locally maintainable with only minor shortcomings."
+              },
+              {
+                "score": 4,
+                "description": "The change is exceptionally clear, cohesive, and easy to maintain without unnecessary abstraction."
+              }
+            ]
+          },
+          {
+            "criterion_id": "test_quality",
+            "dimension": "test_quality",
+            "applicability": "scored",
+            "weight_basis_points": 3000,
+            "applicability_rationale": "A repair should add or improve regression evidence beyond merely satisfying hidden acceptance tests.",
+            "evidence_sources": [
+              "diff",
+              "test_results",
+              "human_review"
+            ],
+            "reviewer_guidance": "Evaluate whether tests target the underlying fault, meaningful boundaries, and plausible regressions; do not treat hidden verifier checks as authored test quality.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "No useful regression evidence is added or existing coverage is weakened."
+              },
+              {
+                "score": 1,
+                "description": "Tests are superficial, brittle, or weakly connected to the repaired behavior."
+              },
+              {
+                "score": 2,
+                "description": "Tests cover the basic repair but miss important boundaries or regressions."
+              },
+              {
+                "score": 3,
+                "description": "Tests cover the repair and its principal regression boundaries."
+              },
+              {
+                "score": 4,
+                "description": "Tests are focused, robust, and exercise the key failure modes and relevant boundaries."
+              }
+            ]
+          },
+          {
+            "criterion_id": "scope_discipline",
+            "dimension": "scope_discipline",
+            "applicability": "scored",
+            "weight_basis_points": 3000,
+            "applicability_rationale": "The task requires a bounded repair that avoids unrelated edits while still fixing all specified behavior.",
+            "evidence_sources": [
+              "diff",
+              "static_analysis",
+              "human_review"
+            ],
+            "reviewer_guidance": "Judge scope against the frozen task specification; a small incomplete patch and a broad unnecessary patch are both low quality.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "The patch violates scope or bypasses required behavior."
+              },
+              {
+                "score": 1,
+                "description": "The patch contains major unrelated changes or omits substantial required work."
+              },
+              {
+                "score": 2,
+                "description": "The patch is mostly in scope but includes avoidable edits or leaves a limited requirement under-addressed."
+              },
+              {
+                "score": 3,
+                "description": "The patch addresses the task with only minor scope inefficiency."
+              },
+              {
+                "score": 4,
+                "description": "The patch is tightly scoped and complete, with no unnecessary edits."
+              }
+            ]
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "requirement_id": "req-compiles",
+          "source_span": {
+            "source_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
+            "start_byte": 0,
+            "end_byte": 40
+          },
+          "origin": "explicit",
+          "ambiguity": "none",
+          "statement_digest": "sha256:34de22addea92583a6d10573644a559ab5cd76d778d54039763679722d1b9abb",
+          "expectation_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "inference_rationale_digest": null,
+          "blocking_check_ids": [
+            "cargo-test"
+          ]
+        },
+        {
+          "requirement_id": "req-api-stable",
+          "source_span": {
+            "source_digest": "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac",
+            "start_byte": 41,
+            "end_byte": 89
+          },
+          "origin": "explicit",
+          "ambiguity": "none",
+          "statement_digest": "sha256:980003ceb862ee2e17661696e7cde954edfb1aa057bd8dbe0abb5fd67d62b6be",
+          "expectation_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "inference_rationale_digest": null,
+          "blocking_check_ids": [
+            "scope"
+          ]
+        }
+      ],
+      "spec_byte_length": 90
+    }
+  ],
+  "seed_policy": "fixed_paired",
+  "attempts_per_task": 1,
+  "attempt_seeds": [
+    17
+  ]
+}

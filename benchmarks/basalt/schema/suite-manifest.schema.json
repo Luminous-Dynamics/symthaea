@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT frozen suite manifest",
+  "description": "Version 3 frozen, content-addressed pre-run declaration of task identities, requirement-to-verifier coverage, task-quality audit dispositions, verifier obligations, and task-specific patch-quality rubrics. A trusted external receipt must pin these exact bytes before trial outcomes are observed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program",
+    "suite_id",
+    "version",
+    "split",
+    "seed_policy",
+    "attempts_per_task",
+    "attempt_seeds",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "program": {
+      "const": "BASALT"
+    },
+    "suite_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "validation",
+        "test",
+        "holdout",
+        "external"
+      ]
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "family",
+          "languages",
+          "base_tree_digest",
+          "spec_digest",
+          "paired_transform_id",
+          "quality_audit",
+          "required_checks",
+          "quality_rubric",
+          "requirements",
+          "spec_byte_length"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "languages": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "base_tree_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "spec_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "paired_transform_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality_audit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "audit_digest",
+              "oracle_independent",
+              "ambiguity",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "accepted",
+                  "quarantined",
+                  "invalid"
+                ]
+              },
+              "audit_digest": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "oracle_independent": {
+                "type": "boolean"
+              },
+              "ambiguity": {
+                "enum": [
+                  "none",
+                  "resolved_before_run",
+                  "material_unresolved"
+                ]
+              },
+              "notes": {
+                "type": "string"
+              }
+            }
+          },
+          "required_checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "check_id",
+                "kind",
+                "blocking"
+              ],
+              "properties": {
+                "check_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "enum": [
+                    "build",
+                    "test",
+                    "typecheck",
+                    "lint",
+                    "security",
+                    "scope",
+                    "regression",
+                    "oracle",
+                    "other"
+                  ]
+                },
+                "blocking": {
+                  "const": true
+                }
+              }
+            }
+          },
+          "quality_rubric": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rubric_id",
+              "version",
+              "total_weight_basis_points",
+              "criteria"
+            ],
+            "properties": {
+              "rubric_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "total_weight_basis_points": {
+                "type": "integer",
+                "const": 10000,
+                "description": "All scored criterion weights must sum to 10000 basis points."
+              },
+              "criteria": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "criterion_id",
+                    "dimension",
+                    "applicability",
+                    "weight_basis_points",
+                    "applicability_rationale",
+                    "evidence_sources",
+                    "reviewer_guidance",
+                    "anchors"
+                  ],
+                  "properties": {
+                    "criterion_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "dimension": {
+                      "enum": [
+                        "maintainability",
+                        "scope_discipline",
+                        "api_compatibility",
+                        "test_quality",
+                        "documentation",
+                        "performance",
+                        "error_handling",
+                        "idiomatic_design",
+                        "security_hardening",
+                        "other"
+                      ]
+                    },
+                    "applicability": {
+                      "enum": [
+                        "scored",
+                        "not_applicable"
+                      ]
+                    },
+                    "weight_basis_points": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "applicability_rationale": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "evidence_sources": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "enum": [
+                          "diff",
+                          "test_results",
+                          "api_analysis",
+                          "static_analysis",
+                          "documentation_review",
+                          "performance_measurements",
+                          "human_review",
+                          "security_scan",
+                          "runtime_logs"
+                        ]
+                      }
+                    },
+                    "reviewer_guidance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "anchors": {
+                      "type": "array",
+                      "minItems": 5,
+                      "maxItems": 5,
+                      "description": "Five ordered rubric anchors; array positions correspond to scores 0, 1, 2, 3, and 4.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "score",
+                          "description"
+                        ],
+                        "properties": {
+                          "score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 4
+                          },
+                          "description": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "requirement_id",
+                "source_span",
+                "origin",
+                "ambiguity",
+                "statement_digest",
+                "expectation_digest",
+                "inference_rationale_digest",
+                "blocking_check_ids"
+              ],
+              "properties": {
+                "requirement_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source_digest",
+                    "start_byte",
+                    "end_byte"
+                  ],
+                  "properties": {
+                    "source_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    "start_byte": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end_byte": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "origin": {
+                  "enum": [
+                    "explicit",
+                    "inferred"
+                  ]
+                },
+                "ambiguity": {
+                  "enum": [
+                    "none",
+                    "resolved_before_run",
+                    "material_unresolved"
+                  ]
+                },
+                "statement_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "expectation_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "inference_rationale_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "blocking_check_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "spec_byte_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Exact byte length of the frozen UTF-8 task specification. The validator loads the artifact from --spec-root using <sha256-hex>.txt, verifies its exact digest and byte length, then hashes every requirement source span."
+          }
+        }
+      }
+    },
+    "seed_policy": {
+      "enum": [
+        "fixed_paired",
+        "predeclared_random",
+        "unseeded",
+        "not_applicable"
+      ]
+    },
+    "attempts_per_task": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "attempt_seeds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": -9223372036854776000,
+            "maximum": 9223372036854776000
+          },
+          {
+            "type": "string",
+            "minLength": 1
+          }
+        ]
+      },
+      "maxItems": 10000
+    }
+  }
+}

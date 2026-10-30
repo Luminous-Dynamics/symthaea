@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -14,14 +15,25 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Validate a BASALT versioned run record and its cross-record evidence invariants.
+    BasaltValidate {
+        /// Path to the run-record JSON file.
+        #[arg(long)]
+        input: PathBuf,
+        /// Path to the frozen suite manifest; its exact bytes must match source.manifest_digest.
+        #[arg(long)]
+        manifest: PathBuf,
+        /// Directory of offline UTF-8 task specifications, named <sha256-hex>.txt.
+        #[arg(long)]
+        spec_root: PathBuf,
+    },
     /// Discovery check: flag a new crate that re-implements an existing symthaea-core module.
     /// Fails only on an UNADJUDICATED collision; known ones live in docs/crate-status.toml.
     DuplicateScan {
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
     },
-
-    /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
+    /// Crate truth registry: join cargo metadata with docs/crate-status.toml.
     /// A crate's existence does not imply endorsement.
     CrateStatus {
         /// Emit the generated markdown inventory instead of checking.
@@ -71,6 +83,13 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::BasaltValidate { input, manifest, spec_root } => {
+            let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.valid {
+                anyhow::bail!("BASALT run-record validation failed");
+            }
+        }
         Commands::RhnSweep {
             dims,
             objects,

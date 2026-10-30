@@ -1,0 +1,2 @@
+The crate must compile after the repair.
+Existing public APIs must remain compatible: π.
