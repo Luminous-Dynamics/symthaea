@@ -523,6 +523,8 @@ pub enum SystemPhiError {
     Repertoire(#[from] RepertoireError),
     #[error(transparent)]
     Partition(#[from] PartitionApplyError),
+    #[error(transparent)]
+    SparseCausal(#[from] SparseCausalError),
     #[error("{direction:?} specified system state has {actual} bits, expected {expected}")]
     SpecifiedStateLength {
         direction: CausalDirection,
