@@ -1004,6 +1004,122 @@ mod tests {
         );
     }
 
+    fn benign_equivalence_fixture() -> Value {
+        const CANDIDATE: &str =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const REFERENCE: &str =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        const REPORT: &str =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        const ASSUMPTIONS: &str =
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+        let mut value = fixture();
+        value["dataset_role"] = json!("evaluation_corpus_member");
+        value["validity_status"] = json!("benign_equivalent");
+        value["subject"]["netlist_sha256"] = json!(CANDIDATE);
+        value["subject"]["local_path"] = json!("candidate.v");
+        value["equivalence"] = json!({
+            "status": "proven",
+            "checker": "independent whole-design equivalence checker",
+            "tool_version": "pinned-test-version",
+            "assumptions_sha256": ASSUMPTIONS,
+            "assumptions_local_path": "assumptions.txt",
+            "proof_evidence_id": "equivalence-report-001",
+            "reference_netlist_sha256": REFERENCE,
+            "reference_local_path": "golden.v"
+        });
+        value["evidence"] = json!([
+            {
+                "evidence_id": "equivalence-report-001",
+                "kind": "equivalence_report",
+                "uri": "https://example.invalid/equivalence-report.json",
+                "local_path": "equivalence-report.json",
+                "sha256": REPORT,
+                "scope": "whole-design sequential equivalence under explicitly hashed assumptions",
+                "status": "pass",
+                "proof_scope": "assumption_scoped",
+                "formal_result": "equivalence_proved",
+                "property_id": "whole_design_miter",
+                "assumptions_sha256": ASSUMPTIONS,
+                "assumptions_local_path": "assumptions.txt",
+                "subject_netlist_sha256": CANDIDATE,
+                "reference_netlist_sha256": REFERENCE
+            }
+        ]);
+        value
+    }
+
+    #[test]
+    fn accepts_benign_equivalence_with_exact_subject_reference_and_assumptions() {
+        let value = benign_equivalence_fixture();
+        let summary = validate_profile(&value, "0".repeat(64)).unwrap();
+        assert_eq!(summary.validity_status, "benign_equivalent");
+        assert_eq!(
+            summary.reference_netlist_sha256.as_deref(),
+            Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        );
+        assert_eq!(summary.reference_local_path.as_deref(), Some("golden.v"));
+    }
+
+    #[test]
+    fn rejects_bounded_only_benign_equivalence_proof() {
+        let mut value = benign_equivalence_fixture();
+        value["evidence"][0]["proof_scope"] = json!("bounded");
+        assert!(
+            validate_profile(&value, "0".repeat(64))
+                .unwrap_err()
+                .contains("unbounded or assumption_scoped")
+        );
+    }
+
+    #[test]
+    fn rejects_equivalence_report_for_a_different_candidate_netlist() {
+        let mut value = benign_equivalence_fixture();
+        value["evidence"][0]["subject_netlist_sha256"] =
+            json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        assert!(
+            validate_profile(&value, "0".repeat(64))
+                .unwrap_err()
+                .contains("does not match the candidate netlist")
+        );
+    }
+
+    #[test]
+    fn rejects_equivalence_report_for_a_different_reference_netlist() {
+        let mut value = benign_equivalence_fixture();
+        value["evidence"][0]["reference_netlist_sha256"] =
+            json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        assert!(
+            validate_profile(&value, "0".repeat(64))
+                .unwrap_err()
+                .contains("does not match the declared golden netlist")
+        );
+    }
+
+    #[test]
+    fn rejects_equivalence_report_with_different_assumptions_bytes() {
+        let mut value = benign_equivalence_fixture();
+        value["evidence"][0]["assumptions_sha256"] =
+            json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        assert!(
+            validate_profile(&value, "0".repeat(64))
+                .unwrap_err()
+                .contains("exact assumptions digest")
+        );
+    }
+
+    #[test]
+    fn rejects_benign_equivalence_without_reference_artifact_path() {
+        let mut value = benign_equivalence_fixture();
+        value["equivalence"].as_object_mut().unwrap().remove("reference_local_path");
+        assert!(
+            validate_profile(&value, "0".repeat(64))
+                .unwrap_err()
+                .contains("equivalence.reference_local_path")
+        );
+    }
+
     #[test]
     fn accepts_unknown_invalid_as_a_non_confirmatory_profile() {
         let mut value = fixture();
