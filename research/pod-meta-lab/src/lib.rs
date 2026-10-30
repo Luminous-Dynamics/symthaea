@@ -33,6 +33,9 @@ pub struct Obligation {
     pub state: ObligationState,
     /// Task-profile priority only; it does not change proof validity.
     pub consequence_priority: u8,
+    /// Identity of the exact evidence/proof workspace state this obligation belongs to.
+    /// Empty means unversioned and cannot accept a promoting verifier receipt.
+    pub state_identity: String,
 }
 
 impl Obligation {
@@ -41,7 +44,16 @@ impl Obligation {
         state: ObligationState,
         consequence_priority: u8,
     ) -> Self {
-        Self { id: id.into(), state, consequence_priority }
+        Self { id: id.into(), state, consequence_priority, state_identity: String::new() }
+    }
+
+    /// Binds this obligation to an exact pre-operation workspace/evidence state.
+    ///
+    /// The lab treats this as an opaque synthetic identity. A production adapter
+    /// must derive it from canonical content and dependency identities.
+    pub fn with_state_identity(mut self, state_identity: impl Into<String>) -> Self {
+        self.state_identity = state_identity.into();
+        self
     }
 }
 
@@ -423,6 +435,9 @@ pub struct VerifierReceipt {
     pub proof_profile_id: String,
     /// Opaque identity only; this lab does not verify signatures.
     pub proof_identity: String,
+    /// New state identity after applying a state-changing verdict.
+    /// This must differ from the input progress key when state changes.
+    pub result_state_identity: String,
     pub proof_verdict: ProofVerdict,
     pub evidence_verdict: EvidenceVerdict,
 }
@@ -447,6 +462,9 @@ pub enum ReceiptError {
     EmptyVerifierIdentity,
     EmptyProfileIdentity,
     EmptyProofIdentity,
+    EmptyResultStateIdentity,
+    MissingCurrentStateIdentity(String),
+    ResultStateIdentityUnchanged,
     OperationBindingMismatch,
     ObligationBindingMismatch,
     ProgressBindingMismatch,
@@ -486,6 +504,9 @@ pub fn apply_operation_receipt(
     if verifier.proof_identity.is_empty() {
         return Err(ReceiptError::EmptyProofIdentity);
     }
+    if verifier.result_state_identity.is_empty() {
+        return Err(ReceiptError::EmptyResultStateIdentity);
+    }
     if verifier.verifier_id == receipt.producer_id {
         return Err(ReceiptError::VerifierNotDistinctFromProducer);
     }
@@ -513,8 +534,21 @@ pub fn apply_operation_receipt(
         }
     }
 
-    let mut changed = 0usize;
-    for obligation in obligations.iter_mut() {
+    // Bind the receipt to the current state, not merely to a verifier receipt
+    // that repeats the same caller-supplied key. This is the anti-replay gate.
+    for obligation in obligations.iter().filter(|o| receipt.obligation_ids.contains(&o.id)) {
+        if obligation.state_identity.is_empty() {
+            return Err(ReceiptError::MissingCurrentStateIdentity(obligation.id.clone()));
+        }
+        if obligation.state_identity != receipt.progress_key {
+            return Err(ReceiptError::ProgressBindingMismatch);
+        }
+    }
+
+    // Stage all transitions before mutating anything, preserving transactional
+    // behavior if a state-identity check fails.
+    let mut transitions = Vec::<(usize, ObligationState)>::new();
+    for (index, obligation) in obligations.iter().enumerate() {
         if !receipt.obligation_ids.contains(&obligation.id) {
             continue;
         }
@@ -529,11 +563,19 @@ pub fn apply_operation_receipt(
             _ => obligation.state,
         };
         if obligation.state != next {
-            obligation.state = next;
-            changed += 1;
+            transitions.push((index, next));
         }
     }
-    Ok(changed)
+
+    if !transitions.is_empty() && verifier.result_state_identity == receipt.progress_key {
+        return Err(ReceiptError::ResultStateIdentityUnchanged);
+    }
+
+    for (index, next) in &transitions {
+        obligations[*index].state = *next;
+        obligations[*index].state_identity = verifier.result_state_identity.clone();
+    }
+    Ok(transitions.len())
 }
 
 #[cfg(test)]
@@ -541,7 +583,7 @@ mod tests {
     use super::*;
 
     fn o(id: &str, state: ObligationState, priority: u8) -> Obligation {
-        Obligation::new(id, state, priority)
+        Obligation::new(id, state, priority).with_state_identity("state-1")
     }
 
     fn op(
@@ -574,6 +616,7 @@ mod tests {
             obligation_ids: ids.iter().map(|s| (*s).to_string()).collect(),
             proof_profile_id: "profile-v1".into(),
             proof_identity: "proof-reference-only".into(),
+            result_state_identity: "state-2".into(),
             progress_key: "state-1".into(),
             proof_verdict: proof,
             evidence_verdict: evidence,
@@ -850,8 +893,11 @@ mod tests {
     }
 
     #[test]
-    fn stale_state_verifier_receipt_cannot_discharge_new_state() {
-        let mut obligations = vec![o("claim", ObligationState::CandidateEvidenceAvailable, 5)];
+    fn receipt_must_match_the_current_obligation_state_identity() {
+        let mut obligations = vec![
+            o("claim", ObligationState::CandidateEvidenceAvailable, 5)
+                .with_state_identity("current-state"),
+        ];
         let mut verifier = receipt_verifier(
             "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
         );
@@ -859,7 +905,7 @@ mod tests {
         let receipt = OperationReceipt {
             producer_id: "planner-v1".into(),
             operation_id: "verify".into(),
-            progress_key: "current-state".into(),
+            progress_key: "old-state".into(),
             obligation_ids: BTreeSet::from(["claim".into()]),
             status: OperationStatus::Completed,
             verifier: Some(verifier),
@@ -869,6 +915,95 @@ mod tests {
             Err(ReceiptError::ProgressBindingMismatch)
         );
         assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+
+        let mut unversioned = vec![
+            Obligation::new("claim", ObligationState::CandidateEvidenceAvailable, 5),
+        ];
+        let unversioned_receipt = OperationReceipt {
+            producer_id: "planner-v1".into(),
+            operation_id: "verify".into(),
+            progress_key: "state-1".into(),
+            obligation_ids: BTreeSet::from(["claim".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(receipt_verifier(
+                "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            )),
+        };
+        assert_eq!(
+            apply_operation_receipt(&mut unversioned, &unversioned_receipt),
+            Err(ReceiptError::MissingCurrentStateIdentity("claim".into()))
+        );
+    }
+
+    #[test]
+    fn state_changing_receipt_must_advance_state_identity() {
+        let mut obligations = vec![o("claim", ObligationState::CandidateEvidenceAvailable, 5)];
+        let mut verifier = receipt_verifier(
+            "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+        );
+        verifier.result_state_identity = "state-1".into();
+        let receipt = OperationReceipt {
+            producer_id: "planner-v1".into(),
+            operation_id: "verify".into(),
+            progress_key: "state-1".into(),
+            obligation_ids: BTreeSet::from(["claim".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(verifier),
+        };
+        assert_eq!(
+            apply_operation_receipt(&mut obligations, &receipt),
+            Err(ReceiptError::ResultStateIdentityUnchanged)
+        );
+        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(obligations[0].state_identity, "state-1");
+    }
+
+    #[test]
+    fn stale_receipt_replay_cannot_resurrect_a_revoked_obligation() {
+        let mut obligations = vec![
+            o("claim", ObligationState::CandidateEvidenceAvailable, 5)
+                .with_state_identity("evidence-v1"),
+        ];
+        let mut initial_verifier = receipt_verifier(
+            "verify-v1", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+        );
+        initial_verifier.progress_key = "evidence-v1".into();
+        initial_verifier.result_state_identity = "verified-v1".into();
+        let original = OperationReceipt {
+            producer_id: "planner-v1".into(),
+            operation_id: "verify-v1".into(),
+            progress_key: "evidence-v1".into(),
+            obligation_ids: BTreeSet::from(["claim".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(initial_verifier),
+        };
+        assert_eq!(apply_operation_receipt(&mut obligations, &original), Ok(1));
+        assert_eq!(obligations[0].state, ObligationState::SupportedUnderProfile);
+        assert_eq!(obligations[0].state_identity, "verified-v1");
+
+        let mut revocation_verifier = receipt_verifier(
+            "refresh-v2", &["claim"], ProofVerdict::Valid, EvidenceVerdict::StaleOrRetracted,
+        );
+        revocation_verifier.progress_key = "verified-v1".into();
+        revocation_verifier.result_state_identity = "revoked-v2".into();
+        let revocation = OperationReceipt {
+            producer_id: "ledger-v2".into(),
+            operation_id: "refresh-v2".into(),
+            progress_key: "verified-v1".into(),
+            obligation_ids: BTreeSet::from(["claim".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(revocation_verifier),
+        };
+        assert_eq!(apply_operation_receipt(&mut obligations, &revocation), Ok(1));
+        assert_eq!(obligations[0].state, ObligationState::StaleOrRetracted);
+        assert_eq!(obligations[0].state_identity, "revoked-v2");
+
+        assert_eq!(
+            apply_operation_receipt(&mut obligations, &original),
+            Err(ReceiptError::ProgressBindingMismatch)
+        );
+        assert_eq!(obligations[0].state, ObligationState::StaleOrRetracted);
+        assert_eq!(obligations[0].state_identity, "revoked-v2");
     }
 
     #[test]
