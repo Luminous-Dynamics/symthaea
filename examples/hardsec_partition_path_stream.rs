@@ -65,7 +65,7 @@ impl<T: BufRead> Cursor<T> {
         let count = reader
             .read_line(&mut header)
             .map_err(|error| format!("read {label} header: {error}"))?;
-        if count == 0 || header.trim_end_matches(['\r', '\n']) != expected_header {
+        if count == 0 || header.trim_end_matches(&['\r', '\n'][..]) != expected_header {
             return Err(format!("{label} header must exactly match {expected_header}"));
         }
         Ok(Self {
@@ -85,7 +85,7 @@ impl<T: BufRead> Cursor<T> {
             return Ok(None);
         }
         self.line_number += 1;
-        let line = line.trim_end_matches(['\r', '\n']);
+        let line = line.trim_end_matches(&['\r', '\n'][..]);
         if line.is_empty() {
             return Err(format!("{label}: blank row at line {}", self.line_number));
         }
