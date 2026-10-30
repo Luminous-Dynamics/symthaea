@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "frame_id": "synthetic-volume-frame",
+  "source": {
+    "volume_id": "synthetic-volume",
+    "volume_revision_id": "volume-rev-1",
+    "volume_content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "segmentation_id": "synthetic-segmentation",
+    "segmentation_revision_id": "seg-rev-1",
+    "segmentation_content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "coordinate_frame": {
+    "coordinate_frame_id": "voxel-axes-xyz",
+    "transform_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "voxel_size_nm": [
+      4,
+      4,
+      40
+    ]
+  },
+  "origin_voxel": [
+    -100,
+    200,
+    300
+  ],
+  "extent_voxels": [
+    10,
+    5,
+    9
+  ],
+  "tile_shape_voxels": [
+    6,
+    5,
+    8
+  ],
+  "edge_policy": "clip_last_tile",
+  "eligibility_mask": {
+    "artifact_id": "synthetic-eligibility-mask",
+    "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "selection_rule_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "frame_protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "frame_generator": {
+    "tool_id": "synthetic-frame-builder",
+    "tool_version": "1.0.0",
+    "binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "cells": [
+    {
+      "psu_id": "0:0:0",
+      "grid_index": [
+        0,
+        0,
+        0
+      ],
+      "disposition": "eligible",
+      "stratum_id": "region-a",
+      "exclusion_reason": null
+    },
+    {
+      "psu_id": "1:0:0",
+      "grid_index": [
+        1,
+        0,
+        0
+      ],
+      "disposition": "eligible",
+      "stratum_id": "region-a",
+      "exclusion_reason": null
+    },
+    {
+      "psu_id": "0:0:1",
+      "grid_index": [
+        0,
+        0,
+        1
+      ],
+      "disposition": "eligible",
+      "stratum_id": "region-b",
+      "exclusion_reason": null
+    },
+    {
+      "psu_id": "1:0:1",
+      "grid_index": [
+        1,
+        0,
+        1
+      ],
+      "disposition": "excluded",
+      "stratum_id": null,
+      "exclusion_reason": "outside preregistered tissue mask"
+    }
+  ]
+}
