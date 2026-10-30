@@ -73,6 +73,9 @@ pub struct ProofEvidenceCandidate {
     /// Result from the trusted authorization adapter; not self-attested by the solver.
     pub authorization_accepted: bool,
     pub authorization_receipt_sha256: String,
+    /// Rank from the broad candidate retriever; 1 is best. It is diagnostic,
+    /// not the sufficiency objective or an exclusion threshold.
+    pub retrieval_rank: u32,
     /// Exact cost from the pinned packet tokenizer/renderer.
     pub token_cost: u32,
 }
@@ -307,6 +310,7 @@ pub struct ProofPacketEvidenceRef {
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
+    pub retrieval_rank: u32,
     pub token_cost: u32,
 }
 
@@ -589,6 +593,7 @@ pub fn solve_proof_budget(
                 payload_sha256: candidate.payload_sha256.clone(),
                 source_span_sha256: candidate.source_span_sha256.clone(),
                 authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
+                retrieval_rank: candidate.retrieval_rank,
                 token_cost: candidate.token_cost,
             }
         })
@@ -659,6 +664,7 @@ mod tests {
             authorized_principal_id: "principal-1".into(),
             authorization_accepted: true,
             authorization_receipt_sha256: digest('c'),
+            retrieval_rank: 50,
             token_cost,
         }
     }
@@ -745,12 +751,14 @@ mod tests {
 
     #[test]
     fn low_relevance_premise_is_kept_when_it_completes_required_proof() {
+        let mut distractor = candidate("high-score-distractor", "family-X", 1);
+        distractor.retrieval_rank = 1;
+        let mut required = candidate("required-premise", "family-Y", 2);
+        required.retrieval_rank = 99;
+        let mut required_second = candidate("required-second-premise", "family-Z", 2);
+        required_second.retrieval_rank = 100;
         let req = request(
-            vec![
-                candidate("high-score-distractor", "family-X", 1),
-                candidate("required-premise", "family-Y", 2),
-                candidate("required-second-premise", "family-Z", 2),
-            ],
+            vec![distractor, required, required_second],
             vec![obligation(
                 "claim-1",
                 vec![justification("complete-proof", &["required-premise", "required-second-premise"])],
