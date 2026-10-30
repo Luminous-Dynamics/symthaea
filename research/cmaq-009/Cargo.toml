@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-009-active-diagnostic-probes"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Paired synthetic benchmark for budgeting safe probes to accelerate support-drift detection"
+
+[dependencies]
+
+[workspace]
