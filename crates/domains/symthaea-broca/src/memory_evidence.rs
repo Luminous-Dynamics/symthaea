@@ -293,12 +293,12 @@ impl EvidenceRecord {
     }
 }
 
-/// Explicit trusted configuration mapping agent roles to readable evidence scopes.
+/// Verified agent-role to evidence-scope grants.
 ///
-/// This policy is intentionally separate from evidence authenticity and source
-/// authority. Construct it from an authenticated configuration or a verified
-/// governance policy; this type does not itself cryptographically authenticate
-/// the policy bytes.
+/// Production instances can only be built from an unforgeable
+/// `VerifiedRoleScopePolicy`; the private manual constructor exists only for
+/// unit tests. Grant activation/expiry and signed policy provenance are carried
+/// into every authorized retrieval result.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoleScopePolicy {
     policy_version: u64,
