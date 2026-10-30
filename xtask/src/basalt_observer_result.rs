@@ -29,6 +29,8 @@ pub struct ResultAuditReport {
     pub observer_receipts_digest: String,
     pub run_id: Option<String>,
     pub adjudication_complete: bool,
+    /// True only when this run explicitly selects every case in the catalog.
+    pub scope_is_full_catalog: bool,
     pub adjudication_passed: bool,
     /// Permanently false: this command adjudicates one run, not a profile.
     pub qualification_eligible: bool,
@@ -279,6 +281,7 @@ pub fn audit_bytes(
         observer_receipts_digest: sha256_tagged(receipts_bytes),
         run_id: None,
         adjudication_complete: false,
+        scope_is_full_catalog: false,
         adjudication_passed: false,
         qualification_eligible: false,
         oracle_authenticity_established: false,
@@ -407,6 +410,10 @@ pub fn audit_bytes(
 
     let selected_ids: BTreeSet<&str> =
         oracle.selected_case_ids.iter().map(String::as_str).collect();
+    let catalog_scope_ids: BTreeSet<&str> =
+        catalog.cases.iter().map(|case| case.case_id.as_str()).collect();
+    report.scope_is_full_catalog =
+        !catalog_scope_ids.is_empty() && selected_ids == catalog_scope_ids;
     if selected_ids.is_empty() || selected_ids.len() != oracle.selected_case_ids.len() {
         push_error(
             &mut report,
@@ -1708,6 +1715,7 @@ mod tests {
         assert_eq!(report.metrics.false_invalidations, 0);
         assert_eq!(report.metrics.unrelated_evidence_not_retained, 0);
         assert!(!report.qualification_eligible);
+        assert!(report.scope_is_full_catalog);
         assert!(!report.oracle_authenticity_established);
         assert!(!report.oracle_replay_executed_by_adjudicator);
         assert!(!report.observer_receipt_authenticity_established);
@@ -1903,6 +1911,7 @@ mod tests {
         assert_eq!(report.counts.challenge_cases, 4);
         assert_eq!(report.counts.selected_cases, 2);
         assert_eq!(report.counts.passed_cases, 2);
+        assert!(!report.scope_is_full_catalog);
         assert!(!report.qualification_eligible);
     }
 
