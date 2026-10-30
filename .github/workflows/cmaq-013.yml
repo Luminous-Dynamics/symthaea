@@ -44,8 +44,9 @@ jobs:
           assert report["feedback_delay_steps"] == 4
           assert report["feedback_drop_rate"] == 0.1
           assert report["search_widths"] == [8, 32, 128]
+          assert report["rollout_horizons"] == [1, 3, 8]
           assert report["scenarios"] == ["stationary", "abrupt_shift", "gradual_shift"]
-          assert len(report["cells"]) == 9
+          assert len(report["cells"]) == 27
           expected_methods = {
               "fixed_gaussian", "random_action_split_conformal", "selected_action_split_conformal",
               "online_aci_style_quantile", "rolling_residual_quantile", "oracle_selected_quantile"
@@ -53,6 +54,7 @@ jobs:
           for cell in report["cells"]:
               assert cell["episode_count"] == 512
               assert cell["decisions_per_episode"] == 48
+              assert cell["rollout_horizon"] in [1, 3, 8]
               assert cell["calibration_samples"] == 8192
               methods = {row["method"]: row for row in cell["methods"]}
               assert set(methods) == expected_methods
@@ -60,14 +62,19 @@ jobs:
                   for key in ["selected_action_coverage", "random_action_coverage", "false_safe_rate",
                               "fallback_rate", "recovery_episode_rate"]:
                       assert 0.0 <= row[key] <= 1.0
+                  for key in ["pre_shift_selected_coverage", "post_shift_selected_coverage"]:
+                      assert -1.0 <= row[key] <= 1.0
                   assert row["mean_interval_width"] >= 0.0
           # Search-selection control: same-width stationary calibration should
           # require wider bounds for selected actions than for random behavior actions.
-          wide = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 128)
+          wide = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 128 and cell["rollout_horizon"] == 8)
           assert wide["selected_calibration_quantile"] > wide["random_calibration_quantile"]
+          short_horizon = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 32 and cell["rollout_horizon"] == 1)
+          long_horizon = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 32 and cell["rollout_horizon"] == 8)
+          assert long_horizon["selected_calibration_quantile"] > short_horizon["selected_calibration_quantile"]
           selected = next(row for row in wide["methods"] if row["method"] == "selected_action_split_conformal")
           assert 0.86 <= selected["selected_action_coverage"] <= 0.96
-          oracle = next(cell for cell in report["cells"] if cell["scenario"] == "abrupt_shift" and cell["search_width"] == 128)
+          oracle = next(cell for cell in report["cells"] if cell["scenario"] == "abrupt_shift" and cell["search_width"] == 128 and cell["rollout_horizon"] == 8)
           oracle_method = next(row for row in oracle["methods"] if row["method"] == "oracle_selected_quantile")
           assert oracle_method["selected_action_coverage"] >= 0.88
           print("CMAQ-013 schema, selection-conditioned quantiles, coverage/fallback metrics and delayed online calibration validated")
