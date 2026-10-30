@@ -456,6 +456,34 @@ mod tests {
     }
 
     #[test]
+    fn selected_residual_quantile_grows_with_rollout_horizon() {
+        let (_, short) = collect_calibration(32, 1, BASE_SEED ^ 0xCA11_BA7E);
+        let (_, long) = collect_calibration(32, 8, BASE_SEED ^ 0xCA11_BA7E);
+        assert!(conformal_quantile(&long, TARGET_COVERAGE) > conformal_quantile(&short, TARGET_COVERAGE));
+    }
+
+    #[test]
+    fn coverage_is_reported_separately_before_and_after_shift() {
+        let (random, selected) = collect_calibration(32, 3, 44);
+        let stationary = generate_evaluation(Scenario::Stationary, 32, 3);
+        let scores: Vec<f64> = stationary.iter().flat_map(|t| t.iter().map(|o| o.selected.nonconformity)).collect();
+        let oracle = conformal_quantile(&scores, TARGET_COVERAGE);
+        let stationary_method = evaluate_method(Method::SelectedSplit, Scenario::Stationary, &stationary,
+            conformal_quantile(&random, TARGET_COVERAGE), conformal_quantile(&selected, TARGET_COVERAGE), oracle);
+        assert!(stationary_method.pre_shift_selected_coverage >= 0.0);
+        assert_eq!(stationary_method.post_shift_selected_coverage, -1.0);
+
+        let shifted = generate_evaluation(Scenario::AbruptShift, 32, 3);
+        let scores: Vec<f64> = shifted.iter().flat_map(|t| t.iter().map(|o| o.selected.nonconformity)).collect();
+        let oracle = conformal_quantile(&scores, TARGET_COVERAGE);
+        let shifted_method = evaluate_method(Method::RandomSplit, Scenario::AbruptShift, &shifted,
+            conformal_quantile(&random, TARGET_COVERAGE), conformal_quantile(&selected, TARGET_COVERAGE), oracle);
+        assert!(shifted_method.pre_shift_selected_coverage >= 0.0);
+        assert!(shifted_method.post_shift_selected_coverage >= 0.0);
+        assert!(shifted_method.post_shift_selected_coverage <= 1.0);
+    }
+
+    #[test]
     fn finite_sample_conformal_quantile_uses_upper_order_statistic() {
         let values = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         assert_eq!(conformal_quantile(&values, 0.90), 8.0);
