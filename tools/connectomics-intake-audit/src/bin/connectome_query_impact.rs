@@ -56,6 +56,8 @@ struct Query {
     query_id: String,
     weight: f64,
     normalization_scale: f64,
+    #[serde(default)]
+    reference_value: Option<f64>,
     metric: QueryMetric,
 }
 
@@ -128,6 +130,8 @@ struct CandidateEvaluation {
     estimated_error_probability: f64,
     review_minutes: f64,
     weighted_query_impact: f64,
+    reference_query_count: usize,
+    weighted_query_error_reduction: Option<f64>,
     expected_weighted_query_impact: f64,
     expected_query_impact_per_review_minute: f64,
     counterfactual_graph_canonical_sha256: String,
@@ -144,6 +148,10 @@ struct QueryImpact {
     delta: f64,
     normalized_absolute_delta: f64,
     weighted_contribution: f64,
+    reference_value: Option<f64>,
+    baseline_absolute_error: Option<f64>,
+    counterfactual_absolute_error: Option<f64>,
+    normalized_query_error_reduction: Option<f64>,
 }
 
 type Graph = BTreeMap<(u64, u64), f64>;
@@ -231,6 +239,9 @@ fn validate_input(input: &Input) -> Result<(), String> {
         }
         if !query.normalization_scale.is_finite() || query.normalization_scale <= 0.0 {
             return Err(format!("query {} normalization_scale must be finite and positive", query.query_id));
+        }
+        if query.reference_value.is_some_and(|value| !value.is_finite()) {
+            return Err(format!("query {} reference_value must be finite when provided", query.query_id));
         }
         total_query_weight += query.weight;
         if !total_query_weight.is_finite() {
@@ -407,6 +418,9 @@ fn evaluate_candidate(
     let counterfactual = apply_candidate(graph, candidate)?;
     let mut query_impacts = Vec::with_capacity(queries.len());
     let mut weighted_sum = 0.0;
+    let mut reference_weighted_sum = 0.0;
+    let mut reference_weight_total = 0.0;
+    let mut reference_query_count = 0;
     for query in queries {
         let baseline_value = query_value(graph, &query.metric);
         let counterfactual_value = query_value(&counterfactual, &query.metric);
@@ -417,6 +431,19 @@ fn evaluate_candidate(
         let normalized_absolute_delta = (delta.abs() / query.normalization_scale).min(1.0);
         let weighted_contribution = query.weight * normalized_absolute_delta;
         weighted_sum += weighted_contribution;
+        let (baseline_absolute_error, counterfactual_absolute_error, normalized_query_error_reduction) =
+            if let Some(reference) = query.reference_value {
+                let baseline_error = (baseline_value - reference).abs();
+                let counterfactual_error = (counterfactual_value - reference).abs();
+                let normalized_reduction =
+                    ((baseline_error - counterfactual_error) / query.normalization_scale).clamp(-1.0, 1.0);
+                reference_query_count += 1;
+                reference_weight_total += query.weight;
+                reference_weighted_sum += query.weight * normalized_reduction;
+                (Some(baseline_error), Some(counterfactual_error), Some(normalized_reduction))
+            } else {
+                (None, None, None)
+            };
         query_impacts.push(QueryImpact {
             query_id: query.query_id.clone(),
             baseline_value,
@@ -424,6 +451,10 @@ fn evaluate_candidate(
             delta,
             normalized_absolute_delta,
             weighted_contribution,
+            reference_value: query.reference_value,
+            baseline_absolute_error,
+            counterfactual_absolute_error,
+            normalized_query_error_reduction,
         });
     }
     let weighted_query_impact = weighted_sum / total_query_weight;
@@ -441,6 +472,9 @@ fn evaluate_candidate(
         estimated_error_probability: candidate.estimated_error_probability,
         review_minutes: candidate.review_minutes,
         weighted_query_impact,
+        reference_query_count,
+        weighted_query_error_reduction: (reference_weight_total > 0.0)
+            .then_some(reference_weighted_sum / reference_weight_total),
         expected_weighted_query_impact,
         expected_query_impact_per_review_minute,
         counterfactual_graph_canonical_sha256: canonical_graph_sha256(&counterfactual),
