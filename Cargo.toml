@@ -20,6 +20,10 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Manifestless paths matched by crates/core/*; keep source-only trees out
+    # of workspace package discovery until they have real crate manifests.
+    "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
