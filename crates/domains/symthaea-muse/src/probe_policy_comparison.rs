@@ -591,6 +591,8 @@ fn build_comparison(
     // requested curve contains only the no-probe point.
     let mut validation_config = planner_config.clone();
     validation_config.pair_probe_budget = 1;
+    validation_config.routing_group_sample_budget =
+        validation_config.routing_group_sample_budget.max(1);
     validation_config.audit_pair_budget = 0;
     validation_config.seed = canonical_seeds[0];
     build_interaction_probe_plan(
