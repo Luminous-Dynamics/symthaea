@@ -459,11 +459,11 @@ jobs:
               item["repository"]: item["commit"]
               for item in action_lock["actions"]
           }
-          workflow_actions = re.findall(
+          workflow_actions = sorted(set(re.findall(
               r"^\s*(?:-\s*)?uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([^\s]+)",
               workflow_text,
               flags=re.MULTILINE,
-          )
+          )))
           if len(workflow_actions) != len(locked_actions):
               raise SystemExit(
                   f"workflow action count {len(workflow_actions)} != lock count {len(locked_actions)}"
