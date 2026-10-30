@@ -273,7 +273,7 @@ pub fn run(
 
         write_synced(&resource_path, &plan.after_bytes)?;
         let (mutated, mutated_pid) =
-            run_worker(&binary_path, plan.mode, &resource_path)?;
+            run_worker(&worker_binary_path, plan.mode, &resource_path)?;
         let expected_mutated = if plan.mode == "consume" {
             sha256_tagged(&plan.after_bytes)
         } else {
