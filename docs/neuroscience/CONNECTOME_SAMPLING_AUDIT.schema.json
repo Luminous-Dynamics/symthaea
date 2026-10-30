@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_SAMPLING_AUDIT.schema.json",
+  "title": "Connectome design-based probability audit",
+  "description": "Evaluation-only audit of a stratified one-stage cluster probability sample. The sample seed is revealed after outcome collection; its SHA-256 commitment must have been externally recorded before outcomes were observed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_input_sha256",
+    "sampling_protocol_sha256",
+    "sample_seed",
+    "sample_seed_commitment_sha256",
+    "strata",
+    "population_frame",
+    "sampled_outcomes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sampling_protocol_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sample_seed": { "type": "string", "minLength": 16 },
+    "sample_seed_commitment_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "strata": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stratum_id", "sampled_cluster_count"],
+        "properties": {
+          "stratum_id": { "type": "string", "minLength": 1 },
+          "sampled_cluster_count": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "population_frame": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_id", "stratum_id", "cluster_id"],
+        "properties": {
+          "candidate_id": { "type": "string", "minLength": 1 },
+          "stratum_id": { "type": "string", "minLength": 1 },
+          "cluster_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "sampled_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_id", "adjudication", "signed_query_error_reduction_if_applied"],
+        "properties": {
+          "candidate_id": { "type": "string", "minLength": 1 },
+          "adjudication": { "enum": ["correct", "incorrect", "indeterminate"] },
+          "signed_query_error_reduction_if_applied": {
+            "description": "Independent evaluator's signed normalized reduction in the preregistered query-error objective for the isolated proposed mutation; positive is beneficial, negative harmful; null for indeterminate adjudication.",
+            "type": ["number", "null"]
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "adjudication": { "const": "indeterminate" } }, "required": ["adjudication"] },
+            "then": { "properties": { "signed_query_error_reduction_if_applied": { "type": "null" } } },
+            "else": { "properties": { "signed_query_error_reduction_if_applied": { "type": "number" } } }
+          }
+        ]
+      }
+    }
+  }
+}
