@@ -2659,9 +2659,9 @@ fn entropy_stopping_benchmark_rows() -> Result<String, String> {
     Ok(output)
 }
 
-const REGRET_SAA_REPLICATES: usize = 12;
-const REGRET_SAA_EVALUATION_N: usize = 48;
-const REGRET_HOLDOUT_REPLICATES: usize = 2048;
+const REGRET_SAA_REPLICATES: usize = 8;
+const REGRET_SAA_EVALUATION_N: usize = 32;
+const REGRET_HOLDOUT_REPLICATES: usize = 1024;
 const REGRET_HOLDOUT_EVALUATION_N: usize = EVAL_N;
 
 #[derive(Clone, Copy, Debug)]
@@ -2815,7 +2815,15 @@ fn greedy_saa_selection_regret_allocate(
     Ok(allocation)
 }
 
-fn selection_regret_benchmark_rows() -> Result<String, String> {
+fn selection_regret_benchmark_rows_with_config(
+    saa_replicates: usize,
+    saa_evaluation_n: usize,
+    holdout_replicates: usize,
+    holdout_evaluation_n: usize,
+) -> Result<String, String> {
+    if saa_replicates == 0 || saa_evaluation_n == 0 || holdout_replicates == 0 || holdout_evaluation_n == 0 {
+        return Err("selection-regret benchmark config must be positive".into());
+    }
     let world = correlated_stress_worlds()[1];
     let portfolio = policy_portfolio(&world);
     let profiles = coherent_profile_scenarios(&world)?;
@@ -2845,8 +2853,8 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
         &world,
         &profiles,
         &portfolio,
-        REGRET_SAA_EVALUATION_N,
-        REGRET_SAA_REPLICATES,
+        saa_evaluation_n,
+        saa_replicates,
         saa_seed,
     )?;
     let exact_regret = exact_saa_selection_regret_allocation(
@@ -2877,8 +2885,8 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
             &allocation,
             &profiles,
             &portfolio,
-            REGRET_SAA_EVALUATION_N,
-            REGRET_SAA_REPLICATES,
+            saa_evaluation_n,
+            saa_replicates,
             saa_seed,
         )?;
         let mut holdout = Vec::with_capacity(profiles.len());
@@ -2887,8 +2895,8 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
                 &profile.world,
                 &allocation,
                 &portfolio,
-                REGRET_HOLDOUT_EVALUATION_N,
-                REGRET_HOLDOUT_REPLICATES,
+                holdout_evaluation_n,
+                holdout_replicates,
                 holdout_seed ^ (profile_index as u64).wrapping_mul(0x94d0_49bb_1331_11eb),
             ));
         }
@@ -2912,10 +2920,10 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
         "REGRET_CONFIG\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
         world.name,
         profiles.len(),
-        REGRET_SAA_REPLICATES,
-        REGRET_SAA_EVALUATION_N,
-        REGRET_HOLDOUT_REPLICATES,
-        REGRET_HOLDOUT_EVALUATION_N,
+        saa_replicates,
+        saa_evaluation_n,
+        holdout_replicates,
+        holdout_evaluation_n,
         exact_regret.combinations_checked,
         saa_seed,
         holdout_seed,
@@ -2973,6 +2981,15 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
         }
     }
     Ok(output)
+}
+
+fn selection_regret_benchmark_rows() -> Result<String, String> {
+    selection_regret_benchmark_rows_with_config(
+        REGRET_SAA_REPLICATES,
+        REGRET_SAA_EVALUATION_N,
+        REGRET_HOLDOUT_REPLICATES,
+        REGRET_HOLDOUT_EVALUATION_N,
+    )
 }
 
 fn main() {
