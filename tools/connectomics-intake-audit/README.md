@@ -298,3 +298,17 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
 ```
 
 The exact optimum is bounded to the submitted candidate pool, budget, graph, query bundle, and canonical candidate-ID application order. Reference query values are evaluation-only and are never consumed by the candidate ranking policies.
+
+
+## Hidden co-linear merge boundary baseline
+
+The experimental `connectome-colinear-merge-audit` binary is a synthetic ordered-centreline change-point baseline. It compares radius-only and multifeature piecewise-linear scores, emits review-only boundary hypotheses, and optionally evaluates them against a separate truth file bound to the exact input SHA-256:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-colinear-merge-audit -- \
+  --input docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json \
+  --truth docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json \
+  --tolerance-nm 500 --output colinear-merge-report.json
+```
+
+The input contains no labels; the evaluator truth is parsed only after proposal generation. This is a 1D feature-profile baseline, not a detector trained on or operating directly on EM imagery. See `docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md`.
