@@ -1,0 +1,18 @@
+{
+  "schema":"symthaea-anchored-ebh-v1",
+  "status":"LOCAL_SYNTHETIC_PILOT_NOT_A_SOTA_CLAIM",
+  "reference":"Ramdas, Anchored multiple testing, arXiv:2610.11279, 2026-10-15 version",
+  "local_validation":{"passed":12,"total":12,"source_sha256":"d31ba65d59cbd7d6943c4330f81c80eb7750824b66e8d0c52ddf564dfd22d202","tests_sha256":"2cf1e4f60a56b0136e362c300cf1839b592eb5d9f5df6032eba164742e2dcbc3"},
+  "sharp_null_boundary":{"m":100,"alpha":0.05,"repetitions":20000,"distribution":"e=2000 with probability 0.0005, otherwise 0; marginal E[e]=1","eBH":{"false_discoveries":979,"FDR":0.04895,"Wilson95":[0.0460453757,0.05202786]},"anchored_eBH":{"false_discoveries":979,"FDR":0.04895,"Wilson95":[0.0460453757,0.05202786]},"mean_additions":0},
+  "paired_power_selected_mu3":{
+    "independent_10pct":{"eBH_power":0.2658,"anchored_power":0.2721,"gain":0.0064,"gain_CI95":[0.0054,0.0073],"anchored_FDR":0.00327},
+    "independent_50pct":{"eBH_power":0.5244,"anchored_power":0.5965,"gain":0.0722,"gain_CI95":[0.0712,0.0731],"anchored_FDR":0.00513},
+    "independent_90pct":{"eBH_power":0.6198,"anchored_power":0.7269,"gain":0.1071,"gain_CI95":[0.1064,0.1079],"anchored_FDR":0.00137},
+    "equicorr05_10pct":{"eBH_power":0.2802,"anchored_power":0.2887,"gain":0.0085,"gain_CI95":[0.0074,0.0096],"anchored_FDR":0.00673},
+    "equicorr05_50pct":{"eBH_power":0.4924,"anchored_power":0.5477,"gain":0.0554,"gain_CI95":[0.0539,0.0569],"anchored_FDR":0.00998},
+    "equicorr05_90pct":{"eBH_power":0.5871,"anchored_power":0.6712,"gain":0.0840,"gain_CI95":[0.0823,0.0858],"anchored_FDR":0.00774}
+  },
+  "scaling_probe_seconds":{"100":0.001378382,"1000":0.003222795,"10000":0.037802442,"100000":1.478781864},
+  "pilot_json_sha256":"c7212b6fd14f701a45e45c93a92292860a69fb42b4fa9e289aa8bcb8c4429f94",
+  "limitations":["fixed offline family only; no SupFDR guarantee","not compared against closed eBH implementation in this run","independent and positive equicorrelation power models only","one normal likelihood-ratio alternative family","not a SOTA claim"]
+}
