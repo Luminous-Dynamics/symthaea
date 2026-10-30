@@ -494,7 +494,9 @@ pub fn workload_regime_matches_query(
             if let Some(query_interval) = query.$field {
                 if profile
                     .$field
-                    .is_none_or(|profile_interval| !intervals_overlap(profile_interval, query_interval))
+                    .is_none_or(|profile_interval| {
+                        !intervals_overlap(profile_interval, query_interval)
+                    })
                 {
                     return false;
                 }
@@ -1088,8 +1090,16 @@ mod tests {
     #[test]
     fn holdout_validator_rejects_holdout_group_leakage() {
         let assignments = vec![
-            assignment("hdc-family-a", "same-source-dataset", ArchitectureEvaluationPartition::Development),
-            assignment("hdc-family-b", "same-source-dataset", ArchitectureEvaluationPartition::Test),
+            assignment(
+                "hdc-family-a",
+                "same-source-dataset",
+                ArchitectureEvaluationPartition::Development,
+            ),
+            assignment(
+                "hdc-family-b",
+                "same-source-dataset",
+                ArchitectureEvaluationPartition::Test,
+            ),
         ];
         assert_eq!(
             validate_workload_holdout_assignments(&assignments),
