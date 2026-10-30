@@ -432,6 +432,10 @@ impl<'a> ExactSearch<'a> {
                 self.budget_blocked = true;
                 return;
             };
+            if total_token_cost > self.request.token_budget {
+                self.budget_blocked = true;
+                return;
+            }
             let plan = CandidatePlan {
                 total_token_cost,
                 evidence_ids,
@@ -494,10 +498,9 @@ impl<'a> ExactSearch<'a> {
                 self.budget_blocked = true;
                 continue;
             };
-            if next_cost > self.request.token_budget {
-                self.budget_blocked = true;
-                continue;
-            }
+            // Do not prune partial over-budget branches here. Only a complete
+            // admissible proof combination can establish BudgetInsufficient;
+            // a partial branch may still fail a later proof obligation entirely.
             if self.best.as_ref()
                 .is_some_and(|best| next_cost > best.total_token_cost)
             {
@@ -506,7 +509,7 @@ impl<'a> ExactSearch<'a> {
 
             let mut next_proofs = selected_proofs.to_vec();
             next_proofs.push(SelectedProof {
-                conclusion_id: obligation.conclusion_id.clone(),
+                conclusion_id: conclusion_id.clone(),
                 justification_id: alternative.justification_id.clone(),
             });
             self.explore(obligation_index + 1, &next_evidence, &next_proofs);
@@ -1043,6 +1046,25 @@ mod tests {
         );
         let result = solve_proof_budget(req).unwrap();
         assert_eq!(result.status, ProofBudgetStatus::BudgetInsufficient);
+        assert!(result.evidence.is_empty());
+        assert_eq!(result.packet_sha256, None);
+    }
+
+    #[test]
+    fn partial_over_budget_branch_without_complete_proof_is_no_eligible_proof() {
+        let req = request(
+            vec![
+                candidate("A-expensive", "family-A", 10),
+                candidate("B", "family-B", 1),
+            ],
+            vec![
+                obligation("claim-1", vec![justification("p1", &["A-expensive"])]),
+                obligation("claim-2", vec![justification("p2", &["missing-source"])]),
+            ],
+            2,
+        );
+        let result = solve_proof_budget(req).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
         assert!(result.evidence.is_empty());
         assert_eq!(result.packet_sha256, None);
     }
