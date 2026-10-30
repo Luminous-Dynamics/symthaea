@@ -43,6 +43,7 @@ pub mod analyst;
 pub mod audio_analyzer;
 pub mod audio_preservation;
 pub mod counterfactual_influence;
+pub mod counterfactual_interaction;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
 pub mod performed_event_map;
