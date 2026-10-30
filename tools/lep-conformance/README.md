@@ -14,6 +14,16 @@ Run tests with:
 
 The CLI prints a JSON report with `conforms` and `scope: LEP_SCHEMA_AND_SEMANTIC_CHECKS_ONLY`. Exit code 0 means the supplied record conformed to this schema and these implemented semantic checks; 1 means validation failed; 2 means the input could not be read or parsed. `conforms: true` is not an authenticated evidence verdict and does not mean the claim is true.
 
+## Performance microbenchmark
+
+The benchmark binary compares strict parsing + schema validation with strict parsing + schema + semantic validation on a synthetic valid statement. It caches schema compilation via the library, warms the process-local cache, and reports p50/p95/mean latency and a p50-derived throughput estimate. It makes no claims about signature verification, artifact I/O, run authenticity, or scientific truth.
+
+Example:
+
+    cargo run --release --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- 10240 1000
+
+Repeat on controlled hardware and record the actual input size and exact commit; do not compare noisy CI timings as a SOTA result.
+
 ## Validation performed
 
 The CLI first parses JSON with duplicate object keys rejected at every nesting level, then validates the predicate against the bundled JSON Schema Draft 2020-12 schema, with format assertions enabled and unknown formats rejected, then performs semantic validation. The schema uses only in-document references; no remote schema retrieval is required.
