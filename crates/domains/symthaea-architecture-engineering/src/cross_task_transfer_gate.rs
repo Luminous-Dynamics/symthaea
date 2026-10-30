@@ -627,9 +627,14 @@ fn validate_calibration_task_ids(
 
 fn mean(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
-        None
+        return None;
+    }
+    let sum = values.iter().sum::<f64>();
+    let average = sum / values.len() as f64;
+    if sum.is_finite() && average.is_finite() {
+        Some(average)
     } else {
-        Some(values.iter().sum::<f64>() / values.len() as f64)
+        None
     }
 }
 
@@ -645,8 +650,12 @@ fn sample_standard_error(values: &[f64]) -> Option<f64> {
             delta * delta
         })
         .sum::<f64>();
+    if !sum_squared.is_finite() {
+        return None;
+    }
     let sample_variance = sum_squared / (values.len() - 1) as f64;
-    Some((sample_variance / values.len() as f64).sqrt())
+    let standard_error = (sample_variance / values.len() as f64).sqrt();
+    standard_error.is_finite().then_some(standard_error)
 }
 
 fn digest_proposal(proposal: &TransferProposal) -> String {
@@ -972,6 +981,22 @@ mod tests {
         let mut invalid = proposal();
         invalid.source_tasks[0].prior_weight = 0.7;
         assert!(gate().qualify(&invalid, &evidence([-2.0, -2.0, -2.0])).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_task_digest_and_overflowing_regret_statistics() {
+        let mut tasks = task_registry();
+        tasks[0].artifact_sha256 = "not-a-digest".into();
+        assert!(CrossTaskTransferGate::new(config(), tasks).is_err());
+
+        let mut e = evidence([-2.0, -2.0, -2.0]);
+        for outcome in &mut e.outcomes {
+            outcome.transferred_regret_percent = f64::MAX;
+            outcome.target_only_regret_percent = 0.0;
+        }
+        let receipt = gate().qualify(&proposal(), &e).unwrap();
+        assert_ne!(receipt.decision, TransferGateDecision::ApplyPrior);
+        assert!(!receipt.prior_is_applied());
     }
 
     #[test]
