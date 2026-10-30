@@ -67,6 +67,8 @@ pub struct ArchitectureEvidenceReceipt {
     pub comparison_contract_fingerprint: String,
     /// Benchmark suite that owns the workload semantics.
     pub benchmark_suite: ArchitectureBenchmarkSuite,
+    /// Public DOI, URL, repository path or immutable source-registry reference.
+    pub source_reference: String,
     /// Exact suite/version or declared upstream result release.
     pub benchmark_version: String,
     /// Stable upstream workload/case identifier.
@@ -97,14 +99,14 @@ pub struct ArchitectureEvidenceReceipt {
     pub device_identity: Option<String>,
     /// Exact compiler, runtime, simulator or analysis toolchain when disclosed.
     pub toolchain_identity: Option<String>,
-    /// Total attempts represented by the raw output and summary.
-    pub repeat_count: u64,
-    /// Failed, timed-out, invalid or rejected attempts within repeat_count.
-    pub failed_run_count: u64,
-    /// Declared uncertainty/interval construction procedure identifier.
-    pub interval_method_id: String,
-    /// Declared replicate aggregation procedure identifier.
-    pub aggregation_method_id: String,
+    /// Total attempts, if reported by the source or captured by the runner.
+    pub repeat_count: Option<u64>,
+    /// Failed attempts, if reported/captured; paired with repeat_count.
+    pub failed_run_count: Option<u64>,
+    /// Declared uncertainty/interval procedure; absent when the source does not report it.
+    pub interval_method_id: Option<String>,
+    /// Declared replicate aggregation procedure; absent when not reported.
+    pub aggregation_method_id: Option<String>,
 }
 
 /// Complete evidence record admitted to the capability atlas.
@@ -133,8 +135,14 @@ pub enum ArchitectureEvidenceError {
     InvalidDigest,
     /// Optional Git source revision is not a 40- or 64-character hexadecimal SHA.
     InvalidSourceRevision,
-    /// Repeat count is zero or failed count exceeds total attempts.
+    /// Repeat/failed counts are incomplete, zero, or internally inconsistent.
     InvalidRepeatCounts,
+    /// A system-level comparison has no declared repeat-count provenance.
+    UnspecifiedRunCounts,
+    /// A system-level comparison has no declared interval-construction method.
+    UnspecifiedIntervalMethod,
+    /// A system-level comparison has no declared replicate aggregation method.
+    UnspecifiedAggregationMethod,
     /// Evidence origin cannot support the observation's declared evidence class.
     IncompatibleEvidenceOrigin,
     /// Physical prototype/production evidence has no concrete device identity.
@@ -167,8 +175,6 @@ fn is_source_revision(value: &str) -> bool {
 pub fn validate_architecture_evidence_record(
     record: &ArchitectureEvidenceRecord,
 ) -> Result<(), ArchitectureEvidenceError> {
-    validate_architecture_observation(&record.observation)
-        .map_err(ArchitectureEvidenceError::InvalidObservation)?;
     validate_architecture_evidence_receipt(&record.observation, &record.receipt)
 }
 
@@ -177,6 +183,8 @@ pub fn validate_architecture_evidence_receipt(
     observation: &ArchitectureBenchmarkObservation,
     receipt: &ArchitectureEvidenceReceipt,
 ) -> Result<(), ArchitectureEvidenceError> {
+    validate_architecture_observation(observation)
+        .map_err(ArchitectureEvidenceError::InvalidObservation)?;
     if receipt.observation_record_id != observation.record_id {
         return Err(ArchitectureEvidenceError::RecordIdMismatch);
     }
@@ -190,11 +198,10 @@ pub fn validate_architecture_evidence_receipt(
     }
 
     for value in [
+        receipt.source_reference.as_str(),
         receipt.benchmark_version.as_str(),
         receipt.workload_case_id.as_str(),
         receipt.executor_identity.as_str(),
-        receipt.interval_method_id.as_str(),
-        receipt.aggregation_method_id.as_str(),
     ] {
         if !non_empty(value) {
             return Err(ArchitectureEvidenceError::EmptyField);
@@ -223,8 +230,20 @@ pub fn validate_architecture_evidence_receipt(
             return Err(ArchitectureEvidenceError::InvalidSourceRevision);
         }
     }
-    if receipt.repeat_count == 0 || receipt.failed_run_count > receipt.repeat_count {
-        return Err(ArchitectureEvidenceError::InvalidRepeatCounts);
+    match (receipt.repeat_count, receipt.failed_run_count) {
+        (Some(total), Some(failed)) if total > 0 && failed <= total => {}
+        (None, None)
+            if matches!(
+                receipt.origin,
+                ArchitectureEvidenceOrigin::PublishedResult
+                    | ArchitectureEvidenceOrigin::AnalyticalReference
+            ) => {}
+        _ => return Err(ArchitectureEvidenceError::InvalidRepeatCounts),
+    }
+    if receipt.interval_method_id.as_deref().is_some_and(|value| !non_empty(value))
+        || receipt.aggregation_method_id.as_deref().is_some_and(|value| !non_empty(value))
+    {
+        return Err(ArchitectureEvidenceError::EmptyField);
     }
     if receipt.device_identity.as_deref().is_some_and(|value| !non_empty(value))
         || receipt
@@ -253,6 +272,15 @@ pub fn validate_architecture_evidence_receipt(
             if receipt.runner_artifact_sha256.is_none() {
                 return Err(ArchitectureEvidenceError::MissingRunnerArtifact);
             }
+            if receipt.repeat_count.is_none() {
+                return Err(ArchitectureEvidenceError::InvalidRepeatCounts);
+            }
+            if receipt.interval_method_id.is_none() {
+                return Err(ArchitectureEvidenceError::UnspecifiedIntervalMethod);
+            }
+            if receipt.aggregation_method_id.is_none() {
+                return Err(ArchitectureEvidenceError::UnspecifiedAggregationMethod);
+            }
         }
         ArchitectureEvidenceOrigin::PublishedResult => {
             if matches!(
@@ -278,6 +306,15 @@ pub fn validate_architecture_evidence_receipt(
             if receipt.runner_artifact_sha256.is_none() {
                 return Err(ArchitectureEvidenceError::MissingRunnerArtifact);
             }
+            if receipt.repeat_count.is_none() {
+                return Err(ArchitectureEvidenceError::InvalidRepeatCounts);
+            }
+            if receipt.interval_method_id.is_none() {
+                return Err(ArchitectureEvidenceError::UnspecifiedIntervalMethod);
+            }
+            if receipt.aggregation_method_id.is_none() {
+                return Err(ArchitectureEvidenceError::UnspecifiedAggregationMethod);
+            }
         }
         ArchitectureEvidenceOrigin::AnalyticalReference => {
             if observation.evidence_class != ArchitectureEvidenceClass::AlgorithmicReference {
@@ -289,13 +326,38 @@ pub fn validate_architecture_evidence_receipt(
     Ok(())
 }
 
+/// Validate an evidence record for system-level comparison or routing.
+///
+/// A structurally valid published record may omit repeat counts or interval
+/// methods when its source does not report them. Such a record is retained as
+/// provenance, but cannot support system-level ranking until those inputs exist.
+pub fn validate_architecture_evidence_record_for_comparison(
+    record: &ArchitectureEvidenceRecord,
+) -> Result<(), ArchitectureEvidenceError> {
+    validate_architecture_evidence_record(record)?;
+    if record.observation.measurement_boundary
+        != crate::architecture_portfolio::ArchitectureMeasurementBoundary::AlgorithmOnly
+    {
+        if record.receipt.repeat_count.is_none() {
+            return Err(ArchitectureEvidenceError::UnspecifiedRunCounts);
+        }
+        if record.receipt.interval_method_id.is_none() {
+            return Err(ArchitectureEvidenceError::UnspecifiedIntervalMethod);
+        }
+        if record.receipt.aggregation_method_id.is_none() {
+            return Err(ArchitectureEvidenceError::UnspecifiedAggregationMethod);
+        }
+    }
+    Ok(())
+}
+
 /// Compare two architecture observations only after validating both source receipts.
 pub fn compare_architecture_evidence_records(
     left: &ArchitectureEvidenceRecord,
     right: &ArchitectureEvidenceRecord,
 ) -> Result<ArchitectureParetoRelation, ArchitectureEvidenceError> {
-    validate_architecture_evidence_record(left)?;
-    validate_architecture_evidence_record(right)?;
+    validate_architecture_evidence_record_for_comparison(left)?;
+    validate_architecture_evidence_record_for_comparison(right)?;
     compare_architecture_pareto(&left.observation, &right.observation)
         .map_err(ArchitectureEvidenceError::InvalidObservation)
 }
@@ -310,7 +372,7 @@ pub fn select_architecture_candidate_from_evidence(
     records: &[ArchitectureEvidenceRecord],
 ) -> Result<ArchitectureRoutingReport, ArchitectureEvidenceError> {
     for record in records {
-        validate_architecture_evidence_record(record)?;
+        validate_architecture_evidence_record_for_comparison(record)?;
     }
     let observations: Vec<ArchitectureBenchmarkObservation> = records
         .iter()
@@ -371,7 +433,7 @@ mod tests {
             workload_fingerprint: "hdc-query-fixture-sha256".to_owned(),
             comparison_contract_fingerprint: "hdc-algorithm-contract-sha256".to_owned(),
             evidence_class: ArchitectureEvidenceClass::AlgorithmicReference,
-            measurement_boundary: crate::architecture_portfolio::ArchitectureMeasurementBoundary::AlgorithmOnly,
+            measurement_boundary: ArchitectureMeasurementBoundary::AlgorithmOnly,
             quality: interval(0.95, 0.96),
             resources: None,
         }
@@ -386,6 +448,7 @@ mod tests {
             workload_fingerprint: observation.workload_fingerprint.clone(),
             comparison_contract_fingerprint: observation.comparison_contract_fingerprint.clone(),
             benchmark_suite: ArchitectureBenchmarkSuite::SymthaeaCanonical,
+            source_reference: "https://example.invalid/synthetic-source".to_owned(),
             benchmark_version: "v1.synthetic".to_owned(),
             workload_case_id: "hdc-retrieval-synthetic-01".to_owned(),
             origin,
@@ -401,10 +464,10 @@ mod tests {
             executor_identity: "synthetic-test-executor".to_owned(),
             device_identity: Some("synthetic-test-device".to_owned()),
             toolchain_identity: Some("synthetic-toolchain-1.0".to_owned()),
-            repeat_count: 10,
-            failed_run_count: 0,
-            interval_method_id: "synthetic-interval-method".to_owned(),
-            aggregation_method_id: "synthetic-aggregation-method".to_owned(),
+            repeat_count: Some(10),
+            failed_run_count: Some(0),
+            interval_method_id: Some("synthetic-interval-method".to_owned()),
+            aggregation_method_id: Some("synthetic-aggregation-method".to_owned()),
         }
     }
 
@@ -452,6 +515,10 @@ mod tests {
         );
         published.runner_artifact_sha256 = None;
         published.toolchain_identity = None;
+        published.repeat_count = None;
+        published.failed_run_count = None;
+        published.interval_method_id = None;
+        published.aggregation_method_id = None;
         assert_eq!(
             validate_architecture_evidence_receipt(&observation, &published),
             Ok(())
