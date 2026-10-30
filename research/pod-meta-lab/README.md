@@ -1,0 +1,41 @@
+# POD-Meta Lab (research-only)
+
+A small, standalone Rust harness for the first executable slice of Proof-Obligation-Driven Metareasoning (POD-Meta).
+
+This lab is intentionally outside the root Cargo workspace and has zero third-party dependencies. It does not define the production COG-META ABI, import the not-yet-qualified #5470 types, or modify production scheduling.
+
+## Run
+
+```bash
+cargo test --manifest-path research/pod-meta-lab/Cargo.toml
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
+```
+
+## What is implemented
+
+- Typed synthetic obligation states.
+- Finite operation vocabulary: retrieval, verification, repair, refresh, independent evidence, alternatives, clarification, and external-evidence requests.
+- Deterministic lexicographic routing: admissibility, mandatory-work priority, consequence priority, number of actionable obligations, work cost, operation family, and stable ID.
+- Mandatory work reserve that competitive operations cannot consume.
+- Repeat guard keyed by operation ID and the relevant pre-operation state identity.
+- Separate operation and verifier receipts.
+- Exact operation/obligation binding checks before a verifier can discharge an obligation.
+- Tests for no-progress stopping, changed-state retry, source revocation, mismatched proof bindings, budget boundaries, deterministic choice, and non-promotion on failed/unverified work.
+
+## Deliberate limits
+
+This is a scheduler-mechanics prototype, not a production proof engine. The verifier receipt is supplied by the test fixture; the crate does not verify signatures, source authenticity, legal correctness, or whether a verifier is truly independent. The state SupportedUnderProfile is only a synthetic transition after an accepted, exactly-bound fixture receipt.
+
+The lab does not yet compute obligations from Symthaea's production ProofGraph because the #5469 inventory and #5470 typed-contract ownership sequence remains open. It also does not estimate learned value-of-computation. The first version uses a deterministic baseline so scheduler mechanics can be checked before adding a predictor.
+
+## Next integration gates
+
+1. Qualify #5469 and #5470 and identify the exact production producer/consumer.
+2. Add an adapter from real typed inference/proof outputs into this research contract.
+3. Replace synthetic verifier receipts with an independently implemented verifier adapter.
+4. Run POAR against fixed-budget, generic COG-META, random cost-matched, and oracle upper-bound controls.
+5. Add prospective value-of-computation forecasts only after #5476's calibration contract is available.
+
+## Claim boundary
+
+The source and tests are authored. Tests have not been compiled or executed here. No model comparison or SOTA result is claimed.
