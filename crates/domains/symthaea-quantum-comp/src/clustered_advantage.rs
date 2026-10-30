@@ -304,7 +304,8 @@ pub fn analyze_clustered_advantage(
         workload_instances: observations.len(),
         median_family_quality_difference,
         median_family_log_resource_ratio,
-        median_family_resource_ratio: (median_ratio.is_finite() && median_ratio > 0.0).then_some(median_ratio),
+        median_family_resource_ratio: (median_ratio.is_finite() && median_ratio > 0.0)
+            .then_some(median_ratio),
         quality_non_inferiority: quality_signs,
         resource_superiority: resource_signs,
         composite_claim_p_value,
