@@ -557,8 +557,12 @@ impl TabularNasBenchmark {
     }
 
     fn build_receipt(&self, parts: QueryOracleReceiptParts) -> QueryReceipt {
-        let query_trace_sha256 =
-            digest_query_trace(&self.manifest, &parts.queried_order, &parts.attempts);
+        let query_trace_sha256 = digest_query_trace(
+            &self.manifest,
+            &self.canonical_import_sha256,
+            &parts.queried_order,
+            &parts.attempts,
+        );
         QueryReceipt {
             benchmark_id: self.manifest.benchmark_id.clone(),
             canonical_import_sha256: self.canonical_import_sha256.clone(),
@@ -769,12 +773,14 @@ fn digest_observation(metric_id: &str, architecture_id: &str, value: f64) -> Str
 
 fn digest_query_trace(
     manifest: &TabularBenchmarkManifest,
+    canonical_import_sha256: &str,
     queried_order: &[String],
     attempts: &[QueryAttempt],
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.tabular-nas.query-trace.v0.1");
     update_string(&mut hasher, &manifest.benchmark_id);
+    update_string(&mut hasher, canonical_import_sha256);
     update_string(&mut hasher, &manifest.metric_id);
     hasher.update([metric_direction_byte(manifest.metric_direction)]);
     hasher.update((manifest.top_k as u64).to_be_bytes());
