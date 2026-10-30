@@ -319,6 +319,55 @@ fn expected_information_gain_with_steps<H, E>(
     Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
 }
 
+/// Select the candidate maximizing expected information gain per unit cost when each
+/// candidate has its own observation-noise standard deviation and prevalidated eligibility.
+///
+/// This is useful when candidate experiments use different instruments, fixtures, test
+/// methods, or calibration states. The eligibility predicate is a hard gate: it is evaluated
+/// before cost, measurement-noise, or hypothesis-prediction closures. An ineligible experiment
+/// is never rescued by a high information score. The caller remains responsible for ensuring
+/// eligibility was computed from an independently validated route, safety, calibration, and
+/// resource policy; this function does not validate those records.
+///
+/// Costs must use one comparable unit (for example, validated labor-minutes or currency) and
+/// each per-candidate standard deviation must describe the measurement process for that
+/// experiment. Incomplete predictions, invalid noise, invalid cost, and zero information gain
+/// are skipped. Returns None when no positive-information eligible experiment remains.
+pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        // Hard constraints precede every information/cost calculation.
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        let Some(information_gain) =
+            expected_information_gain_nats(experiment, hypotheses, noise, predict)
+        else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -332,26 +381,14 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
     cost: impl Fn(&E) -> f64 + Copy,
 ) -> Option<(&'a E, f64)> {
-    let mut best: Option<(&'a E, f64)> = None;
-    for experiment in candidates {
-        let experiment_cost = cost(experiment);
-        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
-            continue;
-        }
-        let Some(information_gain) =
-            expected_information_gain_nats(experiment, hypotheses, observation_std_dev, predict)
-        else {
-            continue;
-        };
-        let score = information_gain / experiment_cost;
-        if score.is_finite()
-            && score > 0.0
-            && best.is_none_or(|(_, best_score)| score > best_score)
-        {
-            best = Some((experiment, score));
-        }
-    }
-    best
+    select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+        candidates,
+        hypotheses,
+        |_| true,
+        |_| observation_std_dev,
+        predict,
+        cost,
+    )
 }
 
 
@@ -554,6 +591,116 @@ mod tests {
         .expect("at least one valid candidate");
         assert_eq!(*chosen, 1);
         assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
+    fn heteroscedastic_selector_prefers_a_cleaner_measurement_over_a_noisier_high_signal_one() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["high_signal_bad_meter", "low_signal_good_meter"];
+        let predict = |hypothesis: &usize, candidate: &&str| match (*candidate, *hypothesis) {
+            ("high_signal_bad_meter", 0) => Some(0.0),
+            ("high_signal_bad_meter", 1) => Some(10.0),
+            ("low_signal_good_meter", 0) => Some(0.0),
+            ("low_signal_good_meter", 1) => Some(1.0),
+            _ => None,
+        };
+        let noise = |candidate: &&str| match *candidate {
+            "high_signal_bad_meter" => 100.0,
+            "low_signal_good_meter" => 0.1,
+            _ => f64::NAN,
+        };
+        let (chosen, score) =
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| true,
+                noise,
+                predict,
+                |_| 1.0,
+            )
+            .expect("the calibrated candidate has positive information gain");
+        assert_eq!(*chosen, "low_signal_good_meter");
+        assert!(score.is_finite() && score > 0.0);
+
+        // Under a shared low-noise assumption, the much larger nominal signal is
+        // selected first. Candidate-specific metrology uncertainty reverses that rank.
+        let (common_noise_choice, _) = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.1,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both candidates are informative under the common-noise assumption");
+        assert_eq!(*common_noise_choice, "high_signal_bad_meter");
+    }
+
+    #[test]
+    fn hard_eligibility_gate_runs_before_cost_noise_or_prediction() {
+        let candidates = ["blocked", "eligible"];
+        let hypotheses = [0_usize, 1];
+        let predict = |hypothesis: &usize, candidate: &&str| {
+            assert_ne!(*candidate, "blocked", "blocked candidates must not be scored");
+            Some(*hypothesis as f64)
+        };
+        let cost = |candidate: &&str| {
+            assert_ne!(*candidate, "blocked", "blocked candidate cost must not be queried");
+            1.0
+        };
+        let noise = |candidate: &&str| {
+            assert_ne!(*candidate, "blocked", "blocked candidate noise must not be queried");
+            1.0
+        };
+        let selected = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |candidate| *candidate == "eligible",
+            noise,
+            predict,
+            cost,
+        )
+        .expect("one eligible informative candidate");
+        assert_eq!(*selected.0, "eligible");
+
+        assert!(select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| false,
+            noise,
+            predict,
+            cost,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn heteroscedastic_selector_skips_invalid_noise_and_invalid_cost() {
+        let candidates = [0_usize, 1, 2];
+        let hypotheses = [0_usize, 1];
+        let selected = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| true,
+            |candidate| match candidate {
+                0 => f64::NAN,
+                1 => 1.0,
+                _ => 1.0,
+            },
+            |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
+            |candidate| if *candidate == 2 { f64::INFINITY } else { 1.0 },
+        )
+        .expect("candidate 1 is admissible and informative");
+        assert_eq!(*selected.0, 1);
+
+        assert!(select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| true,
+            |_| f64::NAN,
+            |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
+            |_| 1.0,
+        )
+        .is_none());
     }
 
     #[test]
