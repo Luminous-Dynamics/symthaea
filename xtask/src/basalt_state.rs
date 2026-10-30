@@ -959,15 +959,26 @@ mod tests {
     #[test]
     fn digest_reversion_does_not_resurrect_old_generation_evidence() {
         let mut value = parsed_example();
+        let before = format!("sha256:{}", "e".repeat(64));
+        let after = format!("sha256:{}", "a".repeat(64));
+        let event_digest = resource_change_digest(
+            "state-shift-selective-invalidation-001",
+            9,
+            "source-reverted",
+            ChangeKind::SourceChange,
+            "repo:src/lib.rs",
+            &before,
+            &after,
+        ).unwrap();
         value["entries"].as_array_mut().unwrap().push(serde_json::json!({
             "entry_type": "resource_changed",
             "sequence": 9,
             "event_id": "source-reverted",
             "change_kind": "source_change",
-            "event_digest": format!("sha256:{}", "f".repeat(64)),
+            "event_digest": event_digest,
             "resource_id": "repo:src/lib.rs",
-            "before_digest": format!("sha256:{}", "e".repeat(64)),
-            "after_digest": format!("sha256:{}", "a".repeat(64))
+            "before_digest": before,
+            "after_digest": after
         }));
         let report = audit_value(&value);
         assert!(report.structurally_valid, "{:?}", report.errors);
@@ -1029,8 +1040,20 @@ mod tests {
     #[test]
     fn no_op_resource_change_is_rejected() {
         let mut value = parsed_example();
-        let digest = value["entries"][5]["before_digest"].clone();
-        value["entries"][5]["after_digest"] = digest;
+        let digest = value["entries"][5]["before_digest"].as_str().unwrap().to_string();
+        value["entries"][5]["after_digest"] = Value::String(digest.clone());
+        value["entries"][5]["event_digest"] = Value::String(
+            resource_change_digest(
+                "state-shift-selective-invalidation-001",
+                6,
+                "source-edit-001",
+                ChangeKind::SourceChange,
+                "repo:src/lib.rs",
+                &digest,
+                &digest,
+            )
+            .unwrap(),
+        );
         let report = audit_value(&value);
         assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_CHANGE_NOOP"));
