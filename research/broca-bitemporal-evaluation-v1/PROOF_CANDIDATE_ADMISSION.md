@@ -60,7 +60,7 @@ These tests establish adapter conformance only. They are not LoCoMo, LongMemEval
 
 ## Future work
 
-1. Add a deterministic EvidenceIndex snapshot digest and a signed admission receipt that binds the index digest, bitemporal cutoff, principal, policy, tokenizer and renderer.
+1. Add a signed admission receipt that binds the existing deterministic index digest, bitemporal cutoff, principal, policy, tokenizer and renderer.
 2. Add a historical EvidenceIndex materializer driven by the append-only source ledger, with exact index rebuild parity tests.
 3. Replace externally supplied conflict edges with a versioned contradiction graph whose false-positive/false-negative rates are benchmarked.
 4. Add exact renderer-tokenization receipts and per-query accounting.
