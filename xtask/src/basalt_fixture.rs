@@ -107,6 +107,11 @@ pub fn run(
         bail!("at least one --case-id is required");
     }
 
+    let catalog_metadata = fs::metadata(catalog_path)
+        .with_context(|| format!("inspecting challenge catalog {}", catalog_path.display()))?;
+    if catalog_metadata.len() > 16 * 1024 * 1024 {
+        bail!("challenge catalog exceeds the 16 MiB fixture-run limit");
+    }
     let catalog_bytes = fs::read(catalog_path)
         .with_context(|| format!("reading challenge catalog {}", catalog_path.display()))?;
     let catalog_audit = crate::basalt_observer::audit_bytes(&catalog_bytes);
@@ -186,12 +191,17 @@ pub fn run(
     let run_id = format!("basalt-{}-{now_nanos}", std::process::id());
     let run_dir = out_dir.join(&run_id);
     let workspace = run_dir.join("workspace");
-    fs::create_dir_all(&workspace)
+    fs::create_dir_all(out_dir)
+        .with_context(|| format!("creating fixture output directory {}", out_dir.display()))?;
+    // Refuse collisions instead of reusing or overwriting any prior run evidence.
+    fs::create_dir(&run_dir)
+        .with_context(|| format!("creating unique fixture run directory {}", run_dir.display()))?;
+    fs::create_dir(&workspace)
         .with_context(|| format!("creating fixture workspace {}", workspace.display()))?;
 
     // Make the untracked fixture visibly ignored by Git-based tooling.
     let gitignore = b"unlisted-secret.txt\n";
-    fs::write(workspace.join(".gitignore"), gitignore)?;
+    write_new_synced(&workspace.join(".gitignore"), gitignore)?;
 
     let mut plans = Vec::new();
     for case_id in &ordered_ids {
@@ -240,7 +250,7 @@ pub fn run(
         "plans": plans.iter().map(|plan| json!({
             "case_id": plan.case_id,
             "resource_id": plan.resource_id,
-            "relative_path": plan.relative_path,
+            "relative_path": plan.relative_path.to_string_lossy(),
             "mode": plan.mode,
             "before_input_digest": sha256_tagged(&plan.before_bytes),
             "after_input_digest": sha256_tagged(&plan.after_bytes)
