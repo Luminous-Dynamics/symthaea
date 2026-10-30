@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "program": "BASALT",
+  "run_id": "state-shift-selective-invalidation-001",
+  "initial_resources": [
+    {
+      "resource_id": "repo:src/lib.rs",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "resource_id": "repo:Cargo.lock",
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "resource_id": "toolchain:rust",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "resource_id": "task:contract",
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "resource_id": "repo:README.md",
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "entries": [
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 1,
+      "evidence_id": "build-before-change",
+      "check_id": "cargo-build",
+      "evidence_kind": "build",
+      "outcome": "pass",
+      "evidence_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "resource_pins": [
+        {
+          "resource_id": "repo:src/lib.rs",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generation": 0
+        },
+        {
+          "resource_id": "repo:Cargo.lock",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "generation": 0
+        },
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": []
+    },
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 2,
+      "evidence_id": "tests-before-change",
+      "check_id": "cargo-test",
+      "evidence_kind": "test",
+      "outcome": "pass",
+      "evidence_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "resource_pins": [
+        {
+          "resource_id": "repo:src/lib.rs",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generation": 0
+        },
+        {
+          "resource_id": "repo:Cargo.lock",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "generation": 0
+        },
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        },
+        {
+          "resource_id": "task:contract",
+          "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": [
+        "build-before-change"
+      ]
+    },
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 3,
+      "evidence_id": "report-before-change",
+      "check_id": "integration-report",
+      "evidence_kind": "other",
+      "outcome": "pass",
+      "evidence_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "resource_pins": [
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        },
+        {
+          "resource_id": "task:contract",
+          "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": [
+        "tests-before-change"
+      ]
+    },
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 4,
+      "evidence_id": "lint-before-change",
+      "check_id": "cargo-clippy",
+      "evidence_kind": "lint",
+      "outcome": "pass",
+      "evidence_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "resource_pins": [
+        {
+          "resource_id": "repo:src/lib.rs",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generation": 0
+        },
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": []
+    },
+    {
+      "entry_type": "resource_changed",
+      "sequence": 5,
+      "event_id": "readme-edit-001",
+      "change_kind": "source_change",
+      "event_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "resource_id": "repo:README.md",
+      "before_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "after_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "entry_type": "resource_changed",
+      "sequence": 6,
+      "event_id": "source-edit-001",
+      "change_kind": "source_change",
+      "event_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "resource_id": "repo:src/lib.rs",
+      "before_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "after_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 7,
+      "evidence_id": "build-after-change",
+      "check_id": "cargo-build",
+      "evidence_kind": "build",
+      "outcome": "pass",
+      "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "resource_pins": [
+        {
+          "resource_id": "repo:src/lib.rs",
+          "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "generation": 1
+        },
+        {
+          "resource_id": "repo:Cargo.lock",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "generation": 0
+        },
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": []
+    },
+    {
+      "entry_type": "evidence_recorded",
+      "sequence": 8,
+      "evidence_id": "tests-after-change",
+      "check_id": "cargo-test",
+      "evidence_kind": "test",
+      "outcome": "pass",
+      "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "resource_pins": [
+        {
+          "resource_id": "repo:src/lib.rs",
+          "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "generation": 1
+        },
+        {
+          "resource_id": "repo:Cargo.lock",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "generation": 0
+        },
+        {
+          "resource_id": "toolchain:rust",
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "generation": 0
+        },
+        {
+          "resource_id": "task:contract",
+          "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "generation": 0
+        }
+      ],
+      "evidence_dependencies": [
+        "build-after-change"
+      ]
+    }
+  ]
+}
