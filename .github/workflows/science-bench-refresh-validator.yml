@@ -1066,7 +1066,9 @@ jobs:
           jq '.adjudicators[0].blind_to_judge_output = false' "$candidate" > /tmp/sbr-ref-blinding-failure.json
           jq '.initial_adjudications[0].decision = "abstain" | .initial_adjudications[0].abstention_reason = null' "$candidate" > /tmp/sbr-ref-invalid-abstention.json
           jq 'del(.initial_adjudications[2])' "$candidate" > /tmp/sbr-ref-missing-panel.json
-          for name in duplicate-claim orphan-span invalid-range retracted-support superseded-support blinding-failure invalid-abstention missing-panel; do
+          jq '.resolutions[0].evidence_span_ids = []' "$candidate" > /tmp/sbr-ref-resolution-no-evidence.json
+          jq '.resolutions[0].adjudicator_id_sha256 = .initial_adjudications[0].adjudicator_id_sha256' "$candidate" > /tmp/sbr-ref-resolution-same-voter.json
+          for name in duplicate-claim orphan-span invalid-range retracted-support superseded-support blinding-failure invalid-abstention missing-panel resolution-no-evidence resolution-same-voter; do
             set +e
             cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
               verify-reference-assurance-package "/tmp/sbr-ref-$name.json" > "/tmp/sbr-ref-$name-report.json"
