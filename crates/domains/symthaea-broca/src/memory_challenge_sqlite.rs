@@ -243,6 +243,30 @@ impl SqliteAmlMemoryBackend {
         Ok(backend)
     }
 
+    /// Reconstruct memory exactly as it was known at the supplied transaction
+    /// time, then query it at the separate world-valid time.
+    ///
+    /// Add batches are visible only when their commit timestamp is <= known_at.
+    /// Revoke/delete/supersede events are replayed only when their recorded_at
+    /// timestamp is <= known_at. EvidenceRecord valid-time bounds are evaluated
+    /// at valid_at. This method is the explicit (valid_at, known_at) query path;
+    /// the public AML Search ABI continues to request the current view only.
+    pub fn search_as_known_at(
+        &self,
+        request: &AmlSearchRequest,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+    ) -> Result<AmlSearchResponse, String> {
+        request.validate()?;
+        let index = self.build_index_as_known_at(known_at_unix_ms)?;
+        Self::search_index(
+            &index,
+            request,
+            valid_at_unix_ms,
+            &self.payload_root,
+        )
+    }
+
     /// Number of persisted Add transactions (not individual messages).
     pub fn persisted_batch_count(&self) -> Result<usize, String> {
         let count: i64 = self
@@ -494,9 +518,18 @@ impl SqliteAmlMemoryBackend {
     }
 
     fn rebuild_index(&mut self) -> Result<(), String> {
-        let rows = self.read_persisted_rows()?;
+        self.index = self.build_index_as_known_at(u64::MAX)?;
+        Ok(())
+    }
+
+    fn build_index_as_known_at(&self, known_at_unix_ms: u64) -> Result<EvidenceIndex, String> {
         let mut rebuilt = EvidenceIndex::new();
-        for row in rows {
+        for row in self.read_persisted_rows()? {
+            if row.stored_at_unix_ms < 0
+                || u64::try_from(row.stored_at_unix_ms).ok().is_none_or(|stored| stored > known_at_unix_ms)
+            {
+                continue;
+            }
             let batch = decode_and_validate_batch(&row.body_json)?;
             validate_row_metadata(&row, &batch)?;
             let source_bytes = serde_json::to_vec(&batch.request)
@@ -504,11 +537,15 @@ impl SqliteAmlMemoryBackend {
             rebuilt.insert_batch_atomic(batch.records, &source_bytes)?;
         }
         for row in self.read_persisted_lifecycle_rows()? {
+            if row.recorded_at_unix_ms < 0
+                || u64::try_from(row.recorded_at_unix_ms).ok().is_none_or(|recorded| recorded > known_at_unix_ms)
+            {
+                continue;
+            }
             let event = decode_and_validate_lifecycle_row(&row)?;
             event.operation.apply(&mut rebuilt)?;
         }
-        self.index = rebuilt;
-        Ok(())
+        Ok(rebuilt)
     }
 
     fn lookup_existing(
@@ -696,11 +733,27 @@ impl AmlMemoryBackend for SqliteAmlMemoryBackend {
         request: &AmlSearchRequest,
     ) -> Result<AmlSearchResponse, String> {
         request.validate()?;
-        let hits = self.index.search_bm25(
-            &request.query,
-            &request.user_id,
+        Self::search_index(
+            &self.index,
+            request,
             current_unix_ms()?,
             &self.payload_root,
+        )
+    }
+}
+
+impl SqliteAmlMemoryBackend {
+    fn search_index(
+        index: &EvidenceIndex,
+        request: &AmlSearchRequest,
+        valid_at_unix_ms: u64,
+        payload_root: &Path,
+    ) -> Result<AmlSearchResponse, String> {
+        let hits = index.search_bm25(
+            &request.query,
+            &request.user_id,
+            valid_at_unix_ms,
+            payload_root,
             Bm25Config {
                 k1: 1.2,
                 b: 0.75,
@@ -768,7 +821,10 @@ fn build_evidence_records(
             content_sha256: sha256_hex(message.content.as_bytes()),
             lifecycle: EvidenceLifecycle::Active,
             occurred_at_unix_ms: message_timestamp,
-            valid_from_unix_ms: None,
+            // When a source message supplies a world-time timestamp, it is
+            // also the earliest valid time for that evidence. Transaction-time
+            // visibility remains independently governed by the Add commit time.
+            valid_from_unix_ms: message_timestamp,
             valid_until_unix_ms: None,
             superseded_by: None,
         });
