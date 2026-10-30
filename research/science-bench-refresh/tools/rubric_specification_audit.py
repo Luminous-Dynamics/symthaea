@@ -149,6 +149,9 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(anchors, list) or len(anchors) != 3:
             issues.append(f"criterion {criterion_id} requires exactly three score_anchors")
         else:
+            for anchor_index, anchor in enumerate(anchors):
+                if not isinstance(anchor, dict) or set(anchor) != {"score_millionths", "description"}:
+                    issues.append(f"criterion {criterion_id} score anchor {anchor_index} has invalid fields")
             values = [item.get("score_millionths") if isinstance(item, dict) else None for item in anchors]
             if values != [0, 500_000, 1_000_000]:
                 issues.append(f"criterion {criterion_id} score anchors must be 0, 500000 and 1000000 millionths")
@@ -225,6 +228,8 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
                 issues.append(f"criterion {criterion_id} lacks {test_type} test coverage")
 
     seen_dependencies: set[tuple[str, str, str]] = set()
+    seen_conflicts: set[tuple[str, str]] = set()
+    dependency_graph: dict[str, set[str]] = {criterion_id: set() for criterion_id in criteria_by_id}
     for index, dependency in enumerate(dependencies):
         context = f"dependency[{index}]"
         if not isinstance(dependency, dict):
@@ -247,9 +252,47 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
         if key in seen_dependencies:
             issues.append(f"{context} duplicates a dependency rule")
         seen_dependencies.add(key)
+        if relation == "conflicts_with":
+            conflict_key = tuple(sorted((source, target)))
+            if conflict_key in seen_conflicts:
+                issues.append(f"{context} duplicates a symmetric conflicts_with rule")
+            seen_conflicts.add(conflict_key)
+        elif relation in {"requires", "overrides"} and source in criteria_by_id and target in criteria_by_id:
+            dependency_graph[source].add(target)
+        if relation == "overrides" and source in criteria_by_id and target in criteria_by_id:
+            source_priority = criteria_by_id[source].get("priority")
+            target_priority = criteria_by_id[target].get("priority")
+            if (
+                isinstance(source_priority, int)
+                and not isinstance(source_priority, bool)
+                and isinstance(target_priority, int)
+                and not isinstance(target_priority, bool)
+                and source_priority >= target_priority
+            ):
+                issues.append(f"{context} overrides edge must point from a higher-priority criterion to a lower-priority criterion")
         rationale = dependency.get("rationale")
         if not isinstance(rationale, str) or len(rationale.strip()) < 12:
             issues.append(f"{context} requires a substantive rationale")
+
+    # Dependencies are a directed partial order where applicable. Cycles make
+    # precedence/requirements ambiguous and are rejected; symmetric conflicts
+    # are canonicalized separately above.
+    indegree = {criterion_id: 0 for criterion_id in criteria_by_id}
+    for source, targets in dependency_graph.items():
+        for target in targets:
+            indegree[target] += 1
+    ready = sorted(criterion_id for criterion_id, degree in indegree.items() if degree == 0)
+    visited = 0
+    while ready:
+        source = ready.pop(0)
+        visited += 1
+        for target in sorted(dependency_graph[source]):
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                ready.append(target)
+                ready.sort()
+    if visited != len(dependency_graph):
+        issues.append("dependency graph contains a cycle in requires/overrides relations")
 
     dimensions = {
         criterion.get("construct_dimension")
