@@ -12,19 +12,23 @@
 //!
 //! # Current temporal-credit semantics
 //!
-//! Training uses next-token cross-entropy with teacher forcing. The output-head
-//! gradient is computed from each token position. The CfC update then calls
-//! `LanguageController::backward_step`, which reads the *current* recurrent
-//! state and applies a local per-step target update. It propagates an approximate
-//! error signal across layers, but does **not** retain an activation tape or send
-//! gradients from position t back to t-1. Consequently, `bptt_window` bounds
-//! the number of teacher-forced token positions updated per pair; it is not a
-//! temporal BPTT window. See `controller.rs::LanguageController::backward_step`
-//! and `docs/TEMPORAL_CREDIT_ASSIGNMENT_STEP4_DESIGN_2026-07-31.md`.
+//! Training uses next-token cross-entropy with teacher forcing. Both the CPU
+//! and optional Candle GPU paths update the CfC parameters once per token from
+//! the current recurrent state. They propagate an approximate error signal
+//! across layers, but neither retains a sequence activation tape nor sends the
+//! loss gradient at position t back through recurrent states at t-1 and earlier.
+//! The GPU path batches tensor operations on the selected device; its historical
+//! "BPTT" labels described a per-token local target update, not temporal BPTT.
+//! Consequently, `bptt_window` is a legacy field name for the maximum number of
+//! teacher-forced positions processed per pair, not a gradient-unroll length.
+//! See `controller.rs::LanguageController::backward_step`,
+//! `gpu_cfc.rs::GpuCfcNetwork::backward_and_update`, and
+//! `docs/TEMPORAL_CREDIT_ASSIGNMENT_STEP4_DESIGN_2026-07-31.md`.
 //!
-//! An eligibility-trace/e-prop intervention is designed separately and must be
-//! evaluated on the pre-registered, information-theoretically validated temporal
-//! benchmark before it can be described as an improvement.
+//! The GPU layer update itself uses a simplified local evolution derivative;
+//! it is not a full derivative of the gated CfC transition. A future e-prop
+//! intervention must be evaluated on the pre-registered, information-theoretically
+//! validated temporal benchmark before it can be described as an improvement.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -192,7 +196,8 @@ pub struct TrainingConfig {
     pub epochs: usize,
     /// Learning rate (for token embeddings).
     pub learning_rate: f32,
-    /// BPTT truncation window (tokens).
+    /// Legacy field name: maximum teacher-forced token positions processed per
+    /// sequence. This is not a backpropagation-through-time unroll window.
     pub bptt_window: usize,
     /// Gradient clipping threshold.
     pub grad_clip: f32,
@@ -208,9 +213,9 @@ pub struct TrainingConfig {
     pub patience: usize,
     /// Enable gradient flow diagnostics (tracking norms, clipping, vanishing/exploding).
     pub enable_diagnostics: bool,
-    /// Train CfC network weights via BPTT (not just embeddings).
-    /// This is the key improvement: without it, only token embeddings are updated
-    /// and loss plateaus rapidly (~5.02 after 3 epochs).
+    /// Apply per-token local target updates to CfC network parameters in addition
+    /// to updating token embeddings. This is not temporal backpropagation through
+    /// time; see the module-level temporal-credit note above.
     pub train_network: bool,
     /// Learning rate scale for CfC network weights relative to embedding LR.
     /// Typically 0.1-0.5x embedding LR to prevent destabilizing the temporal dynamics.
@@ -228,9 +233,9 @@ pub struct TrainingConfig {
     /// teaching the CfC network cross-sentence temporal coherence.
     /// Recommended: 0.3-0.5.
     pub carry_state: f32,
-    /// Phased training: number of embedding-only epochs before enabling CfC BPTT.
-    /// Solves the "uniform plateau" problem where CfC receives conflicting gradients
-    /// from randomly-sampled negatives before embeddings have separated.
+    /// Phased training: number of embedding-only epochs before enabling local CfC
+    /// parameter updates. Solves the "uniform plateau" problem where the CfC receives
+    /// conflicting learning signals before embeddings have separated.
     /// When > 0, `train_network` is forced false for the first N epochs,
     /// then automatically enabled for the remaining epochs.
     /// Recommended: 10-30 (enough for embeddings to develop structure).
@@ -252,9 +257,8 @@ pub struct TrainingConfig {
     /// Science: Pascanu et al. (2013) — adaptive gradient management in RNNs
     pub enable_anomaly_response: bool,
     /// Freeze embedding weights during training.
-    /// When true, only CfC network weights are updated (via BPTT).
-    /// Useful for Phase 2 training where embeddings are already well-trained
-    /// and BPTT gradients flowing back through CfC destabilize embedding quality.
+    /// When true, token embeddings are frozen while CfC parameters receive the
+    /// per-token local target updates. Useful after embeddings are already trained.
     pub freeze_embeddings: bool,
     /// Coherence-gated loss weighting (0.0 = disabled).
     /// When > 0, each training pair's loss contribution is scaled by its
@@ -306,8 +310,8 @@ pub struct TrainingConfig {
     // ── Training-Time Fusion ──
     /// Enable fusion flags on the generator's controller during training.
     /// When true, compositional logits, adaptive dt, and adaptive alpha are
-    /// activated before the training loop begins, so BPTT gradients flow through
-    /// the full fused forward path (not just the raw CfC output).
+    /// activated before the training loop begins, so the per-token local update
+    /// sees the selected fused output path (rather than a post-hoc inference overlay).
     /// Without this, the CfC network learns dynamics for raw output, and fusion
     /// flags at eval time are a post-hoc overlay.
     pub enable_fusion_during_training: bool,
@@ -470,7 +474,8 @@ pub struct TrainingConfig {
     // ── GPU Acceleration ──
     /// Use GPU-accelerated CfC forward/backward via candle CUDA tensors.
     /// When true and a CUDA device is available, packs neuron states into
-    /// batched [N, D] tensors on GPU for ~5-15x BPTT speedup.
+    /// batched [N, D] tensors on GPU for per-token CfC forward/local updates.
+    /// This accelerates tensor execution but does not add temporal credit assignment.
     /// Automatically falls back to CPU if CUDA is unavailable.
     #[cfg(feature = "gpu")]
     pub use_gpu_cfc: bool,
@@ -838,7 +843,7 @@ pub struct AnomalyReport {
     pub anomalous_epoch_count: usize,
     /// Whether training was stopped early due to anomaly response (vs patience).
     pub anomaly_early_stopped: bool,
-    /// Whether CfC BPTT was force-enabled by plateau detection.
+    /// Whether local CfC parameter updates were force-enabled by plateau detection.
     pub plateau_forced_network_training: bool,
     /// Per-epoch anomaly log: (epoch, anomalies detected).
     pub epoch_anomalies: Vec<(usize, Vec<GradientAnomaly>)>,
@@ -1129,8 +1134,9 @@ pub fn train_with_adam(
     };
 
     // ── GPU Trainer initialization ─────────────────────────────────────
-    // Creates a GpuTrainer that keeps ALL state on device (CUDA or CPU tensors).
-    // The entire BPTT window runs on GPU; sync happens once per training pair.
+    // Creates a GpuTrainer that keeps state on the selected device (CUDA or CPU tensors).
+    // Per-token forward/local updates run on device; sync happens once per training pair.
+    // This reduces transfer overhead but does not perform temporal BPTT.
     // Automatically detects CUDA and falls back to CPU tensors if unavailable.
     #[cfg(feature = "gpu")]
     let mut gpu_trainer: Option<crate::gpu_cfc::GpuTrainer> = if config.use_gpu_cfc {
@@ -1319,11 +1325,11 @@ pub fn train_with_adam(
         if config.network_warmup_epochs > 0 && epoch == config.network_warmup_epochs {
             tracing::info!(
                 epoch = epoch,
-                "Phase 2: enabling CfC network BPTT (embeddings warmed up)"
+                "Phase 2: enabling local CfC network updates (embeddings warmed up)"
             );
             if config.progress {
                 use std::io::Write;
-                let _ = writeln!(std::io::stderr(), "[phase] epoch {epoch}: CfC BPTT enabled");
+                let _ = writeln!(std::io::stderr(), "[phase] epoch {epoch}: local CfC updates enabled");
                 std::io::stderr().flush().ok();
             }
         }
@@ -1403,7 +1409,7 @@ pub fn train_with_adam(
                 std::io::stderr().flush().ok();
             }
 
-            // ── GPU fast path: entire BPTT window on device ─────────────
+            // ── GPU path: per-token forward/local update on device ───────
             #[cfg(feature = "gpu")]
             let gpu_ran = if let Some(ref mut trainer) = gpu_trainer {
                 let train_network_this_epoch = (config.train_network
@@ -1474,7 +1480,7 @@ pub fn train_with_adam(
                         total_tokens += 1;
                         gpu_sequence.record_loss(loss);
 
-                        // Backward on GPU (CfC BPTT)
+                        // Current-position local CfC parameter update on GPU (not temporal BPTT).
                         if train_network_this_epoch {
                             let network_lr = lr * config.network_lr_scale;
                             trainer.backward_step(
@@ -1753,13 +1759,13 @@ pub fn train_with_adam(
                     total_tokens += 1;
                     cpu_sequence.record_loss(loss);
 
-                    // Phased training: only enable CfC BPTT after network_warmup_epochs
+                    // Phased training: only enable local CfC updates after network_warmup_epochs
                     // (force_train_network overrides when plateau anomaly detected)
                     let train_network_this_epoch = (config.train_network
                         && epoch >= config.network_warmup_epochs)
                         || force_train_network;
 
-                    // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
+                    // Compute current-position CE gradient w.r.t. the output HV.
                     let d_output = if train_network_this_epoch {
                         Some(compute_ce_gradient_wrt_output(
                             &logits,
@@ -1954,7 +1960,7 @@ pub fn train_with_adam(
                         let network_lr = lr * config.network_lr_scale;
                         let dt = generator.controller().config().dt_per_token;
 
-                        // CPU BPTT (GPU training uses the fast path above)
+                        // CPU per-token local update (GPU training uses the device-local path above)
                         generator.controller_mut().backward_step(
                             d_out,
                             &thought_hv,
@@ -4652,7 +4658,7 @@ mod tests {
             warmup_fraction: 0.0,
             patience: 3,
             enable_diagnostics: false,
-            train_network: false, // Disable network BPTT for early stopping test
+            train_network: false, // Disable local CfC parameter updates for early stopping test
             ..Default::default()
         };
 
@@ -5034,7 +5040,7 @@ mod tests {
     }
 
     #[test]
-    fn test_network_bptt_improves_over_embeddings_only() {
+    fn test_local_cfc_updates_improve_over_embeddings_only() {
         let genesis = test_genesis();
         let config = test_config();
 
@@ -5058,9 +5064,9 @@ mod tests {
         };
         let emb_metrics = train(&mut gen_emb, &dataset, &emb_only_config);
 
-        // Train with CfC BPTT
-        let mut gen_bptt = BrocaGenerator::new(&genesis, config);
-        let bptt_config = TrainingConfig {
+        // Train with per-token local CfC parameter updates.
+        let mut gen_network_updates = BrocaGenerator::new(&genesis, config);
+        let network_update_config = TrainingConfig {
             epochs: 15,
             learning_rate: 0.01,
             bptt_window: 8,
@@ -5070,17 +5076,18 @@ mod tests {
             embedding_target_norm: 0.0, // No norm for fair comparison
             ..Default::default()
         };
-        let bptt_metrics = train(&mut gen_bptt, &dataset, &bptt_config);
+        let network_update_metrics = train(&mut gen_network_updates, &dataset, &network_update_config);
 
         let emb_final = emb_metrics.last().unwrap().avg_loss;
-        let bptt_final = bptt_metrics.last().unwrap().avg_loss;
+        let network_update_final = network_update_metrics.last().unwrap().avg_loss;
 
-        // BPTT should achieve lower or equal loss (more parameters being trained)
+        // Network parameter updates should not catastrophically regress over the
+        // embeddings-only arm. This test does not measure temporal credit assignment.
         // Allow a generous margin: with a large vocab (code tokens expand the space),
         // the CfC network may converge slower than embeddings-only on tiny datasets.
         assert!(
-            bptt_final <= emb_final + 1.5,
-            "BPTT ({bptt_final:.4}) should not be much worse than emb-only ({emb_final:.4})"
+            network_update_final <= emb_final + 1.5,
+            "local CfC updates ({network_update_final:.4}) should not be much worse than embeddings-only ({emb_final:.4})"
         );
     }
 
