@@ -933,10 +933,13 @@ mod tests {
             FidelityCostModel, FidelityLevel, FidelityTargetLabel, MultiFidelityManifest,
             MultiFidelityTabularBenchmark,
         };
+        use super::super::proxy_acquisition::{
+            ProxyAcquisitionBenchmark, ProxyAcquisitionManifest,
+        };
         use super::super::tabular_nas_firewall::MetricDirection;
 
-        let mut rows = features();
-        for (index, row) in rows.iter_mut().enumerate() {
+        let mut source_features = features();
+        for (index, row) in source_features.iter_mut().enumerate() {
             row.topology_encoding = vec![
                 (index / 5) as u8,
                 (index % 5) as u8,
@@ -946,7 +949,33 @@ mod tests {
                 0,
             ];
         }
-        let consensus = build_proxy_consensus(&rows, &config()).unwrap();
+        let consensus_config = config();
+        let acquisition = ProxyAcquisitionBenchmark::new(
+            ProxyAcquisitionManifest {
+                benchmark_id: "synthetic-metered-proxy-acquisition".into(),
+                target_metric_id: consensus_config.target_metric_id.clone(),
+                artifact_sha256: consensus_config.benchmark_artifact_sha256.clone(),
+                evaluation_split_id: consensus_config.evaluation_split_id.clone(),
+                proxy_calibration_split_id: consensus_config.proxy_calibration_split_id.clone(),
+                proxy_calibration_sha256: consensus_config.proxy_calibration_sha256.clone(),
+                proxy_directions: consensus_config.proxy_directions.clone(),
+                max_unique_proxy_queries: source_features.len() * consensus_config.proxy_directions.len(),
+                max_total_proxy_seconds: 10.0,
+            },
+            source_features,
+        )
+        .unwrap()
+        .run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                for proxy_id in consensus_config.proxy_directions.keys() {
+                    oracle.query(&candidate.architecture_id, proxy_id).unwrap();
+                }
+            }
+        });
+        assert_eq!(acquisition.receipt.unique_proxy_queries, 24);
+        assert!((acquisition.receipt.total_proxy_seconds - 0.6).abs() < 1e-12);
+        let rows = acquisition.to_complete_feature_table().unwrap();
+        let consensus = build_proxy_consensus(&rows, &consensus_config).unwrap();
         let derived = apply_consensus_prior(&rows, &consensus, "cora_consensus").unwrap();
         let search = TrajectorySearchConfig {
             proxy_id: "cora_consensus".into(),
