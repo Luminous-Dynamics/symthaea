@@ -688,6 +688,101 @@ mod tests {
         assert!(replay.validate_shape(&packet).is_err());
     }
 
+    fn sign_receipt(
+        packet: &PublicTaskPacket,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> VerifierReceipt {
+        use ed25519_dalek::Signer;
+        let mut receipt = VerifierReceipt {
+            schema: RECEIPT_SCHEMA.into(),
+            version: VERSION.into(),
+            task_packet_sha256: packet.digest().unwrap(),
+            solver_artifact_sha256: A.into(),
+            environment_sha256: B.into(),
+            verifier_profile_sha256: C.into(),
+            evidence_bundle_sha256: A.into(),
+            signer_key_id: "verifier-key-1".into(),
+            signature_hex: "00".repeat(64),
+            stages: vec![StageEvidence {
+                stage_id: "execution".into(),
+                score_tenths: 850,
+                evidence_sha256: B.into(),
+            }],
+            wall_time_ms: 1_000,
+            cpu_time_ms: 800,
+            peak_memory_bytes: 10_000,
+            tool_calls: 2,
+            candidate_executions: 1,
+        };
+        let signature = signing_key.sign(&receipt.signing_payload_bytes().unwrap());
+        receipt.signature_hex = signature.to_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
+        receipt
+    }
+
+    fn key_registry(
+        signing_key: &ed25519_dalek::SigningKey,
+        revoked_at_unix_ms: Option<u64>,
+    ) -> TrustedVerifierKeyRegistry {
+        let public_key_hex: String = signing_key
+            .verifying_key()
+            .to_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        TrustedVerifierKeyRegistry {
+            schema: "symthaea.adaptive-benchmark.trusted-verifier-keys".into(),
+            version: VERSION.into(),
+            keys: std::collections::BTreeMap::from([(
+                "verifier-key-1".into(),
+                TrustedVerifierKey {
+                    key_id: "verifier-key-1".into(),
+                    public_key_hex,
+                    not_before_unix_ms: 100,
+                    not_after_unix_ms: Some(10_000),
+                    revoked_at_unix_ms,
+                },
+            )]),
+        }
+    }
+
+    #[test]
+    fn ed25519_receipt_signature_verifies_against_trusted_registry() {
+        let packet = packet();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        let receipt = sign_receipt(&packet, &signing_key);
+        let registry = key_registry(&signing_key, None);
+        receipt.verify_signature_at(&packet, &registry, 1_000).unwrap();
+    }
+
+    #[test]
+    fn ed25519_receipt_rejects_payload_tampering_and_untrusted_key() {
+        let packet = packet();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        let receipt = sign_receipt(&packet, &signing_key);
+        let registry = key_registry(&signing_key, None);
+        let mut altered = receipt.clone();
+        altered.solver_artifact_sha256 = B.into();
+        assert!(altered.verify_signature_at(&packet, &registry, 1_000).is_err());
+
+        let other_key = ed25519_dalek::SigningKey::from_bytes(&[99u8; 32]);
+        let other_registry = key_registry(&other_key, None);
+        assert!(receipt.verify_signature_at(&packet, &other_registry, 1_000).is_err());
+    }
+
+    #[test]
+    fn ed25519_key_validity_window_and_revocation_are_enforced() {
+        let packet = packet();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
+        let receipt = sign_receipt(&packet, &signing_key);
+        let active = key_registry(&signing_key, None);
+        assert!(receipt.verify_signature_at(&packet, &active, 99).is_err());
+        assert!(receipt.verify_signature_at(&packet, &active, 10_001).is_err());
+
+        let revoked = key_registry(&signing_key, Some(500));
+        assert!(receipt.verify_signature_at(&packet, &revoked, 500).is_err());
+        assert!(receipt.verify_signature_at(&packet, &revoked, 499).is_ok());
+    }
+
     #[test]
     fn verifier_receipt_rejects_duplicate_or_missing_evidence_stages() {
         let packet = packet();
