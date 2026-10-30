@@ -161,7 +161,6 @@ def generate(output_dir: Path) -> dict[str, Any]:
         "judge_source_revision": plan_fields["judge_source_revision"],
         "judge_prompt_sha256": plan_fields["judge_prompt_sha256"],
         "rubric_sha256": plan_fields["rubric_sha256"],
-        "blind_to_system_identity": True,
         "observations": observations,
     }
     receipt_path = output_dir / "judge-factorial-receipt.example.json"
