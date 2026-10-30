@@ -511,17 +511,22 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     blocked_by_evidence_ids: blocked_by.into_iter().collect(),
                 };
 
-                for pin in resource_pins {
-                    reverse_resources
-                        .entry(pin.resource_id.clone())
-                        .or_default()
-                        .insert(evidence_id.clone());
-                }
-                for parent_id in evidence_dependencies {
-                    reverse_evidence
-                        .entry(parent_id.clone())
-                        .or_default()
-                        .insert(evidence_id.clone());
+                // Only current evidence belongs in reverse invalidation indexes.
+                // Evidence born stale through an upstream dependency remains in
+                // the audit output but cannot become a propagation source.
+                if freshness == EvidenceFreshness::Fresh {
+                    for pin in resource_pins {
+                        reverse_resources
+                            .entry(pin.resource_id.clone())
+                            .or_default()
+                            .insert(evidence_id.clone());
+                    }
+                    for parent_id in evidence_dependencies {
+                        reverse_evidence
+                            .entry(parent_id.clone())
+                            .or_default()
+                            .insert(evidence_id.clone());
+                    }
                 }
                 total_edges = total_edges
                     .checked_add(resource_pins.len())
