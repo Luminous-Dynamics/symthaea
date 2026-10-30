@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT observer qualification challenge catalog v1",
+  "description": "Adapter-neutral challenge cases for qualifying a bounded dependency-observation profile. A catalog is not evidence that a profile has passed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "profile_id",
+    "profile_status",
+    "execution_status",
+    "scoped_claim",
+    "oracle_policy",
+    "expected_dispositions",
+    "cases"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "type": "string",
+      "const": "basalt-observer-challenges-v1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "profile_status": {
+      "const": "candidate_not_qualified"
+    },
+    "execution_status": {
+      "const": "not_executed"
+    },
+    "scoped_claim": {
+      "type": "string",
+      "minLength": 1
+    },
+    "oracle_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ground_truth_source",
+        "observer_under_test_must_not_author_the_oracle",
+        "independent_replay_required_for_confirmatory_use",
+        "score_unit",
+        "repeated_events_are_not_independent_samples"
+      ],
+      "properties": {
+        "ground_truth_source": {
+          "type": "string",
+          "const": "challenge_harness_injected_resources_and_independently_checked_mutation_pairs"
+        },
+        "observer_under_test_must_not_author_the_oracle": {
+          "const": true
+        },
+        "independent_replay_required_for_confirmatory_use": {
+          "const": true
+        },
+        "score_unit": {
+          "const": "independent_task_scenario"
+        },
+        "repeated_events_are_not_independent_samples": {
+          "const": true
+        }
+      }
+    },
+    "expected_dispositions": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "capture_dependency",
+          "report_unresolved",
+          "invalidate_receipt",
+          "preserve_unrelated"
+        ]
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "family",
+          "channel",
+          "mutation_kind",
+          "ground_truth_resource_id",
+          "expected_disposition",
+          "required_receipt_facts",
+          "paired_case_ids",
+          "description",
+          "safety_property"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+          },
+          "family": {
+            "enum": [
+              "filesystem",
+              "process",
+              "environment",
+              "generated_artifact",
+              "toolchain",
+              "cache",
+              "network",
+              "observer_integrity",
+              "snapshot_consistency",
+              "positive_control"
+            ]
+          },
+          "channel": {
+            "enum": [
+              "filesystem",
+              "process",
+              "environment",
+              "generated_artifact",
+              "toolchain",
+              "cache",
+              "network",
+              "observer_integrity"
+            ]
+          },
+          "mutation_kind": {
+            "enum": [
+              "read_content",
+              "read_metadata",
+              "directory_membership",
+              "symlink_target",
+              "mmap_bytes",
+              "rename_delete_create",
+              "untracked_read",
+              "root_escape",
+              "generated_source",
+              "build_script_input",
+              "proc_macro_input",
+              "env_value",
+              "child_env",
+              "inherited_fd",
+              "invocation_metadata",
+              "dynamic_library",
+              "nondeterministic_source",
+              "pseudo_filesystem_read",
+              "toolchain_closure",
+              "dependency_resolution",
+              "cache_hit",
+              "network_dns",
+              "network_artifact",
+              "registry_artifact",
+              "event_overflow",
+              "observer_restart",
+              "unmonitored_child",
+              "concurrent_hash_mutation",
+              "irrelevant_mutation",
+              "unsupported_channel"
+            ]
+          },
+          "ground_truth_resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "expected_disposition": {
+            "enum": [
+              "capture_dependency",
+              "report_unresolved",
+              "invalidate_receipt",
+              "preserve_unrelated"
+            ]
+          },
+          "required_receipt_facts": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "resource_identity",
+                "content_digest",
+                "read_event",
+                "metadata_digest",
+                "metadata_read_event",
+                "directory_identity",
+                "sorted_membership_digest",
+                "enumeration_event",
+                "link_identity",
+                "resolved_target_identity",
+                "target_digest",
+                "mapping_observation",
+                "path_identity",
+                "namespace_change",
+                "tree_digest",
+                "untracked_classification",
+                "unresolved_channel",
+                "access_path_classification",
+                "generator_identity",
+                "generator_input_digest",
+                "generated_artifact_digest",
+                "process_lineage",
+                "argv_cwd",
+                "toolchain_digest",
+                "macro_host_identity",
+                "environment_binding",
+                "value_commitment",
+                "inherited_fd_provenance",
+                "invocation_identity",
+                "executable_identity",
+                "loaded_object_digest",
+                "virtualization_status",
+                "mount_identity",
+                "closure_identity",
+                "target_configuration",
+                "lockfile_digest",
+                "config_digest",
+                "feature_resolution",
+                "cache_entry_identity",
+                "artifact_digest",
+                "cache_producer_provenance",
+                "network_policy",
+                "resolution_observation",
+                "endpoint_identity",
+                "protocol",
+                "response_artifact_digest",
+                "drop_counter",
+                "overflow_status",
+                "receipt_integrity",
+                "observer_lifecycle",
+                "capture_interval",
+                "supervision_status",
+                "stable_handle_identity",
+                "snapshot_consistency",
+                "root_boundary",
+                "mutation_identity",
+                "non_dependency_witness",
+                "coverage_scope",
+                "registry_identity"
+              ]
+            }
+          },
+          "paired_case_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+            }
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "safety_property": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
