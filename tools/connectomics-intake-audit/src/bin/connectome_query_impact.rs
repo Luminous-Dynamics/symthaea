@@ -40,6 +40,7 @@ struct Input {
     graph: Vec<Edge>,
     queries: Vec<Query>,
     candidates: Vec<Candidate>,
+    review_budgets_minutes: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -125,9 +126,26 @@ struct Report {
     candidate_count: usize,
     scoring_semantics: &'static str,
     candidate_evaluations: Vec<CandidateEvaluation>,
+    policy_budget_results: Vec<PolicyBudgetResult>,
     warnings: Vec<String>,
     status: &'static str,
     scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct PolicyBudgetResult {
+    policy: &'static str,
+    review_budget_minutes: f64,
+    actual_review_minutes: f64,
+    reviewed_candidate_count: usize,
+    applied_candidate_count: usize,
+    rejected_conflict_count: usize,
+    reviewed_candidate_ids: Vec<String>,
+    applied_candidate_ids: Vec<String>,
+    rejected_conflict_candidate_ids: Vec<String>,
+    baseline_weighted_query_error: Option<f64>,
+    final_weighted_query_error: Option<f64>,
+    weighted_query_error_reduction: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
