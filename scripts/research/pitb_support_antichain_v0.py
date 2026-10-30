@@ -92,8 +92,8 @@ def validate_outcome(row, n):
         digest(row[key], f"outcome row {n}.{key}")
     universe = strings(row["mutable_declarations"], f"row {n}.mutable_declarations")
     available = strings(row["available_declarations"], f"row {n}.available_declarations")
-    if len(universe) > 16:
-        raise ContractError("exact exhaustive lattice is capped at 16 declarations")
+    if len(universe) > max_variables:
+        raise ContractError(f"exact exhaustive lattice has {len(universe)} declarations; configured cap is {max_variables}")
     if not set(available) <= set(universe):
         raise ContractError(f"row {n} contains a declaration outside its mutable universe")
     digest(row["local_context_sha256"], f"row {n}.local_context_sha256")
@@ -113,7 +113,7 @@ def group_key(row):
     ).encode()).hexdigest()
 
 
-def analyze_group(gid, rows):
+def analyze_group(gid, rows, max_variables=12):
     first = rows[0]
     universe = first["mutable_declarations"]
     expected = powerset(universe)
@@ -274,7 +274,7 @@ def analyze(rows, predictions=None, max_variables=12):
     for i, raw in enumerate(rows, 1):
         row = validate_outcome(raw, i)
         grouped[group_key(row)].append(row)
-    reports = [analyze_group(k, v) for k, v in sorted(grouped.items())]
+    reports = [analyze_group(k, v, max_variables) for k, v in sorted(grouped.items())]
     return {
         "schema_version": REPORT_SCHEMA,
         "outcomes_jsonl_sha256": None,
@@ -382,6 +382,7 @@ def main():
     parser.add_argument("--outcomes", type=Path)
     parser.add_argument("--predictions", type=Path)
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--max-variables", type=int, default=12, help="maximum mutable declarations for exhaustive powerset analysis (default: 12; hard maximum: 16)")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     try:
@@ -392,12 +393,14 @@ def main():
             return 0
         if not args.outcomes or not args.report:
             raise ContractError("--outcomes and --report are required")
+        if not 1 <= args.max_variables <= 16:
+            raise ContractError("--max-variables must lie in [1,16]")
         rows, raw_digest = load_jsonl(args.outcomes, "outcome ledger")
         predictions = None
         pred_digest = None
         if args.predictions:
             predictions, pred_digest = load_jsonl(args.predictions, "prediction ledger")
-        report = analyze(rows, predictions)
+        report = analyze(rows, predictions, args.max_variables)
         report["outcomes_jsonl_sha256"] = raw_digest
         report["predictions_jsonl_sha256"] = pred_digest
         args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
