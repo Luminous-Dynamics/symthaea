@@ -337,7 +337,7 @@ fn reward_greedy_logger(floor: f64) -> Logger {
     Logger { p1 }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum GridObjective {
     WeightSecondMoment,
     RewardEnvelopeSecondMoment([[f64; 2]; 2]),
