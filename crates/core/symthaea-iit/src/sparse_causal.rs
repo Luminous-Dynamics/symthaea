@@ -82,7 +82,7 @@ impl SparseMechanismCpt {
 
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum SparseCausalError {
-    #[error("sparse model unit count must be in 1..={MAX_SPARSE_UNITS}; got {units}")]
+    #[error("sparse model unit count must be in 1..=1000000; got {units}")]
     InvalidUnitCount { units: usize },
     #[error("target unit {target} is outside 0..{unit_count}")]
     TargetOutOfRange { target: usize, unit_count: usize },
