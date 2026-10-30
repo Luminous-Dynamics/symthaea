@@ -23,7 +23,7 @@ pub struct StateAuditReport {
     pub final_state_digest: Option<String>,
     /// Always false until authenticated runner coverage receipts are independently verified.
     pub confirmatory_eligible: bool,
-    pub valid: bool,
+    pub structurally_valid: bool,
     pub counts: StateAuditCounts,
     pub evidence: Vec<EvidenceAssessment>,
     /// Stale evidence IDs in original topological/creation order.
@@ -289,7 +289,7 @@ pub fn audit_bytes(bytes: &[u8]) -> StateAuditReport {
         input_digest,
         final_state_digest: None,
         confirmatory_eligible: false,
-        valid: false,
+        structurally_valid: false,
         counts: StateAuditCounts::default(),
         evidence: Vec::new(),
         reverification_plan: Vec::new(),
@@ -322,7 +322,7 @@ pub fn audit_bytes(bytes: &[u8]) -> StateAuditReport {
     report.run_id = Some(timeline.run_id.clone());
     match audit_timeline(&timeline) {
         Ok(result) => {
-            report.valid = true;
+            report.structurally_valid = true;
             report.counts = result.counts;
             report.final_state_digest = Some(result.final_state_digest);
             report.evidence = result.evidence;
@@ -883,7 +883,7 @@ mod tests {
     #[test]
     fn synthetic_timeline_reports_direct_and_transitive_invalidation() {
         let report = audit_bytes(EXAMPLE.as_bytes());
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         assert!(!report.confirmatory_eligible);
         assert_eq!(report.counts.evidence_total, 6);
         assert_eq!(report.counts.evidence_stale_direct, 3);
@@ -916,7 +916,7 @@ mod tests {
         ]);
 
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         assert_eq!(freshness(&report, "report-before-change"), EvidenceFreshness::StaleTransitive);
 
         let report_evidence = report.evidence.iter()
@@ -938,7 +938,7 @@ mod tests {
         value["entries"].as_array_mut().unwrap().remove(5);
         value["entries"].as_array_mut().unwrap().truncate(5);
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         assert_eq!(report.counts.evidence_fresh, 4);
         assert_eq!(report.counts.reverification_required, 0);
         assert_eq!(report.counts.unrelated_resource_changes, 1);
@@ -947,7 +947,7 @@ mod tests {
     #[test]
     fn exact_reverification_restores_current_evidence_without_reusing_stale_parent() {
         let report = audit_bytes(EXAMPLE.as_bytes());
-        assert!(report.valid);
+        assert!(report.structurally_valid);
         let build = report.evidence.iter().find(|item| item.evidence_id == "build-after-change").unwrap();
         let tests = report.evidence.iter().find(|item| item.evidence_id == "tests-after-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::Fresh);
@@ -970,7 +970,7 @@ mod tests {
             "after_digest": format!("sha256:{}", "a".repeat(64))
         }));
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         assert_eq!(freshness(&report, "build-after-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "tests-after-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(report.counts.unrelated_resource_changes, 1);
@@ -995,7 +995,7 @@ mod tests {
             .unwrap(),
         );
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_CHANGE_BEFORE_MISMATCH"));
     }
 
@@ -1022,7 +1022,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][5]["after_digest"] = Value::String(format!("sha256:{}", "9".repeat(64)));
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_EVENT_DIGEST_MISMATCH"));
     }
 
@@ -1032,7 +1032,7 @@ mod tests {
         let digest = value["entries"][5]["before_digest"].clone();
         value["entries"][5]["after_digest"] = digest;
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_CHANGE_NOOP"));
     }
 
@@ -1041,7 +1041,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][6]["resource_pins"][0]["generation"] = Value::from(0);
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_EVIDENCE_PIN_NOT_CURRENT"));
     }
 
@@ -1050,7 +1050,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][1]["evidence_dependencies"][0] = Value::String("missing-build".into());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_EVIDENCE_PARENT_UNKNOWN"));
     }
 
@@ -1060,7 +1060,7 @@ mod tests {
         let duplicate = value["entries"][0]["resource_pins"][0].clone();
         value["entries"][0]["resource_pins"].as_array_mut().unwrap().push(duplicate);
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_RESOURCE_PIN_ID"));
     }
 
@@ -1069,7 +1069,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][0]["resource_pins"][0]["resource_id"] = Value::String("unknown:file".into());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_RESOURCE_PIN_UNKNOWN"));
     }
 
@@ -1078,7 +1078,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][0]["outcome"] = Value::String("fail".into());
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         let child = report.evidence.iter().find(|item| item.evidence_id == "tests-before-change").unwrap();
         assert!(!child.eligible_under_declared_coverage);
         assert!(child.blocked_by_evidence_ids.iter().any(|id| id == "build-before-change"));
@@ -1089,7 +1089,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][2]["sequence"] = Value::from(99);
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_SEQUENCE"));
     }
 
@@ -1099,7 +1099,7 @@ mod tests {
         let first = value["initial_resources"][0].clone();
         value["initial_resources"].as_array_mut().unwrap().push(first);
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_RESOURCE_DUPLICATE"));
     }
 
@@ -1116,7 +1116,7 @@ mod tests {
         }
 
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::Fresh);
         assert_eq!(build.dependency_coverage, DependencyCoverage::Incomplete);
@@ -1134,7 +1134,7 @@ mod tests {
         value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
         value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:CARGO_HOME"]);
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
 
         let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::StaleDirect);
@@ -1171,7 +1171,7 @@ mod tests {
         );
 
         let report = audit_value(&value);
-        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.structurally_valid, "{:?}", report.errors);
         let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
         assert_eq!(build.freshness, EvidenceFreshness::StaleDirect);
         assert!(build.invalidated_by_unknown_dependency_change);
@@ -1183,7 +1183,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:HOME"]);
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_DEPENDENCY_COVERAGE_CONTRADICTION"));
     }
 
@@ -1192,7 +1192,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_DEPENDENCY_COVERAGE_EMPTY"));
     }
 
@@ -1201,7 +1201,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"][0]["unmodeled_field"] = Value::String("must not be ignored".into());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_TIMELINE_JSON"));
     }
 
@@ -1210,7 +1210,7 @@ mod tests {
         let mut value = parsed_example();
         value["entries"] = Value::Array(Vec::new());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_TIMELINE_EMPTY"));
     }
 
@@ -1219,7 +1219,7 @@ mod tests {
         let mut value = parsed_example();
         value["initial_resources"][0]["digest"] = Value::String("sha256:ABC".into());
         let report = audit_value(&value);
-        assert!(!report.valid);
+        assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_RESOURCE_DIGEST"));
     }
 }
