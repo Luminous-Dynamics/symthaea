@@ -56,7 +56,6 @@ struct Query {
     query_id: String,
     weight: f64,
     normalization_scale: f64,
-    #[serde(flatten)]
     metric: QueryMetric,
 }
 
@@ -538,10 +537,10 @@ mod tests {
                 {"source": 1, "target": 3, "weight": 1.0}
             ],
             "queries": [
-                {"query_id":"direct_1_to_3","weight":5.0,"normalization_scale":1.0,"kind":"edge_weight","source":1,"target":3},
-                {"query_id":"input_3","weight":2.0,"normalization_scale":3.0,"kind":"in_degree","node":3},
-                {"query_id":"output_1","weight":1.0,"normalization_scale":4.0,"kind":"out_degree","node":1},
-                {"query_id":"reach_1_to_3","weight":3.0,"normalization_scale":1.0,"kind":"path_exists","source":1,"target":3}
+                {"query_id":"direct_1_to_3","weight":5.0,"normalization_scale":1.0,"metric":{"kind":"edge_weight","source":1,"target":3}},
+                {"query_id":"input_3","weight":2.0,"normalization_scale":3.0,"metric":{"kind":"in_degree","node":3}},
+                {"query_id":"output_1","weight":1.0,"normalization_scale":4.0,"metric":{"kind":"out_degree","node":1}},
+                {"query_id":"reach_1_to_3","weight":3.0,"normalization_scale":1.0,"metric":{"kind":"path_exists","source":1,"target":3}}
             ],
             "candidates": [
                 {
