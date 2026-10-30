@@ -2584,9 +2584,11 @@ mod tests {
             influence_measurement(20, 30, 0.7, 0.0, 1.0, false),
         ];
         let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
         };
         let (_, intervals, _, _, _) = hysteresis_segment(
             &measurements,
@@ -2611,6 +2613,7 @@ mod tests {
             influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
         ];
         let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 15,
@@ -2636,6 +2639,7 @@ mod tests {
             influence_measurement(30, 40, 2.0, 0.0, 1.0, true),
         ];
         let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 20,
@@ -2709,9 +2713,11 @@ mod tests {
         };
         let measurement = influence_measurement(0, 10, 2.0, 0.0, 1.0, true);
         let segmentation = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 15,
+            tail_guard_profile_sha256: Some(sha256_hex(b"fixture-tail-profile")),
         };
         let (decisions, hysteresis, guard, conservative, clipped) = hysteresis_segment(
             std::slice::from_ref(&measurement),
