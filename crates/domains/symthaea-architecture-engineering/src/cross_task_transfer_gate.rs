@@ -275,6 +275,7 @@ impl CrossTaskTransferGate {
 
         let mut source_ids = Vec::with_capacity(proposal.source_tasks.len());
         let mut source_seen = HashSet::with_capacity(proposal.source_tasks.len());
+        let mut source_split_sha256s = HashSet::with_capacity(proposal.source_tasks.len());
         let mut source_weight_sum = 0.0;
         for (index, source) in proposal.source_tasks.iter().enumerate() {
             let task = self.tasks.get(&source.task_id).ok_or_else(|| {
@@ -312,6 +313,13 @@ impl CrossTaskTransferGate {
                 ));
             }
             validate_objective_compatibility(task, target, "proposal.source_tasks")?;
+            if task.split_sha256 == target.split_sha256 {
+                return Err(TaskTransferGateError::new(
+                    format!("proposal.source_tasks[{index}].task_id"),
+                    "historical source split digest must differ from evaluation target split",
+                ));
+            }
+            source_split_sha256s.insert(task.split_sha256.as_str());
             source_weight_sum += source.prior_weight;
             source_ids.push(source.task_id.clone());
         }
@@ -332,6 +340,7 @@ impl CrossTaskTransferGate {
             &self.tasks,
             target,
             &source_seen,
+            &source_split_sha256s,
             evidence,
         )?;
         let calibration_set: HashSet<&str> =
@@ -568,6 +577,7 @@ fn validate_calibration_task_ids(
     tasks: &HashMap<String, TaskManifest>,
     target: &TaskManifest,
     source_seen: &HashSet<&str>,
+    source_split_sha256s: &HashSet<&str>,
     evidence: &TransferCalibrationEvidence,
 ) -> Result<Vec<String>, TaskTransferGateError> {
     if evidence.calibration_task_ids.is_empty() {
@@ -603,10 +613,12 @@ fn validate_calibration_task_ids(
             ));
         }
         validate_objective_compatibility(task, target, "evidence.calibration_task_ids")?;
-        if task.split_sha256 == target.split_sha256 {
+        if task.split_sha256 == target.split_sha256
+            || source_split_sha256s.contains(task.split_sha256.as_str())
+        {
             return Err(TaskTransferGateError::new(
                 format!("evidence.calibration_task_ids[{index}]"),
-                "calibration split digest must differ from evaluation target split",
+                "calibration split digest must differ from target and all historical source splits",
             ));
         }
     }
@@ -792,9 +804,9 @@ mod tests {
             objective_semantics_id: "validation_error".into(),
             metric_direction: MetricDirection::Minimize,
             artifact_sha256: digest.clone(),
-            split_sha256: format!("{:c}{:0<63}", hash_byte, "1"),
-            fidelity_ladder_sha256: format!("{:c}{:0<63}", hash_byte, "2"),
-            resource_profile_sha256: format!("{:c}{:0<63}", hash_byte, "3"),
+            split_sha256: format!("{}{}", hash_byte, "1".repeat(63)),
+            fidelity_ladder_sha256: format!("{}{}", hash_byte, "2".repeat(63)),
+            resource_profile_sha256: format!("{}{}", hash_byte, "3".repeat(63)),
         }
     }
 
@@ -960,6 +972,43 @@ mod tests {
         let mut invalid = proposal();
         invalid.source_tasks[0].prior_weight = 0.7;
         assert!(gate().qualify(&invalid, &evidence([-2.0, -2.0, -2.0])).is_err());
+    }
+
+    #[test]
+    fn rejects_source_or_calibration_split_reuse_with_target_or_source() {
+        let mut tasks = task_registry();
+        let source_split = tasks
+            .iter()
+            .find(|task| task.task_id == "source-nb201-c10")
+            .unwrap()
+            .split_sha256
+            .clone();
+        let calibration = tasks
+            .iter_mut()
+            .find(|task| task.task_id == "calibration-nb101")
+            .unwrap();
+        calibration.split_sha256 = source_split;
+        let gate = CrossTaskTransferGate::new(config(), tasks).unwrap();
+        assert!(gate
+            .qualify(&proposal(), &evidence([-2.0, -2.0, -2.0]))
+            .is_err());
+
+        let mut tasks = task_registry();
+        let target_split = tasks
+            .iter()
+            .find(|task| task.task_id == "target-nb201-imagenet16")
+            .unwrap()
+            .split_sha256
+            .clone();
+        let source = tasks
+            .iter_mut()
+            .find(|task| task.task_id == "source-nb201-c10")
+            .unwrap();
+        source.split_sha256 = target_split;
+        let gate = CrossTaskTransferGate::new(config(), tasks).unwrap();
+        assert!(gate
+            .qualify(&proposal(), &evidence([-2.0, -2.0, -2.0]))
+            .is_err());
     }
 
     #[test]
