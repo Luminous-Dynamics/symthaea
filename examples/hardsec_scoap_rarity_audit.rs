@@ -1,36 +1,41 @@
 //! HARDSEC-009 per-design SCOAP rarity audit.
 //!
-//! Consumes a JSONL manifest whose first line is a dataset/analyzer header and
-//! whose remaining lines are per-net CC0/CC1/CO observations. Computes
-//! R(n) = max(CC0, CC1) + alpha * CO using fixed-point arithmetic, ranks each
-//! design independently, and evaluates labels only after ranking is frozen.
+//! Reads a JSONL stream: one provenance header followed by node records sorted
+//! by (design_id, node_id). It retains one design's nodes at a time, giving
+//! O(max nodes in one design) working memory rather than loading the source
+//! manifest or all designs into memory.
 //!
-//! This tool audits supplied SCOAP metrics. It does not parse HDL, calculate
-//! SCOAP from a netlist, prove sequential reachability, or certify a design.
+//! R(n) = max(CC0(n), CC1(n)) + alpha * CO(n)
+//!
+//! CC0/CC1/CO are supplied by a named analyzer. This tool does not parse HDL,
+//! calculate SCOAP from a netlist, prove sequential reachability, or certify a
+//! design. Labels are excluded from ranking and used only for aggregate
+//! post-ranking metrics. The ranking TSV contains no labels.
+//!
+//! Required header: schema_version, record_order, dataset_id, split_protocol,
+//! alpha_milli, analyzer, designs[].
 //!
 //! Example:
 //!   cargo run --example hardsec_scoap_rarity_audit --features hardsec-scoap-audit -- \
-//!     --manifest /path/to/scoap-manifest.jsonl \
-//!     --ranking-output /path/outside/manifest/rarity-ranking.tsv \
-//!     --receipt /path/outside/manifest/rarity-audit.json
-//!
-//! Optional --evidence-root verifies every design's source netlist bytes against
-//! the SHA-256 declared in the header. Path traversal and symlinks are rejected.
+//!     --manifest /data/scoap.jsonl --ranking-output /output/ranking.tsv \
+//!     --receipt /output/audit.json --evidence-root /data/netlists
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::env;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
 const CLAIM_SCOPE: &str =
     "supplied_scoap_metric_integrity_and_per_design_rarity_ranking_only";
-const ALGORITHM: &str = "scoap-rarity-fixed-point-cdf-percentile-v1";
+const ALGORITHM: &str = "scoap-rarity-fixed-point-midrank-percentile-v2";
+const RECORD_ORDER: &str = "design_id_then_node_id_ascending";
 const ALPHA_MIN_MILLI: u64 = 500;
 const ALPHA_MAX_MILLI: u64 = 1_000;
+const TAIL_THRESHOLDS_BPS: [u32; 4] = [9_900, 9_500, 9_000, 8_000];
 
 #[derive(Debug, Clone)]
 struct Args {
@@ -79,15 +84,6 @@ impl NodeLabel {
             _ => Err(format!("unsupported node label {value:?}")),
         }
     }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Trigger => "trigger",
-            Self::Payload => "payload",
-            Self::Benign => "benign",
-            Self::Unknown => "unknown",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -102,13 +98,15 @@ struct Node {
 #[derive(Debug, Default)]
 struct DesignData {
     nodes: Vec<Node>,
+    last_node_id: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
 struct TailMetrics {
     threshold_bps: u32,
-    selected_nodes: usize,
-    known_selected_nodes: usize,
+    selected_measured_nodes: usize,
+    selected_labeled_nodes: usize,
+    selected_unknown_label_nodes: usize,
     trigger_total: usize,
     trigger_selected: usize,
     payload_total: usize,
@@ -124,10 +122,13 @@ struct DesignSummary {
     design_id: String,
     base_design_family_id: String,
     split: String,
+    netlist_sha256: String,
+    netlist_path: Option<String>,
     node_count: usize,
-    trigger_count: usize,
-    payload_count: usize,
-    benign_count: usize,
+    measured_metric_count: usize,
+    trigger_label_count: usize,
+    payload_label_count: usize,
+    benign_label_count: usize,
     unknown_label_count: usize,
     unknown_metric_count: usize,
     tails: Vec<TailMetrics>,
@@ -143,14 +144,11 @@ fn parse_args() -> Result<Option<Args>, String> {
     let mut receipt = None;
     let mut evidence_root = None;
     let mut args = env::args().skip(1);
-
     while let Some(flag) = args.next() {
         if flag == "--help" || flag == "-h" {
             return Ok(None);
         }
-        let value = args
-            .next()
-            .ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--manifest" => manifest = Some(PathBuf::from(value)),
             "--ranking-output" => ranking_output = Some(PathBuf::from(value)),
@@ -159,7 +157,6 @@ fn parse_args() -> Result<Option<Args>, String> {
             _ => return Err(format!("unknown argument: {flag}")),
         }
     }
-
     Ok(Some(Args {
         manifest: manifest.ok_or("--manifest is required")?,
         ranking_output: ranking_output.ok_or("--ranking-output is required")?,
@@ -201,10 +198,7 @@ fn safe_relative_path(value: &str, field: &str) -> Result<(), String> {
     if path.is_absolute() || path.as_os_str().is_empty() {
         return Err(format!("{field} must be a non-empty relative path"));
     }
-    if path
-        .components()
-        .any(|component| !matches!(component, Component::Normal(_)))
-    {
+    if path.components().any(|part| !matches!(part, Component::Normal(_))) {
         return Err(format!("{field} must not contain '.', '..', root or prefix components"));
     }
     Ok(())
@@ -228,15 +222,20 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 }
 
 fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
-    let relative = design
-        .netlist_path
-        .as_deref()
-        .ok_or_else(|| format!("design {}: netlist_path is required with --evidence-root", design.design_id))?;
+    let root_meta = fs::symlink_metadata(root)
+        .map_err(|error| format!("stat evidence root {}: {error}", root.display()))?;
+    if root_meta.file_type().is_symlink() || !root_meta.is_dir() {
+        return Err("evidence root must be a regular non-symlink directory".to_owned());
+    }
+    let relative = design.netlist_path.as_deref().ok_or_else(|| {
+        format!("design {}: netlist_path is required with --evidence-root", design.design_id)
+    })?;
     safe_relative_path(relative, "netlist_path")?;
     let canonical_root = fs::canonicalize(root)
         .map_err(|error| format!("canonicalize evidence root {}: {error}", root.display()))?;
     let components = Path::new(relative).components().collect::<Vec<_>>();
     let mut candidate = canonical_root.clone();
+
     for (index, component) in components.iter().enumerate() {
         let Component::Normal(part) = component else {
             return Err(format!("design {}: non-normal path component", design.design_id));
@@ -245,7 +244,11 @@ fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
         let metadata = fs::symlink_metadata(&candidate)
             .map_err(|error| format!("stat {}: {error}", candidate.display()))?;
         if metadata.file_type().is_symlink() {
-            return Err(format!("design {}: symlink is forbidden at {}", design.design_id, candidate.display()));
+            return Err(format!(
+                "design {}: symlink is forbidden at {}",
+                design.design_id,
+                candidate.display()
+            ));
         }
         if index + 1 == components.len() {
             if !metadata.is_file() {
@@ -255,6 +258,7 @@ fn verify_source_file(root: &Path, design: &DesignMeta) -> Result<(), String> {
             return Err(format!("design {}: netlist parent is not a directory", design.design_id));
         }
     }
+
     let resolved = fs::canonicalize(&candidate)
         .map_err(|error| format!("canonicalize netlist {}: {error}", candidate.display()))?;
     if !resolved.starts_with(&canonical_root) {
@@ -274,6 +278,9 @@ fn parse_header(value: &Value) -> Result<Header, String> {
     if required_string(value, "schema_version")? != "hardsec-scoap-manifest-v1" {
         return Err("unsupported schema_version".to_owned());
     }
+    if required_string(value, "record_order")? != RECORD_ORDER {
+        return Err(format!("record_order must equal {RECORD_ORDER}"));
+    }
     let dataset_id = required_string(value, "dataset_id")?.to_owned();
     let analyzer = value
         .get("analyzer")
@@ -287,10 +294,15 @@ fn parse_header(value: &Value) -> Result<Header, String> {
     if !valid_sha256(&analyzer_config_sha256) {
         return Err("analyzer.config_sha256 must be a SHA-256 digest".to_owned());
     }
-    let sequential_cut_policy = required_string(&analyzer_value, "sequential_cut_policy")?.to_owned();
+    let sequential_cut_policy =
+        required_string(&analyzer_value, "sequential_cut_policy")?.to_owned();
     let split_protocol = required_string(value, "split_protocol")?.to_owned();
-    if !["per_design", "leave_one_design_out", "leave_one_base_family_out"]
-        .contains(&split_protocol.as_str())
+    if ![
+        "per_design",
+        "leave_one_design_out",
+        "leave_one_base_family_out",
+    ]
+    .contains(&split_protocol.as_str())
     {
         return Err(format!("unsupported split_protocol {split_protocol}"));
     }
@@ -314,9 +326,12 @@ fn parse_header(value: &Value) -> Result<Header, String> {
     }
     let mut designs = BTreeMap::new();
     let mut family_splits: BTreeMap<String, String> = BTreeMap::new();
+    let mut netlist_splits: BTreeMap<String, String> = BTreeMap::new();
+
     for item in design_values {
         let design_id = required_string(item, "design_id")?.to_owned();
-        let base_design_family_id = required_string(item, "base_design_family_id")?.to_owned();
+        let base_design_family_id =
+            required_string(item, "base_design_family_id")?.to_owned();
         let split = required_string(item, "split")?.to_owned();
         if !["train", "validation", "test"].contains(&split.as_str()) {
             return Err(format!("design {design_id}: split must be train, validation or test"));
@@ -329,22 +344,26 @@ fn parse_header(value: &Value) -> Result<Header, String> {
         if let Some(path) = netlist_path.as_deref() {
             safe_relative_path(path, "netlist_path")?;
         }
-        if split_protocol == "leave_one_design_out" || split_protocol == "leave_one_base_family_out" {
-            if let Some(previous) = family_splits.insert(
-                if split_protocol == "leave_one_design_out" {
-                    format!("design:{design_id}")
-                } else {
-                    format!("family:{base_design_family_id}")
-                },
-                split.clone(),
-            ) {
+
+        if split_protocol == "leave_one_base_family_out" {
+            if let Some(previous) =
+                family_splits.insert(base_design_family_id.clone(), split.clone())
+            {
                 if previous != split {
                     return Err(format!(
-                        "split leakage: design/family {design_id}/{base_design_family_id} crosses splits"
+                        "base family {base_design_family_id} appears in {previous} and {split}"
                     ));
                 }
             }
         }
+        if let Some(previous) = netlist_splits.insert(netlist_sha256.clone(), split.clone()) {
+            if previous != split {
+                return Err(format!(
+                    "identical netlist SHA-256 appears in {previous} and {split}"
+                ));
+            }
+        }
+
         let metadata = DesignMeta {
             design_id: design_id.clone(),
             base_design_family_id,
@@ -386,7 +405,15 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
         .ok_or_else(|| format!("node {design_id}: node_id must be a non-negative integer"))?;
     let label = NodeLabel::parse(required_string(value, "label")?)?;
     let metric_status = required_string(value, "metric_status")?;
+
     if metric_status == "unknown" {
+        for field in ["cc0", "cc1", "co"] {
+            if value.get(field).is_some_and(|entry| !entry.is_null()) {
+                return Err(format!(
+                    "node {design_id}/{node_id}: unknown metric_status must not supply {field}"
+                ));
+            }
+        }
         return Ok((
             design_id,
             Node {
@@ -399,8 +426,11 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
         ));
     }
     if metric_status != "measured" {
-        return Err(format!("node {design_id}/{node_id}: metric_status must be measured or unknown"));
+        return Err(format!(
+            "node {design_id}/{node_id}: metric_status must be measured or unknown"
+        ));
     }
+
     let cc0 = value
         .get("cc0")
         .and_then(Value::as_u64)
@@ -413,6 +443,7 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
         .get("co")
         .and_then(Value::as_u64)
         .ok_or_else(|| format!("node {design_id}/{node_id}: co must be a non-negative integer"))?;
+
     let max_cc = u128::from(cc0.max(cc1));
     let score_milli = max_cc
         .checked_mul(1_000)
@@ -464,9 +495,9 @@ fn rank_design(nodes: &mut [Node]) -> Result<usize, String> {
         while end < order.len() && nodes[order[end]].score_milli == score {
             end += 1;
         }
-        // CDF percentile: ties share the upper rank of their score group.
-        // The same score therefore always receives the same percentile.
-        let percentile_bps = ((end as u128) * 10_000 / total) as u32;
+        // Midrank percentile: ties share the empirical mid-distribution rank.
+        let rank_twice = (start as u128) * 2 + (end - start) as u128;
+        let percentile_bps = (rank_twice * 10_000 / (total * 2)) as u32;
         for index in &order[start..end] {
             nodes[*index].rarity_percentile_bps = percentile_bps;
         }
@@ -484,16 +515,19 @@ fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
 }
 
 fn evaluate_tails(nodes: &[Node]) -> Vec<TailMetrics> {
-    [9_900_u32, 9_500, 9_000, 8_000]
+    TAIL_THRESHOLDS_BPS
         .into_iter()
         .map(|threshold_bps| {
-            let selected: Vec<&Node> = nodes
+            let selected_measured: Vec<&Node> = nodes
                 .iter()
                 .filter(|node| {
-                    node.metric_measured
-                        && node.rarity_percentile_bps >= threshold_bps
-                        && node.label != NodeLabel::Unknown
+                    node.metric_measured && node.rarity_percentile_bps >= threshold_bps
                 })
+                .collect();
+            let selected_labeled: Vec<&Node> = selected_measured
+                .iter()
+                .copied()
+                .filter(|node| node.label != NodeLabel::Unknown)
                 .collect();
             let trigger_total = nodes
                 .iter()
@@ -503,91 +537,105 @@ fn evaluate_tails(nodes: &[Node]) -> Vec<TailMetrics> {
                 .iter()
                 .filter(|node| node.metric_measured && node.label == NodeLabel::Payload)
                 .count();
-            let trigger_selected = selected
+            let trigger_selected = selected_labeled
                 .iter()
                 .filter(|node| node.label == NodeLabel::Trigger)
                 .count();
-            let payload_selected = selected
+            let payload_selected = selected_labeled
                 .iter()
                 .filter(|node| node.label == NodeLabel::Payload)
                 .count();
-            let known_selected_nodes = selected.len();
-            let selected_nodes = nodes
-                .iter()
-                .filter(|node| node.metric_measured && node.rarity_percentile_bps >= threshold_bps)
-                .count();
+
             TailMetrics {
                 threshold_bps,
-                selected_nodes,
-                known_selected_nodes,
+                selected_measured_nodes: selected_measured.len(),
+                selected_labeled_nodes: selected_labeled.len(),
+                selected_unknown_label_nodes: selected_measured.len() - selected_labeled.len(),
                 trigger_total,
                 trigger_selected,
                 payload_total,
                 payload_selected,
                 trigger_recall: ratio(trigger_selected, trigger_total),
-                trigger_precision: ratio(trigger_selected, known_selected_nodes),
+                trigger_precision: ratio(trigger_selected, selected_labeled.len()),
                 payload_recall: ratio(payload_selected, payload_total),
-                payload_precision: ratio(payload_selected, known_selected_nodes),
+                payload_precision: ratio(payload_selected, selected_labeled.len()),
             }
         })
         .collect()
 }
 
-fn write_ranking(path: &Path, header: &Header, data: &BTreeMap<String, DesignData>) -> Result<String, String> {
-    let mut output = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(|error| format!("create ranking output {}: {error}", path.display()))?;
-    writeln!(
-        output,
-        "design_id\tbase_design_family_id\tsplit\tnode_id\tscoap_score_milli\trarity_percentile_bps\tlabel"
-    )
-    .map_err(|error| format!("write ranking header: {error}"))?;
-
-    for (design_id, design_data) in data {
-        let metadata = header
-            .designs
-            .get(design_id)
-            .ok_or_else(|| format!("missing design metadata {design_id}"))?;
-        let mut nodes = design_data.nodes.clone();
-        nodes.sort_by_key(|node| node.node_id);
-        for node in nodes {
-            if !node.metric_measured {
-                writeln!(
-                    output,
-                    "{}\t{}\t{}\t{}\tunknown\tunknown\t{}",
-                    metadata.design_id,
-                    metadata.base_design_family_id,
-                    metadata.split,
-                    node.node_id,
-                    node.label.as_str()
-                )
-                .map_err(|error| format!("write unknown ranking row: {error}"))?;
-            } else {
-                writeln!(
-                    output,
-                    "{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                    metadata.design_id,
-                    metadata.base_design_family_id,
-                    metadata.split,
-                    node.node_id,
-                    node.score_milli,
-                    node.rarity_percentile_bps,
-                    node.label.as_str()
-                )
-                .map_err(|error| format!("write ranking row: {error}"))?;
-            }
-        }
+fn summarize_design(metadata: &DesignMeta, data: &mut DesignData) -> Result<DesignSummary, String> {
+    if data.nodes.is_empty() {
+        return Err(format!("design {} has no node records", metadata.design_id));
     }
-    output
-        .sync_all()
-        .map_err(|error| format!("sync ranking output: {error}"))?;
-    drop(output);
-    sha256_file(path)
+    let unknown_metric_count = rank_design(&mut data.nodes)?;
+    let measured_metric_count = data.nodes.len() - unknown_metric_count;
+
+    Ok(DesignSummary {
+        design_id: metadata.design_id.clone(),
+        base_design_family_id: metadata.base_design_family_id.clone(),
+        split: metadata.split.clone(),
+        netlist_sha256: metadata.netlist_sha256.clone(),
+        netlist_path: metadata.netlist_path.clone(),
+        node_count: data.nodes.len(),
+        measured_metric_count,
+        trigger_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Trigger).count(),
+        payload_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Payload).count(),
+        benign_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Benign).count(),
+        unknown_label_count: data.nodes.iter().filter(|node| node.label == NodeLabel::Unknown).count(),
+        unknown_metric_count,
+        tails: evaluate_tails(&data.nodes),
+    })
 }
 
-fn target_path_outside(path: &Path, inputs: &[&Path]) -> Result<PathBuf, String> {
+fn flush_design(
+    design_id: &str,
+    data: &mut DesignData,
+    header: &Header,
+    ranking: &mut BufWriter<&mut File>,
+) -> Result<DesignSummary, String> {
+    let metadata = header
+        .designs
+        .get(design_id)
+        .ok_or_else(|| format!("missing design metadata {design_id}"))?;
+    let summary = summarize_design(metadata, data)?;
+
+    for node in &data.nodes {
+        if node.metric_measured {
+            writeln!(
+                ranking,
+                "{}\t{}\t{}\t{}\t{}\t{}",
+                metadata.design_id,
+                metadata.base_design_family_id,
+                metadata.split,
+                node.node_id,
+                node.score_milli,
+                node.rarity_percentile_bps
+            )
+            .map_err(|error| format!("write ranking row: {error}"))?;
+        } else {
+            writeln!(
+                ranking,
+                "{}\t{}\t{}\t{}\tunknown\tunknown",
+                metadata.design_id,
+                metadata.base_design_family_id,
+                metadata.split,
+                node.node_id
+            )
+            .map_err(|error| format!("write unknown ranking row: {error}"))?;
+        }
+    }
+
+    data.nodes.clear();
+    data.last_node_id = None;
+    Ok(summary)
+}
+
+fn target_path_outside(
+    path: &Path,
+    file_inputs: &[&Path],
+    directory_inputs: &[&Path],
+) -> Result<PathBuf, String> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -596,18 +644,56 @@ fn target_path_outside(path: &Path, inputs: &[&Path]) -> Result<PathBuf, String>
         .map_err(|error| format!("canonicalize output parent {}: {error}", parent.display()))?;
     let filename = path.file_name().ok_or("output path must have a filename")?;
     let target = parent.join(filename);
-    for input in inputs {
-        let input = fs::canonicalize(input)
+
+    for input in file_inputs {
+        let canonical = fs::canonicalize(input)
             .map_err(|error| format!("canonicalize input {}: {error}", input.display()))?;
-        if target == input || target.starts_with(input.parent().unwrap_or(Path::new("/"))) {
+        if target == canonical {
+            return Err(format!("output {} aliases an input file", target.display()));
+        }
+    }
+    for input in directory_inputs {
+        let canonical = fs::canonicalize(input)
+            .map_err(|error| format!("canonicalize input directory {}: {error}", input.display()))?;
+        if target.starts_with(canonical) {
             return Err(format!(
                 "output {} must be outside input directory {}",
                 target.display(),
-                input.display()
+                canonical.display()
             ));
         }
     }
     Ok(target)
+}
+
+fn parse_jsonl_line<R: BufRead>(
+    reader: &mut R,
+    hasher: &mut Sha256,
+    line_number: &mut usize,
+) -> Result<Option<Value>, String> {
+    let mut bytes = Vec::new();
+    let count = reader
+        .read_until(b'\n', &mut bytes)
+        .map_err(|error| format!("read JSONL line {}: {error}", *line_number + 1))?;
+    if count == 0 {
+        return Ok(None);
+    }
+    *line_number += 1;
+    hasher.update(&bytes);
+    if bytes.last() == Some(&b'\n') {
+        bytes.pop();
+    }
+    if bytes.last() == Some(&b'\r') {
+        bytes.pop();
+    }
+    if bytes.is_empty() {
+        return Err(format!("blank JSONL record at line {}", *line_number));
+    }
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|error| format!("JSONL line {} is not UTF-8: {error}", *line_number))?;
+    let value = serde_json::from_str(text)
+        .map_err(|error| format!("invalid JSON at line {}: {error}", *line_number))?;
+    Ok(Some(value))
 }
 
 fn run(args: Args) -> Result<(), String> {
@@ -616,107 +702,191 @@ fn run(args: Args) -> Result<(), String> {
     if manifest_meta.file_type().is_symlink() || !manifest_meta.is_file() {
         return Err("manifest must be a regular non-symlink file".to_owned());
     }
-    let manifest_bytes = fs::read(&args.manifest)
-        .map_err(|error| format!("read manifest {}: {error}", args.manifest.display()))?;
-    let manifest_sha256 = format!("{:x}", Sha256::digest(&manifest_bytes));
-    let text = std::str::from_utf8(&manifest_bytes)
-        .map_err(|error| format!("manifest is not UTF-8: {error}"))?;
-    let mut lines = text.lines();
-    let header_line = lines.next().ok_or("manifest is empty")?;
-    let header_value: Value =
-        serde_json::from_str(header_line).map_err(|error| format!("invalid JSONL header: {error}"))?;
-    let header = parse_header(&header_value)?;
-    let mut data: BTreeMap<String, DesignData> = header
-        .designs
-        .keys()
-        .map(|design_id| (design_id.clone(), DesignData::default()))
-        .collect();
-    let mut unknown_metric_counts: BTreeMap<String, usize> = BTreeMap::new();
 
-    for (index, line) in lines.enumerate() {
-        if line.trim().is_empty() {
-            return Err(format!("blank JSONL node record at line {}", index + 2));
-        }
-        let value: Value = serde_json::from_str(line)
-            .map_err(|error| format!("invalid node JSON at line {}: {error}", index + 2))?;
-        let (design_id, node) = parse_node(&value, &header)?;
-        if node.score_milli == 0 && required_string(&value, "metric_status")? == "unknown" {
-            *unknown_metric_counts.entry(design_id.clone()).or_insert(0) += 1;
-        }
-        data.get_mut(&design_id)
-            .ok_or_else(|| format!("unknown design_id {design_id}"))?
-            .nodes
-            .push(node);
+    let manifest_parent = args
+        .manifest
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut directory_inputs = vec![manifest_parent];
+    if let Some(root) = args.evidence_root.as_deref() {
+        directory_inputs.push(root);
     }
-
-    for (design_id, metadata) in &header.designs {
-        if let Some(root) = args.evidence_root.as_deref() {
-            verify_source_file(root, metadata)?;
-        }
-    }
-
-    let mut summaries = Vec::new();
-    for (design_id, design_data) in data.iter_mut() {
-        if design_data.nodes.is_empty() {
-            return Err(format!("design {design_id} has no node records"));
-        }
-        let unknown_count = unknown_metric_counts.get(design_id).copied().unwrap_or(0);
-        rank_design(&mut design_data.nodes)?;
-        let metadata = header
-            .designs
-            .get(design_id)
-            .ok_or_else(|| format!("missing design metadata {design_id}"))?;
-        let trigger_count = design_data
-            .nodes
-            .iter()
-            .filter(|node| node.label == NodeLabel::Trigger)
-            .count();
-        let payload_count = design_data
-            .nodes
-            .iter()
-            .filter(|node| node.label == NodeLabel::Payload)
-            .count();
-        let benign_count = design_data
-            .nodes
-            .iter()
-            .filter(|node| node.label == NodeLabel::Benign)
-            .count();
-        let unknown_label_count = design_data
-            .nodes
-            .iter()
-            .filter(|node| node.label == NodeLabel::Unknown)
-            .count();
-        summaries.push(DesignSummary {
-            design_id: design_id.clone(),
-            base_design_family_id: metadata.base_design_family_id.clone(),
-            split: metadata.split.clone(),
-            node_count: design_data.nodes.len(),
-            trigger_count,
-            payload_count,
-            benign_count,
-            unknown_label_count,
-            unknown_metric_count: unknown_count,
-            tails: evaluate_tails(&design_data.nodes),
-        });
-    }
-
     let ranking_path = target_path_outside(
         &args.ranking_output,
         &[&args.manifest],
+        &directory_inputs,
     )?;
     let receipt_path = target_path_outside(
         &args.receipt,
         &[&args.manifest, &args.ranking_output],
+        &directory_inputs,
     )?;
-    let ranking_sha256 = write_ranking(&ranking_path, &header, &data)?;
+    if ranking_path == receipt_path {
+        return Err("ranking output and receipt paths must differ".to_owned());
+    }
+
+    let input_file = File::open(&args.manifest)
+        .map_err(|error| format!("open manifest {}: {error}", args.manifest.display()))?;
+    let opened_metadata = input_file
+        .metadata()
+        .map_err(|error| format!("stat opened manifest: {error}"))?;
+    if !opened_metadata.is_file() {
+        return Err("opened manifest is not a regular file".to_owned());
+    }
+    let mut reader = BufReader::new(input_file);
+    let mut manifest_hasher = Sha256::new();
+    let mut line_number = 0usize;
+    let header_value = parse_jsonl_line(&mut reader, &mut manifest_hasher, &mut line_number)?
+        .ok_or("manifest is empty")?;
+    let header = parse_header(&header_value)?;
+
+    let mut ranking_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&ranking_path)
+        .map_err(|error| format!("create ranking output {}: {error}", ranking_path.display()))?;
+
+    let processing = (|| -> Result<Vec<DesignSummary>, String> {
+        let mut ranking = BufWriter::new(&mut ranking_file);
+        writeln!(
+            ranking,
+            "design_id\tbase_design_family_id\tsplit\tnode_id\tscoap_score_milli\trarity_percentile_bps"
+        )
+        .map_err(|error| format!("write ranking header: {error}"))?;
+
+        let design_ids: Vec<&String> = header.designs.keys().collect();
+        let mut next_design_index = 0usize;
+        let mut current_design: Option<String> = None;
+        let mut current_data = DesignData::default();
+        let mut summaries = Vec::with_capacity(header.designs.len());
+
+        while let Some(value) =
+            parse_jsonl_line(&mut reader, &mut manifest_hasher, &mut line_number)?
+        {
+            let (design_id, node) = parse_node(&value, &header)?;
+            match current_design.as_deref() {
+                None => {
+                    let expected = design_ids
+                        .get(next_design_index)
+                        .ok_or_else(|| format!("unexpected extra design {design_id}"))?;
+                    if expected.as_str() != design_id {
+                        return Err(format!(
+                            "record order violation: expected design {}, received {design_id}",
+                            expected
+                        ));
+                    }
+                    current_design = Some(design_id.clone());
+                }
+                Some(current) if design_id == current => {}
+                Some(current) if design_id.as_str() > current => {
+                    summaries.push(flush_design(
+                        current,
+                        &mut current_data,
+                        &header,
+                        &mut ranking,
+                    )?);
+                    next_design_index += 1;
+                    let expected = design_ids
+                        .get(next_design_index)
+                        .ok_or_else(|| format!("unexpected extra design {design_id}"))?;
+                    if expected.as_str() != design_id {
+                        return Err(format!(
+                            "record order violation: expected design {}, received {design_id}",
+                            expected
+                        ));
+                    }
+                    current_design = Some(design_id.clone());
+                }
+                Some(current) => {
+                    return Err(format!(
+                        "record order violation: design {design_id} follows {current}"
+                    ));
+                }
+            }
+
+            if let Some(previous) = current_data.last_node_id {
+                if node.node_id <= previous {
+                    return Err(format!(
+                        "design {design_id}: node_id {} is not greater than previous node_id {previous}",
+                        node.node_id
+                    ));
+                }
+            }
+            current_data.last_node_id = Some(node.node_id);
+            current_data.nodes.push(node);
+        }
+
+        if let Some(current) = current_design.as_deref() {
+            summaries.push(flush_design(
+                current,
+                &mut current_data,
+                &header,
+                &mut ranking,
+            )?);
+            next_design_index += 1;
+        }
+
+        if next_design_index != design_ids.len() {
+            let missing = design_ids
+                .get(next_design_index)
+                .map(|value| value.as_str())
+                .unwrap_or("<unknown>");
+            return Err(format!("manifest missing node records for design {missing}"));
+        }
+
+        ranking
+            .flush()
+            .map_err(|error| format!("flush ranking output: {error}"))?;
+        Ok(summaries)
+    })();
+
+    let summaries = match processing {
+        Ok(value) => value,
+        Err(error) => {
+            drop(ranking_file);
+            let _ = fs::remove_file(&ranking_path);
+            return Err(error);
+        }
+    };
+    ranking_file
+        .sync_all()
+        .map_err(|error| format!("sync ranking output: {error}"))?;
+    drop(ranking_file);
+
+    let manifest_sha256 = format!("{:x}", manifest_hasher.finalize());
+    let mut verified_netlists = Vec::new();
+    let source_integrity_status = if let Some(root) = args.evidence_root.as_deref() {
+        for metadata in header.designs.values() {
+            verify_source_file(root, metadata)?;
+            verified_netlists.push(json!({
+                "design_id": metadata.design_id,
+                "path": metadata.netlist_path,
+                "sha256": metadata.netlist_sha256
+            }));
+        }
+        "verified"
+    } else {
+        "not_requested"
+    };
+
+    let ranking_sha256 = match sha256_file(&ranking_path) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = fs::remove_file(&ranking_path);
+            return Err(error);
+        }
+    };
 
     let receipt = json!({
-        "schema_version": "hardsec-scoap-rarity-audit-v1",
+        "schema_version": "hardsec-scoap-rarity-audit-v2",
         "result": "pass",
         "claim_scope": CLAIM_SCOPE,
         "algorithm": ALGORITHM,
+        "record_order": RECORD_ORDER,
         "dataset_id": header.dataset_id,
         "manifest_sha256": manifest_sha256,
+        "manifest_line_count": line_number,
         "analyzer": {
             "name": header.analyzer_name,
             "version": header.analyzer_version,
@@ -727,25 +897,36 @@ fn run(args: Args) -> Result<(), String> {
         "alpha_milli": header.alpha_milli,
         "design_count": summaries.len(),
         "total_node_count": summaries.iter().map(|item| item.node_count).sum::<usize>(),
+        "total_measured_metric_count": summaries.iter().map(|item| item.measured_metric_count).sum::<usize>(),
         "total_unknown_metric_count": summaries.iter().map(|item| item.unknown_metric_count).sum::<usize>(),
+        "source_integrity": {
+            "status": source_integrity_status,
+            "verified_netlist_count": verified_netlists.len(),
+            "netlists": verified_netlists
+        },
         "ranking_output": {
             "path": ranking_path,
-            "sha256": ranking_sha256
+            "sha256": ranking_sha256,
+            "contains_labels": false
         },
         "designs": summaries.iter().map(|item| json!({
             "design_id": item.design_id,
             "base_design_family_id": item.base_design_family_id,
             "split": item.split,
+            "netlist_sha256": item.netlist_sha256,
+            "netlist_path": item.netlist_path,
             "node_count": item.node_count,
-            "trigger_count": item.trigger_count,
-            "payload_count": item.payload_count,
-            "benign_count": item.benign_count,
+            "measured_metric_count": item.measured_metric_count,
+            "trigger_label_count": item.trigger_label_count,
+            "payload_label_count": item.payload_label_count,
+            "benign_label_count": item.benign_label_count,
             "unknown_label_count": item.unknown_label_count,
             "unknown_metric_count": item.unknown_metric_count,
             "tails": item.tails.iter().map(|tail| json!({
                 "rarity_percentile_threshold_bps": tail.threshold_bps,
-                "selected_nodes_including_unknown": tail.selected_nodes,
-                "selected_labeled_nodes": tail.known_selected_nodes,
+                "selected_measured_nodes": tail.selected_measured_nodes,
+                "selected_labeled_nodes": tail.selected_labeled_nodes,
+                "selected_unknown_label_nodes": tail.selected_unknown_label_nodes,
                 "trigger_total": tail.trigger_total,
                 "trigger_selected": tail.trigger_selected,
                 "trigger_recall": tail.trigger_recall,
@@ -760,18 +941,27 @@ fn run(args: Args) -> Result<(), String> {
         "notes": [
             "CC0/CC1/CO values are supplied by the declared analyzer and are not recomputed from HDL.",
             "Rarity is ranked independently within each design; scores are not pooled across designs.",
-            "Node labels are excluded from score computation and ordering; they are used only for post-ranking descriptive metrics.",
+            "Ranking output contains no node labels; labels are used only for post-ranking descriptive metrics.",
+            "Percentiles use empirical midranks; tied SCOAP scores receive identical percentiles.",
             "SCOAP uses the analyzer's declared sequential cut policy and does not prove sequential trigger reachability.",
-            "A high SCOAP rarity percentile is a candidate-prioritization signal, not a Trojan verdict."
+            "A high SCOAP rarity percentile is a candidate-prioritization signal, not a Trojan verdict.",
+            "JSONL input is streamed; only one design's nodes are held in memory at a time."
         ]
     });
+
     let serialized = serde_json::to_vec_pretty(&receipt)
         .map_err(|error| format!("serialize receipt: {error}"))?;
-    let mut output = OpenOptions::new()
+    let mut output = match OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&receipt_path)
-        .map_err(|error| format!("create receipt {}: {error}", receipt_path.display()))?;
+    {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = fs::remove_file(&ranking_path);
+            return Err(format!("create receipt {}: {error}", receipt_path.display()));
+        }
+    };
     let write_result = output
         .write_all(&serialized)
         .and_then(|_| output.write_all(b"\n"))
@@ -785,8 +975,14 @@ fn run(args: Args) -> Result<(), String> {
 
     println!("HARDSEC-009 SCOAP rarity audit: PASS");
     println!("designs: {}", summaries.len());
-    println!("nodes: {}", summaries.iter().map(|item| item.node_count).sum::<usize>());
-    println!("unknown SCOAP records: {}", summaries.iter().map(|item| item.unknown_metric_count).sum::<usize>());
+    println!(
+        "nodes: {}",
+        summaries.iter().map(|item| item.node_count).sum::<usize>()
+    );
+    println!(
+        "unknown SCOAP records: {}",
+        summaries.iter().map(|item| item.unknown_metric_count).sum::<usize>()
+    );
     println!("ranking output SHA-256: {ranking_sha256}");
     println!("receipt: {}", receipt_path.display());
     println!("claim scope: {}", CLAIM_SCOPE);
@@ -798,7 +994,7 @@ fn main() -> ExitCode {
         Ok(Some(args)) => match run(args) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
-                eprintln!("HARDSEC-009 SCOAP audit failed: {error}");
+                eprintln!("HARDSEC-009 SCOAP rarity audit failed: {error}");
                 ExitCode::FAILURE
             }
         },
@@ -821,13 +1017,26 @@ mod tests {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
     fn header(alpha_milli: u64) -> Header {
-        let design = DesignMeta {
-            design_id: "design-a".to_owned(),
-            base_design_family_id: "family-a".to_owned(),
-            split: "train".to_owned(),
-            netlist_sha256: "a".repeat(64),
-            netlist_path: None,
-        };
+        let designs = [
+            ("design-a", "family-a", "train", "1"),
+            ("design-b", "family-b", "validation", "2"),
+            ("design-c", "family-c", "test", "3"),
+        ]
+        .into_iter()
+        .map(|(design_id, family, split, hash_digit)| {
+            (
+                design_id.to_owned(),
+                DesignMeta {
+                    design_id: design_id.to_owned(),
+                    base_design_family_id: family.to_owned(),
+                    split: split.to_owned(),
+                    netlist_sha256: hash_digit.repeat(64),
+                    netlist_path: None,
+                },
+            )
+        })
+        .collect();
+
         Header {
             dataset_id: "fixture".to_owned(),
             analyzer_name: "fixture-scoap".to_owned(),
@@ -836,11 +1045,18 @@ mod tests {
             sequential_cut_policy: "register_cut".to_owned(),
             split_protocol: "per_design".to_owned(),
             alpha_milli,
-            designs: BTreeMap::from([("design-a".to_owned(), design)]),
+            designs,
         }
     }
 
-    fn node(node_id: u64, cc0: u64, cc1: u64, co: u64, label: NodeLabel, alpha: u64) -> Node {
+    fn node(
+        node_id: u64,
+        cc0: u64,
+        cc1: u64,
+        co: u64,
+        label: NodeLabel,
+        alpha: u64,
+    ) -> Node {
         let max_cc = u128::from(cc0.max(cc1));
         Node {
             node_id,
@@ -851,213 +1067,406 @@ mod tests {
         }
     }
 
+    fn header_value(alpha_milli: u64, protocol: &str) -> Value {
+        json!({
+            "schema_version": "hardsec-scoap-manifest-v1",
+            "record_order": RECORD_ORDER,
+            "dataset_id": "fixture",
+            "alpha_milli": alpha_milli,
+            "split_protocol": protocol,
+            "analyzer": {
+                "name": "fixture-scoap",
+                "version": "1.0",
+                "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "sequential_cut_policy": "register_cut"
+            },
+            "designs": [
+                {
+                    "design_id": "design-a",
+                    "base_design_family_id": "family-a",
+                    "split": "train",
+                    "netlist_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                {
+                    "design_id": "design-b",
+                    "base_design_family_id": "family-b",
+                    "split": "validation",
+                    "netlist_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                {
+                    "design_id": "design-c",
+                    "base_design_family_id": "family-c",
+                    "split": "test",
+                    "netlist_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                }
+            ]
+        })
+    }
+
+    struct Fixture {
+        base: PathBuf,
+        manifest: PathBuf,
+        output_dir: PathBuf,
+        ranking: PathBuf,
+        receipt: PathBuf,
+    }
+
+    impl Fixture {
+        fn new(node_rows: &[(&str, u64, &str, Option<(u64, u64, u64)>, &str)]) -> Self {
+            let id = NEXT.fetch_add(1, Ordering::Relaxed);
+            let base = env::temp_dir().join(format!(
+                "hardsec-scoap-audit-{}-{id}",
+                std::process::id()
+            ));
+            let input_dir = base.join("input");
+            let output_dir = base.join("output");
+            fs::create_dir_all(&input_dir).unwrap();
+            fs::create_dir_all(&output_dir).unwrap();
+            let manifest = input_dir.join("scoap.jsonl");
+            let ranking = output_dir.join("ranking.tsv");
+            let receipt = output_dir.join("receipt.json");
+
+            let header = json!({
+                "schema_version": "hardsec-scoap-manifest-v1",
+                "record_order": RECORD_ORDER,
+                "dataset_id": "fixture",
+                "alpha_milli": 1000,
+                "split_protocol": "per_design",
+                "analyzer": {
+                    "name": "fixture-scoap",
+                    "version": "1.0",
+                    "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "sequential_cut_policy": "register_cut"
+                },
+                "designs": [
+                    {"design_id":"design-a","base_design_family_id":"family-a","split":"train","netlist_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+                    {"design_id":"design-b","base_design_family_id":"family-b","split":"validation","netlist_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+                    {"design_id":"design-c","base_design_family_id":"family-c","split":"test","netlist_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+                ]
+            });
+
+            let mut content = serde_json::to_string(&header).unwrap();
+            content.push('\n');
+            for (design, node_id, label, metrics, metric_status) in node_rows {
+                let value = match metrics {
+                    Some((cc0, cc1, co)) => json!({
+                        "design_id": design,
+                        "node_id": node_id,
+                        "label": label,
+                        "metric_status": metric_status,
+                        "cc0": cc0,
+                        "cc1": cc1,
+                        "co": co
+                    }),
+                    None => json!({
+                        "design_id": design,
+                        "node_id": node_id,
+                        "label": label,
+                        "metric_status": metric_status
+                    }),
+                };
+                content.push_str(&serde_json::to_string(&value).unwrap());
+                content.push('\n');
+            }
+            fs::write(&manifest, content).unwrap();
+            Self {
+                base,
+                manifest,
+                output_dir,
+                ranking,
+                receipt,
+            }
+        }
+
+        fn args(&self) -> Args {
+            Args {
+                manifest: self.manifest.clone(),
+                ranking_output: self.ranking.clone(),
+                receipt: self.receipt.clone(),
+                evidence_root: None,
+            }
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
+    }
+
     #[test]
-    fn matches_published_scoap_example_at_alpha_one() {
+    fn matches_composite_score_at_alpha_one() {
         let header = header(1_000);
-        let (design_id, value) = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 1,
-                "metric_status": "measured",
-                "cc0": 1,
-                "cc1": 2,
-                "co": 10,
-                "label": "trigger"
-            }),
-            &header,
-        )
-        .unwrap();
-        assert_eq!(design_id, "design-a");
+        let value = json!({
+            "design_id": "design-a",
+            "node_id": 1,
+            "metric_status": "measured",
+            "cc0": 1,
+            "cc1": 2,
+            "co": 10,
+            "label": "trigger"
+        });
+        let (_, value) = parse_node(&value, &header).unwrap();
         assert_eq!(value.score_milli, 12_000);
     }
 
     #[test]
     fn supports_half_weight_observability() {
         let header = header(500);
-        let (_, value) = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 1,
-                "metric_status": "measured",
-                "cc0": 1,
-                "cc1": 2,
-                "co": 10,
-                "label": "trigger"
-            }),
-            &header,
-        )
-        .unwrap();
+        let value = json!({
+            "design_id": "design-a",
+            "node_id": 1,
+            "metric_status": "measured",
+            "cc0": 1,
+            "cc1": 2,
+            "co": 10,
+            "label": "trigger"
+        });
+        let (_, value) = parse_node(&value, &header).unwrap();
         assert_eq!(value.score_milli, 7_000);
     }
 
     #[test]
-    fn groups_equal_scores_into_the_same_percentile() {
+    fn ties_receive_equal_midrank_percentiles() {
         let mut nodes = vec![
             node(1, 1, 2, 10, NodeLabel::Trigger, 1_000),
             node(2, 1, 2, 10, NodeLabel::Benign, 1_000),
             node(3, 2, 2, 0, NodeLabel::Payload, 1_000),
         ];
         rank_design(&mut nodes).unwrap();
-        let first = nodes.iter().find(|item| item.node_id == 1).unwrap();
-        let second = nodes.iter().find(|item| item.node_id == 2).unwrap();
+        let first = nodes.iter().find(|node| node.node_id == 1).unwrap();
+        let second = nodes.iter().find(|node| node.node_id == 2).unwrap();
         assert_eq!(first.rarity_percentile_bps, second.rarity_percentile_bps);
-        assert_eq!(first.rarity_percentile_bps, 10_000);
+        assert_eq!(first.rarity_percentile_bps, 3_333);
     }
 
     #[test]
-    fn computes_percentiles_separately_per_design() {
-        let mut left = vec![
+    fn all_equal_scores_receive_midpoint_percentile() {
+        let mut nodes = vec![
+            node(1, 1, 1, 1, NodeLabel::Trigger, 1_000),
+            node(2, 1, 1, 1, NodeLabel::Benign, 1_000),
+            node(3, 1, 1, 1, NodeLabel::Payload, 1_000),
+        ];
+        rank_design(&mut nodes).unwrap();
+        assert!(nodes.iter().all(|item| item.rarity_percentile_bps == 5_000));
+    }
+
+    #[test]
+    fn percentile_ranking_is_per_design_not_pooled() {
+        let mut low = vec![
             node(1, 1, 1, 1, NodeLabel::Trigger, 1_000),
             node(2, 2, 2, 2, NodeLabel::Benign, 1_000),
         ];
-        let mut right = vec![
+        let mut high = vec![
             node(1, 100, 100, 100, NodeLabel::Benign, 1_000),
             node(2, 200, 200, 200, NodeLabel::Payload, 1_000),
         ];
-        rank_design(&mut left).unwrap();
-        rank_design(&mut right).unwrap();
+        rank_design(&mut low).unwrap();
+        rank_design(&mut high).unwrap();
         assert_eq!(
-            left.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
-            10_000
+            low.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
+            7_500
         );
         assert_eq!(
-            right.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
-            10_000
+            high.iter().find(|node| node.node_id == 2).unwrap().rarity_percentile_bps,
+            7_500
         );
     }
 
     #[test]
-    fn ignores_labels_when_computing_score_and_rank() {
-        let mut trigger = node(1, 1, 4, 10, NodeLabel::Trigger, 1_000);
-        let mut benign = trigger;
-        benign.label = NodeLabel::Benign;
-        let mut left = vec![trigger, node(2, 1, 1, 1, NodeLabel::Benign, 1_000)];
-        let mut right = vec![benign, node(2, 1, 1, 1, NodeLabel::Trigger, 1_000)];
-        rank_design(&mut left).unwrap();
-        rank_design(&mut right).unwrap();
-        let a = left.iter().find(|node| node.node_id == 1).unwrap();
-        let b = right.iter().find(|node| node.node_id == 1).unwrap();
-        assert_eq!(a.score_milli, b.score_milli);
-        assert_eq!(a.rarity_percentile_bps, b.rarity_percentile_bps);
+    fn label_changes_do_not_change_scores_or_ranks() {
+        let mut original = vec![
+            node(1, 1, 4, 10, NodeLabel::Trigger, 1_000),
+            node(2, 1, 1, 1, NodeLabel::Benign, 1_000),
+        ];
+        let mut changed = original.clone();
+        changed[0].label = NodeLabel::Benign;
+        changed[1].label = NodeLabel::Trigger;
+        rank_design(&mut original).unwrap();
+        rank_design(&mut changed).unwrap();
+        for id in [1, 2] {
+            let left = original.iter().find(|node| node.node_id == id).unwrap();
+            let right = changed.iter().find(|node| node.node_id == id).unwrap();
+            assert_eq!(left.score_milli, right.score_milli);
+            assert_eq!(left.rarity_percentile_bps, right.rarity_percentile_bps);
+        }
     }
 
     #[test]
-    fn unknown_metric_rows_are_not_imputed() {
+    fn unknown_metrics_are_not_imputed() {
         let header = header(1_000);
-        let (_, value) = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 5,
-                "metric_status": "unknown",
-                "label": "unknown"
-            }),
-            &header,
-        )
-        .unwrap();
-        assert_eq!(value.rarity_percentile_bps, 0);
-        assert_eq!(value.score_milli, 0);
-        assert!(!value.metric_measured);
+        let value = json!({
+            "design_id": "design-a",
+            "node_id": 5,
+            "metric_status": "unknown",
+            "label": "unknown"
+        });
+        let (_, node) = parse_node(&value, &header).unwrap();
+        assert!(!node.metric_measured);
+        assert_eq!(node.score_milli, 0);
+        assert_eq!(node.rarity_percentile_bps, 0);
     }
 
     #[test]
-    fn measured_zero_scoap_values_are_ranked_not_mistaken_for_unknown() {
+    fn measured_zero_is_distinct_from_unknown() {
         let header = header(1_000);
-        let (_, value) = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 6,
-                "metric_status": "measured",
-                "cc0": 0,
-                "cc1": 0,
-                "co": 0,
-                "label": "unknown"
-            }),
-            &header,
-        )
-        .unwrap();
-        assert!(value.metric_measured);
-        let mut nodes = vec![value];
+        let value = json!({
+            "design_id": "design-a",
+            "node_id": 6,
+            "metric_status": "measured",
+            "cc0": 0,
+            "cc1": 0,
+            "co": 0,
+            "label": "unknown"
+        });
+        let (_, node) = parse_node(&value, &header).unwrap();
+        assert!(node.metric_measured);
+        let mut nodes = vec![node];
         assert_eq!(rank_design(&mut nodes).unwrap(), 0);
-        assert_eq!(nodes[0].rarity_percentile_bps, 10_000);
+        assert_eq!(nodes[0].rarity_percentile_bps, 5_000);
     }
 
     #[test]
-    fn unknown_trigger_labels_do_not_enter_measured_recall_denominators() {
-        let mut nodes = vec![
+    fn unknown_labels_are_not_treated_as_benign() {
+        let nodes = vec![
             Node {
                 node_id: 1,
-                score_milli: 0,
-                label: NodeLabel::Trigger,
-                metric_measured: false,
-                rarity_percentile_bps: 0,
+                score_milli: 1,
+                label: NodeLabel::Unknown,
+                metric_measured: true,
+                rarity_percentile_bps: 10_000,
             },
-            node(2, 1, 2, 3, NodeLabel::Benign, 1_000),
+            Node {
+                node_id: 2,
+                score_milli: 2,
+                label: NodeLabel::Trigger,
+                metric_measured: true,
+                rarity_percentile_bps: 10_000,
+            },
         ];
-        rank_design(&mut nodes).unwrap();
-        let tail = evaluate_tails(&nodes);
-        assert_eq!(tail[0].trigger_total, 0);
-        assert_eq!(tail[0].trigger_recall, None);
+        let tails = evaluate_tails(&nodes);
+        assert_eq!(tails[0].selected_measured_nodes, 2);
+        assert_eq!(tails[0].selected_labeled_nodes, 1);
+        assert_eq!(tails[0].selected_unknown_label_nodes, 1);
+        assert_eq!(tails[0].trigger_precision, Some(1.0));
     }
 
     #[test]
     fn rejects_invalid_alpha() {
-        let mut value = json!({
+        assert!(parse_header(&header_value(499, "per_design"))
+            .unwrap_err()
+            .contains("alpha_milli"));
+        assert!(parse_header(&header_value(1_001, "per_design")).is_err());
+    }
+
+    #[test]
+    fn rejects_family_leakage_and_duplicate_netlists_across_splits() {
+        let mut family = header_value(1_000, "leave_one_base_family_out");
+        family["designs"][1]["base_design_family_id"] = json!("family-a");
+        assert!(parse_header(&family)
+            .unwrap_err()
+            .contains("appears in train and validation"));
+
+        let mut duplicated = header_value(1_000, "leave_one_design_out");
+        duplicated["designs"][1]["netlist_sha256"] =
+            duplicated["designs"][0]["netlist_sha256"].clone();
+        assert!(parse_header(&duplicated)
+            .unwrap_err()
+            .contains("identical netlist SHA-256"));
+    }
+
+    #[test]
+    fn streamed_run_writes_label_free_rankings_and_receipt() {
+        let fixture = Fixture::new(&[
+            ("design-a", 1, "trigger", Some((1, 2, 10)), "measured"),
+            ("design-a", 2, "benign", Some((1, 1, 1)), "measured"),
+            ("design-b", 1, "payload", Some((2, 2, 2)), "measured"),
+            ("design-c", 1, "unknown", None, "unknown"),
+        ]);
+        run(fixture.args()).unwrap();
+        let ranking = fs::read_to_string(&fixture.ranking).unwrap();
+        assert!(ranking.starts_with("design_id\tbase_design_family_id\tsplit\tnode_id"));
+        assert!(!ranking.lines().any(|line| line.ends_with("\ttrigger")));
+        assert!(!ranking.lines().any(|line| line.ends_with("\tbenign")));
+        assert!(ranking.contains("unknown\tunknown"));
+
+        let receipt: Value = serde_json::from_slice(&fs::read(&fixture.receipt).unwrap()).unwrap();
+        assert_eq!(receipt["result"], "pass");
+        assert_eq!(receipt["ranking_output"]["contains_labels"], false);
+        assert_eq!(receipt["design_count"], 3);
+        assert_eq!(receipt["total_unknown_metric_count"], 1);
+    }
+
+    #[test]
+    fn rejects_out_of_order_designs_and_cleans_partial_ranking() {
+        let fixture = Fixture::new(&[
+            ("design-b", 1, "trigger", Some((1, 2, 10)), "measured"),
+            ("design-a", 1, "benign", Some((1, 1, 1)), "measured"),
+            ("design-c", 1, "unknown", None, "unknown"),
+        ]);
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("record order violation"));
+        assert!(!fixture.ranking.exists());
+        assert!(!fixture.receipt.exists());
+    }
+
+    #[test]
+    fn rejects_nonincreasing_node_ids_within_design() {
+        let fixture = Fixture::new(&[
+            ("design-a", 2, "trigger", Some((1, 2, 10)), "measured"),
+            ("design-a", 1, "benign", Some((1, 1, 1)), "measured"),
+            ("design-b", 1, "payload", Some((2, 2, 2)), "measured"),
+            ("design-c", 1, "unknown", None, "unknown"),
+        ]);
+        assert!(run(fixture.args())
+            .unwrap_err()
+            .contains("is not greater than previous node_id"));
+    }
+
+    #[test]
+    fn rejects_output_inside_manifest_directory() {
+        let mut fixture = Fixture::new(&[
+            ("design-a", 1, "trigger", Some((1, 2, 10)), "measured"),
+            ("design-b", 1, "payload", Some((2, 2, 2)), "measured"),
+            ("design-c", 1, "unknown", None, "unknown"),
+        ]);
+        fixture.ranking = fixture.manifest.parent().unwrap().join("ranking.tsv");
+        assert!(run(fixture.args()).unwrap_err().contains("outside input directory"));
+    }
+
+    fn header_value(alpha_milli: u64, protocol: &str) -> Value {
+        json!({
             "schema_version": "hardsec-scoap-manifest-v1",
+            "record_order": RECORD_ORDER,
             "dataset_id": "fixture",
-            "alpha_milli": 499,
+            "alpha_milli": alpha_milli,
+            "split_protocol": protocol,
             "analyzer": {
-                "name": "fixture",
+                "name": "fixture-scoap",
                 "version": "1.0",
                 "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 "sequential_cut_policy": "register_cut"
             },
-            "split_protocol": "per_design",
-            "designs": [{
-                "design_id": "design-a",
-                "base_design_family_id": "family-a",
-                "split": "train",
-                "netlist_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            }]
-        });
-        assert!(parse_header(&value).unwrap_err().contains("alpha_milli"));
-        value["alpha_milli"] = json!(1_001);
-        assert!(parse_header(&value).is_err());
-    }
-
-    #[test]
-    fn detects_duplicate_node_ids() {
-        let mut nodes = vec![
-            node(7, 1, 2, 3, NodeLabel::Trigger, 1_000),
-            node(7, 2, 3, 4, NodeLabel::Payload, 1_000),
-        ];
-        assert!(rank_design(&mut nodes).unwrap_err().contains("duplicate node_id"));
-    }
-
-    #[test]
-    fn rejects_malformed_metric_status_and_labels() {
-        let header = header(1_000);
-        let result = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 1,
-                "metric_status": "not-measured",
-                "label": "trigger"
-            }),
-            &header,
-        );
-        assert!(result.is_err());
-        let result = parse_node(
-            &json!({
-                "design_id": "design-a",
-                "node_id": 1,
-                "metric_status": "measured",
-                "cc0": 1,
-                "cc1": 1,
-                "co": 1,
-                "label": "maybe"
-            }),
-            &header,
-        );
-        assert!(result.is_err());
+            "designs": [
+                {
+                    "design_id": "design-a",
+                    "base_design_family_id": "family-a",
+                    "split": "train",
+                    "netlist_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                {
+                    "design_id": "design-b",
+                    "base_design_family_id": "family-b",
+                    "split": "validation",
+                    "netlist_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                {
+                    "design_id": "design-c",
+                    "base_design_family_id": "family-c",
+                    "split": "test",
+                    "netlist_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                }
+            ]
+        })
     }
 }
