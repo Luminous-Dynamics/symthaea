@@ -1989,6 +1989,127 @@ mod tests {
     }
 
     #[test]
+    fn zero_shared_variance_reduces_exactly_to_independent_annotation_formula() {
+        let world = World::mixed_bias_cancellation();
+        assert_eq!(world.shared_factor_variance, [0.0; 2]);
+        let mut allocation = Allocation::default();
+        allocation.counts[0][0] = [0, 2, 1];
+        let x = 0;
+        let a = 0;
+        let nf = world.factual_count[x][a] as f64;
+        let n = nf + allocation.counts[x][a].iter().map(|count| *count as f64).sum::<f64>();
+        let sigma2 = reward_variance(world.reward_mean[x][a]);
+        let independent_numerator = nf * sigma2
+            + (0..SOURCES)
+                .map(|k| {
+                    allocation.count(x, a, k) as f64
+                        * (sigma2 + world.source_excess_variance[x][a][k])
+                })
+                .sum::<f64>();
+        let (_, q_variance) = cell_bias_and_variance(&world, &allocation, x, a);
+        assert!((q_variance - independent_numerator / n.powi(2)).abs() < 1e-14);
+    }
+
+    #[test]
+    fn shared_panel_errors_inflate_repeated_source_samples_but_not_independent_source_mix() {
+        let world = correlated_stress_worlds()[0];
+        world.validate().unwrap();
+        let independent = independent_profile(&world);
+        let mut same_source = Allocation::default();
+        same_source.counts[0][0][1] = 2;
+        let mut diverse_mix = Allocation::default();
+        diverse_mix.counts[0][0][1] = 1;
+        diverse_mix.counts[0][0][2] = 1;
+        let (_, same_corr) = cell_bias_and_variance(&world, &same_source, 0, 0);
+        let (_, same_ind) = cell_bias_and_variance(&independent, &same_source, 0, 0);
+        let (_, mix_corr) = cell_bias_and_variance(&world, &diverse_mix, 0, 0);
+        let (_, mix_ind) = cell_bias_and_variance(&independent, &diverse_mix, 0, 0);
+        assert!(same_corr > same_ind);
+        assert!((mix_corr - mix_ind).abs() < 1e-14);
+        assert!(weighted_q_variance_inflation(&world, &same_source) > 1.0);
+    }
+
+    #[test]
+    fn analytic_correlated_ope_mse_matches_independent_monte_carlo() {
+        for world in correlated_stress_worlds() {
+            world.validate().unwrap();
+            let allocation = exact_dynamic_program(&world, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let analytic = analytic_mse(&world, &allocation, 64).unwrap();
+            let mc = monte_carlo_evaluate(
+                &world,
+                &allocation,
+                64,
+                MC_TEST_REPLICATES,
+                0x0560_c0a1 ^ world.name.len() as u64,
+                None,
+            );
+            let relative_error = (mc.mse - analytic).abs() / analytic.max(1e-12);
+            assert!(
+                relative_error < 0.18,
+                "scenario={}, analytic={analytic}, MC={}, relative={relative_error}",
+                world.name,
+                mc.mse
+            );
+            assert!(mc.bias.abs() < 0.04, "scenario={}, bias={}", world.name, mc.bias);
+        }
+    }
+
+    #[test]
+    fn robust_upper_correlation_plan_minimizes_its_declared_worst_case_profile() {
+        for world in correlated_stress_worlds() {
+            let independent = independent_profile(&world);
+            let robust_profile = upper_correlation_profile(&world, 1.5).unwrap();
+            let plugin = exact_dynamic_program(&independent, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let robust = exact_dynamic_program(&robust_profile, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let plugin_worst = analytic_mse(&robust_profile, &plugin, EVAL_N).unwrap();
+            let robust_worst = analytic_mse(&robust_profile, &robust, EVAL_N).unwrap();
+            assert!(robust_worst <= plugin_worst + 1e-12);
+            assert!(robust.feasible(&world));
+        }
+    }
+
+    #[test]
+    fn invalid_shared_covariance_factor_and_marginal_variance_fail_closed() {
+        let mut invalid = correlated_stress_worlds()[0];
+        invalid.shared_factor_variance[0] = -0.01;
+        assert!(invalid.validate().is_err());
+
+        let mut excessive = correlated_stress_worlds()[0];
+        excessive.shared_factor_variance[0] = 10.0;
+        assert!(excessive.validate().is_err());
+
+        let mut non_finite = correlated_stress_worlds()[0];
+        non_finite.source_shared_loadings[1][0] = f64::NAN;
+        assert!(non_finite.validate().is_err());
+
+        assert!(upper_correlation_profile(&correlated_stress_worlds()[0], 0.9).is_err());
+        let mut invalid_variance = correlated_stress_worlds()[0];
+        invalid_variance.shared_factor_variance[1] = f64::INFINITY;
+        assert!(invalid_variance.validate().is_err());
+    }
+
+    #[test]
+    fn output_includes_deterministic_correlated_stress_rows() {
+        let first = correlation_benchmark_rows(2, 456).unwrap();
+        let second = correlation_benchmark_rows(2, 456).unwrap();
+        assert_eq!(first, second);
+        let rows: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("CORR_RESULT\t"))
+            .collect();
+        assert_eq!(rows.len(), 18);
+        for row in rows {
+            assert_eq!(row.split('\t').count(), 22);
+        }
+    }
+
+    #[test]
     fn output_is_deterministic_and_has_exact_row_counts() {
         let first = benchmark(2, 123).unwrap();
         let second = benchmark(2, 123).unwrap();
