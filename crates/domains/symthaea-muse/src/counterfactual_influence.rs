@@ -21,6 +21,7 @@
 //! it must not replace these raw measurements or make sample ownership claims.
 
 use crate::audio_preservation::{AudioView, FrameInterval};
+use crate::performed_event_map::{PerformedEventLineage, PerformedEventMap};
 use crate::renderer_execution_receipt::{RendererExecutionReceipt, RendererReceiptInputs};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
@@ -145,7 +146,9 @@ pub struct VerifiedRendererAudioBinding {
     renderer_config_sha256: String,
     source_score_sha256: String,
     input_artifact_sha256: String,
-    performed_event_map_sha256: Option<String>,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: Option<String>,
+    performed_event_lineage: Vec<PerformedEventLineage>,
 }
 
 impl VerifiedRendererAudioBinding {
@@ -173,8 +176,12 @@ impl VerifiedRendererAudioBinding {
         &self.input_artifact_sha256
     }
 
-    pub fn performed_event_map_sha256(&self) -> Option<&str> {
-        self.performed_event_map_sha256.as_deref()
+    pub fn performed_event_map_sha256(&self) -> &str {
+        &self.performed_event_map_sha256
+    }
+
+    pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
+        &self.performed_event_lineage
     }
 }
 
@@ -195,9 +202,42 @@ fn decoded_pcm_f32_le_sha256(audio: &AudioView<'_>) -> String {
 pub fn verify_renderer_audio_binding(
     receipt: &RendererExecutionReceipt,
     inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: Option<&[u8]>,
     audio: &AudioView<'_>,
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
     let frames = validate_audio(audio)?;
+    if receipt.backend != crate::renderer_execution_receipt::RendererBackend::FluidSynth {
+        // NativeMuse needs its own exact performed-schedule parser before it
+        // can mint event-level provenance tokens.
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let midi_bytes = inputs
+        .input_midi_bytes
+        .ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?;
+    let parsed_map = PerformedEventMap::from_midi_bytes(
+        midi_bytes,
+        &receipt.score_sha256,
+        audio.sample_rate_hz,
+        frames as u64,
+    )
+    .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
+
+    if let Some(receipt_map_sha256) = receipt.performed_event_map_sha256.as_deref()
+        && receipt_map_sha256 != parsed_map.receipt_sha256
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    if let Some(map_bytes) = performed_event_map_bytes {
+        let supplied_map: PerformedEventMap = serde_json::from_slice(map_bytes)
+            .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
+        if supplied_map != parsed_map
+            || receipt.performed_event_map_sha256.as_deref()
+                != Some(parsed_map.receipt_sha256.as_str())
+        {
+            return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+        }
+    }
+
     receipt
         .verify_artifacts(inputs)
         .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
@@ -217,8 +257,7 @@ pub fn verify_renderer_audio_binding(
     .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
     let input_artifact_sha256 = receipt
         .input_midi_sha256
-        .as_deref()
-        .or(receipt.performed_schedule_sha256.as_deref())
+        .clone()
         .ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?;
 
     Ok(VerifiedRendererAudioBinding {
@@ -227,8 +266,10 @@ pub fn verify_renderer_audio_binding(
         renderer_identity_sha256: sha256_hex(&identity_bytes),
         renderer_config_sha256: receipt.render_config_sha256.clone(),
         source_score_sha256: receipt.score_sha256.clone(),
-        input_artifact_sha256: input_artifact_sha256.to_owned(),
-        performed_event_map_sha256: receipt.performed_event_map_sha256.clone(),
+        input_artifact_sha256,
+        performed_event_map_sha256: parsed_map.receipt_sha256,
+        performed_event_map_artifact_sha256: performed_event_map_bytes.map(sha256_hex),
+        performed_event_lineage: parsed_map.events,
     })
 }
 
@@ -683,8 +724,9 @@ pub fn calibrate_repeatability(
     let baseline_schedule_sha256 = sha256_hex(baseline_schedule_bytes);
     if anchor_renderer_evidence.source_score_sha256 != score_sha256
         || anchor_renderer_evidence.input_artifact_sha256 != baseline_schedule_sha256
-        || anchor_renderer_evidence.performed_event_map_sha256.as_deref()
+        || anchor_renderer_evidence.performed_event_map_artifact_sha256.as_deref()
             != Some(event_map_sha256.as_str())
+        || anchor_renderer_evidence.performed_event_map_sha256 != event_map_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
@@ -699,8 +741,9 @@ pub fn calibrate_repeatability(
         }
         if evidence.source_score_sha256 != score_sha256
             || evidence.input_artifact_sha256 != baseline_schedule_sha256
-            || evidence.performed_event_map_sha256.as_deref()
+            || evidence.performed_event_map_artifact_sha256.as_deref()
                 != Some(event_map_sha256.as_str())
+            || evidence.performed_event_map_sha256 != event_map_sha256
         {
             return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
         }
@@ -807,10 +850,8 @@ fn validate_intervention(
 ) -> Result<(), CounterfactualInfluenceError> {
     match intervention {
         EventIntervention::Remove => Ok(()),
-        EventIntervention::Transpose { semitones } if *semitones != 0 => Ok(()),
-        EventIntervention::ShiftOnset { delta_ticks } if *delta_ticks != 0 => Ok(()),
-        EventIntervention::ChangeDuration { delta_ticks } if *delta_ticks != 0 => Ok(()),
-        EventIntervention::ChangeVelocity { delta } if *delta != 0 => Ok(()),
+        // Other typed variants remain reserved until their operation-specific
+        // MIDI obligations are implemented and independently tested.
         _ => Err(CounterfactualInfluenceError::InvalidIntervention),
     }
 }
@@ -874,11 +915,53 @@ fn validate_input(
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.counterfactual_schedule_bytes)
-        || input.baseline_renderer_evidence.performed_event_map_sha256.as_deref()
-            != Some(calibration.performed_event_map_sha256.as_str())
+        || input.baseline_renderer_evidence.performed_event_map_artifact_sha256.as_deref()
+            != Some(sha256_hex(input.performed_event_map_bytes).as_str())
+        || input.baseline_renderer_evidence.performed_event_map_sha256
+            != calibration.performed_event_map_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
+    let baseline_target_present = input
+        .baseline_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .any(|row| row.source_event_id == input.source_event_id);
+    let counterfactual_target_absent = input
+        .counterfactual_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .all(|row| row.source_event_id != input.source_event_id);
+    if !baseline_target_present || !counterfactual_target_absent {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    }
+
+    let baseline_protected: Vec<&PerformedEventLineage> = input
+        .baseline_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .filter(|row| row.source_event_id != input.source_event_id)
+        .collect();
+    let candidate_protected =
+        &input.counterfactual_renderer_evidence.performed_event_lineage;
+    if baseline_protected.len() != candidate_protected.len()
+        || baseline_protected.iter().any(|baseline| {
+            !candidate_protected.iter().any(|candidate| {
+                candidate.source_event_id == baseline.source_event_id
+                    && candidate.descendant_ordinal == baseline.descendant_ordinal
+                    && candidate.midi_track_index == baseline.midi_track_index
+                    && candidate.midi_channel == baseline.midi_channel
+                    && candidate.midi_note == baseline.midi_note
+                    && candidate.onset_micros == baseline.onset_micros
+                    && candidate.end_micros == baseline.end_micros
+                    && candidate.onset_frame == baseline.onset_frame
+                    && candidate.end_frame == baseline.end_frame
+            })
+        })
+    {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    }
+
     if input.baseline_renderer_evidence.receipt_sha256
         != calibration.anchor_renderer_receipt_sha256
         || input.baseline_renderer_evidence.renderer_identity_sha256
