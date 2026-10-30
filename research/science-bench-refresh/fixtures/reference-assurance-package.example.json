@@ -1,0 +1,140 @@
+{
+  "schema": "symthaea.science_bench_refresh_reference_assurance_package.v1",
+  "purpose": "example_only",
+  "package_id": "reference-assurance-example-001",
+  "validator_source_revision": "NOT_IMPLEMENTED_YET",
+  "rubric_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scope_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "claims": [
+    {
+      "claim_id": "claim-001",
+      "text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "material": true,
+      "scope": {
+        "domain": "controlled_scientific_claim",
+        "jurisdiction": null,
+        "target_date": "2026-10-01",
+        "valid_from": "2026-01-01",
+        "valid_until": "2026-12-31",
+        "unit_context": null,
+        "time_independent": false
+      }
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "source-001",
+      "snapshot_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "ancestry_group_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "canonicalization_profile": "raw_utf8_bytes_v1",
+      "publication_date": "2026-09-01",
+      "retrieved_date": "2026-10-02",
+      "lifecycle": "active"
+    },
+    {
+      "source_id": "source-002",
+      "snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_identity_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "ancestry_group_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "canonicalization_profile": "raw_utf8_bytes_v1",
+      "publication_date": "2026-09-15",
+      "retrieved_date": "2026-10-02",
+      "lifecycle": "active"
+    }
+  ],
+  "spans": [
+    {
+      "span_id": "span-001",
+      "source_id": "source-001",
+      "start_offset": 0,
+      "end_offset": 42,
+      "offset_unit": "byte",
+      "span_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "span_id": "span-002",
+      "source_id": "source-002",
+      "start_offset": 10,
+      "end_offset": 58,
+      "offset_unit": "byte",
+      "span_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "adjudicators": [
+    {
+      "adjudicator_id_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "independence_group_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "role": "domain_reviewer",
+      "blind_to_system_identity": true,
+      "blind_to_candidate_identity": true,
+      "blind_to_judge_output": true,
+      "conflict_of_interest_declared": true,
+      "conflict_disclosure_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "adjudicator_id_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "independence_group_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "role": "domain_reviewer",
+      "blind_to_system_identity": true,
+      "blind_to_candidate_identity": true,
+      "blind_to_judge_output": true,
+      "conflict_of_interest_declared": true,
+      "conflict_disclosure_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+    },
+    {
+      "adjudicator_id_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+      "independence_group_sha256": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+      "role": "domain_reviewer",
+      "blind_to_system_identity": true,
+      "blind_to_candidate_identity": true,
+      "blind_to_judge_output": true,
+      "conflict_of_interest_declared": true,
+      "conflict_disclosure_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    }
+  ],
+  "initial_adjudications": [
+    {
+      "record_id": "judgment-001",
+      "claim_id": "claim-001",
+      "adjudicator_id_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "rubric_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "supported_within_scope",
+      "confidence_millionths": 900000,
+      "abstention_reason": null,
+      "evidence_span_ids": [
+        "span-001"
+      ],
+      "rationale_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+    },
+    {
+      "record_id": "judgment-002",
+      "claim_id": "claim-001",
+      "adjudicator_id_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "rubric_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "supported_within_scope",
+      "confidence_millionths": 800000,
+      "abstention_reason": null,
+      "evidence_span_ids": [
+        "span-002"
+      ],
+      "rationale_sha256": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+    },
+    {
+      "record_id": "judgment-003",
+      "claim_id": "claim-001",
+      "adjudicator_id_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+      "rubric_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "mixed_or_contested",
+      "confidence_millionths": 650000,
+      "abstention_reason": null,
+      "evidence_span_ids": [
+        "span-001",
+        "span-002"
+      ],
+      "rationale_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+    }
+  ],
+  "resolutions": [],
+  "package_commitment_sha256": "f2e848cdc321192244cbc068e6b8912fc78f448e67a17e208e893a13f9054d72"
+}
