@@ -137,7 +137,7 @@
       "sequence": 5,
       "event_id": "readme-edit-001",
       "change_kind": "source_change",
-      "event_digest": "sha256:0224c33a90ed0b8f417de768990950ec15ad013eb4e024f1f9fa5c0039117f65",
+      "event_digest": "sha256:2da6225ebde58ff73b61cc62ceb8330ec0e3e1a20699bbf890369905d8ebf020",
       "resource_id": "repo:README.md",
       "before_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "after_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
@@ -147,7 +147,7 @@
       "sequence": 6,
       "event_id": "source-edit-001",
       "change_kind": "source_change",
-      "event_digest": "sha256:0d588a31e5c5e5c8da58321dd2767b8b3611f0c0a5942cf122d165d7460366c3",
+      "event_digest": "sha256:e50c5eeb142fcb19d5197ec5e5f0f64b1fa710041bce9272384f34985ca4c097",
       "resource_id": "repo:src/lib.rs",
       "before_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "after_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
