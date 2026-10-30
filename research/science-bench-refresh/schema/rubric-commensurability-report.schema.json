@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/rubric-commensurability-report.schema.json",
+  "title": "Symthaea Rubric Commensurability Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "analyzer_worktree_clean",
+    "comparison_id",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "report_commitment_sha256",
+    "left_rubric_id",
+    "right_rubric_id",
+    "overall_status",
+    "construct_count",
+    "directly_commensurable_construct_count",
+    "calibration_required_construct_count",
+    "partially_mapped_construct_count",
+    "incompatible_construct_count",
+    "unmapped_construct_count",
+    "insufficient_anchor_construct_count",
+    "left_criterion_count",
+    "right_criterion_count",
+    "left_unmapped_criterion_count",
+    "right_unmapped_criterion_count",
+    "left_weight_total_millionths",
+    "right_weight_total_millionths",
+    "left_right_mapping_adjudicator_overlap_count",
+    "mapping_adjudicator_ids_disjoint",
+    "mapping_panel_independence_proven",
+    "shared_anchor_item_count",
+    "minimum_anchor_items_per_construct",
+    "direct_score_comparison_allowed",
+    "model_ranking_comparison_allowed",
+    "construct_validity_proven",
+    "human_alignment_proven",
+    "generalized_accuracy_estimated",
+    "scoring_eligible_declared",
+    "external_anchor_required",
+    "construct_results",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_rubric_commensurability_report.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "analyzer_worktree_clean": {
+      "type": "boolean"
+    },
+    "comparison_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "left_rubric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "right_rubric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "overall_status": {
+      "enum": [
+        "fully_commensurable",
+        "partially_commensurable",
+        "calibration_required",
+        "non_commensurable",
+        "insufficient_evidence"
+      ]
+    },
+    "construct_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "directly_commensurable_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "calibration_required_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "partially_mapped_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "incompatible_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unmapped_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "insufficient_anchor_construct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "left_criterion_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "right_criterion_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "left_unmapped_criterion_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "right_unmapped_criterion_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "left_weight_total_millionths": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "right_weight_total_millionths": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shared_anchor_item_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimum_anchor_items_per_construct": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "direct_score_comparison_allowed": {
+      "type": "boolean"
+    },
+    "model_ranking_comparison_allowed": {
+      "type": "boolean"
+    },
+    "construct_validity_proven": {
+      "const": false
+    },
+    "human_alignment_proven": {
+      "const": false
+    },
+    "generalized_accuracy_estimated": {
+      "const": false
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "construct_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/construct_result"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "left_right_mapping_adjudicator_overlap_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mapping_adjudicator_ids_disjoint": {
+      "type": "boolean"
+    },
+    "mapping_panel_independence_proven": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relation": {
+      "enum": [
+        "equivalent",
+        "narrower_than",
+        "broader_than",
+        "overlaps",
+        "orthogonal",
+        "incompatible",
+        "unmapped"
+      ]
+    },
+    "construct_status": {
+      "enum": [
+        "directly_commensurable",
+        "calibration_required",
+        "partially_mapped",
+        "incompatible",
+        "unmapped"
+      ]
+    },
+    "construct_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "construct_id",
+        "status",
+        "left_criterion_ids",
+        "right_criterion_ids",
+        "left_relations",
+        "right_relations",
+        "left_weight_millionths",
+        "right_weight_millionths",
+        "weight_difference_millionths",
+        "left_measurement_spec_sha256",
+        "right_measurement_spec_sha256",
+        "exact_measurement_spec_match",
+        "normalized_scale_anchor_match",
+        "shared_anchor_item_count",
+        "required_anchor_item_count",
+        "direct_score_comparison_allowed",
+        "reasons"
+      ],
+      "properties": {
+        "construct_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/construct_status"
+        },
+        "left_criterion_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "right_criterion_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "left_relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relation"
+          }
+        },
+        "right_relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relation"
+          }
+        },
+        "left_weight_millionths": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "right_weight_millionths": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "weight_difference_millionths": {
+          "type": "integer"
+        },
+        "left_measurement_spec_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "right_measurement_spec_sha256": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "exact_measurement_spec_match": {
+          "type": "boolean"
+        },
+        "normalized_scale_anchor_match": {
+          "type": "boolean"
+        },
+        "shared_anchor_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_anchor_item_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "direct_score_comparison_allowed": {
+          "type": "boolean"
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

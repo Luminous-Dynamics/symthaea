@@ -20,6 +20,10 @@ use science_bench_refresh_validator::judge_robustness::{
     compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
     verify_judge_robustness_plan, verify_judge_robustness_report,
 };
+use science_bench_refresh_validator::rubric_commensurability::{
+    audit_rubric_commensurability, compute_rubric_commensurability_plan_commitment,
+    compute_rubric_construct_ontology_commitment, verify_rubric_commensurability_plan,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
@@ -62,6 +66,10 @@ fn usage(program: &str) {
             "  {program} commit-judge-factorial-plan PLAN_FIELDS.json\n",
             "  {program} verify-judge-factorial-plan PLAN.json\n",
             "  {program} analyze-judge-factorial PLAN.json RECEIPT.json\n",
+            "  {program} commit-rubric-construct-ontology CONSTRUCTS.json\n",
+            "  {program} commit-rubric-commensurability-plan PLAN_FIELDS.json\n",
+            "  {program} verify-rubric-commensurability-plan PLAN.json\n",
+            "  {program} audit-rubric-commensurability PLAN.json\n",
             "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
             "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
@@ -178,6 +186,121 @@ fn run(args: &[String]) -> ExitCode {
                         "{}",
                         serde_json::to_string_pretty(&report)
                             .expect("judge factorial analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-rubric-construct-ontology" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let constructs_bytes = match read(&args[1], "construct ontology rows") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_rubric_construct_ontology_commitment(&constructs_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_rubric_construct_ontology_commitment.v1",
+                            "construct_ontology_sha256": commitment
+                        }))
+                        .expect("construct ontology commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "commit-rubric-commensurability-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "rubric commensurability plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_rubric_commensurability_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_rubric_commensurability_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("rubric commensurability commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-rubric-commensurability-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "rubric commensurability plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_rubric_commensurability_plan(&plan_bytes) {
+                Ok((plan, plan_sha256)) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_rubric_commensurability_plan_verification.v1",
+                            "valid": true,
+                            "plan_sha256": plan_sha256,
+                            "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
+                            "comparison_id": plan.comparison_id,
+                            "construct_count": plan.constructs.len(),
+                            "left_rubric_id": plan.left_instrument.rubric_id,
+                            "right_rubric_id": plan.right_instrument.rubric_id,
+                            "direct_score_comparison": false,
+                            "scoring_eligible": false,
+                            "external_anchor_required": true
+                        }))
+                        .expect("rubric commensurability plan verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "audit-rubric-commensurability" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "rubric commensurability plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match audit_rubric_commensurability(&plan_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("rubric commensurability report serializes")
                     );
                     ExitCode::SUCCESS
                 }
