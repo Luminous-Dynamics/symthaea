@@ -514,8 +514,6 @@ pub enum SystemPhiError {
     ZeroSeveredConnections,
     #[error("candidate system must be in strictly ascending unit-index order")]
     CandidateSystemNotCanonical,
-    #[error("proper-subsystem IIT 4.0 scoring is not qualified: Eq. 3/Eq. 4 external-background marginals are not implemented")]
-    UnsupportedSubsystemBackground,
     #[error("numeric decimal precision {precision} is outside the supported range 0..=15")]
     InvalidNumericalPrecision { precision: u32 },
     #[error("intrinsic-specification GID became non-finite at state index {state_index}")]
@@ -2755,41 +2753,44 @@ mod tests {
     }
 
     #[test]
-    fn system_iit4_scoring_rejects_unimplemented_proper_subsystem_background() {
+    fn proper_subsystem_iit4_system_api_accepts_embedded_candidate_systems() {
         let model = two_unit_model();
-        assert!(matches!(
-            model.intrinsic_specification_iit4(
+        let intrinsic = model
+            .intrinsic_specification_iit4(
                 &[0],
                 &[true, false],
                 CausalDirection::Cause,
                 6,
-            ),
-            Err(SystemPhiError::UnsupportedSubsystemBackground)
-        ));
-        assert!(matches!(
-            model.analyze_iit4_2023_system_phi_s(
+            )
+            .unwrap();
+        assert_eq!(intrinsic.direction, CausalDirection::Cause);
+
+        let analysis = model
+            .analyze_iit4_2023_system_phi_s(
                 &[0],
                 &[true, false],
                 Iit4SystemPhiSearchConfig::default(),
-            ),
-            Err(SystemPhiError::UnsupportedSubsystemBackground)
-        ));
+            )
+            .unwrap();
+        assert_eq!(analysis.status, Iit4SystemPhiStatus::NullSingleUnit);
+        assert_eq!(analysis.phi_s, Some(0.0));
+
         let partition = enumerate_iit4_system_partitions(&[0], 2, false, 1)
             .unwrap()
             .into_iter()
             .next()
             .unwrap();
-        assert!(matches!(
-            model.score_iit4_system_partition(
+        let score = model
+            .score_iit4_system_partition(
                 &partition,
                 &[true, false],
                 &Iit4SystemState {
                     cause_specified_state: vec![true],
                     effect_specified_state: vec![false],
                 },
-            ),
-            Err(SystemPhiError::UnsupportedSubsystemBackground)
-        ));
+            )
+            .unwrap();
+        assert_eq!(score.severed_connections, 1);
     }
 
     #[test]
