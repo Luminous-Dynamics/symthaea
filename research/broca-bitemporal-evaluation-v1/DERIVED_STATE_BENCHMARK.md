@@ -127,3 +127,7 @@ The LongMemEval-V2 project page currently lists AgentRunbook-C at 74.9% overall 
 5. Run official external tasks and compare with fixed readers/budgets. Keep the entire research harness reproducible offline where licensing/data access permits.
 
 This protocol is a research plan, not a completed implementation or a claim that Broca currently outperforms any baseline.
+
+## 15. Lifecycle action controller and Vera-Life alignment
+
+See [LIFECYCLE_ACTION_POLICY.md](LIFECYCLE_ACTION_POLICY.md) for the deterministic ANSWER / WARN_STALE / EXPLAIN_CONFLICT / RETRIEVE_MORE / ABSTAIN policy, opaque proof-verifier capability, action receipt and Vera-Life-Eval scorecard. This is the policy layer between verified proof construction and answer generation. It has not yet been wired into the production generation loop, and no LifeEM benchmark result is claimed.
