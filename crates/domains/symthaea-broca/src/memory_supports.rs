@@ -444,11 +444,9 @@ impl SupportGraph {
         &mut self,
         event_id: &str,
     ) -> Result<SupportMutation, String> {
-        let source = self
-            .source_events
-            .get(event_id)
-            .ok_or_else(|| format!("cannot retract unknown source event {event_id:?}"))?;
-        let _ = source;
+        if !self.source_events.contains_key(event_id) {
+            return Err(format!("cannot retract unknown source event {event_id:?}"));
+        }
         let before = self.support_snapshot()?;
         if self.source_events.get(event_id).is_some_and(|source| source.retracted) {
             return Ok(SupportMutation::default());
@@ -946,4 +944,168 @@ mod tests {
         assert_eq!(left.state_sha256().unwrap(), right.state_sha256().unwrap());
         assert_eq!(left.retract_source_event("E1").unwrap(), SupportMutation::default());
     }
+    fn offset_date(day_offset: i64) -> String {
+        (NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()
+            + chrono::Duration::days(day_offset))
+        .format("%Y-%m-%d")
+        .to_string()
+    }
+
+    fn oracle_supported_on_date(
+        graph: &SupportGraph,
+        valid_at: NaiveDate,
+    ) -> BTreeSet<String> {
+        // Independent boolean fixed-point oracle. It scans all justifications
+        // and evaluates each dependency directly at one date; it does not use
+        // the production interval-union/intersection implementation.
+        let mut supported = BTreeSet::new();
+        for _ in 0..=graph.propositions.len() {
+            let mut next = supported.clone();
+            for justification in graph.justifications.values() {
+                if graph.retired_rule_versions.contains(&(
+                    justification.rule_id.clone(),
+                    justification.rule_version.clone(),
+                )) {
+                    continue;
+                }
+                let interval = ValidInterval {
+                    valid_from: justification.valid_from.clone(),
+                    valid_to: justification.valid_to.clone(),
+                }
+                .parse()
+                .unwrap();
+                if valid_at < interval.start
+                    || interval.end.is_some_and(|end| valid_at >= end)
+                {
+                    continue;
+                }
+
+                let all_dependencies_hold = justification.dependencies.iter().all(|dependency| {
+                    match dependency {
+                        SupportDependency::SourceEvent(event_id) => {
+                            graph.source_events.get(event_id).is_some_and(|source| {
+                                if source.retracted {
+                                    return false;
+                                }
+                                let source_interval = source.valid_interval.parse().unwrap();
+                                source_interval.start <= valid_at
+                                    && source_interval.end.is_none_or(|end| valid_at < end)
+                            })
+                        }
+                        SupportDependency::Proposition(proposition_id) => {
+                            supported.contains(proposition_id)
+                        }
+                    }
+                });
+
+                if all_dependencies_hold {
+                    next.insert(justification.proposition_id.clone());
+                }
+            }
+
+            if next == supported {
+                return supported;
+            }
+            supported = next;
+        }
+        panic!("independent oracle did not converge on an acyclic graph");
+    }
+
+    #[test]
+    fn generated_alternative_support_dags_match_independent_date_oracle() {
+        const SOURCES: usize = 8;
+        const PROPOSITIONS: usize = 28;
+
+        for seed in 1_u64..=24 {
+            let mut rng = seed;
+            let mut graph = SupportGraph::default();
+
+            for index in 0..SOURCES {
+                let start = ((next_random(&mut rng) >> 32) % 8) as i64;
+                let end = start + 8 + ((next_random(&mut rng) >> 32) % 12) as i64;
+                graph
+                    .register_source_event(
+                        format!("E{index:02}"),
+                        interval(&offset_date(start), Some(&offset_date(end))),
+                    )
+                    .unwrap();
+            }
+
+            for index in 0..PROPOSITIONS {
+                graph
+                    .register_proposition(proposition(
+                        &format!("P{index:02}"),
+                        "generated-entity",
+                        "state",
+                        if index % 5 == 0 { "false" } else { "true" },
+                    ))
+                    .unwrap();
+            }
+
+            for index in 0..PROPOSITIONS {
+                // Two independent proof candidates per proposition. Each proof
+                // has a source leaf and may also depend on an earlier proposition.
+                for alternative in 0..2 {
+                    let source_index =
+                        ((next_random(&mut rng) >> 32) as usize) % SOURCES;
+                    let start = ((next_random(&mut rng) >> 32) % 10) as i64;
+                    let end = start + 10 + ((next_random(&mut rng) >> 32) % 12) as i64;
+                    let mut dependencies = BTreeSet::new();
+                    dependencies.insert(SupportDependency::SourceEvent(format!(
+                        "E{source_index:02}"
+                    )));
+                    if index > 0 && next_random(&mut rng) % 3 == 0 {
+                        let parent = ((next_random(&mut rng) >> 32) as usize) % index;
+                        dependencies.insert(SupportDependency::Proposition(format!(
+                            "P{parent:02}"
+                        )));
+                    }
+
+                    let mut item = justification(
+                        &format!("J{index:02}-{alternative}"),
+                        &format!("P{index:02}"),
+                        &offset_date(start),
+                        Some(&offset_date(end)),
+                        dependencies,
+                    );
+                    item.rule_id = if index % 2 == 0 { "r0" } else { "r1" }.into();
+                    item.rule_version = if alternative == 0 { "v0" } else { "v1" }.into();
+                    graph.add_justification(item).unwrap();
+                }
+            }
+
+            graph.verify_consistency().unwrap();
+
+            // Check every day across the generated horizon. Then mutate source
+            // and rule support and repeat the same oracle comparison.
+            let check_all_dates = |graph: &SupportGraph, seed: u64| {
+                let snapshot = graph.support_snapshot().unwrap();
+                for day in 0..32_i64 {
+                    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()
+                        + chrono::Duration::days(day);
+                    let expected = oracle_supported_on_date(graph, date);
+                    let date_text = date.format("%Y-%m-%d").to_string();
+                    for proposition_id in graph.propositions.keys() {
+                        assert_eq!(
+                            snapshot.is_supported_at(proposition_id, &date_text).unwrap(),
+                            expected.contains(proposition_id),
+                            "seed {seed}, proposition {proposition_id}, date {date_text}"
+                        );
+                    }
+                }
+            };
+
+            check_all_dates(&graph, seed);
+
+            for event_index in [seed as usize % SOURCES, (seed as usize + 3) % SOURCES] {
+                graph.retract_source_event(&format!("E{event_index:02}")).unwrap();
+                check_all_dates(&graph, seed);
+            }
+
+            graph.invalidate_rule_version("r0", "v0").unwrap();
+            check_all_dates(&graph, seed);
+        }
+    }
+
+
 }
