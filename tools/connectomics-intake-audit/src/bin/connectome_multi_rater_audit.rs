@@ -65,7 +65,7 @@ struct OutcomeFile {
     candidate_outcomes: Vec<CandidateOutcome>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CandidateOutcome {
     candidate_id: String,
