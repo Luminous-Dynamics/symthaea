@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-scoap-rarity-audit-receipt-v2.schema.json",
+  "title": "HARDSEC SCOAP rarity audit receipt v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result",
+    "claim_scope",
+    "algorithm",
+    "record_order",
+    "dataset_id",
+    "manifest_sha256",
+    "manifest_line_count",
+    "analyzer",
+    "split_protocol",
+    "alpha_milli",
+    "design_count",
+    "total_node_count",
+    "total_measured_metric_count",
+    "total_unknown_metric_count",
+    "source_integrity",
+    "ranking_output",
+    "designs",
+    "security_verdict",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-scoap-rarity-audit-v2"
+    },
+    "result": {
+      "const": "pass"
+    },
+    "claim_scope": {
+      "const": "supplied_scoap_metric_integrity_and_per_design_rarity_ranking_only"
+    },
+    "algorithm": {
+      "const": "scoap-rarity-fixed-point-midrank-percentile-v2"
+    },
+    "record_order": {
+      "const": "design_id_then_node_id_ascending"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "manifest_line_count": {
+      "type": "integer",
+      "minimum": 4
+    },
+    "analyzer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "config_sha256",
+        "sequential_cut_policy"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sequential_cut_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "split_protocol": {
+      "enum": [
+        "per_design",
+        "leave_one_design_out",
+        "leave_one_base_family_out"
+      ]
+    },
+    "alpha_milli": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 1000
+    },
+    "design_count": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "total_node_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_measured_metric_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_unknown_metric_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "verified_netlist_count",
+        "netlists"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "not_requested"
+          ]
+        },
+        "verified_netlist_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "netlists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "design_id",
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "design_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ranking_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "contains_labels"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "contains_labels": {
+          "const": false
+        }
+      }
+    },
+    "designs": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/design"
+      }
+    },
+    "security_verdict": {
+      "type": "null"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableRatio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "base_design_family_id",
+        "split",
+        "netlist_sha256",
+        "netlist_path",
+        "node_count",
+        "measured_metric_count",
+        "trigger_label_count",
+        "payload_label_count",
+        "benign_label_count",
+        "unknown_label_count",
+        "unknown_metric_count",
+        "tails"
+      ],
+      "properties": {
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_design_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "netlist_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "netlist_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measured_metric_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trigger_label_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "payload_label_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "benign_label_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_label_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_metric_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tails": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rarity_percentile_threshold_bps",
+              "selected_measured_nodes",
+              "selected_labeled_nodes",
+              "selected_unknown_label_nodes",
+              "trigger_total",
+              "trigger_selected",
+              "trigger_recall",
+              "trigger_precision",
+              "payload_total",
+              "payload_selected",
+              "payload_recall",
+              "payload_precision"
+            ],
+            "properties": {
+              "rarity_percentile_threshold_bps": {
+                "enum": [
+                  8000,
+                  9000,
+                  9500,
+                  9900
+                ]
+              },
+              "selected_measured_nodes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "selected_labeled_nodes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "selected_unknown_label_nodes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trigger_total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trigger_selected": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trigger_recall": {
+                "$ref": "#/$defs/nullableRatio"
+              },
+              "trigger_precision": {
+                "$ref": "#/$defs/nullableRatio"
+              },
+              "payload_total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "payload_selected": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "payload_recall": {
+                "$ref": "#/$defs/nullableRatio"
+              },
+              "payload_precision": {
+                "$ref": "#/$defs/nullableRatio"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
