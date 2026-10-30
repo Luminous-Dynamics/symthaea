@@ -195,6 +195,7 @@ POAR measures whether proof-aware scheduling achieves better correctness/resourc
 12. **No-information case:** internal reasoning cannot resolve a missing physical/empirical fact; stop and seek external observation.
 13. **Long dependency chain:** local steps are tractable, but evidence dependencies must be retained over increasing chain depth.
 14. **Null-benefit control:** the generic scheduler's additional complexity should not improve an already trivial/cached task.
+15. **Stale receipt replay:** a valid proof receipt is followed by a newer revocation/correction; replaying the old receipt must be rejected against the current state identity, without mutating any obligation in a multi-target batch.
 
 The task generator and independent oracle must keep hidden proof labels, hidden outcomes, and source-truth labels outside the runtime planner input. Hold out rule-template families and source families, not just random instances.
 
@@ -229,6 +230,7 @@ Report independently:
 - independent derivation acceptance;
 - evidence support precision and provenance/authorization correctness;
 - dependency retraction recall and unaffected-claim stability;
+- stale-receipt replay rejection and transactional all-or-nothing behavior for mixed-currentness multi-obligation receipts;
 - contradiction detection and resolution/abstention quality;
 - semantic-progress efficiency (verified obligations discharged per resource unit);
 - scheduler regret against the synthetic oracle;
