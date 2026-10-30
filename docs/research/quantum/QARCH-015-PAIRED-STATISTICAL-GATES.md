@@ -13,27 +13,27 @@ The existing small sign-test helper is suitable for local diagnostics; it is not
 
 ## Estimands and direction
 
-For independent paired block (i), let (Q_{q,i}) and (Q_{c,i}) be quantum and classical quality, with larger values better. Let (R_{q,i}) and (R_{c,i}) be end-to-end resource per verified acceptable answer, with smaller values better.
+For independent paired block \(i\), let \(Q_{q,i}\) and \(Q_{c,i}\) be quantum and classical quality, with larger values better. Let \(R_{q,i}\) and \(R_{c,i}\) be end-to-end resource per verified acceptable answer, with smaller values better.
 
 Quality non-inferiority requires:
 
-[
-D_{Q,i}=Q_{q,i}-Q_{c,i}>-delta_Q
-]
+\[
+D_{Q,i}=Q_{q,i}-Q_{c,i}>-\delta_Q
+\]
 
-Resource superiority requires a predeclared practical reduction from the classical resource baseline (delta_R):
+Resource superiority requires a predeclared practical reduction from the classical resource baseline, \(\delta_R\in[0,1)\):
 
-[
-D_{R,i}=log(R_{c,i})-log(R_{q,i})>log(1+delta_R)
-]
+\[
+D_{R,i}=\log(R_{c,i})-\log(R_{q,i})>-\log(1-\delta_R)
+\]
 
 Both conditions are required. A statistically detectable but practically trivial difference does not pass the resource gate. A faster/cheaper system that fails the common output-quality requirement does not pass either.
 
 The API reports the two exact one-sided sign-test p-values and the joint intersection-union p-value:
 
-[
-p_{joint}=max(p_{quality},p_{resource})
-]
+\[
+p_{joint}=\max(p_{quality},p_{resource})
+\]
 
 This is the appropriate conservative p-value for the preregistered conjunction “quality non-inferior AND resource reduction exceeds the minimum.” The conjunction must be fixed before outcomes are inspected. The claim is not accepted until this joint p-value is adjusted across the full preregistered family.
 
