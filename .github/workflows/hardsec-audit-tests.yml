@@ -8,7 +8,9 @@ on:
       - "examples/hardsec_trigger_budget.rs"
       - "examples/hardsec_evidence_packet_audit.rs"
       - "tests/fixtures/hardsec/*.json"
+      - "schemas/hardsec-*.schema.json"
       - "tools/hardsec-audit-harness/Cargo.toml"
+      - "tools/hardsec-audit-harness/requirements-validation.txt"
       - ".github/workflows/hardsec-audit-tests.yml"
   workflow_dispatch:
 
@@ -190,6 +192,32 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Validate evidence packet against published JSON Schema
+        run: |
+          set -euo pipefail
+          python -m pip install --requirement tools/hardsec-audit-harness/requirements-validation.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("schemas")
+          cases = [
+              ("hardsec-evidence-packet-v1.schema.json", "tests/fixtures/hardsec/seqcube-witness-validation-packet.json"),
+          ]
+          for schema_name, instance_name in cases:
+              schema = json.loads((root / schema_name).read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              instance = json.loads(Path(instance_name).read_text(encoding="utf-8"))
+              errors = list(Draft202012Validator(schema).iter_errors(instance))
+              if errors:
+                  raise SystemExit(
+                      f"{instance_name} failed {schema_name}: "
+                      + "; ".join(error.message for error in errors)
+                  )
+              print(f"JSON Schema PASS: {instance_name}")
+          PY
+
       - name: Install Z3 and Icarus Verilog
         run: |
           set -euo pipefail
@@ -236,6 +264,21 @@ jobs:
             --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
             --evidence-root "$SEQCUBE_PACKAGE_ROOT" \
             --receipt "$RUNNER_TEMP/seqcube-evidence-audit.json"
+          python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-evidence-audit-receipt-v1.schema.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("audit receipt schema failure: " + "; ".join(error.message for error in errors))
+          print("JSON Schema PASS: evidence audit receipt")
+          PY
+
           python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
           import json
           import sys
@@ -513,10 +556,18 @@ jobs:
               "claim_ceiling": manifest["claim_ceiling"],
           }
           Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\n", encoding="utf-8")
+          schema = json.loads(Path("schemas/hardsec-seqcubewitness-attestation-v1.schema.json").read_text(encoding="utf-8"))
+          from jsonschema import Draft202012Validator
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(predicate))
+          if errors:
+              raise SystemExit("attestation predicate schema failure: " + "; ".join(error.message for error in errors))
+          Path(sys.argv[2]).write_text(json.dumps(predicate, indent=2) + "\\n", encoding="utf-8")
           print(json.dumps({
               "subject": predicate["subject"],
               "source_commit": manifest["run"]["source_commit"],
               "predicate_type": "https://luminousdynamics.io/attestations/hardsec-seqcubewitness-validation/v1",
+              "schema_validation": "pass",
           }, indent=2))
           PY
 
