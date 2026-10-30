@@ -20,7 +20,7 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `benchmarks/basalt/schema/observer-oracle.v1.schema.json`: strict Draft 2020-12 oracle-ledger schema.
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
-- Five Rust tests cover a paired recall/selectivity success case, stale reuse, event-loss misreporting, false attribution of an unrelated resource, and cross-run receipt mismatch.
+- Seven Rust tests cover a paired recall/selectivity success case, stale reuse, event-loss misreporting, false attribution of an unrelated resource, and cross-run receipt mismatch.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
 The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 34-case catalog is the fixture definition, not evidence that any observer has executed it.
