@@ -993,7 +993,7 @@ mod tests {
     }
 
     #[test]
-    fn all_deployable_loggers_preserve_the_registered_support_floor() {
+    fn all_logger_designs_preserve_the_registered_support_floor() {
         for regime in PortfolioRegime::ALL {
             for m in POLICY_COUNTS {
                 let policy_set = policies(regime, m);
