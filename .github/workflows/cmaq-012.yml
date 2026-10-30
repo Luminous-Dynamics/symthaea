@@ -1,0 +1,110 @@
+name: CMAQ-012 safe dual-control benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-dual-control:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-012
+        run: cargo test --locked
+      - name: Generate report and validate safety-budget contracts
+        working-directory: research/cmaq-012
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-012-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          assert report["schema_version"] == "cmaq-012-safe-dual-control-v0.1"
+          assert report["episode_count"] == 256
+          assert report["horizon"] == 64
+          assert report["target_switch_step"] == 24
+          assert report["parameter_shift_step"] == 44
+          assert report["state_limit"] == 0.60
+          assert report["mission_degradation_budget"] == 0.35
+          assert report["probe_period"] == 8
+          assert report["scenarios"] == ["stationary_unknown_gain", "abrupt_gain_shift"]
+          assert report["policies"] == [
+              "certainty_equivalent", "shielded_certainty_equivalent", "worst_case_robust",
+              "unconstrained_information_bonus", "budgeted_dual_control",
+              "separated_sensor_probe_reference", "oracle_known_gain"
+          ]
+
+          rows = report["summary"]
+          assert len(rows) == 14
+          by_key = {(row["scenario"], row["policy"]): row for row in rows}
+          assert len(by_key) == len(rows)
+          required_numeric = [
+              "mean_cost", "mean_cost_delta_vs_shielded_ce", "paired_ci95_low",
+              "paired_ci95_high", "p95_cost", "cvar95_cost",
+              "violation_episode_rate", "violation_step_rate", "mean_max_abs_state",
+              "mean_information_gain", "mean_budget_spent", "max_budget_spent",
+              "mean_probe_count", "mean_probe_cost", "mean_action_effort"
+          ]
+          for row in rows:
+              for key in required_numeric:
+                  assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+              for key in ["violation_episode_rate", "violation_step_rate"]:
+                  assert 0.0 <= row[key] <= 1.0
+              assert row["cvar95_cost"] + 1e-8 >= row["p95_cost"]
+              assert row["p95_cost"] + 1e-8 >= row["mean_cost"]
+          
+          for scenario in report["scenarios"]:
+              dual = by_key[(scenario, "budgeted_dual_control")]
+              shielded = by_key[(scenario, "shielded_certainty_equivalent")]
+              assert dual["max_budget_spent"] <= report["mission_degradation_budget"] + 1e-8
+              assert dual["mean_probe_count"] == 0.0
+              assert dual["violation_episode_rate"] == 0.0
+              assert shielded["violation_episode_rate"] == 0.0
+              probe = by_key[(scenario, "separated_sensor_probe_reference")]
+              assert probe["mean_probe_count"] == 8.0
+              assert abs(probe["mean_probe_cost"] - 8.0 * 0.002) < 1e-8
+          
+          # The unconstrained information arm is intentionally not protected.
+          # Its observed risk is reported, not assumed; no performance hypothesis is
+          # converted into a pass condition by weakening the safety requirement.
+          print("CMAQ-012 schema, paired-policy census, robust envelope, mission budget, and charged probe contracts validated")
+          print(json.dumps({
+              scenario: {
+                  policy: {
+                      "mean_cost": by_key[(scenario, policy)]["mean_cost"],
+                      "delta_vs_shielded_ce": by_key[(scenario, policy)]["mean_cost_delta_vs_shielded_ce"],
+                      "ci95": [by_key[(scenario, policy)]["paired_ci95_low"], by_key[(scenario, policy)]["paired_ci95_high"]],
+                      "p95": by_key[(scenario, policy)]["p95_cost"],
+                      "cvar95": by_key[(scenario, policy)]["cvar95_cost"],
+                      "violations": by_key[(scenario, policy)]["violation_episode_rate"],
+                      "information_gain": by_key[(scenario, policy)]["mean_information_gain"],
+                      "budget_spent": by_key[(scenario, policy)]["mean_budget_spent"],
+                      "probes": by_key[(scenario, policy)]["mean_probe_count"]
+                  }
+                  for policy in [
+                      "certainty_equivalent", "shielded_certainty_equivalent",
+                      "unconstrained_information_bonus", "budgeted_dual_control",
+                      "separated_sensor_probe_reference", "oracle_known_gain"
+                  ]
+              }
+              for scenario in report["scenarios"]
+          }, sort_keys=True))
+          PY
