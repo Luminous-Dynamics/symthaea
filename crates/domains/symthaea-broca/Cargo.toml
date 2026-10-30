@@ -38,6 +38,7 @@ tree-sitter.workspace = true
 regex = "1.10"
 tempfile = "3.10"
 sled = "0.34"
+rusqlite.workspace = true
 rnix = "0.11"
 rowan = "0.15"
 chrono = { version = "0.4", features = ["serde"] }

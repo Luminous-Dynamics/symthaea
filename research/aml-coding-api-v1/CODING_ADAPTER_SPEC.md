@@ -140,6 +140,45 @@ This is only a **local research baseline**. It is not a deployment-ready competi
 
 The local test suite exercises persistence across reopen, immediate BM25 retrieval, idempotent replay, conflicting ID reuse, user isolation, cross-session visibility for one user, top_k, purge, corrupt batch rejection, and non-canonical key rejection. The tests are authored but must be compiled and executed at the exact stacked PR head.
 
+## 5B. SQLite/WAL persistence backend (preferred local baseline)
+
+The repository workspace already defines `rusqlite 0.37` with bundled SQLite. The stacked research implementation adds `memory_challenge_sqlite.rs` and exposes `SqliteAmlMemoryBackend` behind the same `AmlMemoryBackend` trait.
+
+Its contract:
+- Open one local SQLite database file; configure `journal_mode=WAL`, `synchronous=FULL`, foreign keys, and a bounded busy timeout on each connection.
+- Store one immutable Add batch per exact `request_id` primary key, including the complete ordered Add request, payload digest, generated evidence records, and storage timestamp.
+- Use `BEGIN IMMEDIATE` to serialize writers before idempotency lookup and insert; same request ID/same digest replays, while same ID/different digest is a conflict.
+- Validate a candidate BM25 index and each message's immediate retrievability before inserting.
+- Commit the request and records in one SQLite transaction. Under WAL with `synchronous=FULL`, SQLite syncs the WAL at each transaction commit; success only follows a successful commit. See the [SQLite synchronous pragma documentation](https://www.sqlite.org/pragma.html#pragma_synchronous) and [WAL documentation](https://www.sqlite.org/wal.html).
+- On restart, validate row metadata, payload digest, canonical source records, and schema version before rebuilding the in-memory evidence index.
+- Explicit cutoff and full-purge operations remove logical rows in SQLite transactions and rebuild/clear the index.
+
+The SQLite implementation has 21 authored tests covering persistence/reopen, immediate retrieval, cross-connection idempotency, conflicting request-ID reuse, user isolation, cross-session retrieval, top_k, WAL/FULL PRAGMA verification, retention purge, malformed rows, and failed-batch atomicity.
+
+The SQLite backend also records lifecycle changes in `aml_evidence_lifecycle_events`:
+- caller-supplied `event_id` provides idempotency; same event ID/same operation is a replay, and same ID/different operation is rejected;
+- Revoke, Delete, and Supersede are append-only events ordered by SQLite sequence;
+- each lifecycle event has a SHA-256 digest over the exact serialized event body, verified before replay; row ID/timestamp and content digest must all match;
+- schema version 3 migrates v2 lifecycle rows transactionally by adding and backfilling event digests; v1 Add-only stores are upgraded additively;
+- restart rebuilds Add batches first, then replays every lifecycle event before Search;
+- invalid events, modified event bodies, or dangling source references fail startup closed;
+- retention cleanup removes expired Add batches and dependent lifecycle events in one SQLite transaction;
+- full purge clears both Add and lifecycle tables.
+
+The internal `search_as_known_at(request, valid_at, known_at)` API reconstructs an immutable view by selecting only Add transactions recorded by `known_at`, replaying only lifecycle events recorded by `known_at`, and then applying source validity bounds at `valid_at`. Source message timestamps populate the lower valid-time boundary when supplied. Add and lifecycle transaction timestamps are globally monotonic across the ledger, avoiding equal-millisecond and backwards-clock ambiguity. The external AML Search API remains a current-view interface and is not changed.
+
+This is a bounded two-clock reference implementation, not a full bitemporal database: timestamps are millisecond instants, arbitrary valid-time correction chains and interval joins are not implemented, and retractions are not yet propagated through the separate derived proof graph/use-validity certificate DAG. Those integrations remain tracked by #9075, #9077, and #9112.
+
+### SQLite backend deployment boundaries
+
+SQLite WAL is a local/same-host storage mode, not a multi-host database: the SQLite documentation states that WAL does not work over a network filesystem and all processes using the database must be on the same host. The implementation therefore remains a **single-node local baseline** with a process-local EvidenceIndex cache and one active cache owner. It is not an HTTP deployment, distributed store, or substitute for service-level authentication, access control, backups, secret management, monitoring, and operator-run retention/erasure controls.
+
+WAL mode also creates `-wal` and `-shm` sidecar files. Logical row deletion is not forensic erasure; when an evaluation's retention window expires, the operator must dispose of the main database, sidecars, backups, and snapshots under the applicable data-deletion policy.
+
+### Sled comparison status
+
+`memory_challenge_sled.rs` remains available as an experimental backend comparison. Sled 0.34 documents itself as beta; keep it for research comparison only. Prefer SQLite/WAL for the local single-node persistence baseline. Neither backend is yet the final public competition service, and neither removes the requirement to use `text-embedding-v4` for embeddings in Open-source Methods.
+
 ## 6. Conformance artifacts
 
 - [JSON Schema](./coding-api-schema.json)
