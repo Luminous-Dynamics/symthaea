@@ -26,15 +26,28 @@ The hidden regime is never exposed to the policies. Signal probability is 0.01 b
 
 The report records false revocation, post-shift detection coverage and p90 delay, model-action coverage, expected utility, evidence multiplicity, independent-group coverage, stale/duplicate rejection, and fail-closed rate.
 
+## Prior art and matched comparator
+
+A directly relevant paper appeared on **24 October 2026**: [Echo chamber dynamics and influence-aware evidence aggregation for epistemic integrity in knowledge-based systems](https://link.springer.com/article/10.1007/s44163-026-02245-5). It proposes an Influence-Indexed Evidence Graph, Effective Independent Evidence (EIE), and bounded confidence propagation (CONFPROP). Its EIE is a weighted sum of evidence independence, and its discount is `gamma = min(1, EIE / K)`. The paper also states a per-observation-window bound on raw evidence increments as an assumption for its tighter propagation bound.
+
+CMAQ-010 adds two deliberately narrower sequential-detection comparators; these are **not reproductions** of the paper's graph-based method:
+
+- `eie_gamma_discount_only`: applies the EIE-style `gamma` to the sum of signed log-likelihood evidence, but does not cap the number of reports in a window. This is an ablation designed to expose what happens when a deployment omits the raw-batch bound.
+- `eie_gamma_bounded_batch`: applies the same `gamma`, while capping each observation window at `K=3` report increments. This operationalizes the paper's per-window raw-increment bound in a simple count-limited way.
+
+The comparison matters: a discount factor alone is not the full safety contract. The provenance graph, evidence weights, freshness, and per-window ingestion bound all matter. The present harness uses a single provenance-group label rather than a full influence graph, so it should not be presented as a direct CONFPROP benchmark.
+
 ## Policies
 
-1. `naive_claim_sum`: adds a likelihood increment for every claimed identity, even when reports share provenance.
-2. `naive_claim_majority`: majority-votes claimed identities, so clones can dominate a vote.
-3. `provenance_root_dedup_sum`: counts at most one report per provenance group but does not check freshness.
-4. `robust_root_majority`: one vote per provenance group and a conservative likelihood envelope intended to tolerate one inverted source; no freshness gate.
-5. `freshness_provenance_fail_closed`: rejects stale epoch/context and duplicate nonces, counts one report per provenance group, requires at least two fresh independent groups, then uses the conservative majority statistic. Four consecutive steps without the minimum evidence cause fallback.
-6. `oracle_changepoint`: evaluator-only upper bound at the hidden shift time.
-7. `direct_fallback`: zero model-use baseline.
+1. `naive_claim_sum`: adds a likelihood increment for every report, even when reports share provenance.
+2. `naive_claim_majority`: gives each claimed source identity one vote; aliases can still act as Sybils if not lineage-linked.
+3. `eie_gamma_discount_only`: EIE-style discount without the per-window raw-batch cap.
+4. `eie_gamma_bounded_batch`: EIE-style discount plus a `K=3` report-increment cap per observation window.
+5. `provenance_root_dedup_sum`: counts at most one report per provenance group but does not check freshness.
+6. `robust_root_majority`: one vote per provenance group and a conservative likelihood envelope intended to tolerate one inverted source; no freshness gate.
+7. `freshness_provenance_fail_closed`: rejects stale epoch/context and duplicate nonces, counts one report per provenance group, requires at least two fresh independent groups, then uses the conservative majority statistic. Four consecutive steps without the minimum evidence cause fallback.
+8. `oracle_changepoint`: evaluator-only upper bound at the hidden shift time.
+9. `direct_fallback`: zero model-use baseline.
 
 The synthetic `provenance_group` field is treated as authenticated metadata to isolate aggregation logic. CMAQ-010 **does not** prove that a production system can authenticate this field. Later work must test signed envelopes, key rotation, revocation, clock uncertainty, lineage registration and compromised roots.
 
