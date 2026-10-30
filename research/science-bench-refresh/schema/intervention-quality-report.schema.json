@@ -33,6 +33,7 @@
     "pipeline_acceptance_rate_ppm",
     "reviewer_pairwise_agreement_ppm",
     "reviewer_pairwise_comparison_count",
+    "reviewer_fleiss_kappa",
     "unique_transformation_family_count",
     "unique_failure_mode_count",
     "unique_semantic_cluster_count",
@@ -200,6 +201,9 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 1
+    },
+    "reviewer_fleiss_kappa": {
+      "$ref": "#/$defs/nullable_number"
     }
   },
   "$defs": {
