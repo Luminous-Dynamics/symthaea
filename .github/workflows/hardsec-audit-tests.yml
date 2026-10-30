@@ -85,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hardsec-seqcubewitness-validation-receipt
-          path: "$RUNNER_TEMP/seqcube-evidence-audit.json"
+          path: "${{ runner.temp }}/seqcube-evidence-audit.json"
 
       - name: Record resolved harness dependency lock
         if: always()
