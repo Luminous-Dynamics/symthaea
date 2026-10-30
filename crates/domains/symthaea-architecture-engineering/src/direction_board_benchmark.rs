@@ -113,6 +113,23 @@ pub struct DirectionCampaignAggregate {
     pub mean_total_cost_units: f64,
 }
 
+/// Paired comparison of one candidate policy against one baseline on identical seeds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirectionCampaignPairedComparison {
+    pub landscape: DirectionLandscapeFamily,
+    pub candidate_policy: DirectionCampaignPolicy,
+    pub baseline_policy: DirectionCampaignPolicy,
+    pub action_budget: usize,
+    pub pair_count: usize,
+    /// Positive values favor the candidate policy.
+    pub mean_final_score_delta: f64,
+    pub final_score_delta_sample_sd: f64,
+    /// Positive values mean the candidate reduced simple regret.
+    pub mean_simple_regret_reduction: f64,
+    pub candidate_win_rate: f64,
+    pub tie_rate: f64,
+}
+
 /// Run one policy on one evaluator-owned landscape with a fixed action budget.
 ///
 /// The first evaluation of A, B and C is common bootstrap cost for every policy. All
@@ -385,6 +402,119 @@ pub fn aggregate_direction_campaign_runs(
         });
     }
     Ok(aggregates)
+}
+
+/// Compare the selected policy with every other policy using strictly paired seeds.
+/// A missing policy/seed cell is an error; silently comparing different seeds is forbidden.
+pub fn compare_paired_direction_campaign_runs(
+    runs: &[DirectionCampaignRun],
+    candidate_policy: DirectionCampaignPolicy,
+) -> Result<Vec<DirectionCampaignPairedComparison>, String> {
+    let mut cells: BTreeMap<
+        (DirectionLandscapeFamily, usize, u64),
+        BTreeMap<DirectionCampaignPolicy, &DirectionCampaignRun>,
+    > = BTreeMap::new();
+    for run in runs {
+        let cell = cells
+            .entry((run.landscape, run.action_budget, run.seed))
+            .or_default();
+        if cell.insert(run.policy, run).is_some() {
+            return Err("duplicate policy/landscape/budget/seed cell".to_owned());
+        }
+    }
+
+    let mut seed_sets: BTreeMap<
+        (DirectionLandscapeFamily, usize, DirectionCampaignPolicy),
+        BTreeSet<u64>,
+    > = BTreeMap::new();
+    for ((landscape, budget, seed), policies) in &cells {
+        if !policies.contains_key(&candidate_policy) {
+            return Err(format!(
+                "missing candidate policy {candidate_policy:?} for {landscape:?}, budget {budget}, seed {seed}"
+            ));
+        }
+        for policy in policies.keys() {
+            seed_sets
+                .entry((*landscape, *budget, *policy))
+                .or_default()
+                .insert(*seed);
+        }
+    }
+
+    let mut reference_sets: BTreeMap<(DirectionLandscapeFamily, usize), BTreeSet<u64>> =
+        BTreeMap::new();
+    for ((landscape, budget, _policy), seeds) in &seed_sets {
+        match reference_sets.get(&(*landscape, *budget)) {
+            Some(reference) if reference != seeds => {
+                return Err(format!(
+                    "policy seed sets differ for {landscape:?} at action budget {budget}"
+                ));
+            }
+            Some(_) => {}
+            None => {
+                reference_sets.insert((*landscape, *budget), seeds.clone());
+            }
+        }
+    }
+
+    let mut paired: BTreeMap<
+        (DirectionLandscapeFamily, DirectionCampaignPolicy, usize),
+        Vec<(f64, f64)>,
+    > = BTreeMap::new();
+    for ((landscape, budget, _seed), policies) in &cells {
+        let candidate = policies
+            .get(&candidate_policy)
+            .expect("candidate presence was checked above");
+        for (baseline_policy, baseline) in policies {
+            if *baseline_policy == candidate_policy {
+                continue;
+            }
+            paired
+                .entry((*landscape, *baseline_policy, *budget))
+                .or_default()
+                .push((
+                    candidate.final_best_score - baseline.final_best_score,
+                    baseline.simple_regret - candidate.simple_regret,
+                ));
+        }
+    }
+
+    let mut comparisons = Vec::with_capacity(paired.len());
+    for ((landscape, baseline_policy, action_budget), deltas) in paired {
+        if deltas.is_empty() {
+            continue;
+        }
+        let count = deltas.len() as f64;
+        let mean_delta = deltas.iter().map(|(score, _)| *score).sum::<f64>() / count;
+        let variance = if deltas.len() < 2 {
+            0.0
+        } else {
+            deltas
+                .iter()
+                .map(|(score, _)| (score - mean_delta).powi(2))
+                .sum::<f64>()
+                / (deltas.len() - 1) as f64
+        };
+        let wins = deltas.iter().filter(|(score, _)| *score > 1e-12).count();
+        let ties = deltas.iter().filter(|(score, _)| score.abs() <= 1e-12).count();
+        comparisons.push(DirectionCampaignPairedComparison {
+            landscape,
+            candidate_policy,
+            baseline_policy,
+            action_budget,
+            pair_count: deltas.len(),
+            mean_final_score_delta: mean_delta,
+            final_score_delta_sample_sd: variance.sqrt(),
+            mean_simple_regret_reduction: deltas
+                .iter()
+                .map(|(_, regret_reduction)| *regret_reduction)
+                .sum::<f64>()
+                / count,
+            candidate_win_rate: wins as f64 / count,
+            tie_rate: ties as f64 / count,
+        });
+    }
+    Ok(comparisons)
 }
 
 fn evaluate_direction(
@@ -799,6 +929,31 @@ mod tests {
         assert_eq!(run.admitted_new_directions, 0);
         assert!(run.rejected_new_proposals > 0);
         assert!(run.final_best_score < TARGET_SCORE);
+    }
+
+    #[test]
+    fn paired_comparisons_require_identical_seed_sets() {
+        let seeds = [11, 22, 33];
+        let runs = run_direction_campaign_matrix(
+            &[DirectionLandscapeFamily::DelayedBreakthrough],
+            &POLICIES,
+            24,
+            &seeds,
+        )
+        .unwrap();
+        let comparisons = compare_paired_direction_campaign_runs(
+            &runs,
+            DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
+        )
+        .unwrap();
+        assert_eq!(comparisons.len(), POLICIES.len() - 1);
+        assert!(comparisons.iter().all(|comparison| comparison.pair_count == 3));
+
+        assert!(compare_paired_direction_campaign_runs(
+            &runs[..runs.len() - 1],
+            DirectionCampaignPolicy::VerifierGroundedDirectionBoard,
+        )
+        .is_err());
     }
 
     #[test]
