@@ -592,6 +592,143 @@ mod tests {
         );
     }
 
+    fn lineage(source_index: usize, channel: u8, midi_note: u8) -> crate::performed_event_map::PerformedEventLineage {
+        crate::performed_event_map::PerformedEventLineage {
+            source_event_id: format!("score_event_index:{source_index}"),
+            descendant_ordinal: 0,
+            midi_track_index: 0,
+            note_on_ordinal: source_index as u32,
+            midi_channel: channel,
+            midi_note,
+            onset_micros: (source_index as u64) * 1_000_000,
+            end_micros: (source_index as u64 + 1) * 1_000_000,
+            onset_frame: (source_index as u64) * 48_000,
+            end_frame: (source_index as u64 + 1) * 48_000,
+        }
+    }
+
+    #[test]
+    fn single_event_binding_maps_channels_and_preserves_measured_empty_support() {
+        let baseline_samples = vec![0.0_f32; 67 * 2];
+        let counterfactual_samples = baseline_samples.clone();
+        let baseline_audio = crate::audio_preservation::AudioView {
+            interleaved_samples: &baseline_samples,
+            sample_rate_hz: 48_000,
+            channels: 2,
+        };
+        let counterfactual_audio = crate::audio_preservation::AudioView {
+            interleaved_samples: &counterfactual_samples,
+            sample_rate_hz: 48_000,
+            channels: 2,
+        };
+        let source_score_sha = digest("source-score");
+        let baseline_map_bytes = b"baseline-event-map";
+        let counterfactual_map_bytes = b"counterfactual-event-map";
+        let baseline_schedule = b"baseline-schedule";
+        let counterfactual_schedule = b"counterfactual-schedule";
+        let expected_pitches = [60_u8, 64_u8];
+        let baseline_lineage = vec![
+            lineage(0, 0, 60),
+            lineage(1, 5, 64),
+            lineage(1, 9, 64),
+        ];
+        let counterfactual_lineage = vec![lineage(0, 0, 60)];
+        let baseline_binding = crate::counterfactual_influence::test_verified_renderer_audio_binding_with_effects_groups(
+            &baseline_audio,
+            digest("baseline-render").to_owned(),
+            digest("renderer").to_owned(),
+            digest("renderer-config").to_owned(),
+            source_score_sha.clone(),
+            digest("baseline-schedule").to_owned(),
+            digest("baseline-map-receipt").to_owned(),
+            digest("baseline-map-artifact").to_owned(),
+            digest("expected-pitches").to_owned(),
+            baseline_lineage,
+            4,
+        );
+        let counterfactual_binding = crate::counterfactual_influence::test_verified_renderer_audio_binding_with_effects_groups(
+            &counterfactual_audio,
+            digest("counterfactual-render").to_owned(),
+            digest("renderer").to_owned(),
+            digest("renderer-config").to_owned(),
+            source_score_sha.clone(),
+            digest("counterfactual-schedule").to_owned(),
+            digest("counterfactual-map-receipt").to_owned(),
+            digest("counterfactual-map-artifact").to_owned(),
+            digest("expected-pitches").to_owned(),
+            counterfactual_lineage,
+            4,
+        );
+        let input = CounterfactualInfluenceInput {
+            source_event_id: "score_event_index:1",
+            intervention: EventIntervention::Remove,
+            source_score_bytes: b"source-score",
+            performed_event_map_bytes: baseline_map_bytes,
+            counterfactual_performed_event_map_bytes: counterfactual_map_bytes,
+            expected_score_event_count: 2,
+            expected_primary_midi_by_score_index: &expected_pitches,
+            baseline_schedule_bytes: baseline_schedule,
+            counterfactual_schedule_bytes: counterfactual_schedule,
+            baseline_renderer_evidence: &baseline_binding,
+            counterfactual_renderer_evidence: &counterfactual_binding,
+            baseline_audio: &baseline_audio,
+            counterfactual_audio: &counterfactual_audio,
+        };
+        let report = CounterfactualInfluenceReport {
+            version: crate::counterfactual_influence::COUNTERFACTUAL_INFLUENCE_VERSION.to_owned(),
+            source_event_id: "score_event_index:1".to_owned(),
+            intervention: EventIntervention::Remove,
+            source_score_sha256: source_score_sha,
+            performed_event_map_sha256: digest("baseline-map-artifact"),
+            performed_event_map_receipt_sha256: digest("baseline-map-receipt"),
+            counterfactual_event_map_sha256: digest("counterfactual-map-artifact"),
+            counterfactual_event_map_receipt_sha256: digest("counterfactual-map-receipt"),
+            expected_primary_pitches_sha256: digest("expected-pitches"),
+            baseline_schedule_sha256: digest("baseline-schedule"),
+            counterfactual_schedule_sha256: digest("counterfactual-schedule"),
+            renderer_identity_sha256: digest("renderer"),
+            renderer_config_sha256: digest("renderer-config"),
+            baseline_audio_sha256: digest("baseline-audio"),
+            counterfactual_audio_sha256: digest("counterfactual-audio"),
+            baseline_renderer_receipt_sha256: digest("baseline-render"),
+            counterfactual_renderer_receipt_sha256: digest("counterfactual-render"),
+            repeatability_calibration_sha256: digest("repeatability"),
+            sample_rate_hz: 48_000,
+            channels: 2,
+            total_frames: 67,
+            analysis: crate::counterfactual_influence::InfluenceAnalysisConfig {
+                window_size_frames: 16,
+                hop_size_frames: 8,
+                minimum_rms_delta: 0.0,
+                minimum_spectral_distance: 0.0,
+                noise_floor_multiplier: 3.0,
+            },
+            total_channel_windows: 0,
+            affected_channel_windows: 0,
+            measured_influence_intervals: Vec::new(),
+            disposition: InfluenceDisposition::NoEffectAboveNoiseFloor,
+            receipt_sha256: digest("influence-report"),
+        };
+
+        let verified = build_event_support(&report, &input).unwrap();
+        let evidence = verified.evidence();
+        assert_eq!(evidence.source_event_index, 1);
+        assert_eq!(evidence.output_frame_count, 67);
+        assert!(evidence.support.acoustic_support.is_empty());
+        assert_eq!(
+            evidence.support.routing_domains,
+            vec![
+                "fluidsynth:effects-group:1".to_owned(),
+            ]
+        );
+        assert!(!evidence.support.routing_complete);
+        assert_eq!(
+            evidence.support.support_evidence_sha256.as_deref(),
+            Some(evidence.evidence_sha256.as_str())
+        );
+        assert_eq!(evidence.effects_group_assignment.effects_group_count, 4);
+    }
+
     #[test]
     fn effect_group_channel_mapping_matches_receipt_bound_assignment() {
         let assignment = build_effects_group_assignment(4).unwrap();
