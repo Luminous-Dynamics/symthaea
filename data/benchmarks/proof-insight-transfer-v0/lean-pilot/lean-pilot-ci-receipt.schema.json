@@ -147,7 +147,8 @@
         "base_structured_local_context_sha256",
         "variant_structured_local_context_sha256",
         "snapshot_schema_version",
-        "irrelevant_context_intervention"
+        "irrelevant_context_intervention",
+        "structured_snapshots"
       ],
       "properties": {
         "operation": {
@@ -266,6 +267,30 @@
             },
             "target_statement_fragment_sha256": {
               "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "structured_snapshots": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base",
+            "variant",
+            "irrelevant_base",
+            "irrelevant_variant"
+          ],
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/state_snapshot"
+            },
+            "variant": {
+              "$ref": "#/$defs/state_snapshot"
+            },
+            "irrelevant_base": {
+              "$ref": "#/$defs/state_snapshot"
+            },
+            "irrelevant_variant": {
+              "$ref": "#/$defs/state_snapshot"
             }
           }
         }
@@ -414,6 +439,59 @@
     "commit": {
       "type": "string",
       "pattern": "^[0-9a-f]{40}$"
+    },
+    "state_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "label",
+        "goal",
+        "declarations"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "pitb.lean-proof-state-snapshot.v0"
+        },
+        "label": {
+          "enum": [
+            "base",
+            "variant",
+            "irrelevant-base",
+            "irrelevant-variant"
+          ]
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declarations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "user_name",
+              "type"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "user_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
