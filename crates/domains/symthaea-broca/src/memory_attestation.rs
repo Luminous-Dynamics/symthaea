@@ -200,6 +200,30 @@ pub struct VerifiedRoleScopePolicy {
     readable_scopes: BTreeMap<String, BTreeSet<String>>,
 }
 
+
+/// Storage contract for a durable anti-rollback high-water mark.
+///
+/// Production implementations MUST make `compare_and_advance` an atomic,
+/// durable compare-and-swap shared by every worker that can accept policies.
+/// A process-local map or an eventually consistent write is not sufficient.
+/// The namespace is supplied by Broca so one store may isolate multiple trust
+/// domains without conflating their policy versions.
+pub trait RoleScopePolicyVersionStore {
+    fn highest_accepted_version(&self, namespace: &str) -> Result<Option<u64>, String>;
+
+    /// Atomically replace `expected_current` with `next_version` iff the
+    /// stored value still equals `expected_current` and next_version is newer.
+    /// Returns false on a concurrent update or a stale/non-increasing version.
+    fn compare_and_advance(
+        &mut self,
+        namespace: &str,
+        expected_current: Option<u64>,
+        next_version: u64,
+    ) -> Result<bool, String>;
+}
+
+pub const ROLE_SCOPE_POLICY_VERSION_NAMESPACE: &str = "broca.role-scope-policy.v1";
+
 impl VerifiedRoleScopePolicy {
     pub fn policy_version(&self) -> u64 {
         self.policy_version
@@ -823,6 +847,34 @@ impl EvidenceTrustStore {
     /// rollback-resistant state. Supplying zero is suitable only for first
     /// enrollment; a long-running worker must persist the last accepted
     /// version and pass it on every reload.
+    /// Verify a signed role policy and atomically advance its durable version
+    /// floor before returning the authorization token.
+    ///
+    /// The store implementation is responsible for a cross-process atomic CAS
+    /// and durable commit. If another worker advances the floor while this
+    /// envelope is being verified, this method fails closed and returns no
+    /// token. The caller should reload the latest policy and retry.
+    pub fn verify_role_scope_policy_and_advance<S: RoleScopePolicyVersionStore>(
+        &self,
+        envelope: &SignedRoleScopePolicy,
+        version_store: &mut S,
+    ) -> Result<VerifiedRoleScopePolicy, String> {
+        let current = version_store.highest_accepted_version(ROLE_SCOPE_POLICY_VERSION_NAMESPACE)?;
+        let verified = self.verify_role_scope_policy(envelope, current.unwrap_or(0))?;
+        let advanced = version_store.compare_and_advance(
+            ROLE_SCOPE_POLICY_VERSION_NAMESPACE,
+            current,
+            verified.policy_version(),
+        )?;
+        if !advanced {
+            return Err(
+                "role-scope policy version floor changed during verification; reload and retry"
+                    .into(),
+            );
+        }
+        Ok(verified)
+    }
+
     pub fn verify_role_scope_policy(
         &self,
         envelope: &SignedRoleScopePolicy,
@@ -1619,6 +1671,111 @@ mod tests {
         let mut empty = role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
         empty.readable_scopes.insert("empty-agent".into(), BTreeSet::new());
         assert!(SignedRoleScopePolicy::sign("policy-root", empty, &policy_key).unwrap_err().contains("at least one readable scope"));
+    }
+
+
+    #[derive(Default)]
+    struct TestPolicyVersionStore {
+        version: Option<u64>,
+        force_compare_failure: bool,
+    }
+
+    impl RoleScopePolicyVersionStore for TestPolicyVersionStore {
+        fn highest_accepted_version(&self, namespace: &str) -> Result<Option<u64>, String> {
+            if namespace != ROLE_SCOPE_POLICY_VERSION_NAMESPACE {
+                return Err("unexpected version namespace".into());
+            }
+            Ok(self.version)
+        }
+
+        fn compare_and_advance(
+            &mut self,
+            namespace: &str,
+            expected_current: Option<u64>,
+            next_version: u64,
+        ) -> Result<bool, String> {
+            if namespace != ROLE_SCOPE_POLICY_VERSION_NAMESPACE {
+                return Err("unexpected version namespace".into());
+            }
+            if self.force_compare_failure {
+                self.version = Some(next_version.saturating_add(1));
+                return Ok(false);
+            }
+            if self.version != expected_current || expected_current.is_some_and(|old| next_version <= old) {
+                return Ok(false);
+            }
+            self.version = Some(next_version);
+            Ok(true)
+        }
+    }
+
+    #[test]
+    fn atomic_version_store_advances_before_returning_policy_and_rejects_replay() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let mut version_store = TestPolicyVersionStore::default();
+        let v4 = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        let verified = store
+            .verify_role_scope_policy_and_advance(&v4, &mut version_store)
+            .unwrap();
+        assert_eq!(verified.policy_version(), 4);
+        assert_eq!(version_store.version, Some(4));
+        assert!(store
+            .verify_role_scope_policy_and_advance(&v4, &mut version_store)
+            .unwrap_err()
+            .contains("not newer"));
+
+        let v5 = sign_role_policy(
+            role_policy(5, "2026-01-03T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-04T00:00:00Z",
+            &ingestion_key,
+        );
+        store
+            .verify_role_scope_policy_and_advance(&v5, &mut version_store)
+            .unwrap();
+        assert_eq!(version_store.version, Some(5));
+    }
+
+    #[test]
+    fn concurrent_version_floor_advance_fails_closed_without_token() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let mut version_store = TestPolicyVersionStore {
+            version: Some(3),
+            force_compare_failure: true,
+        };
+        let v4 = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        assert!(store
+            .verify_role_scope_policy_and_advance(&v4, &mut version_store)
+            .unwrap_err()
+            .contains("changed during verification"));
+        assert_eq!(version_store.version, Some(5));
+    }
+
+    #[test]
+    fn invalid_policy_does_not_advance_version_floor() {
+        let (store, policy_key, _, ingestion_key) = store();
+        let mut version_store = TestPolicyVersionStore { version: Some(2), force_compare_failure: false };
+        let mut invalid = sign_role_policy(
+            role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        invalid.policy.readable_scopes.get_mut("security-agent").unwrap().clear();
+        assert!(store
+            .verify_role_scope_policy_and_advance(&invalid, &mut version_store)
+            .is_err());
+        assert_eq!(version_store.version, Some(2));
     }
 
 
