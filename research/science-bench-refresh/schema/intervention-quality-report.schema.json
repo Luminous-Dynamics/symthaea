@@ -26,6 +26,9 @@
     "rejected_valid_count",
     "rejected_invalid_count",
     "rejected_ambiguous_count",
+    "abstained_valid_count",
+    "abstained_invalid_count",
+    "abstained_ambiguous_count",
     "accepted_valid_precision_lower_bound_ppm",
     "accepted_confirmed_invalid_rate_ppm",
     "accepted_ambiguous_rate_ppm",
@@ -204,6 +207,15 @@
     },
     "reviewer_fleiss_kappa": {
       "$ref": "#/$defs/nullable_number"
+    },
+    "abstained_valid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "abstained_invalid_count": {
+      "$ref": "#/$defs/count"
+    },
+    "abstained_ambiguous_count": {
+      "$ref": "#/$defs/count"
     }
   },
   "$defs": {
@@ -242,6 +254,9 @@
         "rejected_valid_count",
         "rejected_invalid_count",
         "rejected_ambiguous_count",
+        "abstained_valid_count",
+        "abstained_invalid_count",
+        "abstained_ambiguous_count",
         "abstained_count",
         "unique_semantic_cluster_count",
         "unique_valid_accepted_test_unit_count",
@@ -299,6 +314,15 @@
         },
         "valid_unique_accepted_per_usd": {
           "$ref": "#/$defs/nullable_number"
+        },
+        "abstained_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_ambiguous_count": {
+          "$ref": "#/$defs/count"
         }
       }
     },
@@ -314,6 +338,9 @@
         "rejected_valid_count",
         "rejected_invalid_count",
         "rejected_ambiguous_count",
+        "abstained_valid_count",
+        "abstained_invalid_count",
+        "abstained_ambiguous_count",
         "abstained_count",
         "unique_valid_accepted_test_unit_count"
       ],
@@ -347,6 +374,15 @@
           "$ref": "#/$defs/count"
         },
         "unique_valid_accepted_test_unit_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_valid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_invalid_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstained_ambiguous_count": {
           "$ref": "#/$defs/count"
         }
       }
