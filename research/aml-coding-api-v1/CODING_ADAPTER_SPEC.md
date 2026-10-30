@@ -179,6 +179,38 @@ WAL mode also creates `-wal` and `-shm` sidecar files. Logical row deletion is n
 
 `memory_challenge_sled.rs` remains available as an experimental backend comparison. Sled 0.34 documents itself as beta; keep it for research comparison only. Prefer SQLite/WAL for the local single-node persistence baseline. Neither backend is yet the final public competition service, and neither removes the requirement to use `text-embedding-v4` for embeddings in Open-source Methods.
 
+## 5C. Proof-aware minimum sufficient context
+
+The companion module `memory_proof_budget.rs` provides a bounded exact solver for query-specific OR-of-AND evidence proof packets. It is an explicit alternative to treating BM25/vector top-k output as a complete memory context.
+
+The request includes:
+- principal, scope, `valid_at` and `known_at`;
+- policy ID/digest;
+- tokenizer ID/version/digest and packet-renderer digest;
+- exact token budget, fixed packet-header overhead and per-conclusion proof-envelope overhead;
+- source candidate revision/pointer/span excerpt/byte offsets, payload and span digests, source-family identity, transaction/valid-time bounds, revocation time, authorization result/receipt, retrieval rank, exact rendered evidence-block cost, and symmetric contradiction edges;
+- every required conclusion and its alternative conjunctive evidence justifications.
+
+The solver:
+- selects exactly one sufficient alternative per required conclusion (OR across alternatives; AND across dependencies);
+- charges shared evidence IDs once across conclusions;
+- counts distinct source families for independence thresholds;
+- rejects future-known, retracted, expired, out-of-scope, unauthorized, source-span-mismatched, and contradictory candidates;
+- binds fixed header, unique evidence-block, and selected proof-envelope costs to the pinned tokenizer/renderer request;
+- returns `BudgetInsufficient` only when a complete admissible proof exists but exceeds the complete rendered token budget;
+- returns `SearchLimitReached` rather than asserting optimality when the exact search node limit is hit;
+- carries the exact dependency edges and source excerpt/revision/pointer/span in the packet.
+
+Two verifiers are separate by design:
+1. `verify_proof_packet` validates sufficiency, source/temporal/scope/authorization constraints, contradiction exclusion, packet structure, exact cost, and digest without optimizing.
+2. `verify_proof_budget_result` additionally recomputes exhaustive search to check minimum-cost optimality.
+
+### Trust boundary
+
+The solver is not itself a signature verifier, authorization engine, tokenizer, source filesystem resolver, or contradiction detector. The `authorization_accepted` result and its receipt digest, contradiction edges, source revision resolution, and rendered evidence-block token cost must come from pinned trusted adapters. The source span text digest is recomputed locally, and byte offsets must match the supplied UTF-8 excerpt length, but the module cannot independently reopen the source payload. The packet digest is an integrity commitment, not a digital signature.
+
+The initial implementation is exact but exponential in the number of alternative proof combinations. It is appropriate for small bounded proof graphs and diagnostics. Large graphs need a later deterministic approximation or ILP/branch-and-bound implementation that returns an explicit optimality gap; it must never reuse the exact solver's Supported/optimality claim.
+
 ## 6. Conformance artifacts
 
 - [JSON Schema](./coding-api-schema.json)
