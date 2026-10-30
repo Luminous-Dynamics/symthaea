@@ -13,7 +13,6 @@
     "judge_source_revision",
     "judge_prompt_sha256",
     "rubric_sha256",
-    "blind_to_system_identity",
     "observations"
   ],
   "properties": {
@@ -46,9 +45,6 @@
     },
     "rubric_sha256": {
       "$ref": "#/$defs/digest"
-    },
-    "blind_to_system_identity": {
-      "type": "boolean"
     },
     "observations": {
       "type": "array",
