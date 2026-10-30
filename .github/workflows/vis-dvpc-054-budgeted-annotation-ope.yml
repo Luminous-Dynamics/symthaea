@@ -6,6 +6,7 @@ on:
     paths:
       - "tools/vision-dvpc-054-budgeted-annotation-ope.rs"
       - "docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md"
+      - "docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md"
       - ".github/workflows/vis-dvpc-054-budgeted-annotation-ope.yml"
   push:
     branches: ["main"]
@@ -49,6 +50,7 @@ jobs:
           awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || $8 != "true" && $8 != "false") bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-smoke-a.tsv)" = "8"
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
       - name: Run full deterministic multi-source allocation frontier
         run: |
           /tmp/vis-dvpc-054 > /tmp/vis-dvpc-054-full.tsv
@@ -56,6 +58,7 @@ jobs:
           awk -F '\t' '$1 == "NEGATIVE_CONTROL" { if (NF != 9 || $2 == "" || $3 != "annotation_as_factual_residual" || $4 < 1 || $5 < 1 || $6 != $6 || $7 < 0 || $8 < 0 || $9 != "IDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT") bad=1; n++ } END { if (n != 2 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || ($8 != "true" && $8 != "false")) bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-full.tsv)" = "8"
+          awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\\t' '$1 == "CORR_RESULT" { if (NF != 22 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 0 || $6 > $5 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 < 0 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 1 || $17 < 0 || $18 < 0 || $19 < 0 || $20 < 0 || $21 < 0 || $22 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           grep -F $'BENCHMARK_CONFIG\tVIS-DVPC-054' /tmp/vis-dvpc-054-full.tsv
       - name: Create exact-source and output SHA-256 receipt
@@ -67,7 +70,7 @@ jobs:
             printf 'VIS_DVPC_054_RECEIPT\tformat\tv1\n'
             printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
             printf 'rustc\t%s\n' "$(rustc --version)"
-            sha256sum tools/vision-dvpc-054-budgeted-annotation-ope.rs docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-full.tsv
+            sha256sum tools/vision-dvpc-054-budgeted-annotation-ope.rs docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md docs/research/VIS_DVPC_056_CORRELATED_ANNOTATION_OPE_V0.md /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-full.tsv
           } > /tmp/vis-dvpc-054-receipt.tsv
           cat /tmp/vis-dvpc-054-receipt.tsv
       - name: Publish results and receipt
