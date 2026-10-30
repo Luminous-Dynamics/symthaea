@@ -852,6 +852,407 @@ impl SparseBinaryCausalModel {
         Ok(repertoire)
     }
 
+    /// Compute the IIT 4.0 directional intrinsic specification using sparse CPTs.
+    ///
+    /// The cause reference is the uniform mean of the forward likelihood vector.
+    /// The effect reference is the average Eq. 3 repertoire over all candidate
+    /// mechanism states. State selection, tie tolerance, and runner-up semantics
+    /// match the dense reference implementation.
+    pub fn intrinsic_specification_iit4(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        direction: CausalDirection,
+        decimal_precision: u32,
+        max_factor_entries: usize,
+    ) -> Result<Iit4IntrinsicSpecificationResult, SystemPhiError> {
+        self.check_state(current_state)?;
+        if candidate_system.is_empty() {
+            return Err(SystemPhiError::Model(ModelError::EmptyCandidateSystem));
+        }
+        if decimal_precision > 15 {
+            return Err(SystemPhiError::InvalidNumericalPrecision {
+                precision: decimal_precision,
+            });
+        }
+        validate_sparse_candidate_system(self, candidate_system)?;
+        if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(SystemPhiError::CandidateSystemNotCanonical);
+        }
+
+        let state_count = 1usize
+            .checked_shl(candidate_system.len() as u32)
+            .ok_or_else(|| {
+                SystemPhiError::SparseCausal(SparseCausalError::ParentTableSizeOverflow {
+                    target: candidate_system[0],
+                    parents: candidate_system.len(),
+                })
+            })?;
+        if state_count > max_factor_entries {
+            return Err(SystemPhiError::SparseCausal(
+                SparseCausalError::FactorGraph(FactorGraphError::IntermediateTooLarge {
+                    entries: state_count,
+                    limit: max_factor_entries,
+                }),
+            ));
+        }
+
+        let (selectivity, forward, unconstrained_forward) = match direction {
+            CausalDirection::Cause => {
+                let forward = self
+                    .forward_cause_likelihood_iit4(
+                        candidate_system,
+                        current_state,
+                        max_factor_entries,
+                    )
+                    .map_err(SystemPhiError::SparseCausal)?
+                    .forward_likelihood;
+                let mass = forward.iter().sum::<f64>();
+                if !mass.is_finite() || mass <= 0.0 {
+                    return Err(SystemPhiError::SparseCausal(
+                        SparseCausalError::UndefinedBackgroundPosterior,
+                    ));
+                }
+                let selectivity = forward.iter().map(|value| value / mass).collect::<Vec<_>>();
+                let mean = mass / state_count as f64;
+                (selectivity, forward, vec![mean; state_count])
+            }
+            CausalDirection::Effect => {
+                let selectivity = self
+                    .effect_repertoire_iit4(
+                        candidate_system,
+                        candidate_system,
+                        current_state,
+                        candidate_system,
+                        max_factor_entries,
+                    )
+                    .map_err(SystemPhiError::SparseCausal)?;
+                let forward = selectivity.clone();
+                let mut unconstrained = vec![0.0; state_count];
+                for mechanism_state_index in 0..state_count {
+                    let mut mechanism_state = current_state.to_vec();
+                    for (slot, unit) in candidate_system.iter().copied().enumerate() {
+                        mechanism_state[unit] = ((mechanism_state_index >> slot) & 1) != 0;
+                    }
+                    let repertoire = self
+                        .effect_repertoire_iit4(
+                            candidate_system,
+                            candidate_system,
+                            &mechanism_state,
+                            candidate_system,
+                            max_factor_entries,
+                        )
+                        .map_err(SystemPhiError::SparseCausal)?;
+                    for (sum, probability) in unconstrained.iter_mut().zip(repertoire) {
+                        *sum += probability / state_count as f64;
+                    }
+                }
+                (selectivity, forward, unconstrained)
+            }
+        };
+
+        let mut information = Vec::with_capacity(state_count);
+        for state_index in 0..state_count {
+            let forward_probability = forward[state_index];
+            let unconstrained_probability = unconstrained_forward[state_index];
+            let pointwise = if forward_probability == 0.0 || unconstrained_probability == 0.0 {
+                0.0
+            } else {
+                let ratio = forward_probability / unconstrained_probability;
+                if !ratio.is_finite() {
+                    return Err(SystemPhiError::NonFiniteIntrinsicSpecification { state_index });
+                }
+                if ratio == 0.0 {
+                    0.0
+                } else {
+                    selectivity[state_index] * ratio.log2()
+                }
+            };
+            if !pointwise.is_finite() {
+                return Err(SystemPhiError::NonFiniteIntrinsicSpecification { state_index });
+            }
+            information.push(pointwise);
+        }
+
+        let mut winner_index = 0usize;
+        for index in 1..state_count {
+            if information[index] > information[winner_index] {
+                winner_index = index;
+            }
+        }
+        let maximum = information[winner_index];
+        let epsilon = 10.0_f64.powi(-(decimal_precision as i32));
+        let specified_states = information
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, value)| crate::pyphi_eq(*value, maximum, epsilon))
+            .map(|(index, _)| {
+                (0..candidate_system.len())
+                    .map(|slot| ((index >> slot) & 1) != 0)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut runner_up_index: Option<usize> = None;
+        for index in 0..state_count {
+            if index == winner_index {
+                continue;
+            }
+            if runner_up_index
+                .map(|best| information[index] > information[best])
+                .unwrap_or(true)
+            {
+                runner_up_index = Some(index);
+            }
+        }
+        let runner_up_state = runner_up_index.map(|index| {
+            (0..candidate_system.len())
+                .map(|slot| ((index >> slot) & 1) != 0)
+                .collect::<Vec<_>>()
+        });
+        let runner_up_intrinsic_specification =
+            runner_up_index.map(|index| information[index]);
+        let selection_margin = runner_up_intrinsic_specification
+            .map(|runner_up| (maximum - runner_up).max(0.0));
+
+        Ok(Iit4IntrinsicSpecificationResult {
+            direction,
+            specified_states,
+            intrinsic_specification: maximum,
+            runner_up_state,
+            runner_up_intrinsic_specification,
+            selection_margin,
+            unconstrained_forward_repertoire: unconstrained_forward,
+            decimal_precision,
+        })
+    }
+
+    /// Select cause and effect intrinsic state families independently.
+    pub fn system_intrinsic_specification_iit4(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        decimal_precision: u32,
+        max_factor_entries: usize,
+    ) -> Result<Iit4SystemIntrinsicSpecification, SystemPhiError> {
+        let cause = self.intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            CausalDirection::Cause,
+            decimal_precision,
+            max_factor_entries,
+        )?;
+        let effect = self.intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            CausalDirection::Effect,
+            decimal_precision,
+            max_factor_entries,
+        )?;
+        Ok(Iit4SystemIntrinsicSpecification { cause, effect })
+    }
+
+    /// Bounded exhaustive sparse IIT 4.0 (2023) Integration-level system search.
+    ///
+    /// The search uses the same intrinsic-state tie families, directed partition
+    /// quotient, MIP ranking, and composition-tie ceiling as the dense reference.
+    /// The explicit factor-entry limit bounds local/intermediate factors and
+    /// candidate-state vectors; system config independently bounds partition
+    /// enumeration, state-pair count, and total state-pair x partition scores.
+    pub fn analyze_iit4_2023_system_phi_s(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        config: Iit4SystemPhiSearchConfig,
+        max_factor_entries: usize,
+    ) -> Result<Iit4SystemPhiAnalysis, SystemPhiError> {
+        self.check_state(current_state)?;
+        if candidate_system.is_empty() {
+            return Err(SystemPhiError::Model(ModelError::EmptyCandidateSystem));
+        }
+        validate_sparse_candidate_system(self, candidate_system)?;
+        if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(SystemPhiError::CandidateSystemNotCanonical);
+        }
+        if config.decimal_precision > 15 {
+            return Err(SystemPhiError::InvalidNumericalPrecision {
+                precision: config.decimal_precision,
+            });
+        }
+
+        let request_sha256 = self.system_search_request_sha256(
+            candidate_system,
+            current_state,
+            config,
+            max_factor_entries,
+        );
+        let empty_summary = Iit4SystemPhiPartitionSummary::default();
+        let null_result = |status, phi_s| Iit4SystemPhiAnalysis {
+            formalism: FormalismProfile::Iit4_0_2023,
+            candidate_system: candidate_system.to_vec(),
+            request_sha256: request_sha256.clone(),
+            search_config: config,
+            status,
+            phi_s,
+            selected_state_pair_index: None,
+            tied_state_pair_indices: Vec::new(),
+            state_pair_results: Vec::new(),
+            partition_summary: empty_summary,
+            partition_score_evaluations: 0,
+            complete: true,
+        };
+
+        if !self.candidate_is_strongly_connected(candidate_system) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullDisconnected, Some(0.0)));
+        }
+
+        let intrinsic = self.system_intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            config.decimal_precision,
+            max_factor_entries,
+        )?;
+        let epsilon = 10.0_f64.powi(-(config.decimal_precision as i32));
+        if !crate::pyphi_is_positive(intrinsic.cause.intrinsic_specification, epsilon) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullNoCause, Some(0.0)));
+        }
+        if !crate::pyphi_is_positive(intrinsic.effect.intrinsic_specification, epsilon) {
+            return Ok(null_result(Iit4SystemPhiStatus::NullNoEffect, Some(0.0)));
+        }
+
+        let state_pair_count = intrinsic
+            .cause
+            .specified_states
+            .len()
+            .checked_mul(intrinsic.effect.specified_states.len())
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        if state_pair_count > config.max_state_pair_evaluations {
+            return Err(SystemPhiError::StatePairBudgetExceeded {
+                candidate_pairs: state_pair_count,
+                max_state_pairs: config.max_state_pair_evaluations,
+            });
+        }
+
+        let mut enumeration = enumerate_iit4_system_partitions_with_stats(
+            candidate_system,
+            self.n_units,
+            config.include_total_cut,
+            config.max_partition_combinations,
+        )?;
+        let partition_summary = Iit4SystemPhiPartitionSummary {
+            raw_direction_labelings_equivalent: enumeration.raw_direction_assignments_equivalent,
+            canonical_direction_assignments_evaluated: enumeration.canonical_direction_assignments_evaluated,
+            redundant_direction_assignments_pruned: enumeration.redundant_direction_assignments_pruned,
+            unique_non_total_cuts: enumeration.unique_non_total_cuts,
+            total_cut_included: enumeration.total_cut_included,
+        };
+        let partitions = std::mem::take(&mut enumeration.partitions);
+        let partition_score_evaluations = partitions
+            .len()
+            .checked_mul(state_pair_count)
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        if partition_score_evaluations > config.max_partition_score_evaluations {
+            return Err(SystemPhiError::PartitionScoreBudgetExceeded {
+                candidate_evaluations: partition_score_evaluations,
+                max_evaluations: config.max_partition_score_evaluations,
+            });
+        }
+
+        let state_pairs = intrinsic.state_pairs();
+        let mut state_pair_results = Vec::with_capacity(state_pair_count);
+        for system_state in state_pairs {
+            let mut scores = Vec::with_capacity(partitions.len());
+            for partition in &partitions {
+                let report = self.score_iit4_system_partition(
+                    partition,
+                    current_state,
+                    &system_state,
+                    max_factor_entries,
+                )?;
+                let score = report.score;
+                report.receipt_sha256()?;
+                if !score.signed_phi.is_finite()
+                    || !score.phi.is_finite()
+                    || !score.normalized_phi.is_finite()
+                {
+                    return Err(SystemPhiError::NonFinitePartitionScore);
+                }
+                scores.push(score);
+            }
+            if scores.is_empty() {
+                return Err(SystemPhiError::ZeroSeveredConnections);
+            }
+            let winner_index = crate::select_pyphi_sia_partition(&partitions, &scores, epsilon);
+            let winner_score = scores[winner_index].clone();
+            let competing_normalized = scores
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != winner_index)
+                .map(|(_, score)| score.normalized_phi)
+                .min_by(f64::total_cmp);
+            let partition_margin = competing_normalized
+                .map(|runner_up| (runner_up - winner_score.normalized_phi).max(0.0));
+            state_pair_results.push(Iit4SystemPhiStatePairResult {
+                system_state,
+                winning_partition: partitions[winner_index].clone(),
+                score: winner_score,
+                partition_margin,
+            });
+        }
+
+        let maximum_phi = state_pair_results
+            .iter()
+            .map(|result| result.score.phi)
+            .max_by(f64::total_cmp)
+            .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        let tied_state_pair_indices = state_pair_results
+            .iter()
+            .enumerate()
+            .filter(|(_, result)| crate::pyphi_eq(result.score.phi, maximum_phi, epsilon))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        let (status, phi_s, selected_state_pair_index) =
+            if tied_state_pair_indices.len() == 1 {
+                (
+                    Iit4SystemPhiStatus::ExactUniqueStatePair,
+                    Some(maximum_phi),
+                    Some(tied_state_pair_indices[0]),
+                )
+            } else if tied_state_pair_indices
+                .iter()
+                .all(|index| state_pair_results[*index].score.phi == 0.0)
+            {
+                (
+                    Iit4SystemPhiStatus::UnresolvedCanonicalTie,
+                    Some(0.0),
+                    None,
+                )
+            } else {
+                (
+                    Iit4SystemPhiStatus::UnresolvedCompositionTie,
+                    None,
+                    None,
+                )
+            };
+
+        Ok(Iit4SystemPhiAnalysis {
+            formalism: FormalismProfile::Iit4_0_2023,
+            candidate_system: candidate_system.to_vec(),
+            request_sha256,
+            search_config: config,
+            status,
+            phi_s,
+            selected_state_pair_index,
+            tied_state_pair_indices,
+            state_pair_results,
+            partition_summary,
+            partition_score_evaluations,
+            complete: true,
+        })
+    }
+
     /// Exact sparse Eq. 4 cause-likelihood contraction.
     ///
     /// A posterior over all past variables is conditioned on the observed
@@ -1093,6 +1494,64 @@ impl SparseBinaryCausalModel {
         sparse_hex_digest(&bytes)
     }
 
+    fn candidate_is_strongly_connected(&self, candidate_system: &[usize]) -> bool {
+        if candidate_system.is_empty() {
+            return false;
+        }
+        let reaches_all = |reverse: bool| {
+            let mut visited = vec![false; candidate_system.len()];
+            let mut stack = vec![0usize];
+            visited[0] = true;
+            while let Some(source_local) = stack.pop() {
+                let source = candidate_system[source_local];
+                for (target_local, target) in candidate_system.iter().copied().enumerate() {
+                    if visited[target_local] {
+                        continue;
+                    }
+                    let edge = if reverse {
+                        self.mechanisms[source].parent_units.contains(&target)
+                    } else {
+                        self.mechanisms[target].parent_units.contains(&source)
+                    };
+                    if edge {
+                        visited[target_local] = true;
+                        stack.push(target_local);
+                    }
+                }
+            }
+            visited.into_iter().all(|seen| seen)
+        };
+        reaches_all(false) && reaches_all(true)
+    }
+
+    fn system_search_request_sha256(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        config: Iit4SystemPhiSearchConfig,
+        max_factor_entries: usize,
+    ) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC);
+        sparse_receipt_string(&mut bytes, SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID);
+        sparse_receipt_string(&mut bytes, FormalismProfile::Iit4_0_2023.id());
+        sparse_receipt_string(&mut bytes, crate::AnalysisQuantity::Iit4SystemPhiS.id());
+        sparse_receipt_string(&mut bytes, &self.model_sha256());
+        sparse_receipt_u64(&mut bytes, candidate_system.len() as u64);
+        for unit in candidate_system {
+            sparse_receipt_u64(&mut bytes, *unit as u64);
+        }
+        sparse_receipt_u64(&mut bytes, current_state.len() as u64);
+        bytes.extend(current_state.iter().map(|on| u8::from(*on)));
+        sparse_receipt_u64(&mut bytes, config.decimal_precision as u64);
+        sparse_receipt_u64(&mut bytes, config.max_partition_combinations as u64);
+        sparse_receipt_u64(&mut bytes, config.max_state_pair_evaluations as u64);
+        sparse_receipt_u64(&mut bytes, config.max_partition_score_evaluations as u64);
+        bytes.push(u8::from(config.include_total_cut));
+        sparse_receipt_u64(&mut bytes, max_factor_entries as u64);
+        sparse_hex_digest(&bytes)
+    }
+
     fn observation_log_factor(
         &self,
         target_unit: usize,
@@ -1158,6 +1617,27 @@ impl SparseBinaryCausalModel {
         }
         bytes
     }
+}
+
+fn validate_sparse_candidate_system(
+    model: &SparseBinaryCausalModel,
+    candidate_system: &[usize],
+) -> Result<(), SparseCausalError> {
+    if candidate_system.is_empty() {
+        return Err(SparseCausalError::EmptyCandidateSystem);
+    }
+    for (position, unit) in candidate_system.iter().copied().enumerate() {
+        if unit >= model.n_units {
+            return Err(SparseCausalError::CandidateUnitOutOfRange {
+                unit,
+                unit_count: model.n_units,
+            });
+        }
+        if position > 0 && candidate_system[position - 1] == unit {
+            return Err(SparseCausalError::DuplicateCandidateUnit { unit });
+        }
+    }
+    Ok(())
 }
 
 fn sparse_direction_score(
