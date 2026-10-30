@@ -28,6 +28,9 @@ struct Args {
     /// Exact sampling protocol artifact committed before outcome collection.
     #[arg(long)]
     sampling_protocol: PathBuf,
+    /// Exact PASS report emitted by connectome-spatial-frame-audit.
+    #[arg(long)]
+    spatial_frame_report: PathBuf,
     /// Independent exhaustive-search outcomes from the probability sample.
     #[arg(long)]
     audit: PathBuf,
@@ -53,6 +56,15 @@ struct RankingInput {
     input_sha256: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct SpatialFrameReport {
+    schema_version: u32,
+    canonical_frame_sha256: String,
+    population_frame_sha256: String,
+    population_frame: Vec<PopulationPsu>,
+    status: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct AuditInput {
@@ -60,6 +72,9 @@ struct AuditInput {
     source_input_sha256: String,
     source_ranking_report_sha256: String,
     sampling_protocol_sha256: String,
+    source_spatial_frame_report_sha256: String,
+    source_spatial_frame_sha256: String,
+    source_population_frame_sha256: String,
     sample_seed: String,
     sample_seed_commitment_sha256: String,
     error_families: Vec<String>,
@@ -159,6 +174,8 @@ struct AuditReport {
     proposal_input_sha256: String,
     ranking_report_sha256: String,
     sampling_protocol_sha256: String,
+    spatial_frame_report_sha256: String,
+    spatial_frame_sha256: String,
     sampling_frame_sha256: String,
     audit_input_sha256: String,
     sampled_outcomes_sha256: String,
