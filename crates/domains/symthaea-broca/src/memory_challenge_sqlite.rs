@@ -1560,6 +1560,72 @@ mod tests {
     }
 
     #[test]
+    fn schema_v2_lifecycle_store_migrates_event_digest_column() {
+        let root = tempdir().unwrap();
+        let path = root.path().join("v2.sqlite3");
+        {
+            let connection = Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE aml_add_batches (
+                    request_id TEXT PRIMARY KEY NOT NULL COLLATE BINARY,
+                    payload_sha256 TEXT NOT NULL,
+                    stored_at_unix_ms INTEGER NOT NULL CHECK (stored_at_unix_ms >= 0),
+                    body_json BLOB NOT NULL
+                );
+                CREATE TABLE aml_evidence_lifecycle_events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT UNIQUE NOT NULL COLLATE BINARY,
+                    recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms >= 0),
+                    body_json BLOB NOT NULL
+                );
+                PRAGMA user_version = 2;"
+            ).unwrap();
+        }
+        let backend = SqliteAmlMemoryBackend::open(&path, root.path()).unwrap();
+        let version: i64 = backend.connection
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        let digest_column: i64 = backend.connection.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('aml_evidence_lifecycle_events')
+             WHERE name = 'event_sha256'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(version, SQLITE_SCHEMA_VERSION);
+        assert_eq!(digest_column, 1);
+    }
+
+    #[test]
+    fn lifecycle_event_payload_tampering_is_rejected_before_replay() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        execute_aml_add(
+            &mut backend,
+            add_request("request-1", "user-1", "session-1", &["legacy revocation test evidence"]),
+        ).unwrap();
+        let evidence_id = backend.lookup_existing("request-1").unwrap().unwrap()
+            .records[0].evidence_id.clone();
+        backend.revoke_evidence("event-tamper", &evidence_id).unwrap();
+
+        let mut event: PersistedEvidenceLifecycleEvent = {
+            let bytes: Vec<u8> = backend.connection.query_row(
+                "SELECT body_json FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+                params!["event-tamper"],
+                |row| row.get(0),
+            ).unwrap();
+            serde_json::from_slice(&bytes).unwrap()
+        };
+        event.operation = EvidenceLifecycleOperation::Delete { evidence_id };
+        let tampered_body = serde_json::to_vec(&event).unwrap();
+        backend.connection.execute(
+            "UPDATE aml_evidence_lifecycle_events SET body_json = ?1 WHERE event_id = ?2",
+            params![tampered_body, "event-tamper"],
+        ).unwrap();
+
+        assert!(backend.rebuild_index().unwrap_err().contains("content digest mismatch"));
+    }
+
+    #[test]
     fn malformed_persisted_batch_fails_rebuild_closed() {
         let root = tempdir().unwrap();
         let path = root.path().join("broken.sqlite3");
