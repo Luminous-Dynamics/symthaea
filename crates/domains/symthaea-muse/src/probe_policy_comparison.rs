@@ -1047,6 +1047,54 @@ mod tests {
     }
 
     #[test]
+    fn comparison_keeps_contextual_pairs_separate_from_global_harsanyi_order() {
+        let events = vec![
+            SyntheticEventSignal { source_event_index: 0, samples: vec![0.2; 64] },
+            SyntheticEventSignal { source_event_index: 1, samples: vec![0.3; 64] },
+            SyntheticEventSignal { source_event_index: 2, samples: vec![0.4; 64] },
+        ];
+        let effect = SyntheticEffect::ThreeWayProduct {
+            event_indices: [0, 1, 2],
+            coefficient: 0.5,
+        };
+        let config = FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
+            spectral_window_frames: 64,
+        };
+        let factorial = crate::factorial_ground_truth::build_factorial_ground_truth(
+            &events,
+            &effect,
+            &config,
+        ).unwrap();
+        let supports = vec![
+            support(0, 0, 64),
+            support(1, 0, 64),
+            support(2, 0, 64),
+        ];
+        let report = compare_probe_policies(
+            &factorial,
+            &events,
+            &effect,
+            &config,
+            &digest("score"),
+            &digest("renderer"),
+            64,
+            &supports,
+            &planner_config(),
+            &[1, 3],
+            &[31],
+            &InteractionProbeBenchmarkConfig::default(),
+        ).unwrap();
+
+        assert_eq!(report.contextual_positive_pair_count, 3);
+        assert_eq!(report.global_order_two_harsanyi_count, 0);
+        assert_eq!(report.higher_order_harsanyi_count, 1);
+        let oracle = find_row(&report, ProbeSelectionPolicy::OracleTopK, 31, 3);
+        assert_eq!(oracle.selected_pair_count, 3);
+        assert_eq!(oracle.recall, Some(1.0));
+    }
+
+    #[test]
     fn report_tampering_is_rejected() {
         let (factorial, events, effect, config, supports) = fixture();
         let planner = planner_config();
