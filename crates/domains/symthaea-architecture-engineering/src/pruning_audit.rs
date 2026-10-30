@@ -800,6 +800,21 @@ mod tests {
     }
 
     #[test]
+    fn zero_miss_schedule_bound_handles_no_sample_and_census() {
+        assert_eq!(
+            zero_miss_upper_bound_false_pruned_count(12, 0, 0.95).unwrap(),
+            12
+        );
+        assert_eq!(
+            zero_miss_upper_bound_false_pruned_count(12, 12, 0.95).unwrap(),
+            0
+        );
+        assert!(zero_miss_upper_bound_false_pruned_count(0, 0, 0.95).is_err());
+        assert!(zero_miss_upper_bound_false_pruned_count(12, 13, 0.95).is_err());
+        assert!(zero_miss_upper_bound_false_pruned_count(12, 2, 1.0).is_err());
+    }
+
+    #[test]
     fn finite_population_bound_is_exact_for_a_census() {
         assert_eq!(finite_population_upper_bound(8, 8, 2, 0.95).unwrap(), 2);
         assert_eq!(finite_population_upper_bound(8, 8, 0, 0.95).unwrap(), 0);
