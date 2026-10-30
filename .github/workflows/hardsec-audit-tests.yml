@@ -71,6 +71,9 @@ jobs:
           test -f tests/fixtures/hardsec/seqcube-challenge-profile.json
           test -f schemas/hardsec-challenge-profile-v1.schema.json
           test -f schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json
+          grep -F 'reference_netlist_sha256' examples/hardsec_challenge_profile_audit.rs
+          grep -F 'assumption_scoped' examples/hardsec_challenge_profile_audit.rs
+          grep -F 'reference_local_path' schemas/hardsec-challenge-profile-v1.schema.json
 
       - name: Test random-trigger sampling budget
         run: |
