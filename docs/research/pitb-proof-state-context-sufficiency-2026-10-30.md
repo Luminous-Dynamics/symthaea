@@ -71,8 +71,10 @@ The pilot now also inspects the assigned proof expression after two checked solu
 - **The proof term:** the elaborator's pretty-printed representation, retained in the receipt alongside the support rows and global references.
 
 The two intervention cases now have explicit, case-manifest-bound expectations:
-- After required hypothesis h is cleared, the alternate-route proof must reference hEq and must not reference h.
-- After irrelevant declaration hIrrelevant is cleared, the original proof must reference h and must not reference hIrrelevant.
+- After required hypothesis h is cleared, the alternate-route proof must reference hEq and must not reference h; its direct constant references must include Nat.le_refl.
+- After irrelevant declaration hIrrelevant is cleared, the original proof must reference h and must not reference hIrrelevant; its direct constant references must include Nat.succ_le_succ.
+
+Direct global-constant collection walks the elaborated proof expression. Its list can also contain logical constructors, coercions, and type-level/infrastructure constants; a name's presence is not by itself a semantic classification as a transferable mathematical lemma.
 
 The CI workflow requires exactly these two proof-support receipts, validates their labels and case joins, checks unique FVar IDs, required/forbidden direct declarations and closure inclusion, and hashes the canonical receipt content. The strict receipt schema retains the direct and transitive support rows.
 
