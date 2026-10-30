@@ -1,0 +1,58 @@
+name: HARDSEC Design Lineage Audit
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "examples/hardsec_design_lineage_audit.rs"
+      - "tools/hardsec-design-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-design-lineage-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-design-lineage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test:
+    name: Focused design-lineage audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check audit formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_design_lineage_audit.rs
+
+      - name: Resolve isolated harness dependencies
+        run: cargo generate-lockfile --manifest-path tools/hardsec-design-audit-harness/Cargo.toml
+
+      - name: Test design-lineage and source-holdout audit
+        run: cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_design_lineage_audit
+
+      - name: Record resolved dependency lock
+        if: always()
+        run: sha256sum tools/hardsec-design-audit-harness/Cargo.lock || true
+
+      - name: Upload exact harness lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-design-audit-harness-lock
+          path: tools/hardsec-design-audit-harness/Cargo.lock
+          if-no-files-found: ignore
