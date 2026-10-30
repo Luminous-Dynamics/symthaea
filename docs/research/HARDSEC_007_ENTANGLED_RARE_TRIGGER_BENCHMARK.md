@@ -112,6 +112,14 @@ Do not assume an architecture wins. Compare against the original component branc
 
 A recent sequential-benchmark lead is **SeqCube-HT: state-cube-guided generation of sequential hardware Trojan benchmarks**, published 9 October 2026 (DOI: https://doi.org/10.1186/s42400-026-00676-2). Its stated problem definition requires trigger execution from a declared reset state and payload effects to reach an observation boundary. This is the right abstraction for sequential-trigger tests: test both state reachability and effect observability, not merely whether an internal trigger predicate toggled. Treat it as a benchmark-generation methodology candidate until the exact artifacts, scripts, license and ground-truth files are independently located and pinned; the paper's publication alone is not a verified local dataset.
 
+For this programme, the evaluation oracle must separately report:
+- **trigger activation:** the trigger condition is reached from a declared reset/initial-state model;
+- **payload effect:** the intended effect reaches a declared architectural or externally observable boundary;
+- **design verdict:** the complete design is classified as suspicious/clean/unknown;
+- **localization:** affected gates/nets/cones are identified.
+
+A trigger witness is not automatically a payload-effect witness. A payload-effect trace is not a proof that every trigger condition is covered. SeqCube-HT is therefore a useful sequential benchmark lead, but its exact dataset artifacts and license must be pinned before reproduction claims.
+
 The new Rust utility examples/hardsec_trigger_budget.rs calculates the miss probability for a user-supplied hypothetical p and N, and the number of IID trials required to reach a target miss probability. It is a budgeting tool only.
 
 Build the activation experiment around distinct evidence classes:
@@ -207,6 +215,22 @@ Formal evidence has an additional typed result: `assertion_proved`, `bounded_no_
 - generic `trojan_absent` and `design_is_secure` claims are rejected.
 
 The tool emits a deterministic, unsigned receipt outside the packet directory. It validates packet shape, claim ceilings and internal hash binding; it does **not** download or hash the referenced evidence bytes, verify tool execution, authenticate signatures, validate assumptions, or prove the evidence truthful. Its receipt says so explicitly. It is an independent consistency check, not a hardware security verdict.
+
+Formal records require both a `property_id` and a typed `formal_result`:
+- `assertion_proved` or `bounded_no_counterexample` for formal assertions;
+- `cover_reached` for a cover witness;
+- `equivalence_proved` for equivalence reports;
+- `counterexample_found`, `timeout` or `unknown` for failed/indeterminate outcomes.
+
+The validator checks that these outcomes agree with the record's `pass`/`fail`/`unknown` status. A generic "pass" flag is insufficient to claim unreachability. It also separates `trigger_activated` from `payload_effect_observed`; the latter requires its own payload-effect trace, observation count and witness digest. The corresponding `*_not_observed_under_budget` claims are explicitly finite-budget observations, never unreachability statements.
+
+Example claim types supported by this version:
+`model_suspects_trojan`, `localization_provided`, `trigger_activated`,
+`trigger_not_observed_under_budget`, `payload_effect_observed`,
+`payload_effect_not_observed_under_budget`, `bounded_reachability_not_found`,
+`trigger_unreachable_under_assumptions`, `functional_equivalence`,
+`source_integrity_checked`, and `reviewer_confirmed`. Generic
+`trojan_absent` / `design_is_secure` claims are not supported.
 
 ### Explanation-quality evaluation
 
