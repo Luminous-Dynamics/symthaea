@@ -1,11 +1,12 @@
 # Symthaea Architecture Engineering Program v0.1
 
-**Status:** research protocol frozen for review; architecture search NOT IMPLEMENTED, experiments NOT EXECUTED, candidates NOT QUALIFIED, NOT PASS. The matrix validator, paired-cohort evaluator, and known-optimum synthetic benchmark are authored; Rust compilation/tests remain unexecuted in this environment.  
+**Status:** research protocol frozen for review; full architecture search NOT IMPLEMENTED, real model experiments NOT EXECUTED, candidates NOT QUALIFIED, NOT PASS. Matrix validation, paired-cohort evaluation, synthetic architecture search, multi-fidelity promotion, and canonical analytical benchmark source are authored; Rust compilation/tests remain unexecuted in this environment.  
 **Tracking issue:** [#8888](https://github.com/Luminous-Dynamics/symthaea/issues/8888)  
 **Prerequisite audit:** [#8308 — Liquid Broca learning signal and benchmark validity](https://github.com/Luminous-Dynamics/symthaea/issues/8308)  
 **Related experiment:** [#8362 — context-local adaptation vs extra thought tokens](https://github.com/Luminous-Dynamics/symthaea/issues/8362)
 **Next-stage qualification protocol:** [Held-out architecture-search landscape suite v0.1](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md) ([#8959](https://github.com/Luminous-Dynamics/symthaea/issues/8959); design only).
 **Multi-fidelity follow-up:** [Cost-aware promotion and evaluation contract v0.1](./MULTI_FIDELITY_ARCHITECTURE_SEARCH_V0_1.md) ([#8994](https://github.com/Luminous-Dynamics/symthaea/issues/8994)); scheduling code authored, not compiled or qualified.
+**Canonical analytical benchmark layer:** `crates/domains/symthaea-architecture-engineering/src/analytical_benchmark.rs`, exposed via `analytical-sweep`; four standard objectives and custom synthetic fidelity transforms, code authored but uncompiled/unqualified.
 
 ## 1. Research question
 
@@ -276,7 +277,7 @@ The two fixed surfaces in this v0.1 harness are implementation controls, not evi
 ## 10. Non-goals and claim ceiling
 
 This design does not:
-- implement a Transformer, state-space model, architecture scheduler, trainer, or benchmark runner;
+- implement a production Transformer/state-space trainer or a full NAS algorithm; the current scheduler and benchmark runners are bounded research primitives, not production architecture search;
 - claim any proposed candidate is already available or faster;
 - reproduce the ICLR 2026 results;
 - establish a SOTA win or independent replication;
