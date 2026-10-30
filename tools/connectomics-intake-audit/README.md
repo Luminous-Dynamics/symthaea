@@ -302,7 +302,7 @@ The exact optimum is bounded to the submitted candidate pool, budget, graph, que
 
 ## Hidden co-linear merge boundary baseline
 
-The experimental `connectome-colinear-merge-audit` binary is a synthetic ordered-centreline change-point baseline. It compares radius-only and multifeature piecewise-linear scores, emits review-only boundary hypotheses, and optionally evaluates them against a separate truth file bound to the exact input SHA-256:
+The experimental `connectome-colinear-merge-audit` binary is a synthetic ordered-centreline change-point baseline. It compares a no-proposal control, radius-only and multifeature piecewise-linear scores, emits review-only boundary hypotheses, and optionally evaluates them against a separate truth file bound to the exact input SHA-256:
 
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-colinear-merge-audit -- \
