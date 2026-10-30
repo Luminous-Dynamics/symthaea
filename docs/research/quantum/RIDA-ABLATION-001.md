@@ -76,6 +76,7 @@ A second frozen case changes only the preregistered target distribution to [0.1,
 - Target-regime probabilities and candidate sampling probabilities must be valid distributions.
 - Validation-error vectors must match regime dimensions and lie in [0,1].
 - Every candidate must have exactly one profile; missing, unknown or duplicate profile IDs fail closed.
+- Every candidate binds an upstream eligibility evidence digest. Ineligible candidates carry no numerical sampling/validation vectors, are listed separately, and do not affect EVSI normalization or policy rankings.
 - Validation and evaluator-only artifact digests must be different.
 - Evaluator-only truth does not enter the ranking API.
 - Scenario and profile order must not change policy rankings.
@@ -101,4 +102,4 @@ A SOTA claim requires matching workload, strongest applicable classical and quan
 
 ## Current implementation boundary
 
-The Rust module is registered in the quantum-computation crate and exposes all component metrics plus seven policy rankings (three individual, three pairwise, one full). Nine unit tests are authored. The frozen JSON fixture contains a default-regime and target-shift synthetic known-answer reference. Rust compilation/tests have not been run in this environment; no passing CI or physical validation is claimed.
+The Rust module is registered in the quantum-computation crate and exposes all component metrics plus seven policy rankings (three individual, three pairwise, one full). It explicitly excludes NotCalibrated, StaleCalibration, OutOfDomain and InsufficientEvidence candidates before ranking; ineligible profiles must not carry numerical score inputs. Twelve unit tests are authored. The frozen JSON fixture contains a default-regime case, a target-shift case, and a stale-calibration exclusion negative control. Rust compilation/tests have not been run in this environment; no passing CI or physical validation is claimed.
