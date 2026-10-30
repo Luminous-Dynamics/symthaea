@@ -1284,7 +1284,7 @@ mod tests {
             "profile_id": "linux-hermetic-candidate-v1",
             "profile_status": "candidate_not_qualified",
             "execution_status": "not_executed",
-            "scoped_claim": "two-case paired oracle/adjudicator test",
+            "scoped_claim": "four-case paired, unresolved, and integrity-fault oracle/adjudicator test",
             "oracle_policy": {
                 "ground_truth_source": "challenge_harness_injected_resources_and_independently_checked_mutation_pairs",
                 "observer_under_test_must_not_author_the_oracle": true,
@@ -1324,6 +1324,30 @@ mod tests {
                     "paired_case_ids": ["hidden-input-read"],
                     "description": "The task does not consume the same changed resource.",
                     "safety_property": "Unchanged result evidence must be retained."
+                },
+                {
+                    "case_id": "unresolved-env-channel",
+                    "family": "environment",
+                    "channel": "environment",
+                    "mutation_kind": "nondeterministic_source",
+                    "ground_truth_resource_id": null,
+                    "expected_disposition": "report_unresolved",
+                    "required_receipt_facts": ["unresolved_channel", "virtualization_status"],
+                    "paired_case_ids": [],
+                    "description": "The candidate profile cannot observe a required environment source.",
+                    "safety_property": "Unsupported observation must be disclosed and cannot be reused as confirmatory."
+                },
+                {
+                    "case_id": "event-loss",
+                    "family": "observer_integrity",
+                    "channel": "observer_integrity",
+                    "mutation_kind": "event_overflow",
+                    "ground_truth_resource_id": null,
+                    "expected_disposition": "invalidate_receipt",
+                    "required_receipt_facts": ["drop_counter", "overflow_status", "receipt_integrity"],
+                    "paired_case_ids": [],
+                    "description": "The observer event queue overflows during the capture interval.",
+                    "safety_property": "Event loss invalidates the receipt and prohibits reuse."
                 }
             ]
         });
@@ -1364,6 +1388,30 @@ mod tests {
                         "after_digest": after
                     },
                     "witness_kind": "controlled_non_read",
+                    "independent_replay": "confirmed"
+                },
+                {
+                    "case_id": "unresolved-env-channel",
+                    "ground_truth": "unsupported",
+                    "injected_resource_id": null,
+                    "mutation": {
+                        "applied": false,
+                        "before_digest": null,
+                        "after_digest": null
+                    },
+                    "witness_kind": "unsupported_channel",
+                    "independent_replay": "confirmed"
+                },
+                {
+                    "case_id": "event-loss",
+                    "ground_truth": "integrity_failure",
+                    "injected_resource_id": null,
+                    "mutation": {
+                        "applied": false,
+                        "before_digest": null,
+                        "after_digest": null
+                    },
+                    "witness_kind": "integrity_fault",
                     "independent_replay": "confirmed"
                 }
             ]
@@ -1412,6 +1460,36 @@ mod tests {
                         "snapshot_race": false,
                         "root_escape": false
                     }
+                },
+                {
+                    "case_id": "unresolved-env-channel",
+                    "disposition": "unresolved",
+                    "observed_resources": [],
+                    "facts": ["unresolved_channel", "virtualization_status"],
+                    "unresolved_channels": ["environment"],
+                    "reuse_decision": "unresolved",
+                    "integrity": {
+                        "event_loss": false,
+                        "observer_restart": false,
+                        "unmonitored_process": false,
+                        "snapshot_race": false,
+                        "root_escape": false
+                    }
+                },
+                {
+                    "case_id": "event-loss",
+                    "disposition": "invalidated",
+                    "observed_resources": [],
+                    "facts": ["drop_counter", "overflow_status", "receipt_integrity"],
+                    "unresolved_channels": [],
+                    "reuse_decision": "invalidated",
+                    "integrity": {
+                        "event_loss": true,
+                        "observer_restart": false,
+                        "unmonitored_process": false,
+                        "snapshot_race": false,
+                        "root_escape": false
+                    }
                 }
             ]
         });
@@ -1425,11 +1503,14 @@ mod tests {
         let report = audit_bytes(&catalog, &oracle, &receipts);
         assert!(report.adjudication_complete, "{:?}", report.errors);
         assert!(report.adjudication_passed, "{:?}", report.errors);
-        assert_eq!(report.counts.passed_cases, 2);
+        assert_eq!(report.counts.passed_cases, 4);
         assert_eq!(report.metrics.hidden_dependency_misses, 0);
         assert_eq!(report.metrics.false_invalidations, 0);
+        assert_eq!(report.metrics.unrelated_evidence_not_retained, 0);
         assert!(!report.qualification_eligible);
         assert!(!report.oracle_authenticity_established);
+        assert!(!report.oracle_replay_executed_by_adjudicator);
+        assert!(!report.observer_receipt_authenticity_established);
     }
 
     #[test]
@@ -1477,6 +1558,51 @@ mod tests {
         assert!(report.errors.iter().any(|error| {
             error.code == "E_UNRELATED_RESOURCE_ATTRIBUTED"
         }));
+    }
+
+    #[test]
+    fn rejects_unsupported_channel_when_receipt_claims_capture() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][2]["disposition"] = json!("captured");
+        receipt_value["records"][2]["unresolved_channels"] = json!([]);
+        receipt_value["records"][2]["reuse_decision"] = json!("reused");
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert_eq!(report.metrics.unresolved_channel_misses, 1);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_UNRESOLVED_CHANNEL_NOT_DISCLOSED"
+        }));
+    }
+
+    #[test]
+    fn rejects_integrity_failure_when_reuse_is_not_invalidated() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][3]["reuse_decision"] = json!("reused");
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert_eq!(report.metrics.integrity_failures_not_invalidated, 1);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_INVALID_RECEIPT_ACCEPTED"
+        }));
+    }
+
+    #[test]
+    fn rejects_false_invalidation_of_unrelated_evidence() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][1]["reuse_decision"] = json!("invalidated");
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert_eq!(report.metrics.false_invalidations, 1);
+        assert_eq!(report.metrics.unrelated_evidence_not_retained, 1);
     }
 
     #[test]
