@@ -51,12 +51,14 @@ The JSON Schemas validate shape. The initial Rust validator in `xtask/src/basalt
 1. `task_id` is unique in `task_records`; `system_id` is unique in `systems`; and every trial references a declared system.
 2. For each eligible `task_id × attempt_index`, every compared system has exactly one row. A declared `paired_group_id`, seed, task spec, base-tree digest, environment, verifier version, and budget policy must match across the comparison arms.
 3. Duplicate cells, omitted cells, inconsistent pair keys, or changed task manifests invalidate the comparison. Do not repair them by silently taking the first or best row.
+
+Seed-policy semantics are explicit: `fixed_paired` and `predeclared_random` must use the same recorded seed across all system arms for a task/attempt; `unseeded` must use the literal marker `unseeded`; and `not_applicable` must use `not_applicable`. Never invent a seed after the run to make rows appear paired.
 4. The verifier's `bundle_digest` matches the run's pinned verifier bundle, and `evaluated_tree_digest` equals the trial's `final_tree_digest`.
 5. A `pass` outcome requires verifier `pass`, all blocking checks `pass`, and integrity `clean`. Contradictions are invalid records and must fail closed.
 6. The same immutable environment, isolation policy, task budgets and retry policy apply across paired systems, or each difference must be explicitly declared as a separate experimental factor.
 7. Token or cost fields unavailable from a provider remain null/omitted where permitted; do not encode unavailable telemetry as zero.
 
-The Rust module now contains 33 unit-test cases, including paired-arm omissions, duplicate cells, manifest-bound reclassification, digest mismatches, budget violations, unknown fields and verifier/integrity contradictions. They are authored but **not executed** in this environment because no Rust toolchain or mounted checkout was available and the draft PR workflows were skipped. Do not treat these tests as passing evidence.
+The Rust module now contains 36 unit-test cases, including paired-arm omissions, duplicate cells, manifest-bound reclassification, digest mismatches, budget violations, unknown fields and verifier/integrity contradictions. They are authored but **not executed** in this environment because no Rust toolchain or mounted checkout was available and the draft PR workflows were skipped. Do not treat these tests as passing evidence.
 
 The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
 
