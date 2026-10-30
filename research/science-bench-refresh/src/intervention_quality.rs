@@ -241,6 +241,7 @@ pub struct InterventionQualityReportFieldsV1 {
     pub pipeline_acceptance_rate_ppm: Option<u32>,
     pub reviewer_pairwise_agreement_ppm: Option<u32>,
     pub reviewer_pairwise_comparison_count: u64,
+    pub reviewer_fleiss_kappa: Option<f64>,
     pub unique_transformation_family_count: u64,
     pub unique_failure_mode_count: u64,
     pub unique_semantic_cluster_count: u64,
@@ -520,6 +521,37 @@ fn pairwise_agreement(reviewers: &[HumanAdjudicationV1]) -> (u64, u64) {
     (matches, comparisons)
 }
 
+fn fleiss_kappa(vote_counts: &[[u64; 3]], reviewers_per_candidate: u32) -> Option<f64> {
+    if vote_counts.is_empty() || reviewers_per_candidate < 2 {
+        return None;
+    }
+    let panel_size = reviewers_per_candidate as f64;
+    let pair_denominator = panel_size * (panel_size - 1.0);
+    let mut category_totals = [0_u64; 3];
+    let mut mean_observed_agreement = 0.0;
+    for counts in vote_counts {
+        let assigned = counts.iter().sum::<u64>();
+        if assigned != u64::from(reviewers_per_candidate) {
+            return None;
+        }
+        for (total, count) in category_totals.iter_mut().zip(counts) {
+            *total += *count;
+        }
+        let squared_sum = counts.iter().map(|count| (*count as f64).powi(2)).sum::<f64>();
+        mean_observed_agreement += (squared_sum - panel_size) / pair_denominator;
+    }
+    mean_observed_agreement /= vote_counts.len() as f64;
+    let total_votes = (vote_counts.len() as u64) * u64::from(reviewers_per_candidate);
+    let expected_agreement = category_totals.iter()
+        .map(|count| {
+            let proportion = *count as f64 / total_votes as f64;
+            proportion * proportion
+        })
+        .sum::<f64>();
+    (1.0 - expected_agreement > f64::EPSILON)
+        .then(|| (mean_observed_agreement - expected_agreement) / (1.0 - expected_agreement))
+}
+
 fn add_disposition(
     counts: &mut DispositionCountsV1,
     disposition: PipelineDispositionV1,
@@ -617,6 +649,7 @@ pub fn analyze_intervention_quality(
     let mut ambiguous_relation_count = 0_u64;
     let mut reviewer_agreement_matches = 0_u64;
     let mut reviewer_pairwise_comparisons = 0_u64;
+    let mut reviewer_vote_counts = Vec::new();
     let mut total_tokens = 0_u64;
     let mut total_cost = 0_u64;
     let mut total_wall_clock = 0_u64;
@@ -628,10 +661,10 @@ pub fn analyze_intervention_quality(
         let candidate = candidates_by_id.get(adjudication.candidate_id.as_str())
             .ok_or_else(|| format!("unknown candidate adjudication {}", adjudication.candidate_id))?;
         let policy = &plan.adjudication_policy;
-        if adjudication.reviewers.len() < policy.minimum_reviewers as usize
+        if adjudication.reviewers.len() != policy.minimum_reviewers as usize
             || adjudication.reviewers.len() > MAX_PANEL as usize
         {
-            return Err(format!("candidate {} has insufficient or excessive reviewers", candidate.candidate_id));
+            return Err(format!("candidate {} must have exactly the preregistered reviewer count", candidate.candidate_id));
         }
         let mut reviewer_ids = BTreeSet::new();
         for reviewer in &adjudication.reviewers {
@@ -655,6 +688,15 @@ pub fn analyze_intervention_quality(
             &adjudication.reviewers,
             policy.consensus_threshold_permille,
         );
+        let mut candidate_vote_counts = [0_u64; 3];
+        for reviewer in &adjudication.reviewers {
+            match reviewer.verdict {
+                ReviewerVerdictV1::MeaningPreserving => candidate_vote_counts[0] += 1,
+                ReviewerVerdictV1::MeaningChanging => candidate_vote_counts[1] += 1,
+                ReviewerVerdictV1::Ambiguous => candidate_vote_counts[2] += 1,
+            }
+        }
+        reviewer_vote_counts.push(candidate_vote_counts);
         let (matches, comparisons) = pairwise_agreement(&adjudication.reviewers);
         checked_add(&mut reviewer_agreement_matches, matches, "reviewer agreement")?;
         checked_add(&mut reviewer_pairwise_comparisons, comparisons, "reviewer comparison")?;
@@ -760,6 +802,10 @@ pub fn analyze_intervention_quality(
         pipeline_acceptance_rate_ppm: ratio_ppm(accepted, plan.candidates.len() as u64),
         reviewer_pairwise_agreement_ppm: ratio_ppm(reviewer_agreement_matches, reviewer_pairwise_comparisons),
         reviewer_pairwise_comparison_count: reviewer_pairwise_comparisons,
+        reviewer_fleiss_kappa: fleiss_kappa(
+            &reviewer_vote_counts,
+            plan.adjudication_policy.minimum_reviewers,
+        ),
         unique_transformation_family_count: all_families.len() as u64,
         unique_failure_mode_count: all_failure_modes.len() as u64,
         unique_semantic_cluster_count: all_clusters.len() as u64,
@@ -938,6 +984,7 @@ mod tests {
         assert!(report.fields.valid_unique_accepted_per_1000_tokens.unwrap() > 0.0);
         assert!(report.fields.valid_unique_accepted_per_usd.unwrap() > 0.0);
         assert!(report.fields.reviewer_pairwise_agreement_ppm.unwrap() < 1_000_000);
+        assert!(report.fields.reviewer_fleiss_kappa.is_some());
     }
 
     #[test]
