@@ -114,6 +114,64 @@ impl DirectedSystemPartition {
     pub fn is_total_cut(&self) -> bool { self.total_cut }
 }
 
+/// IIT 4.0 causal direction for a fixed system-level partition evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CausalDirection {
+    /// Bayesian-inverted cause likelihood over candidate past states.
+    Cause,
+    /// Forward effect repertoire over candidate future states.
+    Effect,
+}
+
+/// One direction's fixed-state system-level GID contribution for a cut.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SystemPhiDirectionScore {
+    pub direction: CausalDirection,
+    /// Unpartitioned cause/effect repertoire mass at the specified state.
+    pub selectivity: f64,
+    /// Unpartitioned forward probability (a likelihood on the cause side).
+    pub forward_probability: f64,
+    /// Forward probability after applying the partition.
+    pub partitioned_forward_probability: f64,
+    /// Signed GID contribution: selectivity * log2(forward / partitioned).
+    pub signed_phi: f64,
+}
+
+/// IIT 4.0 system-partition score for an explicitly supplied state and cut.
+///
+/// This is the per-partition quantity used by the IIT 4.0 (2023) SIA search;
+/// it is not an SIA or phi_s result until the system's intrinsic specified
+/// states are selected and all eligible partitions are searched.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SystemPhiPartitionScore {
+    pub cause: SystemPhiDirectionScore,
+    pub effect: SystemPhiDirectionScore,
+    /// Signed minimum of cause and effect contributions before |.|+ clamping.
+    pub signed_phi: f64,
+    /// Nonnegative phi value after the IIT |.|+ convention.
+    pub phi: f64,
+    /// 1 / number of severed connections (the EdgeCut normalization).
+    pub normalization_factor: f64,
+    pub signed_normalized_phi: f64,
+    pub normalized_phi: f64,
+    pub severed_connections: usize,
+}
+
+/// Errors while evaluating a fixed-state IIT 4.x system partition.
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum SystemPhiError {
+    #[error(transparent)]
+    Model(#[from] ModelError),
+    #[error(transparent)]
+    Repertoire(#[from] RepertoireError),
+    #[error(transparent)]
+    Partition(#[from] PartitionApplyError),
+    #[error("specified system state has {actual} bits, expected {expected}")]
+    SpecifiedStateLength { expected: usize, actual: usize },
+    #[error("system partition cuts no connections and therefore has no EdgeCut normalization")]
+    ZeroSeveredConnections,
+}
+
 /// Errors while applying a directed partition to a causal model.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub enum PartitionApplyError {
@@ -990,6 +1048,85 @@ impl BinaryCausalModel {
         Self::new(self.n_units, tpm, connectivity).map_err(PartitionApplyError::from)
     }
 
+    /// Evaluate both IIT 4.0 system-level directional GID contributions for a cut.
+    ///
+    /// This matches PyPhi's fixed-state partition-evaluation path: effect uses
+    /// the forward effect probability, cause uses the unnormalized forward cause
+    /// likelihood, both weighted by the corresponding unpartitioned repertoire
+    /// probability at the specified state. The system score is min(cause, effect),
+    /// followed by the positive-part convention and EdgeCut normalization.
+    ///
+    /// The candidate system and state ordering are taken from the supplied
+    /// DirectedSystemPartition; the current state is in model-global unit order.
+    /// This function deliberately does not choose the intrinsic specified state,
+    /// filter non-disconnecting cuts, resolve ties, or search for the MIP.
+    pub fn score_iit4_system_partition(
+        &self,
+        partition: &DirectedSystemPartition,
+        current_state: &[bool],
+        specified_state: &[bool],
+    ) -> Result<SystemPhiPartitionScore, SystemPhiError> {
+        self.check_state(current_state)?;
+        let candidate = partition.candidate_system();
+        if specified_state.len() != candidate.len() {
+            return Err(SystemPhiError::SpecifiedStateLength {
+                expected: candidate.len(),
+                actual: specified_state.len(),
+            });
+        }
+        self.validate_subset(candidate, "candidate_system")?;
+        let cut_edges = partition.cut_matrix().iter().filter(|cut| **cut).count();
+        if cut_edges == 0 {
+            return Err(SystemPhiError::ZeroSeveredConnections);
+        }
+        let specified_index = specified_state
+            .iter()
+            .enumerate()
+            .fold(0usize, |index, (unit, on)| {
+                if *on { index | (1usize << unit) } else { index }
+            });
+
+        let cause_selectivity = self.cause_repertoire(candidate, current_state, candidate)?;
+        let cause_forward = self.forward_cause_likelihood(candidate, current_state, candidate)?;
+        let effect_selectivity = self.effect_repertoire(candidate, current_state, candidate)?;
+        // In IIT 4.0 the forward effect repertoire is the effect repertoire.
+        let effect_forward = effect_selectivity.clone();
+
+        let cut_model = self.apply_partition(partition)?;
+        let cause_partitioned =
+            cut_model.forward_cause_likelihood(candidate, current_state, candidate)?;
+        let effect_partitioned = cut_model.effect_repertoire(candidate, current_state, candidate)?;
+
+        let cause = system_phi_direction_score(
+            CausalDirection::Cause,
+            cause_selectivity[specified_index],
+            cause_forward[specified_index],
+            cause_partitioned[specified_index],
+        );
+        let effect = system_phi_direction_score(
+            CausalDirection::Effect,
+            effect_selectivity[specified_index],
+            effect_forward[specified_index],
+            effect_partitioned[specified_index],
+        );
+        let signed_phi = cause.signed_phi.min(effect.signed_phi);
+        let normalization_factor = 1.0 / cut_edges as f64;
+        let signed_normalized_phi = signed_phi * normalization_factor;
+        let phi = signed_phi.max(0.0);
+        let normalized_phi = signed_normalized_phi.max(0.0);
+
+        Ok(SystemPhiPartitionScore {
+            cause,
+            effect,
+            signed_phi,
+            phi,
+            normalization_factor,
+            signed_normalized_phi,
+            normalized_phi,
+            severed_connections: cut_edges,
+        })
+    }
+
     /// SHA-256 of the v0.1 canonical binary model encoding.
     ///
     /// Encoding: magic/version bytes; n_units as little-endian u32; each TPM
@@ -1200,6 +1337,26 @@ impl AnalysisRequest {
         bytes.push(0);
         bytes.extend_from_slice(self.quantity.id().as_bytes());
         hex_digest(&bytes)
+    }
+}
+
+fn system_phi_direction_score(
+    direction: CausalDirection,
+    selectivity: f64,
+    forward_probability: f64,
+    partitioned_forward_probability: f64,
+) -> SystemPhiDirectionScore {
+    let signed_phi = if forward_probability == 0.0 || partitioned_forward_probability == 0.0 {
+        0.0
+    } else {
+        selectivity * (forward_probability / partitioned_forward_probability).log2()
+    };
+    SystemPhiDirectionScore {
+        direction,
+        selectivity,
+        forward_probability,
+        partitioned_forward_probability,
+        signed_phi,
     }
 }
 
