@@ -8,6 +8,8 @@
 
 A judge audit can bind a reference decision by digest and measure whether a judge agrees with it. That is necessary, but it does not establish that the reference was produced independently, was supported by admissible evidence, used the right scope and time interval, or represented genuine uncertainty.
 
+A separate confidentiality hazard applies to low-entropy labels: the current #9065 implementation hashes one of four short decision strings directly. That digest is trivially dictionary-recoverable to anyone who can read the plan. It is a binding commitment, not a hiding commitment. Either enforce and independently evidence evaluator-only plan access, or use a high-entropy per-case/per-condition nonce in a domain-separated commitment and reveal the nonce only after judge execution. Never claim a precommitted label is hidden merely because it is hashed. This issue is tracked in the review discussion on #9065.
+
 A hash establishes byte identity. It does not establish:
 - who produced the label or whether annotators were independent;
 - whether a cited source exists, is authentic, or is independent of another cited source;
