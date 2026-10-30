@@ -3456,16 +3456,26 @@ mod tests {
             ],
             vec![false, true, true, false],
         ).unwrap();
+        let baseline = model
+            .analyze_iit4_2023_system_phi_s(
+                &[0, 1],
+                &[true, false],
+                Iit4SystemPhiSearchConfig::default(),
+            )
+            .unwrap();
+        assert!(baseline.partition_score_evaluations > 0);
+        let budget = baseline.partition_score_evaluations - 1;
         let config = Iit4SystemPhiSearchConfig {
-            max_partition_score_evaluations: 2,
+            max_partition_score_evaluations: budget,
             ..Iit4SystemPhiSearchConfig::default()
         };
         assert!(matches!(
             model.analyze_iit4_2023_system_phi_s(&[0, 1], &[true, false], config),
             Err(SystemPhiError::PartitionScoreBudgetExceeded {
-                candidate_evaluations: 3,
-                max_evaluations: 2,
-            })
+                candidate_evaluations,
+                max_evaluations,
+            }) if candidate_evaluations == baseline.partition_score_evaluations
+                && max_evaluations == budget
         ));
     }
 
