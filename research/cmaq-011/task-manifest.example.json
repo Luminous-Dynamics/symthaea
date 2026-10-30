@@ -97,7 +97,38 @@
     "prediction_mediation_vs_shuffled_future",
     "compute_only_gain_vs_direct",
     "oracle_gap",
-    "capability_coverage_fraction"
+    "capability_coverage_fraction",
+    "action_following_fidelity",
+    "physics_adherence_violation_rate",
+    "optimism_bias_detection_rate",
+    "joint_candidate_set_coverage",
+    "selected_action_error_coverage",
+    "verified_task_success_rate",
+    "evaluation_shortcut_attempt_rate",
+    "probe_value_of_information"
   ],
-  "claim_ceiling": "schema_template_only_no_results"
+  "claim_ceiling": "schema_template_only_no_results",
+  "integrity": {
+    "network_access": "disabled",
+    "allowed_network_domains": [],
+    "available_agent_tools": [
+      "environment_observation",
+      "environment_action"
+    ],
+    "hidden_qualification": false,
+    "agent_can_access_hidden_targets": false,
+    "agent_can_write_scoring_artifacts": false,
+    "task_prompt_sha256": null,
+    "evaluator_source_sha256": null,
+    "scoring_verifier_sha256": null,
+    "independent_verifier_id": null,
+    "outcome_verification": "environment_side",
+    "transcript_audit": "all",
+    "negative_controls": [
+      "shuffled_future",
+      "action_observation_mismatch",
+      "scoring_artifact_write_attempt",
+      "hidden_target_access_attempt"
+    ]
+  }
 }
