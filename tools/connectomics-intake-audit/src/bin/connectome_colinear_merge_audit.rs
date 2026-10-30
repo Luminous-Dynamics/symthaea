@@ -393,39 +393,52 @@ fn evaluate(
     input: &Input,
     tolerance_nm: f64,
 ) -> Evaluation {
-    let mut truth_rows = truth.tracks.iter()
-        .flat_map(|track| track.boundaries_nm.iter().map(move |boundary| (track.track_id.clone(), *boundary)))
-        .collect::<Vec<_>>();
-    truth_rows.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.total_cmp(&right.1)));
+    let mut proposals_by_track = BTreeMap::<String, Vec<(usize, f64)>>::new();
+    for (index, proposal) in proposals.iter().enumerate() {
+        proposals_by_track.entry(proposal.track_id.clone())
+            .or_default()
+            .push((index, proposal.boundary_nm));
+    }
+    let mut truth_by_track = BTreeMap::<String, Vec<f64>>::new();
+    let mut truth_boundary_count = 0;
+    for track in &truth.tracks {
+        let mut boundaries = track.boundaries_nm.clone();
+        boundaries.sort_by(f64::total_cmp);
+        truth_boundary_count += boundaries.len();
+        truth_by_track.insert(track.track_id.clone(), boundaries);
+    }
 
-    let mut pairs = Vec::<(f64, usize, usize)>::new();
-    for (proposal_index, proposal) in proposals.iter().enumerate() {
-        for (truth_index, (track_id, boundary)) in truth_rows.iter().enumerate() {
-            if proposal.track_id == *track_id {
-                let error = (proposal.boundary_nm - boundary).abs();
-                if error <= tolerance_nm {
-                    pairs.push((error, proposal_index, truth_index));
-                }
+    let mut localization_errors = Vec::new();
+    for (track_id, truth_boundaries) in &truth_by_track {
+        let mut track_proposals = proposals_by_track.get(track_id).cloned().unwrap_or_default();
+        track_proposals.sort_by(|left, right| left.1.total_cmp(&right.1));
+        let mut proposal_index = 0;
+        let mut truth_index = 0;
+        // Ordered one-dimensional interval matching is maximum-cardinality:
+        // when the smallest remaining pair is outside tolerance, the smaller
+        // endpoint cannot match any later point on the opposite side.
+        while proposal_index < track_proposals.len() && truth_index < truth_boundaries.len() {
+            let proposal_nm = track_proposals[proposal_index].1;
+            let truth_nm = truth_boundaries[truth_index];
+            let error = (proposal_nm - truth_nm).abs();
+            if error <= tolerance_nm {
+                localization_errors.push(error);
+                proposal_index += 1;
+                truth_index += 1;
+            } else if proposal_nm < truth_nm {
+                proposal_index += 1;
+            } else {
+                truth_index += 1;
             }
         }
     }
-    pairs.sort_by(|left, right| left.0.total_cmp(&right.0));
-    let mut matched_proposals = BTreeSet::new();
-    let mut matched_truth = BTreeSet::new();
-    let mut localization_errors = Vec::new();
-    for (error, proposal_index, truth_index) in pairs {
-        if !matched_proposals.contains(&proposal_index) && !matched_truth.contains(&truth_index) {
-            matched_proposals.insert(proposal_index);
-            matched_truth.insert(truth_index);
-            localization_errors.push(error);
-        }
-    }
+
     localization_errors.sort_by(f64::total_cmp);
     let tp = localization_errors.len();
     let fp = proposals.len().saturating_sub(tp);
-    let fn_count = truth_rows.len().saturating_sub(tp);
+    let fn_count = truth_boundary_count.saturating_sub(tp);
     let precision = if proposals.is_empty() { None } else { Some(tp as f64 / proposals.len() as f64) };
-    let recall = if truth_rows.is_empty() { None } else { Some(tp as f64 / truth_rows.len() as f64) };
+    let recall = if truth_boundary_count == 0 { None } else { Some(tp as f64 / truth_boundary_count as f64) };
     let f1 = precision.zip(recall).and_then(|(p, r)| {
         if p + r == 0.0 { None } else { Some(2.0 * p * r / (p + r)) }
     });
@@ -434,7 +447,7 @@ fn evaluate(
         .sum::<f64>();
     Evaluation {
         tolerance_nm,
-        truth_boundary_count: truth_rows.len(),
+        truth_boundary_count,
         true_positive_count: tp,
         false_positive_count: fp,
         false_negative_count: fn_count,
@@ -655,6 +668,24 @@ mod tests {
             tracks: vec![TruthTrack { track_id: "one".into(), boundaries_nm: vec![] }],
         };
         assert!(validate_truth(&truth, &sha256(&bytes), &input).unwrap_err().contains("every detector track"));
+    }
+
+    #[test]
+    fn boundary_matching_maximizes_true_positives_before_localization_cost() {
+        let input = base_input(vec![make_track("one", |_| (60.0, 0.0, 0.9, 0.2))]);
+        let proposals = vec![
+            Candidate { track_id: "one".into(), boundary_nm: 0.0, score: 1.0 },
+            Candidate { track_id: "one".into(), boundary_nm: 10.0, score: 1.0 },
+        ];
+        let truth = Truth {
+            schema_version: 1,
+            input_sha256: "a".repeat(64),
+            tracks: vec![TruthTrack { track_id: "one".into(), boundaries_nm: vec![5.0, 6.0] }],
+        };
+        let result = evaluate(&proposals, &truth, &input, 6.0);
+        assert_eq!(result.true_positive_count, 2);
+        assert_eq!(result.false_positive_count, 0);
+        assert_eq!(result.false_negative_count, 0);
     }
 
     #[test]
