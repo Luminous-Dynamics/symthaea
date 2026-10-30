@@ -51,7 +51,12 @@ fn get_path_optional<'a>(root: &'a Value, path: &str) -> Result<Option<&'a Value
     for segment in segments {
         let next = match current {
             Value::Object(object) => object.get(segment),
-            Value::Array(array) => segment.parse::<usize>().ok().and_then(|index| array.get(index)),
+            Value::Array(array) => {
+                let index = segment
+                    .parse::<usize>()
+                    .map_err(|_| format!("array path segment {segment:?} is not an index in {path:?}"))?;
+                array.get(index)
+            }
             _ => None,
         };
         let Some(next) = next else {
