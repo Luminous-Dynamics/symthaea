@@ -50,6 +50,7 @@ def generate(output_dir: Path) -> dict[str, Any]:
         ("case-004", "evidence", "conflict", "cluster-3", "semantic_change", "rejected", ["meaning_changing"] * 3),
         ("case-005", "authority", "provenance", "cluster-4", "semantic_invariant", "abstained", ["meaning_preserving", "meaning_changing", "ambiguous"]),
         ("case-006", "authority", "confidence", "cluster-5", "semantic_change", "rejected", ["meaning_changing", "ambiguous", "ambiguous"]),
+        ("case-007", "authority", "reviewer-disagreement", "cluster-6", "semantic_change", "accepted", ["meaning_preserving", "meaning_changing", "ambiguous"]),
     ]
     plan_fields = {
         "schema": PLAN_SCHEMA,
