@@ -190,7 +190,7 @@ The preregistered decision continues to use **unconditional** pass and false-cla
 
 The real cross-family relationship inventory is still absent and the holdout is not qualified. Use [the 30 October docket specification](../../../docs/research/pitb-coverage-review-docket-2026-10-30.md) and `scripts/research/pitb_build_coverage_review_docket_v0.py` to construct a content-addressed review worklist from the exact frozen `splits.json`.
 
-The docket expands all 372 families into 744 pending obligations: one independent candidate-derivation pass and one false-negative challenge pass per family. It preserves family IDs, split labels, titles, linked paths, the raw split-manifest digest, and the partition digest. It is an assignment template only: it cannot add or adjudicate relationship edges, complete the inventory, issue a receipt, or authorize confirmatory use. CI checks deterministic regeneration and full-universe accounting; it does not replace independent human review or an external trust root.
+The checked-in [pending coverage-review docket](coverage-review-docket.pending.json) is generated from the exact frozen manifest and expands all 372 families into 744 pending obligations: one independent candidate-derivation pass and one false-negative challenge pass per family. It preserves family IDs, split labels, titles, linked paths, the raw split-manifest digest, and the partition digest. It is an assignment template only: it cannot add or adjudicate relationship edges, complete the inventory, issue a receipt, or authorize confirmatory use. CI checks deterministic regeneration and full-universe accounting; it does not replace independent human review or an external trust root.
 
 ## Signed component-coverage receipt verification
 
