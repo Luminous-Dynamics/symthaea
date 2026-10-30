@@ -358,9 +358,33 @@ impl JustificationGraph {
         &self,
         as_of: &str,
     ) -> Result<BTreeMap<String, AsOfSupportStatus>, String> {
+        let active_source_ids: BTreeSet<String> = self.source_events
+            .difference(&self.retracted_source_events)
+            .cloned()
+            .collect();
+        self.support_statuses_at_with_source_events(as_of, &active_source_ids)
+    }
+
+    /// Evaluate derivation support using an explicit set of source revisions
+    /// eligible at a particular (valid_at, known_at) coordinate.
+    ///
+    /// Unlike support_statuses_at(), this method does not use the graph's
+    /// latest retraction set. That distinction is essential when reconstructing
+    /// what a memory could support before a later retraction or supersession.
+    pub fn support_statuses_at_with_source_events(
+        &self,
+        as_of: &str,
+        eligible_source_event_ids: &BTreeSet<String>,
+    ) -> Result<BTreeMap<String, AsOfSupportStatus>, String> {
         let as_of_date = NaiveDate::parse_from_str(as_of, "%Y-%m-%d")
             .map_err(|error| format!("as_of must be YYYY-MM-DD: {error}"))?;
         self.verify_consistency()?;
+        if let Some(unknown) = eligible_source_event_ids
+            .iter()
+            .find(|source_id| !self.source_events.contains(*source_id))
+        {
+            return Err(format!("eligible source set contains unknown revision {unknown:?}"));
+        }
 
         let mut statuses = BTreeMap::<String, AsOfSupportStatus>::new();
         for fact_id in &self.fact_order {
@@ -390,8 +414,7 @@ impl JustificationGraph {
                 .filter(|justification| {
                     justification.dependencies.iter().all(|dependency| match dependency {
                         SupportRef::SourceEvent(source_id) => {
-                            self.source_events.contains(source_id)
-                                && !self.retracted_source_events.contains(source_id)
+                            eligible_source_event_ids.contains(source_id)
                         }
                         SupportRef::DerivedFact(parent_id) => statuses
                             .get(parent_id)
@@ -443,6 +466,16 @@ impl JustificationGraph {
 
     pub fn source_is_retracted(&self, event_id: &str) -> bool {
         self.retracted_source_events.contains(event_id)
+    }
+
+    /// Check whether an immutable source revision has been registered.
+    pub fn has_source_event(&self, event_id: &str) -> bool {
+        self.source_events.contains(event_id)
+    }
+
+    /// Number of registered immutable source revisions, including retracted ones.
+    pub fn source_event_count(&self) -> usize {
+        self.source_events.len()
     }
 
     pub fn fact_count(&self) -> usize {
