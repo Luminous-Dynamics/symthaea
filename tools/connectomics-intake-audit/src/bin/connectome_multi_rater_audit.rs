@@ -545,7 +545,8 @@ fn validate(
     }
 
     if mapped.len() != expected_ids.len() {
-        let missing: Vec<String> = expected_ids.difference(&mapped.keys().cloned().collect()).cloned().collect();
+        let present_ids: BTreeSet<String> = mapped.keys().cloned().collect();
+        let missing: Vec<String> = expected_ids.difference(&present_ids).cloned().collect();
         return Err(format!("outcomes must cover the complete frozen candidate pool; missing: {}", missing.join(",")));
     }
     if !reviewer_ids.is_disjoint(&adjudicator_ids) {
@@ -633,11 +634,7 @@ fn evaluate(
     reviewer_metrics.sort_by(|left, right| left.reviewer_id.cmp(&right.reviewer_id));
 
     let reviewer_count = reviewer_metrics.len();
-    let adjudicator_count = adjudicator_units
-        .iter()
-        .flat_map(|_| std::iter::empty::<String>())
-        .count()
-        + by_candidate
+    let adjudicator_count = by_candidate
             .values()
             .flat_map(|row| row.adjudicator_votes.iter().map(|vote| vote.adjudicator_id.clone()))
             .collect::<BTreeSet<_>>()
