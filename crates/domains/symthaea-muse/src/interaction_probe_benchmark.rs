@@ -25,19 +25,20 @@ pub const INTERACTION_PROBE_BENCHMARK_VERSION: &str =
     "mel-mr-eval-023-oracle-probe-audit-v0.1";
 const REPORT_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-023-oracle-probe-audit-v1\0";
 
-/// PCM-space Harsanyi interaction magnitudes below these floors are treated
-/// as numerical/operational nulls for this benchmark fixture. Thresholds are
-/// explicit because L2 magnitude scales with fixture length and signal level.
+/// Contextual pair and unconditional Harsanyi thresholds are separate: their
+/// L2 magnitudes answer different questions and depend on fixture scale.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InteractionProbeBenchmarkConfig {
-    pub minimum_pair_pcm_l2_norm: f64,
+    pub minimum_contextual_pair_pcm_l2_norm: f64,
+    pub minimum_global_order_two_harsanyi_pcm_l2_norm: f64,
     pub minimum_higher_order_pcm_l2_norm: f64,
 }
 
 impl Default for InteractionProbeBenchmarkConfig {
     fn default() -> Self {
         Self {
-            minimum_pair_pcm_l2_norm: 1.0e-9,
+            minimum_contextual_pair_pcm_l2_norm: 1.0e-9,
+            minimum_global_order_two_harsanyi_pcm_l2_norm: 1.0e-9,
             minimum_higher_order_pcm_l2_norm: 1.0e-9,
         }
     }
@@ -218,13 +219,15 @@ pub fn evaluate_interaction_probe_plan(
     probe_config: &InteractionProbeConfig,
     benchmark_config: &InteractionProbeBenchmarkConfig,
 ) -> Result<InteractionProbeBenchmarkReport, InteractionProbeBenchmarkError> {
-    if !benchmark_config.minimum_pair_pcm_l2_norm.is_finite()
+    if !benchmark_config.minimum_contextual_pair_pcm_l2_norm.is_finite()
         || benchmark_config.minimum_pair_pcm_l2_norm <= 0.0
+        || !benchmark_config.minimum_global_order_two_harsanyi_pcm_l2_norm.is_finite()
+        || benchmark_config.minimum_global_order_two_harsanyi_pcm_l2_norm <= 0.0
         || !benchmark_config.minimum_higher_order_pcm_l2_norm.is_finite()
         || benchmark_config.minimum_higher_order_pcm_l2_norm <= 0.0
     {
         return Err(InteractionProbeBenchmarkError::InvalidConfig(
-            "PCM interaction floors must be finite and positive",
+            "contextual-pair and Harsanyi interaction floors must be finite and positive",
         ));
     }
 
