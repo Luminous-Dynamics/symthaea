@@ -412,6 +412,7 @@ fn aggregate(results: &[SeedResult], law: Law) -> Aggregate {
 fn render(results: &[SeedResult]) -> String {
     let source = aggregate(results, Law::Source);
     let reversal = aggregate(results, Law::ActionEffectReversal);
+    let interaction_shift = aggregate(results, Law::InteractionSignReversal);
     let mut out = format!(
         concat!(
             "{{\n",
@@ -426,20 +427,22 @@ fn render(results: &[SeedResult]) -> String {
             "  \"reward\": \"negative mean squared next-state distance to zero target\",\n",
             "  \"regimes\": {{\n",
             "    \"source_holdout\": {},\n",
-            "    \"action_effect_reversal\": {}\n",
+            "    \"action_effect_reversal\": {},\n",
+            "    \"interaction_sign_reversal\": {}\n",
             "  }},\n",
             "  \"per_seed\": [\n"
         ),
         DIM, HIDDEN, TRAIN_SAMPLES, EPOCHS, results.len(), EVAL_STATES,
         MODEL_FORWARD_CALLS_PER_DECISION,
-        render_aggregate(&source), render_aggregate(&reversal)
+        render_aggregate(&source), render_aggregate(&reversal), render_aggregate(&interaction_shift)
     );
     for (index, row) in results.iter().enumerate() {
         out.push_str(&format!(
-            "    {{\"seed\":\"{:016x}\",\"direct_mode\":\"{}\",\"training_mse\":{:.8},\"training_steps\":{},\"source_lift\":{:.8},\"source_regret\":{:.8},\"source_pairwise_accuracy\":{:.8},\"reversal_lift\":{:.8},\"reversal_regret\":{:.8},\"reversal_pairwise_accuracy\":{:.8}}}",
+            "    {{\"seed\":\"{:016x}\",\"direct_mode\":\"{}\",\"training_mse\":{:.8},\"training_steps\":{},\"source_lift\":{:.8},\"source_regret\":{:.8},\"source_pairwise_accuracy\":{:.8},\"reversal_lift\":{:.8},\"reversal_regret\":{:.8},\"reversal_pairwise_accuracy\":{:.8},\"interaction_lift\":{:.8},\"interaction_regret\":{:.8},\"interaction_pairwise_accuracy\":{:.8}}}",
             row.seed, row.direct_mode, row.training_mse, row.training_steps,
             row.source.model_lift_vs_direct, row.source.model_regret, row.source.pairwise_ranking_accuracy,
-            row.reversal.model_lift_vs_direct, row.reversal.model_regret, row.reversal.pairwise_ranking_accuracy
+            row.reversal.model_lift_vs_direct, row.reversal.model_regret, row.reversal.pairwise_ranking_accuracy,
+            row.interaction_shift.model_lift_vs_direct, row.interaction_shift.model_regret, row.interaction_shift.pairwise_ranking_accuracy
         ));
         if index + 1 != results.len() { out.push(','); }
         out.push('\n');
@@ -531,6 +534,20 @@ mod tests {
     }
 
     #[test]
+    fn interaction_shift_changes_state_action_coupling() {
+        let mut state = vec![0.0; DIM];
+        let mut action = vec![0.0; DIM];
+        state[0] = 0.2;
+        state[1] = 0.8;
+        action[0] = 1.0;
+        let source = transition(&state, &action, Law::Source);
+        let shifted = transition(&state, &action, Law::InteractionSignReversal);
+        assert!((source[0] - (0.55 * 0.2 + 0.25 + 0.06 * 0.8)).abs() < 1e-6);
+        assert!((shifted[0] - (0.55 * 0.2 + 0.25 - 0.12 * 0.8)).abs() < 1e-6);
+        assert!((source[0] - shifted[0]).abs() > 0.1);
+    }
+
+    #[test]
     fn direct_policy_is_selected_only_from_observed_training_outcomes() {
         let rows = training_data(DATA_SEED);
         let chosen = fit_direct_policy(&rows);
@@ -550,7 +567,7 @@ mod tests {
         let results = run().unwrap();
         assert_eq!(results.len(), MODEL_SEEDS.len());
         for row in &results {
-            for metrics in [row.source, row.reversal] {
+            for metrics in [row.source, row.reversal, row.interaction_shift] {
                 for value in [
                     metrics.model_reward, metrics.direct_reward, metrics.oracle_reward,
                     metrics.model_lift_vs_direct, metrics.model_regret, metrics.direct_regret,
@@ -576,6 +593,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&render(&results)).unwrap();
         assert_eq!(parsed["schema_version"], "cmaq-008-action-ranking-v0.1");
         assert_eq!(parsed["model"], "HierarchicalCfCWorldModel");
+        assert_eq!(parsed["regimes"].as_object().unwrap().len(), 3);
         assert_eq!(parsed["per_seed"].as_array().unwrap().len(), MODEL_SEEDS.len());
     }
 }
