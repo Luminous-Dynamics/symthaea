@@ -1991,7 +1991,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_schema_version_one_is_not_silently_interpreted_as_version_two() {
+    fn manifest_schema_version_one_is_not_silently_interpreted_as_version_three() {
         let report = validate_value_and_manifest(|_run, manifest| {
             manifest["schema_version"] = Value::from(1);
         });
