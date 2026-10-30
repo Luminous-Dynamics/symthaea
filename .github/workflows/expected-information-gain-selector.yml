@@ -8,6 +8,8 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
+      - "docs/research/DECISION_AWARE_MANUFACTURING_EVSI_V0_1.md"
+      - "crates/core/symthaea-core/examples/fixtures/manufacturing-decision-policy-synthetic.csv"
       - "research/manufacturing-acquisition-test-harness.rs"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
