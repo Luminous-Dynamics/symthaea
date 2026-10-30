@@ -6,12 +6,6 @@ use science_bench_refresh_validator::evidence_behavior_contracts::{
     compute_evidence_behavior_contract_report_commitment, verify_evidence_behavior_contract_plan,
     verify_evidence_behavior_contract_report,
 };
-use science_bench_refresh_validator::judge_robustness::{
-    compute_judge_robustness_plan_commitment,
-    compute_judge_robustness_report_commitment,
-    verify_judge_robustness_plan,
-    verify_judge_robustness_report,
-};
 use science_bench_refresh_validator::evidence_outcomes::{
     compute_evidence_outcome_report_commitment, verify_evidence_outcome_report,
 };
@@ -19,14 +13,18 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
+use science_bench_refresh_validator::judge_robustness::{
+    compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
+    verify_judge_robustness_plan, verify_judge_robustness_report,
+};
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
-use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
-use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
 use science_bench_refresh_validator::reference_assurance::{
     compute_reference_package_commitment, verify_reference_assurance_package,
 };
+use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
+use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
 use science_bench_refresh_validator::{
     compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
     validate_manifest_bytes, verify_regeneration, verify_reveal,
@@ -197,8 +195,7 @@ fn run(args: &[String]) -> ExitCode {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&report)
-                    .expect("judge robustness report serializes")
+                serde_json::to_string_pretty(&report).expect("judge robustness report serializes")
             );
             if report.valid {
                 ExitCode::SUCCESS
