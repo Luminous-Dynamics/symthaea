@@ -27,6 +27,7 @@ pub mod paired_outcome_analysis;
 pub mod evidence_behavior_contracts;
 pub mod judge_factorial;
 pub mod judge_robustness;
+pub mod intervention_quality;
 pub mod reference_assurance;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
 const WEIGHT_TOLERANCE: f64 = 1.0e-9;
