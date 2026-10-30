@@ -62,6 +62,16 @@ jobs:
           cp tools/hardsec-audit-harness/Cargo.lock "$RUNNER_TEMP/hardsec-seqcube/Cargo.lock"
           printf 'harness_lock_sha256=%s\n' "$actual" > "$RUNNER_TEMP/hardsec-seqcube/harness-lock.sha256"
 
+      - name: Verify challenge profile audit target registration
+        run: |
+          set -euo pipefail
+          grep -F 'name = "hardsec_challenge_profile_audit"' tools/hardsec-audit-harness/Cargo.toml
+          grep -F 'path = "../../examples/hardsec_challenge_profile_audit.rs"' tools/hardsec-audit-harness/Cargo.toml
+          test -f examples/hardsec_challenge_profile_audit.rs
+          test -f tests/fixtures/hardsec/seqcube-challenge-profile.json
+          test -f schemas/hardsec-challenge-profile-v1.schema.json
+          test -f schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json
+
       - name: Test random-trigger sampling budget
         run: |
           set -euo pipefail
