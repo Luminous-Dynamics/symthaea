@@ -14,6 +14,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - schema/judge-robustness-plan.schema.json and schema/judge-robustness-report.schema.json plus non-scoring fixtures.
 - tools/judge_robustness_test_vectors.py: synthetic CLI positive controls and hostile mutations; not empirical judge evidence.
 - docs/research/SCI-REFERENCE-ASSURANCE-001.md: protocol for evidence-backed reference labels, independent adjudication, uncertainty preservation, source ancestry and external custody.
+- docs/research/SCI-RUBRIC-EXPLOITABILITY-001.md: protocol for rubric validity, meaning-preserving/meaning-changing interventions, score gaming, adaptive Goodhart tests and human-alignment comparisons; no empirical result is claimed.
 - src/reference_assurance.rs: strict typed reference-package commitment/verification, cross-record validation, disagreement accounting and explicit claim-boundary report.
 - schema/reference-assurance-package.schema.json and fixtures/reference-assurance-package.example.json: strict v1 package schema and non-scoring example with intentionally preserved rater disagreement.
 - tools/test_reference_assurance.py: independent standard-library Python commitment/structure oracle and adversarial unit tests; test-only, not a production validator.
