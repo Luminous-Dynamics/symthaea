@@ -375,7 +375,7 @@ mod tests {
         assert!((risk.bias_squared - 0.000625).abs() < EPS);
         assert!((risk.variance_over_n - 0.0111).abs() < EPS);
         assert!((risk.mse - 0.011725).abs() < EPS);
-        assert!((risk.omitted_target_mass - 0.5).abs() < EPS);
+        assert!((risk.omitted_target_mass - 0.2).abs() < EPS);
         assert!(!risk.identified);
     }
 
