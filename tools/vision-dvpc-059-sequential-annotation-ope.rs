@@ -359,6 +359,9 @@ fn two_batch_variance_objective(
 #[derive(Clone, Copy, Debug)]
 struct PilotEstimate {
     profile: VarianceProfile,
+    /// Mean Horvitz-weighted pilot score; the pilot batch is part of the final
+    /// estimator, with its own inclusion probabilities.
+    score_mean: f64,
     stage1_count: usize,
     stage2_count: [usize; BRANCHES],
 }
@@ -380,16 +383,26 @@ fn estimate_pilot_profile(world: World, pilot_n: usize, pilot_probability: f64, 
         return Err("invalid pilot sample size or annotation probability".into());
     }
     let mut rng = Rng::new(seed);
+    let pilot_prefix = pilot_design(pilot_probability)?;
     let mut stage1_values = Vec::new();
     let mut stage2_values: [Vec<f64>; BRANCHES] = std::array::from_fn(|_| Vec::new());
+    let mut score_sum = 0.0;
     for _ in 0..pilot_n {
         let branch = if rng.bernoulli(world.branch_probability[0]) { 0 } else { 1 };
         let d1 = world.variance.stage1.sqrt() * rng.normal();
         let d2 = world.variance.stage2[branch].sqrt() * rng.normal();
-        if rng.bernoulli(pilot_probability) {
+        let annotated = rng.bernoulli(pilot_probability);
+        if annotated {
             stage1_values.push(d1);
             stage2_values[branch].push(d2);
         }
+        // Pilot observations remain part of the final estimator. Since both
+        // stages are annotated together, both score increments use p.
+        score_sum += if annotated {
+            d1 / pilot_prefix.lambda1 + d2 / pilot_prefix.lambda12[branch]
+        } else {
+            0.0
+        };
     }
     let profile = VarianceProfile {
         stage1: sample_variance(&stage1_values, 0.5).max(EPS),
@@ -400,6 +413,7 @@ fn estimate_pilot_profile(world: World, pilot_n: usize, pilot_probability: f64, 
     profile.validate()?;
     Ok(PilotEstimate {
         profile,
+        score_mean: score_sum / pilot_n as f64,
         stage1_count: stage1_values.len(),
         stage2_count: std::array::from_fn(|branch| stage2_values[branch].len()),
     })
@@ -487,19 +501,31 @@ fn evaluate_design(
 fn evaluate_batch_adaptive(
     world: World,
     replicates: usize,
-    evaluation_n: usize,
+    adaptive_n: usize,
     pilot_n: usize,
     seed: u64,
 ) -> Result<Metrics, String> {
-    let kappa = PILOT_FRACTION;
+    if replicates < 2 || adaptive_n == 0 || pilot_n == 0 {
+        return Err("two-batch evaluation requires positive pilot/adaptive sample sizes".into());
+    }
+    let total_n = pilot_n + adaptive_n;
+    let kappa = pilot_n as f64 / total_n as f64;
+    if (kappa - PILOT_FRACTION).abs() > 1e-10 {
+        return Err("pilot sample fraction does not match the registered mixture fraction".into());
+    }
     let pilot_p = PILOT_ANNOTATION_PROBABILITY;
-    let oracle_target = exact_history_adaptive(world, world.variance)?.design;
+    let pilot_design = pilot_design(pilot_p)?;
+    let adaptive_budget = adaptive_batch_budget(world.budget, kappa, pilot_p)?;
+    let mut adaptive_world = world;
+    adaptive_world.budget = adaptive_budget;
+    let oracle_target = exact_history_adaptive(adaptive_world, world.variance)?.design;
+
     let mut estimates = Vec::with_capacity(replicates);
     let mut analytic_mse = 0.0;
     let mut expected_labels = 0.0;
-    let mut pooled_lambda1 = 0.0;
-    let mut pooled_lambda12_low = 0.0;
-    let mut pooled_lambda12_high = 0.0;
+    let mut adaptive_lambda1 = 0.0;
+    let mut adaptive_lambda12_low = 0.0;
+    let mut adaptive_lambda12_high = 0.0;
     let mut stage1_estimates = 0.0;
     let mut stage2_low_estimates = 0.0;
     let mut stage2_high_estimates = 0.0;
@@ -512,53 +538,68 @@ fn evaluate_batch_adaptive(
             pilot_p,
             mixed_seed(seed, replicate, 31),
         )?;
-        let plug_in_target = exact_history_adaptive(world, pilot.profile)?.design;
-        let pooled = pooled_two_batch_design(
-            plug_in_target,
-            kappa,
-            pilot_p,
-            ADAPTIVE_FLOOR,
-        )?;
-        let analytic_for_design =
-            objective(world.variance, pooled, world.branch_probability) / evaluation_n as f64;
-        analytic_mse += analytic_for_design;
-        expected_labels += expected_label_cost(pooled, world.branch_probability);
-        pooled_lambda1 += pooled.lambda1;
-        pooled_lambda12_low += pooled.lambda12[0];
-        pooled_lambda12_high += pooled.lambda12[1];
+        let plug_in_target = exact_history_adaptive(adaptive_world, pilot.profile)?.design;
+        let adaptive_objective =
+            objective(world.variance, plug_in_target, world.branch_probability);
+        let combined_objective = kappa * objective(world.variance, pilot_design, world.branch_probability)
+            + (1.0 - kappa) * adaptive_objective;
+        analytic_mse += combined_objective / total_n as f64;
+
+        let combined_cost = kappa * expected_label_cost(pilot_design, world.branch_probability)
+            + (1.0 - kappa) * expected_label_cost(plug_in_target, world.branch_probability);
+        expected_labels += combined_cost;
+        adaptive_lambda1 += plug_in_target.lambda1;
+        adaptive_lambda12_low += plug_in_target.lambda12[0];
+        adaptive_lambda12_high += plug_in_target.lambda12[1];
         stage1_estimates += pilot.profile.stage1;
         stage2_low_estimates += pilot.profile.stage2[0];
         stage2_high_estimates += pilot.profile.stage2[1];
 
-        let mut estimate = 0.0;
-        for index in 0..evaluation_n {
+        let mut adaptive_score_sum = 0.0;
+        for index in 0..adaptive_n {
             let trajectory = sample_trajectory(
                 world,
-                pooled,
-                mixed_seed(seed, replicate * evaluation_n + index, 41),
+                plug_in_target,
+                mixed_seed(seed, replicate * adaptive_n + index, 41),
             )?;
-            estimate += trajectory.score;
+            adaptive_score_sum += trajectory.score;
             prefix_violations += usize::from(trajectory.prefix_violation);
         }
-        estimates.push(estimate / evaluation_n as f64);
-        let _ = pilot.stage1_count;
-        let _ = pilot.stage2_count;
+
+        // Independent pilot and adaptive batch means are combined by their
+        // actual sample fractions. Each batch uses the exact probabilities
+        // under which its labels were drawn.
+        let adaptive_score_mean = adaptive_score_sum / adaptive_n as f64;
+        let combined_estimate = kappa * pilot.score_mean
+            + (1.0 - kappa) * adaptive_score_mean;
+        estimates.push(combined_estimate);
     }
 
     let n = estimates.len() as f64;
     let bias = estimates.iter().sum::<f64>() / n;
     let mse = estimates.iter().map(|estimate| estimate * estimate).sum::<f64>() / n;
     let variance = (mse - bias * bias).max(0.0);
-    let _ = oracle_target;
+    let pilot_expected_labels = expected_label_cost(pilot_design, world.branch_probability);
+    let expected_labels = expected_labels / n;
+    if expected_labels > world.budget + 1e-10 {
+        return Err(format!(
+            "two-batch design exceeds total budget: expected={expected_labels}, budget={}",
+            world.budget
+        ));
+    }
+    let _oracle_mse =
+        two_batch_variance_objective(world.variance, pilot_p, oracle_target,
+            world.branch_probability, kappa)? / total_n as f64;
+    let _ = pilot_expected_labels;
     Ok(Metrics {
         bias,
         variance,
         mse,
         analytic_mse: analytic_mse / n,
-        expected_labels: expected_labels / n,
-        mean_lambda1: pooled_lambda1 / n,
-        mean_lambda12_low: pooled_lambda12_low / n,
-        mean_lambda12_high: pooled_lambda12_high / n,
+        expected_labels,
+        mean_lambda1: adaptive_lambda1 / n,
+        mean_lambda12_low: adaptive_lambda12_low / n,
+        mean_lambda12_high: adaptive_lambda12_high / n,
         mean_pilot_stage1: stage1_estimates / n,
         mean_pilot_stage2_low: stage2_low_estimates / n,
         mean_pilot_stage2_high: stage2_high_estimates / n,
