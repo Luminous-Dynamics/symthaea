@@ -40,12 +40,12 @@ jobs:
           /tmp/vis-dvpc-052 --smoke > /tmp/vis-dvpc-052-smoke-a.tsv
           /tmp/vis-dvpc-052 --smoke > /tmp/vis-dvpc-052-smoke-b.tsv
           cmp /tmp/vis-dvpc-052-smoke-a.tsv /tmp/vis-dvpc-052-smoke-b.tsv
-          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $6 < 0 || $6 > 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $10 < 0 || $11 < 0 || $12 < 0 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > $3 || $16 != "true" || $17 < 1) bad=1; if ($5 == "full_support" && ($15 != "true" || $11 > 0.0000000001 || $13 > 0.0000000001)) bad=1; n++ } END { if (n != 108 || bad) exit 1 }' /tmp/vis-dvpc-052-smoke-a.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $6 < 0 || $6 > 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $10 < 0 || $11 < 0 || $12 < 0 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > $3 || $16 != "true" || $17 < 1 || ($10-$11-$12 > 0.00000001) || ($11+$12-$10 > 0.00000001)) bad=1; if ($5 == "full_support" && ($15 != "true" || $11 > 0.0000000001 || $13 > 0.0000000001)) bad=1; n++ } END { if (n != 108 || bad) exit 1 }' /tmp/vis-dvpc-052-smoke-a.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-052-smoke-a.tsv)" = "6"
       - name: Run full finite-budget MSE frontier
         run: |
           /tmp/vis-dvpc-052 > /tmp/vis-dvpc-052-full.tsv
-          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $6 < 0 || $6 > 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $10 < 0 || $11 < 0 || $12 < 0 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > $3 || $16 != "true" || $17 < 1) bad=1; if ($5 == "full_support" && ($15 != "true" || $11 > 0.0000000001 || $13 > 0.0000000001)) bad=1; n++ } END { if (n != 108 || bad) exit 1 }' /tmp/vis-dvpc-052-full.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $6 < 0 || $6 > 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $10 < 0 || $11 < 0 || $12 < 0 || $13 < 0 || $13 > 1 || $14 < 0 || $14 > $3 || $16 != "true" || $17 < 1 || ($10-$11-$12 > 0.00000001) || ($11+$12-$10 > 0.00000001)) bad=1; if ($5 == "full_support" && ($15 != "true" || $11 > 0.0000000001 || $13 > 0.0000000001)) bad=1; n++ } END { if (n != 108 || bad) exit 1 }' /tmp/vis-dvpc-052-full.tsv
           awk -F '\t' '$1 == "RESULT" && $2 == "balanced" && $3 == 4 && $4 == 1 && $5 == "support_truncating_oracle" { if ($15 != "false" || $11 <= 0 || $13 <= 0) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-052-full.tsv
           awk -F '\t' '$1 == "RESULT" && $2 == "balanced" && $3 == 4 && $4 == 1024 && $5 == "support_truncating_oracle" { if ($15 != "true" || $11 > 0.0000000001 || $13 > 0.0000000001) bad=1; n++ } END { if (n != 1 || bad) exit 1 }' /tmp/vis-dvpc-052-full.tsv
           grep -F $'BENCHMARK_CONFIG\tid\tVIS-DVPC-052' /tmp/vis-dvpc-052-full.tsv
