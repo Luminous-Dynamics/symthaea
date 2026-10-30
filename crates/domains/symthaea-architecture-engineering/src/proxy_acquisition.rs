@@ -84,7 +84,7 @@ pub enum ProxyQueryAttemptStatus {
     ComputeBudgetExhausted,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProxyQueryAttempt {
     pub attempt_index: usize,
     pub architecture_id: String,
@@ -96,7 +96,7 @@ pub struct ProxyQueryAttempt {
     pub observation_sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProxyAcquisitionReceipt {
     pub benchmark_id: String,
     pub target_metric_id: String,
