@@ -421,6 +421,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory_retrieval_calibration::{
+        RetrievalCalibrationAuditRequest, RetrievalCalibrationAuditReport,
+        RetrievalCalibrationObservation, ValidatedRetrievalCalibration,
+        audit_retrieval_value_estimator,
+    };
 
     fn digest(value: &str) -> String {
         sha256_hex(value.as_bytes())
@@ -468,6 +473,36 @@ mod tests {
         }
     }
 
+    fn calibration_receipt() -> (
+        RetrievalCalibrationAuditReport,
+        ValidatedRetrievalCalibration,
+    ) {
+        let observations = (0..300)
+            .map(|index| RetrievalCalibrationObservation {
+                query_id: format!("calibration-query-{index:04}"),
+                predicted_positive_probability: 0.9,
+                predicted_net_value_lcb_micro: 100,
+                observed_net_value_micro: 250,
+            })
+            .collect();
+        let request = RetrievalCalibrationAuditRequest {
+            estimator_id: "utility-estimator".into(),
+            estimator_version: "v1".into(),
+            estimator_sha256: digest("estimator"),
+            training_split_sha256: digest("training split"),
+            calibration_split_sha256: digest("heldout calibration split"),
+            audit_split_sha256: digest("audit split"),
+            family_alpha: 0.05,
+            family_size: 1,
+            target_lower_bound_coverage: 0.90,
+            minimum_audit_observations: 30,
+            ece_bins: 10,
+            observations,
+        };
+        let (report, capability) = audit_retrieval_value_estimator(request).unwrap();
+        (report, capability.unwrap())
+    }
+
     fn estimate() -> RetrievalUtilityEstimate {
         let unresolved = BTreeSet::from(["C1".to_string(), "C2".to_string()]);
         RetrievalUtilityEstimate {
@@ -484,6 +519,7 @@ mod tests {
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator"),
             calibration_split_sha256: digest("heldout calibration split"),
+            calibration_report_sha256: calibration_receipt().0.report_sha256,
             feature_schema_sha256: digest("features"),
             utility_schema_sha256: digest("micro-utility-v1"),
             correctness_gain_lcb_micro: 900,
