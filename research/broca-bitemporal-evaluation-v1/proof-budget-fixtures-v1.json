@@ -1,0 +1,1482 @@
+{
+  "schema_version": "broca-proof-budget-fixtures/v1",
+  "status": "synthetic_seed_fixtures_not_official_dataset",
+  "note": "D41-D47 are synthetic proof-budget counterfactuals. Oracle labels are evaluator-only and must not be exposed to retrieval or reader components.",
+  "algorithm_contract": {
+    "proof_semantics": "OR across alternative justifications; AND across evidence dependencies in one justification.",
+    "objective": "Minimize unique evidence token cost while satisfying every required conclusion and all candidate eligibility/independence constraints.",
+    "budget_semantics": "No partial or silently truncated proof packet is supported.",
+    "verification": "Separate proof sufficiency verification from exact minimum-cost optimality verification."
+  },
+  "cases": [
+    {
+      "case_id": "D41",
+      "name": "choose_minimum_cost_alternative_not_highest_similarity",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "candidates.D.token_cost",
+        "invariant_path": "presentation.label",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D41-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 2
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2,
+                "retrieval_rank": 1
+              },
+              "B": {
+                "token_cost": 2,
+                "retrieval_rank": 2
+              },
+              "C": {
+                "token_cost": 1,
+                "retrieval_rank": 50
+              },
+              "D": {
+                "token_cost": 1,
+                "retrieval_rank": 51
+              }
+            },
+            "proofs": {
+              "claim": {
+                "alternatives": {
+                  "pAB": [
+                    "A",
+                    "B"
+                  ],
+                  "pCD": [
+                    "C",
+                    "D"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "pCD",
+            "evidence_ids": [
+              "C",
+              "D"
+            ],
+            "token_cost": 2
+          }
+        },
+        {
+          "variant_id": "D41-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 2
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2,
+                "retrieval_rank": 1
+              },
+              "B": {
+                "token_cost": 2,
+                "retrieval_rank": 2
+              },
+              "C": {
+                "token_cost": 1,
+                "retrieval_rank": 50
+              },
+              "D": {
+                "token_cost": 4,
+                "retrieval_rank": 51
+              }
+            },
+            "proofs": {
+              "claim": {
+                "alternatives": {
+                  "pAB": [
+                    "A",
+                    "B"
+                  ],
+                  "pCD": [
+                    "C",
+                    "D"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proof": null,
+            "evidence_ids": [],
+            "token_cost": 0
+          }
+        },
+        {
+          "variant_id": "D41-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 2
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2,
+                "retrieval_rank": 1
+              },
+              "B": {
+                "token_cost": 2,
+                "retrieval_rank": 2
+              },
+              "C": {
+                "token_cost": 1,
+                "retrieval_rank": 50
+              },
+              "D": {
+                "token_cost": 1,
+                "retrieval_rank": 51
+              }
+            },
+            "proofs": {
+              "claim": {
+                "alternatives": {
+                  "pAB": [
+                    "A",
+                    "B"
+                  ],
+                  "pCD": [
+                    "C",
+                    "D"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "label": "compact"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "pCD",
+            "evidence_ids": [
+              "C",
+              "D"
+            ],
+            "token_cost": 2
+          }
+        },
+        {
+          "variant_id": "D41-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 2
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2,
+                "retrieval_rank": 1
+              },
+              "B": {
+                "token_cost": 2,
+                "retrieval_rank": 2
+              },
+              "C": {
+                "token_cost": 1,
+                "retrieval_rank": 50
+              },
+              "D": {
+                "token_cost": 1,
+                "retrieval_rank": 51
+              }
+            },
+            "proofs": {
+              "claim": {
+                "alternatives": {
+                  "pAB": [
+                    "A",
+                    "B"
+                  ],
+                  "pCD": [
+                    "C",
+                    "D"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "pCD",
+            "evidence_ids": [
+              "C",
+              "D"
+            ],
+            "token_cost": 2
+          }
+        },
+        {
+          "variant_id": "D41-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 2
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2,
+                "retrieval_rank": 1
+              },
+              "B": {
+                "token_cost": 2,
+                "retrieval_rank": 2
+              },
+              "C": {
+                "token_cost": 1,
+                "retrieval_rank": 50
+              },
+              "D": {
+                "token_cost": 4,
+                "retrieval_rank": 51
+              }
+            },
+            "proofs": {
+              "claim": {
+                "alternatives": {
+                  "pAB": [
+                    "A",
+                    "B"
+                  ],
+                  "pCD": [
+                    "C",
+                    "D"
+                  ]
+                }
+              }
+            },
+            "presentation": {
+              "label": "compact"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proof": null,
+            "evidence_ids": [],
+            "token_cost": 0
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D42",
+      "name": "low_rank_missing_premise_is_added_to_complete_proof",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "proofs.claim.dependencies.1",
+        "invariant_path": "presentation.color",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D42-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "low-rank-premise": {
+                "retrieval_rank": 99,
+                "token_cost": 2
+              },
+              "second": {
+                "retrieval_rank": 5,
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "second"
+                ]
+              }
+            },
+            "presentation": {
+              "color": "gray"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "required low-rank premise is absent from the proof graph"
+          }
+        },
+        {
+          "variant_id": "D42-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "low-rank-premise": {
+                "retrieval_rank": 99,
+                "token_cost": 2
+              },
+              "second": {
+                "retrieval_rank": 5,
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "second",
+                  "low-rank-premise"
+                ]
+              }
+            },
+            "presentation": {
+              "color": "gray"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "low-rank-premise",
+              "second"
+            ],
+            "token_cost": 4
+          }
+        },
+        {
+          "variant_id": "D42-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "low-rank-premise": {
+                "retrieval_rank": 99,
+                "token_cost": 2
+              },
+              "second": {
+                "retrieval_rank": 5,
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "second"
+                ]
+              }
+            },
+            "presentation": {
+              "color": "blue"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "required low-rank premise is absent from the proof graph"
+          }
+        },
+        {
+          "variant_id": "D42-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "low-rank-premise": {
+                "retrieval_rank": 99,
+                "token_cost": 2
+              },
+              "second": {
+                "retrieval_rank": 5,
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "second",
+                  null
+                ]
+              }
+            },
+            "presentation": {
+              "color": "gray"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "required low-rank premise is absent from the proof graph"
+          }
+        },
+        {
+          "variant_id": "D42-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "low-rank-premise": {
+                "retrieval_rank": 99,
+                "token_cost": 2
+              },
+              "second": {
+                "retrieval_rank": 5,
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "second",
+                  "low-rank-premise"
+                ]
+              }
+            },
+            "presentation": {
+              "color": "blue"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "low-rank-premise",
+              "second"
+            ],
+            "token_cost": 4
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D43",
+      "name": "duplicate_revisions_do_not_satisfy_independent_family_floor",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "candidates.B.source_family_id",
+        "invariant_path": "presentation.caption",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D43-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "policy": {
+              "minimum_independent_families": 2
+            },
+            "candidates": {
+              "A": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              },
+              "B": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "caption": "default"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "two revisions belong to one source family"
+          }
+        },
+        {
+          "variant_id": "D43-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "policy": {
+              "minimum_independent_families": 2
+            },
+            "candidates": {
+              "A": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              },
+              "B": {
+                "source_family_id": "family-B",
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "caption": "default"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A",
+              "B"
+            ],
+            "token_cost": 2
+          }
+        },
+        {
+          "variant_id": "D43-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "policy": {
+              "minimum_independent_families": 2
+            },
+            "candidates": {
+              "A": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              },
+              "B": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "caption": "reviewed"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "two revisions belong to one source family"
+          }
+        },
+        {
+          "variant_id": "D43-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "policy": {
+              "minimum_independent_families": 2
+            },
+            "candidates": {
+              "A": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              },
+              "B": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "caption": "default"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "two revisions belong to one source family"
+          }
+        },
+        {
+          "variant_id": "D43-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "policy": {
+              "minimum_independent_families": 2
+            },
+            "candidates": {
+              "A": {
+                "source_family_id": "family-A",
+                "token_cost": 1
+              },
+              "B": {
+                "source_family_id": "family-B",
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "caption": "reviewed"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A",
+              "B"
+            ],
+            "token_cost": 2
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D44",
+      "name": "retracted_evidence_is_ineligible_after_known_time",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "query.known_at",
+        "invariant_path": "presentation.note",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D44-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "candidates": {
+              "A": {
+                "recorded_at": "2026-10-01T00:00:00Z",
+                "retracted_at": "2026-10-30T12:00:00.001Z"
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "note": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A"
+            ]
+          }
+        },
+        {
+          "variant_id": "D44-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00Z",
+              "known_at": "2026-10-30T12:00:00.001Z"
+            },
+            "candidates": {
+              "A": {
+                "recorded_at": "2026-10-01T00:00:00Z",
+                "retracted_at": "2026-10-30T12:00:00.001Z"
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "note": "normal"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "retraction is known"
+          }
+        },
+        {
+          "variant_id": "D44-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "candidates": {
+              "A": {
+                "recorded_at": "2026-10-01T00:00:00Z",
+                "retracted_at": "2026-10-30T12:00:00.001Z"
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "note": "revocation"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A"
+            ]
+          }
+        },
+        {
+          "variant_id": "D44-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "candidates": {
+              "A": {
+                "recorded_at": "2026-10-01T00:00:00Z",
+                "retracted_at": "2026-10-30T12:00:00.001Z"
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "note": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A"
+            ]
+          }
+        },
+        {
+          "variant_id": "D44-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00Z",
+              "known_at": "2026-10-30T12:00:00.001Z"
+            },
+            "candidates": {
+              "A": {
+                "recorded_at": "2026-10-01T00:00:00Z",
+                "retracted_at": "2026-10-30T12:00:00.001Z"
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "note": "revocation"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "retraction is known"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D45",
+      "name": "one_token_over_budget_never_yields_truncated_packet",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "budget.token_budget",
+        "invariant_path": "presentation.summary",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D45-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 3
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "summary": "normal"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proof": null,
+            "evidence_ids": [],
+            "required_cost": 5
+          }
+        },
+        {
+          "variant_id": "D45-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 3
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "summary": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A",
+              "B"
+            ],
+            "token_cost": 5
+          }
+        },
+        {
+          "variant_id": "D45-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 3
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "summary": "terse"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proof": null,
+            "evidence_ids": [],
+            "required_cost": 5
+          }
+        },
+        {
+          "variant_id": "D45-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 3
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "summary": "normal"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proof": null,
+            "evidence_ids": [],
+            "required_cost": 5
+          }
+        },
+        {
+          "variant_id": "D45-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 3
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              }
+            },
+            "presentation": {
+              "summary": "terse"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A",
+              "B"
+            ],
+            "token_cost": 5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D46",
+      "name": "mutated_source_span_invalidates_candidate",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "candidates.A.resolved_span_matches",
+        "invariant_path": "presentation.source_label",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D46-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "resolved_span_matches": false,
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "source_label": "source"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "reconstructed source span does not match its committed digest"
+          }
+        },
+        {
+          "variant_id": "D46-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "resolved_span_matches": true,
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "source_label": "source"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A"
+            ],
+            "token_cost": 1
+          }
+        },
+        {
+          "variant_id": "D46-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "resolved_span_matches": false,
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "source_label": "verified"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "reconstructed source span does not match its committed digest"
+          }
+        },
+        {
+          "variant_id": "D46-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "resolved_span_matches": false,
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "source_label": "source"
+            }
+          },
+          "oracle": {
+            "status": "no_eligible_proof",
+            "selected_proof": null,
+            "reason": "reconstructed source span does not match its committed digest"
+          }
+        },
+        {
+          "variant_id": "D46-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 4
+            },
+            "candidates": {
+              "A": {
+                "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "source_span_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "resolved_span_matches": true,
+                "token_cost": 1
+              }
+            },
+            "proofs": {
+              "claim": {
+                "dependencies": [
+                  "A"
+                ]
+              }
+            },
+            "presentation": {
+              "source_label": "verified"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proof": "proof-1",
+            "evidence_ids": [
+              "A"
+            ],
+            "token_cost": 1
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D47",
+      "name": "shared_evidence_is_deduplicated_across_required_claims",
+      "decision": "select_minimum_sufficient_proof_packet",
+      "intervention_contract": {
+        "decisive_path": "candidates.B.token_cost",
+        "invariant_path": "presentation.annotation",
+        "or_of_and_semantics": true
+      },
+      "variants": [
+        {
+          "variant_id": "D47-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 1
+              },
+              "C": {
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim1": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              },
+              "claim2": {
+                "dependencies": [
+                  "B",
+                  "C"
+                ]
+              }
+            },
+            "presentation": {
+              "annotation": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proofs": [
+              "claim1-p",
+              "claim2-p"
+            ],
+            "evidence_ids": [
+              "A",
+              "B",
+              "C"
+            ],
+            "token_cost": 5
+          }
+        },
+        {
+          "variant_id": "D47-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 2
+              },
+              "C": {
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim1": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              },
+              "claim2": {
+                "dependencies": [
+                  "B",
+                  "C"
+                ]
+              }
+            },
+            "presentation": {
+              "annotation": "normal"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proofs": null,
+            "evidence_ids": [],
+            "required_cost": 6
+          }
+        },
+        {
+          "variant_id": "D47-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 1
+              },
+              "C": {
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim1": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              },
+              "claim2": {
+                "dependencies": [
+                  "B",
+                  "C"
+                ]
+              }
+            },
+            "presentation": {
+              "annotation": "dedup"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proofs": [
+              "claim1-p",
+              "claim2-p"
+            ],
+            "evidence_ids": [
+              "A",
+              "B",
+              "C"
+            ],
+            "token_cost": 5
+          }
+        },
+        {
+          "variant_id": "D47-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 1
+              },
+              "C": {
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim1": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              },
+              "claim2": {
+                "dependencies": [
+                  "B",
+                  "C"
+                ]
+              }
+            },
+            "presentation": {
+              "annotation": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported",
+            "selected_proofs": [
+              "claim1-p",
+              "claim2-p"
+            ],
+            "evidence_ids": [
+              "A",
+              "B",
+              "C"
+            ],
+            "token_cost": 5
+          }
+        },
+        {
+          "variant_id": "D47-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "budget": {
+              "token_budget": 5
+            },
+            "candidates": {
+              "A": {
+                "token_cost": 2
+              },
+              "B": {
+                "token_cost": 2
+              },
+              "C": {
+                "token_cost": 2
+              }
+            },
+            "proofs": {
+              "claim1": {
+                "dependencies": [
+                  "A",
+                  "B"
+                ]
+              },
+              "claim2": {
+                "dependencies": [
+                  "B",
+                  "C"
+                ]
+              }
+            },
+            "presentation": {
+              "annotation": "dedup"
+            }
+          },
+          "oracle": {
+            "status": "budget_insufficient",
+            "selected_proofs": null,
+            "evidence_ids": [],
+            "required_cost": 6
+          }
+        }
+      ]
+    }
+  ],
+  "invariants": [
+    "Retrieval similarity rank is diagnostic and cannot override proof sufficiency.",
+    "Unique evidence IDs are charged once across all selected conclusions.",
+    "Distinct source families, not revision counts, satisfy independence thresholds.",
+    "Bitemporal, valid-time, scope, authorization, and source-span constraints are applied before proof selection.",
+    "A search limit reached before exhaustive completion is not reported as Supported or optimal.",
+    "A valid but non-minimal proof may pass sufficiency verification but must fail minimum-cost optimality verification."
+  ]
+}
