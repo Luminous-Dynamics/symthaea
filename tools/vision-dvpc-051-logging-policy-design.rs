@@ -25,6 +25,7 @@ const DEFAULT_GRID_INTERVALS: usize = 200;
 const SMOKE_GRID_INTERVALS: usize = 20;
 const EPS: f64 = 1e-12;
 const REWARD_UPPER_ENVELOPE: [[f64; 2]; 2] = [[0.20, 0.95], [0.98, 0.20]];
+const REWARD_ENVELOPE_SCALES: [f64; 5] = [1.0, 1.1, 1.25, 1.5, 2.0];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PortfolioRegime {
@@ -221,26 +222,55 @@ fn frozen_reward_mean_table() -> [[f64; 2]; 2] {
     ]
 }
 
-/// Upper bound on E_mu[(w_pi R)^2] using the preregistered reward envelope.
+/// Upper bound on E_mu[(w_pi R)^2] using a registered reward envelope.
 /// For Bernoulli rewards, R^2=R, so it upper-bounds the exact second moment if
 /// every envelope entry is at least the true reward mean. It is not variance itself.
-fn envelope_ips_reward_second_moment(policy: Policy, logger: Logger) -> f64 {
+fn envelope_ips_reward_second_moment_with(
+    policy: Policy,
+    logger: Logger,
+    envelope: [[f64; 2]; 2],
+) -> f64 {
     let mut second_moment_upper = 0.0;
     for context in 0..2 {
         let q = policy.p1[context];
         let p = logger.p1[context];
         second_moment_upper += 0.5
-            * (q * q * reward_upper_mean(context, 1) / p
-                + (1.0 - q) * (1.0 - q) * reward_upper_mean(context, 0) / (1.0 - p));
+            * (q * q * envelope[context][1] / p
+                + (1.0 - q) * (1.0 - q) * envelope[context][0] / (1.0 - p));
     }
     second_moment_upper
 }
-fn worst_reward_envelope_second_moment(policy_set: &[Policy], logger: Logger) -> (usize, f64) {
+fn envelope_ips_reward_second_moment(policy: Policy, logger: Logger) -> f64 {
+    envelope_ips_reward_second_moment_with(policy, logger, REWARD_UPPER_ENVELOPE)
+}
+fn worst_reward_envelope_second_moment_with(
+    policy_set: &[Policy],
+    logger: Logger,
+    envelope: [[f64; 2]; 2],
+) -> (usize, f64) {
     policy_set
         .iter()
-        .map(|p| (p.id, envelope_ips_reward_second_moment(*p, logger)))
+        .map(|p| (p.id, envelope_ips_reward_second_moment_with(*p, logger, envelope)))
         .max_by(|a, b| a.1.total_cmp(&b.1))
         .unwrap_or((0, f64::INFINITY))
+}
+fn worst_reward_envelope_second_moment(policy_set: &[Policy], logger: Logger) -> (usize, f64) {
+    worst_reward_envelope_second_moment_with(policy_set, logger, REWARD_UPPER_ENVELOPE)
+}
+fn scaled_reward_envelope(scale: f64) -> Result<[[f64; 2]; 2], String> {
+    if !scale.is_finite() || scale < 1.0 {
+        return Err("reward-envelope scale must be finite and at least 1".into());
+    }
+    Ok([
+        [
+            (REWARD_UPPER_ENVELOPE[0][0] * scale).min(1.0),
+            (REWARD_UPPER_ENVELOPE[0][1] * scale).min(1.0),
+        ],
+        [
+            (REWARD_UPPER_ENVELOPE[1][0] * scale).min(1.0),
+            (REWARD_UPPER_ENVELOPE[1][1] * scale).min(1.0),
+        ],
+    ])
 }
 
 /// Exact E_mu[(w_pi R)^2] - V(pi)^2 for Bernoulli rewards, because R^2=R.
@@ -310,14 +340,14 @@ fn reward_greedy_logger(floor: f64) -> Logger {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum GridObjective {
     WeightSecondMoment,
-    RewardEnvelopeSecondMoment,
+    RewardEnvelopeSecondMoment([[f64; 2]; 2]),
     RewardVariance,
 }
 fn objective_score(policy_set: &[Policy], logger: Logger, objective: GridObjective) -> f64 {
     match objective {
         GridObjective::WeightSecondMoment => worst_weight_second_moment(policy_set, logger).1,
-        GridObjective::RewardEnvelopeSecondMoment => {
-            worst_reward_envelope_second_moment(policy_set, logger).1
+        GridObjective::RewardEnvelopeSecondMoment(envelope) => {
+            worst_reward_envelope_second_moment_with(policy_set, logger, envelope).1
         }
         GridObjective::RewardVariance => worst_ips_variance(policy_set, logger).1,
     }
@@ -380,7 +410,7 @@ fn logger_for(
             policy_set,
             floor,
             grid_intervals,
-            GridObjective::RewardEnvelopeSecondMoment,
+            GridObjective::RewardEnvelopeSecondMoment(REWARD_UPPER_ENVELOPE),
         )?,
         LoggerKind::OracleRewardAwareMinimaxVariance => minimax_logger(
             policy_set,
@@ -439,11 +469,41 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
     ));
     out.push_str("BENCHMARK_CONFIG\tinterpretation\tanalytic_expected_values_no_monte_carlo_sampling\n");
     out.push_str("BENCHMARK_CONFIG\treward_envelope\tregistered upper means: 0.20,0.95;0.98,0.20\n");
+    out.push_str("BENCHMARK_CONFIG\treward_envelope_sensitivity_scales\t1.0,1.1,1.25,1.5,2.0\n");
     out.push_str("BENCHMARK_CONFIG\toracle_only\toracle_reward_aware_variance and reward_greedy_with_floor use known synthetic reward means\n");
     out.push_str("BENCHMARK_CONFIG\tfrontier\timmediate_reward_vs_worst_policy_IPS_variance_weight_moment_and_envelope_bound\n");
     for regime in PortfolioRegime::ALL {
         for m in POLICY_COUNTS {
             let policy_set = policies(regime, m);
+            for scale in REWARD_ENVELOPE_SCALES {
+                let envelope = scaled_reward_envelope(scale)?;
+                validate_reward_envelope(envelope, frozen_reward_mean_table())?;
+                let logger = minimax_logger(
+                    &policy_set,
+                    ACTION_PROPENSITY_FLOOR,
+                    grid_intervals,
+                    GridObjective::RewardEnvelopeSecondMoment(envelope),
+                )?;
+                let (_, envelope_m2) =
+                    worst_reward_envelope_second_moment_with(&policy_set, logger, envelope);
+                let (_, worst_weight_m2) = worst_weight_second_moment(&policy_set, logger);
+                let (_, worst_variance) = worst_ips_variance(&policy_set, logger);
+                out.push_str(&format!(
+                    "ENVELOPE_SENSITIVITY\t{}\t{}\t{:.2}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\n",
+                    regime.name(),
+                    m,
+                    scale,
+                    logger.p1[0],
+                    logger.p1[1],
+                    logger_reward(logger),
+                    worst_weight_m2,
+                    1.0 / worst_weight_m2.max(1.0),
+                    envelope_m2,
+                    worst_variance,
+                    worst_reward_envelope_second_moment_with(&policy_set, logger, envelope).0,
+                    grid_intervals,
+                ));
+            }
             for kind in LoggerKind::ALL {
                 let logger = logger_for(kind, &policy_set, ACTION_PROPENSITY_FLOOR, grid_intervals)?;
                 let met = metrics(&policy_set, logger, ACTION_PROPENSITY_FLOOR)?;
@@ -552,7 +612,7 @@ mod tests {
             &policy_set,
             ACTION_PROPENSITY_FLOOR,
             100,
-            GridObjective::RewardEnvelopeSecondMoment,
+            GridObjective::RewardEnvelopeSecondMoment(REWARD_UPPER_ENVELOPE),
         )
         .unwrap();
         let uniform_variance = worst_ips_variance(&policy_set, uniform).1;
@@ -702,6 +762,12 @@ mod tests {
         let b = benchmark(10).unwrap();
         assert_eq!(a, b);
         assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 63);
+        assert_eq!(
+            a.lines()
+                .filter(|line| line.starts_with("ENVELOPE_SENSITIVITY\t"))
+                .count(),
+            45
+        );
         assert!(a.contains("oracle_reward_aware_variance and reward_greedy_with_floor use known synthetic reward means"));
         assert!(a.contains("reward_envelope_minimax_ips_second_moment_grid"));
         assert!(a.contains("minimax_weight_second_moment_grid"));
