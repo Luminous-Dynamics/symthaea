@@ -1,16 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Topology sweep for the exact binary min-fill factor-elimination kernel.
+//! Topology sweep for the production log-domain binary min-fill factor kernel.
 //!
 //! Run with:
 //! cargo run --release --locked -p symthaea-iit --example factor_elimination_sweep
 //!
-//! This measures the standalone sum-product primitive. It is not yet an IIT
-//! end-to-end benchmark and must not be compared with PyPhi's SIA timing.
+//! This measures the same log-domain primitive used by IIT 4.0 Eq. 4. It is not
+//! an end-to-end SIA benchmark and must not be compared with PyPhi's SIA timing.
 
 use std::time::{Duration, Instant};
 
-use symthaea_iit::{min_fill_sum_product, BinaryFactor};
+use symthaea_iit::{min_fill_log_sum_product, BinaryLogFactor};
 
 #[derive(Clone, Copy)]
 struct Fixture {
@@ -45,19 +45,20 @@ const PAIR_FACTOR: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
 const MAX_FACTOR_ENTRIES: usize = 1 << 16;
 const REPEATS: usize = 9;
 
-fn add_edge(factors: &mut Vec<BinaryFactor>, left: usize, right: usize) -> Result<(), String> {
+fn add_edge(factors: &mut Vec<BinaryLogFactor>, left: usize, right: usize) -> Result<(), String> {
     let scope = if left < right {
         vec![left, right]
     } else {
         vec![right, left]
     };
-    let factor = BinaryFactor::new(scope, PAIR_FACTOR.to_vec())
+    let log_values = PAIR_FACTOR.iter().map(|probability| probability.ln()).collect();
+    let factor = BinaryLogFactor::new(scope, log_values)
         .map_err(|error| error.to_string())?;
     factors.push(factor);
     Ok(())
 }
 
-fn build_factors(fixture: Fixture) -> Result<Vec<BinaryFactor>, String> {
+fn build_factors(fixture: Fixture) -> Result<Vec<BinaryLogFactor>, String> {
     let mut factors = Vec::new();
     match fixture.topology {
         "chain" => {
@@ -113,11 +114,11 @@ fn run() -> Result<(), String> {
     for fixture in FIXTURES {
         let factors = build_factors(fixture)?;
         let eliminate = (0..fixture.variables - 1).collect::<Vec<_>>();
-        let warmup = min_fill_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
+        let warmup = min_fill_log_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
             .map_err(|error| format!("warm-up failed for {}-{}: {error}", fixture.topology, fixture.variables))?;
         if warmup.factor.variables() != [fixture.variables - 1]
-            || warmup.factor.values().len() != 2
-            || warmup.factor.values().iter().any(|value| !value.is_finite())
+            || warmup.factor.log_values().len() != 2
+            || warmup.factor.log_values().iter().any(|value| !value.is_finite())
             || warmup.variables_summed_out != fixture.variables - 1
         {
             return Err(format!(
@@ -129,11 +130,11 @@ fn run() -> Result<(), String> {
         let mut samples = Vec::with_capacity(REPEATS);
         for _ in 0..REPEATS {
             let start = Instant::now();
-            let report = min_fill_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
+            let report = min_fill_log_sum_product(&factors, &eliminate, MAX_FACTOR_ENTRIES)
                 .map_err(|error| format!("elimination failed: {error}"))?;
             samples.push(start.elapsed());
             if report.factor.variables() != [fixture.variables - 1]
-                || report.factor.values().len() != 2
+                || report.factor.log_values().len() != 2
                 || report.induced_width != warmup.induced_width
                 || report.peak_factor_entries != warmup.peak_factor_entries
             {
@@ -145,7 +146,7 @@ fn run() -> Result<(), String> {
         }
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
-        let validated = warmup.factor.values().iter().all(|value| value.is_finite());
+        let validated = warmup.factor.log_values().iter().all(|value| value.is_finite());
         println!(
             "{},{},{},{},{},{},{},{},{},{}",
             fixture.topology,
