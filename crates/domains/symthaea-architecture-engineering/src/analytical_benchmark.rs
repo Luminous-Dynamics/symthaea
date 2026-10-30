@@ -224,10 +224,6 @@ pub fn run_analytical_trial(
     }
     let pool = generate_candidates(function, dimension, seed)?;
     let ladder = analytical_fidelity_ladder();
-    let costs: HashMap<String, u64> = ladder
-        .iter()
-        .map(|level| (level.id.clone(), level.cumulative_cost_units))
-        .collect();
     let by_id: HashMap<String, AnalyticalCandidate> = pool
         .iter()
         .cloned()
@@ -606,7 +602,9 @@ fn uniform(state: &mut u64) -> f64 {
 }
 
 fn deterministic_noise(seed: u64) -> f64 {
-    2.0 * uniform(&mut seed.clone()) - 1.0
+    let value = splitmix64(seed);
+    let unit = (value >> 11) as f64 / ((1u64 << 53) as f64);
+    2.0 * unit - 1.0
 }
 
 fn ranks(values: &[f64]) -> Vec<f64> {
