@@ -75,7 +75,10 @@
         "must_exclude_direct_declarations": [
           "h"
         ],
-        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity."
+        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity.",
+        "must_include_direct_constants": [
+          "Nat.le_refl"
+        ]
       }
     },
     {
@@ -107,7 +110,10 @@
         "must_exclude_direct_declarations": [
           "hIrrelevant"
         ],
-        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity."
+        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity.",
+        "must_include_direct_constants": [
+          "Nat.succ_le_succ"
+        ]
       }
     }
   ],
