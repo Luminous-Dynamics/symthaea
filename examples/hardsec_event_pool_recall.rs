@@ -46,6 +46,8 @@ struct CoverageSummary {
     observed_event_ids: BTreeSet<String>,
     unreachable_transition_ids: BTreeSet<String>,
     unreachable_event_ids: BTreeSet<String>,
+    reference_phase_edges: BTreeSet<(String, String)>,
+    observed_phase_edges: BTreeSet<(String, String)>,
     trace_count: usize,
 }
 
@@ -301,15 +303,38 @@ fn enumerate_reference_events(
     ))
 }
 
+fn enumerate_reference_phase_edges(
+    reachable_transition_ids: &BTreeSet<String>,
+    transitions_by_id: &BTreeMap<String, Transition>,
+    by_state: &BTreeMap<String, Vec<Transition>>,
+) -> BTreeSet<(String, String)> {
+    let mut phase_edges = BTreeSet::new();
+    for transition_id in reachable_transition_ids {
+        let transition = &transitions_by_id[transition_id];
+        if let Some(next_transitions) = by_state.get(&transition.to) {
+            for next in next_transitions {
+                phase_edges.insert((transition.id.clone(), next.id.clone()));
+            }
+        }
+    }
+    phase_edges
+}
+
 fn replay_trace_pool(
     traces: &[Trace],
     transitions_by_id: &BTreeMap<String, Transition>,
-) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+) -> Result<(
+    BTreeSet<String>,
+    BTreeSet<String>,
+    BTreeSet<(String, String)>,
+), String> {
     let mut observed_transition_ids = BTreeSet::new();
     let mut observed_event_ids = BTreeSet::new();
+    let mut observed_phase_edges = BTreeSet::new();
 
     for trace in traces {
         let mut current_state = trace.initial_state.clone();
+        let mut previous_transition_id: Option<String> = None;
         for (index, transition_id) in trace.steps.iter().enumerate() {
             let transition = transitions_by_id.get(transition_id).ok_or_else(|| {
                 format!(
@@ -326,11 +351,19 @@ fn replay_trace_pool(
 
             observed_transition_ids.insert(transition.id.clone());
             observed_event_ids.insert(transition.event_id.clone());
+            if let Some(previous) = previous_transition_id.as_ref() {
+                observed_phase_edges.insert((previous.clone(), transition.id.clone()));
+            }
+            previous_transition_id = Some(transition.id.clone());
             current_state = transition.to.clone();
         }
     }
 
-    Ok((observed_transition_ids, observed_event_ids))
+    Ok((
+        observed_transition_ids,
+        observed_event_ids,
+        observed_phase_edges,
+    ))
 }
 
 fn validate_spec(value: &Value, spec_sha256: String) -> Result<CoverageSummary, String> {
@@ -365,7 +398,12 @@ fn validate_spec(value: &Value, spec_sha256: String) -> Result<CoverageSummary, 
 
     let (reference_transition_ids, reference_event_ids, reference_state_count) =
         enumerate_reference_events(&initial_states, &transitions_by_state, state_limit)?;
-    let (observed_transition_ids, observed_event_ids) =
+    let reference_phase_edges = enumerate_reference_phase_edges(
+        &reference_transition_ids,
+        &transitions_by_id,
+        &transitions_by_state,
+    );
+    let (observed_transition_ids, observed_event_ids, observed_phase_edges) =
         replay_trace_pool(&traces, &transitions_by_id)?;
 
     if !observed_transition_ids.is_subset(&reference_transition_ids) {
@@ -377,6 +415,11 @@ fn validate_spec(value: &Value, spec_sha256: String) -> Result<CoverageSummary, 
     if !observed_event_ids.is_subset(&reference_event_ids) {
         return Err(
             "trace pool contains an event outside the enumerated reachable event set".to_owned(),
+        );
+    }
+    if !observed_phase_edges.is_subset(&reference_phase_edges) {
+        return Err(
+            "trace pool contains a phase edge outside the reachable transition graph".to_owned(),
         );
     }
 
@@ -404,6 +447,8 @@ fn validate_spec(value: &Value, spec_sha256: String) -> Result<CoverageSummary, 
         observed_event_ids,
         unreachable_transition_ids,
         unreachable_event_ids,
+        reference_phase_edges,
+        observed_phase_edges,
         trace_count: traces.len(),
     })
 }
@@ -422,6 +467,21 @@ fn receipt(summary: &CoverageSummary) -> Value {
         .reference_transition_ids
         .difference(&summary.observed_transition_ids)
         .cloned()
+        .collect::<Vec<_>>();
+    let missed_phase_edges = summary
+        .reference_phase_edges
+        .difference(&summary.observed_phase_edges)
+        .map(|(from, to)| json!({"from_transition_id": from, "to_transition_id": to}))
+        .collect::<Vec<_>>();
+    let reference_phase_edges = summary
+        .reference_phase_edges
+        .iter()
+        .map(|(from, to)| json!({"from_transition_id": from, "to_transition_id": to}))
+        .collect::<Vec<_>>();
+    let observed_phase_edges = summary
+        .observed_phase_edges
+        .iter()
+        .map(|(from, to)| json!({"from_transition_id": from, "to_transition_id": to}))
         .collect::<Vec<_>>();
 
     json!({
@@ -448,6 +508,15 @@ fn receipt(summary: &CoverageSummary) -> Value {
             summary.reference_transition_ids.len()
         ),
         "missed_transition_ids": missed_transition_ids,
+        "reference_phase_edge_count": summary.reference_phase_edges.len(),
+        "observed_phase_edge_count": summary.observed_phase_edges.len(),
+        "phase_edge_recall": ratio(
+            summary.observed_phase_edges.len(),
+            summary.reference_phase_edges.len()
+        ),
+        "reference_phase_edges": reference_phase_edges,
+        "observed_phase_edges": observed_phase_edges,
+        "missed_phase_edges": missed_phase_edges,
         "unreachable_transition_ids_excluded_from_denominator": summary.unreachable_transition_ids,
         "unreachable_event_ids_excluded_from_denominator": summary.unreachable_event_ids,
         "coverage_interpretation": "exact unique-event recall against the complete reachable transition graph of this declared finite FSM",
@@ -455,7 +524,7 @@ fn receipt(summary: &CoverageSummary) -> Value {
         "limitations": [
             "Completeness applies only to the declared finite FSM and its declared initial states.",
             "Trace-pool recall is not physical hardware trigger coverage or reachable-state coverage of a real circuit.",
-            "This prototype counts unique transition event identifiers; it does not yet measure temporal path-sequence recall or state-cube extraction loss."
+            "Phase-edge recall measures adjacent transition-ID pairs only; it does not yet measure longer path-sequence recall or state-cube extraction loss."
         ]
     })
 }
@@ -596,6 +665,33 @@ mod tests {
         ]);
         let summary = validate_spec(&value, "0".repeat(64)).unwrap();
         assert_eq!(summary.observed_event_ids.len(), 4);
+    }
+
+    #[test]
+    fn phase_edge_recall_detects_temporal_compatibility_edges_missing_from_the_pool() {
+        let summary = validate_spec(&fixture(), "0".repeat(64)).unwrap();
+        assert_eq!(summary.reference_phase_edges.len(), 7);
+        assert_eq!(summary.observed_phase_edges.len(), 4);
+        let result = receipt(&summary);
+        assert_eq!(result["reference_phase_edge_count"], json!(7));
+        assert_eq!(result["observed_phase_edge_count"], json!(4));
+        assert_eq!(result["phase_edge_recall"], json!(4.0 / 7.0));
+        assert_eq!(result["missed_phase_edges"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn repeated_trace_steps_do_not_inflate_unique_phase_edges() {
+        let mut value = fixture();
+        value["trace_pool"][0]["steps"] = json!([
+            "t_reset_to_a",
+            "t_a_idle",
+            "t_a_idle",
+            "t_a_idle",
+            "t_a_to_done",
+            "t_done_to_sink"
+        ]);
+        let summary = validate_spec(&value, "0".repeat(64)).unwrap();
+        assert_eq!(summary.observed_phase_edges.len(), 4);
     }
 
     #[test]
