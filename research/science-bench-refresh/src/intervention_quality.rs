@@ -881,6 +881,7 @@ mod tests {
                 make_candidate("c3", "evidence", "withdrawal", "task-2", IntendedSemanticRelationV1::SemanticChange, PipelineDispositionV1::Rejected, 80),
                 make_candidate("c4", "authority", "provenance", "task-3", IntendedSemanticRelationV1::SemanticInvariant, PipelineDispositionV1::Abstained, 60),
                 make_candidate("c5", "authority", "authority-cue", "task-4", IntendedSemanticRelationV1::SemanticChange, PipelineDispositionV1::Accepted, 70),
+                make_candidate("c6", "surface", "rubric-order", "task-5", IntendedSemanticRelationV1::SemanticInvariant, PipelineDispositionV1::Accepted, 90),
             ],
         }
     }
@@ -946,6 +947,10 @@ mod tests {
                     candidate_id: "c5".to_owned(),
                     reviewers: reviewers("c5", [ReviewerVerdictV1::MeaningPreserving, ReviewerVerdictV1::MeaningChanging, ReviewerVerdictV1::Ambiguous]),
                 },
+                CandidateAdjudicationV1 {
+                    candidate_id: "c6".to_owned(),
+                    reviewers: reviewers("c6", [ReviewerVerdictV1::MeaningChanging, ReviewerVerdictV1::MeaningChanging, ReviewerVerdictV1::MeaningPreserving]),
+                },
             ],
         };
         let receipt_bytes = serde_json::to_vec_pretty(&receipt).unwrap();
@@ -956,8 +961,8 @@ mod tests {
     fn accepts_clean_census_and_counts_all_candidates() {
         let (_, plan, receipt) = fixture();
         let report = analyze_intervention_quality(&plan, &receipt).unwrap();
-        assert_eq!(report.fields.candidate_count, 5);
-        assert_eq!(report.fields.adjudicated_candidate_count, 5);
+        assert_eq!(report.fields.candidate_count, 6);
+        assert_eq!(report.fields.adjudicated_candidate_count, 6);
         assert_eq!(report.fields.accepted_valid_count, 2);
         assert_eq!(report.fields.rejected_valid_count, 1);
         assert_eq!(report.fields.abstained_count, 1);
@@ -971,6 +976,7 @@ mod tests {
         let (_, plan, receipt) = fixture();
         let report = analyze_intervention_quality(&plan, &receipt).unwrap();
         assert_eq!(report.fields.accepted_ambiguous_count, 1);
+        assert_eq!(report.fields.accepted_invalid_count, 1);
         assert_eq!(report.fields.ambiguous_relation_count, 2);
     }
 
@@ -978,9 +984,9 @@ mod tests {
     fn reports_precision_recall_and_cost_denominators() {
         let (_, plan, receipt) = fixture();
         let report = analyze_intervention_quality(&plan, &receipt).unwrap();
-        assert_eq!(report.fields.accepted_valid_precision_lower_bound_ppm, Some(666_666));
+        assert_eq!(report.fields.accepted_valid_precision_lower_bound_ppm, Some(500_000));
         assert_eq!(report.fields.valid_candidate_recall_ppm, Some(666_666));
-        assert_eq!(report.fields.pipeline_acceptance_rate_ppm, Some(600_000));
+        assert_eq!(report.fields.pipeline_acceptance_rate_ppm, Some(666_666));
         assert!(report.fields.valid_unique_accepted_per_1000_tokens.unwrap() > 0.0);
         assert!(report.fields.valid_unique_accepted_per_usd.unwrap() > 0.0);
         assert!(report.fields.reviewer_pairwise_agreement_ppm.unwrap() < 1_000_000);
@@ -992,8 +998,9 @@ mod tests {
         let (_, plan, receipt) = fixture();
         let report = analyze_intervention_quality(&plan, &receipt).unwrap();
         assert_eq!(report.fields.accepted_ambiguous_count, 1);
-        assert_eq!(report.fields.accepted_valid_precision_lower_bound_ppm, Some(666_666));
-        assert_eq!(report.fields.accepted_ambiguous_rate_ppm, Some(333_333));
+        assert_eq!(report.fields.accepted_valid_precision_lower_bound_ppm, Some(500_000));
+        assert_eq!(report.fields.accepted_invalid_count, 1);
+        assert_eq!(report.fields.accepted_ambiguous_rate_ppm, Some(250_000));
     }
 
     #[test]
