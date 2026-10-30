@@ -621,7 +621,7 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                                     format!("{:.10}", result.value + 1.96 * result.standard_error),
                                     "score_based_normal_interval_empirical_only",
                                 )
-                            } else if estimator == Estimator::DmPilot {
+                            } else if *estimator == Estimator::DmPilot {
                                 ("NA".to_string(), "NA".to_string(), "model_uncertainty_not_in_score_ci")
                             } else {
                                 ("NA".to_string(), "NA".to_string(), "same_sample_nuisance_ci_unavailable")
