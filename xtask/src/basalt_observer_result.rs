@@ -986,7 +986,20 @@ fn adjudicate_case(
             }
         }
         "preserve_unrelated" => {
-            if receipt.disposition != "preserved" {
+            let disposition_failed = receipt.disposition != "preserved";
+            let reuse_failed = receipt.reuse_decision != "reused";
+            if disposition_failed || reuse_failed {
+                report.metrics.unrelated_evidence_not_retained += 1;
+            }
+            if receipt.disposition == "invalidated"
+                || matches!(
+                    receipt.reuse_decision.as_str(),
+                    "invalidated" | "reverified"
+                )
+            {
+                report.metrics.false_invalidations += 1;
+            }
+            if disposition_failed {
                 push_error(
                     report,
                     Some(case_id),
@@ -995,14 +1008,7 @@ fn adjudicate_case(
                     "unrelated positive control must retain its evidence",
                 );
             }
-            if receipt.reuse_decision != "reused" {
-                report.metrics.unrelated_evidence_not_retained += 1;
-                if matches!(
-                    receipt.reuse_decision.as_str(),
-                    "invalidated" | "reverified"
-                ) {
-                    report.metrics.false_invalidations += 1;
-                }
+            if reuse_failed {
                 push_error(
                     report,
                     Some(case_id),
