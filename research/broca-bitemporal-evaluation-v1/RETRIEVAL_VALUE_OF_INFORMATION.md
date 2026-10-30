@@ -50,6 +50,14 @@ The input is a RetrievalUtilityEstimate bound to one decision, principal, scope,
 
 The gate does not train the estimator. The upstream component must calibrate marginal effects on a held-out split and produce conservative confidence bounds. A SHA-256 receipt binds the estimate to its inputs; it is not a digital signature and does not prove that the estimator was honestly calibrated.
 
+### Calibration is an empirical requirement, not a confidence-score label
+
+The reference calibration routine is `memory_retrieval_value_calibration.rs`. It consumes paired retrieval/no-retrieval observations from a held-out calibration split, grouped by an independent unit such as source document, user or conversation. It computes within-group residuals against a frozen point predictor; it uses the minimum residual for each benefit component and maximum residual for harm. Across independent groups, it applies one-sided split-conformal order statistics with alpha=1/30 per component. Bonferroni allocation across correctness gain, lifecycle-risk reduction and retrieval harm yields a **90% joint marginal coverage target** under exchangeability.
+
+At least 29 independent groups are required for finite bounds at this error allocation. The resulting residual offsets are added to the runtime point predictions. Benefit lower bounds and harm upper bounds are signed: a lower bound below zero is meaningful evidence that retrieval may worsen the outcome, and must not be clamped to zero. A versioned fixture contains the 29-group reference sample.
+
+The guarantee is group-marginal under exchangeable held-out groups. It is **not** a per-query, per-domain, conditional or distribution-shift guarantee. Group construction, split leakage, treatment compliance, judge error, and shifts in retrieval policy or corpus must be reported. The correctness and lifecycle-risk components must be defined as disjoint utility components in the pinned utility schema; double-counting the same error reduction in both components invalidates the sum.
+
 ## Integration with lifecycle action selection
 
 The gate returns RetrieveMore or Stop plus a deterministic decision receipt. Its to_lifecycle_progress() adapter converts that outcome into the existing lifecycle controller's progress field and carries the VOI decision digest into the lifecycle action receipt.
@@ -101,7 +109,7 @@ These are engineering targets, not measured Broca results:
 
 ## Implementation and limitations
 
-The reference module is memory_retrieval_value.rs. It uses deterministic integer arithmetic, conservative benefit/harm bounds, a strict margin comparison, snapshot/query binding and a SHA-256 decision receipt. It returns an explicit early-stop state and preserves unused retrieval calls.
+The reference module is memory_retrieval_value.rs. It uses deterministic integer arithmetic, conservative benefit/harm bounds, a strict margin comparison, snapshot/query binding and a SHA-256 decision receipt. The companion memory_retrieval_value_calibration.rs computes signed bounds from paired held-out observations using grouped split-conformal residuals and a pinned 90% joint-coverage target (minimum 29 independent groups); retrieval-value estimates carry the estimator, calibration split/method and EvidenceIndex state digests. It returns an explicit early-stop state and preserves unused retrieval calls.
 
 The module does not train the value estimator, authenticate calibration artifacts, measure token/latency costs, or prove that the supplied lower/upper bounds are statistically valid. The current lifecycle action controller accepts a progress record with an optional VOI digest; orchestrators should use this adapter to populate it. A future release can require authenticated estimator receipts before permitting a production retrieval continuation.
 
@@ -110,6 +118,7 @@ No retrieval reduction, calibration score, LifeEM improvement or SOTA result is 
 ## References
 
 - HALT, *Verification-Aware Stopping for Retrieval-Augmented Search Agents*, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.343/
+- Zhao, *When Is Additional Retrieval Worthwhile? A Cost-Aware Study of Evidence Gain and Answer Reliability in RAG* (27 October 2026): https://arxiv.org/abs/2610.37358
 - When Should Active RAG Retrieve? *A Budget-Aware Evaluation of Utility, Calibration, and Cost* (2026): https://arxiv.org/abs/2607.24010
 - CONFRAG, *Confidence-Guided Retrieval-Augmented Generation*, EMNLP 2026 Industry Track: https://aclanthology.org/2026.emnlp-industry.171/
 - AgentAbstain, NeurIPS 2026 Evaluations & Datasets Track: https://agentabstain.github.io/
