@@ -457,7 +457,6 @@ impl Integrator for Rk45Integrator {
             // interval. Do not discard a merely-small remainder: simulate()
             // advances its external clock by the full requested dt.
             if actual_dt >= remaining {
-                elapsed = dt;
                 break;
             }
 
@@ -468,7 +467,6 @@ impl Integrator for Rk45Integrator {
                 t + elapsed
             );
             if next_elapsed >= dt {
-                elapsed = dt;
                 break;
             }
             elapsed = next_elapsed;
@@ -1159,6 +1157,22 @@ pub fn trajectory_to_hvs(result: &SimulationResult) -> Vec<ContinuousHV> {
 mod tests {
     use super::*;
 
+    struct TimePolynomial;
+
+    impl DynamicalSystem for TimePolynomial {
+        fn state_dim(&self) -> usize {
+            1
+        }
+
+        fn derivatives(&self, _state: &[f64], t: f64) -> Vec<f64> {
+            vec![t.powi(5)]
+        }
+
+        fn name(&self) -> &str {
+            "time-polynomial"
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Harmonic oscillator: energy conservation
     // -------------------------------------------------------------------------
@@ -1610,6 +1624,22 @@ mod tests {
         // tolerance cannot be met. Fail closed at the requested interval;
         // never grow the trial to dt_min and step beyond the caller's time.
         let _ = rk45.step(&osc, &[1.0, 0.0], 0.0, 0.1);
+    }
+
+    #[test]
+    fn test_rk45_adaptive_substeps_integrate_non_autonomous_interval_endpoint() {
+        let system = TimePolynomial;
+        let rk45 = Rk45Integrator::new(1e-12);
+        let result = simulate(&system, &rk45, &[0.0], 1.0, 4.0, 3.0);
+
+        // Integral from t=1 to t=4 of t^5 dt = (4^6 - 1^6)/6.
+        let exact = (4.0_f64.powi(6) - 1.0) / 6.0;
+        assert_eq!(result.times.last().copied(), Some(4.0));
+        assert!(
+            (result.final_state()[0] - exact).abs() < 1e-9,
+            "RK45 state={} at t=4; expected {exact}",
+            result.final_state()[0]
+        );
     }
 
     #[test]
