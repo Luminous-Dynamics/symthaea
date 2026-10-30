@@ -46,9 +46,11 @@ For each direction opened after a global best existed, the NEW estimator looks a
 
 \`potential_NEW = y_NEW + c * sqrt(ln(N) / (sum(infancy counts) + 1))\`
 
-Finally, the configured agent seats are distributed proportionally to each direction's and NEW's potential using deterministic largest-remainder rounding. If all potentials are zero, seats go to the global-best direction. Direction claims are limited separately from the advisory wanted counts.
+Finally, the configured agent seats are distributed proportionally to each direction's and NEW's potential using deterministic largest-remainder rounding. If all potentials are zero, seats go to the global-best direction; when no scored direction exists yet, this implementation assigns the seats to NEW as an explicit bootstrap fallback. Direction claims are limited separately from the advisory wanted counts.
 
 ## Implemented interface
+
+The module reconstructs each event's credit and global-best value from the ordered score inputs, then checks that the direction histories and attempt-ID index exactly reconcile with the global event stream. Tampered credit records or direction-only extra/missing events fail validation.
 
 The module provides:
 - versioned CoralBaselineConfig with the paper defaults;
@@ -60,7 +62,7 @@ The module provides:
 - separate first-round and steady-state direction claim caps;
 - integrity reconciliation of direction records, global event stream, attempt IDs and global best.
 
-Ten tests are authored for formula defaults, local record credit, parent/inspired thresholds, failed evaluation accounting, window expiry, NEW infancy, headcount conservation, zero-potential fallback, claim caps and the deliberate distinction between per-evaluation yield and recorded cost units.
+Twelve tests are authored for formula defaults, local record credit, parent/inspired thresholds, failed evaluation accounting, window expiry, NEW infancy, headcount conservation, zero-potential fallback, claim caps, per-evaluation yield semantics, and tamper rejection for credits/global-best receipts and direction-history reconciliation.
 
 ## Important limitations / deviations
 
