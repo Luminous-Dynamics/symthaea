@@ -29,7 +29,7 @@ pub struct PairedBenchmarkObservation {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PairedAdvantageConfig {
     /// Required minimum fractional reduction in resource use, non-negative.
-    pub min_relative_resource_gain: f64,
+    pub min_relative_resource_reduction: f64,
     /// Largest tolerated quantum quality decrease relative to the classical run.
     pub quality_non_inferiority_margin: f64,
     /// Tie tolerance in log(classical resource / quantum resource) units.
@@ -166,8 +166,9 @@ pub fn analyze_paired_advantage(
     if observations.len() < 2 {
         return Err(PairedAdvantageError::InsufficientIndependentBlocks);
     }
-    if !config.min_relative_resource_gain.is_finite()
-        || config.min_relative_resource_gain < 0.0
+    if !config.min_relative_resource_reduction.is_finite()
+        || config.min_relative_resource_reduction < 0.0
+        || config.min_relative_resource_reduction >= 1.0
         || !config.quality_non_inferiority_margin.is_finite()
         || config.quality_non_inferiority_margin < 0.0
         || !config.resource_log_ratio_tie_tolerance.is_finite()
@@ -229,7 +230,7 @@ pub fn analyze_paired_advantage(
     }
 
     let quality_threshold = -config.quality_non_inferiority_margin;
-    let resource_threshold = config.min_relative_resource_gain.ln_1p();
+    let resource_threshold = -(-config.min_relative_resource_reduction).ln_1p();
     if !(quality_threshold - config.quality_difference_tie_tolerance).is_finite()
         || !(quality_threshold + config.quality_difference_tie_tolerance).is_finite()
         || !(resource_threshold - config.resource_log_ratio_tie_tolerance).is_finite()
@@ -426,7 +427,7 @@ mod tests {
 
     fn fixture_config() -> PairedAdvantageConfig {
         PairedAdvantageConfig {
-            min_relative_resource_gain: 0.10,
+            min_relative_resource_reduction: 0.10,
             quality_non_inferiority_margin: 0.02,
             resource_log_ratio_tie_tolerance: 1e-12,
             quality_difference_tie_tolerance: 1e-12,
@@ -552,7 +553,7 @@ mod tests {
     #[test]
     fn invalid_margins_are_rejected() {
         let mut config = fixture_config();
-        config.min_relative_resource_gain = -0.1;
+        config.min_relative_resource_reduction = -0.1;
         assert_eq!(
             analyze_paired_advantage(&fixture_observations(), config).unwrap_err(),
             PairedAdvantageError::InvalidConfig
