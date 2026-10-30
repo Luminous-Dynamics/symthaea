@@ -19,7 +19,7 @@ A single undifferentiated variance penalty can therefore be too optimistic under
 
 ## Experimental protocol
 
-The dependency-free Rust CLI uses a disjoint calibration seed family and qualification seed family. It evaluates 2,048 calibration episodes and 2,048 qualification episodes per scenario/candidate-count cell.
+The dependency-free Rust CLI uses disjoint calibration and qualification seed families. It evaluates 2,048 in-distribution calibration episodes per candidate count K (reused across evaluation lanes) and 2,048 qualification episodes for each scenario/candidate-count cell.
 
 Candidate-set sizes are **8, 16, 32 and 64**. Four lanes are evaluated:
 
