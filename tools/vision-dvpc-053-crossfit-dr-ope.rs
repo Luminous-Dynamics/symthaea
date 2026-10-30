@@ -179,6 +179,8 @@ struct Observation {
 struct Estimate {
     value: f64,
     standard_error: f64,
+    /// Same-sample fitted nuisance models do not receive score-based CIs.
+    interval_valid: bool,
 }
 
 #[derive(Default)]
@@ -186,8 +188,8 @@ struct Aggregate {
     count: usize,
     sum_error: f64,
     sum_squared_error: f64,
-    sum_estimate: f64,
     sum_ci_width: f64,
+    interval_count: usize,
     covered: usize,
 }
 impl Aggregate {
@@ -196,13 +198,15 @@ impl Aggregate {
         self.count += 1;
         self.sum_error += error;
         self.sum_squared_error += error * error;
-        self.sum_estimate += estimate.value;
-        self.sum_ci_width += 2.0 * 1.96 * estimate.standard_error;
-        if error.abs() <= 1.96 * estimate.standard_error + EPS {
-            self.covered += 1;
+        if estimate.interval_valid {
+            self.interval_count += 1;
+            self.sum_ci_width += 2.0 * 1.96 * estimate.standard_error;
+            if error.abs() <= 1.96 * estimate.standard_error + EPS {
+                self.covered += 1;
+            }
         }
     }
-    fn metrics(&self) -> Result<(f64, f64, f64, f64, f64), String> {
+    fn metrics(&self) -> Result<(f64, f64, f64, Option<f64>, Option<f64>), String> {
         if self.count == 0 {
             return Err("aggregate must contain at least one replicate".into());
         }
@@ -210,9 +214,16 @@ impl Aggregate {
         let bias = self.sum_error / n;
         let mse = self.sum_squared_error / n;
         let variance = (mse - bias * bias).max(0.0);
-        let coverage = self.covered as f64 / n;
-        let mean_width = self.sum_ci_width / n;
-        if [bias, mse, variance, coverage, mean_width].iter().any(|v| !v.is_finite()) {
+        let (coverage, mean_width) = if self.interval_count == 0 {
+            (None, None)
+        } else {
+            let interval_n = self.interval_count as f64;
+            (Some(self.covered as f64 / interval_n), Some(self.sum_ci_width / interval_n))
+        };
+        if [bias, mse, variance].iter().any(|v| !v.is_finite())
+            || coverage.is_some_and(|v| !v.is_finite())
+            || mean_width.is_some_and(|v| !v.is_finite())
+        {
             return Err("non-finite aggregate metric".into());
         }
         Ok((bias, variance, mse, coverage, mean_width))
@@ -415,7 +426,7 @@ fn validate_identification(policy: Policy, logger: Logger) -> Result<(), String>
     Ok(())
 }
 
-fn mean_and_se(scores: &[f64]) -> Result<Estimate, String> {
+fn mean_and_se(scores: &[f64], interval_valid: bool) -> Result<Estimate, String> {
     if scores.is_empty() || scores.iter().any(|s| !s.is_finite()) {
         return Err("estimator requires nonempty finite scores".into());
     }
@@ -428,7 +439,7 @@ fn mean_and_se(scores: &[f64]) -> Result<Estimate, String> {
     };
     let standard_error = (variance.max(0.0) / n).sqrt();
     if mean.is_finite() && standard_error.is_finite() {
-        Ok(Estimate { value: mean, standard_error })
+        Ok(Estimate { value: mean, standard_error, interval_valid })
     } else {
         Err("non-finite estimate".into())
     }
@@ -506,7 +517,8 @@ fn estimate(
         };
         scores.push(score);
     }
-    mean_and_se(&scores)
+    let interval_valid = !matches!(estimator, Estimator::DmInSample | Estimator::DrInSample);
+    mean_and_se(&scores, interval_valid)
 }
 
 fn benchmark(replicates: usize) -> Result<String, String> {
@@ -514,7 +526,7 @@ fn benchmark(replicates: usize) -> Result<String, String> {
         return Err("replicate count must be positive".into());
     }
     let mut output = String::from(
-        "record_type\tscenario\tN\tlogger\tpolicy\testimator\tshrinkage_weight\tlogger_reward\tmin_propensity\treplicates\tbias\tvariance\tmse\tcoverage_95\tmean_ci_width\tidentification_status\n",
+        "record_type\tscenario\tN\tlogger\tpolicy\testimator\tshrinkage_weight\tlogger_reward\tmean_min_propensity\treplicates\tbias\tvariance\tmse\tcoverage_95\tmean_ci_width\tidentification_status\tinference_status\n",
     );
     output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-053\tversion\t0\n");
     output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
@@ -593,8 +605,17 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                             let result = estimate(&rows, policy, logger, *estimator, q_model)?;
                             aggregates[index].add(result, truth);
                             let error = result.value - truth;
+                            let (ci_lower, ci_upper, inference_status) = if result.interval_valid {
+                                (
+                                    format!("{:.10}", result.value - 1.96 * result.standard_error),
+                                    format!("{:.10}", result.value + 1.96 * result.standard_error),
+                                    "score_based_normal_interval_empirical_only",
+                                )
+                            } else {
+                                ("NA".to_string(), "NA".to_string(), "same_sample_nuisance_ci_unavailable")
+                            };
                             output.push_str(&format!(
-                                "REPLICATE\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\tidentified_full_support\n",
+                                "REPLICATE\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{}\t{}\tidentified_full_support\t{}\n",
                                 scenario.name(),
                                 sample_size,
                                 logger_kind.name(),
@@ -609,8 +630,9 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                                 error,
                                 error * error,
                                 result.standard_error,
-                                result.value - 1.96 * result.standard_error,
-                                result.value + 1.96 * result.standard_error,
+                                ci_lower,
+                                ci_upper,
+                                inference_status,
                             ));
                         }
                         mean_w += weight;
@@ -621,8 +643,15 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                     let nrep = replicates as f64;
                     for (index, estimator) in Estimator::ALL.iter().enumerate() {
                         let (bias, variance, mse, coverage, width) = aggregates[index].metrics()?;
+                        let coverage_text = coverage.map(|v| format!("{v:.6}")).unwrap_or_else(|| "NA".to_string());
+                        let width_text = width.map(|v| format!("{v:.8}")).unwrap_or_else(|| "NA".to_string());
+                        let inference_status = if coverage.is_some() {
+                            "score_based_normal_interval_empirical_only"
+                        } else {
+                            "same_sample_nuisance_ci_unavailable"
+                        };
                         output.push_str(&format!(
-                            "RESULT\t{}\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.6}\t{:.8}\tidentified_full_support\n",
+                            "RESULT\t{}\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{}\t{:.10}\t{:.10}\t{:.10}\t{}\t{}\tidentified_full_support\t{}\n",
                             scenario.name(),
                             sample_size,
                             logger_kind.name(),
@@ -635,8 +664,9 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                             bias,
                             variance,
                             mse,
-                            coverage,
-                            width,
+                            coverage_text,
+                            width_text,
+                            inference_status,
                         ));
                     }
                 }
@@ -716,11 +746,11 @@ mod tests {
         assert_eq!(a.lines().filter(|line| line.starts_with("RESULT\t")).count(), 5 * 2 * 5 * 4 * 6);
         assert_eq!(a.lines().filter(|line| line.starts_with("REPLICATE\t")).count(), 3 * 5 * 2 * 5 * 4 * 6);
         for line in a.lines().filter(|line| line.starts_with("RESULT\t")) {
-            assert_eq!(line.split('\t').count(), 16);
+            assert_eq!(line.split('\t').count(), 17);
             assert!(line.contains("identified_full_support"));
         }
         for line in a.lines().filter(|line| line.starts_with("REPLICATE\t")) {
-            assert_eq!(line.split('\t').count(), 18);
+            assert_eq!(line.split('\t').count(), 19);
             assert!(line.contains("identified_full_support"));
         }
         assert_eq!(a.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
