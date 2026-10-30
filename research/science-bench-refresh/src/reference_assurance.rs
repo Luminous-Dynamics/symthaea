@@ -672,36 +672,48 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     }
 
     for record in &fields.initial_adjudications {
-            if record.decision.requires_current_source() {
-                let claim = claims.get(record.claim_id.as_str());
-                for span_id in &record.evidence_span_ids {
-                    if let Some(span) = spans.get(span_id.as_str()) {
-                        if let Some(source) = sources.get(span.source_id.as_str()) {
-                            if source.lifecycle != SourceLifecycleV1::Active {
-                                issues.push(format!("adjudication {} uses a non-active source as current support without a source-validity interval", record.record_id));
-                            }
-                            if let (Some(target), Some(published)) = (
-                                claim.and_then(|item| item.scope.target_date.as_deref()),
-                                source.publication_date.as_deref(),
-                            ) {
-                                if published > target {
-                                    issues.push(format!("adjudication {} uses a source published after the claim target date", record.record_id));
-                                }
-                            }
+        if record.decision.requires_current_source() {
+            let target_date = claims
+                .get(record.claim_id.as_str())
+                .and_then(|claim| claim.scope.target_date.as_deref());
+            for span_id in &record.evidence_span_ids {
+                let source = spans
+                    .get(span_id.as_str())
+                    .and_then(|span| sources.get(span.source_id.as_str()));
+                if let Some(source) = source {
+                    if source.lifecycle != SourceLifecycleV1::Active {
+                        issues.push(format!(
+                            "adjudication {} uses a non-active source as current support without a source-validity interval",
+                            record.record_id
+                        ));
+                    }
+                    if let (Some(target), Some(published)) =
+                        (target_date, source.publication_date.as_deref())
+                    {
+                        if published > target {
+                            issues.push(format!(
+                                "adjudication {} uses a source published after the claim target date",
+                                record.record_id
+                            ));
                         }
                     }
                 }
             }
-            if record.decision == ReferenceDecisionV1::TemporallyStale {
-                let has_stale_source = record.evidence_span_ids.iter().any(|span_id| {
-                    spans.get(span_id.as_str())
-                        .and_then(|span| sources.get(span.source_id.as_str()))
-                        .is_some_and(|source| source.lifecycle != SourceLifecycleV1::Active)
-                });
-                if !has_stale_source {
-                    issues.push(format!("adjudication {} declares temporal staleness without a superseded/deleted/retracted source", record.record_id));
-                }
+        }
+        if record.decision == ReferenceDecisionV1::TemporallyStale {
+            let has_stale_source = record.evidence_span_ids.iter().any(|span_id| {
+                spans
+                    .get(span_id.as_str())
+                    .and_then(|span| sources.get(span.source_id.as_str()))
+                    .is_some_and(|source| source.lifecycle != SourceLifecycleV1::Active)
+            });
+            if !has_stale_source {
+                issues.push(format!(
+                    "adjudication {} declares temporal staleness without a superseded/deleted/retracted source",
+                    record.record_id
+                ));
             }
+        }
     }
     issues
 }
