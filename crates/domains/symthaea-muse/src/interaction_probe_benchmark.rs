@@ -222,7 +222,7 @@ pub fn evaluate_interaction_probe_plan(
     if candidate_pairs.iter().any(|pair| audit_pairs.contains(pair)) {
         return Err(InteractionProbeBenchmarkError::InvalidProbeSelection);
     }
-    let measured_pairs: BTreeSet<_> = candidate_pairs
+    let selected_pairs: BTreeSet<_> = candidate_pairs
         .union(&audit_pairs)
         .copied()
         .collect();
@@ -230,7 +230,7 @@ pub fn evaluate_interaction_probe_plan(
     let possible_pair_count = (events.len() as u128)
         .saturating_mul((events.len().saturating_sub(1)) as u128)
         / 2;
-    let selected_pair_count = measured_pairs.len();
+    let selected_pair_count = selected_pairs.len();
     if probe_plan.all_possible_pair_count != possible_pair_count
         || probe_plan.selected_pair_count != selected_pair_count
         || probe_plan.unprobed_pair_count
@@ -272,11 +272,11 @@ pub fn evaluate_interaction_probe_plan(
     let audit_true_positive_count = audit_pairs
         .intersection(&ground_truth_pairs)
         .count();
-    let measured_true_positive_count = measured_pairs
+    let selected_true_positive_count = selected_pairs
         .intersection(&ground_truth_pairs)
         .count();
     let unmeasured_ground_truth_pair_count =
-        ground_truth_pairs.len().saturating_sub(measured_true_positive_count);
+        ground_truth_pairs.len().saturating_sub(selected_true_positive_count);
 
     let planned_render_count = probe_plan.estimated_render_count_with_cached_single_removals;
     let exhaustive_pairwise_render_count = 1u128
@@ -318,8 +318,8 @@ pub fn evaluate_interaction_probe_plan(
         audit_true_positive_count,
         audit_positive_rate: ratio(audit_true_positive_count, audit_pairs.len()),
         selected_pair_count,
-        selected_true_positive_count: measured_true_positive_count,
-        selected_pair_recall: ratio(measured_true_positive_count, ground_truth_pairs.len()),
+        selected_true_positive_count,
+        selected_pair_recall: ratio(selected_true_positive_count, ground_truth_pairs.len()),
         unselected_ground_truth_pair_count: unmeasured_ground_truth_pair_count,
         nonzero_higher_order_interaction_count,
         pairwise_total_pcm_l2_norm,
