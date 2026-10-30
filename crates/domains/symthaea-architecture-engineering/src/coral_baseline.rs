@@ -396,43 +396,121 @@ impl CoralDirectionBoard {
             return Err(CoralBaselineError::new("schema", "unsupported baseline schema or version"));
         }
         self.config.validate()?;
-        if self.attempt_ids.len() != self.evaluations.len()
-            || self.attempt_ids.iter().any(|id| !self.evaluations.iter().any(|event| &event.attempt_id == id)) {
-            return Err(CoralBaselineError::new("attempt_ids", "attempt ID index does not reconcile"));
-        }
-        if self.evaluations.iter().any(|event| event.credit < 0.0 || !event.credit.is_finite()) {
-            return Err(CoralBaselineError::new("evaluations.credit", "credit must be finite and non-negative"));
-        }
-        let mut seen = HashSet::new();
+        let mut expected_ids = BTreeSet::new();
+        let mut expected_by_direction: BTreeMap<String, Vec<CoralEvaluation>> = BTreeMap::new();
+        let mut reconstructed_best: Option<f64> = None;
+
         for (index, event) in self.evaluations.iter().enumerate() {
-            if !seen.insert(event.attempt_id.as_str()) {
-                return Err(CoralBaselineError::new(format!("evaluations[{index}].attempt_id"), "duplicate attempt ID"));
+            if canonical_id("attempt_id", &event.attempt_id)? != event.attempt_id
+                || canonical_id("direction_id", &event.direction_id)? != event.direction_id
+            {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}]"),
+                    "attempt and direction IDs must be canonical",
+                ));
             }
-            let direction = self.directions.get(&event.direction_id)
-                .ok_or_else(|| CoralBaselineError::new(format!("evaluations[{index}].direction_id"), "unregistered direction"))?;
-            if !direction.evaluations.iter().any(|candidate| candidate.attempt_id == event.attempt_id && candidate == event) {
-                return Err(CoralBaselineError::new(format!("evaluations[{index}]"), "global and direction event records disagree"));
+            if !expected_ids.insert(event.attempt_id.clone()) {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}].attempt_id"),
+                    "duplicate attempt ID",
+                ));
             }
+            if event.evaluation_cost_units == 0
+                || event.score.is_some_and(|v| !v.is_finite())
+                || event.parent_score.is_some_and(|v| !v.is_finite())
+                || event.inspired_by_scores.iter().any(|v| !v.is_finite())
+            {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}]"),
+                    "score inputs and cost are invalid",
+                ));
+            }
+            if !self.directions.contains_key(&event.direction_id) {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}].direction_id"),
+                    "unregistered direction",
+                ));
+            }
+
+            let local_best = expected_by_direction
+                .get(&event.direction_id)
+                .into_iter()
+                .flatten()
+                .filter_map(|prior| prior.score)
+                .max_by(f64::total_cmp);
+            let threshold = event.parent_score
+                .into_iter()
+                .chain(event.inspired_by_scores.iter().copied())
+                .chain(local_best)
+                .max_by(f64::total_cmp);
+            let expected_best = match (reconstructed_best, event.score) {
+                (Some(old), Some(new)) => Some(old.max(new)),
+                (Some(old), None) => Some(old),
+                (None, Some(new)) => Some(new),
+                (None, None) => None,
+            };
+            let expected_credit = match (event.score, threshold, expected_best) {
+                (Some(score), Some(threshold), Some(best)) if best.abs() > f64::EPSILON => {
+                    (score - threshold).max(0.0) / best.abs()
+                }
+                _ => 0.0,
+            };
+            if !event.credit.is_finite()
+                || (event.credit - expected_credit).abs() > 1e-12
+                || !same_optional_score(event.global_best_after, expected_best)
+            {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}]"),
+                    "stored credit or global-best value does not reconcile with ordered score inputs",
+                ));
+            }
+            reconstructed_best = expected_best;
+            expected_by_direction
+                .entry(event.direction_id.clone())
+                .or_default()
+                .push(event.clone());
         }
-        let recomputed_best = self.evaluations.iter().filter_map(|event| event.score).max_by(f64::total_cmp);
-        if recomputed_best != self.global_best_score {
-            return Err(CoralBaselineError::new("global_best_score", "does not reconcile with evaluation stream"));
+
+        if expected_ids != self.attempt_ids {
+            return Err(CoralBaselineError::new(
+                "attempt_ids",
+                "attempt ID index does not exactly match the ordered evaluation stream",
+            ));
         }
-        for (id, state) in &self.directions {
-            if id != &state.direction_id || id.trim().is_empty() {
-                return Err(CoralBaselineError::new("directions", "map key and direction ID disagree"));
+        if !same_optional_score(reconstructed_best, self.global_best_score) {
+            return Err(CoralBaselineError::new(
+                "global_best_score",
+                "does not reconcile with the ordered evaluation stream",
+            ));
+        }
+        for (map_id, state) in &self.directions {
+            if map_id != &state.direction_id || canonical_id("direction_id", map_id)? != *map_id {
+                return Err(CoralBaselineError::new(
+                    "directions",
+                    "map key and canonical direction ID disagree",
+                ));
             }
-            if state.evaluations.iter().any(|event| &event.direction_id != id) {
-                return Err(CoralBaselineError::new("directions.evaluations", "event assigned to wrong direction"));
+            let expected = expected_by_direction.get(map_id).cloned().unwrap_or_default();
+            if state.evaluations != expected {
+                return Err(CoralBaselineError::new(
+                    format!("directions[{map_id}].evaluations"),
+                    "direction history does not reconcile with ordered global evaluation stream",
+                ));
             }
         }
         Ok(())
-    }
-}
+    }}
 
 fn canonical_id(field: &str, value: &str) -> Result<String, CoralBaselineError> {
     let id = value.split_whitespace().collect::<Vec<_>>().join(" ");
     if id.is_empty() { Err(CoralBaselineError::new(field, "must be non-empty")) } else { Ok(id) }
+}
+fn same_optional_score(left: Option<f64>, right: Option<f64>) -> bool {
+    match (left, right) {
+        (Some(a), Some(b)) => (a - b).abs() <= 1e-12,
+        (None, None) => true,
+        _ => false,
+    }
 }
 fn arm_key(arm: &CoralArm) -> &str {
     match arm {
