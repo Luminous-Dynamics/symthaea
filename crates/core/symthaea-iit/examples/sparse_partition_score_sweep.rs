@@ -69,7 +69,7 @@ fn parse_repeats() -> Result<usize, String> {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "substrate_units,candidate_units,background_units,local_cpt_cells,parent_references,severed_matrix_entries,repeats,factor_entry_budget,median_ns,min_ns,phi,signed_phi,normalized_phi,cause_signed_phi,effect_signed_phi,receipt_sha256,validated"
+        "substrate_units,candidate_units,background_units,local_cpt_cells,parent_references,severed_matrix_entries,repeats,factor_entry_budget,median_ns,min_ns,phi,signed_phi,normalized_phi,cause_signed_phi,effect_signed_phi,uncut_eq4_receipt_sha256,partitioned_eq4_receipt_sha256,partition_score_receipt_sha256,validated"
     );
 
     for n_units in SUBSTRATE_SIZES {
@@ -136,15 +136,23 @@ fn run() -> Result<(), String> {
             .sum::<usize>();
         let median_ns = median_duration(&mut samples).as_nanos();
         let min_ns = samples.iter().copied().min().unwrap_or_default().as_nanos();
-        let receipt = cut_cause
+        let uncut_receipt = uncut_cause
+            .receipt_sha256()
+            .map_err(|error| format!("uncut Eq4 receipt failed at n={n_units}: {error}"))?;
+        let partitioned_receipt = cut_cause
             .receipt_sha256()
             .map_err(|error| format!("partitioned Eq4 receipt failed at n={n_units}: {error}"))?;
+        let score_receipt = warmup_score
+            .receipt_sha256()
+            .map_err(|error| format!("partition score receipt failed at n={n_units}: {error}"))?;
         let validated = score_is_finite(&warmup_score.score)
             && uncut_cause.forward_likelihood.iter().all(|value| value.is_finite())
             && cut_cause.forward_likelihood.iter().all(|value| value.is_finite())
-            && receipt.len() == 64;
+            && uncut_receipt.len() == 64
+            && partitioned_receipt.len() == 64
+            && score_receipt.len() == 64;
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{:.17},{:.17},{:.17},{:.17},{:.17},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{:.17},{:.17},{:.17},{:.17},{:.17},{},{},{},{}",
             n_units,
             CANDIDATE.len(),
             n_units - CANDIDATE.len(),
@@ -160,7 +168,9 @@ fn run() -> Result<(), String> {
             warmup_score.score.normalized_phi,
             warmup_score.score.cause.signed_phi,
             warmup_score.score.effect.signed_phi,
-            receipt,
+            uncut_receipt,
+            partitioned_receipt,
+            score_receipt,
             validated
         );
         if !validated {
