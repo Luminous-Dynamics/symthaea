@@ -69,6 +69,7 @@ pub mod robustness;
 pub mod schema;
 pub mod significance;
 pub mod paired_advantage;
+pub mod clustered_advantage;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -160,6 +161,10 @@ pub use paired_advantage::{
     ExactSignTest, HolmAdjustedPValue, PairedAdvantageConfig, PairedAdvantageError,
     PairedAdvantageReport, PairedBenchmarkObservation, RawHypothesis,
     analyze_paired_advantage, exact_one_sided_sign_test_p_value, holm_adjust,
+};
+pub use clustered_advantage::{
+    ClusteredAdvantageConfig, ClusteredAdvantageError, ClusteredAdvantageReport,
+    ClusteredBenchmarkObservation, FamilyEffect, FamilySignTest, analyze_clustered_advantage,
 };
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
