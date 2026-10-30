@@ -6,7 +6,7 @@ This isolated Rust workspace validates the LEP v0.1 predicate embedded in an in-
 
 From the repository root:
 
-    cargo run --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json
+    cargo run --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json
 
 Run tests with:
 
@@ -51,4 +51,4 @@ A one-off local cross-check of the current schema and four structural fixtures w
 
 The parser rejects oversized statements before deserialization; excessive JSON nesting is rejected by serde_json's recursion limit. These are parser resource-safety controls, not a complete CPU/memory sandbox.
 
-The source is a prototype. The first hosted test run used Cargo to generate the standalone lockfile from this exact manifest, then compiled the crate. That run executed 23 tests: 22 passed and the machine-readable mutation-manifest test exposed a missing-field insertion bug, which has been fixed in the current source. The generated Cargo.lock is now committed; the workflow has returned to `--locked` test and lint commands and no longer regenerates the lock during normal validation.
+The standalone lockfile is now Cargo-generated and committed. On PR source head `9f120920153c78374fb782c493046d38d8f2c2b6` (workflow merge commit `3d89fe67866905474fb782c493046d38d8f2c2b6`), the hosted workflow passed formatting, all 23 unit tests, Clippy with warnings denied, valid/negative CLI fixture checks, and one synthetic benchmark sample per size. The 23 tests include the executable conformance manifest, 1,000 deterministic invalid mutations, duplicate-key rejection, oversized-input rejection in the parser, and deep-nesting rejection. The 16 MiB public-CLI boundary now also has a dedicated test, and the next workflow revision collects five independent benchmark processes per size. Raw results from the first successful smoke run are preserved under `docs/research/benchmarks/LEP-PERF-2026-10-30/`.
