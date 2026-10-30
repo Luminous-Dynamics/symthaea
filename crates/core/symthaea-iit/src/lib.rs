@@ -123,6 +123,15 @@ pub enum CausalDirection {
     Effect,
 }
 
+/// IIT 4.0 system intrinsic states: cause and effect specifications are distinct.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Iit4SystemState {
+    /// Candidate past state selected by cause intrinsic specification.
+    pub cause_specified_state: Vec<bool>,
+    /// Candidate future state selected by effect intrinsic specification.
+    pub effect_specified_state: Vec<bool>,
+}
+
 /// One direction's fixed-state system-level GID contribution for a cut.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemPhiDirectionScore {
@@ -166,8 +175,12 @@ pub enum SystemPhiError {
     Repertoire(#[from] RepertoireError),
     #[error(transparent)]
     Partition(#[from] PartitionApplyError),
-    #[error("specified system state has {actual} bits, expected {expected}")]
-    SpecifiedStateLength { expected: usize, actual: usize },
+    #[error("{direction:?} specified system state has {actual} bits, expected {expected}")]
+    SpecifiedStateLength {
+        direction: CausalDirection,
+        expected: usize,
+        actual: usize,
+    },
     #[error("system partition cuts no connections and therefore has no EdgeCut normalization")]
     ZeroSeveredConnections,
 }
@@ -1056,22 +1069,31 @@ impl BinaryCausalModel {
     /// probability at the specified state. The system score is min(cause, effect),
     /// followed by the positive-part convention and EdgeCut normalization.
     ///
-    /// The candidate system and state ordering are taken from the supplied
-    /// DirectedSystemPartition; the current state is in model-global unit order.
-    /// This function deliberately does not choose the intrinsic specified state,
-    /// filter non-disconnecting cuts, resolve ties, or search for the MIP.
+    /// The candidate system is taken from the supplied DirectedSystemPartition;
+    /// the current state is in model-global unit order. Cause and effect use
+    /// separate specified states, as required by IIT 4.0. This function deliberately
+    /// does not choose either state, resolve state ties, filter non-disconnecting
+    /// cuts, resolve partition ties, or search for the MIP.
     pub fn score_iit4_system_partition(
         &self,
         partition: &DirectedSystemPartition,
         current_state: &[bool],
-        specified_state: &[bool],
+        system_state: &Iit4SystemState,
     ) -> Result<SystemPhiPartitionScore, SystemPhiError> {
         self.check_state(current_state)?;
         let candidate = partition.candidate_system();
-        if specified_state.len() != candidate.len() {
+        if system_state.cause_specified_state.len() != candidate.len() {
             return Err(SystemPhiError::SpecifiedStateLength {
+                direction: CausalDirection::Cause,
                 expected: candidate.len(),
-                actual: specified_state.len(),
+                actual: system_state.cause_specified_state.len(),
+            });
+        }
+        if system_state.effect_specified_state.len() != candidate.len() {
+            return Err(SystemPhiError::SpecifiedStateLength {
+                direction: CausalDirection::Effect,
+                expected: candidate.len(),
+                actual: system_state.effect_specified_state.len(),
             });
         }
         self.validate_subset(candidate, "candidate_system")?;
@@ -1079,7 +1101,15 @@ impl BinaryCausalModel {
         if cut_edges == 0 {
             return Err(SystemPhiError::ZeroSeveredConnections);
         }
-        let specified_index = specified_state
+        let cause_state_index = system_state
+            .cause_specified_state
+            .iter()
+            .enumerate()
+            .fold(0usize, |index, (unit, on)| {
+                if *on { index | (1usize << unit) } else { index }
+            });
+        let effect_state_index = system_state
+            .effect_specified_state
             .iter()
             .enumerate()
             .fold(0usize, |index, (unit, on)| {
@@ -1099,15 +1129,15 @@ impl BinaryCausalModel {
 
         let cause = system_phi_direction_score(
             CausalDirection::Cause,
-            cause_selectivity[specified_index],
-            cause_forward[specified_index],
-            cause_partitioned[specified_index],
+            cause_selectivity[cause_state_index],
+            cause_forward[cause_state_index],
+            cause_partitioned[cause_state_index],
         );
         let effect = system_phi_direction_score(
             CausalDirection::Effect,
-            effect_selectivity[specified_index],
-            effect_forward[specified_index],
-            effect_partitioned[specified_index],
+            effect_selectivity[effect_state_index],
+            effect_forward[effect_state_index],
+            effect_partitioned[effect_state_index],
         );
         let signed_phi = cause.signed_phi.min(effect.signed_phi);
         let normalization_factor = 1.0 / cut_edges as f64;
@@ -1594,7 +1624,10 @@ mod tests {
         let score = model.score_iit4_system_partition(
             all_cross_edges_cut,
             &[false, false],
-            &[false, false],
+            &Iit4SystemState {
+                cause_specified_state: vec![false, false],
+                effect_specified_state: vec![false, false],
+            },
         ).unwrap();
 
         let expected = 0.72 * (0.72_f64 / 0.25).log2();
@@ -1634,7 +1667,10 @@ mod tests {
         let score = model.score_iit4_system_partition(
             &partition,
             &[false, false],
-            &[true, true],
+            &Iit4SystemState {
+                cause_specified_state: vec![true, true],
+                effect_specified_state: vec![true, true],
+            },
         ).unwrap();
 
         assert!(score.signed_phi < 0.0);
@@ -1652,8 +1688,19 @@ mod tests {
             .next()
             .unwrap();
         assert!(matches!(
-            model.score_iit4_system_partition(&partition, &[false, false], &[false]),
-            Err(SystemPhiError::SpecifiedStateLength { expected: 2, actual: 1 })
+            model.score_iit4_system_partition(
+                &partition,
+                &[false, false],
+                &Iit4SystemState {
+                    cause_specified_state: vec![false],
+                    effect_specified_state: vec![false, false],
+                },
+            ),
+            Err(SystemPhiError::SpecifiedStateLength {
+                direction: CausalDirection::Cause,
+                expected: 2,
+                actual: 1,
+            })
         ));
     }
 
