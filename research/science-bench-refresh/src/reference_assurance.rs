@@ -862,6 +862,8 @@ mod tests {
         assert_eq!(report.claim_count, 1);
         assert_eq!(report.material_claim_count, 1);
         assert_eq!(report.initial_adjudication_count, 3);
+        assert_eq!(report.resolution_count, 1);
+        assert_eq!(report.adjudicator_count, 4);
         assert_eq!(report.claims_with_disagreement, 1);
         assert_eq!(report.claims_missing_minimum_panel, 0);
         assert!(!report.adjudicator_independence_proven);
@@ -902,6 +904,48 @@ mod tests {
         let first = serde_json::to_vec(&verify_reference_assurance_package(FIXTURE.as_bytes()).unwrap()).unwrap();
         let second = serde_json::to_vec(&verify_reference_assurance_package(FIXTURE.as_bytes()).unwrap()).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn resolution_is_separate_from_initial_votes() {
+        let report = verify_reference_assurance_package(FIXTURE.as_bytes()).unwrap();
+        assert_eq!(report.initial_adjudication_count, 3);
+        assert_eq!(report.resolution_count, 1);
+        assert_eq!(report.claims_with_disagreement, 1);
+    }
+
+    #[test]
+    fn resolution_cannot_be_made_by_an_initial_voter() {
+        let mut value = fixture_value();
+        value["resolutions"][0]["adjudicator_id_sha256"] =
+            value["initial_adjudications"][0]["adjudicator_id_sha256"].clone();
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("outside the initial voting set")));
+    }
+
+    #[test]
+    fn resolution_requires_evidence_for_contested_decision() {
+        let mut value = fixture_value();
+        value["resolutions"][0]["evidence_span_ids"] = json!([]);
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("resolution resolution-001 requires at least one evidence span")));
+    }
+
+    #[test]
+    fn audit_candidate_resolver_must_have_new_independence_group() {
+        let mut value = fixture_value();
+        value["purpose"] = json!("audit_candidate");
+        value["validator_source_revision"] = json!(BUILT_GENERATOR_SOURCE_REVISION);
+        value["adjudicators"][3]["independence_group_sha256"] =
+            value["adjudicators"][0]["independence_group_sha256"].clone();
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("shares an initial panel independence group")));
     }
 
     #[test]
