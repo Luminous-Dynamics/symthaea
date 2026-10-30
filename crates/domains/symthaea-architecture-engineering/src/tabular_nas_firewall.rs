@@ -18,6 +18,13 @@ use sha2::{Digest, Sha256};
 const BENCHMARK_SCHEMA: &str = "symthaea.tabular-nas.benchmark";
 const BENCHMARK_VERSION: &str = "0.1.0";
 
+/// Target metric orientation used for top-K ranking and regret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricDirection {
+    Maximize,
+    Minimize,
+}
+
 /// Source and evaluation contract for one imported tabular benchmark split.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TabularBenchmarkManifest {
@@ -25,6 +32,7 @@ pub struct TabularBenchmarkManifest {
     pub version: String,
     pub benchmark_id: String,
     pub metric_id: String,
+    pub metric_direction: MetricDirection,
     /// Evaluation task/split whose target labels remain hidden until queried.
     pub split_id: String,
     /// Separate task/split used to select or calibrate the proxy subset.
@@ -81,6 +89,7 @@ impl Error for QueryError {}
 pub struct QueryObservation {
     pub architecture_id: String,
     pub metric_id: String,
+    pub metric_direction: MetricDirection,
     pub value: f64,
     pub query_index: usize,
     pub remaining_unique_queries: usize,
@@ -112,11 +121,13 @@ pub struct QueryAttempt {
 pub struct QueryReceipt {
     pub benchmark_id: String,
     pub metric_id: String,
+    pub metric_direction: MetricDirection,
     pub split_id: String,
     pub proxy_calibration_split_id: String,
     pub proxy_calibration_sha256: String,
     pub source_artifact_sha256: String,
     pub max_unique_queries: usize,
+    pub top_k: usize,
     pub unique_queries: usize,
     pub queried_architecture_ids: Vec<String>,
     pub attempts: Vec<QueryAttempt>,
@@ -186,6 +197,7 @@ impl Error for TabularNasError {}
 /// private, and no method exposes them. A unique successful query consumes one unit.
 pub struct QueryOracle<'a> {
     metric_id: &'a str,
+    metric_direction: MetricDirection,
     labels: &'a HashMap<String, f64>,
     allowed_ids: &'a HashSet<String>,
     max_unique_queries: usize,
@@ -247,6 +259,7 @@ impl QueryOracle<'_> {
         Ok(QueryObservation {
             architecture_id: architecture_id.to_owned(),
             metric_id: self.metric_id.to_owned(),
+            metric_direction: self.metric_direction,
             value,
             query_index,
             remaining_unique_queries: self.max_unique_queries - self.queried_order.len(),
@@ -399,9 +412,11 @@ impl TabularNasBenchmark {
             .map(|(id, value)| (id.clone(), *value))
             .collect();
         ranked.sort_by(|(left_id, left_value), (right_id, right_value)| {
-            right_value
-                .total_cmp(left_value)
-                .then_with(|| left_id.cmp(right_id))
+            let score_order = match manifest.metric_direction {
+                MetricDirection::Maximize => right_value.total_cmp(left_value),
+                MetricDirection::Minimize => left_value.total_cmp(right_value),
+            };
+            score_order.then_with(|| left_id.cmp(right_id))
         });
         let true_top_k_ids = ranked
             .iter()
@@ -438,6 +453,7 @@ impl TabularNasBenchmark {
     {
         let mut oracle = QueryOracle {
             metric_id: &self.manifest.metric_id,
+            metric_direction: self.manifest.metric_direction,
             labels: &self.labels,
             allowed_ids: &self.allowed_ids,
             max_unique_queries: self.manifest.max_unique_queries,
@@ -462,11 +478,13 @@ impl TabularNasBenchmark {
         QueryReceipt {
             benchmark_id: self.manifest.benchmark_id.clone(),
             metric_id: self.manifest.metric_id.clone(),
+            metric_direction: self.manifest.metric_direction,
             split_id: self.manifest.split_id.clone(),
             proxy_calibration_split_id: self.manifest.proxy_calibration_split_id.clone(),
             proxy_calibration_sha256: self.manifest.proxy_calibration_sha256.clone(),
             source_artifact_sha256: self.manifest.artifact_sha256.clone(),
             max_unique_queries: self.manifest.max_unique_queries,
+            top_k: self.manifest.top_k,
             unique_queries: parts.queried_order.len(),
             queried_architecture_ids: parts.queried_order,
             attempts: parts.attempts,
@@ -489,9 +507,14 @@ impl TabularNasBenchmark {
             .queried_architecture_ids
             .iter()
             .filter_map(|id| self.labels.get(id).copied())
-            .max_by(f64::total_cmp);
-        let simple_regret =
-            best_queried_metric.map(|best| self.global_best_metric - best);
+            .reduce(|best, candidate| match self.manifest.metric_direction {
+                MetricDirection::Maximize => best.max(candidate),
+                MetricDirection::Minimize => best.min(candidate),
+            });
+        let simple_regret = best_queried_metric.map(|best| match self.manifest.metric_direction {
+            MetricDirection::Maximize => self.global_best_metric - best,
+            MetricDirection::Minimize => best - self.global_best_metric,
+        });
 
         let duplicate_attempts = receipt
             .attempts
@@ -626,6 +649,8 @@ fn digest_query_trace(
     hasher.update(b"symthaea.tabular-nas.query-trace.v0.1");
     update_string(&mut hasher, &manifest.benchmark_id);
     update_string(&mut hasher, &manifest.metric_id);
+    hasher.update([metric_direction_byte(manifest.metric_direction)]);
+    hasher.update((manifest.top_k as u64).to_be_bytes());
     update_string(&mut hasher, &manifest.split_id);
     update_string(&mut hasher, &manifest.proxy_calibration_split_id);
     update_string(&mut hasher, &manifest.proxy_calibration_sha256);
@@ -679,6 +704,13 @@ fn digest_queried_targets(
     hex_digest(hasher.finalize().as_slice())
 }
 
+fn metric_direction_byte(direction: MetricDirection) -> u8 {
+    match direction {
+        MetricDirection::Maximize => 0,
+        MetricDirection::Minimize => 1,
+    }
+}
+
 fn attempt_status_byte(status: QueryAttemptStatus) -> u8 {
     match status {
         QueryAttemptStatus::Revealed => 0,
@@ -713,6 +745,7 @@ mod tests {
             version: BENCHMARK_VERSION.into(),
             benchmark_id: "synthetic-nas-firewall-v0".into(),
             metric_id: "validation_accuracy".into(),
+            metric_direction: MetricDirection::Maximize,
             split_id: "challenge-a".into(),
             proxy_calibration_split_id: "development-b".into(),
             proxy_calibration_sha256: "b".repeat(64),
@@ -963,12 +996,36 @@ mod tests {
         });
         assert_eq!(run.receipt.benchmark_id, "synthetic-nas-firewall-v0");
         assert_eq!(run.receipt.metric_id, "validation_accuracy");
+        assert_eq!(run.receipt.metric_direction, MetricDirection::Maximize);
+        assert_eq!(run.receipt.top_k, 12);
         assert_eq!(run.receipt.split_id, "challenge-a");
         assert_eq!(run.receipt.proxy_calibration_split_id, "development-b");
         assert_eq!(run.receipt.proxy_calibration_sha256, "b".repeat(64));
         assert_eq!(run.receipt.source_artifact_sha256, "a".repeat(64));
         assert_eq!(run.receipt.attempts.len(), 1);
         assert_eq!(run.receipt.attempts[0].status, QueryAttemptStatus::Revealed);
+    }
+
+    #[test]
+    fn minimize_metrics_use_correct_top_k_order_and_regret_direction() {
+        let mut manifest = manifest();
+        manifest.metric_id = "latency_ms".into();
+        manifest.metric_direction = MetricDirection::Minimize;
+        let labels = (0..12)
+            .map(|index| TargetLabel {
+                architecture_id: format!("arch-{index:03}"),
+                value: (12 - index) as f64,
+            })
+            .collect();
+        let benchmark = TabularNasBenchmark::new(manifest, features(12), labels).unwrap();
+        let run = benchmark.run_search(|_, oracle| {
+            let observed = oracle.query("arch-008").unwrap();
+            assert_eq!(observed.metric_direction, MetricDirection::Minimize);
+        });
+        assert_eq!(run.evaluation.global_best_metric, 1.0);
+        assert_eq!(run.evaluation.best_queried_metric, Some(4.0));
+        assert_eq!(run.evaluation.simple_regret, Some(3.0));
+        assert_eq!(run.evaluation.top_1.capture_rate, 0.0);
     }
 
     #[test]
