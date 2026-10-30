@@ -2710,11 +2710,9 @@ fn fluidsynth_candidate_wav(
 ) -> Option<FluidCandidateRender> {
     use symthaea_muse::performed_event_map::PerformedEventMap;
     use symthaea_muse::renderer_execution_receipt::{
-        RendererBackend, RendererExecutionReceipt, RendererReceiptInputs, sha256_file,
-        sha256_hex, summarize_wav,
+        RendererBackend, RendererExecutionReceipt, RendererProcessObservation,
+        RendererReceiptInputs, sha256_hex, summarize_wav,
     };
-
-    let (binary, soundfont) = symthaea_muse::fluid_render::available()?;
     let path = fluidsynth_candidate_midi_path(seed);
     let result = (|| -> Option<FluidCandidateRender> {
         symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
@@ -2726,16 +2724,53 @@ fn fluidsynth_candidate_wav(
             symthaea_muse::fluid_render::RenderColor::from_state(state),
             dialect,
         );
-        let wav_bytes =
-            symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color))?;
-        // Ensure the exact file observed by the receipt did not change while
-        // the renderer was consuming the temporary MIDI path.
+        let invocation =
+            symthaea_muse::fluid_render::render_midi_to_wav_observed(
+                &path,
+                SAMPLE_RATE,
+                Some(color),
+            )?;
+        // Keep the original MIDI artifact bound to the renderer input and reject
+        // an observed mutation during the child-process window.
         let midi_bytes_after = std::fs::read(&path).ok()?;
         if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
             return None;
         }
-        let executable_sha256 = sha256_file(&binary).ok()?;
-        let soundfont_sha256 = sha256_file(&soundfont).ok()?;
+        if invocation.exit_code != Some(0)
+            || invocation.spawn_error.is_some()
+            || invocation.executable_sha256_before != invocation.executable_sha256_after
+            || invocation.soundfont_sha256_before != invocation.soundfont_sha256_after
+        {
+            eprintln!(
+                "FluidSynth invocation rejected: exit={:?}, spawn_error={:?}, stderr={}",
+                invocation.exit_code,
+                invocation.spawn_error,
+                invocation.stderr_preview
+            );
+            return None;
+        }
+        let wav_bytes = invocation.mastered_wav_bytes.as_ref()?.clone();
+        let executable_sha256 = invocation.executable_sha256_after.as_str();
+        let soundfont_sha256 = invocation.soundfont_sha256_after.as_str();
+        let executable_path = invocation.executable_path.to_str()?.to_owned();
+        let soundfont_path = invocation.soundfont_path.to_str()?.to_owned();
+        let process_observation = RendererProcessObservation {
+            executable_path,
+            executable_sha256_before: invocation.executable_sha256_before.clone(),
+            executable_sha256_after: invocation.executable_sha256_after.clone(),
+            soundfont_path,
+            soundfont_sha256_before: invocation.soundfont_sha256_before.clone(),
+            soundfont_sha256_after: invocation.soundfont_sha256_after.clone(),
+            arguments: invocation.arguments.clone(),
+            environment_sha256: invocation.environment_sha256.clone(),
+            stdout_sha256: invocation.stdout_sha256.clone(),
+            stderr_sha256: invocation.stderr_sha256.clone(),
+            stdout_preview: invocation.stdout_preview.clone(),
+            stderr_preview: invocation.stderr_preview.clone(),
+            stdout_truncated: invocation.stdout_truncated,
+            stderr_truncated: invocation.stderr_truncated,
+            exit_code: invocation.exit_code?,
+        };
         let score_bytes = serde_json::to_vec(score).ok()?;
         let score_sha256 = sha256_hex(&score_bytes);
         let audio_summary = summarize_wav(&wav_bytes).ok()?;
@@ -2795,7 +2830,8 @@ fn fluidsynth_candidate_wav(
             performed_schedule_bytes: None,
             renderer_executable_sha256: Some(&executable_sha256),
             soundfont_sha256: Some(&soundfont_sha256),
-            process_exit_code: Some(0),
+            process_exit_code: Some(process_observation.exit_code),
+            process_observation: Some(process_observation),
             performed_event_map_sha256: map_sha256.as_deref(),
             output_wav_bytes: &wav_bytes,
         }).ok()?;
