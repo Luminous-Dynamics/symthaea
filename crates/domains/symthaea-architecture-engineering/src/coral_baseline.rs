@@ -10,7 +10,7 @@
 //! Coral's yield equation; heterogeneous-cost scheduling is a separate comparison.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.coral-direction-board";
 const VERSION: &str = "0.1.0";
@@ -643,6 +643,32 @@ mod tests {
         assert!(b.validate_claim_capacity("A", 1, true).is_err());
         b.validate_claim_capacity("A", 1, false).unwrap();
         assert!(b.validate_claim_capacity("A", 2, false).is_err());
+    }
+
+    #[test]
+    fn integrity_rejects_tampered_credit_and_global_best_receipts() {
+        let mut b = board();
+        b.register_direction("A").unwrap();
+        b.record_evaluation("a1", "A", Some(100.0), Some(90.0), vec![], 1).unwrap();
+        b.validate_integrity().unwrap();
+
+        b.evaluations[0].credit = 0.0;
+        assert!(b.validate_integrity().is_err());
+        b.evaluations[0].credit = 0.1;
+        b.evaluations[0].global_best_after = Some(101.0);
+        assert!(b.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn integrity_rejects_direction_history_missing_or_adding_events() {
+        let mut b = board();
+        b.register_direction("A").unwrap();
+        b.register_direction("B").unwrap();
+        b.record_evaluation("a1", "A", Some(100.0), Some(90.0), vec![], 1).unwrap();
+        b.validate_integrity().unwrap();
+
+        b.directions.get_mut("A").unwrap().evaluations.clear();
+        assert!(b.validate_integrity().is_err());
     }
 
     #[test]
