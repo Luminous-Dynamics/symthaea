@@ -321,8 +321,14 @@ pub struct FactorialMainEffectV1 {
     /// Normalized selected display-position delta (high minus low).
     pub selected_option_position_delta_millionths: Option<f64>,
     pub candidate_a_choice_rate_delta_millionths: Option<f64>,
+    pub tie_rate_delta_millionths: Option<f64>,
+    pub abstention_rate_delta_millionths: Option<f64>,
     pub decisive_low_count: u64,
     pub decisive_high_count: u64,
+    pub tie_low_count: u64,
+    pub tie_high_count: u64,
+    pub abstention_low_count: u64,
+    pub abstention_high_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -350,7 +356,17 @@ pub struct FactorialInteractionV1 {
     pub decisive_01_count: u64,
     pub decisive_10_count: u64,
     pub decisive_11_count: u64,
+    pub tie_00_count: u64,
+    pub tie_01_count: u64,
+    pub tie_10_count: u64,
+    pub tie_11_count: u64,
+    pub abstention_00_count: u64,
+    pub abstention_01_count: u64,
+    pub abstention_10_count: u64,
+    pub abstention_11_count: u64,
     pub candidate_a_choice_interaction_millionths: Option<f64>,
+    pub tie_rate_interaction_millionths: Option<f64>,
+    pub abstention_rate_interaction_millionths: Option<f64>,
     pub excluded_conditions_across_four_cells: u64,
 }
 
@@ -641,6 +657,8 @@ struct CompletedMetricV1 {
     mean_criterion_score: f64,
     mean_selected_option_position: f64,
     candidate_a_choice: Option<f64>,
+    tie_indicator: f64,
+    abstention_indicator: f64,
     criterion_scores: BTreeMap<String, f64>,
 }
 
@@ -699,6 +717,8 @@ fn metric_for_observation(
             Some(FactorialDecisionV1::CandidateB) => Some(0.0),
             Some(FactorialDecisionV1::Tie | FactorialDecisionV1::Abstain) | None => None,
         },
+        tie_indicator: f64::from(observation.decision == Some(FactorialDecisionV1::Tie)),
+        abstention_indicator: f64::from(observation.decision == Some(FactorialDecisionV1::Abstain)),
         criterion_scores: scores,
     })
 }
@@ -770,6 +790,10 @@ fn main_effects(
         let high_position = mean(high.iter().map(|metric| metric.mean_selected_option_position));
         let low_choice = mean(low.iter().filter_map(|metric| metric.candidate_a_choice));
         let high_choice = mean(high.iter().filter_map(|metric| metric.candidate_a_choice));
+        let low_tie_rate = mean(low.iter().map(|metric| metric.tie_indicator));
+        let high_tie_rate = mean(high.iter().map(|metric| metric.tie_indicator));
+        let low_abstention_rate = mean(low.iter().map(|metric| metric.abstention_indicator));
+        let high_abstention_rate = mean(high.iter().map(|metric| metric.abstention_indicator));
 
         let mut planned_low = 0_u64;
         let mut planned_high = 0_u64;
@@ -807,6 +831,12 @@ fn main_effects(
                 .map(|(high, low)| high - low),
             decisive_low_count: low.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
             decisive_high_count: high.iter().filter(|metric| metric.candidate_a_choice.is_some()).count() as u64,
+            tie_rate_delta_millionths: high_tie_rate.zip(low_tie_rate).map(|(high, low)| (high - low) * 1_000_000.0),
+            abstention_rate_delta_millionths: high_abstention_rate.zip(low_abstention_rate).map(|(high, low)| (high - low) * 1_000_000.0),
+            tie_low_count: low.iter().filter(|metric| metric.tie_indicator > 0.5).count() as u64,
+            tie_high_count: high.iter().filter(|metric| metric.tie_indicator > 0.5).count() as u64,
+            abstention_low_count: low.iter().filter(|metric| metric.abstention_indicator > 0.5).count() as u64,
+            abstention_high_count: high.iter().filter(|metric| metric.abstention_indicator > 0.5).count() as u64,
         });
         counts.push(FactorialLevelCountsV1 {
             factor,
@@ -876,6 +906,19 @@ fn pairwise_interactions(
             let m01_choice = mean_choice_at(false, true);
             let m10_choice = mean_choice_at(true, false);
             let m11_choice = mean_choice_at(true, true);
+            let mean_indicator_at = |a: bool, b: bool, select: fn(&CompletedMetricV1) -> f64| {
+                mean(metrics.iter().filter(|metric| {
+                    metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
+                }).map(select))
+            };
+            let m00_tie = mean_indicator_at(false, false, |metric| metric.tie_indicator);
+            let m01_tie = mean_indicator_at(false, true, |metric| metric.tie_indicator);
+            let m10_tie = mean_indicator_at(true, false, |metric| metric.tie_indicator);
+            let m11_tie = mean_indicator_at(true, true, |metric| metric.tie_indicator);
+            let m00_abstention = mean_indicator_at(false, false, |metric| metric.abstention_indicator);
+            let m01_abstention = mean_indicator_at(false, true, |metric| metric.abstention_indicator);
+            let m10_abstention = mean_indicator_at(true, false, |metric| metric.abstention_indicator);
+            let m11_abstention = mean_indicator_at(true, true, |metric| metric.abstention_indicator);
             let count_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
                 metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
             }).count() as u64;
@@ -892,6 +935,16 @@ fn pairwise_interactions(
                 decisive_at(false, false), decisive_at(false, true),
                 decisive_at(true, false), decisive_at(true, true),
             ];
+            let tie_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
+                metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
+                    && metric.tie_indicator > 0.5
+            }).count() as u64;
+            let abstention_at = |a: bool, b: bool| metrics.iter().filter(|metric| {
+                metric.factors.level(factor_a) == a && metric.factors.level(factor_b) == b
+                    && metric.abstention_indicator > 0.5
+            }).count() as u64;
+            let tie_counts = [tie_at(false, false), tie_at(false, true), tie_at(true, false), tie_at(true, true)];
+            let abstention_counts = [abstention_at(false, false), abstention_at(false, true), abstention_at(true, false), abstention_at(true, true)];
             let completed_in_four_cells = counts.iter().copied().sum::<u64>();
             let planned_per_cell = plan.blocks.len() as u64
                 * u64::from(plan.repeats_per_condition)
@@ -912,8 +965,20 @@ fn pairwise_interactions(
                 decisive_01_count: decisive_counts[1],
                 decisive_10_count: decisive_counts[2],
                 decisive_11_count: decisive_counts[3],
+                tie_00_count: tie_counts[0],
+                tie_01_count: tie_counts[1],
+                tie_10_count: tie_counts[2],
+                tie_11_count: tie_counts[3],
+                abstention_00_count: abstention_counts[0],
+                abstention_01_count: abstention_counts[1],
+                abstention_10_count: abstention_counts[2],
+                abstention_11_count: abstention_counts[3],
                 candidate_a_choice_interaction_millionths: m11_choice.zip(m10_choice)
                     .zip(m01_choice.zip(m00_choice)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
+                tie_rate_interaction_millionths: m11_tie.zip(m10_tie).zip(m01_tie.zip(m00_tie))
+                    .map(|((m11, m10), (m01, m00))| (m11 - m10 - m01 + m00) * 1_000_000.0),
+                abstention_rate_interaction_millionths: m11_abstention.zip(m10_abstention).zip(m01_abstention.zip(m00_abstention))
+                    .map(|((m11, m10), (m01, m00))| (m11 - m10 - m01 + m00) * 1_000_000.0),
                 excluded_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
             });
         }
