@@ -3782,6 +3782,118 @@ mod tests {
     }
 
     #[test]
+    fn exact_selection_regret_saa_matches_independent_allocation_enumeration() {
+        let mut world = correlated_stress_worlds()[1];
+        world.context_annotation_cap = [1, 1];
+        world.budget = 2;
+        world.source_cost = [1; SOURCES];
+        world.validate().unwrap();
+        let portfolio = policy_portfolio(&world);
+        let profiles = [ProfileScenario {
+            name: "nominal_only",
+            world,
+        }];
+        let exact = exact_saa_selection_regret_allocation(
+            &world,
+            &profiles,
+            &portfolio,
+            12,
+            4,
+            0x0600_1111,
+        )
+        .unwrap();
+        let left = enumerate_context_options(&world, 0, [true; SOURCES]);
+        let right = enumerate_context_options(&world, 1, [true; SOURCES]);
+        let mut brute = f64::INFINITY;
+        let mut combinations = 0usize;
+        for left_option in &left {
+            for right_option in &right {
+                if left_option.cost + right_option.cost > world.budget {
+                    continue;
+                }
+                let mut allocation = Allocation::default();
+                allocation.counts[0] = left_option.counts;
+                allocation.counts[1] = right_option.counts;
+                let value = sample_average_worst_profile_regret(
+                    &allocation,
+                    &profiles,
+                    &portfolio,
+                    12,
+                    4,
+                    0x0600_1111,
+                )
+                .unwrap();
+                brute = brute.min(value);
+                combinations += 1;
+            }
+        }
+        assert_eq!(exact.combinations_checked, combinations);
+        assert!((exact.objective - brute).abs() < 1e-12);
+        assert!(exact.allocation.feasible(&world));
+    }
+
+    #[test]
+    fn selection_regret_saa_uses_reproducible_common_random_number_bank() {
+        let world = correlated_stress_worlds()[1];
+        let portfolio = policy_portfolio(&world);
+        let profiles = coherent_profile_scenarios(&world).unwrap();
+        let allocation = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap()
+        .allocation;
+        let first = sample_average_worst_profile_regret(
+            &allocation,
+            &profiles,
+            &portfolio,
+            24,
+            8,
+            0x0600_2222,
+        )
+        .unwrap();
+        let repeated = sample_average_worst_profile_regret(
+            &allocation,
+            &profiles,
+            &portfolio,
+            24,
+            8,
+            0x0600_2222,
+        )
+        .unwrap();
+        assert_eq!(first, repeated);
+        assert_ne!(0x0600_5aa0_2026_1030_u64, 0x0600_001d_2026_1030_u64);
+    }
+
+    #[test]
+    fn selection_regret_benchmark_separates_training_saa_from_holdout_results() {
+        let first = selection_regret_benchmark_rows_with_config(4, 16, 8, 32).unwrap();
+        let second = selection_regret_benchmark_rows_with_config(4, 16, 8, 32).unwrap();
+        assert_eq!(first, second);
+        let configs: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("REGRET_CONFIG\t"))
+            .collect();
+        let results: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("REGRET_RESULT\t"))
+            .collect();
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].split('\t').count(), 10);
+        assert_eq!(results.len(), 24);
+        for row in results {
+            assert_eq!(row.split('\t').count(), 22);
+        }
+        let methods: Vec<_> = results
+            .iter()
+            .filter_map(|row| row.split('\t').nth(3))
+            .collect();
+        assert!(methods.contains(&"exact_saa_selection_regret"));
+        assert!(methods.contains(&"nominal_prior_mse_exact"));
+    }
+
+    #[test]
     fn entropy_stop_benchmark_outputs_deterministic_stepwise_risk_diagnostics() {
         let first = entropy_stopping_benchmark_rows().unwrap();
         let second = entropy_stopping_benchmark_rows().unwrap();
@@ -3931,6 +4043,20 @@ mod tests {
                 .filter(|line| line.starts_with("ENTROPY_STOP\t"))
                 .count(),
             3
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("REGRET_CONFIG\t"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("REGRET_RESULT\t"))
+                .count(),
+            24
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
