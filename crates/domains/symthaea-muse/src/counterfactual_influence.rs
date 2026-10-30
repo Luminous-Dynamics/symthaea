@@ -567,7 +567,7 @@ fn parse_score_event_index(value: &str) -> Option<usize> {
     suffix.parse().ok()
 }
 
-fn audio_sha256(audio: &AudioView<'_>) -> String {
+pub(crate) fn audio_sha256(audio: &AudioView<'_>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"luminous-dynamics-mel-mr-eval-017-audio-v1\0");
     hasher.update(audio.sample_rate_hz.to_le_bytes());
