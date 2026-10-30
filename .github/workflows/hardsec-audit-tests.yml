@@ -61,7 +61,80 @@ jobs:
           package_root="$RUNNER_TEMP/seqcube-ht-witness-validation-artifact-e5acac37af6dbe1fa53b0be93199bb81a62c5320"
           test -f "$package_root/manifest.json"
           test -f "$package_root/netlists/seqctrl_infected.v"
-          (cd "$package_root" && sha256sum -c checksums/SHA256SUMS) | tee "$RUNNER_TEMP/seqcube-checksums.stdout"
+          archive_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
+          python3 - "$package_root" "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$archive_sha256" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          archive_sha256 = sys.argv[3]
+          manifest = root / "checksums/SHA256SUMS"
+          entries = []
+          failures = []
+
+          for line_number, line in enumerate(manifest.read_text(encoding="ascii").splitlines(), 1):
+              if not line:
+                  continue
+              try:
+                  expected, relative_path = line.split("  ", 1)
+              except ValueError as error:
+                  raise SystemExit(f"invalid checksum manifest line {line_number}: {line!r}") from error
+              path = root / relative_path
+              raw = path.read_bytes()
+              raw_sha256 = hashlib.sha256(raw).hexdigest()
+              if raw_sha256 == expected:
+                  mode = "exact_bytes"
+              elif b"\\r" not in raw and b"\\n" in raw:
+                  crlf_sha256 = hashlib.sha256(raw.replace(b"\\n", b"\\r\\n")).hexdigest()
+                  if crlf_sha256 == expected:
+                      mode = "lf_archive_matches_published_crlf_digest"
+                  else:
+                      failures.append({
+                          "path": relative_path,
+                          "expected": expected,
+                          "raw_sha256": raw_sha256,
+                          "crlf_sha256": crlf_sha256,
+                      })
+                      mode = "mismatch"
+              else:
+                  failures.append({
+                      "path": relative_path,
+                      "expected": expected,
+                      "raw_sha256": raw_sha256,
+                  })
+                  mode = "mismatch"
+              entries.append({
+                  "path": relative_path,
+                  "published_sha256": expected,
+                  "extracted_sha256": raw_sha256,
+                  "reconciliation": mode,
+              })
+
+          receipt = {
+              "schema_version": "seqcube-checksum-reconciliation-v1",
+              "upstream_commit": "e5acac37af6dbe1fa53b0be93199bb81a62c5320",
+              "archive_sha256": archive_sha256,
+              "manifest_path": "checksums/SHA256SUMS",
+              "manifest_entries": len(entries),
+              "exact_byte_matches": sum(item["reconciliation"] == "exact_bytes" for item in entries),
+              "line_ending_reconciled": sum(item["reconciliation"] == "lf_archive_matches_published_crlf_digest" for item in entries),
+              "mismatches": failures,
+              "entries": entries,
+              "rule": "Accept exact bytes or LF-only extracted bytes whose LF-to-CRLF representation matches the publisher digest; never rewrite source files.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "mismatches": len(failures),
+          }, indent=2))
+          if failures:
+              raise SystemExit("SeqCube publisher checksum mismatch beyond LF/CRLF representation")
+          PY
           echo "SEQCUBE_PACKAGE_ROOT=$package_root" >> "$GITHUB_ENV"
 
       - name: Set up Python for upstream SeqCube verifier
@@ -103,7 +176,7 @@ jobs:
           cp "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json" "$RUNNER_TEMP/hardsec-seqcube/"
           cp "$RUNNER_TEMP/seqcube-verifier.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
           cp "$RUNNER_TEMP/seqcube-verifier.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
-          cp "$RUNNER_TEMP/seqcube-checksums.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$RUNNER_TEMP/hardsec-seqcube/"
           cp "$RUNNER_TEMP/seqcube-toolchain.txt" "$RUNNER_TEMP/hardsec-seqcube/"
 
       - name: Audit pinned SeqCube witness-validation packet and local bytes
