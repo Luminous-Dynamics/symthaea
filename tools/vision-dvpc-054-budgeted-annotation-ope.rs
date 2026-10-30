@@ -25,6 +25,8 @@ const EVAL_N: usize = 128;
 const FULL_REPLICATES: usize = 4096;
 const SMOKE_REPLICATES: usize = 48;
 const MC_TEST_REPLICATES: usize = 4096;
+const MAX_T_BOOTSTRAPS: usize = 199;
+const SELECTION_INFERENCE_REPLICATES: usize = 1024;
 const ACTION_CAP_PER_CONTEXT: u8 = 3;
 const BUDGET_TOKENS: u32 = 8;
 const EPS: f64 = 1e-12;
@@ -1618,6 +1620,10 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         replicates,
         seed ^ 0x0570_ba7c_2026_1030,
     )?);
+    output.push_str(&selection_inference_benchmark_rows(
+        replicates,
+        seed ^ 0x0580_1afe_2026_1030,
+    )?);
     Ok(output)
 }
 
@@ -2085,6 +2091,456 @@ fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<Strin
                 prior_gap,
                 worst_gap,
             );
+        }
+    }
+    Ok(output)
+}
+
+const INFERENCE_METHODS: [&str; 3] = [
+    "pointwise_95_negative_control",
+    "bonferroni_95",
+    "common_sample_multiplier_max_t_95",
+];
+
+#[derive(Clone, Copy, Debug, Default)]
+struct InferenceAggregate {
+    replicates: usize,
+    simultaneous_covered: usize,
+    marginal_covered: usize,
+    certified: usize,
+    false_certified: usize,
+    selected_correct: usize,
+    total_regret: f64,
+    total_global_winner_curse: f64,
+    total_selective_winner_curse: f64,
+    total_width: f64,
+    total_critical: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct InferenceSummary {
+    simultaneous_coverage: f64,
+    simultaneous_wilson_low: f64,
+    simultaneous_wilson_high: f64,
+    marginal_coverage: f64,
+    certification_rate: f64,
+    false_promotion_rate: f64,
+    false_promotion_given_certification: f64,
+    selection_accuracy: f64,
+    simple_regret: f64,
+    global_winner_curse: f64,
+    selective_winner_curse: f64,
+    mean_interval_width: f64,
+    mean_critical_value: f64,
+}
+
+fn normal_quantile(probability: f64) -> Result<f64, String> {
+    if !probability.is_finite() || probability <= 0.0 || probability >= 1.0 {
+        return Err("normal quantile probability must lie strictly between zero and one".into());
+    }
+    // Peter J. Acklam's rational approximation to the inverse standard-normal CDF.
+    const A: [f64; 6] = [
+        -3.969683028665376e1,
+        2.209460984245205e2,
+        -2.759285104469687e2,
+        1.383577518672690e2,
+        -3.066479806614716e1,
+        2.506628277459239,
+    ];
+    const B: [f64; 5] = [
+        -5.447609879822406e1,
+        1.615858368580409e2,
+        -1.556989798598866e2,
+        6.680131188771972e1,
+        -1.328068155288572e1,
+    ];
+    const C: [f64; 6] = [
+        -7.784894002430293e-3,
+        -3.223964580411365e-1,
+        -2.400758277161838,
+        -2.549732539343734,
+        4.374664141464968,
+        2.938163982698783,
+    ];
+    const D: [f64; 4] = [
+        7.784695709041462e-3,
+        3.224671290700398e-1,
+        2.445134137142996,
+        3.754408661907416,
+    ];
+    const LOW: f64 = 0.02425;
+    const HIGH: f64 = 1.0 - LOW;
+
+    let value = if probability < LOW {
+        let q = (-2.0 * probability.ln()).sqrt();
+        (((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
+            / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
+    } else if probability <= HIGH {
+        let q = probability - 0.5;
+        let r = q * q;
+        (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5]) * q
+            / (((((B[0] * r + B[1]) * r + B[2]) * r + B[3]) * r + B[4]) * r + 1.0)
+    } else {
+        let q = (-2.0 * (1.0 - probability).ln()).sqrt();
+        -(((((C[0] * q + C[1]) * q + C[2]) * q + C[3]) * q + C[4]) * q + C[5])
+            / ((((D[0] * q + D[1]) * q + D[2]) * q + D[3]) * q + 1.0)
+    };
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err("normal quantile approximation returned a non-finite value".into())
+    }
+}
+
+fn policy_score_rows(
+    world: &World,
+    q_model: &[[f64; ACTIONS]; CONTEXTS],
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+    seed: u64,
+) -> Vec<[f64; PORTFOLIO_POLICIES]> {
+    let mut rng = Rng::new(seed);
+    let mut rows = Vec::with_capacity(evaluation_n);
+    for _ in 0..evaluation_n {
+        let context = if rng.uniform() < world.context_probability[0] { 0 } else { 1 };
+        let action = sample_action(&world.behavior[context], &mut rng);
+        let reward = if rng.uniform() < world.reward_mean[context][action] {
+            1.0
+        } else {
+            0.0
+        };
+        let mu = world.behavior[context][action];
+        let scores = std::array::from_fn(|policy| {
+            let target = portfolio.targets[policy];
+            let dm = (0..ACTIONS)
+                .map(|a| target[context][a] * q_model[context][a])
+                .sum::<f64>();
+            let pi = target[context][action];
+            dm + pi / mu * (reward - q_model[context][action])
+        });
+        rows.push(scores);
+    }
+    rows
+}
+
+fn score_row_moments(
+    rows: &[[f64; PORTFOLIO_POLICIES]],
+) -> ([f64; PORTFOLIO_POLICIES], [f64; PORTFOLIO_POLICIES]) {
+    let n = rows.len() as f64;
+    let means = std::array::from_fn(|policy| {
+        rows.iter().map(|row| row[policy]).sum::<f64>() / n
+    });
+    let standard_errors = std::array::from_fn(|policy| {
+        let sum_squared = rows
+            .iter()
+            .map(|row| (row[policy] - means[policy]).powi(2))
+            .sum::<f64>();
+        let sample_variance = sum_squared / (n - 1.0).max(1.0);
+        (sample_variance / n).sqrt()
+    });
+    (means, standard_errors)
+}
+
+/// Rademacher multiplier max-T bootstrap. A single multiplier is drawn per
+/// logged observation and applied to every policy score for that observation;
+/// this preserves cross-policy dependence instead of bootstrapping policies
+/// independently.
+fn multiplier_max_t_critical(
+    rows: &[[f64; PORTFOLIO_POLICIES]],
+    means: &[f64; PORTFOLIO_POLICIES],
+    standard_errors: &[f64; PORTFOLIO_POLICIES],
+    bootstrap_replicates: usize,
+    seed: u64,
+    alpha: f64,
+) -> Result<f64, String> {
+    if rows.len() < 2 || bootstrap_replicates < 32 || !(0.0..1.0).contains(&alpha) {
+        return Err("max-T bootstrap requires n>=2, at least 32 draws, and alpha in (0,1)".into());
+    }
+    let n = rows.len() as f64;
+    let mut rng = Rng::new(seed);
+    let mut statistics = Vec::with_capacity(bootstrap_replicates);
+    for _ in 0..bootstrap_replicates {
+        let mut perturbation = [0.0; PORTFOLIO_POLICIES];
+        for row in rows {
+            let multiplier = if rng.next_u64() & 1 == 0 { -1.0 } else { 1.0 };
+            for policy in 0..PORTFOLIO_POLICIES {
+                perturbation[policy] += multiplier * (row[policy] - means[policy]) / n;
+            }
+        }
+        let statistic = (0..PORTFOLIO_POLICIES)
+            .map(|policy| {
+                perturbation[policy] / standard_errors[policy].max(EPS)
+            })
+            .map(f64::abs)
+            .fold(0.0, f64::max);
+        if !statistic.is_finite() {
+            return Err("max-T bootstrap produced a non-finite statistic".into());
+        }
+        statistics.push(statistic);
+    }
+    statistics.sort_by(f64::total_cmp);
+    let rank = (((bootstrap_replicates + 1) as f64 * (1.0 - alpha)).ceil() as usize)
+        .saturating_sub(1)
+        .min(bootstrap_replicates - 1);
+    Ok(statistics[rank])
+}
+
+fn wilson_interval(successes: usize, trials: usize, z: f64) -> (f64, f64) {
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half = z
+        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
+        / denominator;
+    ((center - half).max(0.0), (center + half).min(1.0))
+}
+
+fn near_tie_policy_portfolio(world: &World) -> PolicyPortfolio {
+    let mut portfolio = policy_portfolio(world);
+    let balanced = portfolio.targets[1];
+    let original = portfolio.targets;
+    for policy in [0, 2] {
+        for context in 0..CONTEXTS {
+            for action in 0..ACTIONS {
+                portfolio.targets[policy][context][action] =
+                    0.98 * balanced[context][action] + 0.02 * original[policy][context][action];
+            }
+        }
+    }
+    portfolio.names = ["near_tie_conservative", "balanced", "near_tie_aggressive"];
+    portfolio
+}
+
+fn exact_tie_policy_portfolio(world: &World) -> PolicyPortfolio {
+    let target = world.target;
+    PolicyPortfolio {
+        names: ["tie_a", "tie_b", "tie_c"],
+        targets: [target; PORTFOLIO_POLICIES],
+        prior_weights: [1.0 / 3.0; PORTFOLIO_POLICIES],
+    }
+}
+
+fn winner_is_certified(
+    means: &[f64; PORTFOLIO_POLICIES],
+    standard_errors: &[f64; PORTFOLIO_POLICIES],
+    critical_value: f64,
+) -> (bool, usize) {
+    let selected = (0..PORTFOLIO_POLICIES)
+        .max_by(|left, right| means[*left].total_cmp(&means[*right]))
+        .unwrap_or(0);
+    let selected_lower = means[selected] - critical_value * standard_errors[selected];
+    let best_other_upper = (0..PORTFOLIO_POLICIES)
+        .filter(|policy| *policy != selected)
+        .map(|policy| means[policy] + critical_value * standard_errors[policy])
+        .fold(f64::NEG_INFINITY, f64::max);
+    (selected_lower > best_other_upper, selected)
+}
+
+fn selection_inference(
+    world: &World,
+    allocation: &Allocation,
+    portfolio: &PolicyPortfolio,
+    replicates: usize,
+    evaluation_n: usize,
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<[InferenceSummary; 3], String> {
+    validate_portfolio(portfolio)?;
+    if !allocation.feasible(world) || replicates < 2 || evaluation_n < 2 {
+        return Err("selection inference requires a feasible allocation and at least two replicates/observations".into());
+    }
+    const ALPHA: f64 = 0.05;
+    let pointwise_critical = normal_quantile(1.0 - ALPHA / 2.0)?;
+    let bonferroni_critical =
+        normal_quantile(1.0 - ALPHA / (2.0 * PORTFOLIO_POLICIES as f64))?;
+    let critical_fixed = [pointwise_critical, bonferroni_critical];
+    let true_values: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
+        target_value(&world_with_target(world, portfolio.targets[policy]))
+    });
+    let mut sorted_truth = true_values;
+    sorted_truth.sort_by(f64::total_cmp);
+    let best_true_value = sorted_truth[PORTFOLIO_POLICIES - 1];
+    let second_true_value = sorted_truth[PORTFOLIO_POLICIES - 2];
+    let unique_best = best_true_value - second_true_value > 1e-10;
+    let true_best_index = (0..PORTFOLIO_POLICIES)
+        .max_by(|left, right| true_values[*left].total_cmp(&true_values[*right]))
+        .unwrap_or(0);
+
+    let mut aggregates = [InferenceAggregate::default(); 3];
+    for replicate in 0..replicates {
+        let q_model = annotation_reward_model(
+            world,
+            allocation,
+            mix_seed(seed, replicate, 211),
+        );
+        let rows = policy_score_rows(
+            world,
+            &q_model,
+            portfolio,
+            evaluation_n,
+            mix_seed(seed, replicate, 223),
+        );
+        let (means, standard_errors) = score_row_moments(&rows);
+        let max_t = multiplier_max_t_critical(
+            &rows,
+            &means,
+            &standard_errors,
+            bootstrap_replicates,
+            mix_seed(seed, replicate, 227),
+            ALPHA,
+        )?;
+        let criticals = [critical_fixed[0], critical_fixed[1], max_t];
+        let selected = (0..PORTFOLIO_POLICIES)
+            .max_by(|left, right| means[*left].total_cmp(&means[*right]))
+            .unwrap_or(0);
+        let global_curse = means[selected] - best_true_value;
+        let selective_curse = means[selected] - true_values[selected];
+        let regret = (best_true_value - true_values[selected]).max(0.0);
+        let selected_correct = !unique_best || selected == true_best_index;
+
+        for method in 0..3 {
+            let critical = criticals[method];
+            let mut all_covered = true;
+            let mut marginal_covered = 0usize;
+            let mut total_width = 0.0;
+            let mut lower = [0.0; PORTFOLIO_POLICIES];
+            let mut upper = [0.0; PORTFOLIO_POLICIES];
+            for policy in 0..PORTFOLIO_POLICIES {
+                lower[policy] = means[policy] - critical * standard_errors[policy];
+                upper[policy] = means[policy] + critical * standard_errors[policy];
+                let covered = lower[policy] <= true_values[policy]
+                    && true_values[policy] <= upper[policy];
+                all_covered &= covered;
+                marginal_covered += usize::from(covered);
+                total_width += upper[policy] - lower[policy];
+            }
+            let (certified, certified_policy) =
+                winner_is_certified(&means, &standard_errors, critical);
+            let false_certified = certified && (!unique_best || certified_policy != true_best_index);
+            let aggregate = &mut aggregates[method];
+            aggregate.replicates += 1;
+            aggregate.simultaneous_covered += usize::from(all_covered);
+            aggregate.marginal_covered += marginal_covered;
+            aggregate.certified += usize::from(certified);
+            aggregate.false_certified += usize::from(false_certified);
+            aggregate.selected_correct += usize::from(selected_correct);
+            aggregate.total_regret += regret;
+            aggregate.total_global_winner_curse += global_curse;
+            aggregate.total_selective_winner_curse += selective_curse;
+            aggregate.total_width += total_width / PORTFOLIO_POLICIES as f64;
+            aggregate.total_critical += critical;
+        }
+    }
+
+    let z = normal_quantile(0.975)?;
+    let mut summaries = [InferenceSummary {
+        simultaneous_coverage: 0.0,
+        simultaneous_wilson_low: 0.0,
+        simultaneous_wilson_high: 0.0,
+        marginal_coverage: 0.0,
+        certification_rate: 0.0,
+        false_promotion_rate: 0.0,
+        false_promotion_given_certification: 0.0,
+        selection_accuracy: 0.0,
+        simple_regret: 0.0,
+        global_winner_curse: 0.0,
+        selective_winner_curse: 0.0,
+        mean_interval_width: 0.0,
+        mean_critical_value: 0.0,
+    }; 3];
+    for method in 0..3 {
+        let aggregate = aggregates[method];
+        let n = aggregate.replicates as f64;
+        let (wilson_low, wilson_high) =
+            wilson_interval(aggregate.simultaneous_covered, aggregate.replicates, z);
+        summaries[method] = InferenceSummary {
+            simultaneous_coverage: aggregate.simultaneous_covered as f64 / n,
+            simultaneous_wilson_low: wilson_low,
+            simultaneous_wilson_high: wilson_high,
+            marginal_coverage: aggregate.marginal_covered as f64
+                / (n * PORTFOLIO_POLICIES as f64),
+            certification_rate: aggregate.certified as f64 / n,
+            false_promotion_rate: aggregate.false_certified as f64 / n,
+            false_promotion_given_certification: if aggregate.certified > 0 {
+                aggregate.false_certified as f64 / aggregate.certified as f64
+            } else {
+                0.0
+            },
+            selection_accuracy: aggregate.selected_correct as f64 / n,
+            simple_regret: aggregate.total_regret / n,
+            global_winner_curse: aggregate.total_global_winner_curse / n,
+            selective_winner_curse: aggregate.total_selective_winner_curse / n,
+            mean_interval_width: aggregate.total_width / n,
+            mean_critical_value: aggregate.total_critical / n,
+        };
+    }
+    Ok(summaries)
+}
+
+fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<String, String> {
+    let mut output = String::new();
+    let base_world = correlated_stress_worlds()[1];
+    let portfolio_default = policy_portfolio(&base_world);
+    let portfolio_near_tie = near_tie_policy_portfolio(&base_world);
+    let portfolio_tie = exact_tie_policy_portfolio(&base_world);
+    let scenarios = [
+        ("distinct_policy_gap", base_world, portfolio_default),
+        ("near_tie_policy_gap", base_world, portfolio_near_tie),
+        ("exact_policy_tie", base_world, portfolio_tie),
+    ];
+    let inference_replicates = if replicates <= SMOKE_REPLICATES {
+        48
+    } else {
+        SELECTION_INFERENCE_REPLICATES
+    };
+
+    for (scenario_index, (scenario_name, world, portfolio)) in scenarios.iter().enumerate() {
+        world.validate()?;
+        validate_portfolio(portfolio)?;
+        let allocation = exact_portfolio_allocation(
+            world,
+            portfolio,
+            PortfolioObjective::WorstPolicy,
+        )?
+        .allocation;
+        let summaries = selection_inference(
+            world,
+            &allocation,
+            portfolio,
+            inference_replicates,
+            EVAL_N,
+            MAX_T_BOOTSTRAPS,
+            seed ^ (scenario_index as u64).wrapping_mul(0x6eed_0e9d_a4d9_4a4f),
+        )?;
+        for method in 0..3 {
+            let summary = summaries[method];
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "INFERENCE_RESULT\t{}\t{}\t{}\t{}\t{:.4}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.8}",
+                scenario_name,
+                INFERENCE_METHODS[method],
+                inference_replicates,
+                EVAL_N,
+                0.05,
+                summary.simultaneous_coverage,
+                summary.simultaneous_wilson_low,
+                summary.simultaneous_wilson_high,
+                summary.marginal_coverage,
+                summary.certification_rate,
+                summary.false_promotion_rate,
+                summary.false_promotion_given_certification,
+                summary.selection_accuracy,
+                summary.simple_regret,
+                summary.global_winner_curse,
+                summary.selective_winner_curse,
+                summary.mean_interval_width,
+                summary.mean_critical_value,
+                if method == 0 { pointwise_critical } else if method == 1 { bonferroni_critical } else { summary.mean_critical_value },
+                unique_best as u8,
+                );
         }
     }
     Ok(output)
