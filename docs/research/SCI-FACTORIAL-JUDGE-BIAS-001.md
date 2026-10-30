@@ -52,7 +52,7 @@ Files:
 - `tools/judge_factorial_fixture.py`
 
 The plan commits to:
-- exact analyzer source revision, judge source revision, prompt and rubric digests;
+- exact analyzer source revision (qualified plans require a clean analyzer worktree), judge source revision, prompt and rubric digests;
 - semantic task-set digest and task-level semantic digests;
 - candidate and criterion identities;
 - canonical score-option IDs and numeric values;
@@ -152,6 +152,7 @@ The acceptable practical-equivalence margin for a nuisance effect must be prereg
 ## 7. Explicit claim boundary
 
 The generated report always sets:
+- `analyzer_worktree_clean` to the build-time checkout cleanliness value (and refuses `qualified_run` when false);
 - `execution_authenticity_proven=false`;
 - `randomization_proven=false`;
 - `raw_prompt_custody_proven=false`;
