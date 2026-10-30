@@ -252,6 +252,8 @@ Reference:
 A public witness-validation package is available at:
 https://github.com/kxiaud/seqcube-ht-witness-validation-artifact
 
+The independent replay work is tracked in [HARDSEC-008 / issue #9136](https://github.com/Luminous-Dynamics/symthaea/issues/9136), pinned to upstream commit `e5acac37af6dbe1fa53b0be93199bb81a62c5320`.
+
 **Critical scope distinction:** its own `manifest.json` declares `reported_corpus_member: false` and `generator_included: false`. It is an author-created sequential controller/datapath reference design for independently inspecting a bounded replay-witness schema. It is **not** one of the SeqCube-HT experimental corpus members and does not include the paper-internal benchmark generator, complete benchmark corpus, detector experiments, or a source from which to infer population-level detector performance.
 
 ### What the reference package provides
@@ -284,7 +286,7 @@ Its own rights metadata says MIT applies to `verify/**`, and CC BY 4.0 applies t
 
 The evidence-packet validator now has a `witness_validation` mode that intentionally omits the detector object and model digest. This is essential: a formal/replay fixture must not invent an AI model identity merely to use the same packet format.
 
-A dedicated Rust test constructs a packet against the public reference package's manifest digests and repository file locators. It keeps five claims distinct:
+A dedicated Rust test constructs a detector-free `witness_validation` packet against the public reference package's manifest digests and repository file locators. The packet mode forbids a detector object/model identity and rejects any attempt to claim `model_suspects_trojan`. It keeps five claims distinct:
 1. the active three-phase trigger was observed in the recorded active trace;
 2. a separate payload-effect trace reports the output effect at cycle 8;
 3. the inactive control observed no trigger under its 10-cycle budget;
@@ -295,6 +297,8 @@ The fixture binds these records to the publisher-listed infected-netlist SHA-256
 `17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33aa04b65ea9941de`.
 
 It also references the publisher-listed digests for the active trace, inactive trace, boundary result, inactive SMT input and configuration. This tests packet shape, exact-subject binding, claim ceilings and bounded-vs-observed semantics. **It does not independently re-fetch or hash those GitHub files**, run their Verilog, re-run the Z3 queries, or verify the publisher's checksums. That remains a separate replay task.
+
+The evidence-packet auditor now has 25 authored unit tests, including detector-free witness-mode rejection of detector objects and model-detection claims. The nine trigger-budget tests remain separate. Neither test suite has been compiled or executed in this environment.
 
 ## 10. Multi-axis benchmark report
 
