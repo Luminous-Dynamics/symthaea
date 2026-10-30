@@ -2013,11 +2013,6 @@ impl BinaryCausalModel {
             complete: true,
         };
 
-        // PyPhi's default IIT 4.0 convention treats a single micro-unit system
-        // as zero-Phi, regardless of whether that unit has a self-loop.
-        if candidate_system.len() == 1 {
-            return Ok(null_result(Iit4SystemPhiStatus::NullSingleUnit, Some(0.0)));
-        }
         if !self.candidate_is_strongly_connected(candidate_system) {
             return Ok(null_result(Iit4SystemPhiStatus::NullDisconnected, Some(0.0)));
         }
@@ -2772,8 +2767,9 @@ mod tests {
                 Iit4SystemPhiSearchConfig::default(),
             )
             .unwrap();
-        assert_eq!(analysis.status, Iit4SystemPhiStatus::NullSingleUnit);
-        assert_eq!(analysis.phi_s, Some(0.0));
+        assert!(analysis.complete);
+        assert_eq!(analysis.candidate_system, vec![0]);
+        assert_eq!(analysis.partition_score_evaluations, 1);
 
         let partition = enumerate_iit4_system_partitions(&[0], 2, false, 1)
             .unwrap()
