@@ -322,6 +322,10 @@ pub struct LifecycleRetrievalProgress {
     pub complete: bool,
     pub can_continue: bool,
     pub remaining_calls: u32,
+    /// Optional deterministic receipt from the calibrated retrieval value gate.
+    /// When present, it is included in the final lifecycle action digest.
+    #[serde(default)]
+    pub value_decision_sha256: Option<String>,
 }
 
 impl LifecycleRetrievalProgress {
@@ -334,6 +338,9 @@ impl LifecycleRetrievalProgress {
         }
         if self.can_continue && self.remaining_calls == 0 {
             return Err("retrieval continuation requires a positive remaining-call budget".into());
+        }
+        if let Some(value_digest) = &self.value_decision_sha256 {
+            validate_sha256(value_digest, "retrieval value decision digest")?;
         }
         Ok(())
     }
@@ -812,7 +819,8 @@ mod tests {
         LifecycleRetrievalProgress {
             complete,
             can_continue,
-            remaining_calls: if can_continue { 2 } else { 0 },
+            remaining_calls: if complete { 0 } else if can_continue { 2 } else { 1 },
+            value_decision_sha256: None,
         }
     }
 
