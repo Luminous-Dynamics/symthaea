@@ -774,6 +774,16 @@ mod tests {
     }
 
     #[test]
+    fn finite_population_bound_matches_independent_reference_fixtures() {
+        assert_eq!(finite_population_upper_bound(100, 30, 0, 0.95).unwrap(), 8);
+        assert_eq!(finite_population_upper_bound(100, 30, 1, 0.95).unwrap(), 13);
+        assert_eq!(finite_population_upper_bound(100, 30, 2, 0.95).unwrap(), 17);
+        assert_eq!(finite_population_upper_bound(256, 52, 0, 0.95).unwrap(), 12);
+        assert_eq!(finite_population_upper_bound(192, 49, 0, 0.95).unwrap(), 9);
+        assert_eq!(finite_population_upper_bound(48, 30, 0, 0.95).unwrap(), 2);
+    }
+
+    #[test]
     fn finite_population_bound_is_monotone_in_observed_false_prunes() {
         let none = finite_population_upper_bound(100, 30, 0, 0.95).unwrap();
         let one = finite_population_upper_bound(100, 30, 1, 0.95).unwrap();
