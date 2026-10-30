@@ -13,7 +13,7 @@ This contract turns the BASALT roadmap into a concrete interchange format. It do
 - [Frozen suite-manifest JSON Schema (version 2)](../../benchmarks/basalt/schema/suite-manifest.schema.json)
 - [Synthetic run record](../../benchmarks/basalt/examples/run-record.example.json)
 - [Synthetic frozen suite manifest](../../benchmarks/basalt/examples/suite-manifest.example.json)
-- Rust validation command in `xtask`: `cargo run -p xtask -- basalt-validate --input PATH --manifest PATH`
+- Rust validation command in `xtask`: `cargo run -p xtask -- basalt-validate --input PATH --manifest PATH --spec-root DIR`
 - Validator implementation and adversarial tests: [`xtask/src/basalt_validate.rs`](../../xtask/src/basalt_validate.rs)
 
 The example record and suite manifest are deliberately synthetic. Their revisions, digests, task and outcomes are fabricated fixtures and must never be used as benchmark results. The validator checks exact manifest bytes against `source.manifest_digest` and compares every task specification and quality-audit disposition against the frozen manifest.
@@ -46,7 +46,7 @@ The task-quality auditor must not use which system won as a reason to retain or 
 
 ## Pairing and record invariants
 
-The JSON Schemas validate shape. The initial Rust validator in `xtask/src/basalt_validate.rs` adds cross-record invariants and requires the separately supplied frozen suite manifest. Run it as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json`. It hashes the exact manifest bytes, verifies the pinned digest, checks suite/task identity and quality-audit dispositions, and validates paired trial coverage. Ordinary JSON Schema cannot establish all of these properties:
+The JSON Schemas validate shape. The initial Rust validator in `xtask/src/basalt_validate.rs` adds cross-record invariants and requires the separately supplied frozen suite manifest. Run it as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json --spec-root TASK-SPEC-DIRECTORY`. Task specifications are loaded offline by their content digest and are never fetched over the network. It hashes the exact manifest bytes, verifies the pinned digest, checks suite/task identity and quality-audit dispositions, and validates paired trial coverage. Ordinary JSON Schema cannot establish all of these properties:
 
 1. `task_id` is unique in `task_records`; `system_id` is unique in `systems`; and every trial references a declared system.
 2. For each eligible `task_id × attempt_index`, every compared system has exactly one row. A declared `paired_group_id`, seed, task spec, base-tree digest, environment, verifier version, and budget policy must match across the comparison arms.
@@ -61,6 +61,14 @@ Seed-policy semantics are explicit and predeclared in the frozen manifest: `fixe
 The Rust module now contains 37 unit-test cases, including paired-arm omissions, duplicate cells, manifest-bound reclassification, digest mismatches, budget violations, unknown fields and verifier/integrity contradictions. They are authored but **not executed** in this environment because no Rust toolchain or mounted checkout was available and the draft PR workflows were skipped. Do not treat these tests as passing evidence.
 
 The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
+
+## Exact specification artifact verification
+
+The validator requires an offline `--spec-root` directory. For a task with specification digest `sha256:<hex>`, the UTF-8 specification artifact must be present as `<spec-root>/<hex>.txt`. The validator reads it with a 4 MiB per-artifact bound, recomputes the full SHA-256 and byte length, checks UTF-8 validity, resolves every requirement's half-open byte range, and recomputes `statement_digest` from the exact selected bytes. A missing artifact, digest/length mismatch, invalid UTF-8, out-of-range span, invalid UTF-8 boundary or statement-digest mismatch fails closed.
+
+This makes source spans executable evidence rather than declarations alone. The expectation digest remains a content commitment, not proof of the expectation's semantic validity; independent requirement adjudication and oracle qualification remain separate gates. Confirmatory holdout specifications must remain outside the agent's policy-visible workspace and be mounted only into the isolated evaluator boundary.
+
+The synthetic specification is public only because it is a deliberately fabricated development fixture. The same file layout does not imply that holdout specifications should be committed to a public repository.
 
 ## Frozen requirement-to-verifier coverage ledger
 
