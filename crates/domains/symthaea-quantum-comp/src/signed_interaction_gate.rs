@@ -492,6 +492,74 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_grid_has_no_false_signed_certification() {
+        let current_values = [-2.0_f64, -1.0, 0.0, 1.0, 2.0];
+        let proxy_values = [-1.0_f64, 0.0, 1.0];
+        let proxy_bounds = [0.0_f64, 0.25, 0.75];
+        let truth_centers = [-1.0_f64, 0.0, 1.0];
+        let truth_half_widths = [0.0_f64, 0.25, 0.75];
+
+        for current in current_values {
+            for proxy in proxy_values {
+                for proxy_bound in proxy_bounds {
+                    for truth_center in truth_centers {
+                        for truth_width in truth_half_widths {
+                            let mut data = input(
+                                current,
+                                proxy,
+                                proxy_bound,
+                                truth_center - truth_width,
+                                truth_center + truth_width,
+                            );
+                            data.margin = 0.1;
+                            let report = assess_signed_interaction(&data).unwrap();
+                            let bar_lower = proxy - proxy_bound;
+                            let bar_upper = proxy + proxy_bound;
+
+                            for bar_step in 0..=10 {
+                                let fraction = f64::from(bar_step) / 10.0;
+                                let bar_f = bar_lower + fraction * (bar_upper - bar_lower);
+                                for truth_step in 0..=10 {
+                                    let truth_fraction = f64::from(truth_step) / 10.0;
+                                    let true_f = data.true_function_interval_lower
+                                        + truth_fraction
+                                            * (data.true_function_interval_upper
+                                                - data.true_function_interval_lower);
+                                    let interaction =
+                                        (current - bar_f) * (bar_f - true_f);
+                                    assert!(
+                                        interaction
+                                            >= report.signed_interaction_interval.lower - 1.0e-12
+                                    );
+                                    assert!(
+                                        interaction
+                                            <= report.signed_interaction_interval.upper + 1.0e-12
+                                    );
+                                    match report.status {
+                                        SignedInteractionGateStatus::CertifiedOffsetting => {
+                                            assert!(interaction < -data.margin);
+                                        }
+                                        SignedInteractionGateStatus::CertifiedReinforcing => {
+                                            assert!(interaction > data.margin);
+                                        }
+                                        SignedInteractionGateStatus::NeutralWithinMargin => {
+                                            assert!(interaction >= -data.margin);
+                                            assert!(interaction <= data.margin);
+                                        }
+                                        SignedInteractionGateStatus::Ambiguous
+                                        | SignedInteractionGateStatus::InsufficientCoverage
+                                        | SignedInteractionGateStatus::EvidenceNotVerified => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn interval_product_contains_all_endpoint_products() {
         let report = assess_signed_interaction(&input(2.0, 1.0, 0.2, 0.1, 0.4)).unwrap();
         let e = report.estimation_error_interval;
