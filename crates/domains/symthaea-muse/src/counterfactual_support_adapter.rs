@@ -126,9 +126,17 @@ impl CounterfactualSupportAdapterReport {
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
+                    && event_evidence_sha256(event)
+                        .is_ok_and(|digest| digest == event.evidence_sha256)
             })
             && adapter_report_sha256(self)
                 .is_ok_and(|digest| self.receipt_sha256 == digest)
+    }
+
+    /// Alias for the structural planner-readiness check. Only the opaque
+    /// verified wrapper actually exposes planner_event_supports().
+    pub fn planner_ready(&self) -> bool {
+        self.receipt_is_intact()
     }
 }
 
@@ -142,6 +150,10 @@ pub struct VerifiedCounterfactualSupportAdapterReport {
 impl VerifiedCounterfactualSupportAdapterReport {
     pub fn report(&self) -> &CounterfactualSupportAdapterReport {
         &self.report
+    }
+
+    pub fn planner_ready(&self) -> bool {
+        self.report.planner_ready()
     }
 
     pub fn planner_event_supports(&self) -> Vec<EventInteractionSupport> {
