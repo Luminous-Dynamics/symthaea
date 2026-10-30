@@ -1597,6 +1597,12 @@ impl BinaryCausalModel {
                 factor_entry_budget,
             )?;
 
+            if report.factor.variables().iter().any(|variable| {
+                *variable < y_base || *variable >= y_base + candidate_count
+            }) {
+                return Err(RepertoireError::UndefinedBackgroundPosterior);
+            }
+
             let mut cause_factor = vec![0.0; purview_state_count];
             for (candidate_state, value) in cause_factor.iter_mut().enumerate() {
                 let local_index = report.factor.variables().iter().enumerate().fold(
