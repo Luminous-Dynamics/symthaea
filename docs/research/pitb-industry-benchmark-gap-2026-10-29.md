@@ -133,6 +133,29 @@ Keep this as a separate portability cohort after PITB v0 is qualified. Lean, Roc
 
 This gives PITB a longer-term route from a Lean-specific retrieval/transfer benchmark toward a testable theory of **prover-independent mathematical knowledge representation**. It is a research direction, not an implemented feature or current benchmark claim.
 
+
+### New mechanism-level frontier — proof-state context sufficiency (2026-10-30)
+
+The current comparison set already covers several adjacent capabilities:
+
+- **LeanGraphSearch / LeanSearch v2:** which library premises and multi-hop dependencies should be retrieved for a target?
+- **T²:** does the generated formal statement preserve enough semantics to support dependent successor theorems?
+- **TheoremBench / ProofFlow:** does a prover make meaningful progress through the internal structure and dependencies of a long proof?
+- **ITPEval:** can formal statements and proofs be translated across different ITP foundations and library ecosystems?
+- **Formal benchmark audits:** is the benchmark statement and evaluation harness itself correct?
+
+PITB is adding a complementary question: **does a system understand which exact declarations make a proposed proof move applicable in the current proof state, and does it change behavior under a controlled context intervention?**
+
+The fixed-theorem Lean calibration now contains two paired cases:
+1. Clear required hypothesis h while retaining an alternate route hEq. The original move must be rejected, but the same target remains provable by replanning.
+2. Clear irrelevant declaration hIrrelevant while preserving required h. The original move should remain eligible and close the same target.
+
+The tactic emits structured JSON snapshots for both before/after pairs. The Lean workflow embeds all four snapshots in its receipt, verifies the human-readable and JSON traces agree, recomputes canonical content/context digests, validates the intervention/case joins, and includes negative controls for tampering and omitted snapshots. This is a formal harness calibration only; the exact-head CI run and receipt are still pending, and no model outcome is claimed.
+
+**Proposed mechanism-level metrics:** support-set precision/recall; necessary-support sensitivity; benign-context decision stability; distractor false-support; replan recovery on the exact target; and per-intervention resource cost. These should be reported separately from proof pass rate and transfer utility. The finite pilot should first demonstrate receipt integrity and correct intervention semantics. A real model benchmark then needs independently reviewed support sets across unrelated mathematical families, a sealed test cohort, connected-component accounting, and validation-derived power.
+
+The scientific differentiator is not another retrieval score. It is a falsifiable, context-conditioned contract for proof actions: each move states what it requires, the evaluator changes one requirement at a time, and the system must reject, preserve, adapt, or replan in the way the checked proof state warrants. This is a research hypothesis and benchmark extension, not an established first or current SOTA claim.
+
 ### Revised benchmark decision
 
 1. **Primary:** paired, component-clustered change in exact-target semantic-gate success from typed insight versus the strongest validation-selected retrieval baseline, at identical budgets.
