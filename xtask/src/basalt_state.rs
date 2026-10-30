@@ -125,7 +125,7 @@ struct InitialResource {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "entry_type", rename_all = "snake_case")]
+#[serde(tag = "entry_type", rename_all = "snake_case", deny_unknown_fields)]
 enum TimelineEntry {
     ResourceChanged {
         sequence: u64,
@@ -187,7 +187,7 @@ fn failure(code: &'static str, path: impl Into<String>, message: impl Into<Strin
     AuditFailure {
         code,
         path: path.into(),
-        message,
+        message: message.into(),
     }
 }
 
@@ -585,8 +585,12 @@ fn invalidate_dependents(
 
     for evidence_id in direct_dependents {
         if let Some(state) = evidence.get_mut(evidence_id) {
-            state.assessment.stale_resources.push(resource_id.to_string());
-            state.assessment.invalidation_event_ids.push(event_id.to_string());
+            if !state.assessment.stale_resources.iter().any(|value| value == resource_id) {
+                state.assessment.stale_resources.push(resource_id.to_string());
+            }
+            if !state.assessment.invalidation_event_ids.iter().any(|value| value == event_id) {
+                state.assessment.invalidation_event_ids.push(event_id.to_string());
+            }
             if state.assessment.freshness == EvidenceFreshness::Fresh {
                 state.assessment.freshness = EvidenceFreshness::StaleDirect;
                 queue.push_back(evidence_id.clone());
@@ -788,6 +792,15 @@ mod tests {
         let report = audit_value(&value);
         assert!(!report.valid);
         assert!(has_code(&report, "E_RESOURCE_DUPLICATE"));
+    }
+
+    #[test]
+    fn timeline_entries_reject_unknown_fields() {
+        let mut value = parsed_example();
+        value["entries"][0]["unmodeled_field"] = Value::String("must not be ignored".into());
+        let report = audit_value(&value);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_TIMELINE_JSON"));
     }
 
     #[test]
