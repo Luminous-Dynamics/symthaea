@@ -487,6 +487,12 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
         total_cable_length_nm: total_length,
         method_reports: vec![
             MethodReport {
+                method: "no_proposal",
+                candidate_count: 0,
+                candidates: Vec::new(),
+                evaluation: truth.as_ref().map(|value| evaluate(&[], value, input, tolerance_nm)),
+            },
+            MethodReport {
                 method: "radius_only_piecewise_linear",
                 candidate_count: radius_candidates.len(),
                 candidates: radius_candidates,
@@ -596,14 +602,17 @@ mod tests {
         let input: Input = serde_json::from_slice(input_bytes).expect("profile fixture should parse");
         let report = run(&input, input_bytes, Some(truth_bytes), 500.0).expect("boundaries should evaluate");
         assert_eq!(report.input_sha256, "e1cef74eb7d37866320e6d8ad93d1d030c4c6d99fd411e3dc8cc277ad83b82fb");
-        let radius = report.method_reports[0].evaluation.as_ref().unwrap();
-        let multi = report.method_reports[1].evaluation.as_ref().unwrap();
+        let no_proposal = report.method_reports[0].evaluation.as_ref().unwrap();
+        let radius = report.method_reports[1].evaluation.as_ref().unwrap();
+        let multi = report.method_reports[2].evaluation.as_ref().unwrap();
+        assert_eq!(no_proposal.true_positive_count, 0);
+        assert_eq!(no_proposal.false_negative_count, 2);
         assert_eq!(radius.true_positive_count, 1);
         assert_eq!(radius.false_positive_count, 1);
         assert_eq!(radius.false_negative_count, 1);
         assert_eq!(multi.true_positive_count, 2);
         assert_eq!(multi.false_negative_count, 0);
-        assert!(multi.false_positive_count >= 1);
+        assert_eq!(multi.false_positive_count, 7);
     }
 
     #[test]
@@ -666,7 +675,7 @@ mod tests {
         let truth_bytes = serde_json::to_vec(&truth).unwrap();
         let report = run(&input, &input_bytes, Some(&truth_bytes), 500.0).unwrap();
         assert_eq!(report.status, "SYNTHETIC_OR_HELD_OUT_EVALUATED_NOT_PROMOTED");
-        assert_eq!(report.method_reports[0].evaluation.as_ref().unwrap().true_positive_count, 1);
+        assert_eq!(report.method_reports[1].evaluation.as_ref().unwrap().true_positive_count, 1);
     }
 
     #[test]
