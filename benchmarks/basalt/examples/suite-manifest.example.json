@@ -34,5 +34,10 @@
         }
       ]
     }
+  ],
+  "seed_policy": "fixed_paired",
+  "attempts_per_task": 1,
+  "attempt_seeds": [
+    17
   ]
 }
