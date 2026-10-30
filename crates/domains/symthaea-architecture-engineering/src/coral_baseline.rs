@@ -760,6 +760,9 @@ mod tests {
         assert_eq!(current[0].shrunk_yield, 0.0);
         assert_eq!(b.max_yield_seen, historical_peak);
         assert!(current[0].exploration_bonus > 0.0);
+        let (new_yield, new_bonus, _) = b.new_direction_potential().unwrap();
+        assert_eq!(new_yield, historical_peak);
+        assert!(new_bonus > 0.0);
     }
 
     #[test]
