@@ -235,6 +235,27 @@ enum GreedyRule {
     GainPerCost,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct LocalMixOption {
+    counts: [u8; SOURCES],
+    score: f64,
+    remaining_swap_gain: f64,
+}
+
+#[derive(Clone, Debug)]
+struct MmRun {
+    allocation: Allocation,
+    iterations: usize,
+    objective_trace: Vec<f64>,
+    remaining_swap_gain: f64,
+}
+
+#[derive(Clone, Copy)]
+struct MmCandidate {
+    allocation: Allocation,
+    remaining_swap_gain: f64,
+}
+
 struct Rng(u64);
 
 impl Rng {
@@ -767,7 +788,374 @@ fn allocation_profile_bias(world: &World, allocation: &Allocation) -> f64 {
     weighted_abs_model_bias(world, allocation)
 }
 
-fn build_plans(world: &World) -> Result<Vec<(&'static str, Allocation)>, String> {
+fn context_bias_sums(world: &World, allocation: &Allocation) -> [f64; CONTEXTS] {
+    std::array::from_fn(|x| {
+        (0..ACTIONS)
+            .map(|a| world.target[x][a] * cell_bias_and_variance(world, allocation, x, a).0)
+            .sum()
+    })
+}
+
+/// Allocation-dependent part of the exact OPE variance objective:
+/// J = J1 - J2 + J3. The factual reward variance and between-context variance
+/// are invariant to the annotation allocation and are dropped from the optimizer.
+fn allocation_dependent_objective(world: &World, allocation: &Allocation) -> Result<f64, String> {
+    if !allocation.feasible(world) {
+        return Err("MM objective requires a feasible allocation".into());
+    }
+    let beta = context_bias_sums(world, allocation);
+    let mut objective = 0.0;
+    for x in 0..CONTEXTS {
+        let d = world.context_probability[x];
+        for a in 0..ACTIONS {
+            let pi = world.target[x][a];
+            let mu = world.behavior[x][a];
+            let (bias, variance) = cell_bias_and_variance(world, allocation, x, a);
+            let alpha1 = d * pi * pi / mu;
+            let alpha3 = d * pi * pi * (1.0 / mu - 1.0);
+            objective += alpha1 * bias * bias + alpha3 * variance;
+        }
+        objective -= d * beta[x] * beta[x];
+    }
+    if objective.is_finite() && objective >= -EPS {
+        Ok(objective.max(0.0))
+    } else {
+        Err("non-finite or materially negative allocation-dependent objective".into())
+    }
+}
+
+/// Dropped-constant MM surrogate at the current iterate:
+/// J1(n) + J3(n) - 2 sum_x d_x beta_x(current) beta_x(n).
+fn mm_surrogate_value(
+    world: &World,
+    allocation: &Allocation,
+    current_beta: &[f64; CONTEXTS],
+) -> Result<f64, String> {
+    if !allocation.feasible(world) {
+        return Err("MM surrogate requires a feasible allocation".into());
+    }
+    let mut value = 0.0;
+    for x in 0..CONTEXTS {
+        let d = world.context_probability[x];
+        for a in 0..ACTIONS {
+            let pi = world.target[x][a];
+            let mu = world.behavior[x][a];
+            let (bias, variance) = cell_bias_and_variance(world, allocation, x, a);
+            let alpha1 = d * pi * pi / mu;
+            let alpha3 = d * pi * pi * (1.0 / mu - 1.0);
+            let omega2 = -2.0 * d * current_beta[x] * pi;
+            value += alpha1 * bias * bias + alpha3 * variance + omega2 * bias;
+        }
+    }
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err("non-finite MM surrogate".into())
+    }
+}
+
+/// Full tangent majorizer. Its gap to J is exactly
+/// sum_x d_x (beta_x(n) - beta_x(current))^2.
+fn full_mm_majorizer(
+    world: &World,
+    allocation: &Allocation,
+    current_beta: &[f64; CONTEXTS],
+) -> Result<f64, String> {
+    let constant = (0..CONTEXTS)
+        .map(|x| world.context_probability[x] * current_beta[x] * current_beta[x])
+        .sum::<f64>();
+    Ok(mm_surrogate_value(world, allocation, current_beta)? + constant)
+}
+
+fn mm_cell_surrogate(
+    world: &World,
+    context: usize,
+    action: usize,
+    source_counts: &[u8; SOURCES],
+    current_beta: f64,
+    lambda: f64,
+) -> f64 {
+    let mut partial = Allocation::default();
+    partial.counts[context][action] = *source_counts;
+    let (bias, variance) = cell_bias_and_variance(world, &partial, context, action);
+    let d = world.context_probability[context];
+    let pi = world.target[context][action];
+    let mu = world.behavior[context][action];
+    let alpha1 = d * pi * pi / mu;
+    let alpha3 = d * pi * pi * (1.0 / mu - 1.0);
+    let omega2 = -2.0 * d * current_beta * pi;
+    let cost = (0..SOURCES)
+        .map(|k| source_counts[k] as f64 * world.source_cost[k] as f64)
+        .sum::<f64>();
+    alpha1 * bias * bias + alpha3 * variance + omega2 * bias + lambda * cost
+}
+
+/// Algorithm 2's fixed-count source mixture search: initialize all annotations
+/// at the cheapest source, then apply the best improving pairwise source swap.
+fn local_mix_option(
+    world: &World,
+    context: usize,
+    action: usize,
+    total_annotations: usize,
+    current_beta: f64,
+    lambda: f64,
+    swap_limit: usize,
+) -> LocalMixOption {
+    let cheapest = (0..SOURCES)
+        .min_by_key(|k| (world.source_cost[*k], *k))
+        .expect("at least one source is registered");
+    let mut counts = [0_u8; SOURCES];
+    counts[cheapest] = total_annotations as u8;
+
+    for _ in 0..swap_limit {
+        let current_score =
+            mm_cell_surrogate(world, context, action, &counts, current_beta, lambda);
+        let mut best_gain = EPS;
+        let mut best_counts = None;
+        for source_from in 0..SOURCES {
+            if counts[source_from] == 0 {
+                continue;
+            }
+            for source_to in 0..SOURCES {
+                if source_from == source_to {
+                    continue;
+                }
+                let mut candidate = counts;
+                candidate[source_from] -= 1;
+                candidate[source_to] += 1;
+                let candidate_score =
+                    mm_cell_surrogate(world, context, action, &candidate, current_beta, lambda);
+                let gain = current_score - candidate_score;
+                if gain > best_gain + EPS {
+                    best_gain = gain;
+                    best_counts = Some(candidate);
+                }
+            }
+        }
+        match best_counts {
+            Some(candidate) => counts = candidate,
+            None => break,
+        }
+    }
+
+    let score = mm_cell_surrogate(world, context, action, &counts, current_beta, lambda);
+    let mut remaining_swap_gain = 0.0_f64;
+    for source_from in 0..SOURCES {
+        if counts[source_from] == 0 {
+            continue;
+        }
+        for source_to in 0..SOURCES {
+            if source_from == source_to {
+                continue;
+            }
+            let mut candidate = counts;
+            candidate[source_from] -= 1;
+            candidate[source_to] += 1;
+            let candidate_score =
+                mm_cell_surrogate(world, context, action, &candidate, current_beta, lambda);
+            remaining_swap_gain = remaining_swap_gain.max((score - candidate_score).max(0.0));
+        }
+    }
+    LocalMixOption {
+        counts,
+        score,
+        remaining_swap_gain,
+    }
+}
+
+/// For fixed lambda, perform per-cell pairwise source search and then an exact
+/// DP over action annotation counts inside each context.
+fn mm_candidate_for_lambda(
+    world: &World,
+    current_beta: &[f64; CONTEXTS],
+    lambda: f64,
+    swap_limit: usize,
+) -> Result<MmCandidate, String> {
+    if !lambda.is_finite() || lambda < 0.0 {
+        return Err("MM multiplier must be finite and nonnegative".into());
+    }
+    let mut allocation = Allocation::default();
+    let mut remaining_swap_gain = 0.0;
+
+    for x in 0..CONTEXTS {
+        let cap = world.context_annotation_cap[x] as usize;
+        let factual_context_count = world.factual_count[x]
+            .iter()
+            .map(|count| *count as usize)
+            .sum::<usize>();
+        let mut tables: [Vec<LocalMixOption>; ACTIONS] = std::array::from_fn(|_| Vec::new());
+        for a in 0..ACTIONS {
+            let factual_cell_count = world.factual_count[x][a] as usize;
+            let max_for_cell = factual_context_count
+                .saturating_sub(factual_cell_count)
+                .min(cap);
+            for m in 0..=max_for_cell {
+                tables[a].push(local_mix_option(
+                    world,
+                    x,
+                    a,
+                    m,
+                    current_beta[x],
+                    lambda,
+                    swap_limit,
+                ));
+            }
+        }
+
+        let mut dp = vec![vec![f64::INFINITY; cap + 1]; ACTIONS + 1];
+        let mut parent: Vec<Vec<Option<(usize, usize)>>> = vec![vec![None; cap + 1]; ACTIONS + 1];
+        dp[0][0] = 0.0;
+        for a in 0..ACTIONS {
+            for used in 0..=cap {
+                if !dp[a][used].is_finite() {
+                    continue;
+                }
+                let max_m = (cap - used).min(tables[a].len() - 1);
+                for m in 0..=max_m {
+                    let next_used = used + m;
+                    let candidate = dp[a][used] + tables[a][m].score;
+                    if candidate + EPS < dp[a + 1][next_used] {
+                        dp[a + 1][next_used] = candidate;
+                        parent[a + 1][next_used] = Some((used, m));
+                    }
+                }
+            }
+        }
+        let mut best_used = 0;
+        for used in 1..=cap {
+            if dp[ACTIONS][used] + EPS < dp[ACTIONS][best_used] {
+                best_used = used;
+            }
+        }
+        if !dp[ACTIONS][best_used].is_finite() {
+            return Err("MM context DP has no feasible state".into());
+        }
+        let mut cursor = best_used;
+        for a in (0..ACTIONS).rev() {
+            let (previous, m) =
+                parent[a + 1][cursor].ok_or_else(|| "missing MM DP backpointer".to_string())?;
+            let option = tables[a][m];
+            allocation.counts[x][a] = option.counts;
+            remaining_swap_gain += option.remaining_swap_gain;
+            cursor = previous;
+        }
+    }
+    // The fixed-lambda subproblem may intentionally return a globally
+    // over-budget candidate. The outer lambda bracket/bisection observes its
+    // cost and raises the multiplier; only the outer loop may admit candidates.
+    if (0..CONTEXTS).any(|x| allocation.context_count(x) > world.context_annotation_cap[x] as u32) {
+        return Err("MM context DP violated a context annotation cap".into());
+    }
+    Ok(MmCandidate {
+        allocation,
+        remaining_swap_gain,
+    })
+}
+
+/// Algorithm 1: linearize the squared context bias, search lambda with doubling
+/// and bisection, and retain the current allocation as a descent-safe fallback.
+/// Only budget-feasible candidates can be accepted.
+fn mm_allocate(
+    world: &World,
+    initial: Allocation,
+    outer_limit: usize,
+    swap_limit: usize,
+) -> Result<MmRun, String> {
+    if !initial.feasible(world) {
+        return Err("MM initial allocation is infeasible".into());
+    }
+    const INITIAL_LAMBDA: f64 = 1e-6;
+    const LAMBDA_TOLERANCE: f64 = 1e-8;
+    const MAX_DOUBLINGS: usize = 64;
+    const MAX_BISECTION: usize = 40;
+
+    let mut current = initial;
+    let mut objective_trace = vec![allocation_dependent_objective(world, &current)?];
+    let mut iterations = 0;
+    let mut last_residual = 0.0;
+
+    for _ in 0..outer_limit {
+        let current_beta = context_bias_sums(world, &current);
+        let mut best_allocation = current;
+        let mut best_surrogate = mm_surrogate_value(world, &current, &current_beta)?;
+        let mut best_residual = 0.0;
+        let mut candidates = Vec::new();
+
+        let zero_price = mm_candidate_for_lambda(world, &current_beta, 0.0, swap_limit)?;
+        if zero_price.allocation.feasible(world) {
+            candidates.push(zero_price);
+        }
+
+        let mut lambda_low = 0.0;
+        let mut lambda_high = INITIAL_LAMBDA;
+        let mut high_candidate =
+            mm_candidate_for_lambda(world, &current_beta, lambda_high, swap_limit)?;
+        let mut doublings = 0;
+        while high_candidate.allocation.cost(world) > world.budget {
+            lambda_low = lambda_high;
+            lambda_high *= 2.0;
+            doublings += 1;
+            if doublings > MAX_DOUBLINGS || !lambda_high.is_finite() {
+                return Err("MM failed to bracket a feasible Lagrange price".into());
+            }
+            high_candidate =
+                mm_candidate_for_lambda(world, &current_beta, lambda_high, swap_limit)?;
+        }
+        candidates.push(high_candidate);
+
+        for _ in 0..MAX_BISECTION {
+            if lambda_high - lambda_low <= LAMBDA_TOLERANCE {
+                break;
+            }
+            let lambda_mid = (lambda_low + lambda_high) / 2.0;
+            let candidate = mm_candidate_for_lambda(world, &current_beta, lambda_mid, swap_limit)?;
+            if candidate.allocation.cost(world) > world.budget {
+                lambda_low = lambda_mid;
+            } else {
+                lambda_high = lambda_mid;
+                candidates.push(candidate);
+            }
+        }
+
+        for candidate in candidates {
+            let surrogate = mm_surrogate_value(world, &candidate.allocation, &current_beta)?;
+            if surrogate + EPS < best_surrogate {
+                best_allocation = candidate.allocation;
+                best_surrogate = surrogate;
+                best_residual = candidate.remaining_swap_gain;
+            }
+        }
+        if best_allocation == current {
+            break;
+        }
+
+        let old_objective = *objective_trace.last().expect("initial objective");
+        let new_objective = allocation_dependent_objective(world, &best_allocation)?;
+        if new_objective > old_objective + 1e-10 {
+            return Err(format!(
+                "MM monotonicity violated: old={old_objective}, new={new_objective}"
+            ));
+        }
+        current = best_allocation;
+        objective_trace.push(new_objective);
+        iterations += 1;
+        last_residual = best_residual;
+        if old_objective - new_objective <= EPS {
+            break;
+        }
+    }
+
+    Ok(MmRun {
+        allocation: current,
+        iterations,
+        objective_trace,
+        remaining_swap_gain: last_residual,
+    })
+}
+
+type Plan = (&'static str, Allocation, usize, f64);
+
+fn build_plans(world: &World) -> Result<Vec<Plan>, String> {
     let none = Allocation::default();
     let greedy_max = greedy_allocate(world, GreedyRule::MaxGain)?;
     let greedy_cost = greedy_allocate(world, GreedyRule::GainPerCost)?;
@@ -776,15 +1164,29 @@ fn build_plans(world: &World) -> Result<Vec<(&'static str, Allocation)>, String>
     let exact = exact_dynamic_program(world, [true; SOURCES])?.allocation;
     let estimated_world = world.estimated_profiles();
     let plugin_profile = exact_dynamic_program(&estimated_world, [true; SOURCES])?.allocation;
+    let mm_zero = mm_allocate(world, none, 24, 128)?;
+    let mm_greedy = mm_allocate(world, greedy_max, 24, 128)?;
 
     Ok(vec![
-        ("no_annotations", none),
-        ("greedy_max_gain", greedy_max),
-        ("greedy_cost_aware", greedy_cost),
-        ("best_single_source_exact", single_source),
-        ("pairwise_exchange", exchange),
-        ("exact_dp_oracle", exact),
-        ("plugin_profile_exact", plugin_profile),
+        ("no_annotations", none, 0, 0.0),
+        ("greedy_max_gain", greedy_max, 0, 0.0),
+        ("greedy_cost_aware", greedy_cost, 0, 0.0),
+        ("best_single_source_exact", single_source, 0, 0.0),
+        ("pairwise_exchange", exchange, 0, 0.0),
+        ("exact_dp_oracle", exact, 0, 0.0),
+        ("plugin_profile_exact", plugin_profile, 0, 0.0),
+        (
+            "mm_from_zero",
+            mm_zero.allocation,
+            mm_zero.iterations,
+            mm_zero.remaining_swap_gain,
+        ),
+        (
+            "mm_from_greedy",
+            mm_greedy.allocation,
+            mm_greedy.iterations,
+            mm_greedy.remaining_swap_gain,
+        ),
     ])
 }
 
@@ -943,7 +1345,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         World::heterogeneous_source_quality(),
     ];
     let mut output = String::from(
-        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\trelative_gap_to_exact\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\n",
+        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\trelative_gap_to_exact\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\tmm_iterations\tremaining_swap_gain\n",
     );
     output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-054\tversion\t0\n");
     output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
@@ -965,11 +1367,13 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let no_annotation = analytic_mse(world, &Allocation::default(), EVAL_N)?;
         let exact_mse = plans
             .iter()
-            .find(|(method, _)| *method == "exact_dp_oracle")
-            .map(|(_, allocation)| analytic_mse(world, allocation, EVAL_N))
+            .find(|(method, _, _, _)| *method == "exact_dp_oracle")
+            .map(|(_, allocation, _, _)| analytic_mse(world, allocation, EVAL_N))
             .transpose()?
             .ok_or_else(|| "missing exact-DP oracle plan".to_string())?;
-        for (method_index, (method, allocation)) in plans.iter().enumerate() {
+        for (method_index, (method, allocation, mm_iterations, mm_residual)) in
+            plans.iter().enumerate()
+        {
             if !allocation.feasible(world) {
                 return Err(format!("infeasible plan: {method}"));
             }
@@ -993,7 +1397,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}",
+                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{:.10}",
                 world.name,
                 method,
                 EVAL_N,
@@ -1011,6 +1415,8 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
                 sources[0],
                 sources[1],
                 sources[2],
+                mm_iterations,
+                mm_residual,
             );
         }
 
@@ -1272,6 +1678,62 @@ mod tests {
     }
 
     #[test]
+    fn mm_majorizer_is_tangent_and_dominates_original_objective() {
+        let world = World::mixed_bias_cancellation();
+        let current = greedy_allocate(&world, GreedyRule::MaxGain).unwrap();
+        let candidate = exact_dynamic_program(&world, [true; SOURCES])
+            .unwrap()
+            .allocation;
+        let beta_current = context_bias_sums(&world, &current);
+        let beta_candidate = context_bias_sums(&world, &candidate);
+        let majorizer = full_mm_majorizer(&world, &candidate, &beta_current).unwrap();
+        let objective = allocation_dependent_objective(&world, &candidate).unwrap();
+        let expected_gap = (0..CONTEXTS)
+            .map(|x| world.context_probability[x] * (beta_candidate[x] - beta_current[x]).powi(2))
+            .sum::<f64>();
+        assert!((majorizer - objective - expected_gap).abs() < 1e-10);
+        let at_current = full_mm_majorizer(&world, &current, &beta_current).unwrap();
+        let current_objective = allocation_dependent_objective(&world, &current).unwrap();
+        assert!((at_current - current_objective).abs() < 1e-10);
+        assert!(majorizer + EPS >= objective);
+    }
+
+    #[test]
+    fn mm_descent_is_monotone_and_never_beats_the_exact_dp_oracle() {
+        for world in [
+            World::mixed_bias_cancellation(),
+            World::heterogeneous_source_quality(),
+        ] {
+            let exact = exact_dynamic_program(&world, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let exact_objective = allocation_dependent_objective(&world, &exact).unwrap();
+            for initial in [
+                Allocation::default(),
+                greedy_allocate(&world, GreedyRule::MaxGain).unwrap(),
+            ] {
+                let initial_objective = allocation_dependent_objective(&world, &initial).unwrap();
+                let result = mm_allocate(&world, initial, 24, 128).unwrap();
+                assert!(result.allocation.feasible(&world));
+                assert!(result.objective_trace.len() >= 1);
+                assert!(
+                    result
+                        .objective_trace
+                        .windows(2)
+                        .all(|pair| pair[1] <= pair[0] + 1e-10),
+                    "MM objective trace is not monotone: {:?}",
+                    result.objective_trace
+                );
+                let mm_objective =
+                    allocation_dependent_objective(&world, &result.allocation).unwrap();
+                assert!(mm_objective <= initial_objective + 1e-10);
+                assert!(mm_objective + 1e-9 >= exact_objective);
+                assert_eq!(result.objective_trace.len(), result.iterations + 1);
+            }
+        }
+    }
+
+    #[test]
     fn output_is_deterministic_and_has_exact_row_counts() {
         let first = benchmark(2, 123).unwrap();
         let second = benchmark(2, 123).unwrap();
@@ -1281,7 +1743,7 @@ mod tests {
                 .lines()
                 .filter(|line| line.starts_with("RESULT\t"))
                 .count(),
-            14
+            18
         );
         assert_eq!(
             first
@@ -1305,7 +1767,7 @@ mod tests {
             8
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
-            assert_eq!(line.split('\t').count(), 18);
+            assert_eq!(line.split('\t').count(), 20);
         }
     }
 

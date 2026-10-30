@@ -78,7 +78,7 @@ For N independent evaluation events, exact expected MSE is Var(Z)/N. This is a f
 
 The exact small-instance solver enumerates all feasible source-count allocations within each context, computes each option's exact risk component, then combines context options by dynamic programming under the shared budget. It reconstructs and rechecks the chosen integer allocation. This is a global optimum for the finite registered instance, up to floating-point comparison tolerance; it is not a scalable optimizer claim.
 
-Compared methods: no annotations; greedy maximum marginal MSE gain; greedy marginal gain per cost unit; best single-source allocation; pairwise-exchange local search from max-gain greedy; exact DP oracle using true source profiles; exact DP using a deliberately misspecified plugin profile, evaluated under the true profile.
+Compared methods: no annotations; greedy maximum marginal MSE gain; greedy marginal gain per cost unit; best single-source allocation; pairwise-exchange local search from max-gain greedy; exact DP oracle using true source profiles; exact DP using a deliberately misspecified plugin profile, evaluated under the true profile; and the paper-style MM allocator initialized from no annotations and from max-gain greedy. Each result reports both relative MSE reduction versus no annotations and relative objective gap to the exact-DP oracle.
 
 Pairwise exchange is a local-search baseline, not a reproduction of Xiang et al.'s MM algorithm. No SOTA claim is made.
 
@@ -122,3 +122,17 @@ A defensible comparison must match the target policy, factual fit data, source c
 ## Scope limits
 
 The frozen worlds assume independent annotation errors conditional on source and cell, fixed profiles, known behavior propensities, stationary Bernoulli factual rewards and a fixed target policy. They do not establish guarantees for correlated annotators, hidden confounding, nonstationary reward, estimated propensities, or deployment.
+## Paper-style MM optimizer (VIS-DVPC-055 follow-on)
+
+The follow-on branch adds a first implementation of the paper's two-layer MM structure:
+
+1. Compute the current context-level target-weighted reward-model bias beta_x.
+2. Linearize the negative squared bias term around the current allocation. The dropped-constant surrogate is J1 + J3 - 2 sum_x d_x beta_x(current) beta_x(candidate).
+3. For each context-action cell and fixed annotation count m, initialize all m annotations at the cheapest source and repeatedly apply the best improving pairwise source swap, up to a fixed swap limit.
+4. For each context, use a dynamic program over action annotation counts up to the per-context cap.
+5. Search the Lagrange multiplier by exponential bracketing and bisection; discard budget-infeasible candidates and retain the current allocation as a fallback.
+6. Accept only surrogate-improving candidates, then verify that the original allocation-dependent objective has not increased.
+
+The implementation reports two MM initializations (`mm_from_zero`, `mm_from_greedy`), outer iteration count, residual best pairwise-swap gain, and relative objective gap against the exact-DP oracle. Tests verify that the full MM majorizer touches the original objective at the current iterate, dominates it elsewhere by the squared tangent remainder, and that the accepted original objective trace is monotone.
+
+This is a paper-style reproduction attempt on our own two small synthetic worlds, not yet a faithful reproduction of the paper's 30 certified instances. The pairwise source-mix search is bounded by a configured swap limit, and the local action-count DP is exact only over those locally searched mix options. The exact global DP remains the certified optimum for our registered small fixture. We should compare MM objective gaps and residual swap gains to that oracle, then add the paper's complete matched fixture set before making any claim against its reported 0.05%/0.26% gaps.

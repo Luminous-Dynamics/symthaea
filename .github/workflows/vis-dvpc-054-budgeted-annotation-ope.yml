@@ -44,14 +44,14 @@ jobs:
           /tmp/vis-dvpc-054 --smoke > /tmp/vis-dvpc-054-smoke-a.tsv
           /tmp/vis-dvpc-054 --smoke > /tmp/vis-dvpc-054-smoke-b.tsv
           cmp /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-smoke-b.tsv
-          awk -F '\t' '$1 == "RESULT" { if (NF != 18 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 14 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 20 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           awk -F '\t' '$1 == "NEGATIVE_CONTROL" { if (NF != 9 || $2 == "" || $3 != "annotation_as_factual_residual" || $4 < 1 || $5 < 1 || $6 != $6 || $7 < 0 || $8 < 0 || $9 != "IDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT") bad=1; n++ } END { if (n != 2 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || $8 != "true" && $8 != "false") bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-smoke-a.tsv)" = "8"
       - name: Run full deterministic multi-source allocation frontier
         run: |
           /tmp/vis-dvpc-054 > /tmp/vis-dvpc-054-full.tsv
-          awk -F '\t' '$1 == "RESULT" { if (NF != 18 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 14 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 20 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 18 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\t' '$1 == "NEGATIVE_CONTROL" { if (NF != 9 || $2 == "" || $3 != "annotation_as_factual_residual" || $4 < 1 || $5 < 1 || $6 != $6 || $7 < 0 || $8 < 0 || $9 != "IDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT") bad=1; n++ } END { if (n != 2 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || ($8 != "true" && $8 != "false")) bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-full.tsv)" = "8"
