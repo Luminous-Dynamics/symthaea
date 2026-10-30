@@ -893,6 +893,24 @@ mod tests {
 
 
     #[test]
+    fn cloned_evidence_index_has_independent_lifecycle_state() {
+        let mut original = EvidenceIndex::new();
+        insert_text(&mut original, 41, "trusted checkout route", "user-1");
+        let mut clone = original.clone();
+
+        clone.revoke_evidence("evidence-41").unwrap();
+
+        let original_hits = original
+            .search_bm25("checkout", "user-1", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        let clone_hits = clone
+            .search_bm25("checkout", "user-1", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        assert_eq!(original_hits.len(), 1);
+        assert!(clone_hits.is_empty());
+    }
+
+    #[test]
     fn batch_ingestion_is_atomic_when_the_final_source_pointer_is_invalid() {
         let mut index = EvidenceIndex::new();
         let source_value = serde_json::json!({
