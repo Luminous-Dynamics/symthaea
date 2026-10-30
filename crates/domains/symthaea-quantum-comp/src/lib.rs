@@ -74,6 +74,7 @@ pub mod adaptive_evaluation;
 pub mod architecture_portfolio;
 pub mod architecture_routing;
 pub mod architecture_evidence;
+pub mod architecture_regime;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -176,6 +177,29 @@ pub use architecture_portfolio::{
     ArchitectureParetoRelation, ArchitectureResourceEnvelope,
     ArchitectureWorkloadKind, ComputeArchitectureFamily, MemoryInterval,
     MetricInterval,
+};
+pub use architecture_regime::{
+    validate_regime_bound_evidence_record,
+    validate_regime_bound_evidence_record_for_comparison,
+    validate_regime_record_holdout_separation,
+    validate_workload_holdout_assignments,
+    validate_workload_regime_profile,
+    validate_workload_regime_query,
+    workload_regime_matches_query,
+    ArchitectureEvaluationPartition,
+    ArchitectureWorkloadRegime,
+    CommunicationBoundaryProfile,
+    CommunicationFabricFamily,
+    CountInterval,
+    RegimeBoundEvidenceRecord,
+    RegimeCharacterizationOrigin,
+    WorkloadExecutionMode,
+    WorkloadHoldoutAssignment,
+    WorkloadHoldoutError,
+    WorkloadPrecisionProfile,
+    WorkloadRegimeError,
+    WorkloadRegimeQuery,
+    WorkloadTemporalPattern,
 };
 pub use architecture_evidence::{
     compare_architecture_evidence_records, select_architecture_candidate_from_evidence,
