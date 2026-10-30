@@ -374,7 +374,7 @@
           "spec_byte_length": {
             "type": "integer",
             "minimum": 1,
-            "description": "Exact byte length of the frozen UTF-8 task specification used for half-open requirement source spans."
+            "description": "Exact byte length of the frozen UTF-8 task specification. The validator loads the artifact from --spec-root using <sha256-hex>.txt, verifies its exact digest and byte length, then hashes every requirement source span."
           }
         }
       }
