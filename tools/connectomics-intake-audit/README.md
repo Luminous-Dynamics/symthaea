@@ -148,6 +148,8 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --output query-impact-report.json
 ```
 
+The report includes canonical SHA-256 digests of the baseline and each counterfactual graph. The digest encodes sorted directed edge triples as big-endian source ID, target ID, and IEEE-754 weight bits, making it independent of input edge order. The caller-supplied `source_graph_sha256` remains separately recorded and is not silently substituted for the canonical graph digest.
+
 The report always has status `RANKED_FOR_HUMAN_REVIEW_ONLY`. No edit is applied. If candidate proposals touch the same baseline edge, their overlap is reported; the tool evaluates each candidate independently and does not compose interactions. A large counterfactual delta means a declared query is sensitive to that proposed mutation, not that the mutation is correct or biologically important. It does not model mesh morphology, synapse uncertainty, path multiplicity, motif counts, dynamic state, query uncertainty, or actual post-review outcomes. Those require separate evidence and validation.
 
 The synthetic fixture deliberately includes a candidate that changes a direct edge weight but leaves reachability unchanged because an alternate route remains, plus two candidates that touch the same edge. It is an executable negative-control example, not biological data.
