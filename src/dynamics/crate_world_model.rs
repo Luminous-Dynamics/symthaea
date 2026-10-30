@@ -280,6 +280,36 @@ impl HierarchicalCfCWorldModel {
         Ok(output.to_vec())
     }
 
+    /// Predict the next state through an explicit persistence skip connection.
+    ///
+    /// The learned head predicts a state delta; the observed state is carried
+    /// forward unchanged and the delta is added. This is useful when the dominant
+    /// dynamics are near-identity and the model should learn only what changes.
+    /// The default `predict` API remains unchanged.
+    pub fn predict_next_state_residual(
+        &self,
+        state: &[f32],
+        action: &[f32],
+        delta_t: f32,
+    ) -> Result<Vec<f32>> {
+        if state.len() != self.config.hdc_dim {
+            return Err(anyhow::anyhow!(
+                "residual prediction requires state dimension {}, got {}",
+                self.config.hdc_dim,
+                state.len()
+            ));
+        }
+        let delta = self.predict(state, action, delta_t)?;
+        if delta.len() != state.len() {
+            return Err(anyhow::anyhow!(
+                "residual output dimension {}, expected {}",
+                delta.len(),
+                state.len()
+            ));
+        }
+        Ok(state.iter().zip(delta).map(|(value, change)| value + change).collect())
+    }
+
     /// Predict and update internal state (stateful prediction)
     pub fn predict_and_update(
         &mut self,
@@ -419,6 +449,28 @@ impl HierarchicalCfCWorldModel {
         self.training_steps += 1;
 
         Ok(mse)
+    }
+
+    /// Train the prediction head on the change in state rather than the full
+    /// next state. Pair this with `predict_next_state_residual`; the default
+    /// `train_step` objective and behavior remain unchanged.
+    pub fn train_step_residual(
+        &mut self,
+        state: &[f32],
+        action: &[f32],
+        next_state: &[f32],
+        delta_t: f32,
+    ) -> Result<f32> {
+        if state.len() != self.config.hdc_dim || next_state.len() != self.config.hdc_dim {
+            return Err(anyhow::anyhow!(
+                "residual training requires state and next_state dimensions {}, got {} and {}",
+                self.config.hdc_dim,
+                state.len(),
+                next_state.len()
+            ));
+        }
+        let delta: Vec<f32> = next_state.iter().zip(state).map(|(next, current)| next - current).collect();
+        self.train_step(state, action, &delta, delta_t)
     }
 
     /// Train on a batch of experiences
@@ -606,6 +658,38 @@ impl ExperienceBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn residual_prediction_preserves_identity_when_the_delta_head_is_zero() {
+        let config = WorldModelConfig {
+            hdc_dim: 16,
+            hidden_dim: 8,
+            ..Default::default()
+        };
+        let mut model = HierarchicalCfCWorldModel::new_with_seed(config, 0x1D3A_71A5).unwrap();
+        model.w_output.fill(0.0);
+        model.b_output.fill(0.0);
+        let state = (0..16).map(|index| index as f32 / 16.0).collect::<Vec<_>>();
+        let action = vec![0.5; 16];
+        let predicted = model.predict_next_state_residual(&state, &action, 1.0).unwrap();
+        assert_eq!(predicted, state);
+    }
+
+    #[test]
+    fn residual_training_uses_next_state_delta_and_rejects_bad_dimensions() {
+        let config = WorldModelConfig {
+            hdc_dim: 16,
+            hidden_dim: 8,
+            ..Default::default()
+        };
+        let mut model = HierarchicalCfCWorldModel::new_with_seed(config, 0xD317_A001).unwrap();
+        let state = vec![0.2; 16];
+        let action = vec![0.4; 16];
+        let next_state = vec![0.3; 16];
+        let loss = model.train_step_residual(&state, &action, &next_state, 1.0).unwrap();
+        assert!(loss.is_finite() && loss >= 0.0);
+        assert!(model.train_step_residual(&state[..8], &action, &next_state, 1.0).is_err());
+    }
 
     #[test]
     fn seeded_initialization_replays_weights_and_predictions() {
