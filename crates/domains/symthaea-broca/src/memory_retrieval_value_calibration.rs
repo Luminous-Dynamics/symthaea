@@ -72,9 +72,12 @@ pub struct CalibratedRetrievalUtilityBounds {
     pub calibration_joint_coverage_percent: u8,
     pub independent_group_count: usize,
     pub observation_count: usize,
-    pub correctness_gain_lcb_micro: i64,
-    pub lifecycle_risk_reduction_lcb_micro: i64,
-    pub retrieval_harm_ucb_micro: i64,
+    /// One-sided lower residual offset; added to the runtime point estimate.
+    pub correctness_gain_lcb_residual_micro: i64,
+    /// One-sided lower residual offset; added to the runtime point estimate.
+    pub lifecycle_risk_reduction_lcb_residual_micro: i64,
+    /// One-sided upper residual offset; added to the runtime point estimate.
+    pub retrieval_harm_ucb_residual_micro: i64,
 }
 
 impl CalibratedRetrievalUtilityBounds {
@@ -86,10 +89,18 @@ impl CalibratedRetrievalUtilityBounds {
         estimate.calibration_method_sha256 = self.calibration_method_sha256.clone();
         estimate.calibration_joint_coverage_percent = self.calibration_joint_coverage_percent;
         estimate.calibration_split_sha256 = self.calibration_split_sha256.clone();
-        estimate.correctness_gain_lcb_micro = self.correctness_gain_lcb_micro;
-        estimate.lifecycle_risk_reduction_lcb_micro =
-            self.lifecycle_risk_reduction_lcb_micro;
-        estimate.retrieval_harm_ucb_micro = self.retrieval_harm_ucb_micro;
+        estimate.correctness_gain_lcb_micro = i64_from_i128(
+            i128::from(estimate.correctness_gain_prediction_micro)
+                + i128::from(self.correctness_gain_lcb_residual_micro),
+        )?;
+        estimate.lifecycle_risk_reduction_lcb_micro = i64_from_i128(
+            i128::from(estimate.lifecycle_risk_reduction_prediction_micro)
+                + i128::from(self.lifecycle_risk_reduction_lcb_residual_micro),
+        )?;
+        estimate.retrieval_harm_ucb_micro = i64_from_i128(
+            i128::from(estimate.retrieval_harm_prediction_micro)
+                + i128::from(self.retrieval_harm_ucb_residual_micro),
+        )?;
         estimate.validate()
     }
 
@@ -215,9 +226,9 @@ pub fn calibrate_retrieval_utility_bounds(
         calibration_joint_coverage_percent: JOINT_COVERAGE_PERCENT,
         independent_group_count: grouped.len(),
         observation_count: observations.len(),
-        correctness_gain_lcb_micro: i64_from_i128(correctness_lcb_offset)?,
-        lifecycle_risk_reduction_lcb_micro: i64_from_i128(lifecycle_lcb_offset)?,
-        retrieval_harm_ucb_micro: i64_from_i128(harm_ucb_offset)?,
+        correctness_gain_lcb_residual_micro: i64_from_i128(correctness_lcb_offset)?,
+        lifecycle_risk_reduction_lcb_residual_micro: i64_from_i128(lifecycle_lcb_offset)?,
+        retrieval_harm_ucb_residual_micro: i64_from_i128(harm_ucb_offset)?,
     };
     result.verify_internal_consistency()?;
     Ok(result)
@@ -319,9 +330,9 @@ mod tests {
         let bounds = calibrate_retrieval_utility_bounds(&rows).unwrap();
 
         // 29 groups => lower rank 1 and upper rank 29 at alpha=1/30.
-        assert_eq!(bounds.correctness_gain_lcb_micro, -14);
-        assert_eq!(bounds.lifecycle_risk_reduction_lcb_micro, -16);
-        assert_eq!(bounds.retrieval_harm_ucb_micro, 15);
+        assert_eq!(bounds.correctness_gain_lcb_residual_micro, -14);
+        assert_eq!(bounds.lifecycle_risk_reduction_lcb_residual_micro, -16);
+        assert_eq!(bounds.retrieval_harm_ucb_residual_micro, 15);
         assert_eq!(bounds.independent_group_count, 29);
         assert_eq!(bounds.observation_count, 29);
         assert_eq!(bounds.calibration_joint_coverage_percent, 90);
@@ -333,9 +344,9 @@ mod tests {
         let mut rows = calibration_rows();
         rows.push(observation(29, 0, -100, -90, 100));
         let bounds = calibrate_retrieval_utility_bounds(&rows).unwrap();
-        assert_eq!(bounds.correctness_gain_lcb_micro, -100);
-        assert_eq!(bounds.lifecycle_risk_reduction_lcb_micro, -92);
-        assert_eq!(bounds.retrieval_harm_ucb_micro, 101);
+        assert_eq!(bounds.correctness_gain_lcb_residual_micro, -100);
+        assert_eq!(bounds.lifecycle_risk_reduction_lcb_residual_micro, -92);
+        assert_eq!(bounds.retrieval_harm_ucb_residual_micro, 101);
         assert_eq!(bounds.independent_group_count, 29);
         assert_eq!(bounds.observation_count, 30);
     }
@@ -403,8 +414,11 @@ mod tests {
             calibration_split_sha256: digest("placeholder split"),
             feature_schema_sha256: digest("features"),
             utility_schema_sha256: digest("utility"),
+            correctness_gain_prediction_micro: 100,
             correctness_gain_lcb_micro: 5,
+            lifecycle_risk_reduction_prediction_micro: 200,
             lifecycle_risk_reduction_lcb_micro: 5,
+            retrieval_harm_prediction_micro: 50,
             retrieval_harm_ucb_micro: 5,
             retrieval_cost_micro: 1,
             remaining_calls: 1,
@@ -417,9 +431,9 @@ mod tests {
             ).unwrap();
         bounds.apply_to_estimate(&mut estimate).unwrap();
 
-        assert_eq!(estimate.correctness_gain_lcb_micro, -14);
-        assert_eq!(estimate.lifecycle_risk_reduction_lcb_micro, -16);
-        assert_eq!(estimate.retrieval_harm_ucb_micro, 15);
+        assert_eq!(estimate.correctness_gain_lcb_micro, 86);
+        assert_eq!(estimate.lifecycle_risk_reduction_lcb_micro, 184);
+        assert_eq!(estimate.retrieval_harm_ucb_micro, 65);
         assert_eq!(estimate.calibration_split_sha256, bounds.calibration_split_sha256);
         assert_eq!(estimate.calibration_method_sha256, bounds.calibration_method_sha256);
         assert_eq!(estimate.calibration_joint_coverage_percent, 90);
