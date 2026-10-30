@@ -1422,12 +1422,23 @@ mod tests {
             assert!((dense_score.effect.signed_phi - sparse_score_value.effect.signed_phi).abs() <= 1e-12);
             assert!((dense_score.signed_phi - sparse_score_value.signed_phi).abs() <= 1e-12);
             assert!((dense_score.normalized_phi - sparse_score_value.normalized_phi).abs() <= 1e-12);
+            let receipt = sparse_score.receipt_sha256().unwrap();
             assert_eq!(
-                sparse_score.receipt_sha256().unwrap(),
+                receipt,
                 sparse.score_iit4_system_partition(
                     &partition, &current_state, &system_state, 1 << 16
                 ).unwrap().receipt_sha256().unwrap()
             );
+            let mut alternate_state_pair = system_state.clone();
+            alternate_state_pair.cause_specified_state[0] =
+                !alternate_state_pair.cause_specified_state[0];
+            let alternate = sparse.score_iit4_system_partition(
+                &partition,
+                &current_state,
+                &alternate_state_pair,
+                1 << 16,
+            ).unwrap();
+            assert_ne!(receipt, alternate.receipt_sha256().unwrap());
         }
     }
 
