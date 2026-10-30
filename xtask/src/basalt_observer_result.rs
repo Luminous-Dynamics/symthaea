@@ -47,6 +47,7 @@ pub struct ResultAuditReport {
 #[derive(Debug, Default, Serialize)]
 pub struct ResultAuditCounts {
     pub challenge_cases: usize,
+    pub selected_cases: usize,
     pub oracle_records: usize,
     pub observer_receipts: usize,
     pub adjudicated_cases: usize,
@@ -162,6 +163,7 @@ struct OracleLedger {
     run_id: String,
     catalog_digest: String,
     profile_id: String,
+    selected_case_ids: Vec<String>,
     harness: HarnessIdentity,
     records: Vec<OracleRecord>,
 }
@@ -184,6 +186,17 @@ struct OracleRecord {
     mutation: MutationWitness,
     witness_kind: String,
     independent_replay: String,
+    execution_witness: ExecutionWitness,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutionWitness {
+    worker_binary_digest: String,
+    baseline_output_digest: String,
+    mutated_output_digest: String,
+    baseline_bytes_read: u64,
+    mutated_bytes_read: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,6 +218,7 @@ struct ObserverReceipts {
     catalog_digest: String,
     observer_profile_id: String,
     observer_binary_digest: String,
+    selected_case_ids: Vec<String>,
     records: Vec<ObserverReceipt>,
 }
 
