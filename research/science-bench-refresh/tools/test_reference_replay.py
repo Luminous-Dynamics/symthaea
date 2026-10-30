@@ -54,6 +54,12 @@ class ReferenceReplayDiagnosticTests(unittest.TestCase):
         left = {"tasks": [{"policy_input": {"observations": [{"x": 1.25}]}}]}
         self.assertIsNone(rr.first_difference(left, left))
 
+    def test_task_identity_is_reported_before_payload_when_order_differs(self) -> None:
+        expected = {"task_id": "task-a", "evaluator_only": {"common_cause": "z"}}
+        observed = {"task_id": "task-b", "evaluator_only": {"target_kind": "other"}}
+        difference = rr.first_difference(expected, observed)
+        self.assertTrue(difference.startswith("$.task_id:"))
+
     def test_first_difference_reports_exact_json_path(self) -> None:
         left = {"tasks": [{"policy_input": {"observations": [{"x": 1.25}]}}]}
         right = {"tasks": [{"policy_input": {"observations": [{"x": 1.5}]}}]}
