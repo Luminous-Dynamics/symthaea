@@ -1,0 +1,107 @@
+name: CMAQ-013 selection-conditioned uncertainty calibration benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selection-calibration:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-013
+        run: cargo test --locked
+      - name: Generate report and validate policy-selection calibration
+        working-directory: research/cmaq-013
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-013-report.json
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-013-report.json").read_text())
+          assert report["schema_version"] == "cmaq-013-selection-conditioned-calibration-v0.1"
+          assert report["episode_count"] == 512
+          assert report["horizon"] == 96
+          assert report["calibration_episodes"] == 2048
+          assert report["target_coverage"] == 0.9
+          assert report["feedback_delay_steps"] == 4
+          assert report["feedback_drop_rate"] == 0.05
+          assert report["scenarios"] == [
+              "stationary", "abrupt_model_error_shift", "gradual_model_error_shift"
+          ]
+          assert report["search_widths"] == [8, 32, 128]
+          assert len(report["policies"]) == 8
+          rows = report["summary"]
+          assert len(rows) == 72
+          by_key = {(row["scenario"], row["search_width"], row["policy"]): row for row in rows}
+          assert len(by_key) == 72
+          numeric = [
+              "behavior_q", "selection_q", "mean_utility", "utility_delta_vs_point",
+              "utility_ci95_low", "utility_ci95_high", "mean_regret",
+              "selected_action_coverage", "pre_shift_coverage", "post_shift_coverage",
+              "mean_bound_width", "false_safe_rate", "fallback_rate", "mean_audits",
+              "feedback_observations_per_episode", "feedback_drop_rate",
+              "calibration_recovery_delay", "mean_selected_overprediction"
+          ]
+          for row in rows:
+              for key in numeric:
+                  assert isinstance(row[key], (int, float)) and math.isfinite(row[key])
+              for key in [
+                  "selected_action_coverage", "false_safe_rate", "fallback_rate",
+                  "feedback_drop_rate"
+              ]:
+                  assert 0.0 <= row[key] <= 1.0
+              assert row["episode_count"] == 512
+              assert row["calibration_sample_count"] == 2048
+              assert row["mean_bound_width"] >= 0.0
+              assert row["mean_audits"] >= 0.0
+          # Selection-conditioned calibration must reflect the planner's
+          # selected-action tail more strongly than random behavior sampling.
+          for width in [32, 128]:
+              row = by_key[("stationary", width, "selection_conditioned_split_conformal")]
+              assert row["selection_q"] > row["behavior_q"]
+          # The audit arm must pay for counterfactual observations; it cannot
+          # silently obtain more feedback at zero cost.
+          audit_rows = [r for r in rows if r["policy"] == "aci_style_with_counterfactual_audit"]
+          assert all(r["mean_audits"] >= 0.0 for r in audit_rows)
+          assert any(r["mean_audits"] > 0.0 for r in audit_rows)
+          print("CMAQ-013 schema and selection-conditioned calibration controls validated; synthetic stress-test only")
+          print(json.dumps({
+              f'{r["scenario"]}/search={r["search_width"]}/{r["policy"]}': {
+                  "coverage": r["selected_action_coverage"],
+                  "pre_shift_coverage": r["pre_shift_coverage"],
+                  "post_shift_coverage": r["post_shift_coverage"],
+                  "bound_width": r["mean_bound_width"],
+                  "false_safe": r["false_safe_rate"],
+                  "fallback": r["fallback_rate"],
+                  "mean_audits": r["mean_audits"],
+                  "utility_delta": r["utility_delta_vs_point"],
+                  "recovery_delay": r["calibration_recovery_delay"]
+              }
+              for r in rows
+              if r["search_width"] == 128 and r["policy"] in [
+                  "behavior_split_conformal", "selection_conditioned_split_conformal",
+                  "aci_style_selective_feedback", "aci_style_with_counterfactual_audit",
+                  "rolling_quantile_selective_feedback", "oracle_selected_quantile"
+              ]
+          }, sort_keys=True))
+          PY
