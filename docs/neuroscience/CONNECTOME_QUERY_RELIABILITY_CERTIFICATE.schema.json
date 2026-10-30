@@ -368,6 +368,80 @@
           "pattern": "^[0-9a-f]{64}$"
         }
       }
+    },
+    "invalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_sha256",
+        "changed_object_kind",
+        "changed_object_id",
+        "previous_revision_sha256",
+        "current_revision_sha256",
+        "reason"
+      ],
+      "properties": {
+        "event_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "changed_object_kind": {
+          "enum": [
+            "volume_region",
+            "neuron",
+            "root",
+            "segment",
+            "synapse",
+            "edge",
+            "morphology_subgraph",
+            "coordinate_transform",
+            "query_derived_value",
+            "source_revision"
+          ]
+        },
+        "changed_object_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous_revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "current_revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "INVALIDATED_BY_REVISION"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "required": [
+          "invalidation"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "invalidation"
+          ]
+        }
+      }
+    }
+  ]
 }
