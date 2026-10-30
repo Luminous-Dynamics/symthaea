@@ -595,6 +595,12 @@ mod tests {
             expected_score_event_count: 2,
             intervention: EventIntervention::Remove,
             influence_report_sha256: digest(&format!("influence-{index}")),
+            segmented_influence_report_sha256: digest(&format!("segmented-influence-{index}")),
+            raw_measured_intervals: intervals.clone(),
+            hysteresis_support_intervals: intervals.clone(),
+            tail_guard_intervals: Vec::new(),
+            conservative_support_intervals: intervals.clone(),
+            tail_guard_was_clipped: false,
             source_score_sha256: digest("score"),
             baseline_event_map_artifact_sha256: digest("baseline-map-bytes"),
             baseline_event_map_receipt_sha256: digest("baseline-map-receipt"),
@@ -617,7 +623,7 @@ mod tests {
             },
             support: EventInteractionSupport {
                 source_event_index: index,
-                acoustic_support: intervals,
+                acoustic_support: intervals.clone(),
                 routing_domains: vec![format!("fluidsynth:effects-group:{}", index % 4)],
                 routing_complete: false,
                 support_evidence_sha256: None,
@@ -747,7 +753,7 @@ mod tests {
             baseline_audio: &baseline_audio,
             counterfactual_audio: &counterfactual_audio,
         };
-        let report = CounterfactualInfluenceReport {
+        let base_report = crate::counterfactual_influence::CounterfactualInfluenceReport {
             version: crate::counterfactual_influence::COUNTERFACTUAL_INFLUENCE_VERSION.to_owned(),
             source_event_id: "score_event_index:1".to_owned(),
             intervention: EventIntervention::Remove,
@@ -782,6 +788,50 @@ mod tests {
             disposition: InfluenceDisposition::NoEffectAboveNoiseFloor,
             receipt_sha256: digest("influence-report"),
         };
+        let segmentation = crate::counterfactual_influence::InfluenceSegmentationConfig {
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 2,
+            tail_guard_frames: 8,
+        };
+        let measurement = crate::counterfactual_influence::InfluenceWindowMeasurement {
+            start_frame: 48,
+            end_frame: 64,
+            channel: 0,
+            rms_delta: 0.0,
+            peak_sample_delta: 0.0,
+            spectral_magnitude_distance: 0.0,
+            calibrated_rms_threshold: 0.0,
+            calibrated_spectral_threshold: 0.0,
+            effect_detected: false,
+        };
+        let mut report = CounterfactualInfluenceSegmentedReport {
+            version: "mel-mr-eval-017-segmented-influence-v0.2".to_owned(),
+            raw_measured_intervals: Vec::new(),
+            base_report,
+            segmentation,
+            window_measurements: vec![measurement],
+            window_segmentation: vec![
+                crate::counterfactual_influence::InfluenceWindowSegmentation {
+                    window_index: 0,
+                    start_frame: 48,
+                    end_frame: 64,
+                    channel: 0,
+                    release_rms_threshold: 0.0,
+                    release_spectral_threshold: 0.0,
+                    release_exceeded: false,
+                    hysteresis_active: false,
+                }
+            ],
+            hysteresis_support_intervals: Vec::new(),
+            tail_guard_intervals: Vec::new(),
+            conservative_support_intervals: Vec::new(),
+            tail_guard_was_clipped: false,
+            receipt_sha256: String::new(),
+        };
+        // This unit isolates route mapping/building. The production entry point
+        // performs exact EVAL-017 v0.2 replay before accepting this object.
+        report.receipt_sha256 =
+            crate::counterfactual_influence::segmented_report_digest_for_test(&report);
 
         let verified = build_event_support(&report, &input).unwrap();
         let evidence = verified.evidence();
@@ -824,11 +874,12 @@ mod tests {
         assert!(report.report().planner_ready());
         assert_eq!(report.report().output_frame_count, 67);
         assert!(!report.report().routing_complete);
-        assert_eq!(report.planner_event_supports().len(), 2);
-        assert_eq!(report.planner_event_supports()[0].source_event_index, 0);
-        assert_eq!(report.planner_event_supports()[1].source_event_index, 1);
-        assert!(report.planner_event_supports()[1].acoustic_support.is_empty());
-        assert!(report.planner_event_supports().iter().all(|support| {
+        let planner_supports = report.planner_event_supports().unwrap();
+        assert_eq!(planner_supports.len(), 2);
+        assert_eq!(planner_supports[0].source_event_index, 0);
+        assert_eq!(planner_supports[1].source_event_index, 1);
+        assert!(planner_supports[1].acoustic_support.is_empty());
+        assert!(planner_supports.iter().all(|support| {
             support.support_evidence_sha256.as_ref().is_some_and(|digest| is_sha256(digest))
                 && !support.routing_complete
         }));
