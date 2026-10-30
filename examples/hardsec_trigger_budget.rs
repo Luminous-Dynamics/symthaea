@@ -72,11 +72,8 @@ fn parse_args() -> Result<Option<Config>, String> {
             .ok_or_else(|| format!("missing value for {flag}"))?;
         match flag.as_str() {
             "--activation-probability" => {
-                activation_probability = Some(parse_probability(
-                    "activation probability",
-                    &value,
-                    true,
-                )?);
+                activation_probability =
+                    Some(parse_probability("activation probability", &value, true)?);
             }
             "--trials" => {
                 trials = value
@@ -112,10 +109,7 @@ fn miss_probability(activation_probability: f64, trials: u64) -> f64 {
     ((trials as f64) * (-activation_probability).ln_1p()).exp()
 }
 
-fn activation_probability_at_least_once(
-    activation_probability: f64,
-    trials: u64,
-) -> f64 {
+fn activation_probability_at_least_once(activation_probability: f64, trials: u64) -> f64 {
     if activation_probability == 0.0 {
         return 0.0;
     }
@@ -125,10 +119,7 @@ fn activation_probability_at_least_once(
     -(((trials as f64) * (-activation_probability).ln_1p()).exp_m1())
 }
 
-fn minimum_trials(
-    activation_probability: f64,
-    target_miss_probability: f64,
-) -> Option<u64> {
+fn minimum_trials(activation_probability: f64, target_miss_probability: f64) -> Option<u64> {
     if activation_probability == 0.0 {
         return None;
     }
@@ -136,9 +127,7 @@ fn minimum_trials(
         return Some(1);
     }
 
-    let estimate = (target_miss_probability.ln()
-        / (-activation_probability).ln_1p())
-    .ceil();
+    let estimate = (target_miss_probability.ln() / (-activation_probability).ln_1p()).ceil();
 
     if !estimate.is_finite() || estimate > u64::MAX as f64 {
         return None;
@@ -179,7 +168,10 @@ fn run(config: Config) {
         scientific(config.activation_probability)
     );
     println!("  \"trials\": {},", config.trials);
-    println!("  \"probability_of_zero_activations\": {},", scientific(miss));
+    println!(
+        "  \"probability_of_zero_activations\": {},",
+        scientific(miss)
+    );
     println!(
         "  \"probability_of_at_least_one_activation\": {},",
         scientific(activation_at_least_once)
@@ -192,12 +184,10 @@ fn run(config: Config) {
         Some(value) => println!("  \"minimum_trials_for_target\": {value},"),
         None => println!("  \"minimum_trials_for_target\": null,"),
     }
-    println!(
-        concat!(
-            "  \"interpretation\": ",
-            "\"sampling_budget_only_not_trigger_probability_estimation_or_formal_reachability\""
-        )
-    );
+    println!(concat!(
+        "  \"interpretation\": ",
+        "\"sampling_budget_only_not_trigger_probability_estimation_or_formal_reachability\""
+    ));
     println!("}}");
 }
 
