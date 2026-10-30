@@ -11,6 +11,7 @@
     "source_ranking_report_sha256",
     "sampling_protocol_sha256",
     "source_spatial_frame_report_sha256",
+    "source_spatial_frame_input_sha256",
     "source_spatial_frame_sha256",
     "source_population_frame_sha256",
     "sample_seed",
@@ -145,6 +146,11 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
       "description": "Canonical digest of the exact eligible PSU ID/stratum export, matching frame_sha256 used by this auditor."
+    },
+    "source_spatial_frame_input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of exact spatial frame manifest bytes, copied from the spatial-frame audit report."
     }
   },
   "$defs": {
