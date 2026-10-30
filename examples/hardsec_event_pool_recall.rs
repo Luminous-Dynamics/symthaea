@@ -457,6 +457,10 @@ fn ratio(numerator: usize, denominator: usize) -> f64 {
     numerator as f64 / denominator as f64
 }
 
+fn optional_ratio(numerator: usize, denominator: usize) -> Option<f64> {
+    (denominator > 0).then(|| ratio(numerator, denominator))
+}
+
 fn receipt(summary: &CoverageSummary) -> Value {
     let missed_event_ids = summary
         .reference_event_ids
@@ -510,7 +514,7 @@ fn receipt(summary: &CoverageSummary) -> Value {
         "missed_transition_ids": missed_transition_ids,
         "reference_phase_edge_count": summary.reference_phase_edges.len(),
         "observed_phase_edge_count": summary.observed_phase_edges.len(),
-        "phase_edge_recall": ratio(
+        "phase_edge_recall": optional_ratio(
             summary.observed_phase_edges.len(),
             summary.reference_phase_edges.len()
         ),
@@ -677,6 +681,33 @@ mod tests {
         assert_eq!(result["observed_phase_edge_count"], json!(4));
         assert_eq!(result["phase_edge_recall"], json!(4.0 / 7.0));
         assert_eq!(result["missed_phase_edges"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn phase_edge_recall_is_null_when_reference_has_no_adjacent_transition_pairs() {
+        let mut value = fixture();
+        value["states"] = json!(["reset", "sink"]);
+        value["initial_states"] = json!(["reset"]);
+        value["transitions"] = json!([
+            {
+                "transition_id": "t_terminal",
+                "event_id": "event_terminal",
+                "from": "reset",
+                "input": "finish",
+                "to": "sink"
+            }
+        ]);
+        value["trace_pool"] = json!([
+            {
+                "trace_id": "trace-one-step",
+                "initial_state": "reset",
+                "steps": ["t_terminal"]
+            }
+        ]);
+        let summary = validate_spec(&value, "0".repeat(64)).unwrap();
+        let result = receipt(&summary);
+        assert_eq!(summary.reference_phase_edges.len(), 0);
+        assert_eq!(result["phase_edge_recall"], Value::Null);
     }
 
     #[test]
