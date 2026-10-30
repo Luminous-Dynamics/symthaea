@@ -1197,6 +1197,45 @@ mod tests {
     }
 
     #[test]
+    fn shared_future_evidence_is_not_double_counted_in_the_lower_bound() {
+        let req = request(
+            vec![
+                candidate("A", "family-A", 1),
+                candidate("E", "family-E", 5),
+                candidate("Z", "family-Z", 1),
+            ],
+            vec![
+                obligation(
+                    "claim-1",
+                    vec![
+                        justification("a-high-evidence-id", &["Z"]),
+                        justification("z-low-evidence-id", &["A"]),
+                    ],
+                ),
+                obligation("claim-2", vec![justification("shared-2", &["E"])]),
+                obligation("claim-3", vec![justification("shared-3", &["E"])]),
+            ],
+            64,
+        );
+
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 6);
+
+        // The second alternative has equal cost but a canonical evidence set
+        // beginning with "A", which wins the deterministic tie-break. Both
+        // remaining obligations share E, so their lower-bound contribution is
+        // max(5, 5)=5, not 10. Equality with the incumbent must not be pruned.
+        assert_eq!(result.selected_proofs[0].justification_id, "z-low-evidence-id");
+        assert_eq!(
+            result.evidence.iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(),
+            vec!["A", "E"],
+        );
+        assert_eq!(result.bound_pruned_nodes, 0);
+        verify_proof_budget_result(&req, &result).unwrap();
+    }
+
+    #[test]
     fn selects_minimum_cost_sufficient_or_of_and_proof() {
         let req = request(
             vec![
