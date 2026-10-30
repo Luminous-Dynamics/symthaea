@@ -15,6 +15,11 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # This legacy path contains only an empty examples/unused.rs and no Cargo.toml.
+    # The actual root package is the repository-root "symthaea" package above.
+    # Excluding the examples-only directory prevents the crates/core/* member glob
+    # from asking Cargo to load a nonexistent package manifest.
+    "crates/core/symthaea",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
