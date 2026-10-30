@@ -44,15 +44,6 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json"
       - "docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json"
       - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
-      - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO.schema.json"
-      - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md"
-      - "docs/neuroscience/CONNECTOME_COLINEAR_PROFILE_INPUT.schema.json"
-      - "docs/neuroscience/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.schema.json"
-      - "docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md"
-      - "docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json"
-      - "docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json"
-      - "docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json"
-      - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   push:
     branches: [main]
@@ -89,6 +80,15 @@ on:
       - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
+      - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO.schema.json"
+      - "docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/CONNECTOME_COLINEAR_PROFILE_INPUT.schema.json"
+      - "docs/neuroscience/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.schema.json"
+      - "docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex"
       - ".github/workflows/connectomics-intake-audit.yml"
   workflow_dispatch:
 
