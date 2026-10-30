@@ -502,6 +502,11 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
             )),
         }
 
+        let coordinate_field = if bank == "operation_bank_synapse_controls" {
+            "synapse_ctr_pt_nm"
+        } else {
+            "interface_point_nm"
+        };
         match coordinate(metadata, bank) {
             Some(point) => match cube_key(row, point, cube_edge_nm) {
                 Some(key) => {
@@ -509,6 +514,11 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
                 }
                 None => errors.push(Finding::row("spatial_cube_invalid", row, "spatial coordinate cannot be mapped to an integer cube")),
             },
+            None if metadata.get(coordinate_field).is_some() => errors.push(Finding::row(
+                "spatial_coordinate_invalid",
+                row,
+                format!("metadata.{coordinate_field} is present but is not a finite three-number coordinate"),
+            )),
             None => rows_without_spatial_coordinate += 1,
         }
 
@@ -958,6 +968,15 @@ mod tests {
         let first = lineage_key(&rows[0].row, &rows[0].metadata, &rows[0].bank).unwrap();
         let second = lineage_key(&rows[1].row, &rows[1].metadata, &rows[1].bank).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rejects_present_but_malformed_spatial_coordinates() {
+        let mut rows = valid_dataset();
+        rows[0].metadata["interface_point_nm"] = json!("not-a-coordinate");
+        rows[0].row.metadata = rows[0].metadata.to_string();
+        let report = report(&rows);
+        assert!(report.errors.iter().any(|finding| finding.code == "spatial_coordinate_invalid"));
     }
 
 }
