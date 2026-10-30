@@ -90,7 +90,7 @@ enum Policy {
 }
 
 impl Policy {
-    fn all() -> [Self; 7] {
+    fn all() -> [Self; 8] {
         [
             Self::CertaintyEquivalent,
             Self::ShieldedCertaintyEquivalent,
@@ -238,12 +238,11 @@ fn belief_moments(belief: &[f64; 5]) -> (f64, f64) {
 }
 
 fn expected_stage_cost(state: f64, action: f64, belief: &[f64; 5], target: f64) -> f64 {
-    let mut cost = 0.0;
-    for i in 0..5 {
-        let next = A * state + GAINS[i] * action;
-        cost += belief[i] * ((next - target).powi(2) + CONTROL_EFFORT * action * action);
-    }
-    cost
+    let (mean_gain, variance) = belief_moments(belief);
+    let second_moment = variance + mean_gain * mean_gain;
+    let offset = A * state - target;
+    offset * offset + 2.0 * offset * mean_gain * action
+        + (second_moment + CONTROL_EFFORT) * action * action
 }
 
 fn worst_case_stage_cost(state: f64, action: f64, target: f64) -> f64 {
@@ -260,9 +259,15 @@ fn robustly_safe(state: f64, action: f64) -> bool {
 }
 
 fn minimum_safe_future_cost(state: f64, belief: &[f64; 5], target: f64) -> f64 {
+    let (mean_gain, variance) = belief_moments(belief);
+    let second_moment = variance + mean_gain * mean_gain;
+    let offset = A * state - target;
     ACTIONS.iter().copied()
         .filter(|action| robustly_safe(state, *action))
-        .map(|action| expected_stage_cost(state, action, belief, target))
+        .map(|action| {
+            offset * offset + 2.0 * offset * mean_gain * action
+                + (second_moment + CONTROL_EFFORT) * action * action
+        })
         .fold(f64::INFINITY, f64::min)
 }
 
@@ -651,7 +656,7 @@ mod tests {
         for state in [-0.55, -0.2, 0.0, 0.2, 0.55] {
             let belief = [0.20; 5];
             let (action, _) = select_action(
-                Policy::WeightedBudgetedDualControl, state, &belief, 0.4, 0.4, 1.0,
+                Policy::DualGatekeeper, state, &belief, 0.4, 0.4, 1.0,
                 MISSION_DEGRADATION_BUDGET,
             );
             assert!(robustly_safe(state, action));
