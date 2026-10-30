@@ -224,6 +224,14 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
         return Err("voxel_size_nm values must be finite and positive".into());
     }
 
+    for axis in 0..3 {
+        let extent = i64::try_from(frame.extent_voxels[axis])
+            .map_err(|_| format!("extent_voxels axis {axis} exceeds signed coordinate range"))?;
+        frame.origin_voxel[axis]
+            .checked_add(extent)
+            .ok_or_else(|| format!("origin_voxel plus extent overflows on axis {axis}"))?;
+    }
+
     let dimensions = grid_dimensions(frame.extent_voxels, frame.tile_shape_voxels)?;
     let expected_cells = checked_product(dimensions, "grid")?;
     let declared_voxels = checked_product(frame.extent_voxels, "declared")?;
@@ -621,6 +629,15 @@ mod tests {
         frame.extent_voxels = [u64::MAX, u64::MAX, u64::MAX];
         frame.tile_shape_voxels = [1, 1, 1];
         assert!(validate(&frame).unwrap_err().contains("voxel count overflows u128"));
+    }
+
+    #[test]
+    fn origin_plus_extent_must_fit_signed_voxel_coordinates() {
+        let mut frame = fixture();
+        frame.origin_voxel[0] = i64::MAX;
+        frame.extent_voxels[0] = 1;
+        frame.tile_shape_voxels[0] = 1;
+        assert!(validate(&frame).unwrap_err().contains("origin_voxel plus extent overflows"));
     }
 
     #[test]
