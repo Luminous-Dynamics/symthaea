@@ -13,17 +13,21 @@ fixed-state system-partition scoring; and a bounded exhaustive IIT 4.0 (2023)
 Integration-level system search for phi_s. Model, evaluation, and analysis-request
 identities are versioned and SHA-256 bound.
 
-The qualified system search currently requires the candidate system to be the
-full substrate. Proper-subsystem IIT 4.0 requires cause-side Eq. 4 background
-marginalization and effect-side Eq. 3 conditioning of external inputs; those
-transformations are not implemented, so proper-subsystem intrinsic-specification
-and system-scoring calls fail closed. For the full substrate, the search is complete
-only for the declared binary factored TPM profile, the IIT 4.0 (2023) formalism,
-its default directed-set-partition family, and the explicit work budgets passed
-to the API. It applies the default PyPhi MIP ranking:
-minimum normalized phi, then maximum nonnegative phi, then lexicographic induced
-cut. It evaluates every tied cause/effect specified-state pair before applying the
-Integration-level maximum-phi rule.
+The system search accepts both the full substrate and embedded proper
+candidate systems. For proper systems it implements IIT 4.0 Eq. 3 effect-side
+conditioning on the observed external state and Eq. 4 cause-side background
+marginalization. Crucially, partitioned cause likelihoods retain the original
+system's Eq. 4 background posterior; the cut graph then removes severed
+candidate-system input axes by maximum-entropy marginalization. Recomputing the
+background posterior from a globally cut TPM is not equivalent and is explicitly
+avoided.
+
+The search is complete only for the declared binary factored TPM profile, the
+IIT 4.0 (2023) Integration-level quantity, the default directed-set-partition
+family, and the explicit work budgets passed to the API. It applies the default
+PyPhi MIP ranking: minimum normalized phi, then maximum nonnegative phi, then
+lexicographic induced cut. It evaluates every tied cause/effect specified-state
+pair before applying the Integration-level maximum-phi rule.
 
 This remains a partial implementation, not a complete PyPhi port. It does not
 construct the full cause-effect structure, compute structure-level big Phi, or
@@ -78,13 +82,14 @@ published IIT 4.0 (2023) Fig. 1A example. It checks all 24 state-by-unit TPM
 values, little-endian state indexing for the specified state (0, 1, 1), and
 directed connectivity.
 
-A new end-to-end regression runs the bounded IIT 4.0 (2023) system search for
-the full {A, B, C} substrate at the published state and checks the documented
-system phi_s anchor (0.1339 ± 0.001). This rounded tolerance qualifies this
-named full-system example only, not general PyPhi parity. The published
-proper-subsystem anchors for {A} and {A, B} remain future end-to-end checks,
-after Eq. 3/Eq. 4 background marginalization is implemented and differentially
-validated.
+End-to-end regressions run the bounded IIT 4.0 (2023) system search
+for all three published candidate systems at state (A,B,C)=(0,1,1):
+{A} = 0.0396 ± 0.001, {A,B} = 0.1719 ± 0.001, and
+{A,B,C} = 0.1339 ± 0.001. The {A} case is especially diagnostic: it
+exercises a proper subsystem with external background units and a self-loop
+TotalCut. These rounded tolerances qualify the named Fig. 1A examples only;
+they do not establish general PyPhi parity. Separate noisy-OR tests pin Eq. 3
+and Eq. 4 proper-subsystem repertoire behavior against PyPhi reference values.
 
 The upstream example source is pinned at:
 https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/pyphi/examples.py.
@@ -99,7 +104,8 @@ https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/p
 2. **System-result parity:** differentially compare the end-to-end IIT 4.0 (2023)
    system search: intrinsic specified-state ties, Cartesian cause/effect state
    pairs, all partition scores, MIP selection, normalization, runner-up/margin,
-   and final phi_s. Extend the Fig. 1A anchors from subset AB to A and ABC.
+   and final phi_s. The three published Fig. 1A anchors {A}, {A,B}, and {A,B,C}
+   are now executable regressions; broaden beyond these named examples.
 3. **Composition parity:** implement distinctions, relations, and big Phi; only then
    resolve nonzero state-pair ties that currently return an explicit unresolved
    status. Do not invent a canonical winner when PyPhi escalates to Composition.
@@ -185,6 +191,59 @@ PyPhi's own previous version, **not** speedups over this Rust crate. The Rust
 benchmark must use the same mathematical workload and compare against the current
 pinned baseline before making any comparative claim:
 https://pyphi.readthedocs.io/en/latest/whats-new-in-2.0.html
+
+
+
+## Exact binary factor-graph kernel (new research track)
+
+The crate now includes a standalone binary sum-product engine:
+`BinaryFactor` and `min_fill_sum_product`. Each factor has an explicitly
+sorted variable scope and a dense table local to that scope. The deterministic
+min-fill heuristic selects the next variable by (fewest fill edges, lowest
+degree, lowest variable id), then performs exact multiplication and summation.
+The report exposes elimination order, induced width, peak factor-table entries,
+multiplication count, and variables eliminated. Every intermediate allocation
+is checked against a caller-supplied entry budget and fails closed when exceeded.
+
+This is the architectural direction for scaling IIT 4.0 Eq. 4 background
+marginalization: contract the causal factor graph with cost governed by induced
+width, rather than enumerating every global past state. Sparse chains and rings
+should remain tractable as node count grows; densely coupled graphs should
+expose their high width and stop at the explicit memory budget. This can make
+proper-subsystem analysis practical in large substrates when the candidate
+system and its boundary have low effective treewidth.
+
+**Important current boundary:** the factor-graph kernel is a separately tested
+primitive and topology benchmark. It is not yet wired into the IIT system scorer.
+The dense cause-inversion path remains the oracle. Integration requires exact
+differential parity for Eq. 4 background posteriors, per-node cause factors,
+partitioned cause likelihoods, and final Fig. 1A/noisy-OR system scores on
+small systems before the sparse path can become the default.
+
+Run the topology sweep:
+
+    cargo run --release --locked -p symthaea-iit --example factor_elimination_sweep
+
+It emits CSV rows for chains (32–256 variables), rings (32–128), and grids
+(4×4, 6×6, 8×8), including induced width, peak entries, multiplication count,
+median/minimum latency, and a deterministic-output check. These are standalone
+kernel measurements, not end-to-end IIT or PyPhi comparisons.
+
+### Factor-graph benchmark targets
+
+- **Exactness:** zero unexplained dense-vs-factor-graph mismatches on exhaustive
+  small binary models, including zero probabilities, disconnected inputs,
+  external-background conditioning, and partition interventions.
+- **Width behavior:** chain width 1 and ring width 2 should keep peak factor size
+  bounded as node count increases; grids should track separator width rather
+  than total state count.
+- **Memory safety:** 100% of cases exceeding the configured factor-entry budget
+  must fail before allocating the oversized intermediate.
+- **Competitive scale:** report the largest exact proper subsystem and substrate
+  solved under fixed memory/time budgets, alongside induced width and boundary
+  size. Compare with PyPhi only after matching its exact TPM, formalism,
+  background convention, partition family, and result receipt.
+
 
 ## Claim ceiling
 
