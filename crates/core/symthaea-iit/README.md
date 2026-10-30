@@ -236,12 +236,12 @@ Run the topology sweep:
 
     cargo run --release --locked -p symthaea-iit --example factor_elimination_sweep
 
-It emits CSV rows for chains (32–256 variables), rings (32–128), and grids
-(4×4, 6×6, 8×8), including induced width, peak entries, multiplication count,
-median/minimum latency, and a deterministic-output check. These are standalone
-factor-kernel measurements, not end-to-end IIT or PyPhi comparisons. The same
-log-domain kernel is used by the system-level Eq. 4 cause path; end-to-end system
-search timing must still be measured separately.
+It emits CSV rows for chains (32–2,048 variables), rings (32–512), and
+grids (4×4 through 14×14), including induced width, peak entries,
+multiplication count, median/minimum latency, and a deterministic-output check.
+The same bucketed, log-domain kernel is used by the system-level Eq. 4 cause
+path; end-to-end system-search timing must still be measured separately.
+
 
 ### Factor-graph benchmark targets
 
