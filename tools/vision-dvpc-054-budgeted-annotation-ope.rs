@@ -3882,7 +3882,7 @@ mod tests {
         assert_eq!(configs.len(), 1);
         assert_eq!(configs[0].split('\t').count(), 10);
         assert_eq!(results.len(), 24);
-        for row in results {
+        for row in &results {
             assert_eq!(row.split('\t').count(), 22);
         }
         let methods: Vec<_> = results
