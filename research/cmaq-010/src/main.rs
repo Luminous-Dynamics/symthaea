@@ -10,6 +10,7 @@ const SHIFT_SIGNAL_RATE: f64 = 0.80;
 const CUSUM_THRESHOLD: f64 = 5.0;
 const ROBUST_NULL_UPPER: f64 = 0.02;
 const ROBUST_SHIFT_LOWER: f64 = 0.70;
+const EIE_K: f64 = 3.0;
 const MIN_INDEPENDENT_GROUPS: usize = 2;
 const MISSING_STEPS_TO_FALLBACK: usize = 4;
 const BASE_SEED: u64 = 0xC0A9_0010_2026_1030;
@@ -52,18 +53,21 @@ impl Scenario {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Policy { DirectFallback, ClaimSum, ClaimMajority, RootDedupSum, RobustRootMajority, IntegrityGate, Oracle }
+enum Policy { DirectFallback, ClaimSum, ClaimMajority, EieGammaOnly, EieGammaBoundedBatch, RootDedupSum, RobustRootMajority, IntegrityGate, Oracle }
 
 impl Policy {
     fn all() -> [Self; 7] {
-        [Self::DirectFallback, Self::ClaimSum, Self::ClaimMajority, Self::RootDedupSum,
-         Self::RobustRootMajority, Self::IntegrityGate, Self::Oracle]
+        [Self::DirectFallback, Self::ClaimSum, Self::ClaimMajority, Self::EieGammaOnly,
+         Self::EieGammaBoundedBatch, Self::RootDedupSum, Self::RobustRootMajority,
+         Self::IntegrityGate, Self::Oracle]
     }
     fn name(self) -> &'static str {
         match self {
             Self::DirectFallback => "direct_fallback",
             Self::ClaimSum => "naive_claim_sum",
             Self::ClaimMajority => "naive_claim_majority",
+            Self::EieGammaOnly => "eie_gamma_discount_only",
+            Self::EieGammaBoundedBatch => "eie_gamma_bounded_batch",
             Self::RootDedupSum => "provenance_root_dedup_sum",
             Self::RobustRootMajority => "robust_root_majority",
             Self::IntegrityGate => "freshness_provenance_fail_closed",
@@ -240,6 +244,26 @@ fn first_per_provenance_group(reports: &[Report]) -> BTreeMap<usize, bool> {
     groups
 }
 
+// EIE-style discount: gamma=min(1, distinct provenance groups / K).
+// The bounded variant additionally enforces the per-window raw-increment cap
+// assumed by the cited CONFPROP-style formulation.
+fn eie_weighted_increment(reports: &[Report], cap_raw_batch: bool) -> f64 {
+    if reports.is_empty() { return 0.0; }
+    let independent_groups = first_per_provenance_group(reports).len() as f64;
+    let gamma = (independent_groups / EIE_K).min(1.0);
+    let mut raw = reports.iter()
+        .map(|report| llr(report.positive, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE))
+        .sum::<f64>();
+    if cap_raw_batch {
+        let max_single = llr(true, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE)
+            .abs()
+            .max(llr(false, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE).abs());
+        let raw_cap = EIE_K * max_single;
+        raw = raw.clamp(-raw_cap, raw_cap);
+    }
+    gamma * raw
+}
+
 fn fresh_reports(
     reports: &[Report],
     step: usize,
@@ -321,6 +345,16 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
                 max_evidence_updates = max_evidence_updates.max(1);
                 if reports.is_empty() { false }
                 else { update_cusum(&mut cusum, by_claim_majority(reports), NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE) }
+            }
+            Policy::EieGammaOnly => {
+                max_evidence_updates = max_evidence_updates.max(reports.len());
+                cusum = (cusum + eie_weighted_increment(reports, false)).max(0.0);
+                cusum >= CUSUM_THRESHOLD
+            }
+            Policy::EieGammaBoundedBatch => {
+                max_evidence_updates = max_evidence_updates.max(reports.len());
+                cusum = (cusum + eie_weighted_increment(reports, true)).max(0.0);
+                cusum >= CUSUM_THRESHOLD
             }
             Policy::RootDedupSum => {
                 max_evidence_updates = max_evidence_updates.max(group_map.len());
@@ -467,6 +501,7 @@ fn report_json(rows: &[Summary]) -> String {
     writeln!(&mut output, "  \"shift_signal_rate\": {},", number(SHIFT_SIGNAL_RATE)).unwrap();
     writeln!(&mut output, "  \"robust_null_upper\": {},", number(ROBUST_NULL_UPPER)).unwrap();
     writeln!(&mut output, "  \"robust_shift_lower\": {},", number(ROBUST_SHIFT_LOWER)).unwrap();
+    writeln!(&mut output, "  \"eie_k\": {},", number(EIE_K)).unwrap();
     writeln!(&mut output, "  \"min_independent_groups\": {MIN_INDEPENDENT_GROUPS},").unwrap();
     writeln!(&mut output, "  \"missing_steps_to_fallback\": {MISSING_STEPS_TO_FALLBACK},").unwrap();
     writeln!(&mut output, "  \"scenarios\": [{scenarios}],").unwrap();
@@ -591,6 +626,27 @@ mod tests {
         let result = run_episode(Scenario::ReplaySafe, Policy::IntegrityGate, &tape);
         assert!(result.rejected_stale > 0);
         assert_eq!(result.provenance_fallback_step, Some(SHIFT_STEP + 3));
+    }
+
+    #[test]
+    fn eie_discount_without_batch_cap_allows_sybil_amplification() {
+        let tape = make_tape(Scenario::SybilFanout, 0);
+        let six_reports = &tape[64];
+        let one_increment = llr(six_reports[0].positive, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE);
+        let discounted = eie_weighted_increment(six_reports, false);
+        let bounded = eie_weighted_increment(six_reports, true);
+        assert!((discounted - 2.0 * one_increment).abs() < 1e-10);
+        assert!((bounded - one_increment).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eie_discount_preserves_three_independent_positive_reports() {
+        let reports = (0..3).map(|source| Report {
+            claimed_source: source, provenance_group: source, epoch: 0, context: 0,
+            nonce: source as u64, positive: true,
+        }).collect::<Vec<_>>();
+        let expected = 3.0 * llr(true, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE);
+        assert!((eie_weighted_increment(&reports, true) - expected).abs() < 1e-10);
     }
 
     #[test]
