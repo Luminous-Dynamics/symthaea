@@ -281,8 +281,6 @@ Use official task/evaluator versions and keep benchmark-specific scores separate
 Do not use a single composite leaderboard as the primary SOTA claim. Public leaderboards mix different model snapshots, benchmark coverage, evaluation protocols, and sometimes provisional versus source-verified evidence. Pin each benchmark's official dataset revision, evaluator, model/checkpoint, context and inference budgets, and evaluation date. Report a separate score and cost vector for each suite. Missing results are not zero, and scores from different benchmark definitions must not be averaged into one "reasoning" number.
 
 Use leaderboard tables as discovery aids only. Promotion requires a reproducible run against the named official evaluator and a paired comparison under matched inputs and resources.
-- **TimlMemBench:** governed memory use, revocation, scope, and restraint; run canonical-pool and raw-native modes separately.
-- **LongMemEval-S / V2:** multi-session recall, temporal updates and answerable/unanswerable restraint. Report strict evidence recall-all and end-answer correctness separately.
 - **MemDerive / evolving-state tasks:** intermediate derivation and support graph correctness, including incremental updates.
 - **MiniF2F / Lean or another formal checker:** formalizable theorem proof acceptance, kept separate from empirical source-grounded claims.
 
