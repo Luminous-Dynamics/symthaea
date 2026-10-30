@@ -175,13 +175,6 @@
           "type": "integer",
           "minimum": 0
         }
-      },
-      "not": {
-        "properties": {
-          "baseline_input_sha256": {
-            "const": "x"
-          }
-        }
       }
     }
   }
