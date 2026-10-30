@@ -478,22 +478,25 @@ fn summarize(
 }
 
 fn run_benchmark() -> Vec<Summary> {
+    let calibrations: Vec<(usize, Calibration)> = SEARCH_WIDTHS
+        .iter()
+        .map(|width| (*width, calibrate(*width)))
+        .collect();
     let mut rows = Vec::new();
     for scenario in Scenario::all() {
-        for width in SEARCH_WIDTHS {
-            let calibration = calibrate(width);
+        for (width, calibration) in &calibrations {
             let point: Vec<EpisodeStats> = (0..EPISODES)
-                .map(|episode| simulate_episode(scenario, Policy::PointNoGuard, width, episode, &calibration))
+                .map(|episode| simulate_episode(scenario, Policy::PointNoGuard, *width, episode, calibration))
                 .collect();
             for policy in Policy::all() {
                 let outcomes: Vec<EpisodeStats> = if policy == Policy::PointNoGuard {
                     point.clone()
                 } else {
                     (0..EPISODES)
-                        .map(|episode| simulate_episode(scenario, policy, width, episode, &calibration))
+                        .map(|episode| simulate_episode(scenario, policy, *width, episode, calibration))
                         .collect()
                 };
-                rows.push(summarize(scenario, width, policy, &calibration, &outcomes, &point));
+                rows.push(summarize(scenario, *width, policy, calibration, &outcomes, &point));
             }
         }
     }
