@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::env;
 use std::fs;
 use std::hint::black_box;
+use std::process::Command;
 use std::process::ExitCode;
 use std::time::Instant;
 
@@ -86,6 +87,16 @@ where
 fn percentile(samples: &[u128], percentage: usize) -> u128 {
     let index = ((samples.len() - 1) * percentage) / 100;
     samples[index]
+}
+
+fn rustc_version() -> String {
+    Command::new("rustc")
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        .unwrap_or_else(|| "unavailable".to_owned())
 }
 
 fn summarize(samples: &[u128]) -> Value {
@@ -178,6 +189,11 @@ fn main() -> ExitCode {
         "actual_input_bytes": bytes.len(),
         "iterations": iterations,
         "warmup_iterations_per_path": 20,
+        "environment": {
+            "os": std::env::consts::OS,
+            "architecture": std::env::consts::ARCH,
+            "rustc_version": rustc_version()
+        },
         "measurements": {
             "strict_parse_plus_schema": summarize(&schema_samples),
             "strict_parse_plus_schema_and_semantics": summarize(&full_samples)
