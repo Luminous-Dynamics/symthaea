@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.quantum_comp.architecture_portfolio.v1",
+  "title": "QARCH cross-paradigm architecture benchmark observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","record_id","architecture_id","architecture_family","workload_kind","workload_fingerprint","comparison_contract_fingerprint","evidence_class","measurement_boundary","quality","resources"],
+  "properties": {
+    "schema_version": {"const": "symthaea.quantum_comp.architecture_portfolio.v1"},
+    "record_id": {"type": "string", "minLength": 1},
+    "architecture_id": {"type": "string", "minLength": 1},
+    "architecture_family": {"enum": ["classical_cpu","classical_gpu","npu","fpga","neuromorphic_digital","neuromorphic_mixed_signal","analog_compute_in_memory","photonic_linear","photonic_reservoir","quantum_gate_superconducting","quantum_gate_trapped_ion","quantum_gate_neutral_atom","quantum_gate_photonic","quantum_annealing","physical_reservoir","spintronic","probabilistic","reversible","hybrid_heterogeneous"]},
+    "workload_kind": {"enum": ["hdc_algebra","sparse_event_perception","streaming_sensor_fusion","continuous_time_dynamics","continual_learning","edge_control","combinatorial_optimization","dense_tensor_inference","other"]},
+    "workload_fingerprint": {"type": "string", "minLength": 1},
+    "comparison_contract_fingerprint": {"type": "string", "minLength": 1},
+    "evidence_class": {"enum": ["algorithmic_reference","simulation","hardware_emulation","physical_prototype","production_system"]},
+    "measurement_boundary": {"enum": ["algorithm_only","kernel_or_device","runtime_end_to_end","application_end_to_end","sensor_to_decision"]},
+    "quality": {"$ref": "#/$defs/metric_interval"},
+    "resources": {"oneOf": [{"$ref": "#/$defs/resource_envelope"},{"type": "null"}]}
+  },
+  "allOf": [{
+    "if": {"properties": {"measurement_boundary": {"const": "algorithm_only"}}},
+    "then": {"properties": {"resources": {"type": "null"}}},
+    "else": {"properties": {"resources": {"$ref": "#/$defs/resource_envelope"}}}
+  }],
+  "$defs": {
+    "metric_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower","upper"],
+      "properties": {"lower": {"type": "number"}, "upper": {"type": "number"}}
+    },
+    "resource_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_time_seconds","energy_joules","monetary_cost_usd","peak_memory"],
+      "properties": {
+        "wall_time_seconds": {"$ref": "#/$defs/metric_interval"},
+        "energy_joules": {"$ref": "#/$defs/metric_interval"},
+        "monetary_cost_usd": {"$ref": "#/$defs/metric_interval"},
+        "peak_memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower_bytes","upper_bytes"],
+          "properties": {"lower_bytes": {"type": "integer","minimum": 0},"upper_bytes": {"type": "integer","minimum": 0}}
+        }
+      }
+    }
+  }
+}
