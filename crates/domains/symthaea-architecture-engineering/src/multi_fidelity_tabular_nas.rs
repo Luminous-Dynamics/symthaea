@@ -662,14 +662,17 @@ fn digest_canonical_import(
     h.update(IMPORT_DOMAIN);
     let mut ordered_features: Vec<&ArchitectureFeatures> = features.iter().collect();
     ordered_features.sort_by(|a, b| a.architecture_id.cmp(&b.architecture_id));
+    h.update((ordered_features.len() as u64).to_be_bytes());
     for feature in ordered_features {
         update_string(&mut h, &feature.architecture_id);
         h.update((feature.topology_encoding.len() as u64).to_be_bytes());
         h.update(&feature.topology_encoding);
+        h.update((feature.proxy_scores.len() as u64).to_be_bytes());
         for (name, score) in &feature.proxy_scores {
             update_string(&mut h, name);
             h.update(score.to_bits().to_be_bytes());
         }
+        h.update((feature.proxy_times_seconds.len() as u64).to_be_bytes());
         for (name, seconds) in &feature.proxy_times_seconds {
             update_string(&mut h, name);
             h.update(seconds.to_bits().to_be_bytes());
@@ -677,6 +680,7 @@ fn digest_canonical_import(
     }
     let mut ordered_labels: Vec<(&(String, usize), &f64)> = labels.iter().collect();
     ordered_labels.sort_by(|(a, _), (b, _)| a.cmp(b));
+    h.update((ordered_labels.len() as u64).to_be_bytes());
     for ((id, index), value) in ordered_labels {
         update_string(&mut h, id);
         h.update((*index as u64).to_be_bytes());
@@ -710,12 +714,16 @@ fn digest_query_trace(manifest: &MultiFidelityManifest, import_sha: &str, parts:
     h.update(manifest.max_total_cost_units.to_be_bytes());
     h.update([match manifest.fidelity_cost_model { FidelityCostModel::ResumablePrefix => 0, FidelityCostModel::IndependentRuns => 1 }]);
     update_string(&mut h, &manifest.resource_unit);
+    h.update((manifest.fidelity_levels.len() as u64).to_be_bytes());
     for level in &manifest.fidelity_levels {
         update_string(&mut h, &level.id);
         h.update(level.cumulative_cost_units.to_be_bytes());
     }
+    h.update((parts.touched.len() as u64).to_be_bytes());
     for id in &parts.touched { update_string(&mut h, id); }
+    h.update((parts.final_ids.len() as u64).to_be_bytes());
     for id in &parts.final_ids { update_string(&mut h, id); }
+    h.update((parts.attempts.len() as u64).to_be_bytes());
     for attempt in &parts.attempts {
         h.update((attempt.attempt_index as u64).to_be_bytes());
         update_string(&mut h, &attempt.architecture_id);
