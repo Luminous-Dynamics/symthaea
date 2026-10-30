@@ -1382,6 +1382,124 @@ mod tests {
     }
 
     #[test]
+    fn direction_board_reaches_a_delayed_breakthrough_that_score_only_misses() {
+        fn run_board(budget: usize) -> Option<usize> {
+            let mut board = DirectionBoard::new(config()).unwrap();
+            let mut direction_ids = BTreeMap::new();
+            for (label, desc) in [
+                ("A", descriptor("task quality", "current topology", "local parameter refinement")),
+                ("B", descriptor("task quality", "new memory regime", "delayed mechanism recombination")),
+                ("C", descriptor("task quality", "current scheduler", "threshold adjustment")),
+            ] {
+                let id = board.register_verified_direction(desc, RECEIPT).unwrap();
+                direction_ids.insert(id, label);
+            }
+            let mut samples = BTreeMap::from([
+                ("A", 0usize),
+                ("B", 0usize),
+                ("C", 0usize),
+            ]);
+
+            for step in 1..=budget {
+                let plan = board.recommend(1).unwrap();
+                let allocation = plan
+                    .allocations
+                    .iter()
+                    .find(|allocation| allocation.recommended_evaluations == 1)
+                    .unwrap();
+
+                let direction_id = match &allocation.arm {
+                    AllocationArm::NewDirection => {
+                        let proposal = NewDirectionProposal {
+                            proposal_id: format!("new-direction-probe-{step}"),
+                            descriptor: descriptor(
+                                "task quality",
+                                "unverified new object",
+                                "unverified new construction",
+                            ),
+                            proposal_sha256: PROPOSAL.to_owned(),
+                            comparison_profile_sha256: PROFILE.to_owned(),
+                            metric_id: "held_out_task_quality".to_owned(),
+                            evaluation_cost_units: 1,
+                            disposition: NewDirectionDisposition::Rejected,
+                            verifier_receipt_sha256: RECEIPT.to_owned(),
+                        };
+                        board.record_new_direction_proposal(proposal).unwrap();
+                        continue;
+                    }
+                    AllocationArm::Direction(id) => id.clone(),
+                };
+
+                let label = direction_ids[&direction_id];
+                let next_sample = samples[label] + 1;
+                samples.insert(label, next_sample);
+                let score = match label {
+                    "A" => 0.82, // Early winner; no further local-record gain.
+                    "B" if next_sample < 6 => 0.12 + (next_sample as f64 * 0.01),
+                    "B" => 0.96, // Delayed breakthrough appears only on the sixth probe.
+                    "C" => 0.60, // Stable middle-quality direction.
+                    _ => unreachable!("only the three seeded directions are registered"),
+                };
+                board
+                    .record_attempt(attempt(
+                        &format!("board-attempt-{step}"),
+                        &direction_id,
+                        Some(score),
+                        AttemptDisposition::Verified,
+                        1,
+                    ))
+                    .unwrap();
+                let breakthrough = board
+                    .direction_stats()
+                    .into_iter()
+                    .any(|stats| stats.direction_sha256 == direction_id && stats.local_best_score.unwrap_or(0.0) >= 0.90);
+                if label == "B" && breakthrough {
+                    return Some(step);
+                }
+            }
+            None
+        }
+
+        fn run_score_only(budget: usize) -> Option<usize> {
+            // Fixed tie order makes A the initial leader; the policy then follows the
+            // highest global local-best score and never pays to revisit a losing line.
+            let mut best = [0.0f64; 3];
+            let mut samples = [0usize; 3];
+            for step in 1..=budget {
+                let mut selected = 0usize;
+                for index in 1..3 {
+                    if best[index] > best[selected] {
+                        selected = index;
+                    }
+                }
+                samples[selected] += 1;
+                let score = match selected {
+                    0 => 0.82,
+                    1 if samples[selected] < 6 => 0.12 + (samples[selected] as f64 * 0.01),
+                    1 => 0.96,
+                    _ => 0.60,
+                };
+                best[selected] = best[selected].max(score);
+                if selected == 1 && best[selected] >= 0.90 {
+                    return Some(step);
+                }
+            }
+            None
+        }
+
+        let direction_board_breakthrough = run_board(80);
+        let score_only_breakthrough = run_score_only(80);
+        assert!(
+            direction_board_breakthrough.is_some(),
+            "direction-board policy should eventually invest in the delayed-payoff direction"
+        );
+        assert_eq!(
+            score_only_breakthrough, None,
+            "score-only policy should expose the planted winner-take-all failure"
+        );
+    }
+
+    #[test]
     fn rejects_attempt_from_different_metric_or_comparison_profile() {
         let (mut board, direction, _) = admitted_board();
         let mut wrong_metric = attempt(
