@@ -2728,6 +2728,12 @@ fn fluidsynth_candidate_wav(
         );
         let wav_bytes =
             symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color))?;
+        // Ensure the exact file observed by the receipt did not change while
+        // the renderer was consuming the temporary MIDI path.
+        let midi_bytes_after = std::fs::read(&path).ok()?;
+        if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
+            return None;
+        }
         let executable_sha256 = sha256_file(&binary).ok()?;
         let soundfont_sha256 = sha256_file(&soundfont).ok()?;
         let score_bytes = serde_json::to_vec(score).ok()?;
