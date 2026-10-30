@@ -133,3 +133,31 @@ Condition on event sparsity/burstiness, data locality, precision, latency tail, 
 ## Claim ceiling
 
 This module is a data contract and conservative comparison primitive. Its tests and synthetic fixture do not constitute physical measurements, system benchmarking, statistical significance, or evidence that any family is superior.
+
+
+## Constraint-aware architecture selection (QARCH-019B)
+
+The routing primitive is a deterministic selector over **already measured** observations. It is not a learned model, an online scheduler, or a claim that automatic routing is already useful.
+
+A request freezes the workload kind and fingerprint, comparison-contract digest, evidence class, measurement boundary, minimum quality, four hard resource ceilings, and one explicit lexicographic priority. A candidate is eligible only when:
+
+- its workload, comparison contract, evidence class and measurement boundary exactly match the request;
+- the lower bound of its quality interval meets the minimum quality threshold;
+- the upper bound of every resource interval is within its hard ceiling;
+- the observation passes the architecture-portfolio validation contract.
+
+The selector distinguishes definite failures from unresolved intervals. For example, a latency interval wholly above the ceiling is a measured limit violation; an interval that straddles the ceiling is simply not proven feasible. Either excludes the candidate, but the report preserves the distinction. The selector abstains when no candidate proves all requirements.
+
+Among eligible candidates, the caller chooses one lexicographic resource priority (latency, energy, monetary cost, or memory). Remaining resources provide deterministic tie-breaks, followed by the guaranteed quality lower bound and stable candidate identifiers. This is intentionally not a weighted scalar score: the priority is visible and the hard limits remain hard constraints.
+
+### What this selector does not do
+
+- It does not estimate the performance of an unmeasured architecture.
+- It does not learn a router or generalize beyond an exact workload/contract identity.
+- It does not switch devices at runtime.
+- It does not include migration, cold-start, cache-warmup, provisioning, or transition costs unless those are measured inside the supplied resource envelope.
+- It does not treat a simulation result as interchangeable with a prototype or production result.
+
+The next empirical stage is to populate a capability atlas from canonical Symthaea tasks and compatible NeuroBench/MLPerf/QOBLIB suites, then compare this transparent constrained selector against best-static, hand-coded, learned and empirical-oracle policies. Only then should we report routing regret, feasibility violations, switching cost, cold-start penalty and out-of-domain abstention. The first goal is **zero hard-constraint violations on the measured operating region**, not maximum average reward.
+
+All unit-test examples are synthetic logic checks. They do not represent hardware, measured energy, or architecture advantage.
