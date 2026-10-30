@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "BASALT frozen suite manifest",
-  "description": "Version 2 frozen, content-addressed pre-run declaration of task identities, specifications, task-quality audit dispositions, verifier obligations, and task-specific patch-quality rubrics. A trusted external receipt must pin these exact bytes before trial outcomes are observed.",
+  "description": "Version 3 frozen, content-addressed pre-run declaration of task identities, requirement-to-verifier coverage, task-quality audit dispositions, verifier obligations, and task-specific patch-quality rubrics. A trusted external receipt must pin these exact bytes before trial outcomes are observed.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": 2
+      "const": 3
     },
     "program": {
       "const": "BASALT"
@@ -54,7 +54,8 @@
           "paired_transform_id",
           "quality_audit",
           "required_checks",
-          "quality_rubric"
+          "quality_rubric",
+          "requirements"
         ],
         "properties": {
           "task_id": {
@@ -280,6 +281,90 @@
                         }
                       }
                     }
+                  }
+                }
+              }
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "requirement_id",
+                "source_span",
+                "origin",
+                "ambiguity",
+                "statement_digest",
+                "expectation_digest",
+                "inference_rationale_digest",
+                "blocking_check_ids"
+              ],
+              "properties": {
+                "requirement_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_span": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "source_digest",
+                    "start_byte",
+                    "end_byte"
+                  ],
+                  "properties": {
+                    "source_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[a-f0-9]{64}$"
+                    },
+                    "start_byte": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end_byte": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "origin": {
+                  "enum": [
+                    "explicit",
+                    "inferred"
+                  ]
+                },
+                "ambiguity": {
+                  "enum": [
+                    "none",
+                    "resolved_before_run",
+                    "material_unresolved"
+                  ]
+                },
+                "statement_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "expectation_digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "inference_rationale_digest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "blocking_check_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
