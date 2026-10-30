@@ -8,7 +8,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -726,6 +726,57 @@ mod tests {
     fn fixture() -> Certificate {
         let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json");
         serde_json::from_slice(bytes).expect("synthetic certificate should parse")
+    }
+
+    #[test]
+    fn query_dependency_roots_reject_an_empty_root_set() {
+        let mut certificate = fixture();
+        certificate.query.dependency_roots.clear();
+        assert!(validate(&certificate).iter().any(|error| error.contains("dependency_roots must not be empty")));
+    }
+
+    #[test]
+    fn dependency_graph_rejects_unresolved_child_reference() {
+        let mut certificate = fixture();
+        certificate.dependency_closure[2].depends_on[0].object_id = "missing-neuron".into();
+        assert!(validate(&certificate).iter().any(|error| error.contains("unresolved dependency")));
+    }
+
+    #[test]
+    fn dependency_graph_rejects_cycle() {
+        let mut certificate = fixture();
+        certificate.dependency_closure[0].depends_on.push(DependencyRef {
+            object_kind: "edge".into(),
+            object_id: "edge-17-42".into(),
+            source_revision_sha256: "e".repeat(64),
+        });
+        certificate.dependency_closure[1].depends_on.push(DependencyRef {
+            object_kind: "neuron".into(),
+            object_id: "neuron-17".into(),
+            source_revision_sha256: "d".repeat(64),
+        });
+        assert!(validate(&certificate).iter().any(|error| error.contains("contains a cycle")));
+    }
+
+    #[test]
+    fn dependency_graph_rejects_unreachable_extra_node() {
+        let mut certificate = fixture();
+        certificate.dependency_closure.push(Dependency {
+            object_kind: "segment".into(),
+            object_id: "orphan-segment".into(),
+            source_revision_sha256: "d".repeat(64),
+            evidence_sha256: "9".repeat(64),
+            depends_on: vec![],
+        });
+        assert!(validate(&certificate).iter().any(|error| error.contains("unreachable from every declared query root")));
+    }
+
+    #[test]
+    fn dependency_graph_rejects_duplicate_child_edge() {
+        let mut certificate = fixture();
+        let child = certificate.dependency_closure[2].depends_on[0].clone();
+        certificate.dependency_closure[2].depends_on.push(child);
+        assert!(validate(&certificate).iter().any(|error| error.contains("duplicate depends_on")));
     }
 
     #[test]
