@@ -247,7 +247,7 @@ pub fn run(
         });
     }
 
-    let docs_plan = plans.iter().find(|plan| plan.relative_path == Path::new("docs/unused.md"));
+    let docs_plan = plans.iter().find(|plan| plan.relative_path.as_path() == Path::new("docs/unused.md"));
     if let Some(plan) = docs_plan {
         let docs_path = workspace.join(&plan.relative_path);
         fs::create_dir_all(docs_path.parent().context("docs fixture has no parent")?)?;
@@ -581,6 +581,53 @@ mod tests {
         assert!(fixture_resource("fixture:unlisted-secret.txt").is_ok());
         assert!(fixture_resource("fixture:docs/unused.md").is_ok());
         assert!(fixture_resource("fixture:arbitrary-input").is_err());
+    }
+
+    #[test]
+    fn verifies_ignored_untracked_and_tracked_git_fixture_states() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock follows UNIX epoch")
+            .as_nanos();
+        let workspace = std::env::temp_dir().join(format!(
+            "basalt-git-fixture-test-{}-{now}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&workspace).expect("workspace creates");
+        write_new_synced(&workspace.join(".gitignore"), b"unlisted-secret.txt\n")
+            .expect("gitignore writes");
+        fs::create_dir_all(workspace.join("docs")).expect("docs directory creates");
+        write_new_synced(&workspace.join("docs/unused.md"), b"baseline docs\n")
+            .expect("tracked docs fixture writes");
+
+        let commit = initialize_git_fixture(&workspace, true)
+            .expect("isolated Git baseline initializes and commits");
+        assert!(commit.len() == 40 || commit.len() == 64);
+
+        write_new_synced(
+            &workspace.join("unlisted-secret.txt"),
+            b"ignored untracked fixture\n",
+        )
+        .expect("ignored file writes");
+        assert_eq!(
+            verify_git_tracking_state(
+                &workspace,
+                Path::new("unlisted-secret.txt"),
+                "fixture:unlisted-secret.txt"
+            )
+            .expect("hidden fixture status is checked"),
+            "ignored_untracked"
+        );
+        assert_eq!(
+            verify_git_tracking_state(
+                &workspace,
+                Path::new("docs/unused.md"),
+                "fixture:docs/unused.md"
+            )
+            .expect("docs fixture status is checked"),
+            "tracked"
+        );
+        fs::remove_dir_all(workspace).expect("workspace cleanup");
     }
 }
 
