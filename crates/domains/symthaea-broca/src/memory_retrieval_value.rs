@@ -93,9 +93,10 @@ impl RetrievalUtilityEstimate {
         for claim_id in &self.unresolved_required_claim_ids {
             require_non_empty(claim_id, "unresolved_required_claim_id")?;
         }
-        if self.remaining_calls == 0 && self.remaining_budget_micro > 0 {
-            // An empty call budget is valid; it simply forces Stop. The cost
-            // budget is retained to explain which constraint was binding.
+        let expected_claims_digest =
+            Self::unresolved_claims_digest(&self.unresolved_required_claim_ids)?;
+        if expected_claims_digest != self.unresolved_claims_sha256 {
+            return Err("unresolved-claim set digest mismatch".into());
         }
         Ok(())
     }
