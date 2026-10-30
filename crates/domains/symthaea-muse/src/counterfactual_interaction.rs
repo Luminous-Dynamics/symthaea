@@ -74,6 +74,7 @@ pub struct PairwiseInteractionReport {
     pub source_event_b: String,
     pub expected_score_event_count: usize,
     pub source_score_sha256: String,
+    pub expected_primary_pitches_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
     pub sample_rate_hz: u32,
@@ -139,6 +140,7 @@ pub enum PairwiseInteractionError {
     InvalidEventCount,
     InvalidCoalition(&'static str),
     SourceScoreMismatch,
+    PitchInventoryMismatch,
     RendererIdentityMismatch,
     RendererConfigMismatch,
     AudioLayoutMismatch,
@@ -162,6 +164,7 @@ impl std::fmt::Display for PairwiseInteractionError {
             Self::InvalidEventCount => write!(f, "invalid expected Score event count"),
             Self::InvalidCoalition(name) => write!(f, "render coalition is invalid: {name}"),
             Self::SourceScoreMismatch => write!(f, "render coalitions do not share the same source Score"),
+            Self::PitchInventoryMismatch => write!(f, "render coalitions do not share the same expected primary-pitch inventory"),
             Self::RendererIdentityMismatch => write!(f, "render coalitions use different renderer identities"),
             Self::RendererConfigMismatch => write!(f, "render coalitions use different renderer execution profiles"),
             Self::AudioLayoutMismatch => write!(f, "render coalitions have different PCM layouts"),
@@ -308,7 +311,7 @@ fn validate_coalition<'view, 'audio>(
     channels: usize,
     total_frames: usize,
 ) -> Result<(), PairwiseInteractionError> {
-    let frames = validate_audio(render.audio)?;
+    let _frames = validate_audio(render.audio)?;
     if frames != total_frames
         || render.audio.sample_rate_hz != sample_rate_hz
         || render.audio.channels != channels
@@ -351,7 +354,6 @@ fn validate_coalition<'view, 'audio>(
     if actual_count != expected_ids.len() {
         return Err(PairwiseInteractionError::InvalidCoalition(name));
     }
-    let _ = samples;
     Ok(())
 }
 
@@ -441,7 +443,7 @@ fn validate_input(
         &input.remove_ab,
     ] {
         if render.evidence.expected_primary_pitches_sha256() != expected_pitch_inventory {
-            return Err(PairwiseInteractionError::SourceScoreMismatch);
+            return Err(PairwiseInteractionError::PitchInventoryMismatch);
         }
     }
 
@@ -624,6 +626,7 @@ pub fn measure_pairwise_interaction(
         source_event_b: input.source_event_b.to_owned(),
         expected_score_event_count: input.expected_score_event_count,
         source_score_sha256: base.source_score_sha256().to_owned(),
+        expected_primary_pitches_sha256: base.expected_primary_pitches_sha256().to_owned(),
         renderer_identity_sha256: base.renderer_identity_sha256().to_owned(),
         renderer_config_sha256: base.renderer_config_sha256().to_owned(),
         sample_rate_hz: input.baseline.audio.sample_rate_hz,
