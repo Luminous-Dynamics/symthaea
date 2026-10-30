@@ -386,14 +386,22 @@ impl RunWidePruningRiskLedger {
                     "pruning state does not match the audit disposition",
                 ));
             }
-            if event.disposition == PruningDisposition::ContinuePruning
-                && (event.audit_sample_size < self.config.min_audit_samples
-                    || event.upper_bound_false_prune_rate
-                        > self.config.max_false_prune_rate_per_event)
-            {
+            let disposition_is_consistent = match event.disposition {
+                PruningDisposition::ContinuePruning =>
+                    event.audit_sample_size >= self.config.min_audit_samples
+                        && event.upper_bound_false_prune_rate
+                            <= self.config.max_false_prune_rate_per_event,
+                PruningDisposition::DisablePruningInsufficientAudit =>
+                    event.audit_sample_size < self.config.min_audit_samples,
+                PruningDisposition::DisablePruningObservedRisk =>
+                    event.audit_sample_size >= self.config.min_audit_samples
+                        && event.upper_bound_false_prune_rate
+                            > self.config.max_false_prune_rate_per_event,
+            };
+            if !disposition_is_consistent {
                 return Err(RunWidePruningRiskError::new(
                     format!("events[{index}].disposition"),
-                    "continue-pruning decision violates the sample or risk threshold",
+                    "audit disposition does not match the pre-registered sample and false-prune thresholds",
                 ));
             }
 
@@ -401,10 +409,15 @@ impl RunWidePruningRiskLedger {
             previous = event.receipt_sha256.clone();
         }
 
-        if self.pruning_enabled != expected_enabled {
+        // An invalid attempted event can disable pruning without adding a success receipt.
+        // The committed event chain must still verify, and every disabled state must retain
+        // a non-empty terminal reason.
+        if self.pruning_enabled != expected_enabled
+            && (self.pruning_enabled || self.stop_reason.as_deref().unwrap_or("").is_empty())
+        {
             return Err(RunWidePruningRiskError::new(
                 "pruning_enabled",
-                "ledger state does not match the final event disposition",
+                "ledger state does not match the final event disposition or a terminal fail-closed reason",
             ));
         }
         if !self.pruning_enabled && self.stop_reason.as_deref().unwrap_or("").is_empty() {
@@ -488,6 +501,17 @@ fn validate_config(
         return Err(RunWidePruningRiskError::new(
             "min_audit_samples",
             "must be positive",
+        ));
+    }
+    let per_event_budget =
+        config.run_confidence_failure_budget / config.max_audit_events as f64;
+    if per_event_budget <= 0.0
+        || per_event_budget >= 1.0
+        || 1.0 - per_event_budget >= 1.0
+    {
+        return Err(RunWidePruningRiskError::new(
+            "run_confidence_failure_budget",
+            "per-event alpha must be representable as a value strictly between zero and one",
         ));
     }
     Ok(())
