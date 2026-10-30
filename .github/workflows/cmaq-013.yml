@@ -77,5 +77,24 @@ jobs:
           oracle = next(cell for cell in report["cells"] if cell["scenario"] == "abrupt_shift" and cell["search_width"] == 128 and cell["rollout_horizon"] == 8)
           oracle_method = next(row for row in oracle["methods"] if row["method"] == "oracle_selected_quantile")
           assert oracle_method["selected_action_coverage"] >= 0.88
+          print(json.dumps({
+              "wide_stationary_width128_horizon8": {
+                  "random_calibration_q": wide["random_calibration_quantile"],
+                  "selected_calibration_q": wide["selected_calibration_quantile"],
+                  "selected_coverage": selected["selected_action_coverage"],
+                  "random_coverage": selected["random_action_coverage"],
+                  "pre_shift_coverage": selected["pre_shift_selected_coverage"],
+                  "post_shift_coverage": selected["post_shift_selected_coverage"],
+                  "false_safe_rate": selected["false_safe_rate"],
+                  "fallback_rate": selected["fallback_rate"]
+              },
+              "stationary_width32_horizon_quantiles": {
+                  "horizon1": short_horizon["selected_calibration_quantile"],
+                  "horizon8": long_horizon["selected_calibration_quantile"]
+              },
+              "abrupt_width128_horizon8": {
+                  "oracle_selected_coverage": oracle_method["selected_action_coverage"]
+              }
+          }, sort_keys=True))
           print("CMAQ-013 schema, selection-conditioned quantiles, coverage/fallback metrics and delayed online calibration validated")
           PY
