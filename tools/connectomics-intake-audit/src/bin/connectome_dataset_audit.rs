@@ -912,4 +912,14 @@ mod tests {
         assert!(report.errors.iter().any(|finding| finding.code == "sample_type_derivation_mismatch"));
     }
 
+    #[test]
+    fn report_carries_the_operator_supplied_immutable_dataset_revision() {
+        let rows = valid_dataset();
+        let revision = "a".repeat(40);
+        let report = audit_rows(&rows, "0".repeat(64), CUBE_EDGE_NM, revision.clone());
+        assert_eq!(report.dataset_revision, "v2");
+        assert_eq!(report.dataset_revision_commit_sha, revision);
+        assert_eq!(report.pinned_upstream_commit, "5679b39aa2641d8d0afeed88b441e696f87a66df");
+    }
+
 }
