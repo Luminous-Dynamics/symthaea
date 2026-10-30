@@ -1054,7 +1054,6 @@ mod tests {
     const RESET: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const CONFIG: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const DIST: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-    const SEQUENCE: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const TRACE: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     const WITNESS: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 
@@ -1130,6 +1129,49 @@ mod tests {
             },
             "trials": active
         })
+    }
+
+    struct TempCampaign {
+        base: PathBuf,
+        campaign: PathBuf,
+        receipt_dir: PathBuf,
+        receipt: PathBuf,
+    }
+
+    impl TempCampaign {
+        fn new(value: &Value) -> Self {
+            let id = NEXT.fetch_add(1, Ordering::Relaxed);
+            let base = env::temp_dir().join(format!(
+                "hardsec-activation-campaign-{}-{id}",
+                std::process::id()
+            ));
+            let input_dir = base.join("input");
+            let receipt_dir = base.join("output");
+            fs::create_dir_all(&input_dir).unwrap();
+            fs::create_dir_all(&receipt_dir).unwrap();
+            let campaign = input_dir.join("campaign.json");
+            let receipt = receipt_dir.join("receipt.json");
+            fs::write(&campaign, serde_json::to_vec_pretty(value).unwrap()).unwrap();
+            Self {
+                base,
+                campaign,
+                receipt_dir,
+                receipt,
+            }
+        }
+
+        fn args(&self) -> Args {
+            Args {
+                campaign: self.campaign.clone(),
+                receipt: self.receipt.clone(),
+            }
+        }
+    }
+
+    impl Drop for TempCampaign {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
     }
 
     #[test]
@@ -1419,6 +1461,57 @@ mod tests {
         value["trials"][0]["formal_result"] = json!("cover_reached");
         value["trials"][0]["formal_bound_cycles"] = json!(8);
         assert!(parse_campaign(&value).unwrap_err().contains("formal fields are valid only"));
+    }
+
+    #[test]
+    fn run_writes_hash_bound_receipt_outside_campaign_directory() {
+        let value = fixture();
+        let expected_campaign_hash = json_hash(&serde_json::to_vec_pretty(&value).unwrap());
+        let files = TempCampaign::new(&value);
+        run(files.args()).unwrap();
+        let receipt: Value =
+            serde_json::from_slice(&fs::read(&files.receipt).unwrap()).unwrap();
+        assert_eq!(receipt["result"], "pass");
+        assert_eq!(receipt["campaign_sha256"], expected_campaign_hash);
+        assert_eq!(receipt["claim_scope"], CLAIM_SCOPE);
+        assert!(receipt["security_verdict"].is_null());
+        assert_eq!(receipt["trials"].as_array().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn run_refuses_to_overwrite_existing_receipt() {
+        let value = fixture();
+        let files = TempCampaign::new(&value);
+        fs::write(&files.receipt, b"keep-existing").unwrap();
+        let error = run(files.args()).unwrap_err();
+        assert!(error.contains("create new receipt"));
+        assert_eq!(fs::read(&files.receipt).unwrap(), b"keep-existing");
+    }
+
+    #[test]
+    fn run_rejects_receipt_inside_campaign_directory() {
+        let value = fixture();
+        let mut files = TempCampaign::new(&value);
+        files.receipt = files.campaign.parent().unwrap().join("inside.json");
+        assert!(run(files.args())
+            .unwrap_err()
+            .contains("receipt must be outside the campaign directory"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_rejects_symlink_campaign_input() {
+        let value = fixture();
+        let files = TempCampaign::new(&value);
+        let link = files.campaign.parent().unwrap().join("campaign-link.json");
+        std::os::unix::fs::symlink(&files.campaign, &link).unwrap();
+        let args = Args {
+            campaign: link,
+            receipt: files.receipt.clone(),
+        };
+        assert!(run(args)
+            .unwrap_err()
+            .contains("regular non-symlink file"));
     }
 
     #[test]
