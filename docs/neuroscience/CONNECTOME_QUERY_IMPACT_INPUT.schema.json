@@ -56,6 +56,10 @@
         "query_id": { "type": "string", "minLength": 1 },
         "weight": { "type": "number", "minimum": 0 },
         "normalization_scale": { "type": "number", "exclusiveMinimum": 0 },
+        "reference_value": {
+          "type": "number",
+          "description": "Optional evaluation-only oracle value for measuring signed query-error reduction. Must be withheld from candidate generation and ranking policy."
+        },
         "metric": {
           "oneOf": [
             {
