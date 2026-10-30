@@ -30,6 +30,8 @@
 //! integrity receipt, not a signature or cryptographic proof of upstream
 //! authorization / verifier execution.
 
+use crate::memory_proof_budget::{ProofBudgetRequest, ProofBudgetResult};
+use crate::memory_verified_reader_context::build_verified_proof_reader_context;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -94,6 +96,97 @@ pub enum LifecycleActionReason {
     ProofPacketWasNotIndependentlyVerified,
 }
 
+/// Opaque proof-verification capability. Its fields are private and the only
+/// public constructor runs the independent proof-packet verifier through the
+/// verified-reader adapter. Do not deserialize or fabricate this value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedLifecycleProofToken {
+    decision_id: String,
+    principal_id: String,
+    scope_id: String,
+    valid_at_unix_ms: u64,
+    known_at_unix_ms: u64,
+    request_sha256: String,
+    packet_sha256: String,
+    selected_proofs: std::collections::BTreeMap<String, (String, BTreeSet<String>)>,
+}
+
+impl VerifiedLifecycleProofToken {
+    fn verify_request_binding(&self, request: &LifecyclePolicyRequest) -> Result<(), String> {
+        if self.decision_id != request.decision_id
+            || self.principal_id != request.principal_id
+            || self.scope_id != request.scope_id
+            || self.valid_at_unix_ms != request.valid_at_unix_ms
+            || self.known_at_unix_ms != request.known_at_unix_ms
+        {
+            return Err("verified proof token does not match lifecycle request identity or time".into());
+        }
+        if request.proof_packet_sha256.as_deref() != Some(self.packet_sha256.as_str()) {
+            return Err("verified proof token packet digest does not match lifecycle request".into());
+        }
+        validate_sha256(&self.request_sha256, "verified proof request digest")?;
+        validate_sha256(&self.packet_sha256, "verified proof packet digest")?;
+
+        if self.selected_proofs.len() != request.required_claims.len() {
+            return Err("verified proof token does not cover every required lifecycle claim".into());
+        }
+        for claim in &request.required_claims {
+            if claim.state != ClaimLifecycleState::SupportedCurrent {
+                return Err("verified proof token cannot be used with a non-current claim".into());
+            }
+            let (justification_id, dependencies) = self
+                .selected_proofs
+                .get(&claim.conclusion_id)
+                .ok_or_else(|| format!(
+                    "verified proof token is missing required conclusion {:?}",
+                    claim.conclusion_id
+                ))?;
+            if claim.selected_justification_id.as_deref() != Some(justification_id.as_str())
+                || &claim.current_evidence_ids != dependencies
+            {
+                return Err(format!(
+                    "lifecycle claim {:?} does not match the independently verified selected proof",
+                    claim.conclusion_id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Create an opaque lifecycle proof token only after the canonical independent
+/// verifier has accepted the packet and its exact reader context.
+pub fn verify_proof_packet_for_lifecycle(
+    request: &ProofBudgetRequest,
+    result: &ProofBudgetResult,
+) -> Result<VerifiedLifecycleProofToken, String> {
+    let context = build_verified_proof_reader_context(request, result)?;
+    context.verify_internal_consistency()?;
+    let selected_proofs = context
+        .claim_proofs
+        .iter()
+        .map(|proof| {
+            (
+                proof.conclusion_id.clone(),
+                (
+                    proof.justification_id.clone(),
+                    proof.evidence_dependencies.iter().cloned().collect(),
+                ),
+            )
+        })
+        .collect();
+    Ok(VerifiedLifecycleProofToken {
+        decision_id: context.decision_id,
+        principal_id: context.principal_id,
+        scope_id: context.scope_id,
+        valid_at_unix_ms: context.valid_at_unix_ms,
+        known_at_unix_ms: context.known_at_unix_ms,
+        request_sha256: context.request_sha256,
+        packet_sha256: context.packet_sha256,
+        selected_proofs,
+    })
+}
+
 /// Claim-level provenance/lifecycle record. It contains IDs and states only;
 /// source text is deliberately kept outside this control-plane structure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,7 +242,6 @@ impl ClaimLifecycleLedgerEntry {
             }
             ClaimLifecycleState::StaleOnly => {
                 if self.selected_justification_id.is_some()
-                    || self.current_evidence_ids.is_empty()
                     || !self.current_evidence_ids.is_empty()
                     || self.stale_evidence_ids.is_empty()
                     || !self.conflicting_evidence_ids.is_empty()
@@ -304,6 +396,7 @@ pub struct LifecycleActionDecision {
     pub action: LifecycleAction,
     pub reason: LifecycleActionReason,
     pub proof_status: ProofVerificationState,
+    pub proof_request_sha256: Option<String>,
     pub proof_packet_sha256: Option<String>,
     pub retrieval: LifecycleRetrievalProgress,
     pub claim_ledger: Vec<ClaimLifecycleLedgerEntry>,
@@ -321,6 +414,7 @@ struct LifecycleActionDigestPayload<'a> {
     action: LifecycleAction,
     reason: LifecycleActionReason,
     proof_status: ProofVerificationState,
+    proof_request_sha256: &'a Option<String>,
     proof_packet_sha256: &'a Option<String>,
     retrieval: LifecycleRetrievalProgress,
     claim_ledger: &'a [ClaimLifecycleLedgerEntry],
@@ -355,14 +449,28 @@ impl LifecycleActionDecision {
         if let Some(packet_sha256) = &self.proof_packet_sha256 {
             validate_sha256(packet_sha256, "proof_packet_sha256")?;
         }
+        if let Some(request_sha256) = &self.proof_request_sha256 {
+            validate_sha256(request_sha256, "proof_request_sha256")?;
+        }
         if self.proof_status == ProofVerificationState::VerifiedOptimal {
             if self.proof_packet_sha256.is_none()
+                || self.proof_request_sha256.is_none()
                 || self.claim_ledger
                     .iter()
                     .any(|claim| claim.state != ClaimLifecycleState::SupportedCurrent)
             {
                 return Err("VerifiedOptimal decision has inconsistent packet or claim state".into());
             }
+        } else if self.proof_packet_sha256.is_some() || self.proof_request_sha256.is_some() {
+            return Err("unverified decision must not carry a verified proof token digest".into());
+        }
+        let (expected_action, expected_reason) = choose_action(
+            self.proof_status,
+            self.retrieval,
+            &self.claim_ledger,
+        );
+        if self.action != expected_action || self.reason != expected_reason {
+            return Err("lifecycle action or reason does not match the deterministic policy".into());
         }
         let expected = lifecycle_action_digest(
             &self.policy_version,
@@ -374,6 +482,7 @@ impl LifecycleActionDecision {
             self.action,
             self.reason,
             self.proof_status,
+            &self.proof_request_sha256,
             &self.proof_packet_sha256,
             self.retrieval,
             &self.claim_ledger,
@@ -424,68 +533,29 @@ pub const LIFECYCLE_POLICY_VERSION: &str = "BROCA-LIFECYCLE-ACTION-V1";
 /// returned decision. It must never convert those actions into ANSWER.
 pub fn decide_lifecycle_action(
     mut request: LifecyclePolicyRequest,
+    verified_proof: Option<&VerifiedLifecycleProofToken>,
 ) -> Result<LifecycleActionDecision, String> {
     request.validate()?;
+    match (request.proof_status, verified_proof) {
+        (ProofVerificationState::VerifiedOptimal, Some(token)) => {
+            token.verify_request_binding(&request)?;
+        }
+        (ProofVerificationState::VerifiedOptimal, None) => {
+            return Err("VerifiedOptimal requires an opaque token from verify_proof_packet_for_lifecycle".into());
+        }
+        (_, Some(_)) => {
+            return Err("a verified proof token cannot accompany a non-VerifiedOptimal status".into());
+        }
+        (_, None) => {}
+    }
     request.required_claims
         .sort_by(|left, right| left.conclusion_id.cmp(&right.conclusion_id));
 
-    let all_supported = request.required_claims
-        .iter()
-        .all(|claim| claim.state == ClaimLifecycleState::SupportedCurrent);
-    let has_conflict = request.required_claims
-        .iter()
-        .any(|claim| claim.state == ClaimLifecycleState::Conflicted);
-    let has_stale_only = request.required_claims
-        .iter()
-        .any(|claim| claim.state == ClaimLifecycleState::StaleOnly);
-    let has_untrusted = request.required_claims.iter().any(|claim| {
-        matches!(
-            claim.state,
-            ClaimLifecycleState::Unauthorized | ClaimLifecycleState::ProvenanceInvalid
-        )
-    });
-    let has_missing = request.required_claims
-        .iter()
-        .any(|claim| claim.state == ClaimLifecycleState::Missing);
-
-    let (action, reason) = if all_supported
-        && request.proof_status == ProofVerificationState::VerifiedOptimal
-    {
-        (
-            LifecycleAction::Answer,
-            LifecycleActionReason::AllRequiredClaimsHaveVerifiedCurrentSupport,
-        )
-    } else if request.retrieval.can_continue {
-        (
-            LifecycleAction::RetrieveMore,
-            LifecycleActionReason::MoreRetrievalMayResolveIncompleteSupport,
-        )
-    } else if has_untrusted {
-        (
-            LifecycleAction::Abstain,
-            LifecycleActionReason::UntrustedEvidenceCannotSupportTheDecision,
-        )
-    } else if has_conflict {
-        (
-            LifecycleAction::ExplainConflict,
-            LifecycleActionReason::CurrentEvidenceConflictRemainsUnresolved,
-        )
-    } else if has_stale_only {
-        (
-            LifecycleAction::WarnStale,
-            LifecycleActionReason::OnlyStaleEvidenceCanSupportTheClaim,
-        )
-    } else if has_missing {
-        (
-            LifecycleAction::Abstain,
-            LifecycleActionReason::RequiredEvidenceIsMissing,
-        )
-    } else {
-        (
-            LifecycleAction::Abstain,
-            LifecycleActionReason::ProofPacketWasNotIndependentlyVerified,
-        )
-    };
+    let (action, reason) = choose_action(
+        request.proof_status,
+        request.retrieval,
+        &request.required_claims,
+    );
 
     let policy_version = LIFECYCLE_POLICY_VERSION.to_string();
     let claim_ledger = request.required_claims;
@@ -499,6 +569,7 @@ pub fn decide_lifecycle_action(
         action,
         reason,
         request.proof_status,
+        &verified_proof.map(|token| token.request_sha256.clone()),
         &request.proof_packet_sha256,
         request.retrieval,
         &claim_ledger,
@@ -514,6 +585,7 @@ pub fn decide_lifecycle_action(
         action,
         reason,
         proof_status: request.proof_status,
+        proof_request_sha256: verified_proof.map(|token| token.request_sha256.clone()),
         proof_packet_sha256: request.proof_packet_sha256,
         retrieval: request.retrieval,
         claim_ledger,
@@ -521,6 +593,61 @@ pub fn decide_lifecycle_action(
     };
     decision.verify_internal_consistency()?;
     Ok(decision)
+}
+
+fn choose_action(
+    proof_status: ProofVerificationState,
+    retrieval: LifecycleRetrievalProgress,
+    claims: &[ClaimLifecycleLedgerEntry],
+) -> (LifecycleAction, LifecycleActionReason) {
+    let all_supported = claims
+        .iter()
+        .all(|claim| claim.state == ClaimLifecycleState::SupportedCurrent);
+    if all_supported && proof_status == ProofVerificationState::VerifiedOptimal {
+        return (
+            LifecycleAction::Answer,
+            LifecycleActionReason::AllRequiredClaimsHaveVerifiedCurrentSupport,
+        );
+    }
+    if retrieval.can_continue {
+        return (
+            LifecycleAction::RetrieveMore,
+            LifecycleActionReason::MoreRetrievalMayResolveIncompleteSupport,
+        );
+    }
+    if claims.iter().any(|claim| {
+        matches!(
+            claim.state,
+            ClaimLifecycleState::Unauthorized | ClaimLifecycleState::ProvenanceInvalid
+        )
+    }) {
+        return (
+            LifecycleAction::Abstain,
+            LifecycleActionReason::UntrustedEvidenceCannotSupportTheDecision,
+        );
+    }
+    if claims.iter().any(|claim| claim.state == ClaimLifecycleState::Conflicted) {
+        return (
+            LifecycleAction::ExplainConflict,
+            LifecycleActionReason::CurrentEvidenceConflictRemainsUnresolved,
+        );
+    }
+    if claims.iter().any(|claim| claim.state == ClaimLifecycleState::StaleOnly) {
+        return (
+            LifecycleAction::WarnStale,
+            LifecycleActionReason::OnlyStaleEvidenceCanSupportTheClaim,
+        );
+    }
+    if claims.iter().any(|claim| claim.state == ClaimLifecycleState::Missing) {
+        return (
+            LifecycleAction::Abstain,
+            LifecycleActionReason::RequiredEvidenceIsMissing,
+        );
+    }
+    (
+        LifecycleAction::Abstain,
+        LifecycleActionReason::ProofPacketWasNotIndependentlyVerified,
+    )
 }
 
 fn lifecycle_action_digest(
@@ -533,6 +660,7 @@ fn lifecycle_action_digest(
     action: LifecycleAction,
     reason: LifecycleActionReason,
     proof_status: ProofVerificationState,
+    proof_request_sha256: &Option<String>,
     proof_packet_sha256: &Option<String>,
     retrieval: LifecycleRetrievalProgress,
     claim_ledger: &[ClaimLifecycleLedgerEntry],
@@ -547,6 +675,7 @@ fn lifecycle_action_digest(
         action,
         reason,
         proof_status,
+        proof_request_sha256,
         proof_packet_sha256,
         retrieval,
         claim_ledger,
