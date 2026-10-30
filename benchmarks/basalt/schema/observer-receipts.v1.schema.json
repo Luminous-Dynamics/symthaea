@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT untrusted observer receipts v1",
+  "description": "Raw observer-reported facts and loss signals to be checked against the separate challenge catalog and independent oracle. A valid receipt does not establish completeness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "catalog_digest",
+    "observer_profile_id",
+    "observer_binary_digest",
+    "records"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-observer-receipts-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "observer_profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "observer_binary_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "disposition",
+          "observed_resources",
+          "facts",
+          "unresolved_channels",
+          "reuse_decision",
+          "integrity"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+          },
+          "disposition": {
+            "enum": [
+              "captured",
+              "unresolved",
+              "invalidated",
+              "preserved"
+            ]
+          },
+          "observed_resources": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "digest"
+              ],
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "facts": {
+            "type": "array",
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "unresolved_channels": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "filesystem",
+                "process",
+                "environment",
+                "generated_artifact",
+                "toolchain",
+                "cache",
+                "network",
+                "observer_integrity"
+              ]
+            }
+          },
+          "reuse_decision": {
+            "enum": [
+              "reused",
+              "invalidated",
+              "reverified",
+              "unresolved"
+            ]
+          },
+          "integrity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_loss",
+              "observer_restart",
+              "unmonitored_process",
+              "snapshot_race",
+              "root_escape"
+            ],
+            "properties": {
+              "event_loss": {
+                "type": "boolean"
+              },
+              "observer_restart": {
+                "type": "boolean"
+              },
+              "unmonitored_process": {
+                "type": "boolean"
+              },
+              "snapshot_race": {
+                "type": "boolean"
+              },
+              "root_escape": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

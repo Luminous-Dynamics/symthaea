@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod basalt_state;
 mod basalt_observer;
+mod basalt_observer_result;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -28,6 +29,18 @@ enum Commands {
         /// Path to the observer-challenge catalog JSON.
         #[arg(long)]
         input: PathBuf,
+    },
+    /// Adjudicate untrusted observer receipts against a separate BASALT oracle ledger.
+    BasaltObserverResultAudit {
+        /// Path to the exact challenge catalog bytes.
+        #[arg(long)]
+        catalog: PathBuf,
+        /// Path to the independently authored challenge-oracle ledger.
+        #[arg(long)]
+        oracle: PathBuf,
+        /// Path to the raw observer-receipt ledger (treated as untrusted).
+        #[arg(long)]
+        receipts: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -109,6 +122,18 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.structurally_valid {
                 anyhow::bail!("BASALT observer challenge catalog is structurally invalid");
+            }
+        }
+        Commands::BasaltObserverResultAudit {
+            catalog,
+            oracle,
+            receipts,
+        } => {
+            let report =
+                basalt_observer_result::audit_files(&catalog, &oracle, &receipts)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.adjudication_passed {
+                anyhow::bail!("BASALT observer result adjudication failed");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {

@@ -513,7 +513,9 @@
         "mutation_identity",
         "non_dependency_witness"
       ],
-      "paired_case_ids": [],
+      "paired_case_ids": [
+        "docs-consumed-positive-control"
+      ],
       "description": "Change a docs-only file that the check demonstrably never reads or depends on.",
       "safety_property": "A selective observer should preserve independent evidence rather than globally invalidate everything."
     },
@@ -548,6 +550,24 @@
       "paired_case_ids": [],
       "description": "Run the profile with one deliberately unsupported observation channel enabled.",
       "safety_property": "The coverage receipt must name the unsupported channel instead of omitting it."
+    },
+    {
+      "case_id": "docs-consumed-positive-control",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "read_content",
+      "ground_truth_resource_id": "fixture:docs/unused.md",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "read_event"
+      ],
+      "paired_case_ids": [
+        "irrelevant-docs-change"
+      ],
+      "description": "The same changed documentation resource is deliberately consumed in this paired positive control.",
+      "safety_property": "The observer must capture the resource when consumed, while the paired case preserves evidence when it is not consumed."
     }
   ]
 }
