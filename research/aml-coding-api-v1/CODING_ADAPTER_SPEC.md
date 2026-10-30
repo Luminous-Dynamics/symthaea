@@ -153,17 +153,21 @@ Its contract:
 - On restart, validate row metadata, payload digest, canonical source records, and schema version before rebuilding the in-memory evidence index.
 - Explicit cutoff and full-purge operations remove logical rows in SQLite transactions and rebuild/clear the index.
 
-The SQLite implementation has 10 authored tests covering persistence/reopen, immediate retrieval, cross-connection idempotency, conflicting request-ID reuse, user isolation, cross-session retrieval, top_k, WAL/FULL PRAGMA verification, retention purge, malformed rows, and failed-batch atomicity.
+The SQLite implementation has 21 authored tests covering persistence/reopen, immediate retrieval, cross-connection idempotency, conflicting request-ID reuse, user isolation, cross-session retrieval, top_k, WAL/FULL PRAGMA verification, retention purge, malformed rows, and failed-batch atomicity.
 
 The SQLite backend also records lifecycle changes in `aml_evidence_lifecycle_events`:
 - caller-supplied `event_id` provides idempotency; same event ID/same operation is a replay, and same ID/different operation is rejected;
 - Revoke, Delete, and Supersede are append-only events ordered by SQLite sequence;
+- each lifecycle event has a SHA-256 digest over the exact serialized event body, verified before replay; row ID/timestamp and content digest must all match;
+- schema version 3 migrates v2 lifecycle rows transactionally by adding and backfilling event digests; v1 Add-only stores are upgraded additively;
 - restart rebuilds Add batches first, then replays every lifecycle event before Search;
-- invalid events or dangling source references fail startup closed;
+- invalid events, modified event bodies, or dangling source references fail startup closed;
 - retention cleanup removes expired Add batches and dependent lifecycle events in one SQLite transaction;
 - full purge clears both Add and lifecycle tables.
 
-This preserves current-index lifecycle state across process restarts. It is not yet a full bitemporal query interface: event time is stored, but Search exposes only the current admissible index and does not accept a caller-supplied `known_at`. It also does not independently propagate a source revocation through the derived proof graph or decision-use certificates; those integrations remain tracked by #9075, #9077, and #9112.
+The internal `search_as_known_at(request, valid_at, known_at)` API reconstructs an immutable view by selecting only Add transactions recorded by `known_at`, replaying only lifecycle events recorded by `known_at`, and then applying source validity bounds at `valid_at`. Source message timestamps populate the lower valid-time boundary when supplied. Add and lifecycle transaction timestamps are globally monotonic across the ledger, avoiding equal-millisecond and backwards-clock ambiguity. The external AML Search API remains a current-view interface and is not changed.
+
+This is a bounded two-clock reference implementation, not a full bitemporal database: timestamps are millisecond instants, arbitrary valid-time correction chains and interval joins are not implemented, and retractions are not yet propagated through the separate derived proof graph/use-validity certificate DAG. Those integrations remain tracked by #9075, #9077, and #9112.
 
 ### SQLite backend deployment boundaries
 
