@@ -36,8 +36,9 @@
   "edge_policy": "clip_last_tile",
   "eligibility_mask": {
     "artifact_id": "synthetic-eligibility-mask",
-    "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-    "selection_rule_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    "artifact_sha256": "e7c4b2e3b80dce18ec740fded46d2fa6043ed76915a6963ece770fecb2b897a3",
+    "selection_rule_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "encoding": "hex_bitset_lsb0_x_fastest_v1"
   },
   "frame_protocol_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "frame_generator": {
