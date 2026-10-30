@@ -45,6 +45,7 @@ Strata are sampled independently, so total variances are added across strata. Th
 - estimated positive isolated query-correction opportunity mass;
 - estimated negative isolated query-harm mass;
 - signed net isolated query-error reduction;
+- estimated independent audit-panel person-minutes (sum of actual person time across annotators/adjudicators), kept separate from normal policy-review cost;
 - design variance and standard error for every estimate.
 
 Normal-approximation 95% intervals are emitted only for census strata or when each non-census stratum has at least 30 sampled clusters. This is a practical reporting guard, not a universal coverage guarantee. For smaller samples, the tool emits the design variance and standard error but withholds the interval; use design-specific randomization inference or a preregistered small-sample method before making a confidence claim.
@@ -53,7 +54,7 @@ The query-delta estimands are isolated candidate counterfactuals. Their totals a
 
 ## Data binding and integrity
 
-The audit file binds to exact frozen proposal bytes and exact sampling protocol bytes. The complete population frame must exactly match the candidate IDs in the proposal input. The report emits a canonical frame digest, sampled-outcome digest, protocol SHA-256, input SHA-256, and seed commitment digest. Outcomes must include every candidate inside every deterministically selected cluster, and no candidate outside those clusters.
+The audit file binds to exact frozen proposal bytes and exact sampling protocol bytes. The complete population frame must exactly match the candidate IDs in the proposal input. The report emits a canonical frame digest, exact full audit-input SHA-256, canonical sampled-outcomes SHA-256, protocol SHA-256, proposal-input SHA-256, and seed commitment digest. Outcomes must include every candidate inside every deterministically selected cluster, and no candidate outside those clusters.
 
 The audit must be generated independently from the ranker. The ranker cannot see the seed, sample selection, or outcome file. Do not tune model scores, query weights, strata, or sampling fractions after seeing audit outcomes.
 
