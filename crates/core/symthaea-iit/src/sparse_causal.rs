@@ -645,7 +645,49 @@ impl SparseBinaryCausalModel {
         current_state: &[bool],
         max_factor_entries: usize,
     ) -> Result<SparseEq4Report, SparseCausalError> {
+        self.forward_cause_likelihood_iit4_with_target_model(
+            self,
+            candidate_system,
+            current_state,
+            max_factor_entries,
+        )
+    }
+
+    /// Partitioned Eq. 4 likelihood using the original substrate posterior.
+    ///
+    /// The observation posterior is always computed from self (the uncut
+    /// substrate). Only candidate-target conditional tables are taken from the
+    /// maximum-entropy cut model. This is the proper Eq. 4 cut semantics; using
+    /// the cut model to recompute the external-background posterior is not
+    /// equivalent.
+    pub fn partitioned_forward_cause_likelihood_iit4(
+        &self,
+        partition: &DirectedSystemPartition,
+        current_state: &[bool],
+        max_factor_entries: usize,
+    ) -> Result<SparseEq4Report, SparseCausalError> {
+        let cut_model = self.apply_partition(partition)?;
+        self.forward_cause_likelihood_iit4_with_target_model(
+            &cut_model,
+            partition.candidate_system(),
+            current_state,
+            max_factor_entries,
+        )
+    }
+
+    fn forward_cause_likelihood_iit4_with_target_model(
+        &self,
+        target_model: &Self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        max_factor_entries: usize,
+    ) -> Result<SparseEq4Report, SparseCausalError> {
         self.check_state(current_state)?;
+        if target_model.n_units != self.n_units {
+            return Err(SparseCausalError::InvalidUnitCount {
+                units: target_model.n_units,
+            });
+        }
         if candidate_system.is_empty() {
             return Err(SparseCausalError::EmptyCandidateSystem);
         }
@@ -722,7 +764,7 @@ impl SparseBinaryCausalModel {
         let mut factor_multiplications = normalizer.factor_multiplications;
 
         for target in candidate_system.iter().copied() {
-            let target_factor = self.observation_log_factor(
+            let target_factor = target_model.observation_log_factor(
                 target, current_state, &y_map, max_factor_entries,
             )?;
             let mut factors = posterior_factors.clone();
@@ -766,6 +808,7 @@ impl SparseBinaryCausalModel {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
         }
         let request_sha256 = self.eq4_request_sha256(
+            target_model,
             candidate_system,
             current_state,
             max_factor_entries,
@@ -783,6 +826,7 @@ impl SparseBinaryCausalModel {
 
     fn eq4_request_sha256(
         &self,
+        target_model: &Self,
         candidate_system: &[usize],
         current_state: &[bool],
         max_factor_entries: usize,
@@ -791,6 +835,7 @@ impl SparseBinaryCausalModel {
         bytes.extend_from_slice(SPARSE_EQ4_REQUEST_MAGIC);
         sparse_receipt_string(&mut bytes, SPARSE_IIT4_EQ4_ALGORITHM_ID);
         bytes.extend_from_slice(self.model_sha256().as_bytes());
+        bytes.extend_from_slice(target_model.model_sha256().as_bytes());
         sparse_receipt_u64(&mut bytes, current_state.len() as u64);
         bytes.extend(current_state.iter().map(|on| u8::from(*on)));
         sparse_receipt_u64(&mut bytes, candidate_system.len() as u64);
@@ -1016,6 +1061,29 @@ mod tests {
                     partition.is_total_cut(),
                     partition.parts(),
                     partition.directions()
+                );
+            }
+
+            let current_state = [true, false, true, false, true];
+            let dense_partitioned = dense
+                .partitioned_forward_cause_likelihood_iit4(partition, &current_state)
+                .unwrap();
+            let sparse_partitioned = sparse
+                .partitioned_forward_cause_likelihood_iit4(
+                    partition,
+                    &current_state,
+                    1 << 16,
+                )
+                .unwrap();
+            for (index, (dense_value, sparse_value)) in dense_partitioned
+                .iter()
+                .zip(&sparse_partitioned.forward_likelihood)
+                .enumerate()
+            {
+                assert!(
+                    (dense_value - sparse_value).abs() <= 1e-12,
+                    "post-cut Eq4 mismatch: total={}, index={index}, dense={dense_value:.17}, sparse={sparse_value:.17}",
+                    partition.is_total_cut()
                 );
             }
             let current_state = [true, false, true, false, true];
