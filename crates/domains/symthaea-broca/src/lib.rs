@@ -70,6 +70,7 @@ pub mod memory_governance;
 pub mod memory_attestation;
 pub mod memory_derivation;
 pub mod memory_justifications;
+pub mod memory_bitemporal;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
 #[cfg(feature = "speech-data")]
