@@ -931,6 +931,7 @@ mod tests {
                 source_span_start: 0,
                 source_span_end: excerpt.len() as u64,
                 source_family_id: "family-1".into(),
+                source_session_id: Some("session-1".into()),
                 scope_id: "scope-1".into(),
                 payload_sha256: digest("payload"),
                 source_span_sha256: digest(excerpt),
