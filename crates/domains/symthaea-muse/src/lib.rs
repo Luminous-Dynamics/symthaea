@@ -44,6 +44,7 @@ pub mod audio_analyzer;
 pub mod audio_preservation;
 pub mod counterfactual_influence;
 pub mod counterfactual_interaction;
+pub mod factorial_ground_truth;
 pub mod interaction_probe_plan;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
