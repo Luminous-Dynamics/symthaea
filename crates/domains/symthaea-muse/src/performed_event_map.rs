@@ -90,6 +90,7 @@ pub enum PerformedEventMapError {
     DuplicateSourceEventId,
     UnknownSourceEvent,
     MissingSourceEvent,
+    ExcludedSourceEventPresent,
     UnresolvedSourceEvents,
     DuplicateMidiEventIdentity,
     DuplicateDescendantOrdinal,
@@ -549,6 +550,90 @@ impl PerformedEventMap {
         }
 
         for index in 0..expected_target_event_count {
+            let id = score_event_id(index);
+            if !seen_source_ids.contains(id.as_str()) {
+                return Err(PerformedEventMapError::MissingSourceEvent);
+            }
+            let ordinals = descendants
+                .get(id.as_str())
+                .ok_or(PerformedEventMapError::MissingSourceEvent)?;
+            if !ordinals.contains(&0) {
+                return Err(PerformedEventMapError::MissingSourceEvent);
+            }
+            for (expected, actual) in ordinals.iter().enumerate() {
+                if *actual != expected as u32 {
+                    return Err(PerformedEventMapError::NonContiguousDescendants);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify a counterfactual map with exactly one declared source event
+    /// removed. The map must still contain every other canonical Score event,
+    /// all descendant ordinals must be contiguous, no unknown or unresolved
+    /// source IDs are allowed, and the excluded source ID must be absent.
+    ///
+    /// This is not a weaker version of verify_for_score: it is an explicit
+    /// operation-scoped exception for a single declared removal.
+    pub fn verify_for_score_excluding(
+        &self,
+        expected_target_score_sha256: &str,
+        expected_performed_midi_sha256: &str,
+        expected_sample_rate_hz: u32,
+        expected_total_frames: u64,
+        expected_target_event_count: usize,
+        excluded_source_event_index: usize,
+    ) -> Result<(), PerformedEventMapError> {
+        self.validate_structure()?;
+        if self.compute_sha256()? != self.receipt_sha256 {
+            return Err(PerformedEventMapError::InvalidReceipt);
+        }
+        if self.target_score_sha256 != expected_target_score_sha256 {
+            return Err(PerformedEventMapError::ContextMismatch("target score digest"));
+        }
+        if self.performed_midi_sha256 != expected_performed_midi_sha256 {
+            return Err(PerformedEventMapError::ContextMismatch("performed MIDI digest"));
+        }
+        if self.sample_rate_hz != expected_sample_rate_hz {
+            return Err(PerformedEventMapError::ContextMismatch("sample rate"));
+        }
+        if self.total_frames != expected_total_frames {
+            return Err(PerformedEventMapError::ContextMismatch("total frame count"));
+        }
+        if expected_target_event_count == 0
+            || expected_target_event_count > MAX_PERFORMED_EVENT_MAP_EVENTS
+            || excluded_source_event_index >= expected_target_event_count
+        {
+            return Err(PerformedEventMapError::InvalidExpectedEventCount);
+        }
+        if !self.unresolved_source_event_ids.is_empty() {
+            return Err(PerformedEventMapError::UnresolvedSourceEvents);
+        }
+
+        let mut seen_source_ids = HashSet::with_capacity(expected_target_event_count);
+        let mut descendants: BTreeMap<&str, BTreeSet<u32>> = BTreeMap::new();
+        for event in &self.events {
+            let Some(index) = parse_score_event_id(&event.source_event_id) else {
+                return Err(PerformedEventMapError::InvalidSourceEventId);
+            };
+            if index >= expected_target_event_count {
+                return Err(PerformedEventMapError::UnknownSourceEvent);
+            }
+            if index == excluded_source_event_index {
+                return Err(PerformedEventMapError::ExcludedSourceEventPresent);
+            }
+            seen_source_ids.insert(event.source_event_id.as_str());
+            descendants
+                .entry(event.source_event_id.as_str())
+                .or_default()
+                .insert(event.descendant_ordinal);
+        }
+
+        for index in 0..expected_target_event_count {
+            if index == excluded_source_event_index {
+                continue;
+            }
             let id = score_event_id(index);
             if !seen_source_ids.contains(id.as_str()) {
                 return Err(PerformedEventMapError::MissingSourceEvent);
