@@ -52,13 +52,13 @@ For a fixed reward model q, the DR score is
 
 With known logging propensities and full target support, its conditional expectation equals the target-policy value for any fixed q. Its variance, finite-sample behavior, and performance under fitted nuisance models remain empirical questions. This benchmark treats in-sample DR separately from cross-fitted DR instead of assuming they are interchangeable.
 
-The 95% intervals are normal intervals based on the sample variance of the per-event estimator scores. Empirical coverage is reported across synthetic replicates; nominal coverage is not assumed.
+Score-based normal intervals are reported only for IPS and estimators whose reward-model nuisance fit is external to the evaluation rows (pilot DR/DM and two-fold cross-fitted DR). These are empirical diagnostics, not finite-sample guarantees. The deliberately in-sample DM/DR arms have no reported confidence interval: their nuisance model is fitted on the same evaluation rows, so a standard error calculated from those same scores would not be a defensible interval. Their point-estimate bias, variance across replicates, and MSE remain reported.
 
 ## Output
 
-Full and smoke runs emit deterministic TSV. Summary rows contain one row per scenario × sample size × logger × target policy × estimator, with shrinkage weight, expected logger reward, minimum action propensity, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, and identification status.
+Full and smoke runs emit deterministic TSV. Summary rows contain one row per scenario × sample size × logger × target policy × estimator, with mean shrinkage weight, expected logger reward, mean of replicate-level minimum action propensities, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, identification status, and inference status. In-sample DM/DR use NA for interval coverage and width.
 
-Expected summary rows: 5 scenarios × 2 sample sizes × 5 loggers × 4 target policies × 6 estimators = 1,200. A separate per-replicate trace records each estimate, truth, signed error, squared error, standard error, interval endpoints, and the independent pilot-fit, shrinkage-calibration, and evaluation seeds. That is 153,600 replicate rows for the 128-replicate full run and 14,400 for the 12-replicate smoke run.
+Expected summary rows: 5 scenarios × 2 sample sizes × 5 loggers × 4 target policies × 6 estimators = 1,200. A separate per-replicate trace records each estimate, truth, signed error, squared error, score-dispersion standard error, valid interval endpoints (or NA when same-sample nuisance fitting invalidates score-based inference), and the independent pilot-fit, shrinkage-calibration, and evaluation seeds. That is 153,600 replicate rows for the 128-replicate full run and 14,400 for the 12-replicate smoke run.
 
 All registered loggers preserve a positive action floor, so rows are labelled identified_full_support. The estimator rejects a target action with zero logging support; it does not return an OPE value in that case.
 
@@ -68,7 +68,7 @@ All registered loggers preserve a positive action floor, so rows are labelled id
 - Shrinkage is not presumed to help. Compare held-out and leaky weights with the oracle source-domain prediction-MSE reference and downstream OPE metrics.
 - Reward drift can make source-calibrated shrinkage stale. DR's residual correction should be evaluated separately from DM's model-only estimate.
 - The benchmark assumes the logging propensities are known exactly. It does not establish robustness to propensity-estimation error.
-- Two-fold cross-fitting and normal intervals are transparent baselines, not a claim of optimal nuisance estimation or finite-sample coverage guarantees.
+- Two-fold cross-fitting and score-based normal intervals are transparent baselines, not a claim of optimal nuisance estimation or finite-sample coverage guarantees. In-sample nuisance arms intentionally suppress intervals rather than attach misleading nominal coverage.
 - Synthetic results do not establish external validity, commercial readiness, or superiority to SCOPE-RL / Open Bandit Pipeline.
 
 ## Industry / SOTA comparison
