@@ -346,6 +346,12 @@ def self_test():
     assert scored["route_sufficiency_rate"] == 1.0
     assert scored["exact_minimal_route_rate"] == 1.0
     assert abs(scored["route_sufficiency_brier_score"] - 0.04) < 1e-12
+    try:
+        score_predictions(predictions[:1], groups)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("incomplete prediction coverage was accepted")
     incomplete = alt[:-1]
     try:
         analyze_group(group_key(incomplete[0]), incomplete)
