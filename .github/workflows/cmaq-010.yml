@@ -55,6 +55,7 @@ jobs:
           ]
           assert report["policies"] == [
               "direct_fallback", "naive_claim_sum", "naive_claim_majority",
+              "eie_gamma_discount_only", "eie_gamma_bounded_batch",
               "provenance_root_dedup_sum", "robust_root_majority",
               "freshness_provenance_fail_closed", "oracle_changepoint"
           ]
