@@ -127,6 +127,17 @@ impl Bm25Config {
     }
 }
 
+/// Deterministic binding to one exact in-memory evidence-index state.
+///
+/// This receipt is an integrity commitment, not a signature or proof that the
+/// supplied known_at coordinate was correctly materialized. The caller must
+/// build the index from the bitemporal source state at that coordinate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceIndexSnapshotReceipt {
+    pub known_at_unix_ms: u64,
+    pub index_state_sha256: String,
+}
+
 /// A scored evidence candidate. Keep this metadata outside the reader context;
 /// the adapter should pass only `context` as a benchmark MemoryContextItem.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -313,6 +324,35 @@ pub struct EvidenceIndex {
 impl EvidenceIndex {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Commit the exact index state to a deterministic SHA-256 digest.
+    ///
+    /// Records and all derived lookup structures are included. Ordered maps
+    /// make serialization deterministic. This detects stale/mismatched index
+    /// state; it does not establish source authenticity or sign the receipt.
+    pub fn state_sha256(&self) -> Result<String, String> {
+        let bytes = serde_json::to_vec(&(
+            &self.records,
+            &self.evidence_ids,
+            &self.lexical_postings,
+            &self.lexical_document_lengths,
+        ))
+        .map_err(|error| format!("cannot serialize evidence index state: {error}"))?;
+        Ok(sha256_hex(&bytes))
+    }
+
+    /// Bind the current exact index state to the caller's bitemporal cutoff.
+    /// The caller is responsible for ensuring this index was materialized at
+    /// that historical known_at coordinate before issuing the receipt.
+    pub fn snapshot_receipt(
+        &self,
+        known_at_unix_ms: u64,
+    ) -> Result<EvidenceIndexSnapshotReceipt, String> {
+        Ok(EvidenceIndexSnapshotReceipt {
+            known_at_unix_ms,
+            index_state_sha256: self.state_sha256()?,
+        })
     }
 
     pub fn insert(&mut self, record: EvidenceRecord, source_bytes: &[u8]) -> Result<(), String> {
