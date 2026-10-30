@@ -1,0 +1,194 @@
+{
+  "schema_version": "BROCA-ROLE-ACCESS-CASESET-V1",
+  "purpose": "Deterministic authorization contract cases for signed, time-bounded role-to-scope memory grants.",
+  "time_semantics": {
+    "activation": "trusted_ingress_accepted_at_inclusive",
+    "expiry": "signed_valid_until_exclusive",
+    "rollback": "policy_version_must_be_greater_than_persisted_minimum"
+  },
+  "cases": [
+    {
+      "id": "RA01",
+      "name": "explicit active grant",
+      "principal": "security-agent",
+      "scope": "security",
+      "now_ms": 150,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "allow"
+    },
+    {
+      "id": "RA02",
+      "name": "role cannot read another scope",
+      "principal": "security-agent",
+      "scope": "finance",
+      "now_ms": 150,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"], "finance-agent": ["finance"]},
+      "expected": "deny"
+    },
+    {
+      "id": "RA03",
+      "name": "unknown role",
+      "principal": "unknown-agent",
+      "scope": "security",
+      "now_ms": 150,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "deny"
+    },
+    {
+      "id": "RA04",
+      "name": "grant is not active before receipt",
+      "principal": "security-agent",
+      "scope": "security",
+      "now_ms": 99,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "deny"
+    },
+    {
+      "id": "RA05",
+      "name": "activation boundary is inclusive",
+      "principal": "security-agent",
+      "scope": "security",
+      "now_ms": 100,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "allow"
+    },
+    {
+      "id": "RA06",
+      "name": "expiry boundary is exclusive",
+      "principal": "security-agent",
+      "scope": "security",
+      "now_ms": 200,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "deny"
+    },
+    {
+      "id": "RA07",
+      "name": "expired grant",
+      "principal": "security-agent",
+      "scope": "security",
+      "now_ms": 250,
+      "minimum_version_exclusive": 6,
+      "policy_version": 7,
+      "accepted_at_ms": 100,
+      "valid_until_ms": 200,
+      "grants": {"security-agent": ["security"]},
+      "expected": "deny"
+    },
+    {
+      "id": "RA08",
+      "name": "wildcard grant is invalid",
+      "policy_version": 7,
+      "grants": {"security-agent": ["*"]},
+      "expected": "reject_policy"
+    },
+    {
+      "id": "RA09",
+      "name": "empty role scope set is invalid",
+      "policy_version": 7,
+      "grants": {"security-agent": []},
+      "expected": "reject_policy"
+    },
+    {
+      "id": "RA10",
+      "name": "whitespace-ambiguous role identifier is invalid",
+      "policy_version": 7,
+      "grants": {" security-agent ": ["security"]},
+      "expected": "reject_policy"
+    },
+    {
+      "id": "RA11",
+      "name": "equal version is replay",
+      "minimum_version_exclusive": 7,
+      "policy_version": 7,
+      "expected": "reject_rollback"
+    },
+    {
+      "id": "RA12",
+      "name": "older policy is rollback",
+      "minimum_version_exclusive": 8,
+      "policy_version": 7,
+      "expected": "reject_rollback"
+    },
+    {
+      "id": "RA13",
+      "name": "newer policy advances version floor",
+      "minimum_version_exclusive": 7,
+      "policy_version": 8,
+      "expected": "accept_new_version"
+    },
+    {
+      "id": "RA14",
+      "name": "grant expired before trusted acceptance",
+      "accepted_at_ms": 300,
+      "valid_until_ms": 200,
+      "policy_version": 8,
+      "expected": "reject_expired_at_acceptance"
+    },
+    {
+      "id": "RA15",
+      "name": "missing ingress receipt",
+      "policy_version": 8,
+      "has_ingress_receipt": false,
+      "expected": "reject_missing_receipt"
+    },
+    {
+      "id": "RA16",
+      "name": "policy signature changed after signing",
+      "policy_payload_tampered": true,
+      "expected": "reject_policy_signature"
+    },
+    {
+      "id": "RA17",
+      "name": "receipt time changed after ingress signing",
+      "receipt_accepted_at_tampered": true,
+      "expected": "reject_receipt_signature"
+    },
+    {
+      "id": "RA18",
+      "name": "event-only signer cannot issue access policy",
+      "signer_role": "event",
+      "expected": "reject_signer_role"
+    },
+    {
+      "id": "RA19",
+      "name": "policy signer must not self-issue ingress receipt",
+      "same_key_for_policy_and_ingress": true,
+      "expected": "reject_duplicate_key_material"
+    },
+    {
+      "id": "RA20",
+      "name": "later version removes previously granted scope",
+      "principal": "security-agent",
+      "scope": "security",
+      "old_policy_version": 7,
+      "new_policy_version": 8,
+      "new_grants": {"security-agent": ["public"]},
+      "minimum_version_exclusive": 7,
+      "expected": "deny_after_policy_reload"
+    }
+  ]
+}
