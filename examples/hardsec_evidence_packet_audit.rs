@@ -16,8 +16,8 @@
 //! See docs/research/HARDSEC_007_ENTANGLED_RARE_TRIGGER_BENCHMARK.md for the
 //! packet contract and claim ceilings.
 
+use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
-use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, OpenOptions};
@@ -123,7 +123,9 @@ fn required_string(value: &Value, field: &str) -> Result<String, String> {
         .and_then(Value::as_str)
         .ok_or_else(|| format!("{field} must be a string"))?;
     if result.trim().is_empty() || result.trim() != result {
-        return Err(format!("{field} must be non-empty and have no surrounding whitespace"));
+        return Err(format!(
+            "{field} must be non-empty and have no surrounding whitespace"
+        ));
     }
     Ok(result.to_owned())
 }
@@ -186,7 +188,9 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         return Err(format!("evidence {id}: unsupported status {status}"));
     }
     if !valid_sha256(&subject_sha256) || !valid_sha256(&evidence_sha256) {
-        return Err(format!("evidence {id}: subject/evidence SHA-256 must be 64 hex characters"));
+        return Err(format!(
+            "evidence {id}: subject/evidence SHA-256 must be 64 hex characters"
+        ));
     }
     if subject_sha256 != expected_subject {
         return Err(format!(
@@ -220,9 +224,9 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
 
     match kind.as_str() {
         "formal_proof" => {
-            let result = formal_result.as_deref().ok_or_else(|| {
-                format!("evidence {id}: formal_proof requires formal_result")
-            })?;
+            let result = formal_result
+                .as_deref()
+                .ok_or_else(|| format!("evidence {id}: formal_proof requires formal_result"))?;
             if property_id.is_none() {
                 return Err(format!("evidence {id}: formal_proof requires property_id"));
             }
@@ -276,13 +280,19 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
                 format!("evidence {id}: equivalence_report requires formal_result")
             })?;
             if property_id.is_none() {
-                return Err(format!("evidence {id}: equivalence_report requires property_id"));
+                return Err(format!(
+                    "evidence {id}: equivalence_report requires property_id"
+                ));
             }
             let expected_status = match result {
                 "equivalence_proved" => "pass",
                 "counterexample_found" => "fail",
                 "timeout" | "unknown" => "unknown",
-                _ => return Err(format!("evidence {id}: unsupported equivalence formal_result {result}")),
+                _ => {
+                    return Err(format!(
+                        "evidence {id}: unsupported equivalence formal_result {result}"
+                    ));
+                }
             };
             if status != expected_status {
                 return Err(format!(
@@ -353,7 +363,9 @@ fn claim_evidence<'a>(
     let mut unique = BTreeSet::new();
     for id in evidence_ids {
         if !unique.insert(id) {
-            return Err(format!("claim {claim_type}: duplicate evidence reference {id}"));
+            return Err(format!(
+                "claim {claim_type}: duplicate evidence reference {id}"
+            ));
         }
         let item = evidence
             .get(id)
@@ -363,11 +375,7 @@ fn claim_evidence<'a>(
     Ok(selected)
 }
 
-fn require_kind_status(
-    claim_type: &str,
-    selected: &[&Evidence],
-    kind: &str,
-) -> Result<(), String> {
+fn require_kind_status(claim_type: &str, selected: &[&Evidence], kind: &str) -> Result<(), String> {
     if !selected
         .iter()
         .any(|item| item.kind == kind && item.status == "pass")
@@ -522,9 +530,7 @@ fn validate_supported_claim(
 }
 
 fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary, String> {
-    if value.get("schema_version").and_then(Value::as_str)
-        != Some("hardsec-evidence-packet-v1")
-    {
+    if value.get("schema_version").and_then(Value::as_str) != Some("hardsec-evidence-packet-v1") {
         return Err("schema_version must be hardsec-evidence-packet-v1".to_owned());
     }
     let packet_id = required_string(value, "packet_id")?;
@@ -555,17 +561,31 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
                 let threshold = required_probability(&detector_value, "threshold")?;
                 let decision = required_string(&detector_value, "decision")?;
                 if !["trojan_suspected", "no_alert", "abstain"].contains(&decision.as_str()) {
-                    return Err("detector.decision must be trojan_suspected, no_alert, or abstain".to_owned());
+                    return Err(
+                        "detector.decision must be trojan_suspected, no_alert, or abstain"
+                            .to_owned(),
+                    );
                 }
-                (Some(model_sha256), Some(score), Some(threshold), Some(decision))
+                (
+                    Some(model_sha256),
+                    Some(score),
+                    Some(threshold),
+                    Some(decision),
+                )
             }
             "witness_validation" => {
                 if value.get("detector").is_some_and(|item| !item.is_null()) {
-                    return Err("witness_validation mode must not include a detector object".to_owned());
+                    return Err(
+                        "witness_validation mode must not include a detector object".to_owned()
+                    );
                 }
                 (None, None, None, None)
             }
-            _ => return Err("evaluation_mode must be detector_alert or witness_validation".to_owned()),
+            _ => {
+                return Err(
+                    "evaluation_mode must be detector_alert or witness_validation".to_owned(),
+                );
+            }
         };
 
     let evidence_values = value
@@ -625,10 +645,9 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
             .ok_or_else(|| format!("claim {claim_type}: evidence_ids must be an array"))?
             .iter()
             .map(|entry| {
-                entry
-                    .as_str()
-                    .map(str::to_owned)
-                    .ok_or_else(|| format!("claim {claim_type}: evidence_ids entries must be strings"))
+                entry.as_str().map(str::to_owned).ok_or_else(|| {
+                    format!("claim {claim_type}: evidence_ids entries must be strings")
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
         let selected = claim_evidence(&claim_type, &ids, &evidence)?;
@@ -817,9 +836,7 @@ fn main() -> ExitCode {
             }
         },
         Ok(None) => {
-            println!(
-                "usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE"
-            );
+            println!("usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE");
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -835,18 +852,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    const NETLIST: &str =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const MODEL: &str =
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const CONFIG: &str =
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-    const EVIDENCE: &str =
-        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-    const WITNESS: &str =
-        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-    const ASSUMPTIONS: &str =
-        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const NETLIST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const MODEL: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const CONFIG: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const EVIDENCE: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const WITNESS: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const ASSUMPTIONS: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     const SEQCUBE_INFECTED_NETLIST: &str =
         "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de";
     const SEQCUBE_ACTIVE_TRACE: &str =
@@ -857,8 +868,7 @@ mod tests {
         "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d";
     const SEQCUBE_INACTIVE_SMT: &str =
         "b93fddb6a38e1ef148e8a259bf26634d031c44dccbc168c50161c1e50846379f";
-    const SEQCUBE_CONFIG: &str =
-        "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9";
+    const SEQCUBE_CONFIG: &str = "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9";
 
     fn base_packet() -> Value {
         json!({
@@ -1002,9 +1012,11 @@ mod tests {
     fn witness_validation_mode_rejects_a_detector_object() {
         let mut packet = base_packet();
         packet["evaluation_mode"] = json!("witness_validation");
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("must not include a detector object"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("must not include a detector object")
+        );
     }
 
     #[test]
@@ -1012,15 +1024,12 @@ mod tests {
         let mut packet = base_packet();
         packet["evaluation_mode"] = json!("witness_validation");
         packet.as_object_mut().unwrap().remove("detector");
-        set_claim(
-            &mut packet,
-            "model_suspects_trojan",
-            "supported",
-            vec![],
+        set_claim(&mut packet, "model_suspects_trojan", "supported", vec![]);
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("requires decision=trojan_suspected")
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("requires decision=trojan_suspected"));
     }
 
     #[test]
@@ -1183,9 +1192,11 @@ mod tests {
             "supported",
             vec!["cover_witness-1"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("positive bound_cycles"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("positive bound_cycles")
+        );
     }
 
     #[test]
@@ -1215,9 +1226,11 @@ mod tests {
             "supported",
             vec!["formal_proof-1"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("requires status unknown"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("requires status unknown")
+        );
     }
 
     #[test]
@@ -1229,18 +1242,22 @@ mod tests {
             "scope": "not evaluated",
             "evidence_ids": []
         }]);
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("unsupported claim_type"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("unsupported claim_type")
+        );
     }
 
     #[test]
     fn rejects_evidence_without_a_locator() {
         let mut packet = base_packet();
         packet["evidence"][0]["uri"] = Value::Null;
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("uri must be a string"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("uri must be a string")
+        );
     }
 
     #[test]
@@ -1285,9 +1302,11 @@ mod tests {
             "supported",
             vec!["stim-1"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("payload_effect_trace"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("payload_effect_trace")
+        );
     }
 
     #[test]
@@ -1368,9 +1387,11 @@ mod tests {
             "supported",
             vec!["formal_proof-1"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("assumptions_sha256"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("assumptions_sha256")
+        );
     }
 
     #[test]
@@ -1385,27 +1406,33 @@ mod tests {
             "supported",
             vec!["equivalence_report-1"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("supported claim cannot cite failed/unknown"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("supported claim cannot cite failed/unknown")
+        );
     }
 
     #[test]
     fn rejects_a_generic_trojan_absent_claim() {
         let mut packet = base_packet();
         set_claim(&mut packet, "trojan_absent", "supported", vec!["stim-1"]);
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("not supported by this packet validator"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("not supported by this packet validator")
+        );
     }
 
     #[test]
     fn requires_evidence_to_bind_the_exact_netlist() {
         let mut packet = base_packet();
         packet["evidence"][0]["subject_sha256"] = json!(MODEL);
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("does not match packet netlist"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("does not match packet netlist")
+        );
     }
 
     #[test]
@@ -1417,28 +1444,44 @@ mod tests {
             "supported",
             vec!["missing-evidence"],
         );
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("unknown evidence_id"));
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("unknown evidence_id")
+        );
     }
 
     #[test]
     fn rejects_claim_without_activation_witness() {
         let mut packet = base_packet();
         packet["evidence"][0]["witness_sha256"] = Value::Null;
-        set_claim(&mut packet, "trigger_activated", "supported", vec!["stim-1"]);
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("witness_sha256"));
+        set_claim(
+            &mut packet,
+            "trigger_activated",
+            "supported",
+            vec!["stim-1"],
+        );
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("witness_sha256")
+        );
     }
 
     #[test]
     fn requires_failed_evidence_for_contradicted_claim() {
         let mut packet = base_packet();
-        set_claim(&mut packet, "trigger_activated", "contradicted", vec!["stim-1"]);
-        assert!(validate_packet(&packet, "0".repeat(64))
-            .unwrap_err()
-            .contains("failed evidence"));
+        set_claim(
+            &mut packet,
+            "trigger_activated",
+            "contradicted",
+            vec!["stim-1"],
+        );
+        assert!(
+            validate_packet(&packet, "0".repeat(64))
+                .unwrap_err()
+                .contains("failed evidence")
+        );
     }
 
     #[test]
@@ -1454,8 +1497,10 @@ mod tests {
         let packet = base_packet();
         let mut fixture = Fixture::new(&packet);
         fixture.receipt = fixture.packet.parent().unwrap().join("receipt.json");
-        assert!(run(fixture.args())
-            .unwrap_err()
-            .contains("outside the packet directory"));
+        assert!(
+            run(fixture.args())
+                .unwrap_err()
+                .contains("outside the packet directory")
+        );
     }
 }
