@@ -958,6 +958,12 @@ mod tests {
         assert_eq!(decision.proof_packet_sha256.as_deref(), Some(token.packet_sha256.as_str()));
         assert!(decision.answer_is_permitted(Some(&token)).unwrap());
         assert!(decision.answer_is_permitted(None).unwrap_err().contains("original opaque proof-verifier token"));
+
+        // The serialized audit receipt can be retained for history, but the
+        // opaque in-process proof capability is deliberately not serialized.
+        let serialized = serde_json::to_vec(&decision).unwrap();
+        let restored: LifecycleActionDecision = serde_json::from_slice(&serialized).unwrap();
+        assert!(restored.answer_is_permitted(None).unwrap_err().contains("original opaque proof-verifier token"));
     }
 
     #[test]
