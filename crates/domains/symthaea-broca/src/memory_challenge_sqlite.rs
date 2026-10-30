@@ -111,6 +111,29 @@ impl SqliteAmlMemoryBackend {
             )
             .map_err(|error| format!("failed to initialize AML SQLite schema: {error}"))?;
 
+        let journal_mode: String = connection
+            .pragma_query_value(None, "journal_mode", |row| row.get(0))
+            .map_err(|error| format!("failed to verify SQLite journal mode: {error}"))?;
+        if !journal_mode.eq_ignore_ascii_case("wal") {
+            return Err(format!(
+                "AML SQLite backend requires WAL journal mode, got {journal_mode:?}"
+            ));
+        }
+        let synchronous: i64 = connection
+            .pragma_query_value(None, "synchronous", |row| row.get(0))
+            .map_err(|error| format!("failed to verify SQLite synchronous mode: {error}"))?;
+        if synchronous != 2 {
+            return Err(format!(
+                "AML SQLite backend requires synchronous=FULL (2), got {synchronous}"
+            ));
+        }
+        let integrity: String = connection
+            .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
+            .map_err(|error| format!("SQLite quick_check failed to execute: {error}"))?;
+        if integrity != "ok" {
+            return Err(format!("SQLite quick_check reported database issue: {integrity}"));
+        }
+
         let schema_version: i64 = connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .map_err(|error| format!("failed to read AML SQLite schema version: {error}"))?;
