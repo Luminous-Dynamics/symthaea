@@ -289,7 +289,7 @@ The verifier permits NOT_APPLICABLE only for a non-critical gate with a document
 
 ## Joint correction portfolio evaluator
 
-The `connectome-portfolio-audit` binary performs exact subset optimization for up to 20 interacting graph-edit candidates on small, frozen evaluation graphs. It compares probability-weighted query sensitivity, probability per minute, uncertainty per minute, and deterministic-random rankings against an evaluator-only exact optimum. It reports pairwise interactions, regret, and reverse-application-order sensitivity. See `docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md`.
+The `connectome-portfolio-audit` binary performs exact subset optimization for up to 20 interacting graph-edit candidates on small, frozen evaluation graphs. It compares probability-weighted query sensitivity, probability per minute, uncertainty per minute, and deterministic-random rankings against an evaluator-only exact optimum. The ranking function receives a reference-free query view, so held-out query values are not present in its input types. It reports pairwise interactions, regret, and reverse-application-order sensitivity. See `docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md`.
 
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-portfolio-audit -- \
