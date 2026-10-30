@@ -180,6 +180,8 @@
       "additionalProperties": false,
       "required": [
         "pair_id",
+        "baseline_input_sha256",
+        "variant_input_sha256",
         "baseline",
         "variant"
       ],
@@ -194,6 +196,12 @@
         },
         "variant": {
           "$ref": "#/$defs/outcome"
+        },
+        "baseline_input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_input_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     }
