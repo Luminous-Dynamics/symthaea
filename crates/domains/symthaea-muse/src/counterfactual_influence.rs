@@ -1558,6 +1558,41 @@ mod tests {
     }
 
     #[test]
+    fn repeated_reference_to_one_noop_receipt_does_not_fake_three_rerenders() {
+        let samples = vec![0.0f32; 128];
+        let midi = baseline_midi();
+        let anchor = build_render("unique-anchor", &midi, &samples);
+        let anchor_evidence = verify_bound_render(&anchor, &samples, None);
+        let noop = build_render("one-noop-only", &midi, &samples);
+        let noop_evidence = verify_bound_render(&noop, &samples, None);
+        let repeated_audio = [
+            audio(&samples),
+            audio(&samples),
+            audio(&samples),
+        ];
+        let repeated_receipts = [
+            noop_evidence.clone(),
+            noop_evidence.clone(),
+            noop_evidence,
+        ];
+
+        assert_eq!(
+            calibrate_repeatability(
+                &audio(&samples),
+                &repeated_audio,
+                SCORE_BYTES,
+                &anchor.map_bytes,
+                &midi,
+                &anchor_evidence,
+                &repeated_receipts,
+                &config(),
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::CalibrationReplayMismatch
+        );
+    }
+
+    #[test]
     fn repeatability_calibration_requires_three_noop_renders_and_replays() {
         let samples = vec![0.0f32; 128];
         let midi = baseline_midi();
