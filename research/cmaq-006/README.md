@@ -141,6 +141,16 @@ Targets are hypotheses to preregister after a development-only power and varianc
 
 These goals must be revised only before qualification is opened. A failed target is a result, not permission to weaken the gate after seeing results.
 
+## Evidence motivating the benchmark design
+
+Three recent evaluations illustrate why change adaptation needs its own lane:
+
+- **CausalGame (ICML 2026, oral):** its official project page describes 14 public scenarios across three SCM families and reports 30 evaluated frontier LLM agents. The strongest reported agentic survival result is 68.0%, below the 75% win threshold; only about 5–7% of sessions received credit for causal reasoning. Larger inference-time reasoning budgets were not consistently better. This motivates evaluating actual interventions, mechanism discovery and transfer rather than rewarding longer explanations: https://mbzuai-clear.github.io/projects/causalgame/
+- **EconCausal (October 2026 research manuscript):** the current manuscript describes 10,490 context-annotated causal relationships from 2,595 studies and 19 evaluated models. It reports 74.75% mean accuracy on all cross-context pairs versus 44.27% on sign-mismatched pairs, with evidence of source-sign over-transfer. The current October 2026 results are from a research manuscript, not an acceptance/publication claim; the authors note that the earlier public arXiv version uses a different model panel and cohorts. Treat it as an empirical challenge dataset, not settled leaderboard SOTA: https://econai.kaist.ac.kr/econcausal/
+- **Active Causal Discovery Benchmark (September 2026 preprint):** its current report finds a PC-based method with greedy active orientation stronger than the raw LLM agents it evaluates, while also documenting calibration weaknesses in its own initial benchmark ladder. This is a reason to retain statistical baselines and audit the benchmark itself: https://arxiv.org/abs/2609.31675
+
+These results should inform task design and baseline selection, not be collapsed into a cross-benchmark ranking. CausalGame measures interactive discovery, EconCausal measures contextual sign transfer from empirical studies, and CMAQ-006 measures online detection/recovery after a mechanism change.
+
 ## Relationship to external benchmarks
 
 CMAQ-006 is a focused sequential adaptation lane, not a replacement for external benchmarks.
