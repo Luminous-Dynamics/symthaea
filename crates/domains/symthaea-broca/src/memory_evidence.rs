@@ -1144,6 +1144,8 @@ mod tests {
         assert_eq!(security[0].evidence.source.trajectory_id, "trajectory-001");
         assert_eq!(security[0].requesting_role, "security-agent");
         assert_eq!(security[0].access_policy_version, 7);
+        assert_eq!(security[0].access_policy_sha256, "test-fixture-only");
+        assert_eq!(security[0].access_policy_accepted_at, "1970-01-01T00:00:00Z");
         assert_eq!(security[0].context.value, "security key rotation overdue");
 
         assert!(index
@@ -1376,4 +1378,46 @@ mod tests {
         tampered.content_sha256 = hash(b"different bytes");
         assert!(tampered.context_item(root.path()).is_err());
     }
+    #[test]
+    fn role_scoped_resolution_rejects_policy_before_ingress_and_at_expiry() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "security key rotation overdue", "security");
+        let policy = RoleScopePolicy {
+            policy_version: 8,
+            readable_scopes: BTreeMap::from([(
+                "security-agent".to_string(),
+                BTreeSet::from(["security".to_string()]),
+            )]),
+            policy_sha256: "fixture-policy-digest".into(),
+            accepted_at: "1970-01-01T00:00:00Z".into(),
+            not_before_unix_ms: 200,
+            valid_until_unix_ms: 300,
+        };
+
+        assert!(index
+            .resolve_for_role(
+                &[1], "security-agent", "security", 199, Path::new("."), 5, &policy,
+            )
+            .unwrap_err()
+            .contains("not active"));
+
+        assert_eq!(
+            index
+                .resolve_for_role(
+                    &[1], "security-agent", "security", 200, Path::new("."), 5, &policy,
+                )
+                .unwrap()
+                .len(),
+            1
+        );
+
+        assert!(index
+            .resolve_for_role(
+                &[1], "security-agent", "security", 300, Path::new("."), 5, &policy,
+            )
+            .unwrap_err()
+            .contains("not active"));
+    }
+
+
 }
