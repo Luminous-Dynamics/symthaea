@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::Path;
 
-pub const RENDER_EXECUTION_RECEIPT_VERSION: &str = "mel-mr-eval-015-render-execution-receipt-v0.1";
+pub const RENDER_EXECUTION_RECEIPT_VERSION: &str = "mel-mr-eval-015-render-execution-receipt-v0.2";
 const MAX_RENDER_ID_BYTES: usize = 256;
 const MAX_CHANNELS: u16 = 32;
 const MAX_SAMPLE_RATE_HZ: u32 = 768_000;
@@ -30,6 +30,30 @@ const MAX_SAMPLE_RATE_HZ: u32 = 768_000;
 pub enum RendererBackend {
     NativeMuse,
     FluidSynth,
+}
+
+/// Structured observation collected by the adapter that directly spawned
+/// FluidSynth. Diagnostic stream digests cover the complete streams; previews
+/// are bounded. This is local process evidence, not remote/cryptographic attestation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RendererProcessObservation {
+    pub executable_path: String,
+    pub executable_sha256_before: String,
+    pub executable_sha256_after: String,
+    pub soundfont_path: String,
+    pub soundfont_sha256_before: String,
+    pub soundfont_sha256_after: String,
+    /// Ordered argv excluding argv[0], which is executable_path.
+    pub arguments: Vec<String>,
+    /// Hash of the exact child environment snapshot; raw values are not persisted.
+    pub environment_sha256: String,
+    pub stdout_sha256: String,
+    pub stderr_sha256: String,
+    pub stdout_preview: String,
+    pub stderr_preview: String,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    pub exit_code: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +95,9 @@ pub struct RendererExecutionReceipt {
     pub soundfont_sha256: Option<String>,
     pub render_config_sha256: String,
     pub process_exit_code: Option<i32>,
+    /// Present for FluidSynth only; absence is not a successful process observation.
+    #[serde(default)]
+    pub process_observation: Option<RendererProcessObservation>,
     pub performed_event_map_sha256: Option<String>,
     pub output: AudioArtifactSummary,
     /// SHA-256 over this receipt with receipt_sha256 blank.
@@ -132,6 +159,7 @@ pub struct RendererReceiptInputs<'a> {
     pub renderer_executable_sha256: Option<&'a str>,
     pub soundfont_sha256: Option<&'a str>,
     pub process_exit_code: Option<i32>,
+    pub process_observation: Option<RendererProcessObservation>,
     pub performed_event_map_sha256: Option<&'a str>,
     pub output_wav_bytes: &'a [u8],
 }
@@ -211,6 +239,35 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
             if inputs.process_exit_code != Some(0) {
                 return Err(RendererReceiptError::InvalidExecutionStatus);
             }
+            let process = inputs
+                .process_observation
+                .as_ref()
+                .ok_or(RendererReceiptError::InvalidInputArtifacts)?;
+            optional_digest_is_valid(Some(&process.executable_sha256_before), "process.executable_sha256_before")?;
+            optional_digest_is_valid(Some(&process.executable_sha256_after), "process.executable_sha256_after")?;
+            optional_digest_is_valid(Some(&process.soundfont_sha256_before), "process.soundfont_sha256_before")?;
+            optional_digest_is_valid(Some(&process.soundfont_sha256_after), "process.soundfont_sha256_after")?;
+            optional_digest_is_valid(Some(&process.environment_sha256), "process.environment_sha256")?;
+            optional_digest_is_valid(Some(&process.stdout_sha256), "process.stdout_sha256")?;
+            optional_digest_is_valid(Some(&process.stderr_sha256), "process.stderr_sha256")?;
+            if process.exit_code != 0
+                || process.executable_path.trim().is_empty()
+                || process.executable_path.len() > 4096
+                || process.soundfont_path.trim().is_empty()
+                || process.soundfont_path.len() > 4096
+                || process.executable_sha256_before != process.executable_sha256_after
+                || process.soundfont_sha256_before != process.soundfont_sha256_after
+                || Some(process.executable_sha256_after.as_str()) != inputs.renderer_executable_sha256
+                || Some(process.soundfont_sha256_after.as_str()) != inputs.soundfont_sha256
+                || process.arguments.len() > 128
+                || process.arguments.iter().any(|argument| {
+                    argument.len() > 4096 || argument.chars().any(char::is_control)
+                })
+                || process.stdout_preview.len() > 4096
+                || process.stderr_preview.len() > 4096
+            {
+                return Err(RendererReceiptError::InvalidExecutionStatus);
+            }
         }
         RendererBackend::NativeMuse => {
             if inputs.input_midi_bytes.is_some()
@@ -219,6 +276,7 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
                     .is_none_or(|bytes| bytes.is_empty())
                 || inputs.soundfont_sha256.is_some()
                 || inputs.process_exit_code.is_some()
+                || inputs.process_observation.is_some()
             {
                 return Err(RendererReceiptError::InvalidInputArtifacts);
             }
@@ -246,6 +304,7 @@ impl RendererExecutionReceipt {
             soundfont_sha256: inputs.soundfont_sha256.map(str::to_owned),
             render_config_sha256: sha256_hex(inputs.render_config_bytes),
             process_exit_code: inputs.process_exit_code,
+            process_observation: inputs.process_observation.clone(),
             performed_event_map_sha256: inputs.performed_event_map_sha256.map(str::to_owned),
             output,
             receipt_sha256: String::new(),
@@ -279,7 +338,7 @@ impl RendererExecutionReceipt {
         let bytes = serde_json::to_vec(&canonical)
             .map_err(|_| RendererReceiptError::SerializationFailure)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"luminous-dynamics-render-execution-receipt-v1\0");
+        hasher.update(b"luminous-dynamics-render-execution-receipt-v2\0");
         hasher.update(bytes);
         Ok(format!("{:x}", hasher.finalize()))
     }
@@ -389,16 +448,34 @@ mod tests {
     }
 
     fn fluid_inputs<'a>(wav: &'a [u8]) -> RendererReceiptInputs<'a> {
+        let process_observation = RendererProcessObservation {
+            executable_path: "/usr/bin/fluidsynth".into(),
+            executable_sha256_before: DIGEST_C.into(),
+            executable_sha256_after: DIGEST_C.into(),
+            soundfont_path: "/usr/share/sounds/sf2/test.sf2".into(),
+            soundfont_sha256_before: DIGEST_D.into(),
+            soundfont_sha256_after: DIGEST_D.into(),
+            arguments: vec!["-g".into(), "0.8".into(), "-T".into(), "wav".into()],
+            environment_sha256: DIGEST_A.into(),
+            stdout_sha256: DIGEST_B.into(),
+            stderr_sha256: DIGEST_F.into(),
+            stdout_preview: "FluidSynth ready".into(),
+            stderr_preview: String::new(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+            exit_code: 0,
+        };
         RendererReceiptInputs {
             render_id: "render-test-1",
             backend: RendererBackend::FluidSynth,
-            score_bytes: br#"{"score":"fixture"}"#,
-            render_config_bytes: br#"{"gain":0.8,"sample_rate_hz":48000}"#,
+            score_bytes: br#"{\"score\":\"fixture\"}"#,
+            render_config_bytes: br#"{\"gain\":0.8,\"sample_rate_hz\":48000}"#,
             input_midi_bytes: Some(b"MThd-fixture-midi"),
             performed_schedule_bytes: None,
             renderer_executable_sha256: Some(DIGEST_C),
             soundfont_sha256: Some(DIGEST_D),
             process_exit_code: Some(0),
+            process_observation: Some(process_observation),
             performed_event_map_sha256: Some(DIGEST_E),
             output_wav_bytes: wav,
         }
@@ -503,6 +580,7 @@ mod tests {
             renderer_executable_sha256: Some(DIGEST_F),
             soundfont_sha256: None,
             process_exit_code: None,
+            process_observation: None,
             performed_event_map_sha256: None,
             output_wav_bytes: &wav,
         };
@@ -510,6 +588,25 @@ mod tests {
         assert!(receipt.input_midi_sha256.is_none());
         assert!(receipt.performed_schedule_sha256.is_some());
         assert_eq!(receipt.backend, RendererBackend::NativeMuse);
+    }
+
+    #[test]
+    fn fluidsynth_receipt_requires_process_observation_and_stable_assets() {
+        let wav = test_wav(&[0, 0, 1, -1]);
+        let mut missing = fluid_inputs(&wav);
+        missing.process_observation = None;
+        assert_eq!(
+            RendererExecutionReceipt::from_successful_render(missing).unwrap_err(),
+            RendererReceiptError::InvalidInputArtifacts
+        );
+
+        let mut unstable = fluid_inputs(&wav);
+        let process = unstable.process_observation.as_mut().unwrap();
+        process.soundfont_sha256_after = DIGEST_A.into();
+        assert_eq!(
+            RendererExecutionReceipt::from_successful_render(unstable).unwrap_err(),
+            RendererReceiptError::InvalidExecutionStatus
+        );
     }
 
     #[test]
