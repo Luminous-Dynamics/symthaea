@@ -91,6 +91,16 @@
       "blind_to_judge_output": true,
       "conflict_of_interest_declared": true,
       "conflict_disclosure_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    {
+      "adjudicator_id_sha256": "a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+      "independence_group_sha256": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+      "role": "independent_resolver",
+      "blind_to_system_identity": true,
+      "blind_to_candidate_identity": true,
+      "blind_to_judge_output": true,
+      "conflict_of_interest_declared": true,
+      "conflict_disclosure_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
     }
   ],
   "initial_adjudications": [
@@ -135,6 +145,23 @@
       "rationale_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
     }
   ],
-  "resolutions": [],
-  "package_commitment_sha256": "f2e848cdc321192244cbc068e6b8912fc78f448e67a17e208e893a13f9054d72"
+  "resolutions": [
+    {
+      "resolution_id": "resolution-001",
+      "claim_id": "claim-001",
+      "adjudicator_id_sha256": "a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+      "decision": "mixed_or_contested",
+      "prior_record_ids": [
+        "judgment-001",
+        "judgment-002",
+        "judgment-003"
+      ],
+      "evidence_span_ids": [
+        "span-001",
+        "span-002"
+      ],
+      "rationale_sha256": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+    }
+  ],
+  "package_commitment_sha256": "874dc8086edb9ce71d21343256141335347c95caa9684aa79edefc02cf39afca"
 }
