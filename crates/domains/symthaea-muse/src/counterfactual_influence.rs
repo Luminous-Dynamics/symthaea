@@ -101,6 +101,9 @@ pub struct RepeatabilityCalibration {
     pub channels: usize,
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
+    pub source_score_sha256: String,
+    pub performed_event_map_sha256: String,
+    pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
     pub anchor_audio_sha256: String,
@@ -518,7 +521,8 @@ fn seal_calibration(
     mut calibration: RepeatabilityCalibration,
 ) -> Result<RepeatabilityCalibration, CounterfactualInfluenceError> {
     calibration.receipt_sha256.clear();
-    calibration.receipt_sha256 = canonical_digest(&calibration, CALIBRATION_DOMAIN)?;
+    let digest = canonical_digest(&calibration, CALIBRATION_DOMAIN)?;
+    calibration.receipt_sha256 = digest;
     Ok(calibration)
 }
 
@@ -529,12 +533,18 @@ fn seal_calibration(
 pub fn calibrate_repeatability(
     anchor: &AudioView<'_>,
     noop_renders: &[AudioView<'_>],
+    source_score_bytes: &[u8],
+    performed_event_map_bytes: &[u8],
+    baseline_schedule_bytes: &[u8],
     renderer_identity_bytes: &[u8],
     renderer_config_bytes: &[u8],
     analysis: &InfluenceAnalysisConfig,
 ) -> Result<RepeatabilityCalibration, CounterfactualInfluenceError> {
     validate_config(analysis)?;
     for (name, bytes) in [
+        ("source_score", source_score_bytes),
+        ("performed_event_map", performed_event_map_bytes),
+        ("baseline_schedule", baseline_schedule_bytes),
         ("renderer_identity", renderer_identity_bytes),
         ("renderer_config", renderer_config_bytes),
     ] {
@@ -590,6 +600,9 @@ pub fn calibrate_repeatability(
         channels: anchor.channels,
         total_frames,
         analysis: analysis.clone(),
+        source_score_sha256: sha256_hex(source_score_bytes),
+        performed_event_map_sha256: sha256_hex(performed_event_map_bytes),
+        baseline_schedule_sha256: sha256_hex(baseline_schedule_bytes),
         renderer_identity_sha256: sha256_hex(renderer_identity_bytes),
         renderer_config_sha256: sha256_hex(renderer_config_bytes),
         anchor_audio_sha256: audio_sha256(anchor),
@@ -607,6 +620,9 @@ pub fn verify_repeatability_calibration(
     calibration: &RepeatabilityCalibration,
     anchor: &AudioView<'_>,
     noop_renders: &[AudioView<'_>],
+    source_score_bytes: &[u8],
+    performed_event_map_bytes: &[u8],
+    baseline_schedule_bytes: &[u8],
     renderer_identity_bytes: &[u8],
     renderer_config_bytes: &[u8],
 ) -> Result<VerifiedRepeatabilityCalibration, CounterfactualInfluenceError> {
@@ -616,6 +632,9 @@ pub fn verify_repeatability_calibration(
     let expected = calibrate_repeatability(
         anchor,
         noop_renders,
+        source_score_bytes,
+        performed_event_map_bytes,
+        baseline_schedule_bytes,
         renderer_identity_bytes,
         renderer_config_bytes,
         &calibration.analysis,
@@ -680,7 +699,10 @@ fn validate_input(
     if audio_sha256(input.baseline_audio) != calibration.anchor_audio_sha256 {
         return Err(CounterfactualInfluenceError::CalibrationAnchorMismatch);
     }
-    if sha256_hex(input.renderer_identity_bytes) != calibration.renderer_identity_sha256
+    if sha256_hex(input.source_score_bytes) != calibration.source_score_sha256
+        || sha256_hex(input.performed_event_map_bytes) != calibration.performed_event_map_sha256
+        || sha256_hex(input.baseline_schedule_bytes) != calibration.baseline_schedule_sha256
+        || sha256_hex(input.renderer_identity_bytes) != calibration.renderer_identity_sha256
         || sha256_hex(input.renderer_config_bytes) != calibration.renderer_config_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
@@ -692,7 +714,8 @@ fn seal_report(
     mut report: CounterfactualInfluenceReport,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
     report.receipt_sha256.clear();
-    report.receipt_sha256 = canonical_digest(&report, INFLUENCE_DOMAIN)?;
+    let digest = canonical_digest(&report, INFLUENCE_DOMAIN)?;
+    report.receipt_sha256 = digest;
     Ok(report)
 }
 
@@ -838,6 +861,9 @@ mod tests {
         let calibration = calibrate_repeatability(
             anchor,
             repeats,
+            br#"{"score":"frozen"}"#,
+            br#"{"map":"frozen"}"#,
+            b"schedule-with-event-17",
             b"renderer-fixture-v1",
             b"config-seed-4-samplerate-48000",
             &config(),
@@ -847,6 +873,9 @@ mod tests {
             &calibration,
             anchor,
             repeats,
+            br#"{"score":"frozen"}"#,
+            br#"{"map":"frozen"}"#,
+            b"schedule-with-event-17",
             b"renderer-fixture-v1",
             b"config-seed-4-samplerate-48000",
         )
@@ -885,6 +914,9 @@ mod tests {
         let calibration = calibrate_repeatability(
             &anchor,
             &repeats,
+            br#"{"score":"frozen"}"#,
+            br#"{"map":"frozen"}"#,
+            b"schedule-with-event-17",
             b"renderer-fixture-v1",
             b"config-seed-4-samplerate-48000",
             &config(),
@@ -900,6 +932,9 @@ mod tests {
                 &calibration,
                 &anchor,
                 &repeats,
+                br#"{"score":"frozen"}"#,
+                br#"{"map":"frozen"}"#,
+                b"schedule-with-event-17",
                 b"renderer-fixture-v1",
                 b"config-seed-4-samplerate-48000",
             )
@@ -968,6 +1003,22 @@ mod tests {
         let candidate = audio(&base);
         let mut experiment = input(&anchor, &candidate);
         experiment.renderer_config_bytes = b"substituted-config";
+
+        assert_eq!(
+            measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::CalibrationConfigMismatch
+        );
+    }
+
+    #[test]
+    fn baseline_schedule_mismatch_is_rejected_before_comparing_pcm() {
+        let base = vec![0.0f32; 256];
+        let anchor = audio(&base);
+        let repeats = [audio(&base), audio(&base), audio(&base)];
+        let calibration = calibration_for(&anchor, &repeats);
+        let candidate = audio(&base);
+        let mut experiment = input(&anchor, &candidate);
+        experiment.baseline_schedule_bytes = b"different-baseline-schedule";
 
         assert_eq!(
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
