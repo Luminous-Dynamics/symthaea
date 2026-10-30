@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "program": "BASALT",
   "suite_id": "basalt-smoke",
   "version": "0.1.0",
@@ -144,7 +144,41 @@
             ]
           }
         ]
-      }
+      },
+      "requirements": [
+        {
+          "requirement_id": "req-compiles",
+          "source_span": {
+            "source_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "start_byte": 0,
+            "end_byte": 24
+          },
+          "origin": "explicit",
+          "ambiguity": "none",
+          "statement_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectation_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "inference_rationale_digest": null,
+          "blocking_check_ids": [
+            "cargo-test"
+          ]
+        },
+        {
+          "requirement_id": "req-api-stable",
+          "source_span": {
+            "source_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "start_byte": 25,
+            "end_byte": 54
+          },
+          "origin": "explicit",
+          "ambiguity": "none",
+          "statement_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "expectation_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "inference_rationale_digest": null,
+          "blocking_check_ids": [
+            "scope"
+          ]
+        }
+      ]
     }
   ],
   "seed_policy": "fixed_paired",
