@@ -644,7 +644,10 @@ fn flush_design(
             writeln!(
                 ranking,
                 "{}\t{}\t{}\t{}\t{}\t{}",
-                metadata.design_id, metadata.base_design_family_id, metadata.split, node.node_id,
+                metadata.design_id,
+                metadata.base_design_family_id,
+                metadata.split,
+                node.node_id,
                 node.score_milli,
                 node.rarity_percentile_bps
             )
@@ -653,10 +656,7 @@ fn flush_design(
             writeln!(
                 ranking,
                 "{}\t{}\t{}\t{}\tunknown\tunknown",
-                metadata.design_id,
-                metadata.base_design_family_id,
-                metadata.split,
-                node.node_id
+                metadata.design_id, metadata.base_design_family_id, metadata.split, node.node_id
             )
             .map_err(|error| format!("write unknown ranking row: {error}"))?;
         }
