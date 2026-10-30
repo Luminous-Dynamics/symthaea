@@ -848,6 +848,329 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     )
 }
 
+
+/// Expected value of sample information (EVSI) for a finite engineering decision.
+///
+/// Utilities are supplied by the approved decision policy; larger values are better.
+/// EVSI is the expected improvement in the best posterior expected utility after one
+/// measurement, compared with the best action before measuring. It is therefore
+/// decision-aware: information about distinctions that cannot change the preferred
+/// action has zero (or near-zero) value, even when that information gain is large.
+///
+/// The prior may be unnormalized but must have finite non-negative entries and at
+/// least two positive-mass hypotheses. Zero-weight hypotheses are ignored. Every
+/// positive-mass hypothesis needs a finite prediction and finite utility for each
+/// action. Measurement noise is an independent Gaussian standard deviation in the
+/// same unit as the predictions. A deterministic midpoint quadrature integrates
+/// over standard-normal outcomes across ±8 standard deviations.
+///
+/// The result is in the utility unit declared by the caller's action×hypothesis
+/// matrix, not nats. Returns None for invalid priors, incomplete predictions,
+/// invalid noise, empty action sets, or non-finite utilities. This ranking primitive
+/// does not validate or authorize the utility policy.
+pub fn expected_value_of_sample_information<H, E, A>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+    utility: impl Fn(&A, &H) -> f64,
+) -> Option<f64> {
+    expected_value_of_sample_information_with_steps(
+        experiment,
+        hypotheses,
+        prior_weights,
+        actions,
+        observation_std_dev,
+        INFORMATION_GAIN_QUADRATURE_STEPS,
+        predict,
+        utility,
+    )
+}
+
+fn expected_value_of_sample_information_with_steps<H, E, A>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    observation_std_dev: f64,
+    quadrature_steps: usize,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+    utility: impl Fn(&A, &H) -> f64,
+) -> Option<f64> {
+    if quadrature_steps == 0
+        || hypotheses.len() < 2
+        || hypotheses.len() != prior_weights.len()
+        || actions.is_empty()
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+        || prior_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+
+    // Normalize after max-scaling so finite but very large prior weights cannot
+    // overflow their sum.
+    let max_weight = prior_weights.iter().copied().fold(0.0_f64, f64::max);
+    if max_weight <= 0.0 {
+        return None;
+    }
+    let scaled_weights: Vec<f64> = prior_weights.iter().map(|weight| weight / max_weight).collect();
+    let weight_sum: f64 = scaled_weights.iter().sum();
+    if !weight_sum.is_finite() || weight_sum <= 0.0 {
+        return None;
+    }
+
+    let mut active: Vec<(usize, f64, f64)> = Vec::new();
+    for (index, weight) in scaled_weights.iter().copied().enumerate() {
+        if weight == 0.0 {
+            continue;
+        }
+        let probability = weight / weight_sum;
+        let prediction = predict(&hypotheses[index], experiment)?;
+        if !prediction.is_finite() {
+            return None;
+        }
+        active.push((index, probability, prediction));
+    }
+    if active.len() < 2 {
+        return None;
+    }
+
+    let utilities: Vec<Vec<f64>> = actions
+        .iter()
+        .map(|action| {
+            active
+                .iter()
+                .map(|(index, _, _)| utility(action, &hypotheses[*index]))
+                .collect()
+        })
+        .collect();
+    if utilities.iter().flatten().any(|value| !value.is_finite()) {
+        return None;
+    }
+
+    let mut baseline = f64::NEG_INFINITY;
+    for action_utilities in &utilities {
+        let expected = active
+            .iter()
+            .zip(action_utilities.iter())
+            .map(|((_, probability, _), value)| probability * value)
+            .sum::<f64>();
+        if !expected.is_finite() {
+            return None;
+        }
+        baseline = baseline.max(expected);
+    }
+
+    // Scale means and noise together to prevent overflow in mean differences.
+    let scale = active
+        .iter()
+        .map(|(_, _, prediction)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let means: Vec<f64> = active.iter().map(|(_, _, mean)| mean / scale).collect();
+    let noise = observation_std_dev / scale;
+
+    if noise == 0.0 {
+        // In the noiseless limit, equal predicted values remain indistinguishable.
+        let mut groups: Vec<(f64, Vec<usize>)> = Vec::new();
+        for (index, mean) in means.iter().copied().enumerate() {
+            if let Some((_, members)) = groups.iter_mut().find(|(value, _)| *value == mean) {
+                members.push(index);
+            } else {
+                groups.push((mean, vec![index]));
+            }
+        }
+        let mut expected_after = 0.0;
+        for (_, members) in groups {
+            let group_mass: f64 = members.iter().map(|i| active[*i].1).sum();
+            let mut best_action = f64::NEG_INFINITY;
+            for action_utilities in &utilities {
+                let expected = members
+                    .iter()
+                    .map(|i| active[*i].1 * action_utilities[*i])
+                    .sum::<f64>()
+                    / group_mass;
+                best_action = best_action.max(expected);
+            }
+            expected_after += group_mass * best_action;
+        }
+        let value = expected_after - baseline;
+        return value.is_finite().then_some(value.max(0.0));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
+    let quadrature: Vec<(f64, f64)> = (0..quadrature_steps)
+        .map(|step| {
+            let z = -INFORMATION_GAIN_Z_LIMIT + (step as f64 + 0.5) * step_width;
+            (z, (-0.5 * z * z).exp() * step_width)
+        })
+        .collect();
+    let quadrature_weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    if !quadrature_weight_sum.is_finite() || quadrature_weight_sum <= 0.0 {
+        return None;
+    }
+
+    let mut expected_after = 0.0;
+    let mut log_joint = Vec::with_capacity(active.len());
+    for (true_index, (_, true_probability, true_mean)) in active.iter().enumerate() {
+        let scaled_true_mean = means[true_index];
+        for (z, raw_weight) in &quadrature {
+            log_joint.clear();
+            for (other_mean, (_, probability, _)) in means.iter().zip(active.iter()) {
+                let separation = (scaled_true_mean - other_mean) / noise;
+                let standardized = separation + z;
+                let log_likelihood = if !standardized.is_finite() || standardized.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * standardized * standardized
+                };
+                log_joint.push(probability.ln() + log_likelihood);
+            }
+            let log_normalizer = log_sum_exp(&log_joint);
+            if !log_normalizer.is_finite() {
+                return None;
+            }
+            let posterior: Vec<f64> = log_joint
+                .iter()
+                .map(|log_value| (*log_value - log_normalizer).exp())
+                .collect();
+
+            let mut best_posterior_utility = f64::NEG_INFINITY;
+            for action_utilities in &utilities {
+                let value = posterior
+                    .iter()
+                    .zip(action_utilities.iter())
+                    .map(|(probability, utility)| probability * utility)
+                    .sum::<f64>();
+                if !value.is_finite() {
+                    return None;
+                }
+                best_posterior_utility = best_posterior_utility.max(value);
+            }
+            expected_after += true_probability
+                * (*raw_weight / quadrature_weight_sum)
+                * best_posterior_utility;
+        }
+        let _ = true_mean;
+    }
+
+    let evsi = expected_after - baseline;
+    if !evsi.is_finite() {
+        return None;
+    }
+    let utility_scale = utilities
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(1.0_f64, f64::max);
+    // Finite quadrature can introduce tiny negative roundoff despite non-negative
+    // theoretical EVSI; larger negative values indicate a numerical/model defect.
+    if evsi < -1.0e-7 * utility_scale {
+        return None;
+    }
+    Some(evsi.max(0.0))
+}
+
+/// Select an experiment by worst-case expected value of sample information (EVSI).
+///
+/// The robust score is:
+/// min_s EVSI(experiment | discrepancy scenario s)
+///   × representativeness × (1 - amplification_risk) / acquisition_cost.
+///
+/// Utility values are provided by an externally approved action×hypothesis policy.
+/// Eligibility is a hard gate and is checked before representativeness, risk, cost,
+/// noise, prediction or utility callbacks. The scenario set is finite and caller-owned;
+/// this does not establish robustness outside the frozen scenario family. Returns None
+/// when no admissible candidate has strictly positive worst-case decision value.
+pub fn select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost<
+    'a,
+    H,
+    E,
+    A,
+    S,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    representativeness: impl Fn(&E) -> f64 + Copy,
+    amplification_risk: impl Fn(&E) -> f64 + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    utility: impl Fn(&A, &H) -> f64 + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
+            continue;
+        }
+        let representative = representativeness(experiment);
+        let amplification = amplification_risk(experiment);
+        if !representative.is_finite()
+            || !(0.0..=1.0).contains(&representative)
+            || !amplification.is_finite()
+            || !(0.0..=1.0).contains(&amplification)
+            || representative <= 0.0
+            || amplification >= 1.0
+        {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        let noise = observation_std_dev(experiment);
+        if !experiment_cost.is_finite()
+            || experiment_cost <= 0.0
+            || !noise.is_finite()
+            || noise <= 0.0
+        {
+            continue;
+        }
+
+        let mut worst_case_evsi = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let Some(value) = expected_value_of_sample_information(
+                experiment,
+                hypotheses,
+                prior_weights,
+                actions,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+                utility,
+            ) else {
+                complete = false;
+                break;
+            };
+            if !value.is_finite() || value <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_evsi = worst_case_evsi.min(value);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_evsi * representative * (1.0 - amplification) / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1661,6 +1984,149 @@ mod tests {
         )
         .expect("eligible candidate is informative in each scenario");
         assert_eq!(*selected.0, "eligible");
+    }
+
+
+    #[test]
+    fn evsi_ignores_nuisance_information_that_cannot_change_the_decision() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let priors = [0.25, 0.25, 0.25, 0.25];
+        let actions = ["ACCEPT_CLASS_A", "ACCEPT_CLASS_B"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("ACCEPT_CLASS_A", 0 | 1) => 10.0,
+            ("ACCEPT_CLASS_A", 2 | 3) => 0.0,
+            ("ACCEPT_CLASS_B", 0 | 1) => 0.0,
+            ("ACCEPT_CLASS_B", 2 | 3) => 10.0,
+            _ => f64::NAN,
+        };
+        // This test separates within-decision-class nuisance hypotheses, but does
+        // not reveal which action class is correct. It has information, not decision value.
+        let nuisance = expected_value_of_sample_information(
+            &"nuisance",
+            &hypotheses,
+            &priors,
+            &actions,
+            0.1,
+            |h, _| Some(if *h % 2 == 0 { 0.0 } else { 4.0 }),
+            utility,
+        )
+        .expect("finite nuisance measurement model");
+        let decision_relevant = expected_value_of_sample_information(
+            &"decision",
+            &hypotheses,
+            &priors,
+            &actions,
+            0.1,
+            |h, _| Some(if *h < 2 { 0.0 } else { 4.0 }),
+            utility,
+        )
+        .expect("finite decision-relevant measurement model");
+        assert!(nuisance < 1.0e-6, "nuisance EVSI should be zero, got {nuisance}");
+        assert!(decision_relevant > 4.9, "decision-relevant EVSI too small: {decision_relevant}");
+    }
+
+    #[test]
+    fn evsi_is_invariant_to_representation_duplication_when_prior_mass_is_split() {
+        let actions = ["CHOOSE_ZERO", "CHOOSE_ONE"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("CHOOSE_ZERO", 0) => 1.0,
+            ("CHOOSE_ZERO", 1) => 0.0,
+            ("CHOOSE_ONE", 0) => 0.0,
+            ("CHOOSE_ONE", 1) => 1.0,
+            _ => f64::NAN,
+        };
+        let base_h = [0_usize, 1];
+        let base = expected_value_of_sample_information(
+            &(), &base_h, &[0.5, 0.5], &actions, 0.2,
+            |h, _| Some(*h as f64 * 2.0), utility,
+        ).unwrap();
+
+        let duplicate_h = [0_usize, 0, 1];
+        let duplicate = expected_value_of_sample_information(
+            &(), &duplicate_h, &[0.25, 0.25, 0.5], &actions, 0.2,
+            |h, _| Some(*h as f64 * 2.0), |action, h| utility(action, h),
+        ).unwrap();
+        assert!((base - duplicate).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn robust_evsi_rejects_a_nominally_useful_measurement_that_fails_under_shift() {
+        let hypotheses = [0_usize, 1];
+        let priors = [0.5, 0.5];
+        let actions = ["A", "B"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("A", 0) | ("B", 1) => 10.0,
+            _ => 0.0,
+        };
+        let candidates = ["fragile", "robust"];
+        let scenarios = ["nominal", "boundary_shift"];
+        let predict = |h: &usize, candidate: &&str, scenario: &&str| match (*candidate, *scenario, *h) {
+            ("fragile", "nominal", 0) => Some(0.0),
+            ("fragile", "nominal", 1) => Some(5.0),
+            ("fragile", "boundary_shift", _) => Some(2.0),
+            ("robust", _, 0) => Some(0.0),
+            ("robust", _, 1) => Some(2.0),
+            _ => None,
+        };
+        let nominal = expected_value_of_sample_information(
+            &"fragile", &hypotheses, &priors, &actions, 0.1,
+            |h, candidate| predict(h, candidate, &"nominal"), utility,
+        ).unwrap();
+        let robust = select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |_| true, |_| 1.0, |_| 0.0, |_| 0.1,
+            predict, utility, |_| 1.0,
+        ).expect("robust candidate has decision value in every scenario");
+        assert!(nominal > 4.9);
+        assert_eq!(*robust.0, "robust");
+        assert!(robust.1 > 4.9);
+    }
+
+    #[test]
+    fn evsi_eligibility_gate_precedes_every_candidate_specific_callback() {
+        let hypotheses = [0_usize, 1];
+        let priors = [0.5, 0.5];
+        let actions = ["A", "B"];
+        let scenarios = [0_usize];
+        let candidates = ["blocked", "allowed"];
+        let utility = |action: &&str, hypothesis: &usize| {
+            if *action == "A" { 1.0 - *hypothesis as f64 } else { *hypothesis as f64 }
+        };
+        let chosen = select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |c| *c == "allowed",
+            |c| { assert_ne!(*c, "blocked"); 1.0 },
+            |c| { assert_ne!(*c, "blocked"); 0.0 },
+            |c| { assert_ne!(*c, "blocked"); 0.1 },
+            |h, c, _| { assert_ne!(*c, "blocked"); Some(*h as f64) },
+            utility,
+            |c| { assert_ne!(*c, "blocked"); 1.0 },
+        ).expect("eligible informative candidate");
+        assert_eq!(*chosen.0, "allowed");
+        assert!(select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |_| false, |_| 1.0, |_| 0.0, |_| 0.1,
+            |h, c, _| { assert_ne!(*c, "blocked"); Some(*h as f64) },
+            utility, |_| 1.0,
+        ).is_none());
+    }
+
+    #[test]
+    fn evsi_fails_closed_on_invalid_utility_prior_or_scenario() {
+        let hypotheses = [0_usize, 1];
+        let actions = ["A", "B"];
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.5, 0.5], &actions, 1.0,
+            |h, _| Some(*h as f64), |_, _| f64::NAN,
+        ).is_none());
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.0, 0.0], &actions, 1.0,
+            |h, _| Some(*h as f64), |_, _| 1.0,
+        ).is_none());
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.5, 0.5], &[], 1.0,
+            |h, _| Some(*h as f64), |_, _| 1.0,
+        ).is_none());
     }
 
     #[test]
