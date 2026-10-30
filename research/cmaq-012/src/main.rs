@@ -11,6 +11,7 @@ const REPORTED_EPISTEMIC_STD: f64 = 0.04;
 const BASE_SEED: u64 = 0xC0A9_0012_2026_1030;
 const CALIBRATION_SEED: u64 = 0xCA11_BA7E_0120_0001;
 const QUALIFICATION_SEED: u64 = 0x51A7_E000_0120_0002;
+const ENSEMBLE_HEADS: usize = 5;
 
 #[derive(Clone, Copy, Debug)]
 struct SplitMix64 {
@@ -86,6 +87,7 @@ enum Policy {
     DirectFallback,
     GreedyMean,
     TotalVarianceLcb,
+    PessimisticEnsembleMin,
     MarginalConformalLcb,
     FixedKJointConformalLcb,
     MatchedKJointConformalLcb,
@@ -93,11 +95,12 @@ enum Policy {
 }
 
 impl Policy {
-    fn all() -> [Self; 7] {
+    fn all() -> [Self; 8] {
         [
             Self::DirectFallback,
             Self::GreedyMean,
             Self::TotalVarianceLcb,
+            Self::PessimisticEnsembleMin,
             Self::MarginalConformalLcb,
             Self::FixedKJointConformalLcb,
             Self::MatchedKJointConformalLcb,
@@ -110,6 +113,7 @@ impl Policy {
             Self::DirectFallback => "direct_fallback",
             Self::GreedyMean => "greedy_predicted_mean",
             Self::TotalVarianceLcb => "total_variance_lcb",
+            Self::PessimisticEnsembleMin => "pessimistic_ensemble_min_value",
             Self::MarginalConformalLcb => "marginal_conformal_lcb",
             Self::FixedKJointConformalLcb => "fixed_k8_joint_conformal_lcb",
             Self::MatchedKJointConformalLcb => "matched_k_joint_conformal_lcb",
@@ -135,6 +139,7 @@ struct Action {
     epistemic_std: f64,
     aleatoric_std: f64,
     realized_reward: f64,
+    ensemble_values: [f64; ENSEMBLE_HEADS],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -198,6 +203,10 @@ fn build_actions(rng: &mut SplitMix64, scenario: Scenario, count: usize) -> Vec<
             let aleatoric_std = scenario.aleatoric_std();
             let reward_noise = rng.centered_normal_approx() * aleatoric_std;
             let realized_reward = (true_value + reward_noise).clamp(0.0, 1.0);
+            let ensemble_values = std::array::from_fn(|_| {
+                (true_value + rng.centered_normal_approx() * scenario.actual_epistemic_std())
+                    .clamp(0.0, 1.0)
+            });
 
             Action {
                 true_value,
@@ -205,6 +214,7 @@ fn build_actions(rng: &mut SplitMix64, scenario: Scenario, count: usize) -> Vec<
                 epistemic_std,
                 aleatoric_std,
                 realized_reward,
+                ensemble_values,
             }
         })
         .collect()
@@ -271,6 +281,7 @@ fn policy_score(
     match policy {
         Policy::DirectFallback => f64::NEG_INFINITY,
         Policy::GreedyMean => action.predicted_mean,
+        Policy::PessimisticEnsembleMin => action.ensemble_values.iter().copied().fold(f64::INFINITY, f64::min),
         Policy::TotalVarianceLcb
         | Policy::MarginalConformalLcb
         | Policy::FixedKJointConformalLcb
@@ -315,8 +326,14 @@ fn simulate_episode(
 
     let selected = &actions[selected_index];
     let selected_bound = interval_for_action(selected, policy, calibration, fixed_k8);
-    let used_fallback = selected_bound.is_some()
-        && selected.predicted_mean - selected_bound.unwrap() < FALLBACK_VALUE;
+    let used_fallback = match policy {
+        Policy::PessimisticEnsembleMin => {
+            selected.ensemble_values.iter().copied().fold(f64::INFINITY, f64::min)
+                < FALLBACK_VALUE
+        }
+        _ => selected_bound.is_some()
+            && selected.predicted_mean - selected_bound.unwrap() < FALLBACK_VALUE,
+    };
 
     if used_fallback {
         let bound_coverage = joint_coverage(actions, policy, calibration, fixed_k8);
@@ -586,6 +603,21 @@ mod tests {
         let calibration = calibrate(16);
         assert!(calibration.marginal_q.is_finite() && calibration.marginal_q > 0.0);
         assert!(calibration.joint_q.is_finite() && calibration.joint_q > 0.0);
+    }
+
+    #[test]
+    fn ensemble_minimum_is_no_greater_than_any_head() {
+        let action = Action {
+            true_value: 0.5,
+            predicted_mean: 0.6,
+            epistemic_std: 0.1,
+            aleatoric_std: 0.1,
+            realized_reward: 0.5,
+            ensemble_values: [0.7, 0.6, 0.8, 0.4, 0.9],
+        };
+        let minimum = action.ensemble_values.iter().copied().fold(f64::INFINITY, f64::min);
+        assert_eq!(minimum, 0.4);
+        assert!(action.ensemble_values.iter().all(|value| minimum <= *value));
     }
 
     #[test]
