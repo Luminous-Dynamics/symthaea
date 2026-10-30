@@ -1447,6 +1447,25 @@ mod tests {
     }
 
     #[test]
+    fn cross_task_adapter_rejects_audit_tasks_reused_as_internal_calibration_splits() {
+        let mut cfg = config();
+        cfg.target_metric_id = "normalized_regret_percent".into();
+        cfg.metric_direction = ProxyDirection::Minimize;
+        cfg.evaluation_split_id = "audit-task-a".into();
+        let predictor = LearningCurveCalibrator::fit(
+            cfg,
+            &samples("fit", 60, 0.0),
+            &samples("cal", 60, 0.3),
+        )
+        .unwrap();
+        assert!(build_cross_task_forecast_evidence(
+            &predictor,
+            &audit_regret_samples(),
+        )
+        .is_err());
+    }
+
+    #[test]
     fn source_split_and_artifact_provenance_change_calibration_digest() {
         let first = fitted();
         let mut altered = config();
