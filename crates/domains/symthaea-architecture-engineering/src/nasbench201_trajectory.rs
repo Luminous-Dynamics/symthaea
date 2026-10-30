@@ -721,6 +721,18 @@ pub fn plan_promotions(
                 "must be finite",
             ));
         }
+        let Some(runtime) = feature.proxy_times_seconds.get(&archive.proxy_id) else {
+            return Err(TrajectorySearchError::new(
+                format!("features[{index}].proxy_times_seconds"),
+                format!("missing runtime for proxy {:?}", archive.proxy_id),
+            ));
+        };
+        if !runtime.is_finite() || *runtime < 0.0 {
+            return Err(TrajectorySearchError::new(
+                format!("features[{index}].proxy_times_seconds.{}", archive.proxy_id),
+                "runtime must be finite and non-negative",
+            ));
+        }
         if by_id
             .insert(feature.architecture_id.clone(), feature)
             .is_some()
@@ -951,6 +963,18 @@ fn validate_search_inputs(
                 "proxy score must be finite",
             ));
         }
+        let Some(runtime) = feature.proxy_times_seconds.get(&config.proxy_id) else {
+            return Err(TrajectorySearchError::new(
+                format!("features[{index}].proxy_times_seconds"),
+                "every candidate must have a runtime for the selected proxy",
+            ));
+        };
+        if !runtime.is_finite() || *runtime < 0.0 {
+            return Err(TrajectorySearchError::new(
+                format!("features[{index}].proxy_times_seconds.{}", config.proxy_id),
+                "proxy runtime must be finite and non-negative",
+            ));
+        }
     }
     Ok(())
 }
@@ -1145,7 +1169,13 @@ fn digest_feature_catalog(
         hasher.update((feature.topology_encoding.len() as u64).to_be_bytes());
         hasher.update(&feature.topology_encoding);
         let score = feature.proxy_scores.get(proxy_id).copied().unwrap_or(f64::NAN);
+        let runtime = feature
+            .proxy_times_seconds
+            .get(proxy_id)
+            .copied()
+            .unwrap_or(f64::NAN);
         hasher.update(score.to_bits().to_be_bytes());
+        hasher.update(runtime.to_bits().to_be_bytes());
     }
     hex_digest(hasher.finalize().as_slice())
 }
@@ -1574,5 +1604,9 @@ mod tests {
         let mut non_finite = binary_catalog();
         non_finite[0].proxy_scores.insert("landscape".into(), f64::NAN);
         assert!(build_trajectory_archive(&non_finite, &config(1)).is_err());
+
+        let mut missing_runtime = binary_catalog();
+        missing_runtime[0].proxy_times_seconds.clear();
+        assert!(build_trajectory_archive(&missing_runtime, &config(1)).is_err());
     }
 }
