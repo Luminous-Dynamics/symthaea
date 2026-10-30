@@ -44,7 +44,7 @@ pub enum SourceLifecycleV1 {
     Retracted,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReferenceDecisionV1 {
     SupportedWithinScope,
@@ -462,6 +462,8 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     let mut adjudications = BTreeMap::new();
     let mut per_claim_adjudicators: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     let mut per_claim_independence_groups: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut seen_claim_adjudicator_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
+    let mut seen_claim_independence_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
     let mut claim_decisions: BTreeMap<&str, BTreeSet<ReferenceDecisionV1>> = BTreeMap::new();
     let mut abstentions = 0_u64;
     for record in &fields.initial_adjudications {
@@ -509,6 +511,12 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
             if !spans.contains_key(span_id.as_str()) {
                 issues.push(format!("adjudication {} references unknown span {}", record.record_id, span_id));
             }
+        }
+        if !seen_claim_adjudicator_pairs.insert((record.claim_id.as_str(), record.adjudicator_id_sha256.as_str())) {
+            issues.push(format!("claim {} has duplicate initial votes from one adjudicator", record.claim_id));
+        }
+        if !seen_claim_independence_pairs.insert((record.claim_id.as_str(), adjudicator.independence_group_sha256.as_str())) {
+            issues.push(format!("claim {} has multiple initial votes from one declared independence group", record.claim_id));
         }
         per_claim_adjudicators.entry(record.claim_id.as_str()).or_default().insert(record.adjudicator_id_sha256.as_str());
         per_claim_independence_groups.entry(record.claim_id.as_str()).or_default().insert(adjudicator.independence_group_sha256.as_str());
@@ -676,8 +684,6 @@ pub fn verify_reference_assurance_package(
                 if let Some(source) = sources.get(span.source_id.as_str()) {
                     if let Some(group) = &source.ancestry_group_sha256 {
                         referenced_ancestry_groups.insert(group.as_str());
-                    } else {
-                        referenced_ancestry_groups.insert(source.source_identity_sha256.as_str());
                     }
                 }
             }
