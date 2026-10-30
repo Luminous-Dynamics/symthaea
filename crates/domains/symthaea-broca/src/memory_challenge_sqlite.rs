@@ -445,7 +445,7 @@ impl SqliteAmlMemoryBackend {
         operation.apply(&mut candidate_index)?;
         let event = PersistedEvidenceLifecycleEvent {
             event_id: event_id.into(),
-            recorded_at_unix_ms: current_unix_ms()?,
+            recorded_at_unix_ms: next_ledger_transaction_time_unix_ms(&transaction)?,
             operation,
         };
         let recorded_at = i64::try_from(event.recorded_at_unix_ms)
@@ -696,7 +696,7 @@ impl AmlMemoryBackend for SqliteAmlMemoryBackend {
         let batch = PersistedAmlAddBatch {
             request: request.clone(),
             payload_sha256: payload_sha256.to_owned(),
-            stored_at_unix_ms: current_unix_ms()?,
+            stored_at_unix_ms: next_ledger_transaction_time_unix_ms(&transaction)?,
             records,
         };
         Self::verify_batch_visible(&candidate_index, &batch, &self.payload_root)?;
@@ -891,6 +891,31 @@ fn current_unix_ms() -> Result<u64, String> {
         .map_err(|error| format!("system clock is before Unix epoch: {error}"))?;
     u64::try_from(elapsed.as_millis())
         .map_err(|_| "system timestamp exceeds u64 milliseconds".into())
+}
+
+/// Allocate a transaction time that is monotonic across Add and lifecycle
+/// commits, even when wall-clock time repeats or moves backwards. BEGIN
+/// IMMEDIATE serializes writers before this global ledger coordinate is read.
+fn next_ledger_transaction_time_unix_ms(
+    transaction: &rusqlite::Transaction<'_>,
+) -> Result<u64, String> {
+    let latest_add: Option<i64> = transaction
+        .query_row("SELECT MAX(stored_at_unix_ms) FROM aml_add_batches", [], |row| row.get(0))
+        .map_err(|error| format!("failed to read latest Add transaction time: {error}"))?;
+    let latest_lifecycle: Option<i64> = transaction
+        .query_row("SELECT MAX(recorded_at_unix_ms) FROM aml_evidence_lifecycle_events", [], |row| row.get(0))
+        .map_err(|error| format!("failed to read latest lifecycle transaction time: {error}"))?;
+    let latest = latest_add.into_iter()
+        .chain(latest_lifecycle)
+        .max();
+    let next_logical = match latest {
+        Some(last) => u64::try_from(last)
+            .map_err(|_| "ledger contains a negative transaction timestamp".to_string())?
+            .checked_add(1)
+            .ok_or_else(|| "ledger transaction timestamp overflow".to_string())?,
+        None => 0,
+    };
+    Ok(current_unix_ms()?.max(next_logical))
 }
 
 #[cfg(test)]
