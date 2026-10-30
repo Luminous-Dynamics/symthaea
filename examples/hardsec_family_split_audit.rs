@@ -361,6 +361,31 @@ fn validate_manifest(value: &Value, manifest_sha256: String) -> Result<Value, St
         .iter()
         .map(|(group, split)| json!({"insertion_source_id": group, "split": split}))
         .collect::<Vec<_>>();
+    let unique_host_families = records
+        .iter()
+        .map(|record| record.host_family_id.clone())
+        .collect::<BTreeSet<_>>();
+    let unique_insertion_sources = records
+        .iter()
+        .filter(|record| record.label == "trojan")
+        .map(|record| record.insertion_source_id.clone())
+        .collect::<BTreeSet<_>>();
+    let record_provenance = records
+        .iter()
+        .map(|record| json!({
+            "sample_id": record.sample_id,
+            "design_id": record.design_id,
+            "host_family_id": record.host_family_id,
+            "insertion_source_id": record.insertion_source_id,
+            "source_uri": record.source_uri,
+            "source_revision": record.source_revision,
+            "source_sha256": record.source_sha256,
+            "netlist_sha256": record.netlist_sha256,
+            "normalized_structure_sha256": record.normalized_structure_sha256,
+            "label": record.label,
+            "split": record.split,
+        }))
+        .collect::<Vec<_>>();
 
     let confirmatory = protocol != "diagnostic_random";
     Ok(json!({
@@ -381,6 +406,9 @@ fn validate_manifest(value: &Value, manifest_sha256: String) -> Result<Value, St
         "sample_count": records.len(),
         "unique_sample_ids": sample_ids.len(),
         "unique_design_ids": design_ids.len(),
+        "unique_host_families": unique_host_families.len(),
+        "unique_trojan_insertion_sources": unique_insertion_sources.len(),
+        "record_provenance": record_provenance,
         "unique_source_sha256": source_digests.len(),
         "unique_netlist_sha256": netlist_digests.len(),
         "unique_normalized_structure_sha256": structure_digests.len(),
