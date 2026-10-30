@@ -736,6 +736,33 @@ mod tests {
         let result = estimate(&rows, TARGET_POLICIES[0], Logger { p1: [0.5, 0.5] }, Estimator::DrCrossfit2, [[0.5; 2]; 2]).unwrap();
         assert!(result.value.is_finite());
         assert!(result.standard_error.is_finite());
+        assert!(result.interval_valid);
+
+        let in_sample_dm = estimate(
+            &rows,
+            policy,
+            Logger { p1: [0.5, 0.5] },
+            Estimator::DmInSample,
+            [[0.5; 2]; 2],
+        ).unwrap();
+        let in_sample_dr = estimate(
+            &rows,
+            policy,
+            Logger { p1: [0.5, 0.5] },
+            Estimator::DrInSample,
+            [[0.5; 2]; 2],
+        ).unwrap();
+        assert!(!in_sample_dm.interval_valid);
+        assert!(!in_sample_dr.interval_valid);
+
+        let pilot_dr = estimate(
+            &rows,
+            policy,
+            Logger { p1: [0.5, 0.5] },
+            Estimator::DrPilot,
+            [[0.5; 2]; 2],
+        ).unwrap();
+        assert!(pilot_dr.interval_valid);
     }
 
     #[test]
