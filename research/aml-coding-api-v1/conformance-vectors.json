@@ -1,0 +1,324 @@
+{
+  "schema_version": "aml-coding-api-conformance-v1",
+  "track": "coding",
+  "source_contract": "https://agentmemoryleaderboard.ai/api-guide",
+  "note": "These are local compatibility fixtures. They do not replace platform-issued Eval Key, Smoke, Full evaluation, or source compliance review.",
+  "vectors": [
+    {
+      "id": "ADD-001",
+      "operation": "add_request",
+      "valid": true,
+      "body": {
+        "request_id": "eval:run-7:repo-42:session-0:chunk-0",
+        "messages": [
+          {
+            "role": "user",
+            "timestamp": 1793350800000,
+            "content": "Investigated failing Cargo integration test."
+          },
+          {
+            "role": "assistant",
+            "timestamp": 1793350860000,
+            "content": "The failure was caused by a stale cache key."
+          }
+        ],
+        "user_id": "eval:run-7:repo-42",
+        "session_id": "eval:run-7:repo-42:session-0"
+      }
+    },
+    {
+      "id": "ADD-002",
+      "operation": "add_request",
+      "valid": true,
+      "body": {
+        "request_id": "eval:run-7:repo-42:session-1:chunk-0",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Refactored the bitemporal source ledger."
+          }
+        ],
+        "user_id": "eval:run-7:repo-42",
+        "session_id": "eval:run-7:repo-42:session-1"
+      }
+    },
+    {
+      "id": "ADD-003",
+      "operation": "add_request",
+      "valid": false,
+      "reason": "missing request_id",
+      "body": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "x"
+          }
+        ],
+        "user_id": "u1",
+        "session_id": "s1"
+      }
+    },
+    {
+      "id": "ADD-004",
+      "operation": "add_request",
+      "valid": false,
+      "reason": "empty messages",
+      "body": {
+        "request_id": "r",
+        "messages": [],
+        "user_id": "u1",
+        "session_id": "s1"
+      }
+    },
+    {
+      "id": "ADD-005",
+      "operation": "add_request",
+      "valid": false,
+      "reason": "empty message content",
+      "body": {
+        "request_id": "r",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": " "
+          }
+        ],
+        "user_id": "u1",
+        "session_id": "s1"
+      }
+    },
+    {
+      "id": "ADD-006",
+      "operation": "add_request",
+      "valid": false,
+      "reason": "unsupported async_mode field",
+      "body": {
+        "request_id": "r",
+        "messages": [
+          {
+            "role": "user",
+            "content": "x"
+          }
+        ],
+        "user_id": "u1",
+        "session_id": "s1",
+        "async_mode": true
+      }
+    },
+    {
+      "id": "ADD-RESP-001",
+      "operation": "add_response",
+      "valid": true,
+      "status": 200,
+      "request_id_echo_required": true,
+      "body": {
+        "success": true,
+        "request_id": "r",
+        "user_id": "u1",
+        "session_id": "s1"
+      }
+    },
+    {
+      "id": "SEARCH-001",
+      "operation": "search_request",
+      "valid": true,
+      "body": {
+        "query": "How was the cache issue fixed?",
+        "user_id": "eval:run-7:repo-42",
+        "top_k": 100
+      }
+    },
+    {
+      "id": "SEARCH-002",
+      "operation": "search_request",
+      "valid": true,
+      "body": {
+        "query": "Select the correct fix.",
+        "options": [
+          "A. rebuild the cache",
+          "B. change the cache key"
+        ],
+        "user_id": "eval:run-7:repo-42",
+        "top_k": 100
+      }
+    },
+    {
+      "id": "SEARCH-003",
+      "operation": "search_request",
+      "valid": false,
+      "reason": "missing user_id",
+      "body": {
+        "query": "Find prior fix",
+        "top_k": 100
+      }
+    },
+    {
+      "id": "SEARCH-004",
+      "operation": "search_request",
+      "valid": false,
+      "reason": "zero top_k",
+      "body": {
+        "query": "Find prior fix",
+        "user_id": "u1",
+        "top_k": 0
+      }
+    },
+    {
+      "id": "SEARCH-005",
+      "operation": "search_request",
+      "valid": false,
+      "reason": "session_id is not a Search filter",
+      "body": {
+        "query": "Find prior fix",
+        "user_id": "u1",
+        "session_id": "s1",
+        "top_k": 100
+      }
+    },
+    {
+      "id": "SEARCH-RESP-001",
+      "operation": "search_response",
+      "valid": true,
+      "request_top_k": 100,
+      "body": {
+        "data": [
+          {
+            "id": "mem-2",
+            "content": "The stale cache key was the root cause.",
+            "score": 0.92,
+            "created_at": "2026-10-29T08:00:00Z"
+          },
+          {
+            "id": "mem-1",
+            "content": "The integration test reproduced after restart.",
+            "score": 0.84,
+            "created_at": "2026-10-28T08:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SEARCH-RESP-002",
+      "operation": "search_response",
+      "valid": true,
+      "request_top_k": 100,
+      "body": {
+        "data": []
+      }
+    },
+    {
+      "id": "SEARCH-RESP-003",
+      "operation": "search_response",
+      "valid": false,
+      "reason": "missing data array",
+      "request_top_k": 100,
+      "body": {}
+    },
+    {
+      "id": "SEARCH-RESP-004",
+      "operation": "search_response",
+      "valid": false,
+      "reason": "empty memory id",
+      "request_top_k": 100,
+      "body": {
+        "data": [
+          {
+            "id": "",
+            "content": "evidence"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SEARCH-RESP-005",
+      "operation": "search_response",
+      "valid": false,
+      "reason": "empty memory content",
+      "request_top_k": 100,
+      "body": {
+        "data": [
+          {
+            "id": "mem-1",
+            "content": " "
+          }
+        ]
+      }
+    },
+    {
+      "id": "SEARCH-RESP-006",
+      "operation": "search_response",
+      "valid": false,
+      "reason": "response exceeds top_k; no silent truncation",
+      "request_top_k": 1,
+      "body": {
+        "data": [
+          {
+            "id": "mem-1",
+            "content": "one"
+          },
+          {
+            "id": "mem-2",
+            "content": "two"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SEARCH-RESP-007",
+      "operation": "search_response",
+      "valid": false,
+      "reason": "duplicate stable memory id",
+      "request_top_k": 100,
+      "body": {
+        "data": [
+          {
+            "id": "mem-1",
+            "content": "one"
+          },
+          {
+            "id": "mem-1",
+            "content": "duplicate"
+          }
+        ]
+      }
+    }
+  ],
+  "semantic_checks": [
+    {
+      "id": "SCOPE-001",
+      "requirement": "Two distinct user_id values must have disjoint retrieval results even when session_id values collide."
+    },
+    {
+      "id": "SCOPE-002",
+      "requirement": "Multiple sessions under one user_id may be retrieved together unless a future approved contract adds a session filter."
+    },
+    {
+      "id": "ORDER-001",
+      "requirement": "Add messages retain exact source order and timestamps."
+    },
+    {
+      "id": "ORDER-002",
+      "requirement": "Search results are already relevance-ranked; adapters preserve order and never sort by created_at."
+    },
+    {
+      "id": "READ-AFTER-WRITE-001",
+      "requirement": "HTTP 200 Add success is forbidden until persisted data can be retrieved immediately."
+    },
+    {
+      "id": "RETRY-001",
+      "requirement": "Same request_id and same payload is an idempotent replay."
+    },
+    {
+      "id": "RETRY-002",
+      "requirement": "Same request_id and different payload is rejected as a conflict."
+    },
+    {
+      "id": "ANSWER-001",
+      "requirement": "Search only returns evidence items; the platform owns answer generation."
+    },
+    {
+      "id": "PRIVACY-001",
+      "requirement": "Evaluation data must not be used for training or shared, and must be deleted within 30 days after the run."
+    }
+  ]
+}
