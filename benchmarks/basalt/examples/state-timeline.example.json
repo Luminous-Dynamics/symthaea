@@ -50,7 +50,9 @@
           "generation": 0
         }
       ],
-      "evidence_dependencies": []
+      "evidence_dependencies": [],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     },
     {
       "entry_type": "evidence_recorded",
@@ -84,7 +86,9 @@
       ],
       "evidence_dependencies": [
         "build-before-change"
-      ]
+      ],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     },
     {
       "entry_type": "evidence_recorded",
@@ -108,7 +112,9 @@
       ],
       "evidence_dependencies": [
         "tests-before-change"
-      ]
+      ],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     },
     {
       "entry_type": "evidence_recorded",
@@ -130,7 +136,9 @@
           "generation": 0
         }
       ],
-      "evidence_dependencies": []
+      "evidence_dependencies": [],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     },
     {
       "entry_type": "resource_changed",
@@ -177,7 +185,9 @@
           "generation": 0
         }
       ],
-      "evidence_dependencies": []
+      "evidence_dependencies": [],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     },
     {
       "entry_type": "evidence_recorded",
@@ -211,7 +221,9 @@
       ],
       "evidence_dependencies": [
         "build-after-change"
-      ]
+      ],
+      "dependency_coverage": "complete",
+      "unresolved_inputs": []
     }
   ]
 }
