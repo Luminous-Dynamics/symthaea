@@ -126,6 +126,10 @@ def generate(output_dir: Path) -> dict[str, Any]:
     plan_path = output_dir / "judge-factorial-plan.example.json"
     plan_path.write_bytes(plan_bytes)
 
+    execution_ordinals = {
+        condition_id: ordinal
+        for ordinal, condition_id in enumerate(execution_order)
+    }
     observations = []
     for row in conditions:
         factors = row["factors"]
@@ -152,6 +156,7 @@ def generate(output_dir: Path) -> dict[str, Any]:
         ]
         observations.append({
             "condition_id": row["condition_id"],
+            "execution_ordinal": execution_ordinals[row["condition_id"]],
             "input_sha256": row["input_sha256"],
             "status": "completed",
             "judge_receipt_sha256": digest(("synthetic-judge-receipt:" + row["condition_id"]).encode()),
