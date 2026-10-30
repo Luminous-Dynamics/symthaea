@@ -609,6 +609,7 @@ wait-timeout = "0.2"
 
 [features]
 default = ["default-mind"]
+hardsec-family-audit = ["dep:sha2"] # HARDSEC-009: preregistered source-family split leakage audit
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
@@ -2543,3 +2544,8 @@ name = "recurrent_mask_recovery"
 # observed. Must be declared here -- autoexamples = false.
 [[example]]
 name = "action_semantics_probe"
+
+# HARDSEC-009: source-family and insertion-lineage split leakage audit.
+[[example]]
+name = "hardsec_family_split_audit"
+required-features = ["hardsec-family-audit"]

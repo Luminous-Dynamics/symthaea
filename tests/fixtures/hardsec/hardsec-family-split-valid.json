@@ -1,0 +1,92 @@
+{
+  "schema_version": "hardsec-family-split-v1",
+  "manifest_id": "hardsec009-known-answer-family-lofo",
+  "dataset_id": "fixture-not-a-research-dataset",
+  "split_protocol": "leave_one_base_family_out",
+  "normalization": {
+    "normalizer_id": "fixture-verilog-normalizer",
+    "normalizer_version": "1.0.0",
+    "cell_library_id": "fixture-library-1",
+    "synthesis_toolchain_id": "yosys-fixture-1"
+  },
+  "records": [
+    {
+      "sample_id": "trojan-a",
+      "design_id": "design-trojan-a",
+      "host_family_id": "host-family-a",
+      "insertion_source_id": "insertion-src-a",
+      "source_uri": "fixture://sources/trojan-a.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+      "netlist_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+      "normalized_structure_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+      "label": "trojan",
+      "split": "train"
+    },
+    {
+      "sample_id": "clean-a",
+      "design_id": "design-clean-a",
+      "host_family_id": "host-family-a",
+      "insertion_source_id": "none",
+      "source_uri": "fixture://sources/clean-a.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "netlist_sha256": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "normalized_structure_sha256": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "label": "clean",
+      "split": "train"
+    },
+    {
+      "sample_id": "trojan-b",
+      "design_id": "design-trojan-b",
+      "host_family_id": "host-family-b",
+      "insertion_source_id": "insertion-src-b",
+      "source_uri": "fixture://sources/trojan-b.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+      "netlist_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+      "normalized_structure_sha256": "1616161616161616161616161616161616161616161616161616161616161616",
+      "label": "trojan",
+      "split": "validation"
+    },
+    {
+      "sample_id": "clean-b",
+      "design_id": "design-clean-b",
+      "host_family_id": "host-family-b",
+      "insertion_source_id": "none",
+      "source_uri": "fixture://sources/clean-b.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e",
+      "netlist_sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "normalized_structure_sha256": "2020202020202020202020202020202020202020202020202020202020202020",
+      "label": "clean",
+      "split": "validation"
+    },
+    {
+      "sample_id": "trojan-c",
+      "design_id": "design-trojan-c",
+      "host_family_id": "host-family-c",
+      "insertion_source_id": "insertion-src-c",
+      "source_uri": "fixture://sources/trojan-c.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+      "netlist_sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+      "normalized_structure_sha256": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+      "label": "trojan",
+      "split": "test"
+    },
+    {
+      "sample_id": "clean-c",
+      "design_id": "design-clean-c",
+      "host_family_id": "host-family-c",
+      "insertion_source_id": "none",
+      "source_uri": "fixture://sources/clean-c.v",
+      "source_revision": "0123456789abcdef0123456789abcdef01234567",
+      "source_sha256": "3232323232323232323232323232323232323232323232323232323232323232",
+      "netlist_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "normalized_structure_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+      "label": "clean",
+      "split": "test"
+    }
+  ]
+}
