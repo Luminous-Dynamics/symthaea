@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema",
+    "analyzer_source_revision",
     "purpose",
     "study_id",
     "judge_source_revision",
@@ -59,6 +60,10 @@
     },
     "plan_commitment_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
     }
   },
   "$defs": {
@@ -264,6 +269,11 @@
           "plan_commitment_sha256": {
             "not": {
               "pattern": "^0{64}$"
+            }
+          },
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
             }
           }
         }
