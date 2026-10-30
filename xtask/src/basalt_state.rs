@@ -897,6 +897,166 @@ mod tests {
             .freshness
     }
 
+    fn next_dag_random(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        *state
+    }
+
+    #[test]
+    fn twelve_seeded_evidence_dags_match_independent_invalidation_oracle() {
+        const NODE_COUNT: usize = 48;
+        let digest_a = format!("sha256:{}", "a".repeat(64));
+        let digest_b = format!("sha256:{}", "b".repeat(64));
+        let digest_c = format!("sha256:{}", "c".repeat(64));
+
+        for seed in 1_u64..=12 {
+            let run_id = format!("dag-seed-{seed}");
+            let mut rng = seed ^ 0x9e37_79b9_7f4a_7c15;
+            let mut entries = Vec::<Value>::new();
+            let mut parents_by_id = BTreeMap::<String, Vec<String>>::new();
+            let mut direct_stale = BTreeSet::<String>::new();
+
+            for index in 0..NODE_COUNT {
+                let evidence_id = format!("evidence-{index:02}");
+                let resource_is_changed = next_dag_random(&mut rng) % 2 == 0;
+                let (resource_id, resource_digest) = if resource_is_changed {
+                    direct_stale.insert(evidence_id.clone());
+                    ("repo:r0", digest_a.as_str())
+                } else {
+                    ("repo:r1", digest_b.as_str())
+                };
+
+                let mut parents = Vec::<String>::new();
+                for parent_index in 0..index {
+                    if next_dag_random(&mut rng) % 5 == 0 {
+                        parents.push(format!("evidence-{parent_index:02}"));
+                    }
+                }
+                parents_by_id.insert(evidence_id.clone(), parents.clone());
+
+                entries.push(serde_json::json!({
+                    "entry_type": "evidence_recorded",
+                    "sequence": index + 1,
+                    "evidence_id": evidence_id,
+                    "check_id": format!("check-{index:02}"),
+                    "evidence_kind": "other",
+                    "outcome": "pass",
+                    "evidence_digest": format!("sha256:{:064x}", index + 1),
+                    "dependency_coverage": "complete",
+                    "unresolved_inputs": [],
+                    "resource_pins": [{
+                        "resource_id": resource_id,
+                        "digest": resource_digest,
+                        "generation": 0
+                    }],
+                    "evidence_dependencies": parents
+                }));
+            }
+
+            let event_digest = resource_change_digest(
+                &run_id,
+                (NODE_COUNT + 1) as u64,
+                "source-shift",
+                ChangeKind::SourceChange,
+                "repo:r0",
+                &digest_a,
+                &digest_c,
+            ).unwrap();
+            entries.push(serde_json::json!({
+                "entry_type": "resource_changed",
+                "sequence": NODE_COUNT + 1,
+                "event_id": "source-shift",
+                "change_kind": "source_change",
+                "event_digest": event_digest,
+                "resource_id": "repo:r0",
+                "before_digest": digest_a,
+                "after_digest": digest_c
+            }));
+
+            let mut expected_stale = direct_stale.clone();
+            loop {
+                let mut changed = false;
+                for (child_id, parent_ids) in &parents_by_id {
+                    if !expected_stale.contains(child_id)
+                        && parent_ids.iter().any(|parent_id| expected_stale.contains(parent_id))
+                    {
+                        expected_stale.insert(child_id.clone());
+                        changed = true;
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+
+            let mut value = serde_json::json!({
+                "schema_version": 1,
+                "program": "BASALT",
+                "run_id": run_id,
+                "initial_resources": [
+                    {"resource_id": "repo:r0", "digest": digest_a},
+                    {"resource_id": "repo:r1", "digest": digest_b}
+                ],
+                "entries": entries
+            });
+            let report = audit_value(&value);
+            assert!(
+                report.structurally_valid,
+                "seed {seed} produced invalid report: {:?}",
+                report.errors
+            );
+            assert!(!report.confirmatory_eligible);
+            assert_eq!(report.evidence.len(), NODE_COUNT);
+
+            for index in 0..NODE_COUNT {
+                let evidence_id = format!("evidence-{index:02}");
+                let assessment = report.evidence.iter()
+                    .find(|item| item.evidence_id == evidence_id)
+                    .expect("generated evidence assessment exists");
+                let expected_freshness = if direct_stale.contains(&evidence_id) {
+                    EvidenceFreshness::StaleDirect
+                } else if expected_stale.contains(&evidence_id) {
+                    EvidenceFreshness::StaleTransitive
+                } else {
+                    EvidenceFreshness::Fresh
+                };
+                assert_eq!(
+                    assessment.freshness,
+                    expected_freshness,
+                    "seed {seed}, evidence {evidence_id}"
+                );
+
+                let mut expected_ancestors = BTreeSet::<String>::new();
+                let mut pending = parents_by_id[&evidence_id].clone();
+                while let Some(parent_id) = pending.pop() {
+                    if expected_stale.contains(&parent_id) && expected_ancestors.insert(parent_id.clone()) {
+                        pending.extend(parents_by_id[&parent_id].iter().cloned());
+                    }
+                }
+                let actual_ancestors: BTreeSet<String> = assessment
+                    .stale_ancestor_evidence_ids
+                    .iter()
+                    .cloned()
+                    .collect();
+                assert_eq!(
+                    actual_ancestors,
+                    expected_ancestors,
+                    "seed {seed}, ancestry closure for {evidence_id}"
+                );
+
+                if expected_stale.contains(&evidence_id) {
+                    assert!(assessment.invalidation_event_ids.iter().any(|id| id == "source-shift"));
+                    assert!(!assessment.eligible_under_declared_coverage);
+                } else {
+                    assert_eq!(assessment.freshness, EvidenceFreshness::Fresh);
+                    assert!(assessment.eligible_under_declared_coverage);
+                }
+            }
+        }
+    }
+
     #[test]
     fn synthetic_timeline_reports_direct_and_transitive_invalidation() {
         let report = audit_bytes(EXAMPLE.as_bytes());
