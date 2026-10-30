@@ -508,6 +508,7 @@ mod tests {
 
     fn config() -> FactorialReferenceConfig {
         FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
             spectral_window_frames: 64,
         }
     }
@@ -639,6 +640,19 @@ mod tests {
         assert_eq!(
             verify_factorial_ground_truth(&tampered, &events, &effect, &config()).unwrap_err(),
             FactorialReferenceError::InvalidReceipt
+        );
+    }
+
+    #[test]
+    fn invalid_sample_rate_fails_closed() {
+        let events = vec![constant_event(0, 0.2), constant_event(1, 0.3)];
+        let bad_config = FactorialReferenceConfig {
+            sample_rate_hz: 0,
+            spectral_window_frames: 64,
+        };
+        assert_eq!(
+            build_factorial_ground_truth(&events, &SyntheticEffect::LinearMix, &bad_config).unwrap_err(),
+            FactorialReferenceError::InvalidConfig("sample_rate_hz must be in 1..=768_000")
         );
     }
 
