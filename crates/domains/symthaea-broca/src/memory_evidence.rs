@@ -296,7 +296,7 @@ impl EvidenceRecord {
 ///
 /// Production persistence must commit lifecycle/tombstone state atomically with
 /// the durable vector index. This in-memory resolver does not solve that yet.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EvidenceIndex {
     records: BTreeMap<u64, EvidenceRecord>,
     evidence_ids: BTreeMap<String, u64>,
@@ -412,46 +412,6 @@ impl EvidenceIndex {
         record.lifecycle = EvidenceLifecycle::Deleted;
         record.superseded_by = None;
         Ok(())
-    }
-
-    /// Revoke an evidence item by its stable external evidence ID.
-    /// Numeric mapping remains as a tombstone so stale candidates cannot resurrect it.
-    pub fn revoke_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
-        let hdc_id = self
-            .evidence_ids
-            .get(evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown evidence_id".to_string())?;
-        self.revoke(hdc_id)
-    }
-
-    /// Mark evidence deleted while retaining a non-resolvable tombstone.
-    pub fn delete_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
-        let hdc_id = self
-            .evidence_ids
-            .get(evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown evidence_id".to_string())?;
-        self.mark_deleted(hdc_id)
-    }
-
-    /// Supersede evidence by stable IDs, enforcing the existing same-scope rule.
-    pub fn supersede_evidence(
-        &mut self,
-        old_evidence_id: &str,
-        new_evidence_id: &str,
-    ) -> Result<(), String> {
-        let old_hdc_id = self
-            .evidence_ids
-            .get(old_evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown old evidence_id".to_string())?;
-        let new_hdc_id = self
-            .evidence_ids
-            .get(new_evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown replacement evidence_id".to_string())?;
-        self.supersede(old_hdc_id, new_hdc_id)
     }
 
     /// Revoke an evidence item by its stable external evidence ID.
@@ -933,26 +893,21 @@ mod tests {
 
 
     #[test]
-    fn evidence_id_lifecycle_transitions_are_query_visible_and_stable() {
-        let mut index = EvidenceIndex::new();
-        let old = text_record(101, "old-evidence", "web", "billing panel moved");
-        let new = text_record(102, "new-evidence", "web", "billing panel now here");
-        index.insert(old, &source_bytes_for_text("billing panel moved")).unwrap();
-        index.insert(new, &source_bytes_for_text("billing panel now here")).unwrap();
+    fn cloned_evidence_index_has_independent_lifecycle_state() {
+        let mut original = EvidenceIndex::new();
+        insert_text(&mut original, 41, "trusted checkout route", "user-1");
+        let mut clone = original.clone();
 
-        index.supersede_evidence("old-evidence", "new-evidence").unwrap();
-        let hits = index
-            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
+        clone.revoke_evidence("evidence-41").unwrap();
+
+        let original_hits = original
+            .search_bm25("checkout", "user-1", 150, Path::new("."), Bm25Config::default())
             .unwrap();
-        assert!(hits.iter().all(|hit| hit.evidence_id != "old-evidence"));
-
-        index.revoke_evidence("new-evidence").unwrap();
-        assert!(index
-            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
-            .unwrap()
-            .is_empty());
-        index.delete_evidence("new-evidence").unwrap();
-        assert!(index.revoke_evidence("new-evidence").is_err());
+        let clone_hits = clone
+            .search_bm25("checkout", "user-1", 150, Path::new("."), Bm25Config::default())
+            .unwrap();
+        assert_eq!(original_hits.len(), 1);
+        assert!(clone_hits.is_empty());
     }
 
     #[test]
