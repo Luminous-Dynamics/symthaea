@@ -307,6 +307,7 @@ jobs:
                   "evidence_declarations": case["evidence_declarations"],
                   "contract_precondition": case.get("contract_precondition"),
                   "state_intervention": case.get("state_intervention"),
+                  "proof_term_support": case.get("proof_term_support"),
                   "model_outcomes": case["model_outcomes"],
               })
 
@@ -445,19 +446,23 @@ jobs:
                   if label in support_by_label:
                       errors.append(f"duplicate proof-term support receipt: {label}")
                   support_by_label[label] = support
-              expected_support = {
-                  "alternate-route-after-required-hypothesis-withdrawal": ("hEq", "h"),
-                  "original-route-after-irrelevant-context-removal": ("h", "hIrrelevant")
+              support_case_bindings = {
+                  (case.get("proof_term_support") or {}).get("receipt_label"): case
+                  for case in bindings
+                  if isinstance(case.get("proof_term_support"), dict)
               }
-              if set(support_by_label) != set(expected_support):
-                  errors.append("proof-term support receipts do not cover exactly the two intervention cases")
-              for label, (required_name, forbidden_name) in expected_support.items():
+              if set(support_by_label) != set(support_case_bindings):
+                  errors.append("proof-term support receipts do not cover exactly the cases that declare support contracts")
+              for label, case in support_case_bindings.items():
                   support = support_by_label.get(label, {})
+                  contract = case.get("proof_term_support", {})
                   direct = support.get("direct_free_variable_support", [])
                   closure = support.get("transitive_local_dependency_closure", [])
                   direct_names = {row.get("user_name") for row in direct if isinstance(row, dict)}
                   closure_names = {row.get("user_name") for row in closure if isinstance(row, dict)}
-                  if required_name not in direct_names or forbidden_name in direct_names:
+                  required_names = set(contract.get("must_include_direct_declarations", []))
+                  forbidden_names = set(contract.get("must_exclude_direct_declarations", []))
+                  if not required_names.issubset(direct_names) or forbidden_names.intersection(direct_names):
                       errors.append(f"proof-term support contract failed for {label}")
                   if not direct_names.issubset(closure_names):
                       errors.append(f"transitive support closure omits direct dependencies for {label}")
