@@ -59,6 +59,8 @@ A black-box paired-render strategy is the reference design. Differentiable DSP m
 - A minimum of three no-op render receipt tokens is required.
 - Reusing the same no-op receipt digest multiple times does not count as multiple controls.
 - Every no-op token must bind the same PCM layout, Score, baseline MIDI bytes, map artifact/receipt, pitch inventory, renderer identity and configuration.
+- The renderer execution profile includes the receipt's stable render-config digest, the exact normalized FluidSynth argument vector, and the child environment digest. The nonce-bearing `-F` output path and final input-MIDI path are normalized to fixed placeholders because output PCM and input MIDI bytes are separately receipt-bound. All other arguments, including gain, sample rate and SoundFont selection, remain configuration-significant.
+- Studio's stable render-config serialization no longer includes the nonce-bearing temporary MIDI path. The exact MIDI bytes remain bound independently as the renderer input artifact.
 - Per-window/per-channel thresholds use the maximum observed no-op difference multiplied by a declared factor, bounded below by absolute configured thresholds.
 
 This calibration is a conservative empirical floor over the supplied controls. It is not a population quantile, confidence interval, proof of independent execution, or universal acoustic tolerance. Different receipt IDs can still be produced by an untrusted local host; the receipt chain remains local artifact evidence, not attestation.
