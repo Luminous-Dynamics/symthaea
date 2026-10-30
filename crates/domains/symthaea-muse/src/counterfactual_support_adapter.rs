@@ -629,8 +629,8 @@ mod tests {
         let expected_pitches = [60_u8, 64_u8];
         let baseline_lineage = vec![
             lineage(0, 0, 60),
-            lineage(1, 5, 64),
-            lineage(1, 9, 64),
+            lineage(1, 4, 64),
+            lineage(1, 7, 64),
         ];
         let counterfactual_lineage = vec![lineage(0, 0, 60)];
         let baseline_binding = crate::counterfactual_influence::test_verified_renderer_audio_binding_with_effects_groups(
@@ -718,7 +718,8 @@ mod tests {
         assert_eq!(
             evidence.support.routing_domains,
             vec![
-                "fluidsynth:effects-group:1".to_owned(),
+                "fluidsynth:effects-group:0".to_owned(),
+                "fluidsynth:effects-group:3".to_owned(),
             ]
         );
         assert!(!evidence.support.routing_complete);
