@@ -16,6 +16,8 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 
+use sha2::{Digest, Sha256};
+
 use super::multi_fidelity::{validate_fidelity_ladder, FidelityLevel};
 
 /// A candidate's score measured at the audit target fidelity (maximize is better).
@@ -60,7 +62,44 @@ pub struct PruningAuditReport {
     pub upper_bound_false_pruned_count: usize,
     pub upper_bound_false_prune_rate: f64,
     pub confidence_level: f64,
+    pub sample_seed: u64,
+    pub population_sha256: String,
+    pub sample_sha256: String,
     pub disposition: PruningDisposition,
+}
+
+/// A proof-carrying, deterministic sample selection. Fields are private so callers cannot
+/// silently substitute a hand-picked set; persisted receipts can be reconstituted only by
+/// verify_pruning_audit_sample, which replays the selection against the full population.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PruningAuditSample {
+    seed: u64,
+    population_ids: Vec<String>,
+    sampled_candidate_ids: Vec<String>,
+    population_sha256: String,
+    sample_sha256: String,
+}
+
+impl PruningAuditSample {
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub fn population_ids(&self) -> &[String] {
+        &self.population_ids
+    }
+
+    pub fn sampled_candidate_ids(&self) -> &[String] {
+        &self.sampled_candidate_ids
+    }
+
+    pub fn population_sha256(&self) -> &str {
+        &self.population_sha256
+    }
+
+    pub fn sample_sha256(&self) -> &str {
+        &self.sample_sha256
+    }
 }
 
 /// Validation or accounting failure. Invalid audits never return partial decisions.
@@ -90,7 +129,7 @@ impl Error for PruningAuditError {}
 /// Select a simple random sample without replacement from the candidates that would be
 /// pruned. IDs are returned in deterministic draw order. The caller must commit to this
 /// sample before observing any target-fidelity audit scores.
-pub fn select_pruning_audit_sample(
+fn sample_candidate_ids(
     pruned_candidate_ids: &[String],
     sample_count: usize,
     seed: u64,
@@ -125,6 +164,7 @@ pub fn select_pruning_audit_sample(
     }
 
     let mut sample = pruned_candidate_ids.to_vec();
+    sample.sort();
     let mut state = seed;
     for index in (1..sample.len()).rev() {
         let selected = uniform_below(&mut state, (index + 1) as u64);
@@ -132,6 +172,67 @@ pub fn select_pruning_audit_sample(
     }
     sample.truncate(sample_count);
     Ok(sample)
+}
+
+/// Prepare a deterministic, uniform-without-replacement audit sample and bind it to the
+/// canonical candidate population. The seed must be independently chosen and committed before
+/// target-fidelity audit outcomes are observed.
+pub fn prepare_pruning_audit_sample(
+    pruned_candidate_ids: &[String],
+    sample_count: usize,
+    seed: u64,
+) -> Result<PruningAuditSample, PruningAuditError> {
+    let mut population_ids = pruned_candidate_ids.to_vec();
+    population_ids.sort();
+    let sampled_candidate_ids = sample_candidate_ids(&population_ids, sample_count, seed)?;
+    Ok(PruningAuditSample {
+        seed,
+        population_sha256: digest_ids(
+            b"symthaea.pruning-audit.population.v0.1",
+            &population_ids,
+        ),
+        sample_sha256: digest_ids(
+            b"symthaea.pruning-audit.sample.v0.1",
+            &sampled_candidate_ids,
+        ),
+        population_ids,
+        sampled_candidate_ids,
+    })
+}
+
+/// Reconstitute a persisted sample receipt only when replaying the declared seed against the
+/// complete candidate population produces exactly the recorded sampled IDs.
+pub fn verify_pruning_audit_sample(
+    pruned_candidate_ids: &[String],
+    sampled_candidate_ids: &[String],
+    seed: u64,
+) -> Result<PruningAuditSample, PruningAuditError> {
+    let verified = prepare_pruning_audit_sample(
+        pruned_candidate_ids,
+        sampled_candidate_ids.len(),
+        seed,
+    )?;
+    if verified.sampled_candidate_ids != sampled_candidate_ids {
+        return Err(PruningAuditError::new(
+            "sampled_candidate_ids",
+            "receipt does not match the deterministic sample generated from the population and seed",
+        ));
+    }
+    Ok(verified)
+}
+
+fn digest_ids(domain: &[u8], ids: &[String]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    for candidate_id in ids {
+        hasher.update((candidate_id.len() as u64).to_be_bytes());
+        hasher.update(candidate_id.as_bytes());
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// Audit whether a uniformly sampled subset of the pruned population would have crossed the
@@ -146,6 +247,64 @@ pub fn select_pruning_audit_sample(
 /// score. Ties do not count as false-prunes; deterministic tie-breaking remains the caller's
 /// promotion-policy responsibility.
 pub fn audit_pruning(
+    selected_scores: &[AuditScore],
+    audit_sample: &PruningAuditSample,
+    audited_pruned_scores: &[AuditScore],
+    config: &PruningAuditConfig,
+) -> Result<PruningAuditReport, PruningAuditError> {
+    let verified = verify_pruning_audit_sample(
+        &audit_sample.population_ids,
+        &audit_sample.sampled_candidate_ids,
+        audit_sample.seed,
+    )?;
+    if verified.population_sha256 != audit_sample.population_sha256
+        || verified.sample_sha256 != audit_sample.sample_sha256
+    {
+        return Err(PruningAuditError::new(
+            "audit_sample",
+            "sample receipt digest mismatch",
+        ));
+    }
+    if audited_pruned_scores.len() != verified.sampled_candidate_ids.len() {
+        return Err(PruningAuditError::new(
+            "audited_pruned_scores",
+            "exactly one target-fidelity outcome is required for every sampled sentinel",
+        ));
+    }
+    let expected_ids: HashSet<&str> = verified
+        .sampled_candidate_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let mut observed_ids = HashSet::with_capacity(audited_pruned_scores.len());
+    for (index, observation) in audited_pruned_scores.iter().enumerate() {
+        if !observed_ids.insert(observation.candidate_id.as_str()) {
+            return Err(PruningAuditError::new(
+                format!("audited_pruned_scores[{index}].candidate_id"),
+                "duplicate audit outcome",
+            ));
+        }
+        if !expected_ids.contains(observation.candidate_id.as_str()) {
+            return Err(PruningAuditError::new(
+                format!("audited_pruned_scores[{index}].candidate_id"),
+                "outcome is not part of the committed audit sample",
+            ));
+        }
+    }
+
+    let mut report = audit_pruning_unverified(
+        selected_scores,
+        &verified.population_ids,
+        audited_pruned_scores,
+        config,
+    )?;
+    report.sample_seed = verified.seed;
+    report.population_sha256 = verified.population_sha256;
+    report.sample_sha256 = verified.sample_sha256;
+    Ok(report)
+}
+
+fn audit_pruning_unverified(
     selected_scores: &[AuditScore],
     pruned_population_ids: &[String],
     audited_pruned_scores: &[AuditScore],
@@ -275,6 +434,9 @@ pub fn audit_pruning(
         upper_bound_false_pruned_count: upper_bound_count,
         upper_bound_false_prune_rate: upper_bound_rate,
         confidence_level: config.confidence_level,
+        sample_seed: 0,
+        population_sha256: String::new(),
+        sample_sha256: String::new(),
         disposition,
     })
 }
@@ -528,21 +690,32 @@ mod tests {
     #[test]
     fn audit_sample_is_reproducible_unique_and_without_replacement() {
         let candidates = ids("pruned", 100);
-        let first = select_pruning_audit_sample(&candidates, 30, 42).unwrap();
-        let second = select_pruning_audit_sample(&candidates, 30, 42).unwrap();
+        let first = prepare_pruning_audit_sample(&candidates, 30, 42).unwrap();
+        let second = prepare_pruning_audit_sample(&candidates, 30, 42).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.len(), 30);
-        assert_eq!(first.iter().collect::<HashSet<_>>().len(), 30);
-        assert!(first.iter().all(|id| candidates.contains(id)));
+        assert_eq!(first.sampled_candidate_ids().len(), 30);
+        assert_eq!(
+            first.sampled_candidate_ids().iter().collect::<HashSet<_>>().len(),
+            30
+        );
+        assert!(first.sampled_candidate_ids().iter().all(|id| candidates.contains(id)));
+        assert_eq!(
+            verify_pruning_audit_sample(
+                &candidates,
+                first.sampled_candidate_ids(),
+                first.seed()
+            ).unwrap(),
+            first
+        );
     }
 
     #[test]
     fn audit_sample_rejects_empty_duplicate_and_out_of_range_inputs() {
-        assert!(select_pruning_audit_sample(&[], 1, 1).is_err());
-        assert!(select_pruning_audit_sample(&["a".into()], 0, 1).is_err());
-        assert!(select_pruning_audit_sample(&["a".into()], 2, 1).is_err());
-        assert!(select_pruning_audit_sample(&["a".into(), "a".into()], 1, 1).is_err());
-        assert!(select_pruning_audit_sample(&[" ".into()], 1, 1).is_err());
+        assert!(prepare_pruning_audit_sample(&[], 1, 1).is_err());
+        assert!(prepare_pruning_audit_sample(&["a".into()], 0, 1).is_err());
+        assert!(prepare_pruning_audit_sample(&["a".into()], 2, 1).is_err());
+        assert!(prepare_pruning_audit_sample(&["a".into(), "a".into()], 1, 1).is_err());
+        assert!(prepare_pruning_audit_sample(&[" ".into()], 1, 1).is_err());
     }
 
     #[test]
@@ -565,7 +738,9 @@ mod tests {
     fn exact_zero_miss_census_qualifies_for_pruning() {
         let selected = selected_scores(2);
         let population = ids("pruned", 40);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 40, 17).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
             .map(|candidate_id| AuditScore {
                 candidate_id: candidate_id.clone(),
@@ -573,7 +748,7 @@ mod tests {
                 score: 0.1,
             })
             .collect();
-        let report = audit_pruning(&selected, &population, &audited, &config(30, 0.01)).unwrap();
+        let report = audit_pruning(&selected, &sample, &audited, &config(30, 0.01)).unwrap();
         assert_eq!(report.false_pruned_count, 0);
         assert_eq!(report.upper_bound_false_pruned_count, 0);
         assert_eq!(report.upper_bound_false_prune_rate, 0.0);
@@ -584,7 +759,9 @@ mod tests {
     fn audit_detects_a_candidate_that_beats_the_selected_frontier() {
         let selected = selected_scores(1);
         let population = ids("pruned", 30);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 30, 1).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
             .enumerate()
             .map(|(index, candidate_id)| AuditScore {
@@ -593,7 +770,7 @@ mod tests {
                 score: if index == 0 { 0.95 } else { 0.1 },
             })
             .collect();
-        let report = audit_pruning(&selected, &population, &audited, &config(30, 0.0)).unwrap();
+        let report = audit_pruning(&selected, &sample, &audited, &config(30, 0.0)).unwrap();
         assert_eq!(report.false_pruned_count, 1);
         assert_eq!(
             report.disposition,
@@ -605,16 +782,17 @@ mod tests {
     fn insufficient_audit_sample_disables_pruning_even_with_zero_misses() {
         let selected = selected_scores(1);
         let population = ids("pruned", 100);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 10, 9).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
-            .take(10)
             .map(|candidate_id| AuditScore {
                 candidate_id: candidate_id.clone(),
                 fidelity_index: 1,
                 score: 0.1,
             })
             .collect();
-        let report = audit_pruning(&selected, &population, &audited, &config(30, 1.0)).unwrap();
+        let report = audit_pruning(&selected, &sample, &audited, &config(30, 1.0)).unwrap();
         assert_eq!(
             report.disposition,
             PruningDisposition::DisablePruningInsufficientAudit
@@ -625,7 +803,9 @@ mod tests {
     fn observed_tail_risk_disables_pruning_under_a_predeclared_limit() {
         let selected = selected_scores(3);
         let population = ids("pruned", 50);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 50, 5).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
             .map(|candidate_id| AuditScore {
                 candidate_id: candidate_id.clone(),
@@ -633,7 +813,7 @@ mod tests {
                 score: 0.85,
             })
             .collect();
-        let report = audit_pruning(&selected, &population, &audited, &config(30, 0.1)).unwrap();
+        let report = audit_pruning(&selected, &sample, &audited, &config(30, 0.1)).unwrap();
         assert_eq!(report.false_pruned_count, 50);
         assert_eq!(report.upper_bound_false_prune_rate, 1.0);
         assert_eq!(
@@ -646,7 +826,9 @@ mod tests {
     fn ties_at_the_selected_frontier_are_not_counted_as_false_prunes() {
         let selected = selected_scores(2);
         let population = ids("pruned", 30);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 30, 77).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
             .map(|candidate_id| AuditScore {
                 candidate_id: candidate_id.clone(),
@@ -654,7 +836,7 @@ mod tests {
                 score: 0.7,
             })
             .collect();
-        let report = audit_pruning(&selected, &population, &audited, &config(30, 0.0)).unwrap();
+        let report = audit_pruning(&selected, &sample, &audited, &config(30, 0.0)).unwrap();
         assert_eq!(report.false_pruned_count, 0);
     }
 
@@ -663,7 +845,9 @@ mod tests {
         let mut selected = selected_scores(1);
         selected[1].candidate_id = selected[0].candidate_id.clone();
         let population = ids("pruned", 30);
-        let audited: Vec<AuditScore> = population
+        let sample = prepare_pruning_audit_sample(&population, 30, 13).unwrap();
+        let audited: Vec<AuditScore> = sample
+            .sampled_candidate_ids()
             .iter()
             .map(|candidate_id| AuditScore {
                 candidate_id: candidate_id.clone(),
@@ -671,31 +855,38 @@ mod tests {
                 score: 0.1,
             })
             .collect();
-        assert!(audit_pruning(&selected, &population, &audited, &config(30, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &audited, &config(30, 0.1)).is_err());
 
         let selected = selected_scores(1);
         let mut mixed = audited.clone();
         mixed[0].fidelity_index = 2;
-        assert!(audit_pruning(&selected, &population, &mixed, &config(30, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &mixed, &config(30, 0.1)).is_err());
 
         let mut invalid = audited.clone();
         invalid[0].score = f64::NAN;
-        assert!(audit_pruning(&selected, &population, &invalid, &config(30, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &invalid, &config(30, 0.1)).is_err());
     }
 
     #[test]
     fn rejects_audited_ids_outside_the_pruned_population_or_inside_selected() {
         let selected = selected_scores(1);
         let population = ids("pruned", 30);
-        let mut outside = vec![AuditScore {
+        let sample = prepare_pruning_audit_sample(&population, 1, 21).unwrap();
+        let outside = vec![AuditScore {
             candidate_id: "unknown".into(),
             fidelity_index: 1,
             score: 0.1,
         }];
-        assert!(audit_pruning(&selected, &population, &outside, &config(1, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &outside, &config(1, 0.1)).is_err());
 
-        outside[0].candidate_id = "kept-a".into();
-        assert!(audit_pruning(&selected, &population, &outside, &config(1, 0.1)).is_err());
+        let overlap_population = vec!["kept-a".to_owned()];
+        let overlap_sample = prepare_pruning_audit_sample(&overlap_population, 1, 21).unwrap();
+        let overlap = vec![AuditScore {
+            candidate_id: "kept-a".into(),
+            fidelity_index: 1,
+            score: 0.1,
+        }];
+        assert!(audit_pruning(&selected, &overlap_sample, &overlap, &config(1, 0.1)).is_err());
     }
 
     #[test]
@@ -723,14 +914,20 @@ mod tests {
     fn rejects_invalid_risk_configuration_and_empty_audit() {
         let selected = selected_scores(1);
         let population = ids("pruned", 2);
+        let sample = prepare_pruning_audit_sample(&population, 1, 8).unwrap();
         let audit = vec![AuditScore {
-            candidate_id: population[0].clone(),
+            candidate_id: sample.sampled_candidate_ids()[0].clone(),
             fidelity_index: 1,
             score: 0.1,
         }];
-        assert!(audit_pruning(&selected, &population, &[], &config(1, 0.1)).is_err());
-        assert!(audit_pruning(&selected, &population, &audit, &config(0, 0.1)).is_err());
-        assert!(audit_pruning(&selected, &population, &audit, &config(1, f64::NAN)).is_err());
-        assert!(audit_pruning(&selected, &population, &audit, &config(1, 0.1)).unwrap().confidence_level == 0.95);
+        assert!(audit_pruning(&selected, &sample, &[], &config(1, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &audit, &config(0, 0.1)).is_err());
+        assert!(audit_pruning(&selected, &sample, &audit, &config(1, f64::NAN)).is_err());
+        assert_eq!(
+            audit_pruning(&selected, &sample, &audit, &config(1, 0.1))
+                .unwrap()
+                .confidence_level,
+            0.95
+        );
     }
 }
