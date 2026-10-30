@@ -1,0 +1,729 @@
+{
+  "schema_version": "broca-decision-use-validity-fixtures/v1",
+  "status": "research_fixture_oracle_not_a_runtime_policy",
+  "description": "Deterministic counterfactual fixtures for D18-D23. A reader adapter must receive only reader_input; oracle is evaluator-only and must never enter the runtime memory packet.",
+  "invariants": [
+    "Factual truth, provenance authenticity, temporal validity, authorization, and decision-use validity are separate dimensions.",
+    "The oracle field is evaluation-only and excluded from model prompts, retrieval, and production state.",
+    "A decisive intervention must change the expected action only where the case contract says it should.",
+    "An irrelevant intervention must preserve the expected action.",
+    "This fixture corpus does not define universal scientific or business policy; each rule is a task-local oracle."
+  ],
+  "cases": [
+    {
+      "case_id": "D18",
+      "name": "plan_lock_precedes_outcome_access",
+      "decision": "classify_result_for_confirmatory_use",
+      "intervention_contract": {
+        "kind": "flip_and_invariance",
+        "decisive_path": "governance.plan_locked_at",
+        "invariant_path": "presentation.annotation_color"
+      },
+      "variants": [
+        {
+          "variant_id": "D18-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "governance": {
+              "plan_locked_at": "2026-01-02T10:00:00Z",
+              "first_outcome_access_at": "2026-01-02T09:00:00Z",
+              "outcome_access_by_decision_maker": true
+            },
+            "presentation": {
+              "annotation_color": "blue"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        },
+        {
+          "variant_id": "D18-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "governance": {
+              "plan_locked_at": "2026-01-02T08:00:00Z",
+              "first_outcome_access_at": "2026-01-02T09:00:00Z",
+              "outcome_access_by_decision_maker": true
+            },
+            "presentation": {
+              "annotation_color": "blue"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "allow_confirmatory_claim"
+          }
+        },
+        {
+          "variant_id": "D18-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "governance": {
+              "plan_locked_at": "2026-01-02T10:00:00Z",
+              "first_outcome_access_at": "2026-01-02T09:00:00Z",
+              "outcome_access_by_decision_maker": true
+            },
+            "presentation": {
+              "annotation_color": "orange"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        },
+        {
+          "variant_id": "D18-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "governance": {
+              "plan_locked_at": "2026-01-02T08:00:00Z",
+              "first_outcome_access_at": "2026-01-02T09:00:00Z",
+              "outcome_access_by_decision_maker": true
+            },
+            "presentation": {
+              "annotation_color": "blue"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "allow_confirmatory_claim"
+          }
+        },
+        {
+          "variant_id": "D18-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "governance": {
+              "plan_locked_at": "2026-01-02T10:00:00Z",
+              "first_outcome_access_at": "2026-01-02T09:00:00Z",
+              "outcome_access_by_decision_maker": true
+            },
+            "presentation": {
+              "annotation_color": "green"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D19",
+      "name": "outcome_selected_after_adaptive_inspection",
+      "decision": "classify_selected_result",
+      "intervention_contract": {
+        "kind": "flip_and_invariance",
+        "decisive_path": "analysis.selection_after_outcome_inspection",
+        "invariant_path": "reporting.caption_style"
+      },
+      "variants": [
+        {
+          "variant_id": "D19-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "analysis": {
+              "registered_family_size": 20,
+              "inspected_outcomes": 20,
+              "selection_after_outcome_inspection": true,
+              "stopping_rule_preregistered": false
+            },
+            "reporting": {
+              "caption_style": "compact"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        },
+        {
+          "variant_id": "D19-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "analysis": {
+              "registered_family_size": 20,
+              "inspected_outcomes": 20,
+              "selection_after_outcome_inspection": false,
+              "stopping_rule_preregistered": true
+            },
+            "reporting": {
+              "caption_style": "compact"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "allow_registered_family_claim"
+          }
+        },
+        {
+          "variant_id": "D19-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "analysis": {
+              "registered_family_size": 20,
+              "inspected_outcomes": 20,
+              "selection_after_outcome_inspection": true,
+              "stopping_rule_preregistered": false
+            },
+            "reporting": {
+              "caption_style": "verbose"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        },
+        {
+          "variant_id": "D19-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "analysis": {
+              "registered_family_size": 20,
+              "inspected_outcomes": 20,
+              "selection_after_outcome_inspection": false,
+              "stopping_rule_preregistered": true
+            },
+            "reporting": {
+              "caption_style": "compact"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "allow_registered_family_claim"
+          }
+        },
+        {
+          "variant_id": "D19-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "analysis": {
+              "registered_family_size": 20,
+              "inspected_outcomes": 20,
+              "selection_after_outcome_inspection": true,
+              "stopping_rule_preregistered": false
+            },
+            "reporting": {
+              "caption_style": "revised"
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "label_exploratory"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D20",
+      "name": "metric_definition_drift",
+      "decision": "compare_two_measurements",
+      "intervention_contract": {
+        "kind": "flip_and_invariance",
+        "decisive_path": "comparison.comparability_certificate",
+        "invariant_path": "reporting.table_order"
+      },
+      "variants": [
+        {
+          "variant_id": "D20-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "comparison": {
+              "left_metric_name": "task_success",
+              "right_metric_name": "task_success",
+              "left_definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "right_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "units_match": false,
+              "comparability_certificate": null
+            },
+            "reporting": {
+              "table_order": "ascending"
+            }
+          },
+          "oracle": {
+            "use_validity": "not_comparable",
+            "action": "do_not_pool"
+          }
+        },
+        {
+          "variant_id": "D20-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "comparison": {
+              "left_metric_name": "task_success",
+              "right_metric_name": "task_success",
+              "left_definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "right_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "units_match": false,
+              "comparability_certificate": {
+                "certificate_id": "conv-1",
+                "conversion": "registered monotone conversion",
+                "scope": "these two metric versions"
+              }
+            },
+            "reporting": {
+              "table_order": "ascending"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "compare_after_registered_conversion"
+          }
+        },
+        {
+          "variant_id": "D20-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "comparison": {
+              "left_metric_name": "task_success",
+              "right_metric_name": "task_success",
+              "left_definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "right_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "units_match": false,
+              "comparability_certificate": null
+            },
+            "reporting": {
+              "table_order": "descending"
+            }
+          },
+          "oracle": {
+            "use_validity": "not_comparable",
+            "action": "do_not_pool"
+          }
+        },
+        {
+          "variant_id": "D20-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "comparison": {
+              "left_metric_name": "task_success",
+              "right_metric_name": "task_success",
+              "left_definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "right_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "units_match": false,
+              "comparability_certificate": {
+                "certificate_id": "conv-1",
+                "conversion": "registered monotone conversion",
+                "scope": "these two metric versions"
+              }
+            },
+            "reporting": {
+              "table_order": "ascending"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "compare_after_registered_conversion"
+          }
+        },
+        {
+          "variant_id": "D20-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "comparison": {
+              "left_metric_name": "task_success",
+              "right_metric_name": "task_success",
+              "left_definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "right_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "units_match": false,
+              "comparability_certificate": null
+            },
+            "reporting": {
+              "table_order": "grouped"
+            }
+          },
+          "oracle": {
+            "use_validity": "not_comparable",
+            "action": "do_not_pool"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D21",
+      "name": "failed_attempt_is_not_measured_zero",
+      "decision": "classify_observation",
+      "intervention_contract": {
+        "kind": "flip_and_invariance",
+        "decisive_path": "measurement.attempt_status",
+        "invariant_path": "instrument.operator_note"
+      },
+      "variants": [
+        {
+          "variant_id": "D21-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "measurement": {
+              "attempt_status": "failed",
+              "reported_numeric_value": 0,
+              "measurement_completed": false,
+              "censoring": null,
+              "detection_limit": null
+            },
+            "instrument": {
+              "operator_note": "shift-A"
+            }
+          },
+          "oracle": {
+            "use_validity": "missing_or_failed",
+            "action": "do_not_treat_as_zero"
+          }
+        },
+        {
+          "variant_id": "D21-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "measurement": {
+              "attempt_status": "completed",
+              "reported_numeric_value": 0,
+              "measurement_completed": true,
+              "censoring": null,
+              "detection_limit": 0
+            },
+            "instrument": {
+              "operator_note": "shift-A"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "accept_measured_zero"
+          }
+        },
+        {
+          "variant_id": "D21-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "measurement": {
+              "attempt_status": "failed",
+              "reported_numeric_value": 0,
+              "measurement_completed": false,
+              "censoring": null,
+              "detection_limit": null
+            },
+            "instrument": {
+              "operator_note": "shift-B"
+            }
+          },
+          "oracle": {
+            "use_validity": "missing_or_failed",
+            "action": "do_not_treat_as_zero"
+          }
+        },
+        {
+          "variant_id": "D21-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "measurement": {
+              "attempt_status": "completed",
+              "reported_numeric_value": 0,
+              "measurement_completed": true,
+              "censoring": null,
+              "detection_limit": 0
+            },
+            "instrument": {
+              "operator_note": "shift-A"
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "accept_measured_zero"
+          }
+        },
+        {
+          "variant_id": "D21-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "measurement": {
+              "attempt_status": "failed",
+              "reported_numeric_value": 0,
+              "measurement_completed": false,
+              "censoring": null,
+              "detection_limit": null
+            },
+            "instrument": {
+              "operator_note": "shift-C"
+            }
+          },
+          "oracle": {
+            "use_validity": "missing_or_failed",
+            "action": "do_not_treat_as_zero"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D22",
+      "name": "sunk_cost_does_not_change_prospective_choice",
+      "decision": "allocate_next_incremental_budget",
+      "intervention_contract": {
+        "kind": "invariance",
+        "decisive_path": "prospective.net_payoff",
+        "invariant_path": "history.sunk_cost"
+      },
+      "variants": [
+        {
+          "variant_id": "D22-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "options": {
+              "A": {
+                "future_benefit": 40,
+                "future_cost": 20
+              },
+              "B": {
+                "future_benefit": 45,
+                "future_cost": 30
+              }
+            },
+            "history": {
+              "sunk_cost_A": 100,
+              "sunk_cost_B": 0
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "choose_A"
+          }
+        },
+        {
+          "variant_id": "D22-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "options": {
+              "A": {
+                "future_benefit": 40,
+                "future_cost": 20
+              },
+              "B": {
+                "future_benefit": 60,
+                "future_cost": 30
+              }
+            },
+            "history": {
+              "sunk_cost_A": 100,
+              "sunk_cost_B": 0
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "choose_B"
+          }
+        },
+        {
+          "variant_id": "D22-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "options": {
+              "A": {
+                "future_benefit": 40,
+                "future_cost": 20
+              },
+              "B": {
+                "future_benefit": 45,
+                "future_cost": 30
+              }
+            },
+            "history": {
+              "sunk_cost_A": 0,
+              "sunk_cost_B": 500
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "choose_A"
+          }
+        },
+        {
+          "variant_id": "D22-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "options": {
+              "A": {
+                "future_benefit": 40,
+                "future_cost": 20
+              },
+              "B": {
+                "future_benefit": 45,
+                "future_cost": 30
+              }
+            },
+            "history": {
+              "sunk_cost_A": 100,
+              "sunk_cost_B": 0
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "choose_A"
+          }
+        },
+        {
+          "variant_id": "D22-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "options": {
+              "A": {
+                "future_benefit": 40,
+                "future_cost": 20
+              },
+              "B": {
+                "future_benefit": 45,
+                "future_cost": 30
+              }
+            },
+            "history": {
+              "sunk_cost_A": 200,
+              "sunk_cost_B": 900
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible",
+            "action": "choose_A"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D23",
+      "name": "duplicate_evidence_family_is_not_independent_corroboration",
+      "decision": "classify_evidence_strength",
+      "intervention_contract": {
+        "kind": "flip_and_invariance",
+        "decisive_path": "evidence.independent_family_count",
+        "invariant_path": "presentation.source_order"
+      },
+      "variants": [
+        {
+          "variant_id": "D23-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "evidence": {
+              "source_revision_count": 5,
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "duplicate_lineage_known": true
+            },
+            "presentation": {
+              "source_order": [
+                "s1",
+                "s2",
+                "s3",
+                "s4",
+                "s5"
+              ]
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "do_not_claim_independent_corroboration"
+          }
+        },
+        {
+          "variant_id": "D23-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "evidence": {
+              "source_revision_count": 5,
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "duplicate_lineage_known": true
+            },
+            "presentation": {
+              "source_order": [
+                "s1",
+                "s2",
+                "s3",
+                "s4",
+                "s5"
+              ]
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "allow_family_stratified_corroboration"
+          }
+        },
+        {
+          "variant_id": "D23-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "evidence": {
+              "source_revision_count": 5,
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "duplicate_lineage_known": true
+            },
+            "presentation": {
+              "source_order": [
+                "s5",
+                "s4",
+                "s3",
+                "s2",
+                "s1"
+              ]
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "do_not_claim_independent_corroboration"
+          }
+        },
+        {
+          "variant_id": "D23-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "evidence": {
+              "source_revision_count": 5,
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "duplicate_lineage_known": true
+            },
+            "presentation": {
+              "source_order": [
+                "s1",
+                "s2",
+                "s3",
+                "s4",
+                "s5"
+              ]
+            }
+          },
+          "oracle": {
+            "use_validity": "admissible_with_limitations",
+            "action": "allow_family_stratified_corroboration"
+          }
+        },
+        {
+          "variant_id": "D23-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "evidence": {
+              "source_revision_count": 5,
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "duplicate_lineage_known": true
+            },
+            "presentation": {
+              "source_order": [
+                "s2",
+                "s1",
+                "s4",
+                "s3",
+                "s5"
+              ]
+            }
+          },
+          "oracle": {
+            "use_validity": "exploratory_only",
+            "action": "do_not_claim_independent_corroboration"
+          }
+        }
+      ]
+    }
+  ]
+}
