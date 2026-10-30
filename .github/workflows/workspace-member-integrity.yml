@@ -1,0 +1,33 @@
+name: Cargo workspace member integrity
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "crates/**"
+      - ".github/scripts/check-workspace-glob-members.py"
+      - ".github/workflows/workspace-member-integrity.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "crates/**"
+      - ".github/scripts/check-workspace-glob-members.py"
+      - ".github/workflows/workspace-member-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-members:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate glob-matched member manifests
+        run: python3 .github/scripts/check-workspace-glob-members.py
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Validate root workspace metadata
+        run: cargo metadata --no-deps --format-version 1
