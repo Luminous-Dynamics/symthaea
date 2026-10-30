@@ -1,0 +1,72 @@
+name: VIS-DVPC-051 portfolio-aware logging policy design
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/vision-dvpc-051-logging-policy-design.rs"
+      - "docs/research/VIS_DVPC_051_LOGGING_POLICY_DESIGN_V0.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-051-logging-policy-design.rs"
+      - "docs/research/VIS_DVPC_051_LOGGING_POLICY_DESIGN_V0.md"
+      - ".github/workflows/vis-dvpc-051-logging-policy-design.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact VIS-DVPC-051 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Compile and run analytic known-answer tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-051-logging-policy-design.rs -o /tmp/vis-dvpc-051-tests
+          /tmp/vis-dvpc-051-tests
+      - name: Verify deterministic smoke and tabular schema
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-051-logging-policy-design.rs -o /tmp/vis-dvpc-051
+          /tmp/vis-dvpc-051 --smoke > /tmp/vis-dvpc-051-smoke-a.tsv
+          /tmp/vis-dvpc-051 --smoke > /tmp/vis-dvpc-051-smoke-b.tsv
+          cmp /tmp/vis-dvpc-051-smoke-a.tsv /tmp/vis-dvpc-051-smoke-b.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 16) bad=1; n++ } END { if (n != 54 || bad) exit 1 }' /tmp/vis-dvpc-051-smoke-a.tsv
+          awk -F '\t' '$1 == "RESULT" { if ($7 < 0.019999 || $8 > 0.980001 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $12 < 0.999999 || $13 <= 0 || $13 > 1 || $14 < 0 || ($12 != $12) || ($14 != $14)) bad=1; if (($4 == "oracle_reward_aware_minimax_ope_variance_grid" || $4 == "reward_greedy_with_floor") && $15 != "true") bad=1; if (($4 != "oracle_reward_aware_minimax_ope_variance_grid" && $4 != "reward_greedy_with_floor") && $15 != "false") bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-051-smoke-a.tsv
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-051-smoke-a.tsv)" = "4"
+      - name: Run full grid-resolution panel
+        run: |
+          /tmp/vis-dvpc-051 > /tmp/vis-dvpc-051-full.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 16) bad=1; n++ } END { if (n != 54 || bad) exit 1 }' /tmp/vis-dvpc-051-full.tsv
+          awk -F '\t' '$1 == "RESULT" { if ($7 < 0.019999 || $8 > 0.980001 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $12 < 0.999999 || $13 <= 0 || $13 > 1 || $14 < 0 || ($12 != $12) || ($14 != $14)) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-051-full.tsv
+          grep -F $'BENCHMARK_CONFIG\tid\tVIS-DVPC-051' /tmp/vis-dvpc-051-full.tsv
+      - name: Create exact-source and output SHA-256 receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          {
+            printf 'VIS_DVPC_051_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-051-logging-policy-design.rs docs/research/VIS_DVPC_051_LOGGING_POLICY_DESIGN_V0.md /tmp/vis-dvpc-051-smoke-a.tsv /tmp/vis-dvpc-051-full.tsv
+          } > /tmp/vis-dvpc-051-receipt.tsv
+          cat /tmp/vis-dvpc-051-receipt.tsv
+      - name: Publish results and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-051-logging-policy-design
+          path: |
+            /tmp/vis-dvpc-051-smoke-a.tsv
+            /tmp/vis-dvpc-051-full.tsv
+            /tmp/vis-dvpc-051-receipt.tsv
+          retention-days: 90
