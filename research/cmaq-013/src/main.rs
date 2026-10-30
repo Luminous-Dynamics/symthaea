@@ -459,7 +459,6 @@ fn summarize(
     let total_feedback = outcomes.iter().map(|item| item.feedback_count).sum::<usize>() as f64;
     let total_dropped = outcomes.iter().map(|item| item.feedback_dropped).sum::<usize>() as f64;
     let total_width = outcomes.iter().map(|item| item.bound_width_sum).sum::<f64>();
-    let total_q = outcomes.iter().map(|item| item.q_sum).sum::<f64>();
     let total_regret = outcomes.iter().map(|item| item.regret).sum::<f64>();
     let total_overprediction = outcomes.iter().map(|item| item.selected_overprediction_sum).sum::<f64>();
     let total_recovery = outcomes.iter().map(|item| recovery_delay(&item.coverage_tape, scenario.shift_onset())).filter(|delay| *delay >= 0.0).collect::<Vec<_>>();
