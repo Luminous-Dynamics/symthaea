@@ -1,0 +1,96 @@
+name: HARDSEC Event-Pool Recall
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_event_pool_recall.rs"
+      - "tests/fixtures/hardsec/finite-event-pool-fsm.json"
+      - "schemas/hardsec-fsm-event-pool-v1.schema.json"
+      - "schemas/hardsec-event-pool-recall-receipt-v1.schema.json"
+      - "tools/hardsec-event-pool-harness/**"
+      - ".github/workflows/hardsec-event-pool-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-event-pool-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Finite FSM event-pool recall audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_event_pool_recall.rs
+
+      - name: Test finite event-pool enumerator
+        run: cargo test --locked --manifest-path tools/hardsec-event-pool-harness/Cargo.toml --features event-pool-audit --example hardsec_event_pool_recall
+
+      - name: Validate FSM specification schema
+        run: |
+          set -euo pipefail
+          python -m pip install --requirement tools/hardsec-event-pool-harness/requirements-validation.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-fsm-event-pool-v1.schema.json").read_text(encoding="utf-8"))
+          instance = json.loads(Path("tests/fixtures/hardsec/finite-event-pool-fsm.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(instance))
+          if errors:
+              raise SystemExit("; ".join(error.message for error in errors))
+          print("FSM fixture schema: PASS")
+          PY
+
+      - name: Run reference event-pool recall audit
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path tools/hardsec-event-pool-harness/Cargo.toml --features event-pool-audit --example hardsec_event_pool_recall -- \
+            --spec tests/fixtures/hardsec/finite-event-pool-fsm.json \
+            --receipt "$RUNNER_TEMP/event-pool-recall.json"
+
+      - name: Validate receipt schema and known-answer metrics
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/event-pool-recall.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-event-pool-recall-receipt-v1.schema.json").read_text(encoding="utf-8"))
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("; ".join(error.message for error in errors))
+          assert receipt["reference_state_count"] == 5, receipt
+          assert receipt["reference_event_count"] == 6, receipt
+          assert receipt["observed_event_count"] == 4, receipt
+          assert abs(receipt["event_pool_recall"] - (4 / 6)) < 1e-12, receipt
+          assert receipt["missed_event_ids"] == ["event_rare_completion", "event_rare_prefix"], receipt
+          assert receipt["unreachable_event_ids_excluded_from_denominator"] == ["event_unreachable"], receipt
+          assert receipt["security_verdict"] is None, receipt
+          print("Known-answer recall: PASS (4/6 reachable events; 2 reachable events missed; 1 unreachable event excluded)")
+          PY
+
+      - name: Upload exact event-pool recall receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: hardsec-event-pool-recall-receipt
+          path: ${{ runner.temp }}/event-pool-recall.json
