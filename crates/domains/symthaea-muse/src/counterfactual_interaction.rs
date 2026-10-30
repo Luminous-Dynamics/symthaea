@@ -809,4 +809,159 @@ mod tests {
             )
         );
     }
+
+    fn lineage_for(indices: &[usize]) -> Vec<crate::performed_event_map::PerformedEventLineage> {
+        indices
+            .iter()
+            .enumerate()
+            .map(|(ordinal, source_index)| {
+                let onset_micros = (*source_index as u64) * 100_000;
+                crate::performed_event_map::PerformedEventLineage {
+                    source_event_id: format!("score_event_index:{source_index}"),
+                    descendant_ordinal: 0,
+                    midi_track_index: 0,
+                    note_on_ordinal: ordinal as u32,
+                    midi_channel: 0,
+                    midi_note: [60, 64, 67][*source_index],
+                    onset_micros,
+                    end_micros: onset_micros + 50_000,
+                    onset_frame: (onset_micros * 48_000 + 500_000) / 1_000_000,
+                    end_frame: ((onset_micros + 50_000) * 48_000 + 500_000) / 1_000_000,
+                }
+            })
+            .collect()
+    }
+
+    fn binding(
+        audio: &AudioView<'_>,
+        label: &str,
+        schedule: &str,
+        map: &str,
+        indices: &[usize],
+    ) -> VerifiedRendererAudioBinding {
+        crate::counterfactual_influence::test_verified_renderer_audio_binding(
+            audio,
+            sha256_hex(format!("receipt:{label}").as_bytes()),
+            sha256_hex(b"fixed-renderer-identity"),
+            sha256_hex(b"fixed-renderer-profile"),
+            sha256_hex(b"fixed-source-score"),
+            sha256_hex(schedule.as_bytes()),
+            sha256_hex(format!("map-receipt:{map}").as_bytes()),
+            sha256_hex(format!("map-artifact:{map}").as_bytes()),
+            sha256_hex(&[60, 64, 67]),
+            lineage_for(indices),
+        )
+    }
+
+    #[test]
+    fn four_coalition_report_replays_for_an_additive_pcm_fixture() {
+        let base_samples = vec![0.8f32; 64];
+        let remove_a_samples = vec![0.3f32; 64];
+        let remove_b_samples = vec![0.5f32; 64];
+        let remove_ab_samples = vec![0.0f32; 64];
+        let base_audio = audio(&base_samples);
+        let remove_a_audio = audio(&remove_a_samples);
+        let remove_b_audio = audio(&remove_b_samples);
+        let remove_ab_audio = audio(&remove_ab_samples);
+
+        let baseline = binding(&base_audio, "baseline", "midi-00", "map-00", &[0, 1, 2]);
+        let remove_a = binding(&remove_a_audio, "remove-a", "midi-10", "map-10", &[1, 2]);
+        let remove_b = binding(&remove_b_audio, "remove-b", "midi-01", "map-01", &[0, 2]);
+        let remove_ab = binding(&remove_ab_audio, "remove-ab", "midi-11", "map-11", &[2]);
+
+        let input = PairwiseInteractionInput {
+            source_event_a: "score_event_index:0",
+            source_event_b: "score_event_index:1",
+            expected_score_event_count: 3,
+            baseline: VerifiedInteractionRender { evidence: &baseline, audio: &base_audio },
+            remove_a: VerifiedInteractionRender { evidence: &remove_a, audio: &remove_a_audio },
+            remove_b: VerifiedInteractionRender { evidence: &remove_b, audio: &remove_b_audio },
+            remove_ab: VerifiedInteractionRender { evidence: &remove_ab, audio: &remove_ab_audio },
+            analysis: config(),
+        };
+
+        let report = measure_pairwise_interaction(&input).unwrap();
+        assert_eq!(report.windows.len(), report.total_channel_windows);
+        assert!(report.windows.iter().all(|window| window.pcm_interaction_rms < 1.0e-7));
+        assert!(verify_pairwise_interaction(&report, &input).unwrap());
+    }
+
+    #[test]
+    fn coalition_validator_rejects_a_double_removal_that_keeps_one_target_event() {
+        let base_samples = vec![0.8f32; 64];
+        let remove_a_samples = vec![0.3f32; 64];
+        let remove_b_samples = vec![0.5f32; 64];
+        let remove_ab_samples = vec![0.0f32; 64];
+        let base_audio = audio(&base_samples);
+        let remove_a_audio = audio(&remove_a_samples);
+        let remove_b_audio = audio(&remove_b_samples);
+        let remove_ab_audio = audio(&remove_ab_samples);
+
+        let baseline = binding(&base_audio, "baseline", "midi-00", "map-00", &[0, 1, 2]);
+        let remove_a = binding(&remove_a_audio, "remove-a", "midi-10", "map-10", &[1, 2]);
+        let remove_b = binding(&remove_b_audio, "remove-b", "midi-01", "map-01", &[0, 2]);
+        // Event 0 remains, despite the declared coalition requiring both 0 and 1 removed.
+        let remove_ab = binding(&remove_ab_audio, "wrong-remove-ab", "midi-11", "map-11", &[0, 2]);
+
+        let input = PairwiseInteractionInput {
+            source_event_a: "score_event_index:0",
+            source_event_b: "score_event_index:1",
+            expected_score_event_count: 3,
+            baseline: VerifiedInteractionRender { evidence: &baseline, audio: &base_audio },
+            remove_a: VerifiedInteractionRender { evidence: &remove_a, audio: &remove_a_audio },
+            remove_b: VerifiedInteractionRender { evidence: &remove_b, audio: &remove_b_audio },
+            remove_ab: VerifiedInteractionRender { evidence: &remove_ab, audio: &remove_ab_audio },
+            analysis: config(),
+        };
+        assert_eq!(
+            measure_pairwise_interaction(&input).unwrap_err(),
+            PairwiseInteractionError::InvalidCoalition("remove_ab")
+        );
+    }
+
+    #[test]
+    fn coalition_validator_rejects_renderer_profile_substitution() {
+        let base_samples = vec![0.8f32; 64];
+        let remove_a_samples = vec![0.3f32; 64];
+        let remove_b_samples = vec![0.5f32; 64];
+        let remove_ab_samples = vec![0.0f32; 64];
+        let base_audio = audio(&base_samples);
+        let remove_a_audio = audio(&remove_a_samples);
+        let remove_b_audio = audio(&remove_b_samples);
+        let remove_ab_audio = audio(&remove_ab_samples);
+
+        let baseline = binding(&base_audio, "baseline", "midi-00", "map-00", &[0, 1, 2]);
+        let remove_a = binding(&remove_a_audio, "remove-a", "midi-10", "map-10", &[1, 2]);
+        let remove_b = binding(&remove_b_audio, "remove-b", "midi-01", "map-01", &[0, 2]);
+        let mut remove_ab = binding(&remove_ab_audio, "remove-ab", "midi-11", "map-11", &[2]);
+        // The test-only constructor is deliberately used to exercise the
+        // fail-closed consumer boundary with a substituted execution profile.
+        let remove_ab = crate::counterfactual_influence::test_verified_renderer_audio_binding(
+            &remove_ab_audio,
+            remove_ab.receipt_sha256().to_owned(),
+            remove_ab.renderer_identity_sha256().to_owned(),
+            sha256_hex(b"substituted-renderer-profile"),
+            remove_ab.source_score_sha256().to_owned(),
+            remove_ab.input_artifact_sha256().to_owned(),
+            remove_ab.performed_event_map_sha256().to_owned(),
+            remove_ab.performed_event_map_artifact_sha256().to_owned(),
+            remove_ab.expected_primary_pitches_sha256().to_owned(),
+            remove_ab.performed_event_lineage().to_vec(),
+        );
+
+        let input = PairwiseInteractionInput {
+            source_event_a: "score_event_index:0",
+            source_event_b: "score_event_index:1",
+            expected_score_event_count: 3,
+            baseline: VerifiedInteractionRender { evidence: &baseline, audio: &base_audio },
+            remove_a: VerifiedInteractionRender { evidence: &remove_a, audio: &remove_a_audio },
+            remove_b: VerifiedInteractionRender { evidence: &remove_b, audio: &remove_b_audio },
+            remove_ab: VerifiedInteractionRender { evidence: &remove_ab, audio: &remove_ab_audio },
+            analysis: config(),
+        };
+        assert_eq!(
+            measure_pairwise_interaction(&input).unwrap_err(),
+            PairwiseInteractionError::RendererIdentityMismatch
+        );
+    }
 }
