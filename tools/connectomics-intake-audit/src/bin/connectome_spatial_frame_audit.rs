@@ -9,7 +9,8 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{self, BufReader, Cursor, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -23,6 +24,9 @@ struct Args {
     /// Spatial frame manifest JSON.
     #[arg(long)]
     frame: PathBuf,
+    /// Eligibility mask artifact bytes (packed bitset or ASCII hex bitset).
+    #[arg(long)]
+    eligibility_mask: PathBuf,
     /// Optional JSON report path; stdout when omitted.
     #[arg(long)]
     output: Option<PathBuf>,
@@ -70,6 +74,7 @@ struct EligibilityMask {
     artifact_id: String,
     artifact_sha256: String,
     selection_rule_sha256: String,
+    encoding: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -116,6 +121,13 @@ struct AuditReport {
     tile_shape_voxels: [u64; 3],
     eligibility_mask_artifact_id: String,
     eligibility_mask_sha256: String,
+    eligibility_mask_encoding: String,
+    eligibility_mask_verified: bool,
+    eligibility_mask_actual_sha256: String,
+    eligibility_mask_artifact_byte_count: String,
+    eligibility_foreground_voxel_count: String,
+    eligibility_foreground_voxel_fraction: f64,
+    mask_tile_counts: Vec<MaskTileCount>,
     eligibility_selection_rule_sha256: String,
     frame_protocol_sha256: String,
     frame_generator_tool_id: String,
@@ -200,6 +212,260 @@ fn population_frame_sha256(population: &[PopulationPsu]) -> String {
         hasher.update(stratum_id.as_bytes());
     }
     hex::encode(hasher.finalize())
+}
+
+
+#[derive(Debug, Serialize)]
+struct MaskTileCount {
+    psu_id: String,
+    tile_voxel_count: String,
+    eligible_voxel_count: String,
+}
+
+struct MaskScan {
+    foreground_voxels: u128,
+    tile_foreground_counts: Vec<u128>,
+}
+
+fn expected_mask_bytes(frame: &FrameInput) -> Result<u128, String> {
+    let voxels = checked_product(frame.extent_voxels, "eligibility mask")?;
+    voxels.checked_add(7)
+        .map(|value| value / 8)
+        .ok_or_else(|| "eligibility mask byte count overflows u128".to_string())
+}
+
+fn hex_nibble(value: u8) -> io::Result<u8> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        b'A'..=b'F' => Ok(value - b'A' + 10),
+        _ => Err(io::Error::new(io::ErrorKind::InvalidData, "eligibility mask contains a non-hex character")),
+    }
+}
+
+struct HexBitsetReader<R: Read> {
+    inner: R,
+}
+
+impl<R: Read> Read for HexBitsetReader<R> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let mut written = 0;
+        while written < output.len() {
+            let mut high = [0_u8; 1];
+            let read_high = self.inner.read(&mut high)?;
+            if read_high == 0 {
+                break;
+            }
+            let mut low = [0_u8; 1];
+            self.inner.read_exact(&mut low)?;
+            output[written] = (hex_nibble(high[0])? << 4) | hex_nibble(low[0])?;
+            written += 1;
+        }
+        Ok(written)
+    }
+}
+
+fn scan_mask<R: Read>(frame: &FrameInput, mut reader: R) -> Result<MaskScan, String> {
+    let dimensions = grid_dimensions(frame.extent_voxels, frame.tile_shape_voxels)?;
+    let cell_count = checked_product(dimensions, "mask grid")?;
+    if cell_count > usize::MAX as u128 {
+        return Err("mask grid exceeds addressable memory".into());
+    }
+    let mut tile_foreground_counts = vec![0_u128; cell_count as usize];
+    let total_voxels = checked_product(frame.extent_voxels, "mask")?;
+    let packed_bytes = expected_mask_bytes(frame)?;
+    let x_extent = u128::from(frame.extent_voxels[0]);
+    let y_extent = u128::from(frame.extent_voxels[1]);
+    let xy_extent = x_extent.checked_mul(y_extent)
+        .ok_or_else(|| "mask XY plane size overflows u128".to_string())?;
+    let mut remaining_bytes = packed_bytes;
+    let mut linear_start = 0_u128;
+    let mut foreground_voxels = 0_u128;
+    let mut buffer = vec![0_u8; 64 * 1024];
+
+    while remaining_bytes > 0 {
+        let chunk_len = remaining_bytes.min(buffer.len() as u128) as usize;
+        reader.read_exact(&mut buffer[..chunk_len])
+            .map_err(|error| format!("eligibility mask is truncated or unreadable: {error}"))?;
+        for byte in &buffer[..chunk_len] {
+            let remaining_voxels = total_voxels - linear_start;
+            let valid_bits = remaining_voxels.min(8) as u8;
+            if valid_bits < 8 && (*byte >> valid_bits) != 0 {
+                return Err("eligibility mask has non-zero padding bits after the declared voxel extent".into());
+            }
+            for bit in 0..valid_bits {
+                if byte & (1_u8 << bit) == 0 {
+                    continue;
+                }
+                let linear_index = linear_start + u128::from(bit);
+                let x = linear_index % x_extent;
+                let y = (linear_index / x_extent) % y_extent;
+                let z = linear_index / xy_extent;
+                let gx = x / u128::from(frame.tile_shape_voxels[0]);
+                let gy = y / u128::from(frame.tile_shape_voxels[1]);
+                let gz = z / u128::from(frame.tile_shape_voxels[2]);
+                let tile_index = (gz * u128::from(dimensions[1]) + gy)
+                    .checked_mul(u128::from(dimensions[0]))
+                    .and_then(|value| value.checked_add(gx))
+                    .ok_or_else(|| "mask tile index overflows u128".to_string())?;
+                let tile_index = usize::try_from(tile_index)
+                    .map_err(|_| "mask tile index exceeds usize".to_string())?;
+                tile_foreground_counts[tile_index] = tile_foreground_counts[tile_index]
+                    .checked_add(1)
+                    .ok_or_else(|| "per-tile foreground voxel count overflows u128".to_string())?;
+                foreground_voxels = foreground_voxels.checked_add(1)
+                    .ok_or_else(|| "foreground voxel count overflows u128".to_string())?;
+            }
+            linear_start = linear_start.checked_add(u128::from(valid_bits))
+                .ok_or_else(|| "mask linear voxel index overflows u128".to_string())?;
+        }
+        remaining_bytes -= chunk_len as u128;
+    }
+
+    let mut extra = [0_u8; 1];
+    if reader.read(&mut extra).map_err(|error| format!("could not check mask EOF: {error}"))? != 0 {
+        return Err("eligibility mask contains trailing bytes beyond the declared voxel extent".into());
+    }
+    if linear_start != total_voxels {
+        return Err("eligibility mask decoded voxel count does not match the declared extent".into());
+    }
+
+    Ok(MaskScan { foreground_voxels, tile_foreground_counts })
+}
+
+fn tile_voxel_count(frame: &FrameInput, grid_index: [u64; 3]) -> Result<u128, String> {
+    let mut cell_extent = [0_u64; 3];
+    for axis in 0..3 {
+        let start = grid_index[axis]
+            .checked_mul(frame.tile_shape_voxels[axis])
+            .ok_or_else(|| format!("tile start overflows on axis {axis}"))?;
+        let remaining = frame.extent_voxels[axis]
+            .checked_sub(start)
+            .ok_or_else(|| format!("tile start exceeds extent on axis {axis}"))?;
+        if remaining == 0 {
+            return Err("empty boundary tile".into());
+        }
+        cell_extent[axis] = remaining.min(frame.tile_shape_voxels[axis]);
+    }
+    checked_product(cell_extent, "tile")
+}
+
+fn hash_file(path: &PathBuf) -> Result<(String, u64), String> {
+    let file = File::open(path).map_err(|error| format!("could not open {}: {error}", path.display()))?;
+    let byte_count = file.metadata()
+        .map_err(|error| format!("could not stat {}: {error}", path.display()))?
+        .len();
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = reader.read(&mut buffer)
+            .map_err(|error| format!("could not hash {}: {error}", path.display()))?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok((hex::encode(hasher.finalize()), byte_count))
+}
+
+fn validate_mask_file(
+    frame: &FrameInput,
+    path: &PathBuf,
+    report: &mut AuditReport,
+) -> Result<(), String> {
+    let (actual_sha256, artifact_bytes) = hash_file(path)?;
+    if actual_sha256 != frame.eligibility_mask.artifact_sha256 {
+        return Err(format!(
+            "eligibility mask SHA-256 mismatch: manifest declares {}, file is {}",
+            frame.eligibility_mask.artifact_sha256, actual_sha256
+        ));
+    }
+    let expected_packed = expected_mask_bytes(frame)?;
+    let expected_artifact_bytes = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => expected_packed,
+        "hex_bitset_lsb0_x_fastest_v1" => expected_packed.checked_mul(2)
+            .ok_or_else(|| "hex mask byte count overflows u128".to_string())?,
+        other => return Err(format!("unsupported eligibility mask encoding {other}")),
+    };
+    if u128::from(artifact_bytes) != expected_artifact_bytes {
+        return Err(format!(
+            "eligibility mask artifact has {artifact_bytes} bytes; expected {expected_artifact_bytes}"
+        ));
+    }
+
+    let file = File::open(path).map_err(|error| format!("could not reopen {}: {error}", path.display()))?;
+    let raw_reader = BufReader::new(file);
+    let decoded_reader: Box<dyn Read> = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => Box::new(raw_reader),
+        "hex_bitset_lsb0_x_fastest_v1" => Box::new(HexBitsetReader { inner: raw_reader }),
+        _ => return Err("unsupported eligibility mask encoding".into()),
+    };
+    let scan = scan_mask(frame, decoded_reader)?;
+    let dimensions = grid_dimensions(frame.extent_voxels, frame.tile_shape_voxels)?;
+    let mut mask_tile_counts = Vec::with_capacity(frame.cells.len());
+    let mut eligible_tile_count = 0_u64;
+    let mut excluded_tile_count = 0_u64;
+
+    for cell in &frame.cells {
+        let tile_index = (u128::from(cell.grid_index[2]) * u128::from(dimensions[1])
+            + u128::from(cell.grid_index[1])) * u128::from(dimensions[0])
+            + u128::from(cell.grid_index[0]);
+        let tile_index = usize::try_from(tile_index)
+            .map_err(|_| "mask tile index exceeds usize while checking dispositions".to_string())?;
+        let foreground = scan.tile_foreground_counts[tile_index];
+        match cell.disposition.as_str() {
+            "eligible" if foreground == 0 => {
+                return Err(format!("PSU {} is marked eligible but contains zero eligible-mask voxels", cell.psu_id));
+            }
+            "excluded" if foreground > 0 => {
+                return Err(format!("PSU {} is marked excluded but contains {foreground} eligible-mask voxels", cell.psu_id));
+            }
+            "eligible" => eligible_tile_count += 1,
+            "excluded" => excluded_tile_count += 1,
+            _ => return Err(format!("PSU {} has invalid disposition", cell.psu_id)),
+        }
+        mask_tile_counts.push(MaskTileCount {
+            psu_id: cell.psu_id.clone(),
+            tile_voxel_count: tile_voxel_count(frame, cell.grid_index)?.to_string(),
+            eligible_voxel_count: foreground.to_string(),
+        });
+    }
+    if scan.foreground_voxels == 0 {
+        return Err("eligibility mask contains no foreground voxels".into());
+    }
+    let total_voxels = checked_product(frame.extent_voxels, "mask")?;
+    report.eligibility_mask_verified = true;
+    report.eligibility_mask_actual_sha256 = actual_sha256;
+    report.eligibility_mask_artifact_byte_count = artifact_bytes.to_string();
+    report.eligibility_foreground_voxel_count = scan.foreground_voxels.to_string();
+    report.eligibility_foreground_voxel_fraction = scan.foreground_voxels as f64 / total_voxels as f64;
+    report.mask_tile_counts = mask_tile_counts;
+    report.status = "PASS";
+    report.scope_note = "Proves exactly-once lattice tiling inside the declared box and verifies the exact eligibility-mask artifact bytes, packed bit order, voxel count, padding, and per-PSU eligible/excluded consistency. Does not prove the declared box covers all biologically eligible tissue, the mask selection rule is biologically valid, source volume/segmentation digests are truthful, or PSUs are independent.";
+    if report.eligible_grid_cells != eligible_tile_count || report.excluded_grid_cells != excluded_tile_count {
+        return Err("eligibility mask tile counts differ from the frame audit".into());
+    }
+    Ok(())
+}
+
+fn validate_mask_bytes(frame: &FrameInput, artifact_bytes: &[u8]) -> Result<MaskScan, String> {
+    let actual_sha = sha256(artifact_bytes);
+    if actual_sha != frame.eligibility_mask.artifact_sha256 {
+        return Err("eligibility mask SHA-256 does not match manifest".into());
+    }
+    let decoded = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => artifact_bytes.to_vec(),
+        "hex_bitset_lsb0_x_fastest_v1" => {
+            let mut reader = HexBitsetReader { inner: Cursor::new(artifact_bytes) };
+            let expected = expected_mask_bytes(frame)?;
+            let mut decoded = Vec::with_capacity(usize::try_from(expected).map_err(|_| "mask too large for test buffer")?);
+            reader.read_to_end(&mut decoded).map_err(|error| error.to_string())?;
+            decoded
+        }
+        other => return Err(format!("unsupported eligibility mask encoding {other}")),
+    };
+    scan_mask(frame, Cursor::new(decoded))
 }
 
 fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
