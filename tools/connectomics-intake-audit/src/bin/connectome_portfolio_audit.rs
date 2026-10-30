@@ -969,7 +969,7 @@ mod tests {
         let ranking_a = rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
         let mut changed_reference = input;
         changed_reference.queries[0].reference_value = 99.0;
-        let ranking_b = rank_candidates(&changed_reference, &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
+        let ranking_b = rank_candidates(&changed_reference.candidates, &graph_from_edges(&changed_reference.graph), &ranking_specs(&changed_reference), &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
         assert_eq!(ranking_a, ranking_b);
     }
 }
