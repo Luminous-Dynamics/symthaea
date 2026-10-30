@@ -67,6 +67,26 @@ The 33 cases cover:
 
 The machine-readable catalog is `benchmarks/basalt/coverage/observer-challenges.v1.json`; its strict Draft 2020-12 schema is `benchmarks/basalt/schema/observer-challenges.schema.json`.
 
+## Linux mechanism selection: containment is not observation
+
+The first Linux prototype should not equate any single filesystem API with a complete dependency observer.
+
+- **Landlock is a containment layer, not a dependency trace.** It can restrict filesystem hierarchies and, depending on the kernel ABI, network ports. The kernel documentation describes ABI-dependent capability detection and notes limits for special filesystems accessed through paths such as `/proc/<pid>/fd/*` and `/proc/<pid>/ns/*`; a sandbox policy also does not retroactively revoke every already-open descriptor. Record the exact Landlock ABI and handled rights, close or explicitly account for inherited descriptors before confinement, and classify unsupported controls as unresolved. See the [Linux kernel Landlock documentation](https://docs.kernel.org/userspace-api/landlock.html).
+- **fanotify is a useful supplemental observer, not a sole completeness oracle.** Its documented limitations include not reporting accesses/modifications caused by `mmap`, `msync` or `munmap`; child additions/removals/changes do not themselves emit events on a marked directory; directory monitoring is not automatically recursive; dynamically adding marks to newly created subdirectories can race; and its event queue can overflow. Mount-level monitoring can remove some recursive-marking gaps, but it does not solve the mmap limitation. See [fanotify(7), Limitations and caveats](https://man7.org/linux/man-pages/man7/fanotify.7.html).
+- **A syscall/process observer and independent snapshot/replay lane are still required.** Qualify the exact mechanisms for descriptor provenance, `exec`/child lineage, metadata and directory enumeration, `mmap`, dynamic library loads, process exit, observer restart and event loss. Treat untested interfaces and special filesystems as unresolved. A second observer or replay is a cross-check, not a magical oracle; common-mode failures must be included in the challenge design.
+
+### Candidate composition
+
+1. Materialize the initial workspace as an immutable, content-addressed read-only snapshot. Provide a separate writable output/artifact area whose final contents are committed to the run receipt.
+2. Pin the toolchain and build closure; admit only explicit immutable roots. Record the exact kernel, Landlock ABI, handled filesystem/network rights, mount topology and confinement profile.
+3. Close inherited descriptors or register each descriptor's immutable provenance before launching the supervised process tree. Do not assume a path-based rule revokes access already obtained through a file descriptor.
+4. Deny network during scored verification where practical. If networking is needed, capture immutable response artifacts and bind their bytes and endpoint/protocol provenance; unsupported DNS/UDP/external state stays unresolved.
+5. Combine a process/syscall-level event stream with tool-native dependency metadata and snapshot-based independent replay. Use fanotify as a complementary filesystem signal only after the exact kernel/filesystem configuration is qualified.
+6. Maintain explicit dropped-event, buffer-overflow, restart, unmonitored-child and snapshot-race counters. Any unknown gap forces unresolved or invalid receipt status.
+7. Run every mechanism against its specific catalog controls. A green sandbox self-test does not establish dependency capture recall.
+
+This design deliberately uses **prevention to shrink the observable state space** and independent observation/replay to test what remains. It is more defensible than attempting to infer all dependencies from file-open notifications after an unconstrained process has already run.
+
 ## Scoring and statistical discipline
 
 Primary metrics:
