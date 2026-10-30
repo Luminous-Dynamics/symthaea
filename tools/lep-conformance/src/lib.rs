@@ -261,6 +261,20 @@ fn validate_predicate_schema(value: &Value, out: &mut Vec<Violation>) {
 /// Object key order is ignored by JSON value equality. Array order remains
 /// significant, so the target and checkedTarget must have exactly equivalent
 /// structured values, including the order of input artifacts.
+/// Validate the predicate against JSON Schema only, without running LEP semantics.
+///
+/// This supports conformance suites that need to distinguish structural failures
+/// from schema-valid but semantically inconsistent statements.
+pub fn validate_schema_only(predicate: &Value) -> ValidationReport {
+    let mut violations = Vec::new();
+    validate_predicate_schema(predicate, &mut violations);
+    ValidationReport {
+        conforms: violations.is_empty(),
+        scope: "LEP_SCHEMA_ONLY",
+        violations,
+    }
+}
+
 pub fn verify_statement(statement: &Value) -> ValidationReport {
     let mut violations = Vec::new();
 
@@ -1050,6 +1064,104 @@ mod tests {
                 "limitations": ["Synthetic data only."]
             }
         })
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ConformanceSuite {
+        cases: Vec<ConformanceCase>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ConformanceCase {
+        id: String,
+        file: String,
+        schema_expected: String,
+        semantic_expected: String,
+        expected_failure: Option<String>,
+    }
+
+    #[test]
+    fn machine_readable_conformance_manifest_is_executable() {
+        use std::path::Path;
+
+        let fixture_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/research/fixtures/luminous-evidence-v0.1");
+        let manifest_bytes = std::fs::read(fixture_dir.join("conformance-cases.json"))
+            .expect("conformance manifest must be available");
+        let manifest_json = parse_json_unique_keys(&manifest_bytes)
+            .expect("conformance manifest must be strict JSON");
+        let suite: ConformanceSuite = serde_json::from_value(manifest_json)
+            .expect("manifest must conform to the conformance-suite contract");
+
+        assert!(!suite.cases.is_empty(), "suite must define at least one case");
+        for case in suite.cases {
+            let case_path = fixture_dir.join(&case.file);
+            let bytes = std::fs::read(&case_path)
+                .unwrap_or_else(|error| panic!("{}: unable to read fixture: {error}", case.id));
+
+            let statement = match parse_json_unique_keys(&bytes) {
+                Ok(statement) => statement,
+                Err(error) => {
+                    assert_eq!(
+                        case.schema_expected, "not_reached",
+                        "{}: parser rejected input but schemaExpected was not not_reached",
+                        case.id
+                    );
+                    assert_eq!(
+                        case.semantic_expected, "reject",
+                        "{}: parser failure must fail the case",
+                        case.id
+                    );
+                    let report = ValidationReport::invalid_json(error);
+                    if let Some(code) = &case.expected_failure {
+                        assert!(
+                            has_code(&report, code),
+                            "{}: expected failure code {code}, got {:?}",
+                            case.id,
+                            report.violations
+                        );
+                    }
+                    continue;
+                }
+            };
+
+            let predicate = statement
+                .get("predicate")
+                .unwrap_or_else(|| panic!("{}: Statement must contain predicate", case.id));
+            let schema_report = validate_schema_only(predicate);
+            let schema_expected = match case.schema_expected.as_str() {
+                "accept" => true,
+                "reject" => false,
+                other => panic!("{}: unsupported schemaExpected {other}", case.id),
+            };
+            assert_eq!(
+                schema_report.conforms, schema_expected,
+                "{}: structural expectation mismatch: {:?}",
+                case.id, schema_report.violations
+            );
+
+            let semantic_report = verify_statement(&statement);
+            let semantic_expected = match case.semantic_expected.as_str() {
+                "accept" => true,
+                "reject" => false,
+                other => panic!("{}: unsupported semanticExpected {other}", case.id),
+            };
+            assert_eq!(
+                semantic_report.conforms, semantic_expected,
+                "{}: semantic expectation mismatch: {:?}",
+                case.id, semantic_report.violations
+            );
+            if let Some(code) = &case.expected_failure {
+                assert!(
+                    has_code(&semantic_report, code),
+                    "{}: expected failure code {code}, got {:?}",
+                    case.id,
+                    semantic_report.violations
+                );
+            }
+        }
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
