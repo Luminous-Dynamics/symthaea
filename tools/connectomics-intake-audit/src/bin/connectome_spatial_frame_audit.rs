@@ -451,6 +451,17 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_synthetic_fixture_is_valid_and_reproducible() {
+        let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME.example.json");
+        let frame: FrameInput = serde_json::from_slice(bytes).expect("fixture JSON should parse");
+        let report = validate(&frame).expect("checked-in synthetic frame should pass");
+        assert_eq!(report.status, "PASS");
+        assert_eq!(report.eligible_grid_cells, 3);
+        assert_eq!(report.excluded_grid_cells, 1);
+        assert_eq!(report.population_frame.len(), 3);
+    }
+
+    #[test]
     fn valid_partial_edge_lattice_passes_and_exports_only_eligible_psus() {
         let report = validate(&fixture()).unwrap();
         assert_eq!(report.grid_dimensions, [2, 1, 2]);
