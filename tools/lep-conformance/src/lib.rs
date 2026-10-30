@@ -1098,6 +1098,83 @@ mod tests {
         value: Value,
     }
 
+    fn decode_json_pointer_segment(segment: &str) -> Result<String, String> {
+        let mut decoded = String::with_capacity(segment.len());
+        let mut chars = segment.chars();
+        while let Some(ch) = chars.next() {
+            if ch != '~' {
+                decoded.push(ch);
+                continue;
+            }
+            match chars.next() {
+                Some('0') => decoded.push('~'),
+                Some('1') => decoded.push('/'),
+                _ => return Err(format!("invalid JSON Pointer escape in segment {segment:?}")),
+            }
+        }
+        Ok(decoded)
+    }
+
+    fn set_json_pointer(root: &mut Value, pointer: &str, value: Value) -> Result<(), String> {
+        if pointer.is_empty() {
+            *root = value;
+            return Ok(());
+        }
+        let segments = pointer
+            .strip_prefix('/')
+            .ok_or_else(|| format!("JSON Pointer must be empty or begin with '/': {pointer}"))?
+            .split('/')
+            .map(decode_json_pointer_segment)
+            .collect::<Result<Vec<_>, _>>()?;
+        let (last, parents) = segments
+            .split_last()
+            .ok_or_else(|| format!("JSON Pointer has no terminal segment: {pointer}"))?;
+
+        let mut parent = &mut *root;
+        for segment in parents {
+            parent = match parent {
+                Value::Object(object) => object
+                    .get_mut(segment)
+                    .ok_or_else(|| format!("parent JSON Pointer segment {segment:?} is missing"))?,
+                Value::Array(array) => {
+                    let index = segment.parse::<usize>().map_err(|_| {
+                        format!("array JSON Pointer segment {segment:?} is not an index")
+                    })?;
+                    array.get_mut(index).ok_or_else(|| {
+                        format!("array JSON Pointer index {index} is out of range")
+                    })?
+                }
+                _ => return Err(format!("parent JSON Pointer segment {segment:?} is not a container")),
+            };
+        }
+
+        match parent {
+            Value::Object(object) => {
+                object.insert(last.clone(), value);
+                Ok(())
+            }
+            Value::Array(array) => {
+                if last == "-" {
+                    array.push(value);
+                    return Ok(());
+                }
+                let index = last
+                    .parse::<usize>()
+                    .map_err(|_| format!("array JSON Pointer terminal {last:?} is not an index"))?;
+                if index > array.len() {
+                    return Err(format!("array JSON Pointer index {index} is out of range"));
+                }
+                if index == array.len() {
+                    array.push(value);
+                } else {
+                    array[index] = value;
+                }
+                Ok(())
+            }
+            _ => Err(format!("terminal JSON Pointer parent is not a container: {pointer}")),
+        }
+    }
+
     #[test]
     fn machine_readable_conformance_manifest_is_executable() {
         use std::path::Path;
@@ -1147,13 +1224,10 @@ mod tests {
             };
 
             if let Some(mutation) = &case.mutation {
-                let target = statement.pointer_mut(&mutation.path).unwrap_or_else(|| {
-                    panic!(
-                        "{}: mutation pointer {} does not exist",
-                        case.id, mutation.path
-                    )
-                });
-                *target = mutation.value.clone();
+                set_json_pointer(&mut statement, &mutation.path, mutation.value.clone())
+                    .unwrap_or_else(|error| {
+                        panic!("{}: cannot apply mutation {}: {error}", case.id, mutation.path)
+                    });
             }
 
             let predicate = statement
