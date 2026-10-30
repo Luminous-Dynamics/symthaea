@@ -63,6 +63,8 @@ The Rust module now contains 37 unit-test cases, including paired-arm omissions,
 The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
 
 ## Analysis plan
+Patch-quality ratings are a separate secondary endpoint tracked in [#9084](https://github.com/Luminous-Dynamics/symthaea/issues/9084). Report them only conditional on strict verified success; no maintainability/readability score may compensate for a failed blocking obligation. Preserve raw criterion ratings, evidence, adjudication, and reviewer agreement rather than publishing only a composite.
+
 
 Pre-register the primary endpoint, comparison arms, task families, exclusions, attempt policy, cost accounting, and stopping rule before opening held-out outcomes.
 
