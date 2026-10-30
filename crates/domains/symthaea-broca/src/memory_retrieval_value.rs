@@ -63,11 +63,17 @@ pub struct RetrievalUtilityEstimate {
     pub feature_schema_sha256: String,
     /// Defines the utility unit and all cost conversion coefficients.
     pub utility_schema_sha256: String,
+    /// Point prediction before held-out calibration.
+    pub correctness_gain_prediction_micro: i64,
     /// Conservative lower confidence bound on marginal correctness gain.
     pub correctness_gain_lcb_micro: i64,
+    /// Point prediction before held-out calibration.
+    pub lifecycle_risk_reduction_prediction_micro: i64,
     /// Conservative lower bound on avoided lifecycle decision loss
     /// (e.g. stale-only or unresolved-conflict failure); may be negative.
     pub lifecycle_risk_reduction_lcb_micro: i64,
+    /// Point prediction before held-out calibration.
+    pub retrieval_harm_prediction_micro: i64,
     /// Upper confidence bound on retrieval-induced answer harm/distraction;
     /// signed because retrieval can reduce harm on some workloads.
     pub retrieval_harm_ucb_micro: i64,
@@ -472,8 +478,11 @@ mod tests {
             calibration_split_sha256: digest("heldout calibration split"),
             feature_schema_sha256: digest("features"),
             utility_schema_sha256: digest("micro-utility-v1"),
+            correctness_gain_prediction_micro: 900,
             correctness_gain_lcb_micro: 900,
+            lifecycle_risk_reduction_prediction_micro: 300,
             lifecycle_risk_reduction_lcb_micro: 300,
+            retrieval_harm_prediction_micro: 100,
             retrieval_harm_ucb_micro: 100,
             retrieval_cost_micro: 400,
             remaining_calls: 2,
