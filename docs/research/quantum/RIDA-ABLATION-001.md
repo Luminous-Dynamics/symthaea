@@ -67,6 +67,10 @@ The fixture uses a two-hypothesis decision task, three target operating regimes,
 
 The ablations deliberately disagree: information-only selects A; representativeness-only and de-amplification-only select B; the full proxy selects C. This is a synthetic unit fixture designed to check the implementation and expose tradeoffs. It does not establish that C is better under real held-out truth, and it should not be used to tune a policy before a broader preregistered suite is frozen.
 
+### Target-distribution shift control
+
+A second frozen case changes only the preregistered target distribution to [0.1, 0.2, 0.7]. The full proxy then selects A (score ≈0.8759), rather than C. This is intentional: the objective has changed because the target operating population has changed. It is not a universal statement that A is now physically better. The same candidate profiles, validation errors, EVSI values and separate evaluator artifact are retained.
+
 ## Validation and leakage controls
 
 - Target-regime probabilities and candidate sampling probabilities must be valid distributions.
@@ -97,4 +101,4 @@ A SOTA claim requires matching workload, strongest applicable classical and quan
 
 ## Current implementation boundary
 
-The Rust module is registered in the quantum-computation crate and exposes all component metrics plus seven policy rankings (three individual, three pairwise, one full). Seven unit tests are authored. The frozen JSON fixture is a synthetic known-answer reference. Rust compilation/tests have not been run in this environment; no passing CI or physical validation is claimed.
+The Rust module is registered in the quantum-computation crate and exposes all component metrics plus seven policy rankings (three individual, three pairwise, one full). Nine unit tests are authored. The frozen JSON fixture contains a default-regime and target-shift synthetic known-answer reference. Rust compilation/tests have not been run in this environment; no passing CI or physical validation is claimed.
