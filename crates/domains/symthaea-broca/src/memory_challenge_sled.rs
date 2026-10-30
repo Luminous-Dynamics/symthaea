@@ -459,7 +459,7 @@ mod tests {
         let result = execute_aml_search(
             &backend,
             AmlSearchRequest {
-                query: "schema migration cache entries".into(),
+                query: "schema migration".into(),
                 options: None,
                 user_id: "user-1".into(),
                 top_k: 10,
@@ -531,6 +531,26 @@ mod tests {
             top_k: 1,
         }).unwrap();
         assert!(result.data.len() <= 1);
+    }
+
+    #[test]
+    fn cutoff_retention_purge_removes_old_batches_and_rebuilds_index() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        execute_aml_add(
+            &mut backend,
+            add_request("request-1", "user-1", "session-1", &["old evaluation-only trajectory"]),
+        ).unwrap();
+        let cutoff = current_unix_ms().unwrap().saturating_add(1);
+        assert_eq!(backend.purge_stored_before(cutoff).unwrap(), 1);
+        assert_eq!(backend.persisted_batch_count(), 0);
+        let result = execute_aml_search(&backend, AmlSearchRequest {
+            query: "evaluation-only trajectory".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        }).unwrap();
+        assert!(result.data.is_empty());
     }
 
     #[test]
