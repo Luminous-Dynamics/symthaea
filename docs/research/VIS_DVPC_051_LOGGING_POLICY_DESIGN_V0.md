@@ -53,13 +53,15 @@ Every logger satisfies p_x in [0.02,0.98] in each context. The floor protects st
 
 ## Metrics
 
-The program emits 63 stable result rows (3 portfolio regimes × 3 portfolio sizes × 7 loggers):
+The program emits 63 stable primary result rows (3 portfolio regimes × 3 portfolio sizes × 7 loggers), plus 45 `ENVELOPE_SENSITIVITY` rows (3 regimes × 3 portfolio sizes × 5 envelope scales):
 - action-1 propensity per context and minimum/maximum probability of any action;
 - expected immediate logger reward and gap versus the reward-greedy floor-constrained logger;
 - worst-policy weight second moment and implied asymptotic weight-only ESS fraction 1/max_pi E[w_pi²];
 - worst-policy registered-envelope upper bound on IPS reward-score second moment;
 - worst-policy exact IPS reward variance;
 - worst weight-moment policy ID, grid resolution, and explicit oracle-only flag.
+
+The envelope sensitivity rows use fixed scales {1.0, 1.1, 1.25, 1.5, 2.0} relative to the registered upper envelope, clipped to the Bernoulli maximum of 1.0. They record the selected logger probabilities, immediate reward, worst weight second moment, ESS proxy, envelope score bound, exact worst IPS variance, and grid resolution. The sensitivity sweep is diagnostic: a looser envelope must never reduce its bound for a fixed logger, but the selected minimax logger can change as the objective changes.
 
 These metrics are complementary. Immediate utility, weight second moment, envelope bound, exact estimator variance, and ESS should not be collapsed into one unexamined score.
 
