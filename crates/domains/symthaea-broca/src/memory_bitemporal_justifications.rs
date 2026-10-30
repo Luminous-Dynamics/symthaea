@@ -236,7 +236,7 @@ impl BitemporalJustificationRuntime {
     ) -> Result<AsOfSupportStatus, String> {
         self.support_statuses_at(valid_at, known_at, scope)?
             .remove(fact_id)
-            .ok_or_else(|| format!("unknown derived fact {fact_id:?}"))
+            .ok_or_else(|| format!("unknown derived fact {fact_id:?} or not yet known at the requested known_at"))
     }
 
     /// Check source-ledger / justification-graph source identity parity and
@@ -612,6 +612,51 @@ mod tests {
         assert!(failed.is_err());
         assert_eq!(runtime.state_sha256().unwrap(), before);
         runtime.verify_consistency().unwrap();
+    }
+
+    #[test]
+    fn derived_conclusion_is_hidden_before_its_own_recorded_at() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 1, "gold")])
+            .unwrap();
+        runtime
+            .derive_at(
+                conclusion("C", [justification("via-A", [source("A")])]),
+                instant(3),
+            )
+            .unwrap();
+
+        let before_derived = runtime
+            .support_statuses_at(date("2026-01-15"), instant(2), "tenant-1")
+            .unwrap();
+        assert!(!before_derived.contains_key("C"));
+        assert!(runtime
+            .support_status_at("C", date("2026-01-15"), instant(2), "tenant-1")
+            .unwrap_err()
+            .contains("not yet known"));
+
+        assert!(matches!(
+            runtime
+                .support_status_at("C", date("2026-01-15"), instant(3), "tenant-1")
+                .unwrap(),
+            AsOfSupportStatus::Supported { .. }
+        ));
+    }
+
+    #[test]
+    fn derivation_rejects_a_source_that_arrived_after_its_recorded_at() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 2, "gold")])
+            .unwrap();
+        let before = runtime.state_sha256().unwrap();
+        let result = runtime.derive_at(
+            conclusion("C", [justification("via-A", [source("A")])]),
+            instant(1),
+        );
+        assert!(result.unwrap_err().contains("was not known"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
     }
 
     #[test]
