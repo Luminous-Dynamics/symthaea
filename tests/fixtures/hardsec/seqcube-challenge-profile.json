@@ -124,7 +124,8 @@
       "formal_result": "bounded_no_counterexample",
       "bound_cycles": 10,
       "property_id": "inactive_trigger_activation",
-      "assumptions_sha256": "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9"
+      "assumptions_sha256": "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9",
+      "assumptions_local_path": "metadata/config.json"
     }
   ]
 }
