@@ -1,21 +1,30 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Training pipeline: data collection, BPTT training, and model serialization.
+//! Training pipeline: teacher-forced token supervision, local recurrent updates,
+//! and model serialization.
 //!
 //! # Bootstrap Strategy
 //!
-//! Run existing LLM organ on diverse StructuredThought inputs, collect
-//! (ThoughtChannels, target_text) pairs as JSONL.
+//! Run the existing LLM organ on diverse StructuredThought inputs and collect
+//! (ThoughtChannels, target_text) pairs as JSONL. These are teacher targets, not
+//! proof that the target's intermediate reasoning was faithful or correct.
 //!
-//! # BPTT Training
+//! # Current temporal-credit semantics
 //!
-//! Next-token cross-entropy loss with teacher forcing:
-//! 1. Forward pass through full sequence (teacher-forced)
-//! 2. Cross-entropy loss per position
-//! 3. Gradient through weight-tied output
-//! 4. BPTT through HdcLtcUnifiedNetwork
-//! 5. Truncated BPTT window: 16-32 tokens
+//! Training uses next-token cross-entropy with teacher forcing. The output-head
+//! gradient is computed from each token position. The CfC update then calls
+//! `LanguageController::backward_step`, which reads the *current* recurrent
+//! state and applies a local per-step target update. It propagates an approximate
+//! error signal across layers, but does **not** retain an activation tape or send
+//! gradients from position t back to t-1. Consequently, `bptt_window` bounds
+//! the number of teacher-forced token positions updated per pair; it is not a
+//! temporal BPTT window. See `controller.rs::LanguageController::backward_step`
+//! and `docs/TEMPORAL_CREDIT_ASSIGNMENT_STEP4_DESIGN_2026-07-31.md`.
+//!
+//! An eligibility-trace/e-prop intervention is designed separately and must be
+//! evaluated on the pre-registered, information-theoretically validated temporal
+//! benchmark before it can be described as an improvement.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
