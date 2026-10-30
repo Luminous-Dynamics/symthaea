@@ -189,6 +189,10 @@ impl VerifiedRendererAudioBinding {
         &self.performed_event_map_artifact_sha256
     }
 
+    pub fn expected_primary_pitches_sha256(&self) -> &str {
+        &self.expected_primary_pitches_sha256
+    }
+
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
         &self.performed_event_lineage
     }
