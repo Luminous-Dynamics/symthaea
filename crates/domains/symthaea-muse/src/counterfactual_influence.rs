@@ -208,7 +208,7 @@ fn decoded_pcm_f32_le_sha256(audio: &AudioView<'_>) -> String {
 /// executable/assets, output WAV and process observation, then bind the decoded
 /// PCM view to the receipt. The caller must not mint this token from self-asserted
 /// digests or an unverified receipt.
-pub fn verify_renderer_audio_binding(
+pub(crate) fn verify_renderer_audio_binding(
     receipt: &RendererExecutionReceipt,
     inputs: RendererReceiptInputs<'_>,
     performed_event_map_bytes: &[u8],
@@ -309,6 +309,42 @@ pub fn verify_renderer_audio_binding(
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
     })
+}
+
+/// Verify renderer output against the exact typed source Score. This is
+/// the production-facing entry point in theory-enabled builds: serialized
+/// Score bytes must match the receipt inputs byte-for-byte, and expected MIDI
+/// pitches are derived directly from Score::events() rather than caller input.
+#[cfg(feature = "theory")]
+pub fn verify_renderer_audio_binding_for_score(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    score: &symthaea_music_theory::Score,
+    excluded_source_event_index: Option<usize>,
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let serialized_score = serde_json::to_vec(score)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    if inputs.score_bytes != serialized_score
+        || receipt.score_sha256 != sha256_hex(&serialized_score)
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let expected_primary_midi_by_score_index: Vec<u8> = score
+        .events()
+        .iter()
+        .map(|event| event.pitch.midi())
+        .collect();
+    verify_renderer_audio_binding(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_primary_midi_by_score_index.len(),
+        &expected_primary_midi_by_score_index,
+        excluded_source_event_index,
+        audio,
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
