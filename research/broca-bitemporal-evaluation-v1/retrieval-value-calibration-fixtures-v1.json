@@ -15,7 +15,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 184,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 37
+      "observed_retrieval_harm_micro": 37,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000064",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-1",
@@ -26,7 +30,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 185,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 38
+      "observed_retrieval_harm_micro": 38,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-2",
@@ -37,7 +45,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 186,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 39
+      "observed_retrieval_harm_micro": 39,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-3",
@@ -48,7 +60,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 187,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 40
+      "observed_retrieval_harm_micro": 40,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-4",
@@ -59,7 +75,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 188,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 41
+      "observed_retrieval_harm_micro": 41,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000068",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-5",
@@ -70,7 +90,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 189,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 42
+      "observed_retrieval_harm_micro": 42,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000069",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-6",
@@ -81,7 +105,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 190,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 43
+      "observed_retrieval_harm_micro": 43,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006a",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-7",
@@ -92,7 +120,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 191,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 44
+      "observed_retrieval_harm_micro": 44,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006b",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-8",
@@ -103,7 +135,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 192,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 45
+      "observed_retrieval_harm_micro": 45,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006c",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-9",
@@ -114,7 +150,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 193,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 46
+      "observed_retrieval_harm_micro": 46,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006d",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-10",
@@ -125,7 +165,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 194,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 47
+      "observed_retrieval_harm_micro": 47,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006e",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-11",
@@ -136,7 +180,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 195,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 48
+      "observed_retrieval_harm_micro": 48,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000006f",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-12",
@@ -147,7 +195,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 196,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 49
+      "observed_retrieval_harm_micro": 49,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000070",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-13",
@@ -158,7 +210,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 197,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 50
+      "observed_retrieval_harm_micro": 50,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000071",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-14",
@@ -169,7 +225,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 198,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 51
+      "observed_retrieval_harm_micro": 51,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000072",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-15",
@@ -180,7 +240,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 199,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 52
+      "observed_retrieval_harm_micro": 52,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000073",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-16",
@@ -191,7 +255,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 200,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 53
+      "observed_retrieval_harm_micro": 53,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000074",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-17",
@@ -202,7 +270,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 201,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 54
+      "observed_retrieval_harm_micro": 54,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000075",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-18",
@@ -213,7 +285,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 202,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 55
+      "observed_retrieval_harm_micro": 55,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000076",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-19",
@@ -224,7 +300,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 203,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 56
+      "observed_retrieval_harm_micro": 56,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000077",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-20",
@@ -235,7 +315,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 204,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 57
+      "observed_retrieval_harm_micro": 57,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000078",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-21",
@@ -246,7 +330,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 205,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 58
+      "observed_retrieval_harm_micro": 58,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000079",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-22",
@@ -257,7 +345,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 206,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 59
+      "observed_retrieval_harm_micro": 59,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007a",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-23",
@@ -268,7 +360,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 207,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 60
+      "observed_retrieval_harm_micro": 60,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007b",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-24",
@@ -279,7 +375,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 208,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 61
+      "observed_retrieval_harm_micro": 61,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007c",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-25",
@@ -290,7 +390,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 209,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 62
+      "observed_retrieval_harm_micro": 62,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007d",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-26",
@@ -301,7 +405,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 210,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 63
+      "observed_retrieval_harm_micro": 63,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007e",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-27",
@@ -312,7 +420,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 211,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 64
+      "observed_retrieval_harm_micro": 64,
+      "evidence_index_state_sha256": "000000000000000000000000000000000000000000000000000000000000007f",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "observation_id": "observation-28",
@@ -323,7 +435,11 @@
       "predicted_lifecycle_risk_reduction_micro": 200,
       "observed_lifecycle_risk_reduction_micro": 212,
       "predicted_retrieval_harm_micro": 50,
-      "observed_retrieval_harm_micro": 65
+      "observed_retrieval_harm_micro": 65,
+      "evidence_index_state_sha256": "0000000000000000000000000000000000000000000000000000000000000080",
+      "estimator_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "feature_schema_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "utility_schema_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     }
   ],
   "expected_residual_offsets": {
