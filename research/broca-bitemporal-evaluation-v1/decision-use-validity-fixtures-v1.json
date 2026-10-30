@@ -130,7 +130,7 @@
               "registered_family_size": 20,
               "inspected_outcomes": 20,
               "selection_after_outcome_inspection": true,
-              "stopping_rule_preregistered": false
+              "stopping_rule_preregistered": true
             },
             "reporting": {
               "caption_style": "compact"
@@ -168,7 +168,7 @@
               "registered_family_size": 20,
               "inspected_outcomes": 20,
               "selection_after_outcome_inspection": true,
-              "stopping_rule_preregistered": false
+              "stopping_rule_preregistered": true
             },
             "reporting": {
               "caption_style": "verbose"
@@ -206,7 +206,7 @@
               "registered_family_size": 20,
               "inspected_outcomes": 20,
               "selection_after_outcome_inspection": true,
-              "stopping_rule_preregistered": false
+              "stopping_rule_preregistered": true
             },
             "reporting": {
               "caption_style": "revised"
@@ -359,11 +359,10 @@
           "intervention": "baseline",
           "reader_input": {
             "measurement": {
-              "attempt_status": "failed",
               "reported_numeric_value": 0,
-              "measurement_completed": false,
               "censoring": null,
-              "detection_limit": null
+              "detection_limit": null,
+              "observation_state": "failed"
             },
             "instrument": {
               "operator_note": "shift-A"
@@ -379,11 +378,10 @@
           "intervention": "decisive_flip",
           "reader_input": {
             "measurement": {
-              "attempt_status": "completed",
               "reported_numeric_value": 0,
-              "measurement_completed": true,
               "censoring": null,
-              "detection_limit": 0
+              "detection_limit": 0,
+              "observation_state": "measured_zero"
             },
             "instrument": {
               "operator_note": "shift-A"
@@ -399,11 +397,10 @@
           "intervention": "irrelevant_change",
           "reader_input": {
             "measurement": {
-              "attempt_status": "failed",
               "reported_numeric_value": 0,
-              "measurement_completed": false,
               "censoring": null,
-              "detection_limit": null
+              "detection_limit": null,
+              "observation_state": "failed"
             },
             "instrument": {
               "operator_note": "shift-B"
@@ -419,11 +416,10 @@
           "intervention": "exact_repair",
           "reader_input": {
             "measurement": {
-              "attempt_status": "completed",
               "reported_numeric_value": 0,
-              "measurement_completed": true,
               "censoring": null,
-              "detection_limit": 0
+              "detection_limit": 0,
+              "observation_state": "measured_zero"
             },
             "instrument": {
               "operator_note": "shift-A"
@@ -439,11 +435,10 @@
           "intervention": "matched_irrelevant_repair",
           "reader_input": {
             "measurement": {
-              "attempt_status": "failed",
               "reported_numeric_value": 0,
-              "measurement_completed": false,
               "censoring": null,
-              "detection_limit": null
+              "detection_limit": null,
+              "observation_state": "failed"
             },
             "instrument": {
               "operator_note": "shift-C"
