@@ -159,3 +159,6 @@ BASALT's differentiated aim should be **verified change per unit cost under cont
 - [in-toto Attestation Framework v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md)
 - [SLSA v1.2 specification](https://slsa.dev/spec/v1.2/)
 - [GitHub artifact attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
+
+
+For current task-quality context, Scale AI's SWE-Bench Pro V2 update on 22 September 2026 reduced its public split to 642 tasks across 11 repositories after removing 89 invalid tasks and correcting 69 instruction/test contradictions. It disabled agent web tools and re-graded every candidate diff in a pristine image, detecting Go module checksum and cache tampering. BASALT should adopt the same separation between agent-visible workspace and pristine verifier, while explicitly testing patch-controlled verifier execution and environment integrity. Artificial Analysis Coding Agent Index v2.0 now combines 100 private FrontierCode v1.1 maintainer-merge tasks, 66 Terminal-Bench 4.0 tasks, and 124 SWE-Atlas-QnA-AA tasks. Reproduce public lanes with matched harness/budgets and use private maintainer-merge results as methodological context only; do not compare their composite directly with BASALT.
