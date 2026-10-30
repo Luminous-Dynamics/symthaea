@@ -346,7 +346,7 @@ pub struct FactorialInteractionV1 {
     pub complete_10_count: u64,
     pub complete_11_count: u64,
     pub candidate_a_choice_interaction_millionths: Option<f64>,
-    pub ineligible_conditions_across_four_cells: u64,
+    pub excluded_conditions_across_four_cells: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -730,7 +730,7 @@ fn main_effects(
     plan: &JudgeFactorialPlanV1,
     metrics: &[CompletedMetricV1],
     observations_by_id: &BTreeMap<String, &JudgeFactorialObservationV1>,
-) -> (Vec<FactorMainEffectV1>, Vec<FactorialLevelCountsV1>, Vec<CriterionOrderEffectV1>) {
+) -> (Vec<FactorialMainEffectV1>, Vec<FactorialLevelCountsV1>, Vec<CriterionOrderEffectV1>) {
     let mut effects = Vec::new();
     let mut counts = Vec::new();
     let mut criterion_effects = Vec::new();
@@ -1272,7 +1272,16 @@ mod tests {
         let report = analyze_judge_factorial(&plan, &serde_json::to_vec(&value).unwrap()).unwrap();
         assert_eq!(report.fields.planned_condition_count, 64);
         assert_eq!(report.fields.ineligible_condition_count, 1);
+        assert_eq!(report.fields.balanced_repeat_count, 1);
+        assert_eq!(report.fields.excluded_incomplete_repeat_count, 1);
+        assert!(report.fields.effects_use_only_fully_completed_repeats);
         assert!(!report.fields.all_conditions_completed);
+        let candidate = report.fields.main_effects.iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
+        assert_eq!(candidate.complete_low_count, 16);
+        assert_eq!(candidate.complete_high_count, 16);
+        assert_eq!(candidate.excluded_completed_low_count, 15);
+        assert_eq!(candidate.excluded_completed_high_count, 16);
     }
 
     #[test]
