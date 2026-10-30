@@ -1166,8 +1166,37 @@ mod tests {
             population_frame: audit.population_frame.clone(),
             status: "PASS".into(),
         };
-        assert!(validate_spatial_frame_binding(&audit, &report, &"9".repeat(64))
-            .unwrap_err().contains("exact report bytes"));
+        assert!(validate_spatial_frame_binding(
+            &audit,
+            &report,
+            &audit.source_spatial_frame_input_sha256,
+            &"9".repeat(64),
+        ).unwrap_err().contains("exact report bytes"));
+    }
+
+    #[test]
+    fn spatial_frame_manifest_byte_digest_mismatch_is_rejected() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let report = SpatialFrameReport {
+            schema_version: 1,
+            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
+            canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
+            population_frame_sha256: audit.source_population_frame_sha256.clone(),
+            eligibility_mask_sha256: "3".repeat(64),
+            eligibility_selection_rule_sha256: "4".repeat(64),
+            frame_protocol_sha256: "5".repeat(64),
+            frame_generator_tool_id: "test-frame-auditor".into(),
+            frame_generator_tool_version: "1.0.0".into(),
+            frame_generator_binary_sha256: "6".repeat(64),
+            population_frame: audit.population_frame.clone(),
+            status: "PASS".into(),
+        };
+        assert!(validate_spatial_frame_binding(
+            &audit,
+            &report,
+            &"9".repeat(64),
+            &audit.source_spatial_frame_report_sha256,
+        ).unwrap_err().contains("exact frame manifest bytes"));
     }
 
     #[test]
@@ -1217,6 +1246,7 @@ mod tests {
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
+            &audit.source_spatial_frame_input_sha256,
             &audit.source_spatial_frame_report_sha256,
         ).unwrap_err().contains("status PASS"));
     }
