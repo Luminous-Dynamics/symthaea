@@ -1062,10 +1062,11 @@ jobs:
           jq '.spans[0].source_id = "unknown-source"' "$candidate" > /tmp/sbr-ref-orphan-span.json
           jq '.spans[0].end_offset = 0' "$candidate" > /tmp/sbr-ref-invalid-range.json
           jq '.sources[0].lifecycle = "retracted"' "$candidate" > /tmp/sbr-ref-retracted-support.json
+          jq '.sources[0].lifecycle = "superseded"' "$candidate" > /tmp/sbr-ref-superseded-support.json
           jq '.adjudicators[0].blind_to_judge_output = false' "$candidate" > /tmp/sbr-ref-blinding-failure.json
           jq '.initial_adjudications[0].decision = "abstain" | .initial_adjudications[0].abstention_reason = null' "$candidate" > /tmp/sbr-ref-invalid-abstention.json
           jq 'del(.initial_adjudications[2])' "$candidate" > /tmp/sbr-ref-missing-panel.json
-          for name in duplicate-claim orphan-span invalid-range retracted-support blinding-failure invalid-abstention missing-panel; do
+          for name in duplicate-claim orphan-span invalid-range retracted-support superseded-support blinding-failure invalid-abstention missing-panel; do
             set +e
             cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
               verify-reference-assurance-package "/tmp/sbr-ref-$name.json" > "/tmp/sbr-ref-$name-report.json"
