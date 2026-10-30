@@ -308,7 +308,6 @@ fn validate_coalition<'view, 'audio>(
     channels: usize,
     total_frames: usize,
 ) -> Result<(), PairwiseInteractionError> {
-    let samples = &render.audio.interleaved_samples;
     let frames = validate_audio(render.audio)?;
     if frames != total_frames
         || render.audio.sample_rate_hz != sample_rate_hz
@@ -419,6 +418,7 @@ fn validate_input(
     let source_score = baseline_evidence.source_score_sha256();
     let renderer_identity = baseline_evidence.renderer_identity_sha256();
     let renderer_config = baseline_evidence.renderer_config_sha256();
+    let expected_pitch_inventory = baseline_evidence.expected_primary_pitches_sha256();
     let rate = input.baseline.audio.sample_rate_hz;
     let channels = input.baseline.audio.channels;
 
@@ -434,6 +434,16 @@ fn validate_input(
     validate_coalition("remove_a", &input.remove_a, &without_a, source_score, renderer_identity, renderer_config, rate, channels, baseline_frames)?;
     validate_coalition("remove_b", &input.remove_b, &without_b, source_score, renderer_identity, renderer_config, rate, channels, baseline_frames)?;
     validate_coalition("remove_ab", &input.remove_ab, &without_ab, source_score, renderer_identity, renderer_config, rate, channels, baseline_frames)?;
+
+    for render in [
+        &input.remove_a,
+        &input.remove_b,
+        &input.remove_ab,
+    ] {
+        if render.evidence.expected_primary_pitches_sha256() != expected_pitch_inventory {
+            return Err(PairwiseInteractionError::SourceScoreMismatch);
+        }
+    }
 
     validate_protected_lineage(&input.baseline, &input.remove_a, &[event_a])?;
     validate_protected_lineage(&input.baseline, &input.remove_b, &[event_b])?;
