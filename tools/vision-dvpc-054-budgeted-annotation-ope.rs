@@ -39,6 +39,11 @@ struct World {
     factual_count: [[u8; ACTIONS]; CONTEXTS],
     source_bias: [[[f64; SOURCES]; ACTIONS]; CONTEXTS],
     source_excess_variance: [[[f64; SOURCES]; ACTIONS]; CONTEXTS],
+    /// Variances of low-rank shared annotation error factors.
+    shared_factor_variance: [f64; 2],
+    /// Source-specific loading on each shared factor. The induced covariance
+    /// matrix is a sum of rank-one PSD matrices.
+    source_shared_loadings: [[f64; 2]; SOURCES],
     source_cost: [u32; SOURCES],
     context_annotation_cap: [u8; CONTEXTS],
     budget: u32,
@@ -67,6 +72,8 @@ impl World {
                 ],
             ],
             source_excess_variance: [[[0.01, 0.08, 0.08]; ACTIONS], [[0.01, 0.08, 0.08]; ACTIONS]],
+            shared_factor_variance: [0.0; 2],
+            source_shared_loadings: [[1.0, 0.0]; SOURCES],
             source_cost: [3, 1, 2],
             context_annotation_cap: [ACTION_CAP_PER_CONTEXT; CONTEXTS],
             budget: BUDGET_TOKENS,
@@ -106,6 +113,10 @@ impl World {
                 }
             }
         }
+        // The simple plugin pilot deliberately assumes independent source
+        // errors. The hidden true shared-error factors remain in the evaluation
+        // world, making under-estimated dependence visible as allocation regret.
+        estimated.shared_factor_variance = [0.0; 2];
         estimated
     }
 
@@ -120,6 +131,18 @@ impl World {
         }
         if self.source_cost.iter().any(|cost| *cost == 0) {
             return Err("annotation source costs must be positive".into());
+        }
+        if self
+            .shared_factor_variance
+            .iter()
+            .any(|variance| !variance.is_finite() || *variance < 0.0)
+            || self
+                .source_shared_loadings
+                .iter()
+                .flatten()
+                .any(|loading| !loading.is_finite())
+        {
+            return Err("invalid shared annotation covariance factor".into());
         }
         for x in 0..CONTEXTS {
             if (self.target[x].iter().sum::<f64>() - 1.0).abs() > 1e-10
@@ -149,6 +172,18 @@ impl World {
                     {
                         return Err("invalid annotation source profile".into());
                     }
+                    let shared = (0..2)
+                        .map(|factor| {
+                            self.shared_factor_variance[factor]
+                                * self.source_shared_loadings[k][factor].powi(2)
+                        })
+                        .sum::<f64>();
+                    let marginal = reward_variance(r) + self.source_excess_variance[x][a][k];
+                    if shared > marginal + EPS {
+                        return Err(
+                            "shared covariance exceeds source marginal error variance".into()
+                        );
+                    }
                 }
             }
             let factual = self.factual_count[x].iter().map(|n| *n as u32).sum::<u32>();
@@ -158,6 +193,43 @@ impl World {
         }
         Ok(())
     }
+}
+
+fn correlated_stress_worlds() -> [World; 3] {
+    let mut within_family = World::heterogeneous_source_quality();
+    within_family.name = "within_family_panel";
+    within_family.shared_factor_variance = [0.025, 0.0];
+    within_family.source_shared_loadings = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0]];
+
+    let mut shared_rubric = World::heterogeneous_source_quality();
+    shared_rubric.name = "shared_rubric_multi_family";
+    shared_rubric.shared_factor_variance = [0.015, 0.012];
+    shared_rubric.source_shared_loadings = [[0.25, 1.0], [1.0, 0.5], [0.20, 0.0]];
+
+    let mut common_mode = World::mixed_bias_cancellation();
+    common_mode.name = "high_common_mode";
+    common_mode.shared_factor_variance = [0.03, 0.0];
+    common_mode.source_shared_loadings = [[0.70, 0.0], [1.0, 0.0], [0.15, 0.0]];
+
+    [within_family, shared_rubric, common_mode]
+}
+
+fn independent_profile(world: &World) -> World {
+    let mut profile = *world;
+    profile.shared_factor_variance = [0.0; 2];
+    profile
+}
+
+fn upper_correlation_profile(world: &World, radius: f64) -> Result<World, String> {
+    if !radius.is_finite() || radius < 1.0 {
+        return Err("correlation uncertainty radius must be finite and at least one".into());
+    }
+    let mut upper = *world;
+    for factor in 0..2 {
+        upper.shared_factor_variance[factor] *= radius * radius;
+    }
+    upper.validate()?;
+    Ok(upper)
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -311,6 +383,42 @@ fn reward_variance(mean: f64) -> f64 {
     mean * (1.0 - mean)
 }
 
+/// Sum of off-diagonal annotation covariances for one context-action
+/// cell. For each factor f, a shared latent shock creates pair covariance
+/// tau_f^2 * loading[k,f] * loading[l,f] between every distinct annotation
+/// draw. This is PSD by construction (diagonal residual covariance plus
+/// low-rank positive-semidefinite shared factors).
+fn shared_source_covariance(world: &World, left: usize, right: usize) -> f64 {
+    (0..2)
+        .map(|factor| {
+            world.shared_factor_variance[factor]
+                * world.source_shared_loadings[left][factor]
+                * world.source_shared_loadings[right][factor]
+        })
+        .sum()
+}
+
+fn shared_annotation_covariance_numerator(
+    world: &World,
+    allocation: &Allocation,
+    x: usize,
+    a: usize,
+) -> f64 {
+    let mut extra = 0.0;
+    for factor in 0..2 {
+        let weighted_sum = (0..SOURCES)
+            .map(|k| allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor])
+            .sum::<f64>();
+        let diagonal = (0..SOURCES)
+            .map(|k| {
+                allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor].powi(2)
+            })
+            .sum::<f64>();
+        extra += world.shared_factor_variance[factor] * (weighted_sum * weighted_sum - diagonal);
+    }
+    extra
+}
+
 fn cell_bias_and_variance(
     world: &World,
     allocation: &Allocation,
@@ -336,7 +444,8 @@ fn cell_bias_and_variance(
                 allocation.count(x, a, k) as f64
                     * (reward_variance(reward_mean) + world.source_excess_variance[x][a][k])
             })
-            .sum::<f64>();
+            .sum::<f64>()
+        + shared_annotation_covariance_numerator(world, allocation, x, a);
     (weighted_bias / total, variance_numerator / (total * total))
 }
 
@@ -668,12 +777,33 @@ fn annotation_reward_model(
                 };
             }
             let mut count = factual_n;
+            let shared_draws: [f64; 2] = std::array::from_fn(|factor| {
+                if world.shared_factor_variance[factor] > 0.0 {
+                    rng.normal()
+                } else {
+                    0.0
+                }
+            });
             for k in 0..SOURCES {
                 let mean = world.reward_mean[x][a] + world.source_bias[x][a][k];
-                let variance = reward_variance(world.reward_mean[x][a])
+                let marginal_variance = reward_variance(world.reward_mean[x][a])
                     + world.source_excess_variance[x][a][k];
+                let shared_variance = (0..2)
+                    .map(|factor| {
+                        world.shared_factor_variance[factor]
+                            * world.source_shared_loadings[k][factor].powi(2)
+                    })
+                    .sum::<f64>();
+                let independent_variance = (marginal_variance - shared_variance).max(0.0);
+                let shared_error = (0..2)
+                    .map(|factor| {
+                        world.shared_factor_variance[factor].sqrt()
+                            * world.source_shared_loadings[k][factor]
+                            * shared_draws[factor]
+                    })
+                    .sum::<f64>();
                 for _ in 0..allocation.count(x, a, k) {
-                    sum += mean + variance.sqrt() * rng.normal();
+                    sum += mean + shared_error + independent_variance.sqrt() * rng.normal();
                     count += 1;
                 }
             }
@@ -786,6 +916,36 @@ fn allocation_sources(allocation: &Allocation) -> [u32; SOURCES] {
 
 fn allocation_profile_bias(world: &World, allocation: &Allocation) -> f64 {
     weighted_abs_model_bias(world, allocation)
+}
+
+fn weighted_q_variance_component(world: &World, allocation: &Allocation) -> f64 {
+    let mut total = 0.0;
+    for x in 0..CONTEXTS {
+        for a in 0..ACTIONS {
+            let pi = world.target[x][a];
+            let mu = world.behavior[x][a];
+            let alpha3 = world.context_probability[x] * pi * pi * (1.0 / mu - 1.0);
+            let (_, q_variance) = cell_bias_and_variance(world, allocation, x, a);
+            total += alpha3 * q_variance;
+        }
+    }
+    total
+}
+
+/// Ratio of the OPE-weighted reward-model variance under correlated versus
+/// independent source errors for exactly the same allocation. This is a
+/// design-effect diagnostic, not a confidence interval or literal vote count.
+fn weighted_q_variance_inflation(world: &World, allocation: &Allocation) -> f64 {
+    let independent = independent_profile(world);
+    let base = weighted_q_variance_component(&independent, allocation);
+    let correlated = weighted_q_variance_component(world, allocation);
+    if base > EPS {
+        correlated / base
+    } else if correlated <= EPS {
+        1.0
+    } else {
+        f64::INFINITY
+    }
 }
 
 fn context_bias_sums(world: &World, allocation: &Allocation) -> [f64; CONTEXTS] {
@@ -1445,6 +1605,102 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
     }
 
     output.push_str(&local_regime_rows());
+    output.push_str(&correlation_benchmark_rows(
+        replicates,
+        seed ^ 0x0560_c011_2026_1030,
+    )?);
+    Ok(output)
+}
+
+fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, String> {
+    let mut output = String::new();
+    for (scenario_index, world) in correlated_stress_worlds().iter().enumerate() {
+        world.validate()?;
+        let independent = independent_profile(world);
+        let robust_profile = upper_correlation_profile(world, 1.5)?;
+
+        let greedy_true = greedy_allocate(world, GreedyRule::MaxGain)?;
+        let true_exact = exact_dynamic_program(world, [true; SOURCES])?.allocation;
+        let independent_exact = exact_dynamic_program(&independent, [true; SOURCES])?.allocation;
+        let robust_exact = exact_dynamic_program(&robust_profile, [true; SOURCES])?.allocation;
+        let mm_zero = mm_allocate(world, Allocation::default(), 24, 128)?;
+        let mm_greedy = mm_allocate(world, greedy_true, 24, 128)?;
+
+        let plans = [
+            ("independent_profile_exact", independent_exact, 0usize),
+            ("correlation_aware_greedy", greedy_true, 0usize),
+            ("correlation_aware_exact", true_exact, 0usize),
+            ("robust_upper_bound_exact", robust_exact, 0usize),
+            ("mm_true_from_zero", mm_zero.allocation, mm_zero.iterations),
+            (
+                "mm_true_from_greedy",
+                mm_greedy.allocation,
+                mm_greedy.iterations,
+            ),
+        ];
+        let exact_mse = analytic_mse(world, &true_exact, EVAL_N)?;
+        for (method_index, (method, allocation, iterations)) in plans.iter().enumerate() {
+            if !allocation.feasible(world) {
+                return Err(format!("correlation plan is infeasible: {method}"));
+            }
+            let analytic_true = analytic_mse(world, allocation, EVAL_N)?;
+            let empirical = monte_carlo_evaluate(
+                world,
+                allocation,
+                EVAL_N,
+                replicates,
+                seed ^ (scenario_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                    ^ (method_index as u64).wrapping_mul(0x94d0_49bb_1331_11eb),
+                None,
+            );
+            let factor0 = world.shared_factor_variance[0];
+            let factor1 = world.shared_factor_variance[1];
+            let profile0 = if *method == "independent_profile_exact" {
+                0.0
+            } else if *method == "robust_upper_bound_exact" {
+                robust_profile.shared_factor_variance[0]
+            } else {
+                factor0
+            };
+            let profile1 = if *method == "independent_profile_exact" {
+                0.0
+            } else if *method == "robust_upper_bound_exact" {
+                robust_profile.shared_factor_variance[1]
+            } else {
+                factor1
+            };
+            let worst_case_mse = analytic_mse(&robust_profile, allocation, EVAL_N)?;
+            let sources = allocation_sources(allocation);
+            let gap = ((analytic_true - exact_mse) / exact_mse.max(EPS)).max(0.0);
+            let inflation = weighted_q_variance_inflation(world, allocation);
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "CORR_RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{:.10}\t{}",
+                world.name,
+                method,
+                replicates,
+                world.budget,
+                allocation.cost(world),
+                allocation.total_count(),
+                factor0,
+                factor1,
+                profile0,
+                profile1,
+                analytic_true,
+                empirical.bias,
+                empirical.variance,
+                empirical.mse,
+                inflation,
+                gap,
+                sources[0],
+                sources[1],
+                sources[2],
+                worst_case_mse,
+                iterations,
+            );
+        }
+    }
     Ok(output)
 }
 
@@ -1734,6 +1990,160 @@ mod tests {
     }
 
     #[test]
+    fn zero_shared_variance_reduces_exactly_to_independent_annotation_formula() {
+        let world = World::mixed_bias_cancellation();
+        assert_eq!(world.shared_factor_variance, [0.0; 2]);
+        let mut allocation = Allocation::default();
+        allocation.counts[0][0] = [0, 2, 1];
+        let x = 0;
+        let a = 0;
+        let nf = world.factual_count[x][a] as f64;
+        let n = nf
+            + allocation.counts[x][a]
+                .iter()
+                .map(|count| *count as f64)
+                .sum::<f64>();
+        let sigma2 = reward_variance(world.reward_mean[x][a]);
+        let independent_numerator = nf * sigma2
+            + (0..SOURCES)
+                .map(|k| {
+                    allocation.count(x, a, k) as f64
+                        * (sigma2 + world.source_excess_variance[x][a][k])
+                })
+                .sum::<f64>();
+        let (_, q_variance) = cell_bias_and_variance(&world, &allocation, x, a);
+        assert!((q_variance - independent_numerator / n.powi(2)).abs() < 1e-14);
+    }
+
+    #[test]
+    fn low_rank_shared_source_covariance_is_positive_semidefinite() {
+        for world in correlated_stress_worlds() {
+            world.validate().unwrap();
+            let covariance: [[f64; SOURCES]; SOURCES] = std::array::from_fn(|k| {
+                std::array::from_fn(|l| shared_source_covariance(&world, k, l))
+            });
+            for vector in [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [1.0, -1.0, 0.5],
+                [-0.25, 0.75, 2.0],
+                [1.0, 1.0, 1.0],
+            ] {
+                let quadratic = (0..SOURCES)
+                    .flat_map(|k| (0..SOURCES).map(move |l| (k, l)))
+                    .map(|(k, l)| vector[k] * covariance[k][l] * vector[l])
+                    .sum::<f64>();
+                assert!(quadratic >= -1e-12, "quadratic={quadratic}");
+            }
+        }
+    }
+
+    #[test]
+    fn shared_panel_errors_inflate_repeated_source_samples_but_not_independent_source_mix() {
+        let world = correlated_stress_worlds()[0];
+        world.validate().unwrap();
+        let independent = independent_profile(&world);
+        let mut same_source = Allocation::default();
+        same_source.counts[0][0][1] = 2;
+        let mut diverse_mix = Allocation::default();
+        diverse_mix.counts[0][0][1] = 1;
+        diverse_mix.counts[0][0][2] = 1;
+        let (_, same_corr) = cell_bias_and_variance(&world, &same_source, 0, 0);
+        let (_, same_ind) = cell_bias_and_variance(&independent, &same_source, 0, 0);
+        let (_, mix_corr) = cell_bias_and_variance(&world, &diverse_mix, 0, 0);
+        let (_, mix_ind) = cell_bias_and_variance(&independent, &diverse_mix, 0, 0);
+        assert!(same_corr > same_ind);
+        assert!((mix_corr - mix_ind).abs() < 1e-14);
+        assert!(weighted_q_variance_inflation(&world, &same_source) > 1.0);
+    }
+
+    #[test]
+    fn analytic_correlated_ope_mse_matches_independent_monte_carlo() {
+        for world in correlated_stress_worlds() {
+            world.validate().unwrap();
+            let allocation = exact_dynamic_program(&world, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let analytic = analytic_mse(&world, &allocation, 64).unwrap();
+            let mc = monte_carlo_evaluate(
+                &world,
+                &allocation,
+                64,
+                MC_TEST_REPLICATES,
+                0x0560_c0a1 ^ world.name.len() as u64,
+                None,
+            );
+            let relative_error = (mc.mse - analytic).abs() / analytic.max(1e-12);
+            assert!(
+                relative_error < 0.18,
+                "scenario={}, analytic={analytic}, MC={}, relative={relative_error}",
+                world.name,
+                mc.mse
+            );
+            assert!(
+                mc.bias.abs() < 0.04,
+                "scenario={}, bias={}",
+                world.name,
+                mc.bias
+            );
+        }
+    }
+
+    #[test]
+    fn robust_upper_correlation_plan_minimizes_its_declared_worst_case_profile() {
+        for world in correlated_stress_worlds() {
+            let independent = independent_profile(&world);
+            let robust_profile = upper_correlation_profile(&world, 1.5).unwrap();
+            let plugin = exact_dynamic_program(&independent, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let robust = exact_dynamic_program(&robust_profile, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let plugin_worst = analytic_mse(&robust_profile, &plugin, EVAL_N).unwrap();
+            let robust_worst = analytic_mse(&robust_profile, &robust, EVAL_N).unwrap();
+            assert!(robust_worst <= plugin_worst + 1e-12);
+            assert!(robust.feasible(&world));
+        }
+    }
+
+    #[test]
+    fn invalid_shared_covariance_factor_and_marginal_variance_fail_closed() {
+        let mut invalid = correlated_stress_worlds()[0];
+        invalid.shared_factor_variance[0] = -0.01;
+        assert!(invalid.validate().is_err());
+
+        let mut excessive = correlated_stress_worlds()[0];
+        excessive.shared_factor_variance[0] = 10.0;
+        assert!(excessive.validate().is_err());
+
+        let mut non_finite = correlated_stress_worlds()[0];
+        non_finite.source_shared_loadings[1][0] = f64::NAN;
+        assert!(non_finite.validate().is_err());
+
+        assert!(upper_correlation_profile(&correlated_stress_worlds()[0], 0.9).is_err());
+        let mut invalid_variance = correlated_stress_worlds()[0];
+        invalid_variance.shared_factor_variance[1] = f64::INFINITY;
+        assert!(invalid_variance.validate().is_err());
+    }
+
+    #[test]
+    fn output_includes_deterministic_correlated_stress_rows() {
+        let first = correlation_benchmark_rows(2, 456).unwrap();
+        let second = correlation_benchmark_rows(2, 456).unwrap();
+        assert_eq!(first, second);
+        let rows: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("CORR_RESULT\t"))
+            .collect();
+        assert_eq!(rows.len(), 18);
+        for row in rows {
+            assert_eq!(row.split('\t').count(), 22);
+        }
+    }
+
+    #[test]
     fn output_is_deterministic_and_has_exact_row_counts() {
         let first = benchmark(2, 123).unwrap();
         let second = benchmark(2, 123).unwrap();
@@ -1765,6 +2175,13 @@ mod tests {
                 .filter(|line| line.starts_with("BENCHMARK_CONFIG\t"))
                 .count(),
             8
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("CORR_RESULT\t"))
+                .count(),
+            18
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
