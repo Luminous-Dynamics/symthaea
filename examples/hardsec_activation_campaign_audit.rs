@@ -145,6 +145,7 @@ struct Trial {
     trial_id: String,
     trial_index: u64,
     condition: Condition,
+    pair_id: Option<String>,
     sequence_sha256: String,
     trigger: Observation,
     trigger_cycle: Option<u64>,
@@ -413,6 +414,7 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
         }
         let trial_index = required_u64(value, "trial_index")?;
         let condition = Condition::parse(required_string(value, "condition")?)?;
+        let pair_id = optional_string(value, "pair_id")?;
         let expected = next_index.entry(condition).or_insert(1);
         if trial_index != *expected {
             return Err(format!(
@@ -559,6 +561,7 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
             trial_id,
             trial_index,
             condition,
+            pair_id,
             sequence_sha256,
             trigger,
             trigger_cycle,
@@ -592,6 +595,26 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
         - 1;
     if inactive_count > 0 && active_count != inactive_count {
         return Err("active and inactive_control conditions must have equal trial counts".to_owned());
+    }
+    if inactive_count > 0 {
+        let mut pairs: BTreeMap<String, BTreeSet<Condition>> = BTreeMap::new();
+        for trial in &trials {
+            let pair_id = trial.pair_id.as_deref().ok_or_else(|| {
+                format!("trial {}: pair_id is required when inactive controls are present", trial.trial_id)
+            })?;
+            pairs.entry(pair_id.to_owned()).or_default().insert(trial.condition);
+        }
+        if pairs.len() != active_count as usize
+            || pairs.values().any(|conditions| {
+                conditions.len() != 2
+                    || !conditions.contains(&Condition::Active)
+                    || !conditions.contains(&Condition::InactiveControl)
+            })
+        {
+            return Err("pair_id must map exactly one active trial and one inactive_control trial".to_owned());
+        }
+    } else if trials.iter().any(|trial| trial.pair_id.is_some()) {
+        return Err("pair_id is only valid when paired inactive controls are present".to_owned());
     }
     if inactive_count > 0 && !budget_points.iter().all(|point| *point <= inactive_count) {
         return Err("budget_points must be available in both active and inactive control trials".to_owned());
@@ -812,12 +835,15 @@ fn summarize(campaign: &Campaign, campaign_sha256: String) -> Value {
     } else {
         let mut trigger_discordant = 0;
         let mut payload_discordant = 0;
-        let active_by_index = active
+        let active_by_pair = active
             .iter()
-            .map(|trial| (trial.trial_index, *trial))
+            .filter_map(|trial| trial.pair_id.as_deref().map(|pair| (pair, *trial)))
             .collect::<BTreeMap<_, _>>();
+        let mut paired = 0;
         for control in &inactive {
-            if let Some(reference) = active_by_index.get(&control.trial_index) {
+            let pair_id = control.pair_id.as_deref().unwrap_or_default();
+            if let Some(reference) = active_by_pair.get(pair_id) {
+                paired += 1;
                 if reference.trigger != control.trigger {
                     trigger_discordant += 1;
                 }
@@ -827,7 +853,7 @@ fn summarize(campaign: &Campaign, campaign_sha256: String) -> Value {
             }
         }
         json!({
-            "paired_trial_count": inactive.len(),
+            "paired_trial_count": paired,
             "trigger_status_discordant_pairs": trigger_discordant,
             "payload_status_discordant_pairs": payload_discordant,
             "interpretation": "descriptive_paired_status_comparison_only_not_a_causal_effect_estimate"
@@ -870,6 +896,7 @@ fn summarize(campaign: &Campaign, campaign_sha256: String) -> Value {
             "trial_id": trial.trial_id,
             "trial_index": trial.trial_index,
             "condition": trial.condition.as_str(),
+            "pair_id": trial.pair_id,
             "sequence_sha256": trial.sequence_sha256,
             "trigger_status": match trial.trigger {
                 Observation::Observed => "observed",
@@ -1014,6 +1041,7 @@ mod tests {
             "trial_id": id,
             "trial_index": index,
             "condition": condition,
+            "pair_id": format!("pair-{index}"),
             "sequence_sha256": format!(
                 "{:064x}",
                 if condition == "active" {
