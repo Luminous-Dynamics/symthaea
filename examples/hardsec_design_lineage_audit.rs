@@ -53,7 +53,7 @@ const HEADER: [&str; 15] = [
     "label",
 ];
 
-const CLAIM_SCOPE: &str = "source_integrity_and_declared_design_lineage_split_integrity_only";
+const CLAIM_SCOPE: &str = "source_integrity_and_declared_design_and_benchmark_source_split_integrity_only";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SplitProtocol {
@@ -433,7 +433,7 @@ fn audit_groups(
         return Ok(BTreeMap::new());
     };
     let mut group_to_split: BTreeMap<String, String> = BTreeMap::new();
-    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut split_groups: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for sample in samples {
         let Some(value) = sample.group_value(field) else {
@@ -456,9 +456,16 @@ fn audit_groups(
         } else {
             group_to_split.insert(value.to_owned(), sample.split.clone());
         }
-        *counts.entry(sample.split.clone()).or_insert(0) += 1;
+        split_groups
+            .entry(sample.split.clone())
+            .or_default()
+            .insert(value.to_owned());
     }
-    Ok(counts)
+
+    Ok(split_groups
+        .into_iter()
+        .map(|(split, groups)| (split, groups.len()))
+        .collect())
 }
 
 #[derive(Debug, Clone, Default)]
@@ -543,13 +550,11 @@ fn lineage_overlap_counts(samples: &[Sample], field: &str) -> BTreeMap<String, u
             group_splits.entry(value.clone()).or_default().insert(sample.split.clone());
         }
     }
-    group_splits
+    let overlapping_group_count = group_splits
         .values()
         .filter(|splits| splits.len() > 1)
-        .fold(BTreeMap::new(), |mut counts, _| {
-            *counts.entry(field.to_owned()).or_insert(0) += 1;
-            counts
-        })
+        .count();
+    BTreeMap::from([(field.to_owned(), overlapping_group_count)])
 }
 
 fn receipt_path_outside_root(root: &Path, receipt: &Path) -> Result<PathBuf, String> {
@@ -1041,6 +1046,21 @@ mod tests {
         assert_eq!(receipt["split_protocol"], "leave_benchmark_source_out");
         assert_eq!(receipt["audited_group_sample_counts"]["train"], 1);
         assert_eq!(receipt["cross_split_lineage_group_counts"]["benchmark_source_id"], 0);
+    }
+
+    #[test]
+    fn rejects_missing_benchmark_source_identity() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", "trojan-a"),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", "trojan-c"),
+            ],
+        );
+        set_manifest_field(&fixture, 1, 11, "");
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("requires benchmark_source_id"));
     }
 
     #[test]
