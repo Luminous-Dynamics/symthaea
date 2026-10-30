@@ -623,6 +623,17 @@ jobs:
           ]
           negative_controls.append(("proof term omits required alternate-route support", omitted_required_support))
 
+          omitted_move_constant = copy.deepcopy(receipt)
+          base_support = next(
+              row["receipt"] for row in omitted_move_constant["proof_state_intervention_trace"]["proof_term_support_receipts"]
+              if row["receipt"]["label"] == "original-route-after-irrelevant-context-removal"
+          )
+          base_support["direct_global_constants"] = [
+              name for name in base_support["direct_global_constants"]
+              if name != "Nat.succ_le_succ"
+          ]
+          negative_controls.append(("proof term omits expected global move constant", omitted_move_constant))
+
           for name, invalid_receipt in negative_controls:
               if not receipt_errors(invalid_receipt):
                   raise SystemExit(f"receipt negative control unexpectedly accepted: {name}")
