@@ -72,6 +72,40 @@
       "expectedFailure": "DUPLICATE_JSON_KEY",
       "implementationStatus": "strict-parser-and-fixture-test-added-not-run-locally",
       "purpose": "Duplicate keys in JSON objects are rejected during parsing before a parser's last-key-wins behavior can alter the attested meaning."
+    },
+    {
+      "id": "LEP-SEMANTIC-005",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/verification/checkedTarget/configurationDigest/sha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "A schema-valid verifier result must not validate a different configuration digest."
+    },
+    {
+      "id": "LEP-SEMANTIC-006",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/target/inputs",
+        "value": [
+          {
+            "name": "sample-dataset",
+            "kind": "dataset_manifest",
+            "digest": {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "A schema-valid verifier result must not validate a different input-artifact set."
     }
   ]
 }
