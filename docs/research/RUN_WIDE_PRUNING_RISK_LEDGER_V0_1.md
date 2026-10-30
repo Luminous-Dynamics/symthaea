@@ -25,19 +25,12 @@ Neither quantity is the probability that the global optimum or final top-K is re
 
 ## 3. Predictable alpha spending
 
-For a predeclared maximum of (T) audit events, event (t) receives:
+For a predeclared maximum of T audit events, every event receives the same allocation:
 
-[
-delta_t = rac{delta_{run}}{T}
-]
+- Per-event failure budget: `delta_event = delta_run / T`
+- Per-event confidence level: `1 - delta_event`
+- For m recorded events, where m <= T: `cumulative_spend = m * delta_run / T <= delta_run`
 
-and the finite-population audit is configured at confidence level (1-delta_t).
-
-For any realized number of events (m le T):
-
-[
-sum_{t=1}^{m}delta_t = rac{m}{T}delta_{run} le delta_{run}
-]
 
 A union bound therefore composes conditional event-level coverage without requiring independent audit outcomes. The schedule is fixed before outcomes are observed and does not depend on previous audit results.
 
