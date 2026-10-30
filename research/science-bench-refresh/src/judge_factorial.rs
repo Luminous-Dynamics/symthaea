@@ -192,6 +192,7 @@ pub struct JudgeFactorialBlockV1 {
 #[serde(deny_unknown_fields)]
 pub struct JudgeFactorialPlanFieldsV1 {
     pub schema: String,
+    pub analyzer_source_revision: String,
     pub purpose: FactorialPurposeV1,
     pub study_id: String,
     pub judge_source_revision: String,
@@ -206,6 +207,7 @@ pub struct JudgeFactorialPlanFieldsV1 {
 #[serde(deny_unknown_fields)]
 pub struct JudgeFactorialPlanV1 {
     pub schema: String,
+    pub analyzer_source_revision: String,
     pub purpose: FactorialPurposeV1,
     pub study_id: String,
     pub judge_source_revision: String,
@@ -221,6 +223,7 @@ impl JudgeFactorialPlanV1 {
     fn fields(&self) -> JudgeFactorialPlanFieldsV1 {
         JudgeFactorialPlanFieldsV1 {
             schema: self.schema.clone(),
+            analyzer_source_revision: self.analyzer_source_revision.clone(),
             purpose: self.purpose,
             study_id: self.study_id.clone(),
             judge_source_revision: self.judge_source_revision.clone(),
@@ -278,6 +281,7 @@ pub struct JudgeFactorialObservationV1 {
 pub struct JudgeFactorialReceiptV1 {
     pub schema: String,
     pub purpose: FactorialPurposeV1,
+    pub analyzer_source_revision: String,
     pub run_id: String,
     pub plan_sha256: String,
     pub plan_commitment_sha256: String,
@@ -356,6 +360,7 @@ pub struct FactorialBlockSummaryV1 {
 pub struct JudgeFactorialReportFieldsV1 {
     pub schema: String,
     pub study_id: String,
+    pub analyzer_source_revision: String,
     pub plan_sha256: String,
     pub receipt_sha256: String,
     pub plan_commitment_sha256: String,
@@ -448,6 +453,11 @@ pub fn validate_judge_factorial_plan_fields(
     let allow_zero = !fields.purpose.qualified();
     if fields.schema != FACTORIAL_PLAN_SCHEMA {
         issues.push("unsupported judge factorial plan schema".to_owned());
+    }
+    if !valid_revision(&fields.analyzer_source_revision, false)
+        || fields.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
+    {
+        issues.push("analyzer_source_revision must match the exact compiled validator revision".to_owned());
     }
     if !nonempty(&fields.study_id, 128) {
         issues.push("study_id must be non-empty and at most 128 bytes".to_owned());
@@ -848,6 +858,11 @@ pub fn analyze_judge_factorial(
     if receipt.purpose != plan.purpose {
         return Err("receipt purpose differs from the plan".to_owned());
     }
+    if receipt.analyzer_source_revision != plan.analyzer_source_revision
+        || receipt.analyzer_source_revision != crate::BUILT_GENERATOR_SOURCE_REVISION
+    {
+        return Err("receipt analyzer revision differs from the exact compiled validator revision".to_owned());
+    }
     if !nonempty(&receipt.run_id, 128) {
         return Err("receipt run_id must be non-empty and at most 128 bytes".to_owned());
     }
@@ -948,6 +963,7 @@ pub fn analyze_judge_factorial(
     let fields = JudgeFactorialReportFieldsV1 {
         schema: FACTORIAL_REPORT_SCHEMA.to_owned(),
         study_id: plan.study_id,
+        analyzer_source_revision: plan.analyzer_source_revision,
         plan_sha256,
         receipt_sha256: sha256_hex(receipt_bytes),
         plan_commitment_sha256: plan.plan_commitment_sha256,
@@ -1023,6 +1039,7 @@ mod tests {
         block.execution_order.reverse();
         let fields = JudgeFactorialPlanFieldsV1 {
             schema: FACTORIAL_PLAN_SCHEMA.to_owned(),
+            analyzer_source_revision: crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned(),
             purpose: FactorialPurposeV1::QualifiedRun,
             study_id: "factorial-example".to_owned(),
             judge_source_revision: "a".repeat(40),
@@ -1035,6 +1052,7 @@ mod tests {
         let commitment = plan_fields_commitment(&fields).unwrap();
         let plan = JudgeFactorialPlanV1 {
             schema: fields.schema.clone(),
+            analyzer_source_revision: fields.analyzer_source_revision.clone(),
             purpose: fields.purpose,
             study_id: fields.study_id.clone(),
             judge_source_revision: fields.judge_source_revision.clone(),
@@ -1078,6 +1096,7 @@ mod tests {
         let receipt = JudgeFactorialReceiptV1 {
             schema: FACTORIAL_RECEIPT_SCHEMA.to_owned(),
             purpose: FactorialPurposeV1::QualifiedRun,
+            analyzer_source_revision: plan.analyzer_source_revision.clone(),
             run_id: "run-001".to_owned(),
             plan_sha256: sha256_hex(&plan_bytes),
             plan_commitment_sha256: plan.plan_commitment_sha256.clone(),
