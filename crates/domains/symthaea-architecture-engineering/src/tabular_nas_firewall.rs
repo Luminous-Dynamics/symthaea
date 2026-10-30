@@ -176,6 +176,9 @@ pub struct TabularNasEvaluation {
     pub best_queried_metric: Option<f64>,
     pub global_best_metric: f64,
     pub simple_regret: Option<f64>,
+    /// ZAPS-style regret relative to the oracle best, expressed as a percentage.
+    /// None is returned when the oracle best metric is zero.
+    pub normalized_regret_percent: Option<f64>,
     pub queried_target_observations_sha256: String,
 }
 
@@ -604,6 +607,14 @@ impl TabularNasBenchmark {
             MetricDirection::Maximize => self.global_best_metric - best,
             MetricDirection::Minimize => best - self.global_best_metric,
         });
+        let normalized_regret_percent = simple_regret.and_then(|regret| {
+            let denominator = self.global_best_metric.abs();
+            if denominator == 0.0 {
+                None
+            } else {
+                Some((regret / denominator) * 100.0)
+            }
+        });
 
         let duplicate_attempts = receipt
             .attempts
@@ -640,6 +651,7 @@ impl TabularNasBenchmark {
             best_queried_metric,
             global_best_metric: self.global_best_metric,
             simple_regret,
+            normalized_regret_percent,
             queried_target_observations_sha256,
         }
     }
@@ -1074,6 +1086,7 @@ mod tests {
         assert_eq!(run.evaluation.global_best_metric, 11.0);
         assert_eq!(run.evaluation.best_queried_metric, Some(10.0));
         assert_eq!(run.evaluation.simple_regret, Some(1.0));
+        assert!((run.evaluation.normalized_regret_percent.unwrap() - (100.0 / 11.0)).abs() < 1e-12);
     }
 
     #[test]
@@ -1167,6 +1180,7 @@ mod tests {
             oracle.query("arch-000").unwrap();
         });
         assert_eq!(run.evaluation.top_1.queried_top_k_count, 1);
+        assert_eq!(run.evaluation.normalized_regret_percent, None);
     }
 
     #[test]
@@ -1206,6 +1220,7 @@ mod tests {
         assert_eq!(run.evaluation.global_best_metric, 1.0);
         assert_eq!(run.evaluation.best_queried_metric, Some(4.0));
         assert_eq!(run.evaluation.simple_regret, Some(3.0));
+        assert_eq!(run.evaluation.normalized_regret_percent, Some(300.0));
         assert_eq!(run.evaluation.top_1.capture_rate, 0.0);
     }
 
@@ -1216,6 +1231,7 @@ mod tests {
         assert_eq!(run.evaluation.unique_queries, 0);
         assert_eq!(run.evaluation.best_queried_metric, None);
         assert_eq!(run.evaluation.simple_regret, None);
+        assert_eq!(run.evaluation.normalized_regret_percent, None);
         assert_eq!(run.evaluation.top_100.capture_rate, 0.0);
         assert_eq!(run.evaluation.budget_utilization, 0.0);
     }
