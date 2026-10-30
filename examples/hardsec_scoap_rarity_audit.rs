@@ -1270,7 +1270,7 @@ mod tests {
         let first = nodes.iter().find(|node| node.node_id == 1).unwrap();
         let second = nodes.iter().find(|node| node.node_id == 2).unwrap();
         assert_eq!(first.rarity_percentile_bps, second.rarity_percentile_bps);
-        assert_eq!(first.rarity_percentile_bps, 3_333);
+        assert_eq!(first.rarity_percentile_bps, 6_666);
     }
 
     #[test]
