@@ -247,6 +247,11 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
             if property_id.is_none() {
                 return Err(format!("evidence {id}: cover_witness requires property_id"));
             }
+            if proof_scope.as_deref() != Some("bounded") || bound_cycles.unwrap_or(0) == 0 {
+                return Err(format!(
+                    "evidence {id}: cover_witness requires proof_scope=bounded and positive bound_cycles"
+                ));
+            }
         }
         "payload_effect_trace" => {
             if status == "pass"
@@ -970,6 +975,8 @@ mod tests {
             "cover_witness" => {
                 item["property_id"] = json!("trigger_cover");
                 item["formal_result"] = json!("cover_reached");
+                item["proof_scope"] = json!("bounded");
+                item["bound_cycles"] = json!(20);
                 item["witness_sha256"] = json!(WITNESS);
                 item["stimuli_count"] = json!(1000);
                 item["activation_count"] = json!(1);
@@ -1035,6 +1042,8 @@ mod tests {
                 "scope": "reset-consistent 10-cycle active replay; trigger phases at cycles 2, 4 and 6",
                 "formal_result": "cover_reached",
                 "property_id": "three_phase_trigger_path",
+                "proof_scope": "bounded",
+                "bound_cycles": 10,
                 "stimuli_count": 10,
                 "activation_count": 3,
                 "witness_sha256": SEQCUBE_ACTIVE_TRACE
@@ -1157,6 +1166,23 @@ mod tests {
             vec!["cover_witness-1"],
         );
         validate_packet(&packet, "0".repeat(64)).unwrap();
+    }
+
+    #[test]
+    fn rejects_cover_witness_without_an_explicit_positive_bound() {
+        let mut packet = base_packet();
+        let mut cover = evidence("cover_witness", "pass");
+        cover["bound_cycles"] = json!(0);
+        add_evidence(&mut packet, cover);
+        set_claim(
+            &mut packet,
+            "trigger_activated",
+            "supported",
+            vec!["cover_witness-1"],
+        );
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("positive bound_cycles"));
     }
 
     #[test]
