@@ -27,6 +27,7 @@ pub mod active_experiment;
 pub mod robust_experiment;
 pub mod predictive_adequacy;
 pub mod experiment_policy_benchmark;
+pub mod representative_experiment;
 pub mod audit;
 pub mod benchmark;
 pub mod beta_readiness;
@@ -176,6 +177,12 @@ pub use quantum_utility::{
 pub use active_experiment::{
     ActiveExperimentProblem, DecisionExperiment, ExperimentDesignError, ExperimentRanking,
     ExperimentScore, OutcomeProbability,
+};
+
+pub use representative_experiment::{
+    ExperimentRegimeProfile, RepresentativeExperimentContext, RidaAblationError,
+    RidaAblationPolicy, RidaAblationReport, RidaExperimentComponentScore, RidaPolicyRanking,
+    RidaPolicyScore, rank_rida_ablations,
 };
 
 pub use robust_experiment::{
