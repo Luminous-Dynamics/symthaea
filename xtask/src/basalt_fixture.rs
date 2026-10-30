@@ -438,9 +438,9 @@ fn initialize_git_fixture(workspace: &Path, has_tracked_docs: bool) -> anyhow::R
     run_git(workspace, &["config", "user.name", "BASALT Fixture Harness"])?;
     run_git(workspace, &["config", "user.email", "basalt-fixture@example.invalid"])?;
     if has_tracked_docs {
-        run_git(workspace, &["add", "--", ".gitignore", "docs/unused.md"])?;
+        run_git(workspace, &["add", "--force", "--", ".gitignore", "docs/unused.md"])?;
     } else {
-        run_git(workspace, &["add", "--", ".gitignore"])?;
+        run_git(workspace, &["add", "--force", "--", ".gitignore"])?;
     }
     run_git(workspace, &["commit", "--quiet", "-m", "BASALT fixture baseline"])?;
     let output = Command::new("git")
