@@ -1145,7 +1145,6 @@ mod tests {
         let mut value = fixture_value();
         value["resolutions"][0]["adjudicator_id_sha256"] =
             value["initial_adjudications"][0]["adjudicator_id_sha256"].clone();
-        reseal(&mut value);
         let report = verify_value(&value);
         assert!(!report.valid);
         assert!(
@@ -1160,7 +1159,6 @@ mod tests {
     fn resolution_requires_evidence_for_contested_decision() {
         let mut value = fixture_value();
         value["resolutions"][0]["evidence_span_ids"] = json!([]);
-        reseal(&mut value);
         let report = verify_value(&value);
         assert!(!report.valid);
         assert!(report.issues.iter().any(|issue| {
@@ -1175,7 +1173,6 @@ mod tests {
         value["validator_source_revision"] = json!(BUILT_GENERATOR_SOURCE_REVISION);
         value["adjudicators"][3]["independence_group_sha256"] =
             value["adjudicators"][0]["independence_group_sha256"].clone();
-        reseal(&mut value);
         let report = verify_value(&value);
         assert!(!report.valid);
         assert!(
@@ -1271,7 +1268,7 @@ mod tests {
             report
                 .issues
                 .iter()
-                .any(|issue| issue.contains("deleted/retracted source"))
+                .any(|issue| issue.contains("non-active source as current support"))
         );
     }
 
