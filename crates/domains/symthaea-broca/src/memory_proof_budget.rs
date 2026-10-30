@@ -925,6 +925,7 @@ pub fn solve_proof_budget(
                 source_span_start: candidate.source_span_start,
                 source_span_end: candidate.source_span_end,
                 source_family_id: candidate.source_family_id.clone(),
+                source_session_id: candidate.source_session_id.clone(),
                 payload_sha256: candidate.payload_sha256.clone(),
                 source_span_sha256: candidate.source_span_sha256.clone(),
                 authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
