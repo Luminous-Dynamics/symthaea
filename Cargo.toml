@@ -2555,3 +2555,8 @@ required-features = ["hardsec-design-audit"]
 [[example]]
 name = "hardsec_partition_path_audit"
 required-features = ["hardsec-design-audit"]
+
+# HARDSEC-010: streaming merge-join path preservation audit.
+[[example]]
+name = "hardsec_partition_path_stream"
+required-features = ["hardsec-design-audit"]
