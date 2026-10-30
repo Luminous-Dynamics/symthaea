@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-014-dual-control-disturbance-v0.1.json",
+  "title": "CMAQ-014 dual-control probe disturbance report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_count",
+    "damage_threshold",
+    "max_damage_probability",
+    "lanes",
+    "policies",
+    "cells"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-014-dual-control-disturbance-v0.1"
+    },
+    "episode_count": {
+      "const": 512
+    },
+    "damage_threshold": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "max_damage_probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "lanes": {
+      "const": [
+        "robust_assets",
+        "mixed_assets",
+        "fragile_assets"
+      ]
+    },
+    "policies": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lane",
+          "fragile_probability",
+          "episode_count",
+          "summaries"
+        ],
+        "properties": {
+          "lane": {
+            "enum": [
+              "robust_assets",
+              "mixed_assets",
+              "fragile_assets"
+            ]
+          },
+          "fragile_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "episode_count": {
+            "const": 512
+          },
+          "summaries": {
+            "type": "array",
+            "minItems": 7,
+            "maxItems": 7,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "policy",
+                "mean_task_success",
+                "mean_decision_accuracy",
+                "mean_net_utility",
+                "mean_disturbance",
+                "mean_probe_cost",
+                "damage_rate",
+                "risk_budget_violation_rate",
+                "mean_probe_accuracy",
+                "probe_counts"
+              ],
+              "properties": {
+                "policy": {
+                  "type": "string"
+                },
+                "mean_task_success": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "mean_decision_accuracy": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "mean_net_utility": {
+                  "type": "number"
+                },
+                "mean_disturbance": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "mean_probe_cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "damage_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "risk_budget_violation_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "mean_probe_accuracy": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "probe_counts": {
+                  "type": "array",
+                  "minItems": 5,
+                  "maxItems": 5,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
