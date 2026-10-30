@@ -992,6 +992,9 @@ mod tests {
         assert_eq!(report.fields.accepted_valid_count, 2);
         assert_eq!(report.fields.rejected_valid_count, 1);
         assert_eq!(report.fields.abstained_count, 1);
+        assert_eq!(report.fields.abstained_valid_count, 0);
+        assert_eq!(report.fields.abstained_invalid_count, 0);
+        assert_eq!(report.fields.abstained_ambiguous_count, 1);
         assert_eq!(report.fields.ambiguous_relation_count, 2);
         assert_eq!(report.fields.unique_valid_accepted_test_unit_count, 2);
         assert_eq!(report.fields.scoring_eligible_declared, false);
