@@ -23,6 +23,9 @@ enum Commands {
         /// Path to the frozen suite manifest; its exact bytes must match source.manifest_digest.
         #[arg(long)]
         manifest: PathBuf,
+        /// Directory of offline UTF-8 task specifications, named <sha256-hex>.txt.
+        #[arg(long)]
+        spec_root: PathBuf,
     },
     /// Discovery check: flag a new crate that re-implements an existing symthaea-core module.
     /// Fails only on an UNADJUDICATED collision; known ones live in docs/crate-status.toml.
@@ -80,8 +83,8 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::BasaltValidate { input, manifest } => {
-            let report = basalt_validate::validate_file(&input, &manifest)?;
+        Commands::BasaltValidate { input, manifest, spec_root } => {
+            let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.valid {
                 anyhow::bail!("BASALT run-record validation failed");
