@@ -11,7 +11,7 @@ import argparse
 import hashlib
 import json
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 UPSTREAM_REPOSITORY = "https://github.com/openai/math"
@@ -80,6 +80,8 @@ def partition_digest(assignments: dict[str, str]) -> str:
 def validate_manifest(
     manifest: dict[str, Any], *, require_pinned: bool
 ) -> tuple[list[dict[str, Any]], dict[str, str], str]:
+    if not isinstance(manifest, dict):
+        raise ValueError("manifest root must be an object")
     if manifest.get("schema_version") != "symthaea.proof-insight-transfer.splits.v0":
         raise ValueError("unsupported split manifest schema_version")
     upstream = manifest.get("upstream")
@@ -132,8 +134,15 @@ def validate_manifest(
             if not isinstance(path, str) or not path.strip():
                 raise ValueError(f"{family_id}: linked path must be a nonblank string")
             parsed = PurePosixPath(path)
-            if parsed.is_absolute() or any(part in {"", ".", ".."} for part in parsed.parts):
-                raise ValueError(f"{family_id}: unsafe repository-relative path: {path}")
+            if (
+                chr(92) in path
+                or parsed.is_absolute()
+                or str(parsed) != path
+                or any(part in {"", ".", ".."} for part in parsed.parts)
+            ):
+                raise ValueError(f"{family_id}: unsafe or non-canonical repository-relative path: {path}")
+            if path in normalized_paths:
+                raise ValueError(f"{family_id}: duplicate linked artifact path: {path}")
             normalized_paths.append(path)
         families.append(
             {
@@ -327,6 +336,29 @@ def run_self_tests() -> int:
     except ValueError:
         checks += 1
 
+    bad = json.loads(json.dumps(manifest))
+    bad["families"][0]["linked_paths"] = ["lean" + chr(92) + "docs" + chr(92) + "family.lean"]
+    try:
+        build_docket(bad, raw, require_pinned=False)
+        raise AssertionError("non-canonical Windows-style path accepted")
+    except ValueError:
+        checks += 1
+
+    bad = json.loads(json.dumps(manifest))
+    bad["families"][0]["linked_paths"] = [bad["families"][0]["linked_paths"][0]] * 2
+    try:
+        build_docket(bad, raw, require_pinned=False)
+        raise AssertionError("duplicate linked path accepted")
+    except ValueError:
+        checks += 1
+
+    bad = []
+    try:
+        build_docket(bad, raw, require_pinned=False)
+        raise AssertionError("non-object manifest root accepted")
+    except ValueError:
+        checks += 1
+
     print(f"PITB_COVERAGE_DOCKET_SELF_TEST_PASS: checks={checks}")
     return checks
 
@@ -342,10 +374,6 @@ def main() -> int:
         return 0
     if not args.split_manifest or not args.output:
         parser.error("split_manifest and output are required unless --self-test is used")
-
-    manifest_path = PurePosixPath(args.split_manifest)
-    del manifest_path  # Paths are opened by pathlib below; validation concerns source paths.
-    from pathlib import Path
 
     source_path = Path(args.split_manifest)
     output_path = Path(args.output)
