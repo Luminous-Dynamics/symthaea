@@ -409,16 +409,27 @@ fn min_fill_order(
     factors: &[BinaryFactor],
     eliminate: &[usize],
 ) -> Result<(Vec<usize>, usize), FactorGraphError> {
+    let scopes = factors
+        .iter()
+        .map(|factor| factor.variables.clone())
+        .collect::<Vec<_>>();
+    min_fill_order_scopes(&scopes, eliminate)
+}
+
+fn min_fill_order_scopes(
+    factor_scopes: &[Vec<usize>],
+    eliminate: &[usize],
+) -> Result<(Vec<usize>, usize), FactorGraphError> {
     let mut adjacency: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for variable in eliminate.iter().copied() {
         adjacency.entry(variable).or_default();
     }
-    for factor in factors {
-        for variable in factor.variables.iter().copied() {
+    for scope in factor_scopes {
+        for variable in scope.iter().copied() {
             adjacency.entry(variable).or_default();
         }
-        for (left_index, a) in factor.variables.iter().copied().enumerate() {
-            for b in factor.variables.iter().copied().skip(left_index + 1) {
+        for (left_index, a) in scope.iter().copied().enumerate() {
+            for b in scope.iter().copied().skip(left_index + 1) {
                 adjacency.entry(a).or_default().insert(b);
                 adjacency.entry(b).or_default().insert(a);
             }
