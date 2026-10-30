@@ -453,7 +453,7 @@ jobs:
               for item in action_lock["actions"]
           }
           workflow_actions = re.findall(
-              r"^\\s*uses:\\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([^\\s]+)",
+              r"^\s*uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([^\s]+)",
               workflow_text,
               flags=re.MULTILINE,
           )
