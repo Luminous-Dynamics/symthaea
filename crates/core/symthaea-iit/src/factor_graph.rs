@@ -399,6 +399,112 @@ pub fn min_fill_sum_product(
     })
 }
 
+/// Exact log-domain sum-product elimination using deterministic min-fill.
+///
+/// This has the same scope/ordering/budget contract as `min_fill_sum_product`,
+/// but factor multiplication is log addition and variable elimination is
+/// log-sum-exp. Use it when a long product of individually valid likelihoods
+/// could underflow even after local factor scaling.
+pub fn min_fill_log_sum_product(
+    factors: &[BinaryLogFactor],
+    eliminate: &[usize],
+    max_factor_entries: usize,
+) -> Result<LogFactorEliminationReport, FactorGraphError> {
+    if factors.is_empty() {
+        return Err(FactorGraphError::EmptyFactorGraph);
+    }
+    let mut seen = BTreeSet::new();
+    for variable in eliminate.iter().copied() {
+        if !seen.insert(variable) {
+            return Err(FactorGraphError::DuplicateEliminationVariable { variable });
+        }
+    }
+
+    let mut work = Vec::<Option<BinaryLogFactor>>::with_capacity(
+        factors.len().saturating_add(eliminate.len()),
+    );
+    let mut buckets = BTreeMap::<usize, BTreeSet<usize>>::new();
+    let mut peak_factor_entries = 1usize;
+    for factor in factors {
+        check_budget(factor.log_values.len(), max_factor_entries)?;
+        peak_factor_entries = peak_factor_entries.max(factor.log_values.len());
+        let factor_id = work.len();
+        for variable in factor.variables.iter().copied() {
+            buckets.entry(variable).or_default().insert(factor_id);
+        }
+        work.push(Some(factor.clone()));
+    }
+
+    let scopes = factors
+        .iter()
+        .map(|factor| factor.variables.clone())
+        .collect::<Vec<_>>();
+    let (elimination_order, induced_width) = min_fill_order_scopes(&scopes, eliminate)?;
+    let mut factor_multiplications = 0usize;
+    let mut variables_summed_out = 0usize;
+
+    for variable in elimination_order.iter().copied() {
+        let incident = buckets.remove(&variable).unwrap_or_default();
+        if incident.is_empty() {
+            work.push(Some(BinaryLogFactor::scalar(std::f64::consts::LN_2)?));
+            variables_summed_out += 1;
+            continue;
+        }
+
+        let mut product: Option<BinaryLogFactor> = None;
+        for factor_id in incident {
+            let Some(factor) = work.get_mut(factor_id).and_then(Option::take) else {
+                continue;
+            };
+            for other_variable in factor.variables.iter().copied() {
+                if other_variable != variable {
+                    if let Some(bucket) = buckets.get_mut(&other_variable) {
+                        bucket.remove(&factor_id);
+                    }
+                }
+            }
+
+            product = Some(match product {
+                None => factor,
+                Some(previous) => {
+                    factor_multiplications += 1;
+                    previous.multiply(&factor, max_factor_entries)?
+                }
+            });
+            if let Some(current) = &product {
+                peak_factor_entries = peak_factor_entries.max(current.log_values.len());
+            }
+        }
+
+        let product = product.ok_or(FactorGraphError::VariableNotInFactor { variable })?;
+        let reduced = product.sum_out(variable, max_factor_entries)?;
+        peak_factor_entries = peak_factor_entries.max(reduced.log_values.len());
+        let factor_id = work.len();
+        for remaining_variable in reduced.variables.iter().copied() {
+            buckets.entry(remaining_variable).or_default().insert(factor_id);
+        }
+        work.push(Some(reduced));
+        variables_summed_out += 1;
+    }
+
+    let mut remaining = work.into_iter().flatten();
+    let mut result = remaining.next().ok_or(FactorGraphError::EmptyFactorGraph)?;
+    for factor in remaining {
+        result = result.multiply(&factor, max_factor_entries)?;
+        factor_multiplications += 1;
+        peak_factor_entries = peak_factor_entries.max(result.log_values.len());
+    }
+
+    Ok(LogFactorEliminationReport {
+        factor: result,
+        elimination_order,
+        induced_width,
+        peak_factor_entries,
+        factor_multiplications,
+        variables_summed_out,
+    })
+}
+
 /// Compute the deterministic min-fill order and its induced width.
 ///
 /// A lazy min-priority queue keeps the planner from rescanning every active
