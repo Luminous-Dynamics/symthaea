@@ -402,6 +402,13 @@ pub struct ProofBudgetResult {
     pub evidence: Vec<ProofPacketEvidenceRef>,
     pub total_token_cost: u64,
     pub search_nodes: u64,
+    /// Number of admissible lower-bound calculations performed by the optimizer.
+    #[serde(default)]
+    pub lower_bound_evaluations: u64,
+    /// Number of branches pruned because selected cost plus an admissible
+    /// remaining-cost lower bound exceeded the best complete packet.
+    #[serde(default)]
+    pub bound_pruned_nodes: u64,
     pub candidate_rejections: BTreeMap<String, Vec<ProofCandidateRejection>>,
     pub justification_rejections: Vec<JustificationRejection>,
     pub packet_sha256: Option<String>,
@@ -456,6 +463,8 @@ struct ExactSearch<'a> {
     candidate_rejections: BTreeMap<String, Vec<ProofCandidateRejection>>,
     justification_rejections: BTreeSet<JustificationRejection>,
     nodes: u64,
+    lower_bound_evaluations: u64,
+    bound_pruned_nodes: u64,
     budget_blocked: bool,
     arithmetic_error: bool,
     search_limit_reached: bool,
@@ -489,6 +498,8 @@ impl<'a> ExactSearch<'a> {
             candidate_rejections,
             justification_rejections: BTreeSet::new(),
             nodes: 0,
+            lower_bound_evaluations: 0,
+            bound_pruned_nodes: 0,
             budget_blocked: false,
             arithmetic_error: false,
             search_limit_reached: false,
@@ -606,8 +617,126 @@ impl<'a> ExactSearch<'a> {
             {
                 continue;
             }
-            self.explore(obligation_index + 1, &next_evidence, &next_proofs);
+
+            let next_obligation_index = obligation_index + 1;
+            if next_obligation_index < self.request.obligations.len() {
+                if let Some(best_cost) = self.best.as_ref().map(|best| best.total_token_cost) {
+                    let Some(remaining_lower_bound) =
+                        self.lower_bound_for_remaining(next_obligation_index, &next_evidence)
+                    else {
+                        // Arithmetic overflow is reported by solve_proof_budget
+                        // after the search returns; never treat it as a valid bound.
+                        continue;
+                    };
+                    let Some(total_lower_bound) = next_cost.checked_add(remaining_lower_bound) else {
+                        self.arithmetic_error = true;
+                        continue;
+                    };
+                    if total_lower_bound > best_cost {
+                        self.bound_pruned_nodes = self.bound_pruned_nodes.saturating_add(1);
+                        // Skip only this alternative. Other alternatives at the
+                        // current obligation remain candidates for the optimum.
+                        continue;
+                    }
+                }
+            }
+            self.explore(next_obligation_index, &next_evidence, &next_proofs);
         }
+    }
+
+    /// Admissible lower bound for the additional cost of all remaining
+    /// obligations. For each obligation, compute its cheapest currently
+    /// admissible alternative relative to the evidence already selected. The
+    /// maximum of these per-obligation minima is a safe bound: the eventual
+    /// shared evidence union must cost at least as much as every individual
+    /// remaining obligation, but summing the minima would overcount evidence
+    /// that future obligations may share.
+    fn lower_bound_for_remaining(
+        &mut self,
+        first_obligation_index: usize,
+        selected_evidence_ids: &BTreeSet<String>,
+    ) -> Option<u64> {
+        self.lower_bound_evaluations = match self.lower_bound_evaluations.checked_add(1) {
+            Some(value) => value,
+            None => {
+                self.arithmetic_error = true;
+                return None;
+            }
+        };
+
+        // Own the small immutable suffix so the bound can use the search maps
+        // without holding a borrow into self.request across helper calls.
+        let remaining_obligations: Vec<_> = self.request.obligations
+            .iter()
+            .skip(first_obligation_index)
+            .cloned()
+            .collect();
+        let mut maximum_minimum = 0u64;
+
+        for obligation in remaining_obligations {
+            let mut minimum_for_obligation: Option<u64> = None;
+            for alternative in &obligation.alternatives {
+                let mut families = BTreeSet::new();
+                let mut admissible = true;
+                for evidence_id in &alternative.evidence_dependencies {
+                    let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
+                        admissible = false;
+                        break;
+                    };
+                    if !self.eligible_by_id.contains_key(evidence_id.as_str()) {
+                        admissible = false;
+                        break;
+                    }
+                    families.insert(candidate.source_family_id.as_str());
+                }
+                if !admissible
+                    || families.len() < obligation.minimum_independent_families as usize
+                {
+                    continue;
+                }
+
+                let mut candidate_union = selected_evidence_ids.clone();
+                candidate_union.extend(alternative.evidence_dependencies.iter().cloned());
+                if self.has_internal_conflict(&candidate_union) {
+                    continue;
+                }
+
+                let mut incremental_cost = u64::from(obligation.selection_overhead_tokens);
+                for evidence_id in &alternative.evidence_dependencies {
+                    if selected_evidence_ids.contains(evidence_id) {
+                        continue;
+                    }
+                    let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
+                        admissible = false;
+                        break;
+                    };
+                    let Some(next_cost) =
+                        incremental_cost.checked_add(u64::from(candidate.token_cost))
+                    else {
+                        self.arithmetic_error = true;
+                        return None;
+                    };
+                    incremental_cost = next_cost;
+                }
+                if !admissible {
+                    continue;
+                }
+
+                minimum_for_obligation = Some(
+                    minimum_for_obligation
+                        .map_or(incremental_cost, |current| current.min(incremental_cost)),
+                );
+            }
+
+            // No individually admissible continuation means this branch will
+            // eventually fail proof construction. A zero lower bound is
+            // conservative and lets the ordinary search record its rejection.
+            if let Some(minimum) = minimum_for_obligation {
+                maximum_minimum = maximum_minimum.max(minimum);
+            }
+        }
+
+        Some(maximum_minimum)
     }
 
     fn has_internal_conflict(&self, evidence_ids: &BTreeSet<String>) -> bool {
@@ -691,6 +820,8 @@ pub fn solve_proof_budget(
             evidence: Vec::new(),
             total_token_cost: 0,
             search_nodes: search.nodes,
+            lower_bound_evaluations: search.lower_bound_evaluations,
+            bound_pruned_nodes: search.bound_pruned_nodes,
             candidate_rejections,
             justification_rejections,
             packet_sha256: None,
@@ -709,6 +840,8 @@ pub fn solve_proof_budget(
             evidence: Vec::new(),
             total_token_cost: 0,
             search_nodes: search.nodes,
+            lower_bound_evaluations: search.lower_bound_evaluations,
+            bound_pruned_nodes: search.bound_pruned_nodes,
             candidate_rejections,
             justification_rejections,
             packet_sha256: None,
@@ -769,6 +902,8 @@ pub fn solve_proof_budget(
         evidence,
         total_token_cost: plan.total_token_cost,
         search_nodes: search.nodes,
+        lower_bound_evaluations: search.lower_bound_evaluations,
+        bound_pruned_nodes: search.bound_pruned_nodes,
         candidate_rejections,
         justification_rejections,
         packet_sha256: Some(packet_sha256),
@@ -1024,6 +1159,80 @@ mod tests {
             candidates,
             obligations,
         }
+    }
+
+    #[test]
+    fn admissible_remaining_cost_bound_prunes_branches_without_changing_optimum() {
+        let req = request(
+            vec![
+                candidate("good-a", "family-good", 5),
+                candidate("worse-a", "family-worse", 6),
+                candidate("shared-b", "family-b", 5),
+            ],
+            vec![
+                obligation(
+                    "claim-a",
+                    vec![
+                        justification("a-best", &["good-a"]),
+                        justification("z-worse", &["worse-a"]),
+                    ],
+                ),
+                obligation(
+                    "claim-b",
+                    vec![justification("only-b", &["shared-b"])],
+                ),
+            ],
+            64,
+        );
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 10);
+        assert_eq!(result.selected_proofs[0].justification_id, "a-best");
+        assert!(result.lower_bound_evaluations > 0);
+        assert_eq!(result.bound_pruned_nodes, 1);
+
+        // The independent exhaustive verifier still checks the complete
+        // Cartesian product, including the branch pruned by the optimizer.
+        verify_proof_budget_result(&req, &result).unwrap();
+    }
+
+    #[test]
+    fn shared_future_evidence_is_not_double_counted_in_the_lower_bound() {
+        let req = request(
+            vec![
+                candidate("A", "family-A", 1),
+                candidate("E", "family-E", 5),
+                candidate("Z", "family-Z", 1),
+            ],
+            vec![
+                obligation(
+                    "claim-1",
+                    vec![
+                        justification("a-high-evidence-id", &["Z"]),
+                        justification("z-low-evidence-id", &["A"]),
+                    ],
+                ),
+                obligation("claim-2", vec![justification("shared-2", &["E"])]),
+                obligation("claim-3", vec![justification("shared-3", &["E"])]),
+            ],
+            64,
+        );
+
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 6);
+
+        // The second alternative has equal cost but a canonical evidence set
+        // beginning with "A", which wins the deterministic tie-break. Both
+        // remaining obligations share E, so their lower-bound contribution is
+        // max(5, 5)=5, not 10. Equality with the incumbent must not be pruned.
+        assert_eq!(result.selected_proofs[0].justification_id, "z-low-evidence-id");
+        assert_eq!(
+            result.evidence.iter().map(|item| item.evidence_id.as_str()).collect::<Vec<_>>(),
+            vec!["A", "E"],
+        );
+        assert_eq!(result.bound_pruned_nodes, 0);
+        verify_proof_budget_result(&req, &result).unwrap();
     }
 
     #[test]
