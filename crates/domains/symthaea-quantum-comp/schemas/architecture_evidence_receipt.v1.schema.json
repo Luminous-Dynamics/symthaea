@@ -10,6 +10,7 @@
     "workload_fingerprint",
     "comparison_contract_fingerprint",
     "benchmark_suite",
+    "source_reference",
     "benchmark_version",
     "workload_case_id",
     "origin",
@@ -21,10 +22,6 @@
     "interval_analysis_sha256",
     "summary_sha256",
     "executor_identity",
-    "repeat_count",
-    "failed_run_count",
-    "interval_method_id",
-    "aggregation_method_id"
   ],
   "properties": {
     "schema_version": {
@@ -47,6 +44,7 @@
         "other"
       ]
     },
+    "source_reference": {"type": "string", "minLength": 1},
     "benchmark_version": {"type": "string", "minLength": 1},
     "workload_case_id": {"type": "string", "minLength": 1},
     "origin": {
@@ -84,14 +82,25 @@
         "required": [
           "device_identity",
           "toolchain_identity",
-          "runner_artifact_sha256"
+          "runner_artifact_sha256",
+          "repeat_count",
+          "failed_run_count",
+          "interval_method_id",
+          "aggregation_method_id"
         ]
       }
     },
     {
       "if": {"properties": {"origin": {"const": "simulation_execution"}}},
       "then": {
-        "required": ["toolchain_identity", "runner_artifact_sha256"]
+        "required": [
+          "toolchain_identity",
+          "runner_artifact_sha256",
+          "repeat_count",
+          "failed_run_count",
+          "interval_method_id",
+          "aggregation_method_id"
+        ]
       }
     },
     {
@@ -106,6 +115,22 @@
           ]
         }
       }
+    },
+    {
+      "if": {"required": ["repeat_count"]},
+      "then": {"required": ["failed_run_count"]}
+    },
+    {
+      "if": {"required": ["failed_run_count"]},
+      "then": {"required": ["repeat_count"]}
+    },
+    {
+      "if": {"required": ["interval_method_id"]},
+      "then": {"required": ["aggregation_method_id"]}
+    },
+    {
+      "if": {"required": ["aggregation_method_id"]},
+      "then": {"required": ["interval_method_id"]}
     }
   ],
   "$defs": {
