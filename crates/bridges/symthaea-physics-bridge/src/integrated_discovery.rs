@@ -365,11 +365,7 @@ fn run_trial(seed: u64, config: PipelineConfig, max_rounds: usize) -> TrialOutco
 /// Estimate a common observation-noise scale from live predictions alone.
 /// The simulator uses truth-scaled noise; the median proxy avoids leakage from the
 /// hidden law and makes the EIG selector's homoscedastic approximation explicit.
-fn selection_noise_std_dev(
-    remaining: &[Experiment],
-    live: &[usize],
-    hypotheses: &[Expr],
-) -> f64 {
+fn selection_noise_std_dev(remaining: &[Experiment], live: &[usize], hypotheses: &[Expr]) -> f64 {
     let mut magnitudes = Vec::new();
     for experiment in remaining {
         for index in live {
@@ -532,8 +528,8 @@ fn run_trial_with_discrepancy(
             .map(|(index, value)| (value * (3.0 + index as f64)).sin())
             .sum::<f64>()
             / coordinates.len().max(1) as f64;
-        let true_val = base_true_val
-            + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
+        let true_val =
+            base_true_val + systematic_discrepancy * (1.0 + base_true_val.abs()) * discrepancy_wave;
         // `smoothing`'s real question: is it worth taking K_REPEATS repeated noisy readings at
         // this SAME chosen point and blending them (CfC, dt-aware, irregular gaps between
         // readings), vs. a single one-shot reading? Deliberately NOT smoothing across
@@ -714,12 +710,8 @@ mod tests {
         let mut paired_outcomes: Vec<SelectorPair> = Vec::with_capacity(SEEDS as usize);
 
         for seed in 1..=SEEDS {
-            let raw = run_trial_with_selector(
-                seed,
-                config,
-                ROUND_BUDGET,
-                ActiveSelector::RawVariance,
-            );
+            let raw =
+                run_trial_with_selector(seed, config, ROUND_BUDGET, ActiveSelector::RawVariance);
             let eig = run_trial_with_selector(
                 seed,
                 config,
@@ -748,7 +740,8 @@ mod tests {
         let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
             |pair| {
-                (if pair.eig_false_singleton { 1.0 } else { 0.0 }) - (if pair.eig_detected { 1.0 } else { 0.0 })
+                (if pair.eig_false_singleton { 1.0 } else { 0.0 })
+                    - (if pair.eig_detected { 1.0 } else { 0.0 })
             },
             0x4549_475f_5355_4343,
         );
@@ -837,14 +830,28 @@ mod tests {
 
             clean_eig_successes += if clean_eig.success { 1 } else { 0 };
             clean_audit_successes += if clean_audit.success { 1 } else { 0 };
-            misspecified_eig_false_singletons +=
-                if misspec_eig.overconfident_under_misspecification { 1 } else { 0 };
+            misspecified_eig_false_singletons += if misspec_eig.overconfident_under_misspecification
+            {
+                1
+            } else {
+                0
+            };
             misspecified_audit_false_singletons +=
-                if misspec_audit.overconfident_under_misspecification { 1 } else { 0 };
-            misspecified_eig_detections +=
-                if misspec_eig.model_discrepancy_detected { 1 } else { 0 };
-            misspecified_audit_detections +=
-                if misspec_audit.model_discrepancy_detected { 1 } else { 0 };
+                if misspec_audit.overconfident_under_misspecification {
+                    1
+                } else {
+                    0
+                };
+            misspecified_eig_detections += if misspec_eig.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
+            misspecified_audit_detections += if misspec_audit.model_discrepancy_detected {
+                1
+            } else {
+                0
+            };
             misspecified_eig_unresolved += if misspec_eig.final_live > 1 { 1 } else { 0 };
             misspecified_audit_unresolved += if misspec_audit.final_live > 1 { 1 } else { 0 };
             audit_query_total += misspec_audit.audit_queries;
