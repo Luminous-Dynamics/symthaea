@@ -212,9 +212,17 @@ impl Enumeration<'_> {
             return Ok(());
         }
 
-        let obligation = &self.request.obligations[obligation_index];
-        for alternative in &obligation.alternatives {
-            let mut families = BTreeSet::new();
+        // Own the branch point so recursive mutable enumeration does not
+        // retain a borrow into the request stored on self.
+        let conclusion_id = self.request.obligations[obligation_index].conclusion_id.clone();
+        let minimum_independent_families =
+            self.request.obligations[obligation_index].minimum_independent_families;
+        let selection_overhead_tokens =
+            self.request.obligations[obligation_index].selection_overhead_tokens;
+        let alternatives = self.request.obligations[obligation_index].alternatives.clone();
+
+        for alternative in &alternatives {
+            let mut families = BTreeSet::<String>::new();
             let mut alternative_is_admissible = true;
 
             for evidence_id in &alternative.evidence_dependencies {
@@ -226,11 +234,11 @@ impl Enumeration<'_> {
                     alternative_is_admissible = false;
                     break;
                 }
-                families.insert(candidate.source_family_id.as_str());
+                families.insert(candidate.source_family_id.clone());
             }
 
             if !alternative_is_admissible
-                || families.len() < obligation.minimum_independent_families as usize
+                || families.len() < minimum_independent_families as usize
             {
                 continue;
             }
@@ -242,10 +250,10 @@ impl Enumeration<'_> {
             }
 
             selected_proofs.push(SelectedProof {
-                conclusion_id: obligation.conclusion_id.clone(),
+                conclusion_id: conclusion_id.clone(),
                 justification_id: alternative.justification_id.clone(),
                 evidence_dependencies: alternative.evidence_dependencies.clone(),
-                selection_overhead_tokens: obligation.selection_overhead_tokens,
+                selection_overhead_tokens,
             });
 
             self.visit(obligation_index + 1, &next_ids, selected_proofs)?;
