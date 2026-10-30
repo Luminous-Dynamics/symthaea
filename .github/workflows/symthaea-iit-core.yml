@@ -58,5 +58,8 @@ jobs:
       - name: Benchmark proper-system Eq4 with sparse external backgrounds
         run: cargo run --locked -p symthaea-iit --example eq4_sparse_background_sweep
 
+      - name: Benchmark sparse local-CPT Eq4 across growing substrates
+        run: cargo run --locked -p symthaea-iit --example sparse_eq4_scale_sweep -- --repeats 3
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings
