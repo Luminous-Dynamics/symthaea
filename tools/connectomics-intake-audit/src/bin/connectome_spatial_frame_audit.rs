@@ -222,6 +222,7 @@ struct MaskTileCount {
     eligible_voxel_count: String,
 }
 
+#[derive(Debug)]
 struct MaskScan {
     foreground_voxels: u128,
     tile_foreground_counts: Vec<u128>,
