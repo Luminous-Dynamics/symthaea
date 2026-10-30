@@ -18,9 +18,9 @@
 
 use crate::counterfactual_influence::{
     CounterfactualInfluenceError, CounterfactualInfluenceInput,
-    CounterfactualInfluenceReport, EventIntervention, InfluenceDisposition,
+    CounterfactualInfluenceSegmentedReport, EventIntervention, InfluenceDisposition,
     VerifiedRendererAudioBinding, VerifiedRepeatabilityCalibration,
-    verify_counterfactual_influence,
+    verify_counterfactual_influence_segmented,
 };
 use crate::fluid_render::{
     FluidSynthEffectsGroupAssignment, build_effects_group_assignment,
@@ -50,6 +50,12 @@ pub struct CounterfactualEventSupportEvidence {
     pub expected_score_event_count: usize,
     pub intervention: EventIntervention,
     pub influence_report_sha256: String,
+    pub segmented_influence_report_sha256: String,
+    pub raw_measured_intervals: Vec<AcousticSupportInterval>,
+    pub hysteresis_support_intervals: Vec<AcousticSupportInterval>,
+    pub tail_guard_intervals: Vec<AcousticSupportInterval>,
+    pub conservative_support_intervals: Vec<AcousticSupportInterval>,
+    pub tail_guard_was_clipped: bool,
     pub source_score_sha256: String,
     pub baseline_event_map_artifact_sha256: String,
     pub baseline_event_map_receipt_sha256: String,
@@ -106,6 +112,9 @@ pub struct CounterfactualSupportAdapterReport {
     pub output_frame_count: u64,
     pub event_count: usize,
     pub events: Vec<CounterfactualEventSupportEvidence>,
+    /// True when one or more event-specific tail guards were clipped by the
+    /// rendered output horizon. Such a report must not be handed to EVAL-019.
+    pub tail_guard_was_clipped: bool,
     /// False until the complete downstream/master route graph is verified.
     pub routing_complete: bool,
     pub routing_incomplete_reason: String,
@@ -136,7 +145,7 @@ impl CounterfactualSupportAdapterReport {
     /// Alias for the structural planner-readiness check. Only the opaque
     /// verified wrapper actually exposes planner_event_supports().
     pub fn planner_ready(&self) -> bool {
-        self.receipt_is_intact()
+        self.receipt_is_intact() && !self.tail_guard_was_clipped
     }
 }
 
@@ -156,12 +165,19 @@ impl VerifiedCounterfactualSupportAdapterReport {
         self.report.planner_ready()
     }
 
-    pub fn planner_event_supports(&self) -> Vec<EventInteractionSupport> {
-        self.report
-            .events
+    pub fn planner_event_supports(
+        &self,
+    ) -> Result<Vec<EventInteractionSupport>, CounterfactualSupportAdapterError> {
+        if self.report.tail_guard_was_clipped {
+            return Err(CounterfactualSupportAdapterError::TailGuardClipped);
+        }
+        if !self.report.receipt_is_intact() {
+            return Err(CounterfactualSupportAdapterError::InvalidAdapterReceipt);
+        }
+        Ok(self.report.events
             .iter()
             .map(|event| event.support.clone())
-            .collect()
+            .collect())
     }
 }
 
@@ -177,6 +193,7 @@ pub enum CounterfactualSupportAdapterError {
     InconsistentSourceOrRendererContext,
     InvalidEvidenceReceipt,
     InvalidAdapterReceipt,
+    TailGuardClipped,
     SerializationFailure,
 }
 
@@ -265,20 +282,85 @@ fn effects_assignment(
     Ok(assignment)
 }
 
+fn convert_intervals(
+    intervals: &[crate::audio_preservation::FrameInterval],
+    output_frame_count: u64,
+) -> Result<Vec<AcousticSupportInterval>, CounterfactualSupportAdapterError> {
+    if intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
+        return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
+    }
+    let mut converted = Vec::with_capacity(intervals.len());
+    for interval in intervals {
+        let start_frame = u64::try_from(interval.start_frame)
+            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+        let end_frame = u64::try_from(interval.end_frame)
+            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+        if start_frame >= end_frame || end_frame > output_frame_count {
+            return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
+        }
+        converted.push(AcousticSupportInterval { start_frame, end_frame });
+    }
+    converted.sort_unstable();
+    let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(converted.len());
+    for interval in converted {
+        if let Some(previous) = merged.last_mut() {
+            if interval.start_frame <= previous.end_frame {
+                previous.end_frame = previous.end_frame.max(interval.end_frame);
+                continue;
+            }
+        }
+        merged.push(interval);
+    }
+    Ok(merged)
+}
+
 fn build_event_support(
-    report: &CounterfactualInfluenceReport,
+    report: &CounterfactualInfluenceSegmentedReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
 ) -> Result<VerifiedCounterfactualEventSupport, CounterfactualSupportAdapterError> {
+    let base = &report.base_report;
     let source_event_index = parse_event_index(input.source_event_id)
         .ok_or(CounterfactualSupportAdapterError::InvalidEventIdentity)?;
-    if report.source_event_id != input.source_event_id
+    if base.source_event_id != input.source_event_id
         || source_event_index >= input.expected_score_event_count
         || input.baseline_audio.channels == 0
-        || report.total_frames as u64
+        || base.total_frames as u64
             != input.baseline_audio.interleaved_samples.len() as u64
                 / input.baseline_audio.channels as u64
     {
         return Err(CounterfactualSupportAdapterError::InvalidEventIdentity);
+    }
+
+    let output_frame_count = base.total_frames as u64;
+    let raw_measured_intervals =
+        convert_intervals(&report.raw_measured_intervals, output_frame_count)?;
+    let hysteresis_support_intervals =
+        convert_intervals(&report.hysteresis_support_intervals, output_frame_count)?;
+    let tail_guard_intervals =
+        convert_intervals(&report.tail_guard_intervals, output_frame_count)?;
+    let conservative_support_intervals =
+        convert_intervals(&report.conservative_support_intervals, output_frame_count)?;
+
+    let expected_conservative = {
+        let mut all = hysteresis_support_intervals.clone();
+        all.extend(tail_guard_intervals.iter().cloned());
+        all.sort_unstable();
+        let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(all.len());
+        for interval in all {
+            if let Some(previous) = merged.last_mut() {
+                if interval.start_frame <= previous.end_frame {
+                    previous.end_frame = previous.end_frame.max(interval.end_frame);
+                    continue;
+                }
+            }
+            merged.push(interval);
+        }
+        merged
+    };
+    if expected_conservative != conservative_support_intervals
+        || report.raw_measured_intervals != base.measured_influence_intervals
+    {
+        return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
     }
 
     let assignment = effects_assignment(
@@ -306,58 +388,38 @@ fn build_event_support(
         domains.insert(format!("fluidsynth:effects-group:{group}"));
     }
 
-    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
-        return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
-    }
-    let mut acoustic_support = Vec::with_capacity(report.measured_influence_intervals.len());
-    for interval in &report.measured_influence_intervals {
-        let start_frame = u64::try_from(interval.start_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        let end_frame = u64::try_from(interval.end_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        if start_frame >= end_frame || end_frame > report.total_frames as u64 {
-            return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
-        }
-        acoustic_support.push(AcousticSupportInterval { start_frame, end_frame });
-    }
-    acoustic_support.sort_unstable();
-    let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(acoustic_support.len());
-    for interval in acoustic_support {
-        if let Some(previous) = merged.last_mut() {
-            if interval.start_frame <= previous.end_frame {
-                previous.end_frame = previous.end_frame.max(interval.end_frame);
-                continue;
-            }
-        }
-        merged.push(interval);
-    }
-
     let mut evidence = CounterfactualEventSupportEvidence {
         version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
         source_event_index,
         source_event_id: input.source_event_id.to_owned(),
         expected_score_event_count: input.expected_score_event_count,
-        intervention: report.intervention.clone(),
-        influence_report_sha256: report.receipt_sha256.clone(),
-        source_score_sha256: report.source_score_sha256.clone(),
-        baseline_event_map_artifact_sha256: report.performed_event_map_sha256.clone(),
-        baseline_event_map_receipt_sha256: report.performed_event_map_receipt_sha256.clone(),
-        baseline_schedule_sha256: report.baseline_schedule_sha256.clone(),
-        baseline_renderer_receipt_sha256: report.baseline_renderer_receipt_sha256.clone(),
-        counterfactual_renderer_receipt_sha256: report.counterfactual_renderer_receipt_sha256.clone(),
-        baseline_audio_sha256: report.baseline_audio_sha256.clone(),
-        counterfactual_audio_sha256: report.counterfactual_audio_sha256.clone(),
-        repeatability_calibration_sha256: report.repeatability_calibration_sha256.clone(),
-        renderer_identity_sha256: report.renderer_identity_sha256.clone(),
-        renderer_config_sha256: report.renderer_config_sha256.clone(),
+        intervention: base.intervention.clone(),
+        influence_report_sha256: base.receipt_sha256.clone(),
+        segmented_influence_report_sha256: report.receipt_sha256.clone(),
+        raw_measured_intervals,
+        hysteresis_support_intervals,
+        tail_guard_intervals,
+        conservative_support_intervals: conservative_support_intervals.clone(),
+        tail_guard_was_clipped: report.tail_guard_was_clipped,
+        source_score_sha256: base.source_score_sha256.clone(),
+        baseline_event_map_artifact_sha256: base.performed_event_map_sha256.clone(),
+        baseline_event_map_receipt_sha256: base.performed_event_map_receipt_sha256.clone(),
+        baseline_schedule_sha256: base.baseline_schedule_sha256.clone(),
+        baseline_renderer_receipt_sha256: base.baseline_renderer_receipt_sha256.clone(),
+        counterfactual_renderer_receipt_sha256: base.counterfactual_renderer_receipt_sha256.clone(),
+        baseline_audio_sha256: base.baseline_audio_sha256.clone(),
+        counterfactual_audio_sha256: base.counterfactual_audio_sha256.clone(),
+        repeatability_calibration_sha256: base.repeatability_calibration_sha256.clone(),
+        renderer_identity_sha256: base.renderer_identity_sha256.clone(),
+        renderer_config_sha256: base.renderer_config_sha256.clone(),
         effects_group_assignment: assignment,
-        sample_rate_hz: report.sample_rate_hz,
-        channels: report.channels,
-        output_frame_count: report.total_frames as u64,
-        disposition: report.disposition,
+        sample_rate_hz: base.sample_rate_hz,
+        channels: base.channels,
+        output_frame_count: output_frame_count,
+        disposition: base.disposition,
         support: EventInteractionSupport {
             source_event_index,
-            acoustic_support: merged,
+            acoustic_support: conservative_support_intervals,
             routing_domains: domains.into_iter().collect(),
             // Partial effects-group topology is not a complete render graph.
             // EVAL-019 will conservatively expand pair scope until this changes.
@@ -372,14 +434,14 @@ fn build_event_support(
     Ok(VerifiedCounterfactualEventSupport { evidence })
 }
 
-/// Verify one EVAL-017 report against the exact artifacts/PCM/no-op calibration,
-/// then bind its measured intervals and EVAL-029 route assignment to one event.
+/// Verify one segmented EVAL-017 v0.2 report against the exact artifacts/PCM/no-op
+/// calibration, then bind conservative support and the receipt-bound route assignment.
 pub fn verify_counterfactual_event_support(
-    report: &CounterfactualInfluenceReport,
+    report: &CounterfactualInfluenceSegmentedReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
     calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<VerifiedCounterfactualEventSupport, CounterfactualSupportAdapterError> {
-    verify_counterfactual_influence(report, input, calibration)?;
+    verify_counterfactual_influence_segmented(report, input, calibration)?;
     build_event_support(report, input)
 }
 
@@ -404,7 +466,7 @@ pub fn verify_counterfactual_event_support_evidence(
 
 /// Complete original inputs required to replay one per-event evidence record.
 pub struct CounterfactualSupportReplayInput<'a, 'view, 'audio> {
-    pub report: &'a CounterfactualInfluenceReport,
+    pub report: &'a CounterfactualInfluenceSegmentedReport,
     pub input: &'a CounterfactualInfluenceInput<'view, 'audio>,
     pub calibration: &'a VerifiedRepeatabilityCalibration,
 }
@@ -431,6 +493,7 @@ fn assemble_from_verified_events(
                 != Some(event.evidence_sha256.as_str())
             || event.version != COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION
             || event.support.routing_complete
+            || event.support.acoustic_support != event.conservative_support_intervals
         {
             return Err(CounterfactualSupportAdapterError::DuplicateOrMissingEvent);
         }
@@ -469,6 +532,7 @@ fn assemble_from_verified_events(
         channels: first.channels,
         output_frame_count: first.output_frame_count,
         event_count: ordered.len(),
+        tail_guard_was_clipped: ordered.iter().any(|event| event.tail_guard_was_clipped),
         events: ordered.into_iter().cloned().collect(),
         routing_complete: false,
         routing_incomplete_reason: ROUTING_INCOMPLETE_REASON.to_owned(),
