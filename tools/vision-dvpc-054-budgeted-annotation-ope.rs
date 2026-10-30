@@ -3175,7 +3175,7 @@ mod tests {
         )
         .unwrap()
         .allocation;
-        let results = selection_inference(&world, &allocation, &portfolio, 128, 64, 63, 0x0580_t1e0)
+        let results = selection_inference(&world, &allocation, &portfolio, 128, 64, 63, 0x0580_71e0)
             .unwrap();
         for method in results {
             assert_eq!(method.certification_rate, 0.0);
@@ -3194,11 +3194,11 @@ mod tests {
         assert_eq!(first, second);
         let rows: Vec<_> = first
             .lines()
-            .filter(|line| line.starts_with("INFERENCE_RESULT\\t"))
+            .filter(|line| line.starts_with("INFERENCE_RESULT\t"))
             .collect();
         assert_eq!(rows.len(), 9);
         for row in rows {
-            assert_eq!(row.split('\\t').count(), 21);
+            assert_eq!(row.split('\t').count(), 21);
         }
     }
 
