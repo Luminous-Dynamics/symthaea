@@ -309,6 +309,8 @@ pub struct FactorialMainEffectV1 {
     pub factor: JudgeNuisanceFactorV1,
     pub complete_low_count: u64,
     pub complete_high_count: u64,
+    pub excluded_completed_low_count: u64,
+    pub excluded_completed_high_count: u64,
     pub ineligible_low_count: u64,
     pub ineligible_high_count: u64,
     /// Mean candidate-A minus candidate-B score at high level minus low level.
@@ -361,6 +363,9 @@ pub struct JudgeFactorialReportFieldsV1 {
     pub schema: String,
     pub study_id: String,
     pub analyzer_source_revision: String,
+    pub balanced_repeat_count: u64,
+    pub excluded_incomplete_repeat_count: u64,
+    pub effects_use_only_fully_completed_repeats: bool,
     pub plan_sha256: String,
     pub receipt_sha256: String,
     pub plan_commitment_sha256: String,
@@ -604,6 +609,8 @@ pub fn verify_judge_factorial_plan(
 
 #[derive(Debug, Clone)]
 struct CompletedMetricV1 {
+    block_id: String,
+    repeat_index: u32,
     factors: JudgeNuisanceFactorsV1,
     candidate_score_gap: f64,
     mean_criterion_score: f64,
@@ -656,6 +663,8 @@ fn metric_for_observation(
     }
     let criterion_count = block.criterion_ids.len() as f64;
     Ok(CompletedMetricV1 {
+        block_id: block.block_id.clone(),
+        repeat_index: condition.repeat_index,
         factors: condition.factors,
         candidate_score_gap: f64::from(candidate_a) - f64::from(candidate_b),
         mean_criterion_score: score_sum / criterion_count,
@@ -672,6 +681,34 @@ fn metric_for_observation(
 fn mean(values: impl Iterator<Item = f64>) -> Option<f64> {
     let values: Vec<f64> = values.collect();
     if values.is_empty() { None } else { Some(values.iter().sum::<f64>() / values.len() as f64) }
+}
+
+fn select_balanced_factorial_repeats(
+    plan: &JudgeFactorialPlanV1,
+    metrics: &[CompletedMetricV1],
+) -> (Vec<CompletedMetricV1>, u64, u64) {
+    let mut grouped: BTreeMap<(String, u32), Vec<&CompletedMetricV1>> = BTreeMap::new();
+    for metric in metrics {
+        grouped.entry((metric.block_id.clone(), metric.repeat_index))
+            .or_default()
+            .push(metric);
+    }
+    let mut balanced = Vec::new();
+    let mut balanced_repeat_count = 0_u64;
+    let mut excluded_repeat_count = 0_u64;
+    for block in &plan.blocks {
+        for repeat_index in 0..plan.repeats_per_condition {
+            let key = (block.block_id.clone(), repeat_index);
+            let rows = grouped.get(&key).map(Vec::as_slice).unwrap_or_default();
+            if rows.len() == FACTORIAL_CELLS {
+                balanced.extend(rows.iter().map(|metric| (*metric).clone()));
+                balanced_repeat_count += 1;
+            } else {
+                excluded_repeat_count += 1;
+            }
+        }
+    }
+    (balanced, balanced_repeat_count, excluded_repeat_count)
 }
 
 fn factor_level_label(factor: JudgeNuisanceFactorV1, high: bool) -> &'static str {
@@ -729,10 +766,12 @@ fn main_effects(
                 }
             }
         }
-        effects.push(FactorMainEffectV1 {
+        effects.push(FactorialMainEffectV1 {
             factor,
-            complete_low_count: completed_low,
-            complete_high_count: completed_high,
+            complete_low_count: low.len() as u64,
+            complete_high_count: high.len() as u64,
+            excluded_completed_low_count: completed_low.saturating_sub(low.len() as u64),
+            excluded_completed_high_count: completed_high.saturating_sub(high.len() as u64),
             ineligible_low_count: ineligible_low,
             ineligible_high_count: ineligible_high,
             candidate_score_gap_delta_millionths: high_gap.zip(low_gap).map(|(high, low)| high - low),
@@ -937,9 +976,11 @@ pub fn analyze_judge_factorial(
         let (block, condition) = expected.get(observation.condition_id.as_str()).unwrap();
         metrics.push(metric_for_observation(block, condition, observation)?);
     }
+    let (balanced_metrics, balanced_repeat_count, excluded_incomplete_repeat_count) =
+        select_balanced_factorial_repeats(&plan, &metrics);
     let (main_effects, level_counts, criterion_order_effects) =
-        main_effects(&plan, &metrics, &observations_by_id);
-    let interactions = pairwise_interactions(&plan, &metrics);
+        main_effects(&plan, &balanced_metrics, &observations_by_id);
+    let interactions = pairwise_interactions(&plan, &balanced_metrics);
 
     let mut block_summaries = Vec::new();
     let mut completed_total = 0_u64;
@@ -964,6 +1005,9 @@ pub fn analyze_judge_factorial(
         schema: FACTORIAL_REPORT_SCHEMA.to_owned(),
         study_id: plan.study_id,
         analyzer_source_revision: plan.analyzer_source_revision,
+        balanced_repeat_count,
+        excluded_incomplete_repeat_count,
+        effects_use_only_fully_completed_repeats: true,
         plan_sha256,
         receipt_sha256: sha256_hex(receipt_bytes),
         plan_commitment_sha256: plan.plan_commitment_sha256,
@@ -991,7 +1035,7 @@ pub fn analyze_judge_factorial(
         generalized_accuracy_estimated: false,
         external_anchor_required: true,
         scoring_eligible_declared: false,
-        claim_boundary: "Descriptive contrasts over the supplied complete factorial receipt only. Exact plan/input digest binding is checked, but randomization, raw prompt custody, judge execution authenticity, semantic equivalence, population causal effects, generalized accuracy and scoring eligibility are not established.".to_owned(),
+        claim_boundary: "Descriptive contrasts use only fully completed 32-cell block/repeat units; all planned conditions remain in the denominator and incomplete completed cells are separately counted as excluded. Exact plan/input digest binding is checked, but randomization, raw prompt custody, judge execution authenticity, semantic equivalence, population causal effects, generalized accuracy and scoring eligibility are not established.".to_owned(),
     };
     let report_payload = serde_json::to_vec(&fields)
         .map_err(|error| format!("cannot serialize factorial report fields: {error}"))?;
