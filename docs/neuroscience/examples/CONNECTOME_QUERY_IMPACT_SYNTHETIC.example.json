@@ -5,37 +5,108 @@
   "source_graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "query_bundle_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "graph": [
-    {"source": 1, "target": 2, "weight": 4.0},
-    {"source": 2, "target": 3, "weight": 3.0},
-    {"source": 1, "target": 3, "weight": 1.0}
+    {
+      "source": 1,
+      "target": 2,
+      "weight": 4
+    },
+    {
+      "source": 2,
+      "target": 3,
+      "weight": 3
+    },
+    {
+      "source": 1,
+      "target": 3,
+      "weight": 1
+    }
   ],
   "queries": [
-    {"query_id": "direct_1_to_3", "weight": 5.0, "normalization_scale": 1.0, "metric": {"kind": "edge_weight", "source": 1, "target": 3}},
-    {"query_id": "input_3", "weight": 2.0, "normalization_scale": 3.0, "metric": {"kind": "in_degree", "node": 3}},
-    {"query_id": "output_1", "weight": 1.0, "normalization_scale": 4.0, "metric": {"kind": "out_degree", "node": 1}},
-    {"query_id": "reach_1_to_3", "weight": 3.0, "normalization_scale": 1.0, "metric": {"kind": "path_exists", "source": 1, "target": 3}}
+    {
+      "query_id": "direct_1_to_3",
+      "weight": 5,
+      "normalization_scale": 1,
+      "metric": {
+        "kind": "edge_weight",
+        "source": 1,
+        "target": 3
+      },
+      "reference_value": 0
+    },
+    {
+      "query_id": "input_3",
+      "weight": 2,
+      "normalization_scale": 3,
+      "metric": {
+        "kind": "in_degree",
+        "node": 3
+      },
+      "reference_value": 3
+    },
+    {
+      "query_id": "output_1",
+      "weight": 1,
+      "normalization_scale": 4,
+      "metric": {
+        "kind": "out_degree",
+        "node": 1
+      },
+      "reference_value": 4
+    },
+    {
+      "query_id": "reach_1_to_3",
+      "weight": 3,
+      "normalization_scale": 1,
+      "metric": {
+        "kind": "path_exists",
+        "source": 1,
+        "target": 3
+      },
+      "reference_value": 1
+    }
   ],
   "candidates": [
     {
       "candidate_id": "remove_direct_edge",
       "estimated_error_probability": 0.8,
-      "review_minutes": 2.0,
+      "review_minutes": 2,
       "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "changes": [{"operation": "remove_weight", "source": 1, "target": 3, "weight": 1.0}]
+      "changes": [
+        {
+          "operation": "remove_weight",
+          "source": 1,
+          "target": 3,
+          "weight": 1
+        }
+      ]
     },
     {
       "candidate_id": "remove_second_leg",
       "estimated_error_probability": 0.6,
       "review_minutes": 1.5,
       "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "changes": [{"operation": "remove_weight", "source": 2, "target": 3, "weight": 3.0}]
+      "changes": [
+        {
+          "operation": "remove_weight",
+          "source": 2,
+          "target": 3,
+          "weight": 3
+        }
+      ]
     },
     {
       "candidate_id": "remove_part_of_second_leg",
       "estimated_error_probability": 0.4,
-      "review_minutes": 1.0,
+      "review_minutes": 1,
       "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "changes": [{"operation": "remove_weight", "source": 2, "target": 3, "weight": 1.0}]
+      "changes": [
+        {
+          "operation": "remove_weight",
+          "source": 2,
+          "target": 3,
+          "weight": 1
+        }
+      ]
     }
   ]
 }
