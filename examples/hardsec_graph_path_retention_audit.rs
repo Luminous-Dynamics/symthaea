@@ -764,6 +764,9 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
     use std::io::Cursor;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
 
     const EDGES_HEADER: &str = "edge_id\tsrc\tdst\trelation\tpartition_id\n";
     const EXCLUSIONS_HEADER: &str = "edge_id\treason\n";
@@ -799,6 +802,66 @@ mod tests {
         format!(
             "{PATHS_HEADER}trigger-to-output\t1\te1\tn0\tn1\ntrigger-to-output\t2\te2\tn1\tn2\ntrigger-to-output\t3\te3\tn2\tn3\ntrigger-to-output\t4\te4\tn3\tn4\n"
         )
+    }
+
+    struct TempInputs {
+        base: PathBuf,
+        input_dir: PathBuf,
+        source: PathBuf,
+        represented: PathBuf,
+        exclusions: PathBuf,
+        paths: PathBuf,
+        receipt_dir: PathBuf,
+        receipt: PathBuf,
+    }
+
+    impl TempInputs {
+        fn new(source: &str, represented: &str, exclusions: &str, paths: &str) -> Self {
+            let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let base = env::temp_dir().join(format!(
+                "hardsec-graph-retention-{}-{id}",
+                std::process::id()
+            ));
+            let input_dir = base.join("inputs");
+            let receipt_dir = base.join("receipts");
+            fs::create_dir_all(&input_dir).unwrap();
+            fs::create_dir_all(&receipt_dir).unwrap();
+            let source_path = input_dir.join("source.tsv");
+            let represented_path = input_dir.join("represented.tsv");
+            let exclusions_path = input_dir.join("exclusions.tsv");
+            let paths_path = input_dir.join("paths.tsv");
+            fs::write(&source_path, source).unwrap();
+            fs::write(&represented_path, represented).unwrap();
+            fs::write(&exclusions_path, exclusions).unwrap();
+            fs::write(&paths_path, paths).unwrap();
+            let receipt = receipt_dir.join("receipt.json");
+            Self {
+                base,
+                input_dir,
+                source: source_path,
+                represented: represented_path,
+                exclusions: exclusions_path,
+                paths: paths_path,
+                receipt_dir,
+                receipt,
+            }
+        }
+
+        fn args(&self) -> Args {
+            Args {
+                source_edges: self.source.clone(),
+                represented_edges: self.represented.clone(),
+                exclusions: self.exclusions.clone(),
+                reference_paths: self.paths.clone(),
+                receipt: self.receipt.clone(),
+            }
+        }
+    }
+
+    impl Drop for TempInputs {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
     }
 
     #[test]
@@ -1057,6 +1120,79 @@ mod tests {
         assert_eq!(summary.paths.len(), 2);
         assert_eq!(summary.retained_path_count, 2);
         assert_eq!(summary.total_reference_path_edges, 4);
+    }
+
+    #[test]
+    fn run_writes_receipt_bound_to_all_four_input_files() {
+        let files = TempInputs::new(
+            &source_fixture(),
+            &represented_fixture(),
+            EXCLUSIONS_HEADER,
+            &paths_fixture(),
+        );
+        run(files.args()).unwrap();
+        let receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(&files.receipt).unwrap()).unwrap();
+        assert_eq!(receipt["result"], "pass");
+        assert_eq!(receipt["claim_scope"], CLAIM_SCOPE);
+        assert_eq!(receipt["edge_accounting"]["source_edges"], 4);
+        assert_eq!(receipt["edge_accounting"]["represented_edges"], 4);
+        assert_eq!(receipt["edge_accounting"]["silent_drops"], 0);
+        assert_eq!(receipt["path_retention"]["retained_paths"], 1);
+        for field in [
+            "source_edges_sha256",
+            "represented_edges_sha256",
+            "exclusions_sha256",
+            "reference_paths_sha256",
+        ] {
+            assert_eq!(receipt["inputs"][field].as_str().unwrap().len(), 64);
+        }
+    }
+
+    #[test]
+    fn run_refuses_to_overwrite_existing_receipt() {
+        let files = TempInputs::new(
+            &source_fixture(),
+            &represented_fixture(),
+            EXCLUSIONS_HEADER,
+            &paths_fixture(),
+        );
+        fs::write(&files.receipt, b"preserve-existing").unwrap();
+        let error = run(files.args()).unwrap_err();
+        assert!(error.contains("create new receipt"));
+        assert_eq!(fs::read(&files.receipt).unwrap(), b"preserve-existing");
+    }
+
+    #[test]
+    fn run_rejects_receipt_inside_an_input_directory() {
+        let mut files = TempInputs::new(
+            &source_fixture(),
+            &represented_fixture(),
+            EXCLUSIONS_HEADER,
+            &paths_fixture(),
+        );
+        files.receipt = files.input_dir.join("receipt.json");
+        assert!(run(files.args())
+            .unwrap_err()
+            .contains("receipt must be outside every input directory"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_rejects_symlink_input_files() {
+        let files = TempInputs::new(
+            &source_fixture(),
+            &represented_fixture(),
+            EXCLUSIONS_HEADER,
+            &paths_fixture(),
+        );
+        let link = files.input_dir.join("source-link.tsv");
+        std::os::unix::fs::symlink(&files.source, &link).unwrap();
+        let mut args = files.args();
+        args.source_edges = link;
+        assert!(run(args)
+            .unwrap_err()
+            .contains("input must be a regular non-symlink file"));
     }
 
     #[test]
