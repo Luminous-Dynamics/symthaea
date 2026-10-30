@@ -662,6 +662,110 @@ mod tests {
     }
 
     #[test]
+    fn sixty_four_seed_alternative_support_retraction_sweep_matches_oracle() {
+        for seed in 0u64..64 {
+            let source_count = 2 + (seed as usize % 6);
+            let mut source_ids: Vec<String> =
+                (0..source_count).map(|index| format!("S{index}")).collect();
+            let mut runtime = BitemporalJustificationRuntime::default();
+            let source_events: Vec<SourceEventRevision> = source_ids
+                .iter()
+                .map(|id| assert_event(id, 1, "gold"))
+                .collect();
+            runtime.append_source_events(source_events).unwrap();
+
+            let alternatives: Vec<JustificationInput> = source_ids
+                .iter()
+                .map(|id| justification(&format!("via-{id}"), [source(id)]))
+                .collect();
+            runtime
+                .derive_at(conclusion("C", alternatives), instant(1))
+                .unwrap();
+
+            // Deterministic seed-dependent ordering without an RNG dependency.
+            let rotation = seed as usize % source_count;
+            source_ids.rotate_left(rotation);
+            if seed % 2 == 1 {
+                source_ids.reverse();
+            }
+
+            let mut remaining: BTreeSet<String> = source_ids.iter().cloned().collect();
+            for (index, source_id) in source_ids.iter().enumerate() {
+                let day = index as u32 + 2;
+                let before_retraction = remaining
+                    .iter()
+                    .map(|id| format!("via-{id}"))
+                    .collect::<BTreeSet<_>>();
+                if !before_retraction.is_empty() {
+                    assert_eq!(
+                        runtime
+                            .support_status_at(
+                                "C",
+                                date("2026-01-15"),
+                                instant(day - 1),
+                                "tenant-1",
+                            )
+                            .unwrap(),
+                        AsOfSupportStatus::Supported {
+                            active_justification_ids: before_retraction,
+                        },
+                        "historical support mismatch for seed {seed} before retracting {source_id}",
+                    );
+                }
+
+                runtime
+                    .append_source_events([SourceEventRevision {
+                        revision_id: format!("R-{seed}-{index}"),
+                        recorded_at: instant(day),
+                        operation: SourceEventOperation::Retract {
+                            target_revision_id: source_id.clone(),
+                            reason: format!("seed {seed} retraction {index}"),
+                        },
+                    }])
+                    .unwrap();
+                remaining.remove(source_id);
+
+                let expected = if remaining.is_empty() {
+                    AsOfSupportStatus::Unsupported
+                } else {
+                    AsOfSupportStatus::Supported {
+                        active_justification_ids: remaining
+                            .iter()
+                            .map(|id| format!("via-{id}"))
+                            .collect(),
+                    }
+                };
+                assert_eq!(
+                    runtime
+                        .support_status_at(
+                            "C",
+                            date("2026-01-15"),
+                            instant(day),
+                            "tenant-1",
+                        )
+                        .unwrap(),
+                    expected,
+                    "current support mismatch for seed {seed} after retracting {source_id}",
+                );
+                runtime.verify_consistency().unwrap();
+            }
+
+            assert_eq!(
+                runtime
+                    .support_status_at(
+                        "C",
+                        date("2026-01-15"),
+                        instant(source_count as u32 + 1),
+                        "tenant-1",
+                    )
+                    .unwrap(),
+                AsOfSupportStatus::Unsupported,
+                "all alternatives should be exhausted for seed {seed}",
+            );
+        }
+    }
+
+    #[test]
     fn ledger_and_graph_source_identity_sets_remain_in_sync() {
         let runtime = base_runtime();
         runtime.verify_consistency().unwrap();
