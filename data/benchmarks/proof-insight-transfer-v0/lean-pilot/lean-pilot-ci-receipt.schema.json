@@ -612,7 +612,8 @@
         "receipt_label",
         "must_include_direct_declarations",
         "must_exclude_direct_declarations",
-        "interpretation"
+        "interpretation",
+        "must_include_direct_constants"
       ],
       "properties": {
         "receipt_label": {
@@ -640,6 +641,14 @@
         "interpretation": {
           "type": "string",
           "minLength": 1
+        },
+        "must_include_direct_constants": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     }
