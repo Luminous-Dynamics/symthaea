@@ -40,6 +40,8 @@ pub struct RetrievalUtilityEstimate {
     pub scope_id: String,
     pub valid_at_unix_ms: u64,
     pub known_at_unix_ms: u64,
+    /// Digest of the exact EvidenceIndex state used by retrieval and the estimator.
+    pub evidence_index_state_sha256: String,
     /// Digest of the exact unresolved-claim state used by the estimator.
     pub unresolved_claims_sha256: String,
     pub unresolved_required_claim_ids: BTreeSet<String>,
@@ -82,6 +84,7 @@ impl RetrievalUtilityEstimate {
             require_non_empty(value, field)?;
         }
         for (field, value) in [
+            ("evidence_index_state_sha256", self.evidence_index_state_sha256.as_str()),
             ("unresolved_claims_sha256", self.unresolved_claims_sha256.as_str()),
             ("estimator_sha256", self.estimator_sha256.as_str()),
             ("calibration_split_sha256", self.calibration_split_sha256.as_str()),
@@ -187,6 +190,7 @@ impl RetrievalValueDecision {
         scope_id: &str,
         valid_at_unix_ms: u64,
         known_at_unix_ms: u64,
+        evidence_index_state_sha256: &str,
         unresolved_claims: &BTreeSet<String>,
     ) -> Result<(), String> {
         if self.estimate.decision_id != decision_id
@@ -196,6 +200,9 @@ impl RetrievalValueDecision {
             || self.estimate.known_at_unix_ms != known_at_unix_ms
         {
             return Err("retrieval value estimate identity/time binding mismatch".into());
+        }
+        if self.estimate.evidence_index_state_sha256 != evidence_index_state_sha256 {
+            return Err("retrieval value estimate evidence-index snapshot mismatch".into());
         }
         if self.estimate.unresolved_required_claim_ids != *unresolved_claims {
             return Err("retrieval value estimate unresolved-claim set mismatch".into());
@@ -361,6 +368,7 @@ mod tests {
             scope_id: "scope-1".into(),
             valid_at_unix_ms: 200,
             known_at_unix_ms: 300,
+            evidence_index_state_sha256: digest("evidence index state"),
             unresolved_claims_sha256: RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap(),
             unresolved_required_claim_ids: unresolved,
             estimator_id: "utility-estimator".into(),
@@ -523,6 +531,7 @@ mod tests {
             "scope-1",
             200,
             300,
+            &digest("evidence index state"),
             &unresolved,
         ).unwrap();
         assert!(decision.verify_request_binding(
@@ -531,6 +540,7 @@ mod tests {
             "scope-1",
             201,
             300,
+            &digest("evidence index state"),
             &unresolved,
         ).unwrap_err().contains("identity/time"));
         let different = BTreeSet::from(["C1".to_string()]);
@@ -540,6 +550,7 @@ mod tests {
             "scope-1",
             200,
             300,
+            &digest("evidence index state"),
             &different,
         ).unwrap_err().contains("claim set mismatch"));
     }
@@ -550,6 +561,22 @@ mod tests {
         value.unresolved_claims_sha256 = digest("different claim set");
         let error = evaluate_retrieval_value(value).unwrap_err();
         assert!(error.contains("unresolved-claim set digest mismatch"));
+    }
+
+    #[test]
+    fn refuses_to_reuse_a_value_estimate_for_a_different_evidence_index_snapshot() {
+        let decision = evaluate_retrieval_value(estimate()).unwrap();
+        let unresolved = BTreeSet::from(["C1".to_string(), "C2".to_string()]);
+        let error = decision.verify_request_binding(
+            "decision-1",
+            "principal-1",
+            "scope-1",
+            200,
+            300,
+            &digest("different evidence index"),
+            &unresolved,
+        ).unwrap_err();
+        assert!(error.contains("evidence-index snapshot mismatch"));
     }
 
     #[test]
