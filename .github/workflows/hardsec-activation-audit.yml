@@ -45,4 +45,4 @@ jobs:
         run: cargo metadata --locked --manifest-path tools/hardsec-activation-audit-harness/Cargo.toml --no-deps
 
       - name: Test empirical activation campaign auditor
-        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-activation-audit --example hardsec_activation_campaign_audit
+        run: cargo test --locked --manifest-path tools/hardsec-activation-audit-harness/Cargo.toml --features hardsec-activation-audit --example hardsec_activation_campaign_audit
