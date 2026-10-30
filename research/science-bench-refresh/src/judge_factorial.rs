@@ -1073,11 +1073,16 @@ mod tests {
                 "low"
             };
             let score = options.iter().find(|option| option.option_id == selected).unwrap().score_millionths;
-            let candidate_a_score = if condition.factors.candidate_order == CandidateOrderV1::CandidateAFirst {
+            let mut candidate_a_score = if condition.factors.candidate_order == CandidateOrderV1::CandidateAFirst {
                 700_000
             } else {
                 650_000
             };
+            if condition.factors.candidate_order == CandidateOrderV1::CandidateBFirst
+                && condition.factors.provenance_cue == ProvenanceCueV1::Displayed
+            {
+                candidate_a_score += 40_000;
+            }
             observations.push(JudgeFactorialObservationV1 {
                 condition_id: condition.condition_id.clone(),
                 input_sha256: condition.input_sha256.clone(),
@@ -1126,10 +1131,17 @@ mod tests {
         assert_eq!(report.fields.completed_condition_count, 64);
         let candidate = report.fields.main_effects.iter()
             .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
-        assert_eq!(candidate.candidate_score_gap_delta_millionths, Some(-50_000.0));
+        assert_eq!(candidate.candidate_score_gap_delta_millionths, Some(-30_000.0));
         let option = report.fields.main_effects.iter()
             .find(|effect| effect.factor == JudgeNuisanceFactorV1::ScoreOptionOrder).unwrap();
         assert!(option.criterion_score_delta_millionths.unwrap() > 0.0);
+        let provenance = report.fields.main_effects.iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
+        assert_eq!(provenance.candidate_score_gap_delta_millionths, Some(20_000.0));
+        let interaction = report.fields.pairwise_interactions.iter()
+            .find(|effect| effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
+                && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
+        assert_eq!(interaction.candidate_score_gap_interaction_millionths, Some(40_000.0));
     }
 
     #[test]
@@ -1138,6 +1150,15 @@ mod tests {
         let first = serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
         let second = serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn rejects_plan_committed_for_a_different_analyzer_revision() {
+        let (plan, _, _) = make_plan();
+        let mut fields = plan.fields();
+        fields.analyzer_source_revision = "b".repeat(40);
+        let issues = validate_judge_factorial_plan_fields(&fields).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("exact compiled validator revision")));
     }
 
     #[test]
