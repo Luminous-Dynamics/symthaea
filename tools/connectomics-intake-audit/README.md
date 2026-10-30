@@ -312,3 +312,8 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
 ```
 
 The input contains no labels; the evaluator truth is parsed only after proposal generation. This is a 1D feature-profile baseline, not a detector trained on or operating directly on EM imagery. See `docs/neuroscience/CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md`.
+
+
+## Query-scoped certificate dependency DAG
+
+The `connectome-query-cert-audit` verifier now requires `query.dependency_roots` and explicit `depends_on` edges for every dependency record. It rejects unresolved references, duplicate identities/edges, reachable cycles, and dependency records outside every declared root's transitive closure. See `docs/neuroscience/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE_V1.md`. Passing this check validates the declared graph, not the scientific completeness of the query's root manifest.
