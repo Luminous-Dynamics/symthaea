@@ -8,7 +8,7 @@
       "workload_fingerprint": "synthetic-workload-hdc-01",
       "comparison_contract_fingerprint": "synthetic-contract-system-01",
       "benchmark_suite": "symthaea_canonical",
-      "source_reference": "https://example.invalid/synthetic/direct"
+      "source_reference": "https://example.invalid/synthetic/direct",
       "benchmark_version": "v1.synthetic",
       "workload_case_id": "hdc-retrieval-synthetic-01",
       "origin": "direct_measurement",
@@ -34,7 +34,7 @@
       "workload_fingerprint": "synthetic-workload-event-02",
       "comparison_contract_fingerprint": "synthetic-contract-system-02",
       "benchmark_suite": "neurobench",
-      "source_reference": "https://example.invalid/synthetic/published"
+      "source_reference": "https://example.invalid/synthetic/published",
       "benchmark_version": "paper-reported",
       "workload_case_id": "event-audio-synthetic-02",
       "origin": "published_result",
@@ -57,7 +57,7 @@
       "workload_fingerprint": "synthetic-workload-dense-03",
       "comparison_contract_fingerprint": "synthetic-contract-system-03",
       "benchmark_suite": "other",
-      "source_reference": "https://example.invalid/synthetic/simulation"
+      "source_reference": "https://example.invalid/synthetic/simulation",
       "benchmark_version": "v0.synthetic",
       "workload_case_id": "dense-transform-synthetic-03",
       "origin": "simulation_execution",
@@ -81,7 +81,7 @@
       "workload_fingerprint": "synthetic-workload-hdc-04",
       "comparison_contract_fingerprint": "synthetic-contract-algorithm-04",
       "benchmark_suite": "symthaea_canonical",
-      "source_reference": "https://example.invalid/synthetic/analytic"
+      "source_reference": "https://example.invalid/synthetic/analytic",
       "benchmark_version": "v1.synthetic",
       "workload_case_id": "bind-cost-synthetic-04",
       "origin": "analytical_reference",
