@@ -431,3 +431,21 @@ A Broca result can be called a direct comparison only when the benchmark revisio
 ### Broca positioning
 
 The target is a Pareto frontier across answer quality, evidence sufficiency, state maintenance, decision-use validity, governance, latency, tokens and operating cost. Vendor headline accuracy is context, not the sole promotion objective. No Broca score is claimed by this ledger.
+
+## 14. Executable fixture-integrity gate
+
+The `broca-memory-bench-audit` executable validates the four synthetic fixture families before any reader/model evaluation:
+
+```sh
+cargo run -p symthaea-broca --no-default-features --bin broca-memory-bench-audit
+```
+
+Pass explicit fixture paths to audit a subset:
+
+```sh
+cargo run -p symthaea-broca --no-default-features --bin broca-memory-bench-audit research/broca-bitemporal-evaluation-v1/proof-budget-fixtures-v1.json
+```
+
+The auditor checks unique case/variant IDs, the five required intervention arms, evaluator-oracle separation from reader input, exactly one declared decisive-field change, an exactly one-field irrelevant/invariance control, the exact-repair control, and a matched irrelevant-repair control whose oracle is unchanged. Missing JSON fields are treated as legitimate values in a counterfactual, which is needed for cases such as not-run/failed/censored observations.
+
+It emits a machine-readable report with source-file SHA-256 digests, case counts and variant counts. It does not call a model, compute answer accuracy, or claim benchmark performance. The evaluator must still keep oracle labels inaccessible to the reader and run the actual registered baselines under matched budgets.
