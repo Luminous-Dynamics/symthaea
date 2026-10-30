@@ -320,6 +320,9 @@ impl JustificationGraph {
             }
         }
 
+        newly_unsupported_fact_ids.sort();
+        retained_with_alternative_support.sort();
+
         *self = candidate;
         Ok(RetractionReport {
             source_event_id: event_id.to_owned(),
@@ -454,10 +457,27 @@ impl JustificationGraph {
         self.facts.values().filter(|record| !record.status.is_supported()).count()
     }
 
+    /// Canonical semantic-state digest. Independent fact insertion order and
+    /// justification vector order do not change the digest; fact IDs, proof
+    /// contents, source/retraction sets and stored support states do.
     pub fn state_sha256(&self) -> Result<String, String> {
         self.verify_consistency()?;
-        let bytes = serde_json::to_vec(self)
-            .map_err(|error| format!("cannot serialize justification graph: {error}"))?;
+        let mut canonical_facts = self.facts.clone();
+        for record in canonical_facts.values_mut() {
+            record.conclusion.justifications.sort_by(|left, right| {
+                left.justification_id.cmp(&right.justification_id)
+            });
+        }
+        // fact_order is a topological execution schedule, not semantic state.
+        // Excluding it avoids a false state difference when independent facts
+        // are inserted in a different order.
+        let canonical_state = (
+            &self.source_events,
+            &self.retracted_source_events,
+            canonical_facts,
+        );
+        let bytes = serde_json::to_vec(&canonical_state)
+            .map_err(|error| format!("cannot serialize canonical justification state: {error}"))?;
         Ok(hex::encode(Sha256::digest(bytes)))
     }
 
@@ -888,6 +908,47 @@ mod tests {
         assert!(replay.newly_unsupported_fact_ids.is_empty());
         assert!(replay.inactive_justifications_by_fact.is_empty());
         assert_eq!(left.state_sha256().unwrap(), after_first);
+    }
+
+    #[test]
+    fn canonical_digest_and_retraction_report_ignore_independent_fact_order() {
+        fn build(reverse: bool) -> JustificationGraph {
+            let mut graph = JustificationGraph::default();
+            graph.register_source_event("A").unwrap();
+            graph.register_source_event("B").unwrap();
+            if reverse {
+                graph.derive(conclusion("right", [justification("from-B", [source("B")])])).unwrap();
+                graph.derive(conclusion("left", [justification("from-A", [source("A")])])).unwrap();
+            } else {
+                graph.derive(conclusion("left", [justification("from-A", [source("A")])])).unwrap();
+                graph.derive(conclusion("right", [justification("from-B", [source("B")])])).unwrap();
+            }
+            let alternatives = if reverse {
+                [
+                    justification("via-right", [derived("right")]),
+                    justification("via-left", [derived("left")]),
+                ]
+            } else {
+                [
+                    justification("via-left", [derived("left")]),
+                    justification("via-right", [derived("right")]),
+                ]
+            };
+            graph.derive(conclusion("root", alternatives)).unwrap();
+            graph
+        }
+
+        let mut left_first = build(false);
+        let mut right_first = build(true);
+        assert_eq!(left_first.state_sha256().unwrap(), right_first.state_sha256().unwrap());
+
+        let left_report = left_first.invalidate_source_event("A").unwrap();
+        let right_report = right_first.invalidate_source_event("A").unwrap();
+        assert_eq!(left_report, right_report);
+        assert_eq!(left_report.newly_unsupported_fact_ids, vec!["left"]);
+        assert!(left_first.current_fact("right").is_some());
+        assert!(left_first.current_fact("root").is_some());
+        assert_eq!(left_first.state_sha256().unwrap(), right_first.state_sha256().unwrap());
     }
 
     #[test]
