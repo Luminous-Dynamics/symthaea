@@ -44,7 +44,8 @@
         "specification_sha256",
         "implementation_sha256",
         "parameters_sha256",
-        "scope"
+        "scope",
+        "dependency_roots"
       ],
       "properties": {
         "query_id": {
@@ -66,6 +67,43 @@
         "scope": {
           "type": "string",
           "minLength": 1
+        },
+        "dependency_roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "object_kind",
+              "object_id",
+              "source_revision_sha256"
+            ],
+            "properties": {
+              "object_kind": {
+                "enum": [
+                  "volume_region",
+                  "neuron",
+                  "root",
+                  "segment",
+                  "synapse",
+                  "edge",
+                  "morphology_subgraph",
+                  "coordinate_transform",
+                  "query_derived_value",
+                  "other"
+                ]
+              },
+              "object_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_revision_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
         }
       }
     },
@@ -120,7 +158,8 @@
           "object_kind",
           "object_id",
           "source_revision_sha256",
-          "evidence_sha256"
+          "evidence_sha256",
+          "depends_on"
         ],
         "properties": {
           "object_kind": {
@@ -148,6 +187,42 @@
           "evidence_sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "object_kind",
+                "object_id",
+                "source_revision_sha256"
+              ],
+              "properties": {
+                "object_kind": {
+                  "enum": [
+                    "volume_region",
+                    "neuron",
+                    "root",
+                    "segment",
+                    "synapse",
+                    "edge",
+                    "morphology_subgraph",
+                    "coordinate_transform",
+                    "query_derived_value",
+                    "other"
+                  ]
+                },
+                "object_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_revision_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
           }
         }
       }
