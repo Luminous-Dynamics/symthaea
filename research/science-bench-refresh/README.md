@@ -27,6 +27,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - schema/metamorphic-evaluator-plan.schema.json and schema/metamorphic-evaluator-receipt.schema.json: strict preregistered pair-plan and observed-outcome receipt contracts.
 - tools/metamorphic_evaluator_audit.py: deterministic paired-outcome relation checker; no judge execution or causal identification claim.
 - tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: eight-pair/seven-family synthetic fixture generator and hostile relation/receipt controls.
+- docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md: balanced 2^5 experimental design for candidate order, score-option order, criterion order, provenance cue and presentation format.
+- src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
+- schema/judge-factorial-plan.schema.json and schema/judge-factorial-receipt.schema.json: preregistered factorial plan and complete-denominator execution receipt contracts.
+- tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -37,6 +41,21 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Analyze interacting judge nuisance factors
+
+The Rust factorial analyzer checks a complete five-factor (2^5) design per semantic block: candidate order, score-option order, criterion order, provenance cue and presentation format. It requires every factor cell at every repeat, an exact execution-order permutation, exact condition IDs and input-digest echoes. Missing and ineligible observations are never imputed.
+
+```sh
+python3 research/science-bench-refresh/tools/judge_factorial_fixture.py /tmp/judge-factorial
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-judge-factorial-plan /tmp/judge-factorial/judge-factorial-plan.example.json
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-judge-factorial /tmp/judge-factorial/judge-factorial-plan.example.json \
+  /tmp/judge-factorial/judge-factorial-receipt.example.json
+```
+
+The report contains main effects, per-criterion criterion-order shifts and all ten pairwise factor interactions. It also reports candidate score-gap and candidate-choice effects. The analyzer is descriptive only; it does not authenticate execution/randomization, prove raw prompt custody or semantic equivalence, estimate population effects, or permit scoring. See [SCI-FACTORIAL-JUDGE-BIAS-001](../../docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md).
 
 ## Audit intervention-based evaluator consistency
 
