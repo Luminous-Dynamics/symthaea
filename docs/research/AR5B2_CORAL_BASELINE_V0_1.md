@@ -38,7 +38,7 @@ Then:
 
 \`potential_d = yield_d + c * sqrt(ln(N) / (n_d_all + 1))\`
 
-where y_plus is the largest direction yield. The lifetime count means a direction that has been neglected does not reset to zero observations.
+where y_plus is the highest direction yield observed **at any point during the run**, not merely the highest yield in the current window. The implementation stores this historical maximum and never lets it decay when an old breakthrough leaves the window. The individual yields still use the current W-evaluation window. The lifetime count means a direction that has been neglected does not reset to zero observations.
 
 For each direction opened after a global best existed, the NEW estimator looks at the best score in the first k evaluations compared with the global best at opening. Its infancy gain is truncated at zero, and its infancy evaluation count is min(k, lifetime evaluations).
 
@@ -50,7 +50,7 @@ Finally, the configured agent seats are distributed proportionally to each direc
 
 ## Implemented interface
 
-The module reconstructs each event's credit and global-best value from the ordered score inputs, then checks that the direction histories and attempt-ID index exactly reconcile with the global event stream. Tampered credit records or direction-only extra/missing events fail validation.
+The module reconstructs each event's credit and global-best value from the ordered score inputs, checks that direction opening positions and opening global-best values match the relevant event-stream prefix, and verifies that the direction histories and attempt-ID index exactly reconcile with the global event stream. It also reconstructs the historical maximum window yield from every prefix and rejects a tampered exploration scale. The historical peak remains active even after a stalled window contains no new credit.
 
 The module provides:
 - versioned CoralBaselineConfig with the paper defaults;
@@ -62,7 +62,7 @@ The module provides:
 - separate first-round and steady-state direction claim caps;
 - integrity reconciliation of direction records, global event stream, attempt IDs and global best.
 
-Twelve tests are authored for formula defaults, local record credit, parent/inspired thresholds, failed evaluation accounting, window expiry, NEW infancy, headcount conservation, zero-potential fallback, claim caps, per-evaluation yield semantics, and tamper rejection for credits/global-best receipts and direction-history reconciliation.
+Fourteen tests are authored for formula defaults, local record credit, parent/inspired thresholds, failed evaluation accounting, window expiry, historical exploration-scale retention, NEW-prior retention, NEW infancy, headcount conservation, zero-potential fallback, claim caps, per-evaluation yield semantics, and tamper rejection for credits/global-best receipts, direction opening and direction-history reconciliation.
 
 ## Important limitations / deviations
 
