@@ -898,6 +898,117 @@ mod tests {
     }
 
     #[test]
+    fn consensus_trajectory_promotion_runs_through_multi_fidelity_query_oracle() {
+        use super::super::multi_fidelity_tabular_nas::{
+            FidelityCostModel, FidelityLevel, FidelityTargetLabel, MultiFidelityManifest,
+            MultiFidelityTabularBenchmark,
+        };
+        use super::super::tabular_nas_firewall::MetricDirection;
+
+        let mut rows = features();
+        for (index, row) in rows.iter_mut().enumerate() {
+            row.topology_encoding = vec![
+                (index / 5) as u8,
+                (index % 5) as u8,
+                0,
+                0,
+                0,
+                0,
+            ];
+        }
+        let consensus = build_proxy_consensus(&rows, &config()).unwrap();
+        let derived = apply_consensus_prior(&rows, &consensus, "cora_consensus").unwrap();
+        let search = TrajectorySearchConfig {
+            proxy_id: "cora_consensus".into(),
+            target_metric_id: "val_accuracy".into(),
+            proxy_direction: ProxyDirection::Maximize,
+            seed: 23,
+            max_walks: 3,
+            max_unique_visits: 6,
+            max_moves_per_walk: 8,
+            max_escapes_per_walk: 1,
+        };
+        let archive = build_trajectory_archive(&derived, &search).unwrap();
+        let mix = PromotionMix {
+            promotion_count: 4,
+            proxy_elite_quota: 1,
+            trajectory_quota: 1,
+            topology_diversity_quota: 2,
+        };
+        let plan = plan_promotions(&derived, &archive, &mix).unwrap();
+
+        let target_labels = derived
+            .iter()
+            .flat_map(|feature| {
+                let id = feature.architecture_id.clone();
+                let value = feature.proxy_scores["cora_consensus"] * 10.0;
+                [
+                    FidelityTargetLabel {
+                        architecture_id: id.clone(),
+                        fidelity_index: 0,
+                        value: 30.0 + value,
+                    },
+                    FidelityTargetLabel {
+                        architecture_id: id,
+                        fidelity_index: 1,
+                        value: 70.0 + value,
+                    },
+                ]
+            })
+            .collect();
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            MultiFidelityManifest {
+                base: TabularBenchmarkManifest {
+                    schema: "symthaea.tabular-nas.benchmark".into(),
+                    version: "0.1.0".into(),
+                    benchmark_id: "synthetic-consensus-trajectory-sh".into(),
+                    metric_id: "val_accuracy".into(),
+                    metric_direction: MetricDirection::Maximize,
+                    split_id: "challenge-cifar10".into(),
+                    proxy_calibration_split_id: "development-cifar100".into(),
+                    proxy_calibration_sha256: "b".repeat(64),
+                    source_description: "synthetic integration fixture".into(),
+                    artifact_sha256: "a".repeat(64),
+                    max_unique_queries: 2,
+                    top_k: 6,
+                },
+                fidelity_levels: vec![
+                    FidelityLevel {
+                        id: "epoch_5".into(),
+                        cumulative_cost_units: 5,
+                    },
+                    FidelityLevel {
+                        id: "epoch_20".into(),
+                        cumulative_cost_units: 20,
+                    },
+                ],
+                fidelity_cost_model: FidelityCostModel::ResumablePrefix,
+                resource_unit: "epoch_equivalent".into(),
+                max_total_cost_units: 50,
+            },
+            derived,
+            target_labels,
+        )
+        .unwrap();
+        let initial_ids = plan
+            .candidates
+            .iter()
+            .map(|candidate| candidate.architecture_id.clone())
+            .collect();
+        let run = benchmark
+            .run_successive_halving(initial_ids, &[4, 2])
+            .unwrap();
+
+        assert_eq!(run.receipt.unique_architectures_touched, 4);
+        assert_eq!(run.receipt.final_fidelity_queries, 2);
+        assert_eq!(run.receipt.total_cost_units, 50);
+        assert_eq!(run.evaluation.final_top_1.true_top_k_count, 1);
+        assert!(run.evaluation.best_final_metric.is_some());
+        assert_eq!(run.receipt.query_trace_sha256.len(), 64);
+        assert_eq!(plan.archive_sha256, archive.archive_sha256);
+    }
+
+    #[test]
     fn derived_consensus_prior_can_be_applied_to_features() {
         let rows = features();
         let result = build_proxy_consensus(&rows, &config()).unwrap();
