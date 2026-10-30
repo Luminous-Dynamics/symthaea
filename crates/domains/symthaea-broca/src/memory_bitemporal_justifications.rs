@@ -512,7 +512,7 @@ mod tests {
             .unwrap();
 
         let after_supersede = runtime
-            .support_status_at("C", date("2026-01-15"), instant(4), "tenant-1")
+            .support_status_at("C", date("2026-01-15"), instant(3), "tenant-1")
             .unwrap();
         assert_eq!(
             after_supersede,
@@ -524,7 +524,7 @@ mod tests {
         runtime
             .append_source_events([SourceEventRevision {
                 revision_id: "R-B".into(),
-                recorded_at: instant(3),
+                recorded_at: instant(4),
                 operation: SourceEventOperation::Retract {
                     target_revision_id: "B".into(),
                     reason: "second source withdrawn".into(),
@@ -533,7 +533,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             runtime
-                .support_status_at("C", date("2026-01-15"), instant(3), "tenant-1")
+                .support_status_at("C", date("2026-01-15"), instant(4), "tenant-1")
                 .unwrap(),
             AsOfSupportStatus::Unsupported
         );
@@ -577,7 +577,7 @@ mod tests {
         ));
         assert_eq!(
             runtime
-                .support_status_at("C", date("2026-01-20"), instant(1), "tenant-1")
+                .support_status_at("C", date("2026-01-20"), instant(2), "tenant-1")
                 .unwrap(),
             AsOfSupportStatus::Unsupported
         );
