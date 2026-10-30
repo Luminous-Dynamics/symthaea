@@ -90,9 +90,6 @@ impl RetrievalUtilityEstimate {
         ] {
             validate_sha256(value, field)?;
         }
-        if self.unresolved_required_claim_ids.is_empty() {
-            return Err("retrieval value estimate requires at least one unresolved claim".into());
-        }
         for claim_id in &self.unresolved_required_claim_ids {
             require_non_empty(claim_id, "unresolved_required_claim_id")?;
         }
@@ -106,9 +103,6 @@ impl RetrievalUtilityEstimate {
     pub fn unresolved_claims_digest(
         claim_ids: &BTreeSet<String>,
     ) -> Result<String, String> {
-        if claim_ids.is_empty() {
-            return Err("cannot digest an empty unresolved-claim set".into());
-        }
         for claim_id in claim_ids {
             require_non_empty(claim_id, "unresolved_required_claim_id")?;
         }
@@ -217,18 +211,14 @@ impl RetrievalValueDecision {
     /// decision carries the remaining call budget forward.
     pub fn to_lifecycle_progress(&self) -> Result<LifecycleRetrievalProgress, String> {
         self.verify_internal_consistency()?;
-        match self.action {
-            RetrievalValueAction::RetrieveMore => Ok(LifecycleRetrievalProgress {
-                complete: false,
-                can_continue: true,
-                remaining_calls: self.estimate.remaining_calls,
-            }),
-            RetrievalValueAction::Stop => Ok(LifecycleRetrievalProgress {
-                complete: true,
-                can_continue: false,
-                remaining_calls: 0,
-            }),
-        }
+        Ok(LifecycleRetrievalProgress {
+            complete: self.estimate.remaining_calls == 0,
+            can_continue: self.action == RetrievalValueAction::RetrieveMore,
+            // Preserve unused calls when the rational stopping threshold is
+            // reached. "Stopped early" is not the same as "budget exhausted".
+            remaining_calls: self.estimate.remaining_calls,
+            value_decision_sha256: Some(self.decision_sha256.clone()),
+        })
     }
 }
 
