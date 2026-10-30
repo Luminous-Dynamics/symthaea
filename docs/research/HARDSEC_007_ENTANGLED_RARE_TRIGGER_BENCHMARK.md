@@ -363,7 +363,9 @@ cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --exa
 cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
 ```
 
-On exact PR head `5922ab26bfb26a21e8afcbe9b3dfdba43d0ef322`, GitHub Actions run [41034832167](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41034832167) completed successfully with **9/9** trigger-budget tests and **26/26** evidence-packet tests. The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12966939156`, archive digest `sha256:c5e1e988798a888d966693a87ef1f3edb18f906a89f8db63ec3972de5b090d0d`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
+On exact PR head `d8b58a7b27ea38786c0e7b08f45853f76188030a`, GitHub Actions run [41035491438](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41035491438) completed successfully: **rustfmt check passed**, **9/9** trigger-budget tests passed, and **26/26** evidence-packet tests passed. The previous focused compile/test run [41034832167](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41034832167) also passed both suites before formatting was made a required step.
+
+The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12967771808`, archive digest `sha256:b849390c04deb6c94278bf53d4b34d67f1779d377799893b3a4f67f713078262`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
 
 The independent SeqCube package verifier remains **not run** here. The passing Rust test validates only the evidence packet's handling of publisher-listed digests and claim scopes; it does not fetch the package's files or reproduce Z3/Icarus outputs.
 
