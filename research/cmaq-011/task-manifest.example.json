@@ -34,7 +34,11 @@
   "baselines": [
     {
       "id": "direct_policy",
-      "kind": "no_world_model"
+      "kind": "no_world_model_direct_policy"
+    },
+    {
+      "id": "direct_compute_matched",
+      "kind": "compute_matched_no_world_model"
     },
     {
       "id": "mpc_cem",
@@ -42,11 +46,31 @@
     },
     {
       "id": "mrsq",
-      "kind": "external_pinned_baseline"
+      "kind": "search_based_model_based_rl_external"
     },
     {
-      "id": "symthaea",
-      "kind": "candidate"
+      "id": "drq",
+      "kind": "sample_efficient_model_based_representation_rl_external"
+    },
+    {
+      "id": "tdmpc2",
+      "kind": "model_based_rl_external"
+    },
+    {
+      "id": "td7",
+      "kind": "model_free_rl_external"
+    },
+    {
+      "id": "symthaea_learned_wm",
+      "kind": "candidate_world_model"
+    },
+    {
+      "id": "symthaea_shuffled_future",
+      "kind": "negative_control_action_future_correspondence"
+    },
+    {
+      "id": "oracle_dynamics",
+      "kind": "simulator_upper_bound"
     }
   ],
   "metrics_required": [
@@ -68,7 +92,12 @@
     "peak_memory_bytes",
     "model_queries_per_decision",
     "environment_queries_per_decision",
-    "probe_count"
+    "probe_count",
+    "advantage_of_prediction_vs_compute_matched_direct",
+    "prediction_mediation_vs_shuffled_future",
+    "compute_only_gain_vs_direct",
+    "oracle_gap",
+    "capability_coverage_fraction"
   ],
   "claim_ceiling": "schema_template_only_no_results"
 }
