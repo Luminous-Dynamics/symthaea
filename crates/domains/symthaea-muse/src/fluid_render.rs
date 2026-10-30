@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 use std::ffi::{OsStr, OsString};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
@@ -206,6 +206,51 @@ fn diagnostic_preview(bytes: &[u8]) -> (String, bool) {
     )
 }
 
+#[derive(Debug)]
+struct CapturedDiagnostic {
+    sha256: String,
+    preview: String,
+    truncated: bool,
+}
+
+/// Hash an entire child stream incrementally while retaining only a bounded
+/// diagnostic prefix. Memory use is O(preview cap), independent of log size.
+fn capture_diagnostic<R: Read>(mut reader: R) -> std::io::Result<CapturedDiagnostic> {
+    let mut hasher = Sha256::new();
+    let mut preview = Vec::with_capacity(PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+    let mut truncated = false;
+    let mut buffer = [0_u8; 16 * 1024];
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+
+        let remaining = PROCESS_DIAGNOSTIC_PREVIEW_BYTES.saturating_sub(preview.len());
+        let retained = remaining.min(count);
+        preview.extend_from_slice(&buffer[..retained]);
+        if retained < count {
+            truncated = true;
+        }
+    }
+
+    Ok(CapturedDiagnostic {
+        sha256: format!("{:x}", hasher.finalize()),
+        preview: String::from_utf8_lossy(&preview).into_owned(),
+        truncated,
+    })
+}
+
+fn empty_captured_diagnostic() -> CapturedDiagnostic {
+    CapturedDiagnostic {
+        sha256: sha256_hex(&[]),
+        preview: String::new(),
+        truncated: false,
+    }
+}
+
 /// Execute FluidSynth and return the process observation even when the child
 /// exits unsuccessfully. No shell is involved: the executable and ordered
 /// argument vector are passed directly to Command. The child receives an
@@ -283,21 +328,48 @@ pub fn render_midi_to_wav_observed(
         .collect::<Option<Vec<_>>>()?;
 
     let mut command = Command::new(&binary);
-    command.args(&arguments);
-    command.env_clear();
+    command
+        .args(&arguments)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env_clear();
     for (key, value) in &environment {
         command.env(key, value);
     }
-    let process_result = command.output();
-    let (stdout, stderr, exit_code, spawn_error) = match process_result {
-        Ok(output) => (output.stdout, output.stderr, output.status.code(), None),
-        Err(error) => (Vec::new(), Vec::new(), None, Some(error.to_string())),
+
+    // Drain stdout and stderr concurrently. Command::output() would retain
+    // unbounded diagnostic buffers in memory even though the receipt only
+    // needs a digest and bounded preview.
+    let (stdout_capture, stderr_capture, exit_code, spawn_error) = match command.spawn() {
+        Err(error) => (
+            empty_captured_diagnostic(),
+            empty_captured_diagnostic(),
+            None,
+            Some(error.to_string()),
+        ),
+        Ok(mut child) => {
+            let stdout = child.stdout.take()?;
+            let stderr = child.stderr.take()?;
+            let stdout_reader = std::thread::spawn(move || capture_diagnostic(stdout));
+            let stderr_reader = std::thread::spawn(move || capture_diagnostic(stderr));
+            let status_result = child.wait();
+
+            let stdout_capture = stdout_reader.join().ok()?.ok()?;
+            let stderr_capture = stderr_reader.join().ok()?.ok()?;
+            match status_result {
+                Ok(status) => (stdout_capture, stderr_capture, status.code(), None),
+                Err(error) => (
+                    stdout_capture,
+                    stderr_capture,
+                    None,
+                    Some(error.to_string()),
+                ),
+            }
+        }
     };
 
     let executable_sha256_after = sha256_file(&binary).unwrap_or_default();
     let soundfont_sha256_after = sha256_file(&soundfont).unwrap_or_default();
-    let (stdout_preview, stdout_truncated) = diagnostic_preview(&stdout);
-    let (stderr_preview, stderr_truncated) = diagnostic_preview(&stderr);
 
     let artifacts_stable = !executable_sha256_after.is_empty()
         && !soundfont_sha256_after.is_empty()
@@ -319,12 +391,12 @@ pub fn render_midi_to_wav_observed(
         soundfont_sha256_after,
         arguments: argument_strings,
         environment_sha256,
-        stdout_sha256: sha256_hex(&stdout),
-        stderr_sha256: sha256_hex(&stderr),
-        stdout_preview,
-        stderr_preview,
-        stdout_truncated,
-        stderr_truncated,
+        stdout_sha256: stdout_capture.sha256,
+        stderr_sha256: stderr_capture.sha256,
+        stdout_preview: stdout_capture.preview,
+        stderr_preview: stderr_capture.preview,
+        stdout_truncated: stdout_capture.truncated,
+        stderr_truncated: stderr_capture.truncated,
         exit_code,
         spawn_error,
         mastered_wav_bytes,
@@ -452,6 +524,20 @@ mod tests {
         ];
         assert_eq!(environment_sha256(&first), environment_sha256(&reordered));
         assert_ne!(environment_sha256(&first), environment_sha256(&changed));
+    }
+
+    #[test]
+    fn child_diagnostic_capture_hashes_full_stream_with_bounded_memory() {
+        let bytes = vec![b'z'; PROCESS_DIAGNOSTIC_PREVIEW_BYTES * 8 + 19];
+        let captured = capture_diagnostic(std::io::Cursor::new(&bytes)).unwrap();
+        assert_eq!(captured.sha256, sha256_hex(&bytes));
+        assert_eq!(captured.preview.len(), PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+        assert!(captured.truncated);
+
+        let empty = capture_diagnostic(std::io::empty()).unwrap();
+        assert_eq!(empty.sha256, sha256_hex(&[]));
+        assert!(empty.preview.is_empty());
+        assert!(!empty.truncated);
     }
 
     #[test]
