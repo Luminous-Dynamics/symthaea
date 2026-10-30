@@ -37,6 +37,21 @@ about state order, TPM layout, connectivity, evaluation state, time grain,
 formalism, partition family, or tie policy. The implementation therefore exposes
 these assumptions and refuses to label incomplete searches exact.
 
+### Proof-carrying result identity
+
+Every completed system-search result exposes `receipt_sha256()`. The versioned
+canonical receipt binds the request digest, algorithm identifier, numerical
+precision, explicit work budgets, TotalCut policy, formalism, result status,
+phi_s (or its absence), selected/tied state-pair indices, exact partition work
+counters, each candidate state pair, selected MIP cut matrix, directional GID
+terms, normalization, and selection margin.
+
+The receipt is an integrity and reproducibility mechanism: changing a search
+setting or a reported score changes the digest, and non-finite fields are rejected.
+It is **not** a proof that the TPM is the correct model of a physical system, nor
+a proof of IIT's axioms or a consciousness claim. An independent verifier can
+recompute the digest from a serialized result and separately replay the analysis.
+
 ### Data contract
 
 - Binary units and a state indexed by unit.
