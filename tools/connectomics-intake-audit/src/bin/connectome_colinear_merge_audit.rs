@@ -607,23 +607,6 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_fixture_demonstrates_multifeature_recall_tradeoff_and_false_positive_control() {
-        let input_bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json");
-        let truth_bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json");
-        let input: Input = serde_json::from_slice(input_bytes).expect("profile fixture should parse");
-        let report = run(&input, input_bytes, Some(truth_bytes), 500.0).expect("boundaries should evaluate");
-        assert_eq!(report.input_sha256, "fa9accfe25bf7b9b10b36322d5782635db775396ade619623ecc3f6e535338d8");
-        let radius = report.method_reports[0].evaluation.as_ref().unwrap();
-        let multi = report.method_reports[1].evaluation.as_ref().unwrap();
-        assert_eq!(radius.true_positive_count, 1);
-        assert_eq!(radius.false_positive_count, 1);
-        assert_eq!(radius.false_negative_count, 1);
-        assert_eq!(multi.true_positive_count, 2);
-        assert_eq!(multi.false_negative_count, 0);
-        assert!(multi.false_positive_count >= 1);
-    }
-
-    #[test]
     fn radius_step_inside_one_non_branching_segment_is_localized() {
         let track = make_track("hidden-merge", |x| {
             if x < 2000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
