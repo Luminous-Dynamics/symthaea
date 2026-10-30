@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-score-geometry-input.schema.json",
+  "title": "Symthaea Matched Judge-Human Score Geometry Input v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "analysis_id",
+    "judge_source_revision",
+    "human_protocol_sha256",
+    "rubric_sha256",
+    "criterion_ids",
+    "analysis_config",
+    "items"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_score_geometry_input.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_measurement"
+      ]
+    },
+    "analysis_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "human_protocol_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "criterion_ids": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "analysis_config": {
+      "$ref": "#/$defs/config"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bootstrap_resamples",
+        "min_items_for_bootstrap",
+        "min_items_per_task_family",
+        "jacobi_tolerance"
+      ],
+      "properties": {
+        "bootstrap_resamples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "min_items_for_bootstrap": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 100000
+        },
+        "min_items_per_task_family": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 100000
+        },
+        "jacobi_tolerance": {
+          "type": "number",
+          "minimum": 1e-15,
+          "maximum": 0.001
+        }
+      }
+    },
+    "rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rater_id_sha256",
+        "scores_millionths"
+      ],
+      "properties": {
+        "rater_id_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "scores_millionths": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/score"
+          }
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "task_family",
+        "judge_ratings",
+        "human_ratings"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "task_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "judge_ratings": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/rating"
+          }
+        },
+        "human_ratings": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/rating"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_measurement"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "judge_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "human_protocol_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
