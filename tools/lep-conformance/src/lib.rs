@@ -1080,6 +1080,13 @@ mod tests {
         schema_expected: String,
         semantic_expected: String,
         expected_failure: Option<String>,
+        mutation: Option<ConformanceMutation>,
+    }
+
+    #[derive(Deserialize)]
+    struct ConformanceMutation {
+        path: String,
+        value: Value,
     }
 
     #[test]
@@ -1101,7 +1108,7 @@ mod tests {
             let bytes = std::fs::read(&case_path)
                 .unwrap_or_else(|error| panic!("{}: unable to read fixture: {error}", case.id));
 
-            let statement = match parse_json_unique_keys(&bytes) {
+            let mut statement = match parse_json_unique_keys(&bytes) {
                 Ok(statement) => statement,
                 Err(error) => {
                     assert_eq!(
@@ -1126,6 +1133,13 @@ mod tests {
                     continue;
                 }
             };
+
+            if let Some(mutation) = &case.mutation {
+                let target = statement.pointer_mut(&mutation.path).unwrap_or_else(|| {
+                    panic!("{}: mutation pointer {} does not exist", case.id, mutation.path)
+                });
+                *target = mutation.value.clone();
+            }
 
             let predicate = statement
                 .get("predicate")
