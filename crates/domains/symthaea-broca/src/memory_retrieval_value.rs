@@ -23,6 +23,7 @@
 //! the lifecycle action controller selects WARN_STALE / EXPLAIN_CONFLICT /
 //! ABSTAIN (or ANSWER if a verified proof already exists).
 
+use crate::memory_evidence::EvidenceIndexSnapshotReceipt;
 use crate::memory_lifecycle_policy::{
     ClaimLifecycleLedgerEntry, ClaimLifecycleState, LifecycleAction, LifecycleActionDecision,
     LifecyclePolicyRequest, LifecycleRetrievalProgress, ProofVerificationState,
@@ -281,7 +282,7 @@ pub fn decide_lifecycle_action_with_voi(
     mut request: LifecyclePolicyRequest,
     verified_proof: Option<&VerifiedLifecycleProofToken>,
     value_decision: &RetrievalValueDecision,
-    evidence_index_state_sha256: &str,
+    evidence_index_snapshot: &EvidenceIndexSnapshotReceipt,
 ) -> Result<LifecycleActionDecision, String> {
     let unresolved_claim_ids: BTreeSet<String> = request
         .required_claims
@@ -290,13 +291,16 @@ pub fn decide_lifecycle_action_with_voi(
         .map(|claim| claim.conclusion_id.clone())
         .collect();
 
+    if evidence_index_snapshot.known_at_unix_ms != request.known_at_unix_ms {
+        return Err("retrieval value snapshot known_at does not match lifecycle request".into());
+    }
     value_decision.verify_request_binding(
         &request.decision_id,
         &request.principal_id,
         &request.scope_id,
         request.valid_at_unix_ms,
         request.known_at_unix_ms,
-        evidence_index_state_sha256,
+        &evidence_index_snapshot.index_state_sha256,
         &unresolved_claim_ids,
     )?;
     request.retrieval = value_decision.to_lifecycle_progress()?;
@@ -501,7 +505,10 @@ mod tests {
             request,
             None,
             &value_decision,
-            &digest("evidence index state"),
+            &EvidenceIndexSnapshotReceipt {
+                known_at_unix_ms: 300,
+                index_state_sha256: digest("evidence index state"),
+            },
         ).unwrap();
         assert_eq!(action.action, LifecycleAction::RetrieveMore);
         assert_eq!(
@@ -544,7 +551,10 @@ mod tests {
             request,
             None,
             &value_decision,
-            &digest("different evidence index"),
+            &EvidenceIndexSnapshotReceipt {
+                known_at_unix_ms: 300,
+                index_state_sha256: digest("different evidence index"),
+            },
         ).unwrap_err();
         assert!(error.contains("evidence-index snapshot mismatch"));
     }
