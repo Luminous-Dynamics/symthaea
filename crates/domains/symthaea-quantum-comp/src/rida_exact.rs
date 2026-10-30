@@ -671,6 +671,21 @@ mod tests {
     }
 
     #[test]
+    fn r_i_preserves_negative_scores_instead_of_clamping() {
+        let score = score_r_i(
+            &[point(0.0)],
+            &[1.5],
+            &[point(0.0), point(1.0)],
+            1.0,
+            5.0,
+            1.0,
+        )
+        .unwrap();
+        assert!(score.representativeness_factor < 0.0);
+        assert!((score.score - score.representativeness_factor).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn r_i_rejects_zero_baseline_and_empty_history() {
         assert_eq!(
             score_r_i(&[], &[1.0], &[point(0.0)], 1.0, 1.0, 1.0),
