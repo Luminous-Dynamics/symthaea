@@ -132,3 +132,11 @@ This protocol is a research plan, not a completed implementation or a claim that
 
 See [LIFECYCLE_ACTION_POLICY.md](LIFECYCLE_ACTION_POLICY.md) for the deterministic ANSWER / WARN_STALE / EXPLAIN_CONFLICT / RETRIEVE_MORE / ABSTAIN policy, opaque proof-verifier capability, action receipt and Vera-Life-Eval scorecard. This is the policy layer between verified proof construction and answer generation. It has not yet been wired into the production generation loop, and no LifeEM benchmark result is claimed.
 The deterministic policy truth table is also versioned at [lifecycle-action-fixtures-v1.json](lifecycle-action-fixtures-v1.json) (60 cases: five non-verified proof outcomes × six claim states × two retrieval-progress states). The Rust test suite reads that checked-in fixture directly. ANSWER is covered separately through a real independently verified proof-packet integration test and opaque capability check.
+
+## BEAM long-horizon memory and multi-session reasoning
+
+BEAM (ICLR 2026) provides a second scale axis alongside LongMemEval and Vera-Life: 100 conversations, 2,000 validated questions, four history sizes (100K, 500K, 1M, 10M) and ten abilities, including multi-session reasoning, event ordering, contradiction resolution, knowledge update, temporal reasoning and abstention. Its LIGHT architecture combines long-term episodic memory, short-term working memory and a scratchpad, reporting 3.5–12.69 percentage-point gains over strongest baselines depending on backbone.
+
+The published past.dev 10M slice reports 85.03% overall across 200 questions / 10 conversations, but 28.17% multi-session reasoning across just 20 questions. The latter is a useful diagnostic target, not a precise population estimate. Published provider values are separately run, with reader/judge/configuration differences; do not treat the leaderboard as a matched head-to-head. Broca should replicate official splits first, then target better multi-session proof coverage while keeping the exact claim lifecycle and action policy in the loop.
+
+References: [BEAM ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/2026/hash/d7f0cfa0fe759b033d5262e1bb7d4065-Abstract-Conference.html); [BEAM published results and ability breakdown](https://www.past.dev/benchmarks/beam).
