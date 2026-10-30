@@ -128,7 +128,7 @@ impl QFunction {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Transition {
     state: usize,
     action: usize,
@@ -662,6 +662,10 @@ impl Aggregate {
     }
 }
 
+fn split_seeds_are_independent(train_seed_root: u64, validation_seed_root: u64) -> bool {
+    train_seed_root != validation_seed_root
+}
+
 fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
     if replicates == 0 {
         return Err("replicates must be positive".into());
@@ -694,11 +698,15 @@ fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let mut aggregates: Vec<Aggregate> = methods.iter().map(|_| Aggregate::new()).collect();
         let mut mean_coercivity = 0.0;
         for replicate in 0..replicates {
-            let train_seed = mix_seed(seed ^ (world_index as u64).wrapping_mul(0x517c_c1b7_2722_0a95), replicate, 1);
-            let validation_seed = mix_seed(seed ^ (world_index as u64).wrapping_mul(0x6eed_0e9d_a4d9_4a4f), replicate, 2);
-            if train_seed == validation_seed {
-                return Err("train and validation seed collision".into());
+            let train_seed_root =
+                seed ^ (world_index as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+            let validation_seed_root =
+                seed ^ 0x0580_5eed ^ (world_index as u64).wrapping_mul(0x6eed_0e9d_a4d9_4a4f);
+            if !split_seeds_are_independent(train_seed_root, validation_seed_root) {
+                return Err("train and validation seed roots collide".into());
             }
+            let train_seed = mix_seed(train_seed_root, replicate, 1);
+            let validation_seed = mix_seed(validation_seed_root, replicate, 2);
             let training = sample_transitions(world, TRAIN_N, train_seed);
             let validation = sample_transitions(world, VALIDATION_N, validation_seed);
             let candidates = fit_candidates(world, &training);
@@ -734,8 +742,8 @@ fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
                 value_error,
                 bellman_loss,
                 mean_coercivity / replicates as f64,
-                seed,
-                seed ^ 0x0580_2026,
+                seed ^ (world_index as u64).wrapping_mul(0x517c_c1b7_2722_0a95),
+                seed ^ 0x0580_5eed ^ (world_index as u64).wrapping_mul(0x6eed_0e9d_a4d9_4a4f),
             );
         }
     }
@@ -855,6 +863,8 @@ mod tests {
         let train = sample_transitions(&world, 128, 10);
         let validation_a = sample_transitions(&world, 128, 11);
         let validation_b = sample_transitions(&world, 128, 12);
+        assert!(split_seeds_are_independent(10, 11));
+        assert!(!split_seeds_are_independent(10, 10));
         let candidates_a = fit_candidates(&world, &train);
         let candidates_b = fit_candidates(&world, &train);
         assert_eq!(candidates_a.len(), 6);
