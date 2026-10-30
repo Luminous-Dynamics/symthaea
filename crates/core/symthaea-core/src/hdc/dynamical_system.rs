@@ -289,7 +289,20 @@ impl Rk45Integrator {
         t: f64,
         dt: f64,
     ) -> (Vec<f64>, f64, f64) {
+        assert!(dt.is_finite() && dt > 0.0, "RK45 requires a finite positive trial interval");
+        assert!(self.tol.is_finite() && self.tol > 0.0, "RK45 tolerance must be finite and positive");
+        assert!(
+            self.dt_min.is_finite()
+                && self.dt_min > 0.0
+                && self.dt_max.is_finite()
+                && self.dt_max >= self.dt_min,
+            "RK45 step bounds must be finite, positive, and ordered"
+        );
+
         let dim = state.len();
+        // The minimum step is a lower bound only when it fits inside the
+        // caller's requested interval. Never enlarge a trial beyond dt.
+        let minimum_step = self.dt_min.min(dt);
         let mut h = dt.min(self.dt_max);
 
         loop {
@@ -357,22 +370,29 @@ impl Rk45Integrator {
                 })
                 .collect();
 
-            // Error estimate (max norm)
-            let error: f64 = y5
-                .iter()
-                .zip(y4.iter())
-                .map(|(&a, &b)| (a - b).abs())
-                .fold(0.0f64, f64::max);
+            // Error estimate (max norm). Treat any non-finite candidate as
+            // an infinite error instead of allowing f64::max to mask NaNs.
+            let finite_candidates = y5.iter().chain(y4.iter()).all(|value| value.is_finite());
+            let error: f64 = if finite_candidates {
+                y5.iter()
+                    .zip(y4.iter())
+                    .map(|(&a, &b)| (a - b).abs())
+                    .fold(0.0f64, f64::max)
+            } else {
+                f64::INFINITY
+            };
 
-            if error <= self.tol || h <= self.dt_min {
+            if error <= self.tol || h <= minimum_step {
                 // Return this accepted substep. The interval-level wrapper below
                 // is responsible for carrying the suggested next step forward.
                 return (y5, h, error);
             }
 
-            // Reject step; shrink h and retry
-            let scale = 0.9 * (self.tol / error).powf(0.25);
-            h = (h * scale).max(self.dt_min);
+            // The embedded Cash-Karp 4(5) difference scales as O(h^5),
+            // so rejected and accepted-step controllers both use exponent 1/5.
+            // Keep the trial bounded by the original requested interval.
+            let scale = 0.9 * (self.tol / error).powf(0.2);
+            h = (h * scale).max(minimum_step).min(dt);
         }
     }
 }
@@ -1557,6 +1577,22 @@ mod tests {
             "Error {:.2e} should be within tolerance or at minimum step",
             error
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "could not satisfy tolerance")]
+    fn test_rk45_does_not_overshoot_interval_when_dt_min_is_larger() {
+        let osc = HarmonicOscillator::simple(1.0);
+        let rk45 = Rk45Integrator {
+            tol: 1e-30,
+            dt_min: 1e-6,
+            dt_max: 1.0,
+        };
+
+        // The requested interval is shorter than dt_min and the requested
+        // tolerance cannot be met. Fail closed at the requested interval;
+        // never grow the trial to dt_min and step beyond the caller's time.
+        let _ = rk45.step(&osc, &[1.0, 0.0], 0.0, 1e-7);
     }
 
     #[test]
