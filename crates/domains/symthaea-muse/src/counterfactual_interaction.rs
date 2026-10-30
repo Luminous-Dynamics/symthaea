@@ -502,7 +502,8 @@ fn channel_window_metrics(
     let mut d = Vec::with_capacity(size);
     let mut pcm_sq = 0.0f64;
     let mut pcm_peak = 0.0f64;
-    let mut main_sq = 0.0f64;
+    let mut main_a_sq = 0.0f64;
+    let mut main_b_sq = 0.0f64;
 
     for offset in 0..size {
         let frame = window.start_frame + offset;
@@ -516,7 +517,8 @@ fn channel_window_metrics(
         let effect_b = y00 as f64 - y01 as f64;
         pcm_sq += residual * residual;
         pcm_peak = pcm_peak.max(residual.abs());
-        main_sq += 0.5 * (effect_a * effect_a + effect_b * effect_b);
+        main_a_sq += effect_a * effect_a;
+        main_b_sq += effect_b * effect_b;
         b.push(Complex::new(y00 * hann[offset], 0.0));
         a.push(Complex::new(y10 * hann[offset], 0.0));
         c.push(Complex::new(y01 * hann[offset], 0.0));
@@ -528,7 +530,8 @@ fn channel_window_metrics(
     fft.process(&mut d);
 
     let mut spectral_sq = 0.0f64;
-    let mut spectral_main_sq = 0.0f64;
+    let mut spectral_main_a_sq = 0.0f64;
+    let mut spectral_main_b_sq = 0.0f64;
     let mut bins = 0usize;
     for index in 0..=(size / 2) {
         let y00 = b[index].norm() as f64;
@@ -539,16 +542,20 @@ fn channel_window_metrics(
         let main_a = y00 - y10;
         let main_b = y00 - y01;
         spectral_sq += residual * residual;
-        spectral_main_sq += 0.5 * (main_a * main_a + main_b * main_b);
+        spectral_main_a_sq += main_a * main_a;
+        spectral_main_b_sq += main_b * main_b;
         bins += 1;
     }
 
     WindowMetrics {
         pcm_rms: (pcm_sq / size as f64).sqrt(),
         pcm_peak,
-        main_effect_rms: (main_sq / size as f64).sqrt(),
+        main_effect_rms: 0.5
+            * ((main_a_sq / size as f64).sqrt() + (main_b_sq / size as f64).sqrt()),
         spectral_rms: (spectral_sq / bins as f64).sqrt(),
-        spectral_main_effect_rms: (spectral_main_sq / bins as f64).sqrt(),
+        spectral_main_effect_rms: 0.5
+            * ((spectral_main_a_sq / bins as f64).sqrt()
+                + (spectral_main_b_sq / bins as f64).sqrt()),
     }
 }
 
