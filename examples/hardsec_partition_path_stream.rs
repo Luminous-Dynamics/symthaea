@@ -896,7 +896,7 @@ mod tests {
         }
         fs::write(
             &witnesses,
-            "path_id\tsequence_index\tedge_id\tsrc_node_id\tdst_node_id\nw1\t0\te00000000\tn00000000\tn00000001\n",
+            "path_id\tsequence_index\tedge_id\tsrc_node_id\tdst_node_id\nw1\t0\te00000999\tn00000000\tn00001000\n",
         )
         .unwrap();
 
@@ -916,6 +916,9 @@ mod tests {
         assert_eq!(output["audit"]["partition_count"], (EDGE_COUNT / 1000) + 1);
         assert_eq!(output["audit"]["total_witness_edges"], 1);
         assert_eq!(output["audit"]["lost_witness_edge_count"], 0);
+        assert_eq!(output["audit"]["total_cross_partition_witness_edges"], 1);
+        assert_eq!(output["audit"]["preserved_cross_partition_witness_edges"], 1);
+        assert_eq!(output["audit"]["partitioned_cross_partition_bridge_count"], 999_001);
         fs::remove_dir_all(root).unwrap();
     }
 
