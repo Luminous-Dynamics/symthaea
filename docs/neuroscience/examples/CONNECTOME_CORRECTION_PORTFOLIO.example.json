@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "dataset_id": "synthetic-portfolio-interaction-fixture-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "graph": [
+    { "source": 10, "target": 11, "weight": 1.0 },
+    { "source": 20, "target": 21, "weight": 1.0 }
+  ],
+  "queries": [
+    {
+      "query_id": "circuit-path-1-to-4",
+      "weight": 2.0,
+      "normalization_scale": 1.0,
+      "reference_value": 1.0,
+      "metric": { "kind": "path_exists", "source": 1, "target": 4 }
+    },
+    {
+      "query_id": "remove-spurious-10-to-11",
+      "weight": 1.0,
+      "normalization_scale": 1.0,
+      "reference_value": 0.0,
+      "metric": { "kind": "edge_weight", "source": 10, "target": 11 }
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_id": "a-add-1-to-2",
+      "estimated_error_probability": 0.72,
+      "review_minutes": 1.0,
+      "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "changes": [{ "operation": "add_weight", "source": 1, "target": 2, "weight": 1.0 }]
+    },
+    {
+      "candidate_id": "b-add-2-to-3",
+      "estimated_error_probability": 0.76,
+      "review_minutes": 1.0,
+      "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "changes": [{ "operation": "add_weight", "source": 2, "target": 3, "weight": 1.0 }]
+    },
+    {
+      "candidate_id": "c-add-3-to-4",
+      "estimated_error_probability": 0.81,
+      "review_minutes": 1.0,
+      "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "changes": [{ "operation": "add_weight", "source": 3, "target": 4, "weight": 1.0 }]
+    },
+    {
+      "candidate_id": "d-remove-spurious-edge",
+      "estimated_error_probability": 0.93,
+      "review_minutes": 1.0,
+      "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "changes": [{ "operation": "remove_weight", "source": 10, "target": 11, "weight": 1.0 }]
+    }
+  ],
+  "review_budgets_minutes": [1.0, 2.0, 3.0, 4.0]
+}
