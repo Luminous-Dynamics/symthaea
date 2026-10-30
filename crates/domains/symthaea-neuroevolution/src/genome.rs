@@ -56,6 +56,37 @@ const LAYER_BINDING_BIT: usize = 315;
 const WEIGHT_SEED_START: usize = 316;
 const WEIGHT_SEED_BITS: usize = 64;
 
+// Encoded genome regions. Bits outside these ranges are reserved and must not
+// create phenotypic variation, mutation opportunities, or speciation distance.
+const NEURAL_GENOME_REGION_END: usize = WEIGHT_SEED_START + WEIGHT_SEED_BITS;
+const THRESHOLD_REGION_START: usize = 400;
+const THRESHOLD_REGION_END: usize = crate::threshold_genome::THRESHOLD_REGION_END;
+const ACTIVE_GENOME_BITS: usize =
+    NEURAL_GENOME_REGION_END + (THRESHOLD_REGION_END - THRESHOLD_REGION_START);
+const ACTIVE_GENOME_BYTES: usize = THRESHOLD_REGION_END.div_ceil(8);
+
+fn is_active_genome_bit(bit: usize) -> bool {
+    bit < NEURAL_GENOME_REGION_END
+        || (THRESHOLD_REGION_START..THRESHOLD_REGION_END).contains(&bit)
+}
+
+fn canonicalize_genome(hv: &mut BinaryHV) {
+    for bit in 0..BinaryHV::DIM {
+        if !is_active_genome_bit(bit) {
+            hv.0[bit / 8] &= !(1 << (bit % 8));
+        }
+    }
+}
+
+fn for_each_active_genome_bit(mut f: impl FnMut(usize)) {
+    for bit in 0..NEURAL_GENOME_REGION_END {
+        f(bit);
+    }
+    for bit in THRESHOLD_REGION_START..THRESHOLD_REGION_END {
+        f(bit);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -149,9 +180,9 @@ fn log_to_bits(val: f32, num_bits: usize, lo: f32, hi: f32) -> u64 {
 impl NeuralGenome {
     /// Create a random genome from a deterministic seed.
     pub fn random(seed: u64) -> Self {
-        Self {
-            hv: BinaryHV::random(seed),
-        }
+        let mut hv = BinaryHV::random(seed);
+        canonicalize_genome(&mut hv);
+        Self { hv }
     }
 
     /// Create a genome from a genesis seed with a domain label.
@@ -160,9 +191,9 @@ impl NeuralGenome {
         let mut bytes = [0u8; 2048];
         use rand::RngCore;
         rng.fill_bytes(&mut bytes);
-        Self {
-            hv: BinaryHV(bytes),
-        }
+        let mut hv = BinaryHV(bytes);
+        canonicalize_genome(&mut hv);
+        Self { hv }
     }
 
     /// Decode the genome into a phenotype (CfC configuration).
@@ -419,30 +450,43 @@ impl NeuralGenome {
 
     /// Mutate the genome by flipping bits at the given rate.
     pub fn mutate(&self, rate: f32, seed: u64) -> Self {
-        Self {
-            hv: self.hv.add_noise(rate, seed),
-        }
+        let mut hv = self.hv.add_noise(rate, seed);
+        canonicalize_genome(&mut hv);
+        Self { hv }
     }
 
     /// Uniform byte crossover with another genome (avoids BinaryHV::bundle tie-breaking).
     pub fn crossover(&self, other: &Self, seed: u64) -> Self {
         let mut rng = ShakeRngAdapter::new(seed);
         let mut child_bytes = [0u8; 2048];
-        for i in 0..2048 {
+        for i in 0..ACTIVE_GENOME_BYTES {
             if rng.next_bit() {
                 child_bytes[i] = self.hv.0[i];
             } else {
                 child_bytes[i] = other.hv.0[i];
             }
         }
-        Self {
-            hv: BinaryHV(child_bytes),
-        }
+        let mut hv = BinaryHV(child_bytes);
+        canonicalize_genome(&mut hv);
+        Self { hv }
     }
 
-    /// Hamming distance (fraction of differing bits, 0.0 = identical, 1.0 = maximally different).
+    /// Hamming distance over encoded loci only (0.0 = identical, 1.0 = maximally different).
+    ///
+    /// Reserved bits must not create artificial genetic distance or species diversity.
+    /// This remains an encoded-locus distance, not a semantic architecture distance:
+    /// distinct bit patterns may still decode to equivalent phenotype values.
     pub fn distance(&self, other: &Self) -> f32 {
-        self.hv.hamming_distance(&other.hv) as f32 / BinaryHV::DIM as f32
+        let mut differing_bits = 0usize;
+        for_each_active_genome_bit(|bit| {
+            let mask = 1 << (bit % 8);
+            let left = self.hv.0[bit / 8] & mask;
+            let right = other.hv.0[bit / 8] & mask;
+            if left != right {
+                differing_bits += 1;
+            }
+        });
+        differing_bits as f32 / ACTIVE_GENOME_BITS as f32
     }
 
     pub fn decode_thresholds(&self) -> crate::threshold_genome::ThresholdPhenotype {
@@ -451,6 +495,7 @@ impl NeuralGenome {
 
     pub fn encode_thresholds(&mut self, pheno: &crate::threshold_genome::ThresholdPhenotype) {
         crate::threshold_genome::encode_thresholds(&mut self.hv, pheno);
+        canonicalize_genome(&mut self.hv);
     }
 
     /// Biased mutation for Lamarckian evolution.
@@ -462,11 +507,14 @@ impl NeuralGenome {
         seed: u64,
         targets: &[(usize, usize, f32)],
     ) -> Self {
-        let mut child = self.hv.add_noise(base_rate, seed);
+        let mut child = self.mutate(base_rate, seed).hv;
         let boost_rate = (base_rate * 3.0).min(0.5);
         for &(start, bits, confidence) in targets {
             let mut rng_state = seed ^ (start as u64 * 0x517CC1B727220A95);
-            for bit_idx in start..start + bits {
+            for bit_idx in start..start.saturating_add(bits).min(BinaryHV::DIM) {
+                if !is_active_genome_bit(bit_idx) {
+                    continue;
+                }
                 rng_state ^= rng_state << 13;
                 rng_state ^= rng_state >> 7;
                 rng_state ^= rng_state << 17;
@@ -478,6 +526,7 @@ impl NeuralGenome {
                 }
             }
         }
+        canonicalize_genome(&mut child);
         Self { hv: child }
     }
 }
@@ -624,6 +673,54 @@ mod tests {
         let phenotype = genome.decode();
         let re_decoded = NeuralGenome::encode(&phenotype).decode();
         assert_eq!(phenotype.weight_seed, re_decoded.weight_seed);
+    }
+
+    #[test]
+    fn constructors_canonicalize_unencoded_bits() {
+        let random = NeuralGenome::random(0x1234);
+        let genesis = GenesisSeed::from_phrase("active-genome-bits");
+        let from_genesis = NeuralGenome::from_genesis(&genesis, "candidate");
+
+        for genome in [&random, &from_genesis] {
+            for bit in 0..BinaryHV::DIM {
+                if !is_active_genome_bit(bit) {
+                    assert_eq!(
+                        genome.hv.0[bit / 8] & (1 << (bit % 8)),
+                        0,
+                        "unencoded bit {bit} must be canonical zero"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mutation_and_crossover_do_not_create_unencoded_variation() {
+        let left = NeuralGenome::random(10);
+        let right = NeuralGenome::random(20);
+        let mutated = left.mutate(0.5, 30);
+        let crossed = left.crossover(&right, 40);
+
+        for genome in [&mutated, &crossed] {
+            for bit in 0..BinaryHV::DIM {
+                if !is_active_genome_bit(bit) {
+                    assert_eq!(
+                        genome.hv.0[bit / 8] & (1 << (bit % 8)),
+                        0,
+                        "operator must leave unencoded bit {bit} at zero"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn distance_ignores_reserved_and_unencoded_bits() {
+        let left = NeuralGenome::random(100);
+        let mut right = left.clone();
+        right.hv.0[100] ^= 0x80; // Reserved, unencoded bit.
+        right.hv.0[2047] ^= 0x01; // Tail bit outside every decoded locus.
+        assert_eq!(left.distance(&right), 0.0);
     }
 
     #[test]

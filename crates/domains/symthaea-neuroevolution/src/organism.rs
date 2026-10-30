@@ -73,6 +73,10 @@ pub struct NeuralOrganism {
     pub parent_ids: (Option<u64>, Option<u64>),
     pub age_cycles: u32,
     pub alive: bool,
+    /// Root seed used to derive the genotype-conditioned network initialization.
+    /// Keeping this separate from the genome lets weight_seed and evaluation seed
+    /// remain distinct experimental variables.
+    root_genesis: GenesisSeed,
     pub total_free_energy: f64,
     pub total_cycles: u64,
     pub peak_phi: f32,
@@ -107,7 +111,8 @@ impl NeuralOrganism {
         let phenotype = genome.decode();
         let mut net_config = phenotype.network_config.clone();
         net_config.neuron_config.dimension = dim;
-        let network = HdcLtcUnifiedNetwork::from_genesis(net_config, genesis);
+        let network_genesis = derive_network_genesis(genesis, phenotype.weight_seed);
+        let network = HdcLtcUnifiedNetwork::from_genesis(net_config, &network_genesis);
 
         let fep_config = ActiveInferenceAgentConfig {
             state_dim: FEP_STATE_DIM,
@@ -133,6 +138,7 @@ impl NeuralOrganism {
             parent_ids: (None, None),
             age_cycles: 0,
             alive: true,
+            root_genesis: genesis.clone(),
             total_free_energy: 0.0,
             total_cycles: 0,
             peak_phi: 0.0,
@@ -320,14 +326,24 @@ impl NeuralOrganism {
         let phenotype = self.genome.decode();
         let mut net_config = phenotype.network_config;
         net_config.neuron_config.dimension = self.eval_dim;
-        let genesis = GenesisSeed::from_phrase(&format!("organism_{}_reset", self.id));
-        self.network = HdcLtcUnifiedNetwork::from_genesis(net_config, &genesis);
+        let network_genesis = derive_network_genesis(&self.root_genesis, phenotype.weight_seed);
+        self.network = HdcLtcUnifiedNetwork::from_genesis(net_config, &network_genesis);
     }
 
     /// Get the best-ever phenotype decoded from this organism's genome.
     pub fn phenotype(&self) -> crate::genome::NeuralPhenotype {
         self.genome.decode()
     }
+}
+
+/// Derive the network initialization namespace from the experiment root and
+/// the genome's explicit weight-seed locus. This keeps architecture/configuration,
+/// representation initialization, and evaluation randomness independently addressable.
+fn derive_network_genesis(root: &GenesisSeed, weight_seed: u64) -> GenesisSeed {
+    GenesisSeed::from_phrase(&format!(
+        "{}::neuroevolution::network-weight-seed::{weight_seed:016x}",
+        root.phrase()
+    ))
 }
 
 /// Phi proxy: measures integration of CfC output via normalized variance.
@@ -555,6 +571,59 @@ mod tests {
         let child = parent.replicate(2, 0.02, 99, &genesis);
         assert_eq!(child.parent_ids, (Some(1), None));
         assert_eq!(child.generation, 1);
+    }
+
+    #[test]
+    fn genome_weight_seed_changes_network_initialization() {
+        let root = test_genesis();
+        let mut phenotype_a = NeuralGenome::random(42).decode();
+        let mut phenotype_b = phenotype_a.clone();
+        phenotype_a.weight_seed = 0x1111_2222_3333_4444;
+        phenotype_b.weight_seed = 0x9999_aaaa_bbbb_cccc;
+
+        let genome_a = NeuralGenome::encode(&phenotype_a);
+        let genome_b = NeuralGenome::encode(&phenotype_b);
+        let org_a = spawn_fast(1, genome_a, &root, 0);
+        let org_b = spawn_fast(1, genome_b, &root, 0);
+
+        let weights_a = org_a.network.layer(0).unwrap()[0].weight_hv_ref();
+        let weights_b = org_b.network.layer(0).unwrap()[0].weight_hv_ref();
+        assert_ne!(
+            weights_a.values, weights_b.values,
+            "changing only the genome weight_seed must change network initialization"
+        );
+    }
+
+    #[test]
+    fn identical_genome_and_root_seed_reproduce_across_ids_and_reset() {
+        let root = test_genesis();
+        let genome = NeuralGenome::random(77);
+        let org_a = spawn_fast(1, genome.clone(), &root, 0);
+        let org_b = spawn_fast(99, genome, &root, 0);
+
+        let initial_a = org_a.network.layer(0).unwrap()[0]
+            .weight_hv_ref()
+            .values
+            .clone();
+        let initial_b = org_b.network.layer(0).unwrap()[0]
+            .weight_hv_ref()
+            .values
+            .clone();
+        assert_eq!(
+            initial_a, initial_b,
+            "organism IDs must not silently change representation initialization"
+        );
+
+        let mut reset_org = org_a;
+        reset_org.reset_evaluation();
+        let after_reset = reset_org.network.layer(0).unwrap()[0]
+            .weight_hv_ref()
+            .values
+            .clone();
+        assert_eq!(
+            initial_a, after_reset,
+            "evaluation reset must reconstruct the same genotype-conditioned network"
+        );
     }
 
     #[test]
