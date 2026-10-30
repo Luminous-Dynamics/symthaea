@@ -13,9 +13,14 @@ fixed-state system-partition scoring; and a bounded exhaustive IIT 4.0 (2023)
 Integration-level system search for phi_s. Model, evaluation, and analysis-request
 identities are versioned and SHA-256 bound.
 
-The system search is complete only for the declared binary factored TPM profile,
-the IIT 4.0 (2023) formalism, its default directed-set-partition family, and the
-explicit work budgets passed to the API. It applies the default PyPhi MIP ranking:
+The qualified system search currently requires the candidate system to be the
+full substrate. Proper-subsystem IIT 4.0 requires cause-side Eq. 4 background
+marginalization and effect-side Eq. 3 conditioning of external inputs; those
+transformations are not implemented, so proper-subsystem intrinsic-specification
+and system-scoring calls fail closed. For the full substrate, the search is complete
+only for the declared binary factored TPM profile, the IIT 4.0 (2023) formalism,
+its default directed-set-partition family, and the explicit work budgets passed
+to the API. It applies the default PyPhi MIP ranking:
 minimum normalized phi, then maximum nonnegative phi, then lexicographic induced
 cut. It evaluates every tied cause/effect specified-state pair before applying the
 Integration-level maximum-phi rule.
@@ -59,11 +64,12 @@ values, little-endian state indexing for the specified state (0, 1, 1), and
 directed connectivity.
 
 A new end-to-end regression runs the bounded IIT 4.0 (2023) system search for
-subset {A, B} at the published state and checks the documented system phi_s
-(0.1719 ± 0.001), cause contribution (0.2446 ± 0.002), and effect contribution
-(0.1719 ± 0.001). These rounded tolerances qualify this named example only, not
-general PyPhi parity. The published phi_s anchors for {A} and {A, B, C} remain
-future end-to-end checks.
+the full {A, B, C} substrate at the published state and checks the documented
+system phi_s anchor (0.1339 ± 0.001). This rounded tolerance qualifies this
+named full-system example only, not general PyPhi parity. The published
+proper-subsystem anchors for {A} and {A, B} remain future end-to-end checks,
+after Eq. 3/Eq. 4 background marginalization is implemented and differentially
+validated.
 
 The upstream example source is pinned at:
 https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/pyphi/examples.py.
