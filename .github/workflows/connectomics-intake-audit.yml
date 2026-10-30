@@ -9,6 +9,8 @@ on:
       - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
       - ".github/workflows/connectomics-intake-audit.yml"
   push:
     branches: [main]
@@ -19,6 +21,8 @@ on:
       - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
       - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
       - ".github/workflows/connectomics-intake-audit.yml"
   workflow_dispatch:
 
@@ -37,5 +41,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage, frozen-prediction scoring, and stopping audits
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, and stopping audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
