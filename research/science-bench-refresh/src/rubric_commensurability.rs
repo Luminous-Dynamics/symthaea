@@ -913,6 +913,41 @@ mod tests {
     }
 
     #[test]
+    fn shared_mapping_adjudicators_require_calibration_instead_of_direct_comparison() {
+        let mut fields = make_fields();
+        fields.right_instrument.criteria[0].construct_mapping.adjudicator_id_sha256 =
+            fields.left_instrument.criteria[0].construct_mapping.adjudicator_id_sha256.clone();
+        let commitment = plan_fields_commitment(&fields).unwrap();
+        let plan = RubricCommensurabilityPlanV1 {
+            schema: fields.schema.clone(),
+            analyzer_source_revision: fields.analyzer_source_revision.clone(),
+            purpose: fields.purpose,
+            comparison_id: fields.comparison_id.clone(),
+            construct_ontology_sha256: fields.construct_ontology_sha256.clone(),
+            constructs: fields.constructs.clone(),
+            left_instrument: fields.left_instrument.clone(),
+            right_instrument: fields.right_instrument.clone(),
+            shared_anchor_items: fields.shared_anchor_items.clone(),
+            minimum_anchor_items_per_construct: fields.minimum_anchor_items_per_construct,
+            plan_commitment_sha256: commitment,
+        };
+        let report = audit_rubric_commensurability(&serde_json::to_vec(&plan).unwrap()).unwrap();
+        assert_eq!(report.fields.overall_status, OverallCommensurabilityV1::CalibrationRequired);
+        assert!(!report.fields.mapping_adjudicator_ids_disjoint);
+        assert_eq!(report.fields.left_right_mapping_adjudicator_overlap_count, 1);
+        assert!(!report.fields.mapping_panel_independence_proven);
+        assert!(!report.fields.direct_score_comparison_allowed);
+    }
+
+    #[test]
+    fn duplicate_semantic_anchor_content_cannot_inflate_anchor_coverage() {
+        let mut fields = make_fields();
+        fields.shared_anchor_items[1].semantics_sha256 =
+            fields.shared_anchor_items[0].semantics_sha256.clone();
+        assert!(validate_rubric_commensurability_plan_fields(&fields).is_err());
+    }
+
+    #[test]
     fn detects_incompatible_and_unmapped_constructs() {
         let mut fields = make_fields();
         fields.right_instrument.criteria[0].construct_mapping.relation = ConstructRelationV1::Incompatible;
