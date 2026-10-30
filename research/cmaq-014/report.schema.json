@@ -91,7 +91,8 @@
                 "damage_rate",
                 "risk_budget_violation_rate",
                 "mean_probe_accuracy",
-                "probe_counts"
+                "probe_counts",
+                "mean_information_gain_bits"
               ],
               "properties": {
                 "policy": {
@@ -141,6 +142,11 @@
                     "type": "integer",
                     "minimum": 0
                   }
+                },
+                "mean_information_gain_bits": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
                 }
               }
             }
