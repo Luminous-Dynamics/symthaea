@@ -17,6 +17,7 @@
 //! named by `SYMTHAEA_SOUNDFONT`. The Muse Studio launcher provides both
 //! via `nix-shell`.
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::ffi::{OsStr, OsString};
 use std::io::Read;
@@ -28,6 +29,8 @@ const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
 /// FluidSynth permits 1..=128 independently configured effects groups.
 pub const MAX_EFFECTS_GROUPS: u8 = 128;
 const MIDI_CHANNEL_COUNT: u8 = 16;
+const EFFECTS_GROUP_ASSIGNMENT_DOMAIN: &[u8] =
+    b"luminous-dynamics-muse-fluidsynth-effects-group-assignment-v1\\0";
 static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
@@ -111,10 +114,72 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
     Some((binary, soundfont))
 }
 
+/// One zero-based MIDI channel to FluidSynth effects-group assignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MidiChannelEffectsGroup {
+    pub midi_channel: u8,
+    pub effects_group: u8,
+}
+
+/// Content-addressed FluidSynth effects assignment for its 16 standard MIDI
+/// channels. This is a typed subgraph of renderer configuration, not a complete
+/// route graph and not proof of independence from downstream master processing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FluidSynthEffectsGroupAssignment {
+    pub version: String,
+    pub effects_group_count: u8,
+    pub midi_channel_count: u8,
+    pub channel_assignments: Vec<MidiChannelEffectsGroup>,
+    pub assignment_sha256: String,
+}
+
+fn effects_group_assignment_digest(
+    assignment: &FluidSynthEffectsGroupAssignment,
+) -> Option<String> {
+    let mut unsigned = assignment.clone();
+    unsigned.assignment_sha256.clear();
+    let bytes = serde_json::to_vec(&unsigned).ok()?;
+    let mut hasher = Sha256::new();
+    hasher.update(EFFECTS_GROUP_ASSIGNMENT_DOMAIN);
+    hasher.update(bytes);
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+/// Build the content-addressed, documented zero-based MIDI channel mapping.
+/// FluidSynth wraps channel indices modulo the configured group count.
+pub fn build_effects_group_assignment(
+    effects_groups: u8,
+) -> Option<FluidSynthEffectsGroupAssignment> {
+    if !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
+    let channel_assignments = (0..MIDI_CHANNEL_COUNT)
+        .map(|midi_channel| MidiChannelEffectsGroup {
+            midi_channel,
+            effects_group: midi_channel % effects_groups,
+        })
+        .collect();
+    let mut assignment = FluidSynthEffectsGroupAssignment {
+        version: "muse-fluidsynth-effects-group-assignment-v1".to_owned(),
+        effects_group_count: effects_groups,
+        midi_channel_count: MIDI_CHANNEL_COUNT,
+        channel_assignments,
+        assignment_sha256: String::new(),
+    };
+    assignment.assignment_sha256 = effects_group_assignment_digest(&assignment)?;
+    Some(assignment)
+}
+
+/// Replay-verify a content-addressed effects-group assignment.
+pub fn verify_effects_group_assignment(
+    assignment: &FluidSynthEffectsGroupAssignment,
+) -> bool {
+    build_effects_group_assignment(assignment.effects_group_count)
+        .is_some_and(|expected| expected == *assignment)
+}
+
 /// Return the FluidSynth effects-group index assigned to a zero-based MIDI
-/// channel. FluidSynth wraps channel indices modulo the configured group count.
-/// This describes the synth's effects-group assignment only; it does not prove
-/// independence from later master processing or other shared output stages.
+/// channel. This describes effects assignment only, not downstream routing.
 pub fn effects_group_for_midi_channel(midi_channel: u8, effects_groups: u8) -> Option<u8> {
     if midi_channel >= MIDI_CHANNEL_COUNT || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
         return None;
@@ -139,6 +204,8 @@ fn effects_groups_setting(effects_groups: u8) -> Option<OsString> {
 pub struct FluidSynthRenderObservation {
     pub executable_path: PathBuf,
     pub soundfont_path: PathBuf,
+    /// Content-addressed group assignment corresponding to the exact argv setting.
+    pub effects_group_assignment: FluidSynthEffectsGroupAssignment,
     pub executable_sha256_before: String,
     pub executable_sha256_after: String,
     pub soundfont_sha256_before: String,
@@ -300,6 +367,7 @@ pub fn render_midi_to_wav_observed_with_effects_groups(
     if sample_rate == 0 || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
         return None;
     }
+    let effects_group_assignment = build_effects_group_assignment(effects_groups)?;
     let (binary, soundfont) = available()?;
     let binary = binary.canonicalize().ok()?;
     let soundfont = soundfont.canonicalize().ok()?;
@@ -424,6 +492,7 @@ pub fn render_midi_to_wav_observed_with_effects_groups(
     Some(FluidSynthRenderObservation {
         executable_path: binary,
         soundfont_path: soundfont,
+        effects_group_assignment,
         executable_sha256_before,
         executable_sha256_after,
         soundfont_sha256_before,
@@ -575,6 +644,31 @@ mod tests {
         assert_eq!(effects_group_for_midi_channel(15, 128), Some(15));
         assert_eq!(effects_group_for_midi_channel(16, 16), None);
         assert_eq!(effects_group_for_midi_channel(0, 0), None);
+
+        let single = build_effects_group_assignment(1).unwrap();
+        assert!(verify_effects_group_assignment(&single));
+        assert!(single.channel_assignments.iter().all(|row| row.effects_group == 0));
+
+        let four = build_effects_group_assignment(4).unwrap();
+        assert!(verify_effects_group_assignment(&four));
+        assert_eq!(
+            four.channel_assignments.iter().map(|row| row.effects_group).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+        );
+
+        let sixteen = build_effects_group_assignment(16).unwrap();
+        assert_eq!(
+            sixteen.channel_assignments.iter().map(|row| row.effects_group).collect::<Vec<_>>(),
+            (0..16).collect::<Vec<_>>(),
+        );
+        assert!(build_effects_group_assignment(0).is_none());
+    }
+
+    #[test]
+    fn effects_group_assignment_receipt_rejects_tampering() {
+        let mut assignment = build_effects_group_assignment(4).unwrap();
+        assignment.channel_assignments[3].effects_group = 7;
+        assert!(!verify_effects_group_assignment(&assignment));
     }
 
     #[test]
