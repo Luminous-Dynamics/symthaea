@@ -34,6 +34,10 @@ pub struct ResultAuditReport {
     pub qualification_eligible: bool,
     /// Hashes identify bytes; this tool does not authenticate who authored them.
     pub oracle_authenticity_established: bool,
+    /// Replay is asserted by the supplied oracle ledger, not executed by this auditor.
+    pub oracle_replay_executed_by_adjudicator: bool,
+    /// Raw observer receipts are parsed as untrusted claims; their signer is not verified.
+    pub observer_receipt_authenticity_established: bool,
     pub counts: ResultAuditCounts,
     pub metrics: ResultAuditMetrics,
     pub cases: Vec<CaseAssessment>,
@@ -55,6 +59,7 @@ pub struct ResultAuditMetrics {
     pub hidden_dependency_misses: usize,
     pub stale_evidence_false_acceptances: usize,
     pub false_invalidations: usize,
+    pub unrelated_evidence_not_retained: usize,
     pub unresolved_channel_misses: usize,
     pub integrity_failures_not_invalidated: usize,
     pub observed_resource_attributions: usize,
@@ -262,6 +267,8 @@ pub fn audit_bytes(
         adjudication_passed: false,
         qualification_eligible: false,
         oracle_authenticity_established: false,
+        oracle_replay_executed_by_adjudicator: false,
+        observer_receipt_authenticity_established: false,
         counts: ResultAuditCounts::default(),
         metrics: ResultAuditMetrics::default(),
         cases: Vec::new(),
@@ -297,13 +304,15 @@ pub fn audit_bytes(
     };
     let catalog_audit = crate::basalt_observer::audit_bytes(catalog_bytes);
     if !catalog_audit.structurally_valid {
-        push_error(
-            &mut report,
-            None,
-            "E_CATALOG_STRUCTURAL",
-            "catalog",
-            "challenge catalog failed the independent structural auditor",
-        );
+        for error in &catalog_audit.errors {
+            push_error(
+                &mut report,
+                None,
+                &format!("E_CATALOG_{}", error.code),
+                &error.path,
+                &error.message,
+            );
+        }
         return report;
     }
 
@@ -984,6 +993,7 @@ fn adjudicate_case(
                 );
             }
             if receipt.reuse_decision != "reused" {
+                report.metrics.unrelated_evidence_not_retained += 1;
                 if matches!(
                     receipt.reuse_decision.as_str(),
                     "invalidated" | "reverified"
@@ -1000,8 +1010,9 @@ fn adjudicate_case(
             }
         }
         "report_unresolved" => {
+            let mut unsupported_channel_violation = false;
             if !unresolved_set.contains(case.channel.as_str()) {
-                report.metrics.unresolved_channel_misses += 1;
+                unsupported_channel_violation = true;
                 push_error(
                     report,
                     Some(case_id),
@@ -1011,6 +1022,7 @@ fn adjudicate_case(
                 );
             }
             if !matches!(receipt.disposition.as_str(), "unresolved" | "invalidated") {
+                unsupported_channel_violation = true;
                 push_error(
                     report,
                     Some(case_id),
@@ -1023,6 +1035,7 @@ fn adjudicate_case(
                 receipt.reuse_decision.as_str(),
                 "unresolved" | "invalidated"
             ) {
+                unsupported_channel_violation = true;
                 if receipt.reuse_decision == "reused" {
                     report.metrics.stale_evidence_false_acceptances += 1;
                 }
@@ -1033,6 +1046,9 @@ fn adjudicate_case(
                     &format!("{path}.receipt.reuse_decision"),
                     "evidence depending on an unsupported channel cannot be reused",
                 );
+            }
+            if unsupported_channel_violation {
+                report.metrics.unresolved_channel_misses += 1;
             }
         }
         "invalidate_receipt" => {
