@@ -680,16 +680,16 @@ fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         "ta_pbv_exact_occupancy_oracle",
     ];
     let mut output = String::from(
-        "record_type\\tscenario\\tmethod\\treplicates\\tcandidate_count\\tselection_accuracy\\toffline_q_error\\ttarget_q_error\\tinitial_value_abs_error\\tbellman_residual_loss\\tpairwise_coercivity\\ttrain_seed\\tvalidation_seed\\n",
+        "record_type\tscenario\tmethod\treplicates\tcandidate_count\tselection_accuracy\toffline_q_error\ttarget_q_error\tinitial_value_abs_error\tbellman_residual_loss\tpairwise_coercivity\ttrain_seed\tvalidation_seed\n",
     );
-    output.push_str("BENCHMARK_CONFIG\\tVIS-DVPC-058\\tversion\\t0\\n");
-    output.push_str(&format!("BENCHMARK_CONFIG\\treplicates\\t{replicates}\\n"));
-    output.push_str(&format!("BENCHMARK_CONFIG\\ttrain_n\\t{TRAIN_N}\\n"));
-    output.push_str(&format!("BENCHMARK_CONFIG\\tvalidation_n\\t{VALIDATION_N}\\n"));
-    output.push_str("BENCHMARK_CONFIG\\tvalidation_design\\tiid one-step transitions from registered offline distribution; stochastic reward and next-state draws\\n");
-    output.push_str("BENCHMARK_CONFIG\\tselection\\tpenalized max over all pairwise candidate critics; smallest-index tie break\\n");
-    output.push_str("BENCHMARK_CONFIG\\toracle_boundary\\texact MDP model and target occupancy are evaluator-only; no selector reads them except labelled TA-PBV oracle arm\\n");
-    output.push_str("BENCHMARK_CONFIG\\tsplitting\\tindependent training and validation seeds; candidate fit receives training rows only\\n");
+    output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-058\tversion\t0\n");
+    output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
+    output.push_str(&format!("BENCHMARK_CONFIG\ttrain_n\t{TRAIN_N}\n"));
+    output.push_str(&format!("BENCHMARK_CONFIG\tvalidation_n\t{VALIDATION_N}\n"));
+    output.push_str("BENCHMARK_CONFIG\tvalidation_design\tiid one-step transitions from registered offline distribution; stochastic reward and next-state draws\n");
+    output.push_str("BENCHMARK_CONFIG\tselection\tpenalized max over all pairwise candidate critics; smallest-index tie break\n");
+    output.push_str("BENCHMARK_CONFIG\toracle_boundary\texact MDP model and target occupancy are evaluator-only; no selector reads them except labelled TA-PBV oracle arm\n");
+    output.push_str("BENCHMARK_CONFIG\tsplitting\tindependent training and validation seeds; candidate fit receives training rows only\n");
 
     for (world_index, world) in worlds.iter().enumerate() {
         world.validate()?;
@@ -731,7 +731,7 @@ fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "RESULT\\t{}\\t{}\\t{}\\t{}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}",
+                "RESULT\t{}\t{}\t{}\t{}\t{:.8}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{}\t{}",
                 world.name,
                 method,
                 replicates,
@@ -747,7 +747,7 @@ fn run_benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             );
         }
     }
-    output.push_str("NEGATIVE_CONTROL\\tvalidation_leakage\\tcandidate_fit_and_validation_seeds_must_be_distinct\\tFAIL_CLOSED_ON_COLLISION\\n");
+    output.push_str("NEGATIVE_CONTROL\tvalidation_leakage\tcandidate_fit_and_validation_seeds_must_be_distinct\tFAIL_CLOSED_ON_COLLISION\n");
     Ok(output)
 }
 
@@ -757,7 +757,7 @@ fn main() {
     match run_benchmark(replicates, 0x0580_2026_1030) {
         Ok(output) => print!("{output}"),
         Err(error) => {
-            eprintln!("VIS_DVPC_058_ERROR\\t{error}");
+            eprintln!("VIS_DVPC_058_ERROR\t{error}");
             std::process::exit(2);
         }
     }
@@ -890,11 +890,11 @@ mod tests {
         let first = run_benchmark(2, 103).unwrap();
         let second = run_benchmark(2, 103).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.lines().filter(|line| line.starts_with("RESULT\\t")).count(), 12);
-        assert_eq!(first.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\\t")).count(), 8);
-        assert_eq!(first.lines().filter(|line| line.starts_with("NEGATIVE_CONTROL\\t")).count(), 1);
-        for row in first.lines().filter(|line| line.starts_with("RESULT\\t")) {
-            assert_eq!(row.split('\\t').count(), 13);
+        assert_eq!(first.lines().filter(|line| line.starts_with("RESULT\t")).count(), 12);
+        assert_eq!(first.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
+        assert_eq!(first.lines().filter(|line| line.starts_with("NEGATIVE_CONTROL\t")).count(), 1);
+        for row in first.lines().filter(|line| line.starts_with("RESULT\t")) {
+            assert_eq!(row.split('\t').count(), 13);
         }
     }
 
