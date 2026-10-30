@@ -248,9 +248,9 @@ impl SqliteAmlMemoryBackend {
     pub fn purge_stored_before(&mut self, cutoff_unix_ms: u64) -> Result<usize, String> {
         let cutoff = i64::try_from(cutoff_unix_ms)
             .map_err(|_| "retention cutoff exceeds SQLite signed integer range".to_string())?;
-        let transaction = self.connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|error| format!("failed to begin AML retention transaction: {error}"))?;
+
+        // Read/validate the rows before opening the mutable transaction so
+        // expired source IDs and every dependent lifecycle event are known.
         let mut expired_evidence_ids = BTreeSet::new();
         for row in self.read_persisted_rows()? {
             if row.stored_at_unix_ms < cutoff {
@@ -271,6 +271,9 @@ impl SqliteAmlMemoryBackend {
             }
         }
 
+        let transaction = self.connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| format!("failed to begin AML retention transaction: {error}"))?;
         let removed = transaction
             .execute(
                 "DELETE FROM aml_add_batches WHERE stored_at_unix_ms < ?1",
@@ -787,6 +790,24 @@ fn validate_row_metadata(row: &PersistedRow, batch: &PersistedAmlAddBatch) -> Re
     Ok(())
 }
 
+fn decode_and_validate_lifecycle_row(
+    row: &PersistedLifecycleRow,
+) -> Result<PersistedEvidenceLifecycleEvent, String> {
+    if row.sequence <= 0 || row.recorded_at_unix_ms < 0 {
+        return Err("SQLite lifecycle row has an invalid sequence or timestamp".into());
+    }
+    let event: PersistedEvidenceLifecycleEvent = serde_json::from_slice(&row.body_json)
+        .map_err(|error| format!("persisted AML lifecycle event is invalid JSON: {error}"))?;
+    require_non_empty(&event.event_id, "lifecycle event_id")?;
+    event.operation.validate()?;
+    if event.event_id != row.event_id
+        || u64::try_from(row.recorded_at_unix_ms).ok() != Some(event.recorded_at_unix_ms)
+    {
+        return Err("SQLite lifecycle row metadata does not match canonical event".into());
+    }
+    Ok(event)
+}
+
 fn decode_and_validate_batch(bytes: &[u8]) -> Result<PersistedAmlAddBatch, String> {
     let batch: PersistedAmlAddBatch = serde_json::from_slice(bytes)
         .map_err(|error| format!("persisted AML Add batch is invalid JSON: {error}"))?;
@@ -1114,6 +1135,102 @@ mod tests {
         )
         .unwrap();
         assert!(result.data.is_empty());
+    }
+
+    #[test]
+    fn revoke_lifecycle_event_survives_restart_and_suppresses_search() {
+        let root = tempdir().unwrap();
+        {
+            let mut backend = open_backend(root.path());
+            execute_aml_add(
+                &mut backend,
+                add_request("request-1", "user-1", "session-1", &["secret alpha legacy configuration"]),
+            ).unwrap();
+            let evidence_id = backend.lookup_existing("request-1").unwrap().unwrap()
+                .records[0].evidence_id.clone();
+            backend.revoke_evidence("revoke-event-1", &evidence_id).unwrap();
+            backend.revoke_evidence("revoke-event-1", &evidence_id).unwrap();
+            assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
+        }
+        let backend = open_backend(root.path());
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
+        let result = execute_aml_search(&backend, AmlSearchRequest {
+            query: "alpha legacy configuration".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        }).unwrap();
+        assert!(result.data.is_empty());
+    }
+
+    #[test]
+    fn lifecycle_event_id_cannot_be_reused_for_a_different_operation() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        execute_aml_add(
+            &mut backend,
+            add_request("request-1", "user-1", "session-1", &["legacy cache token"]),
+        ).unwrap();
+        let evidence_id = backend.lookup_existing("request-1").unwrap().unwrap()
+            .records[0].evidence_id.clone();
+        backend.revoke_evidence("event-1", &evidence_id).unwrap();
+        assert!(backend.delete_evidence("event-1", &evidence_id).is_err());
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn supersession_lifecycle_event_survives_restart() {
+        let root = tempdir().unwrap();
+        {
+            let mut backend = open_backend(root.path());
+            execute_aml_add(
+                &mut backend,
+                add_request("old-request", "user-1", "session-1", &["alpha legacy resolver configuration"]),
+            ).unwrap();
+            execute_aml_add(
+                &mut backend,
+                add_request("new-request", "user-1", "session-2", &["omega replacement migration policy"]),
+            ).unwrap();
+            let old_id = backend.lookup_existing("old-request").unwrap().unwrap()
+                .records[0].evidence_id.clone();
+            let new_id = backend.lookup_existing("new-request").unwrap().unwrap()
+                .records[0].evidence_id.clone();
+            backend.supersede_evidence("supersede-event-1", &old_id, &new_id).unwrap();
+            assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
+        }
+        let backend = open_backend(root.path());
+        let old = execute_aml_search(&backend, AmlSearchRequest {
+            query: "alpha legacy resolver".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        }).unwrap();
+        let new = execute_aml_search(&backend, AmlSearchRequest {
+            query: "omega replacement migration".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        }).unwrap();
+        assert!(old.data.is_empty());
+        assert_eq!(new.data.len(), 1);
+    }
+
+    #[test]
+    fn retention_purge_removes_expired_sources_and_dependent_lifecycle_events() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        execute_aml_add(
+            &mut backend,
+            add_request("request-1", "user-1", "session-1", &["old retention test payload"]),
+        ).unwrap();
+        let evidence_id = backend.lookup_existing("request-1").unwrap().unwrap()
+            .records[0].evidence_id.clone();
+        backend.revoke_evidence("revoke-event-1", &evidence_id).unwrap();
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 1);
+        let cutoff = current_unix_ms().unwrap().saturating_add(1);
+        assert_eq!(backend.purge_stored_before(cutoff).unwrap(), 1);
+        assert_eq!(backend.persisted_batch_count().unwrap(), 0);
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 0);
     }
 
     #[test]
