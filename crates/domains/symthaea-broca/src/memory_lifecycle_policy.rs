@@ -782,6 +782,42 @@ mod tests {
         }
     }
 
+    fn token_for(request: &LifecyclePolicyRequest) -> VerifiedLifecycleProofToken {
+        let selected_proofs = request.required_claims
+            .iter()
+            .map(|claim| {
+                (
+                    claim.conclusion_id.clone(),
+                    (
+                        claim.selected_justification_id.clone().unwrap(),
+                        claim.current_evidence_ids.clone(),
+                    ),
+                )
+            })
+            .collect();
+        VerifiedLifecycleProofToken {
+            decision_id: request.decision_id.clone(),
+            principal_id: request.principal_id.clone(),
+            scope_id: request.scope_id.clone(),
+            valid_at_unix_ms: request.valid_at_unix_ms,
+            known_at_unix_ms: request.known_at_unix_ms,
+            request_sha256: digest("verified request"),
+            packet_sha256: request.proof_packet_sha256.clone().unwrap(),
+            selected_proofs,
+        }
+    }
+
+    fn decide_with_test_token(
+        request: LifecyclePolicyRequest,
+    ) -> Result<LifecycleActionDecision, String> {
+        let token = if request.proof_status == ProofVerificationState::VerifiedOptimal {
+            Some(token_for(&request))
+        } else {
+            None
+        };
+        decide_lifecycle_action(request, token.as_ref())
+    }
+
     fn request(
         proof_status: ProofVerificationState,
         claims: Vec<ClaimLifecycleLedgerEntry>,
@@ -806,7 +842,7 @@ mod tests {
 
     #[test]
     fn answers_only_when_every_required_claim_has_verified_current_support() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::VerifiedOptimal,
             vec![supported_claim("C1"), supported_claim("C2")],
             progress(true, false),
@@ -822,8 +858,36 @@ mod tests {
     }
 
     #[test]
+    fn verified_optimal_status_without_opaque_verifier_token_is_rejected() {
+        let req = request(
+            ProofVerificationState::VerifiedOptimal,
+            vec![supported_claim("C1")],
+            progress(true, false),
+        );
+        let error = decide_lifecycle_action(req, None).unwrap_err();
+        assert!(error.contains("opaque token"));
+    }
+
+    #[test]
+    fn opaque_proof_token_must_match_exact_selected_claim_dependencies() {
+        let req = request(
+            ProofVerificationState::VerifiedOptimal,
+            vec![supported_claim("C1")],
+            progress(true, false),
+        );
+        let mut token = token_for(&req);
+        token
+            .selected_proofs
+            .get_mut("C1")
+            .unwrap()
+            .1 = BTreeSet::from(["different-evidence".into()]);
+        let error = decide_lifecycle_action(req, Some(&token)).unwrap_err();
+        assert!(error.contains("does not match the independently verified selected proof"));
+    }
+
+    #[test]
     fn all_current_looking_claims_without_independent_verification_cannot_answer() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::SearchLimitReached,
             vec![supported_claim("C1")],
             progress(false, false),
@@ -835,7 +899,7 @@ mod tests {
 
     #[test]
     fn incomplete_retrieval_requests_more_before_a_terminal_decision() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::NoEligibleProof,
             vec![missing_claim("C1")],
             progress(false, true),
@@ -846,7 +910,7 @@ mod tests {
 
     #[test]
     fn unresolved_current_conflict_is_explained_not_answered() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::NoEligibleProof,
             vec![conflict_claim("C1")],
             progress(true, false),
@@ -858,7 +922,7 @@ mod tests {
 
     #[test]
     fn stale_only_support_warns_instead_of_answering() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::NoEligibleProof,
             vec![stale_claim("C1")],
             progress(true, false),
@@ -870,7 +934,7 @@ mod tests {
 
     #[test]
     fn missing_required_evidence_abstains_after_retrieval_is_exhausted() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::NoEligibleProof,
             vec![missing_claim("C1")],
             progress(true, false),
@@ -885,7 +949,7 @@ mod tests {
             ClaimLifecycleState::Unauthorized,
             ClaimLifecycleState::ProvenanceInvalid,
         ] {
-            let decision = decide_lifecycle_action(request(
+            let decision = decide_with_test_token(request(
                 ProofVerificationState::NoEligibleProof,
                 vec![rejected_claim("C1", state)],
                 progress(true, false),
@@ -897,7 +961,7 @@ mod tests {
 
     #[test]
     fn retrieval_continuation_precedes_conflict_and_stale_terminal_actions() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::NoEligibleProof,
             vec![conflict_claim("C1"), stale_claim("C2")],
             progress(false, true),
@@ -908,12 +972,12 @@ mod tests {
 
     #[test]
     fn claim_order_does_not_change_canonical_action_receipt() {
-        let first = decide_lifecycle_action(request(
+        let first = decide_with_test_token(request(
             ProofVerificationState::VerifiedOptimal,
             vec![supported_claim("C2"), supported_claim("C1")],
             progress(true, false),
         )).unwrap();
-        let second = decide_lifecycle_action(request(
+        let second = decide_with_test_token(request(
             ProofVerificationState::VerifiedOptimal,
             vec![supported_claim("C1"), supported_claim("C2")],
             progress(true, false),
@@ -928,7 +992,7 @@ mod tests {
 
     #[test]
     fn action_receipt_detects_post_decision_mutation() {
-        let mut decision = decide_lifecycle_action(request(
+        let mut decision = decide_with_test_token(request(
             ProofVerificationState::VerifiedOptimal,
             vec![supported_claim("C1")],
             progress(true, false),
@@ -939,7 +1003,7 @@ mod tests {
 
     #[test]
     fn decision_cannot_be_reused_across_principal_scope_or_time() {
-        let decision = decide_lifecycle_action(request(
+        let decision = decide_with_test_token(request(
             ProofVerificationState::VerifiedOptimal,
             vec![supported_claim("C1")],
             progress(true, false),
