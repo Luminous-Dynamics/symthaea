@@ -122,7 +122,10 @@ pub struct PairedRetrievalUtilitySummary {
     pub mean_correctness_gain_micro: i64,
     pub mean_lifecycle_risk_reduction_micro: i64,
     pub mean_retrieval_harm_delta_micro: i64,
+    /// Per-query weighted mean over all paired observations.
     pub mean_net_utility_delta_micro: i64,
+    /// Equal-weight mean across independent calibration/bootstrap groups.
+    pub mean_group_net_utility_delta_micro: i64,
     pub mean_retrieval_cost_micro: u64,
     pub mean_retrieval_calls: u64,
     pub mean_retrieval_tokens: u64,
@@ -243,6 +246,7 @@ pub fn summarize_paired_retrieval_outcomes(
         mean_lifecycle_risk_reduction_micro: mean_i64(&lifecycle)?,
         mean_retrieval_harm_delta_micro: mean_i64(&harm)?,
         mean_net_utility_delta_micro: mean_i64(&net)?,
+        mean_group_net_utility_delta_micro: mean_i64(&group_means)?,
         mean_retrieval_cost_micro: u64::try_from(mean_cost)
             .map_err(|_| "mean retrieval cost exceeds u64".to_string())?,
         mean_retrieval_calls: u64::try_from(mean_calls)
@@ -389,6 +393,7 @@ mod tests {
         assert_eq!(summary.negative_net_utility_count, 0);
         assert_eq!(summary.mean_correctness_gain_micro, 100);
         assert_eq!(summary.mean_net_utility_delta_micro, 80);
+        assert_eq!(summary.mean_group_net_utility_delta_micro, 80);
         assert_eq!(summary.mean_retrieval_cost_micro, 20);
         assert_eq!(summary.net_utility_cluster_bootstrap_95.lower_95_micro, 80);
         assert_eq!(summary.net_utility_cluster_bootstrap_95.upper_95_micro, 80);
@@ -405,8 +410,10 @@ mod tests {
         assert_eq!(summary.observation_count, 120);
         assert_eq!(summary.independent_group_count, 21);
         // Group 0 has 100 queries with mean net utility 80; the other 20
-        // independent groups each have net utility -120. The bootstrap target
-        // is the equally weighted mean of group means, not query-weighted data.
+        // independent groups each have net utility -120. Publish both the
+        // query-weighted mean and equal-group mean so the estimand is explicit.
+        assert_eq!(summary.mean_net_utility_delta_micro, 46);
+        assert_eq!(summary.mean_group_net_utility_delta_micro, -110);
         assert_eq!(summary.net_utility_cluster_bootstrap_95.lower_95_micro, -120);
     }
 
