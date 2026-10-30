@@ -1862,13 +1862,21 @@ mod tests {
     #[test]
     fn four_and_five_unit_partition_counts_pin_combinatorial_growth() {
         // Raw assignments are sum_k S(n,k) * (3^k), excluding the one-block
-        // partition: n=4 gives 306, n=5 gives 1,863. Deduplication reduces
-        // these to 150 and 1,061 distinct directed cut matrices respectively.
+        // partition: n=4 gives 306, n=5 gives 1,863, and n=6 gives 12,348.
+        // Deduplication reduces these to 150, 1,061, and 7,896 cut matrices.
         let four = enumerate_iit4_system_partitions(&[0, 1, 2, 3], 4, false, 306).unwrap();
         assert_eq!(four.len(), 150);
 
         let five = enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_863).unwrap();
         assert_eq!(five.len(), 1_061);
+
+        let six = enumerate_iit4_system_partitions(
+            &[0, 1, 2, 3, 4, 5],
+            6,
+            false,
+            12_348,
+        ).unwrap();
+        assert_eq!(six.len(), 7_896);
 
         assert!(matches!(
             enumerate_iit4_system_partitions(&[0, 1, 2, 3, 4], 5, false, 1_862),
@@ -2093,14 +2101,15 @@ mod tests {
     }
 
     #[test]
-    fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_five_units() {
-        for units in 2..=5 {
+    fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_six_units() {
+        for units in 2..=6 {
             let candidate: Vec<usize> = (0..units).collect();
             let budget = match units {
                 2 => 9,
                 3 => 54,
                 4 => 306,
                 5 => 1_863,
+                6 => 12_348,
                 _ => unreachable!(),
             };
             let expected = reference_directed_cut_matrices(units);
