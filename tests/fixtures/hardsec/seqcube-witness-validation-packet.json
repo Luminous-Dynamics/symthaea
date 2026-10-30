@@ -70,7 +70,8 @@
       "tool_version": "1.0",
       "scope": "paired clean/infected output difference not observed on inactive control",
       "stimuli_count": 10,
-      "payload_effects_observed": 0
+      "payload_effects_observed": 0,
+      "local_path": "replay/expected_boundary.json"
     },
     {
       "evidence_id": "seqcube-inactive-bounded-audit",
@@ -96,31 +97,41 @@
       "claim_type": "trigger_activated",
       "status": "supported",
       "scope": "active reset-consistent trace reached all three phases",
-      "evidence_ids": ["seqcube-active-cover"]
+      "evidence_ids": [
+        "seqcube-active-cover"
+      ]
     },
     {
       "claim_type": "payload_effect_observed",
       "status": "supported",
       "scope": "active trace reached the primary output observation boundary at cycle 8",
-      "evidence_ids": ["seqcube-active-payload"]
+      "evidence_ids": [
+        "seqcube-active-payload"
+      ]
     },
     {
       "claim_type": "trigger_not_observed_under_budget",
       "status": "supported",
       "scope": "inactive 10-cycle control only",
-      "evidence_ids": ["seqcube-inactive-trace"]
+      "evidence_ids": [
+        "seqcube-inactive-trace"
+      ]
     },
     {
       "claim_type": "payload_effect_not_observed_under_budget",
       "status": "supported",
       "scope": "inactive 10-cycle control only",
-      "evidence_ids": ["seqcube-inactive-payload"]
+      "evidence_ids": [
+        "seqcube-inactive-payload"
+      ]
     },
     {
       "claim_type": "bounded_reachability_not_found",
       "status": "supported",
       "scope": "inactive query and its declared 10-cycle bound only",
-      "evidence_ids": ["seqcube-inactive-bounded-audit"]
+      "evidence_ids": [
+        "seqcube-inactive-bounded-audit"
+      ]
     }
   ]
 }
