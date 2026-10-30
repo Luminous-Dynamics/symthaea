@@ -281,7 +281,11 @@ def validate_package(package: dict[str, Any]) -> list[str]:
                 issues.append(f"resolution {event_id} has invalid predecessor")
             else:
                 prior_voters.add(previous["adjudicator_id_sha256"])
-                prior_groups.add(group_by_adjudicator[previous["adjudicator_id_sha256"]])
+                group = group_by_adjudicator.get(previous["adjudicator_id_sha256"])
+                if group is None:
+                    issues.append(f"resolution {event_id} predecessor has unknown adjudicator")
+                else:
+                    prior_groups.add(group)
         if len(prior_voters) < 2:
             issues.append(f"resolution {event_id} needs at least two distinct prior raters")
         if resolver_id in prior_voters:
