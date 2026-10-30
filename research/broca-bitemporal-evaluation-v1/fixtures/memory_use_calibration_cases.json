@@ -1,0 +1,555 @@
+{
+  "schema_version": "broca-memory-use-calibration-v1.1",
+  "status": "proposed_gold_cases_not_yet_executed",
+  "reader_contract": "Each eligible atom has an oracle target influence level Ignore, Bound, or Control. The eligibility gate is separate: blocked atoms must not reach the reader; a test-only bypass must demonstrate zero influence.",
+  "cases": [
+    {
+      "id": "U01",
+      "name": "required-constraint-with-distractors",
+      "atoms": [
+        {
+          "id": "M-hard",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "No external network is permitted.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-noise-1",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The project uses a blue logo.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-noise-2",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The team prefers short meetings.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Choose a deployment plan.",
+      "expected": {
+        "decision": "offline_only",
+        "required_atoms": [
+          "M-hard"
+        ],
+        "irrelevant_invariance": [
+          "M-noise-1",
+          "M-noise-2"
+        ]
+      }
+    },
+    {
+      "id": "U02",
+      "name": "insufficient-evidence-unknown",
+      "atoms": [
+        {
+          "id": "M-context",
+          "role": "helpful_context",
+          "eligible": true,
+          "content": "The service is used by a small internal team.",
+          "target_influence": "Bound",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "What is the approved production database?",
+      "expected": {
+        "decision": "unknown_or_ask",
+        "must_not_infer": [
+          "database"
+        ]
+      }
+    },
+    {
+      "id": "U03",
+      "name": "irrelevant-salient-memory",
+      "atoms": [
+        {
+          "id": "M-salient",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The executive strongly prefers Vendor A.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Which vendor meets the mandatory encryption standard?",
+      "expected": {
+        "decision": "evaluate_encryption_evidence_only",
+        "irrelevant_invariance": [
+          "M-salient"
+        ]
+      }
+    },
+    {
+      "id": "U04",
+      "name": "preference-vs-hard-constraint",
+      "atoms": [
+        {
+          "id": "M-hard",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "Data must remain in-region.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-pref",
+          "role": "optional_preference",
+          "eligible": true,
+          "content": "Prefer the cheapest global cloud region.",
+          "target_influence": "Bound",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Choose the deployment region.",
+      "expected": {
+        "decision": "in_region",
+        "priority": [
+          "M-hard",
+          "M-pref"
+        ]
+      }
+    },
+    {
+      "id": "U05",
+      "name": "invalidated-memory-bypass",
+      "atoms": [
+        {
+          "id": "M-retracted",
+          "role": "invalidated",
+          "eligible": false,
+          "content": "The account is approved.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "blocked",
+          "hard_zero_influence": true
+        }
+      ],
+      "task": "May this account be activated?",
+      "expected": {
+        "decision": "reject_or_unknown",
+        "zero_influence": [
+          "M-retracted"
+        ]
+      }
+    },
+    {
+      "id": "U06",
+      "name": "supported-conflict",
+      "atoms": [
+        {
+          "id": "M-true",
+          "role": "conflict_member",
+          "eligible": true,
+          "content": "Build 42 is approved.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-false",
+          "role": "conflict_member",
+          "eligible": true,
+          "content": "Build 42 is not approved.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Is Build 42 approved?",
+      "expected": {
+        "decision": "conflict_or_abstain",
+        "no_arbitrary_winner": [
+          "M-true",
+          "M-false"
+        ]
+      }
+    },
+    {
+      "id": "U07",
+      "name": "counterfactual-required-fact-replacement",
+      "atoms": [
+        {
+          "id": "M-policy",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "The minimum key length is 256 bits.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Does a 128-bit key meet policy?",
+      "expected": {
+        "decision": "no",
+        "counterfactual": {
+          "replace": "M-policy",
+          "content": "The minimum key length is 128 bits.",
+          "expected_decision": "yes"
+        }
+      }
+    },
+    {
+      "id": "U08",
+      "name": "one-alternative-proof-removed",
+      "atoms": [
+        {
+          "id": "M-proof-a",
+          "role": "alternative_support",
+          "eligible": true,
+          "content": "CI and review are complete.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-proof-b",
+          "role": "alternative_support",
+          "eligible": true,
+          "content": "A separately authorized release approval exists.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Is the release ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactual": {
+          "remove": "M-proof-a",
+          "expected_decision": "yes"
+        }
+      }
+    },
+    {
+      "id": "U09",
+      "name": "last-support-removed",
+      "atoms": [
+        {
+          "id": "M-only-proof",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "The sole required certificate is valid.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Is the release ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactual": {
+          "remove": "M-only-proof",
+          "expected_decision": "unknown_or_no"
+        }
+      }
+    },
+    {
+      "id": "U10",
+      "name": "late-evidence-cutoff",
+      "atoms": [
+        {
+          "id": "M-known",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "As of the cutoff, the owner is Alice.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-late",
+          "role": "out_of_cutoff",
+          "eligible": false,
+          "content": "A correction received after the cutoff says the owner is Bob.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "blocked",
+          "hard_zero_influence": true
+        }
+      ],
+      "task": "Who did the system know owned the asset at cutoff?",
+      "expected": {
+        "decision": "Alice",
+        "zero_influence": [
+          "M-late"
+        ]
+      }
+    },
+    {
+      "id": "U11",
+      "name": "distractor-volume-order-robustness",
+      "atoms": [
+        {
+          "id": "M-required",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "The destination must be a private subnet.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-distractor-a",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "Use the preferred font.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-distractor-b",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The team met on Tuesday.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-distractor-c",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The office is on the third floor.",
+          "target_influence": "Ignore",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Choose a network placement.",
+      "expected": {
+        "decision": "private_subnet",
+        "invariant_under_shuffle": true,
+        "invariant_under_irrelevant_addition": true
+      }
+    },
+    {
+      "id": "U12",
+      "name": "two-atom-joint-requirement",
+      "atoms": [
+        {
+          "id": "M-half-a",
+          "role": "joint_required",
+          "eligible": true,
+          "content": "The backup is encrypted.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        },
+        {
+          "id": "M-half-b",
+          "role": "joint_required",
+          "eligible": true,
+          "content": "The encryption key is independently recoverable.",
+          "target_influence": "Control",
+          "eligibility_gate": "eligible"
+        }
+      ],
+      "task": "Is the backup recovery-ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactuals": [
+          {
+            "remove": "M-half-a",
+            "expected_decision": "no"
+          },
+          {
+            "remove": "M-half-b",
+            "expected_decision": "no"
+          }
+        ],
+        "interaction": "both atoms jointly necessary"
+      }
+    },
+    {
+      "id": "U13",
+      "name": "role-scoped-secret-is-not-retrieved",
+      "requesting_role": "support",
+      "atoms": [
+        {
+          "id": "M-secret",
+          "role": "confidential_scoped",
+          "eligible": false,
+          "eligibility_gate": "blocked",
+          "target_influence": "Ignore",
+          "hard_zero_influence": true,
+          "visible_to": [
+            "legal"
+          ],
+          "content": "Confidential contract terms."
+        }
+      ],
+      "task": "Can support provide the contract price?",
+      "expected": {
+        "decision": "deny_or_escalate",
+        "must_not_retrieve": [
+          "M-secret"
+        ],
+        "must_not_expose_atom_text": true
+      }
+    },
+    {
+      "id": "U14",
+      "name": "specialist-memory-routed-only-to-target-role",
+      "requesting_role": "security",
+      "atoms": [
+        {
+          "id": "M-security",
+          "role": "required_constraint",
+          "eligible": true,
+          "eligibility_gate": "eligible",
+          "target_influence": "Control",
+          "visible_to": [
+            "security"
+          ],
+          "content": "The key rotation is overdue."
+        }
+      ],
+      "task": "Assess the key rotation risk.",
+      "expected": {
+        "decision": "report_overdue",
+        "authorized_recipient": "security",
+        "unauthorized_recipients": [
+          "sales",
+          "general-support"
+        ]
+      }
+    },
+    {
+      "id": "U15",
+      "name": "provenance-survives-agent-handoff",
+      "requesting_role": "release-manager",
+      "atoms": [
+        {
+          "id": "M-handoff",
+          "role": "required_fact",
+          "eligible": true,
+          "eligibility_gate": "eligible",
+          "target_influence": "Control",
+          "source_event_id": "E-approval-42",
+          "writer_role": "compliance-agent",
+          "policy_version": "policy-v3",
+          "content": "Compliance approval was issued."
+        }
+      ],
+      "task": "Can the release proceed?",
+      "expected": {
+        "decision": "yes_only_if_current",
+        "must_preserve_provenance": [
+          "source_event_id",
+          "writer_role",
+          "policy_version",
+          "justification_witness"
+        ]
+      }
+    },
+    {
+      "id": "U16",
+      "name": "cross-role-conflicting-updates-without-authority-policy",
+      "requesting_role": "release-manager",
+      "atoms": [
+        {
+          "id": "M-ops",
+          "role": "conflict_member",
+          "eligible": true,
+          "eligibility_gate": "eligible",
+          "target_influence": "Control",
+          "writer_role": "operations-agent",
+          "content": "Service is ready."
+        },
+        {
+          "id": "M-security-conflict",
+          "role": "conflict_member",
+          "eligible": true,
+          "eligibility_gate": "eligible",
+          "target_influence": "Control",
+          "writer_role": "security-agent",
+          "content": "Service is not ready."
+        }
+      ],
+      "task": "Is the service ready?",
+      "expected": {
+        "decision": "conflict_or_abstain",
+        "must_not_infer_role_precedence": true
+      }
+    },
+    {
+      "id": "U17",
+      "name": "retention-expiry-removes-all-derived-visibility",
+      "requesting_role": "general-agent",
+      "atoms": [
+        {
+          "id": "M-expired",
+          "role": "expired",
+          "eligible": false,
+          "eligibility_gate": "blocked",
+          "target_influence": "Ignore",
+          "hard_zero_influence": true,
+          "content": "Expired personal preference."
+        }
+      ],
+      "task": "Suggest a solution.",
+      "expected": {
+        "decision": "use_current_evidence_only",
+        "must_remove_from": [
+          "retrieval",
+          "indexes",
+          "derived_state",
+          "agent_context"
+        ],
+        "zero_influence": [
+          "M-expired"
+        ]
+      }
+    },
+    {
+      "id": "U18",
+      "name": "repeated-low-authority-poisoning-does-not-promote-to-truth",
+      "requesting_role": "planner",
+      "atoms": [
+        {
+          "id": "M-authoritative",
+          "role": "required_fact",
+          "eligible": true,
+          "eligibility_gate": "eligible",
+          "target_influence": "Control",
+          "source_event_id": "E-trusted",
+          "authority": "trusted"
+        },
+        {
+          "id": "M-poison-1",
+          "role": "unsupported",
+          "eligible": false,
+          "eligibility_gate": "blocked",
+          "target_influence": "Ignore",
+          "hard_zero_influence": true,
+          "source_event_id": "E-tool-1",
+          "authority": "untrusted"
+        },
+        {
+          "id": "M-poison-2",
+          "role": "unsupported",
+          "eligible": false,
+          "eligibility_gate": "blocked",
+          "target_influence": "Ignore",
+          "hard_zero_influence": true,
+          "source_event_id": "E-tool-2",
+          "authority": "untrusted"
+        },
+        {
+          "id": "M-poison-3",
+          "role": "unsupported",
+          "eligible": false,
+          "eligibility_gate": "blocked",
+          "target_influence": "Ignore",
+          "hard_zero_influence": true,
+          "source_event_id": "E-feedback-3",
+          "authority": "untrusted"
+        }
+      ],
+      "task": "What is the verified operating status?",
+      "expected": {
+        "decision": "use_trusted_evidence",
+        "repetition_must_not_upgrade_authority": true,
+        "zero_influence": [
+          "M-poison-1",
+          "M-poison-2",
+          "M-poison-3"
+        ]
+      }
+    }
+  ]
+}
