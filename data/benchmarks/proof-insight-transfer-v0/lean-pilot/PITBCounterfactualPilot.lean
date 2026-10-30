@@ -18,7 +18,7 @@ is used in this file.
 
 namespace PITBCounterfactualPilot
 
-open Lean Elab Tactic Meta in
+open Lean Elab Tactic Meta
 partial def collectExprFVars : Expr → FVarIdSet
   | .fvar id => ({id} : FVarIdSet)
   | .app fn arg => (collectExprFVars fn).union (collectExprFVars arg)
