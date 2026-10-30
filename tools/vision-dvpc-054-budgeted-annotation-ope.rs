@@ -22,7 +22,7 @@ const CONTEXTS: usize = 2;
 const ACTIONS: usize = 3;
 const SOURCES: usize = 3;
 const EVAL_N: usize = 128;
-const FULL_REPLICATES: usize = 512;
+const FULL_REPLICATES: usize = 4096;
 const SMOKE_REPLICATES: usize = 48;
 const MC_TEST_REPLICATES: usize = 4096;
 const ACTION_CAP_PER_CONTEXT: u8 = 3;
@@ -943,7 +943,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         World::heterogeneous_source_quality(),
     ];
     let mut output = String::from(
-        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\n",
+        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\trelative_gap_to_exact\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\n",
     );
     output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-054\tversion\t0\n");
     output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
@@ -963,6 +963,12 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         world.validate()?;
         let plans = build_plans(world)?;
         let no_annotation = analytic_mse(world, &Allocation::default(), EVAL_N)?;
+        let exact_mse = plans
+            .iter()
+            .find(|(method, _)| *method == "exact_dp_oracle")
+            .map(|(_, allocation)| analytic_mse(world, allocation, EVAL_N))
+            .transpose()?
+            .ok_or_else(|| "missing exact-DP oracle plan".to_string())?;
         for (method_index, (method, allocation)) in plans.iter().enumerate() {
             if !allocation.feasible(world) {
                 return Err(format!("infeasible plan: {method}"));
@@ -983,10 +989,11 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             } else {
                 0.0
             };
+            let relative_gap_to_exact = ((analytic - exact_mse) / exact_mse.max(EPS)).max(0.0);
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{}\t{}\t{}",
+                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}",
                 world.name,
                 method,
                 EVAL_N,
@@ -999,6 +1006,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
                 mc.variance,
                 mc.mse,
                 relative_reduction,
+                relative_gap_to_exact,
                 allocation_profile_bias(world, allocation),
                 sources[0],
                 sources[1],
@@ -1297,7 +1305,7 @@ mod tests {
             8
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
-            assert_eq!(line.split('\t').count(), 17);
+            assert_eq!(line.split('\t').count(), 18);
         }
     }
 
