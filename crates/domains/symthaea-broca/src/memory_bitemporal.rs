@@ -264,13 +264,14 @@ impl BitemporalSourceLedger {
         let visible_events: Vec<_> = self.events.iter()
             .filter(|event| event.recorded_at <= known_at)
             .collect();
-        let invalidated_revision_ids: BTreeSet<_> = visible_events.iter()
+        let invalidated_revision_ids: BTreeSet<String> = visible_events.iter()
             .filter_map(|event| event.operation.target_revision_id())
+            .map(str::to_owned)
             .collect();
 
         let mut known_assertions: Vec<_> = visible_events.iter().filter_map(|event| {
             let assertion = event.operation.assertion()?;
-            if invalidated_revision_ids.contains(event.revision_id.as_str())
+            if invalidated_revision_ids.contains(&event.revision_id)
                 || assertion.subject != subject
                 || assertion.attribute != attribute
                 || assertion.scope != scope
@@ -336,13 +337,13 @@ impl BitemporalSourceLedger {
     /// Recheck revision uniqueness, transaction ordering, target ancestry,
     /// one-time mutation, and assertion invariants without mutating the ledger.
     pub fn verify_consistency(&self) -> Result<(), String> {
-        let mut seen: BTreeMap<&str, &SourceEventRevision> = BTreeMap::new();
-        let mut mutated_targets = BTreeSet::new();
+        let mut seen: BTreeMap<String, &SourceEventRevision> = BTreeMap::new();
+        let mut mutated_targets: BTreeSet<String> = BTreeSet::new();
         let mut prior_transaction_time: Option<DateTime<Utc>> = None;
 
         for event in &self.events {
             non_empty(&event.revision_id, "revision_id")?;
-            if seen.contains_key(event.revision_id.as_str()) {
+            if seen.contains_key(&event.revision_id) {
                 return Err(format!("duplicate source revision ID {:?}", event.revision_id));
             }
             if prior_transaction_time.is_some_and(|prior| event.recorded_at < prior) {
@@ -359,7 +360,7 @@ impl BitemporalSourceLedger {
                 if target.operation.assertion().is_none() {
                     return Err(format!("target revision {target_id:?} is not an assertion"));
                 }
-                if !mutated_targets.insert(target_id) {
+                if !mutated_targets.insert(target_id.to_owned()) {
                     return Err(format!("target revision {target_id:?} is mutated more than once"));
                 }
                 match &event.operation {
@@ -374,7 +375,7 @@ impl BitemporalSourceLedger {
                     SourceEventOperation::Assert { .. } => unreachable!(),
                 }
             }
-            seen.insert(event.revision_id.as_str(), event);
+            seen.insert(event.revision_id.clone(), event);
         }
         Ok(())
     }
