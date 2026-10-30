@@ -106,7 +106,8 @@
         "same_construct_decision",
         "candidate_construct_invariant",
         "rubric_construct_changes",
-        "evidence_support_decreases"
+        "evidence_support_decreases",
+        "unsupported_authority_claim_added"
       ]
     },
     "behavior": {
