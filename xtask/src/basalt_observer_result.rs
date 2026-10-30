@@ -1476,4 +1476,33 @@ mod tests {
             error.code == "E_RUN_ID_MISMATCH"
         }));
     }
+
+    #[test]
+    fn rejects_cross_catalog_receipts() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["catalog_digest"] = json!(format!("sha256:{}", "f".repeat(64)));
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_CATALOG_DIGEST_MISMATCH"
+        }));
+    }
+
+    #[test]
+    fn rejects_incomplete_receipt_coverage() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"].as_array_mut().expect("records array").remove(0);
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_complete);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_RECEIPT_CASE_MISSING"
+        }));
+    }
 }
