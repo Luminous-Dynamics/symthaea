@@ -174,6 +174,7 @@ struct ResourceVersion {
 #[derive(Debug)]
 struct EvidenceState {
     assessment: EvidenceAssessment,
+    pinned_resource_ids: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -412,6 +413,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     &direct_dependents,
                     resource_id,
                     event_id,
+                    &mut reverse_resources,
                     &reverse_evidence,
                     &mut evidence,
                 );
@@ -531,7 +533,10 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
 
                 evidence.insert(
                     evidence_id.clone(),
-                    EvidenceState { assessment },
+                    EvidenceState {
+                        assessment,
+                        pinned_resource_ids: resource_pins.iter().map(|pin| pin.resource_id.clone()).collect(),
+                    },
                 );
                 evidence_order.push(evidence_id.clone());
             }
@@ -578,24 +583,31 @@ fn invalidate_dependents(
     direct_dependents: &BTreeSet<String>,
     resource_id: &str,
     event_id: &str,
+    reverse_resources: &mut BTreeMap<String, BTreeSet<String>>,
     reverse_evidence: &BTreeMap<String, BTreeSet<String>>,
     evidence: &mut BTreeMap<String, EvidenceState>,
 ) {
     let mut queue = VecDeque::<String>::new();
 
     for evidence_id in direct_dependents {
-        if let Some(state) = evidence.get_mut(evidence_id) {
-            if !state.assessment.stale_resources.iter().any(|value| value == resource_id) {
+        let pinned_resource_ids = if let Some(state) = evidence.get_mut(evidence_id) {
+            if state.assessment.freshness != EvidenceFreshness::Fresh {
+                Vec::new()
+            } else {
                 state.assessment.stale_resources.push(resource_id.to_string());
-            }
-            if !state.assessment.invalidation_event_ids.iter().any(|value| value == event_id) {
                 state.assessment.invalidation_event_ids.push(event_id.to_string());
-            }
-            if state.assessment.freshness == EvidenceFreshness::Fresh {
                 state.assessment.freshness = EvidenceFreshness::StaleDirect;
+                state.assessment.usable_for_success = false;
                 queue.push_back(evidence_id.clone());
+                state.pinned_resource_ids.clone()
             }
-            state.assessment.usable_for_success = false;
+        } else {
+            Vec::new()
+        };
+        for pinned_resource_id in pinned_resource_ids {
+            if let Some(dependents) = reverse_resources.get_mut(&pinned_resource_id) {
+                dependents.remove(evidence_id);
+            }
         }
     }
 
@@ -604,7 +616,7 @@ fn invalidate_dependents(
             continue;
         };
         for child_id in children {
-            if let Some(child) = evidence.get_mut(child_id) {
+            let pinned_resource_ids = if let Some(child) = evidence.get_mut(child_id) {
                 if !child.assessment.stale_ancestor_evidence_ids.contains(&stale_parent_id) {
                     child.assessment.stale_ancestor_evidence_ids.push(stale_parent_id.clone());
                 }
@@ -612,6 +624,16 @@ fn invalidate_dependents(
                     child.assessment.freshness = EvidenceFreshness::StaleTransitive;
                     child.assessment.usable_for_success = false;
                     queue.push_back(child_id.clone());
+                    child.pinned_resource_ids.clone()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+            for pinned_resource_id in pinned_resource_ids {
+                if let Some(dependents) = reverse_resources.get_mut(&pinned_resource_id) {
+                    dependents.remove(child_id);
                 }
             }
         }
