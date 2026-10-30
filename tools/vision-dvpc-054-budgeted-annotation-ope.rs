@@ -2507,6 +2507,26 @@ mod tests {
     }
 
     #[test]
+    fn invalid_policy_portfolio_priors_and_target_distributions_fail_closed() {
+        let world = correlated_stress_worlds()[0];
+        let mut portfolio = policy_portfolio(&world);
+        portfolio.prior_weights = [0.5, 0.5, 0.5];
+        assert!(validate_portfolio(&portfolio).is_err());
+
+        let mut portfolio = policy_portfolio(&world);
+        portfolio.prior_weights[1] = f64::NAN;
+        assert!(validate_portfolio(&portfolio).is_err());
+
+        let mut portfolio = policy_portfolio(&world);
+        portfolio.targets[2][1] = [0.7, 0.7, -0.4];
+        assert!(validate_portfolio(&portfolio).is_err());
+
+        let mut portfolio = policy_portfolio(&world);
+        portfolio.targets[0][0] = [0.5, 0.5, f64::INFINITY];
+        assert!(validate_portfolio(&portfolio).is_err());
+    }
+
+    #[test]
     fn exact_portfolio_prior_and_worst_oracles_match_independent_exhaustive_enumeration() {
         let world = correlated_stress_worlds()[1];
         let portfolio = policy_portfolio(&world);
