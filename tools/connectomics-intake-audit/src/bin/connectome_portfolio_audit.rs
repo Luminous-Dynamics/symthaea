@@ -68,6 +68,13 @@ enum QueryMetric {
     PathExists { source: u64, target: u64 },
 }
 
+#[derive(Debug, Clone)]
+struct QueryRankingSpec {
+    weight: f64,
+    normalization_scale: f64,
+    metric: QueryMetric,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Candidate {
@@ -400,13 +407,17 @@ fn utility(input: &Input, baseline_error: f64, selected: &[usize]) -> Result<f64
     Ok(baseline_error - weighted_query_error(input, &graph)?)
 }
 
-fn marginal_sensitivity(input: &Input, graph: &Graph, candidate: &Candidate) -> f64 {
+fn marginal_sensitivity(
+    queries: &[QueryRankingSpec],
+    graph: &Graph,
+    candidate: &Candidate,
+) -> f64 {
     let Ok(next_graph) = apply_candidate(graph, candidate) else {
         return f64::NEG_INFINITY;
     };
     let mut numerator = 0.0;
     let mut denominator = 0.0;
-    for query in &input.queries {
+    for query in queries {
         let before = query_value(graph, &query.metric);
         let after = query_value(&next_graph, &query.metric);
         numerator += query.weight * ((after - before).abs() / query.normalization_scale).min(1.0);
@@ -415,10 +426,14 @@ fn marginal_sensitivity(input: &Input, graph: &Graph, candidate: &Candidate) -> 
     numerator / denominator
 }
 
-fn rank_candidates(input: &Input, input_sha: &str, policy: &str) -> Vec<usize> {
-    let baseline = graph_from_edges(&input.graph);
-    let mut ranked: Vec<(usize, f64, String)> = input
-        .candidates
+fn rank_candidates(
+    candidates: &[Candidate],
+    baseline: &Graph,
+    queries: &[QueryRankingSpec],
+    input_sha: &str,
+    policy: &str,
+) -> Vec<usize> {
+    let mut ranked: Vec<(usize, f64, String)> = candidates
         .iter()
         .enumerate()
         .map(|(index, candidate)| {
@@ -429,7 +444,7 @@ fn rank_candidates(input: &Input, input_sha: &str, policy: &str) -> Vec<usize> {
                     (1.0 - (2.0 * probability - 1.0).abs()) / candidate.review_minutes
                 }
                 "probability_weighted_query_sensitivity_per_minute" => {
-                    probability * marginal_sensitivity(input, &baseline, candidate)
+                    probability * marginal_sensitivity(queries, baseline, candidate)
                         / candidate.review_minutes
                 }
                 "deterministic_random" => {
@@ -614,9 +629,25 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         "uncertainty_per_minute",
         "deterministic_random",
     ];
+    // This reduced view intentionally omits every held-out query reference value.
+    // The ranker cannot access evaluator outcomes through its function arguments.
+    let ranking_specs = input.queries.iter().map(|query| QueryRankingSpec {
+        weight: query.weight,
+        normalization_scale: query.normalization_scale,
+        metric: query.metric.clone(),
+    }).collect::<Vec<_>>();
     let rankings = policy_names
         .iter()
-        .map(|name| (*name, rank_candidates(input, input_sha_str, name)))
+        .map(|name| (
+            *name,
+            rank_candidates(
+                &input.candidates,
+                &baseline_graph,
+                &ranking_specs,
+                input_sha_str,
+                name,
+            ),
+        ))
         .collect::<Vec<_>>();
 
     let mut budget_results = Vec::new();
@@ -718,6 +749,14 @@ mod tests {
         char.to_string().repeat(64)
     }
 
+    fn ranking_specs(input: &Input) -> Vec<QueryRankingSpec> {
+        input.queries.iter().map(|query| QueryRankingSpec {
+            weight: query.weight,
+            normalization_scale: query.normalization_scale,
+            metric: query.metric.clone(),
+        }).collect()
+    }
+
     fn base_input(candidates: Vec<Candidate>, queries: Vec<Query>, graph: Vec<Edge>) -> Input {
         Input {
             schema_version: 1,
@@ -803,7 +842,7 @@ mod tests {
             reference_value: 1.0, metric: QueryMetric::EdgeWeight { source: 1, target: 2 },
         }];
         let input = base_input(candidates, queries, vec![Edge { source: 9, target: 10, weight: 1.0 }]);
-        let ranking = rank_candidates(&input, &"d".repeat(64), "probability_per_minute");
+        let ranking = rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"d".repeat(64), "probability_per_minute");
         assert_eq!(input.candidates[ranking[0]].candidate_id, "cheap-correct");
         let baseline = weighted_query_error(&input, &graph_from_edges(&input.graph)).unwrap();
         let (best, _, cost) = exact_optimum(&input, baseline, 1.0).unwrap();
@@ -912,8 +951,8 @@ mod tests {
         };
         let input = base_input(candidates, vec![query], vec![Edge { source: 9, target: 10, weight: 1.0 }]);
         assert_eq!(
-            rank_candidates(&input, &"e".repeat(64), "deterministic_random"),
-            rank_candidates(&input, &"e".repeat(64), "deterministic_random")
+            rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"e".repeat(64), "deterministic_random"),
+            rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"e".repeat(64), "deterministic_random")
         );
     }
 
@@ -927,7 +966,7 @@ mod tests {
             reference_value: 1.0, metric: QueryMetric::EdgeWeight { source: 1, target: 2 },
         };
         let input = base_input(candidates, vec![query], vec![Edge { source: 9, target: 10, weight: 1.0 }]);
-        let ranking_a = rank_candidates(&input, &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
+        let ranking_a = rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
         let mut changed_reference = input;
         changed_reference.queries[0].reference_value = 99.0;
         let ranking_b = rank_candidates(&changed_reference, &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
