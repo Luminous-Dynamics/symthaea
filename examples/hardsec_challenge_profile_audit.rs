@@ -30,6 +30,8 @@ struct EvidenceSummary {
     local_path: Option<String>,
     assumptions_sha256: Option<String>,
     assumptions_local_path: Option<String>,
+    subject_netlist_sha256: Option<String>,
+    reference_netlist_sha256: Option<String>,
     proof_scope: Option<String>,
     formal_result: Option<String>,
     bound_cycles: Option<u64>,
@@ -48,6 +50,8 @@ struct ProfileSummary {
     evidence_ids: BTreeSet<String>,
     active_trace_sha256: Option<String>,
     payload_effect_sha256: Option<String>,
+    reference_netlist_sha256: Option<String>,
+    reference_local_path: Option<String>,
 }
 
 fn parse_args() -> Result<Option<Args>, String> {
@@ -250,17 +254,23 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
 
         let assumptions_sha256 = optional_string(item, "assumptions_sha256")?;
         let assumptions_local_path = optional_string(item, "assumptions_local_path")?;
+        let subject_netlist_sha256 = optional_string(item, "subject_netlist_sha256")?;
+        let reference_netlist_sha256 = optional_string(item, "reference_netlist_sha256")?;
         if let Some(assumptions_path) = assumptions_local_path.as_deref() {
             safe_relative_path(
                 assumptions_path,
                 &format!("evidence {id}.assumptions_local_path"),
             )?;
         }
-        if let Some(assumptions_digest) = assumptions_sha256.as_deref() {
-            if !valid_sha256(assumptions_digest) {
-                return Err(format!(
-                    "evidence {id}: assumptions_sha256 must be a SHA-256 digest"
-                ));
+        for (field, digest) in [
+            ("assumptions_sha256", assumptions_sha256.as_deref()),
+            ("subject_netlist_sha256", subject_netlist_sha256.as_deref()),
+            ("reference_netlist_sha256", reference_netlist_sha256.as_deref()),
+        ] {
+            if let Some(digest) = digest {
+                if !valid_sha256(digest) {
+                    return Err(format!("evidence {id}: {field} must be a SHA-256 digest"));
+                }
             }
         }
         if assumptions_sha256.is_some() != assumptions_local_path.is_some() {
@@ -277,6 +287,8 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
             local_path,
             assumptions_sha256,
             assumptions_local_path,
+            subject_netlist_sha256,
+            reference_netlist_sha256,
             proof_scope: optional_string(item, "proof_scope")?,
             formal_result: optional_string(item, "formal_result")?,
             bound_cycles: optional_u64(item, "bound_cycles")?,
@@ -395,6 +407,8 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
         }
     }
 
+    let mut reference_netlist_sha256 = None;
+    let mut reference_local_path = None;
     if validity_status == "benign_equivalent" {
         let equivalence = value.get("equivalence").ok_or("equivalence is required")?;
         if required_string(equivalence, "status")? != "proven" {
@@ -403,20 +417,61 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
         let proof_id = required_string(equivalence, "proof_evidence_id")?;
         let proof = evidence_by_id(&evidence_lookup, proof_id, "equivalence_report")?;
         if proof.formal_result.as_deref() != Some("equivalence_proved") {
-            return Err(
-                "benign_equivalent requires equivalence_proved evidence".to_owned(),
-            );
+            return Err("benign_equivalent requires equivalence_proved evidence".to_owned());
         }
-        if proof.proof_scope.as_deref() == Some("bounded") {
+        if !matches!(
+            proof.proof_scope.as_deref(),
+            Some("unbounded") | Some("assumption_scoped")
+        ) {
             return Err(
-                "bounded equivalence evidence cannot certify whole-design benign equivalence"
+                "benign equivalence requires unbounded or assumption_scoped proof metadata; bounded evidence is insufficient"
                     .to_owned(),
             );
         }
-        let assumptions = required_string(equivalence, "assumptions_sha256")?;
-        if !valid_sha256(assumptions) {
+        if proof.property_id.is_none() {
+            return Err("benign equivalence evidence requires property_id".to_owned());
+        }
+
+        let assumptions = required_string(equivalence, "assumptions_sha256")?.to_ascii_lowercase();
+        if !valid_sha256(&assumptions) {
             return Err("equivalence.assumptions_sha256 is invalid".to_owned());
         }
+        let assumptions_path = required_string(equivalence, "assumptions_local_path")?;
+        safe_relative_path(assumptions_path, "equivalence.assumptions_local_path")?;
+        if proof.assumptions_sha256.as_deref() != Some(assumptions.as_str())
+            || proof.assumptions_local_path.as_deref() != Some(assumptions_path)
+        {
+            return Err(
+                "equivalence proof must bind the exact assumptions digest and local bytes"
+                    .to_owned(),
+            );
+        }
+        if proof.subject_netlist_sha256.as_deref() != Some(netlist_sha256.as_str()) {
+            return Err(
+                "equivalence proof subject digest does not match the candidate netlist"
+                    .to_owned(),
+            );
+        }
+
+        let reference_digest =
+            required_string(equivalence, "reference_netlist_sha256")?.to_ascii_lowercase();
+        if !valid_sha256(&reference_digest) || reference_digest == netlist_sha256 {
+            return Err(
+                "equivalence.reference_netlist_sha256 must be a distinct valid digest"
+                    .to_owned(),
+            );
+        }
+        if proof.reference_netlist_sha256.as_deref() != Some(reference_digest.as_str()) {
+            return Err(
+                "equivalence proof reference digest does not match the declared golden netlist"
+                    .to_owned(),
+            );
+        }
+        let reference_path = required_string(equivalence, "reference_local_path")?.to_owned();
+        safe_relative_path(&reference_path, "equivalence.reference_local_path")?;
+
+        reference_netlist_sha256 = Some(reference_digest);
+        reference_local_path = Some(reference_path);
     }
 
     let _ = profile_sha256;
@@ -431,6 +486,8 @@ fn validate_profile(value: &Value, profile_sha256: String) -> Result<ProfileSumm
         evidence_ids,
         active_trace_sha256,
         payload_effect_sha256,
+        reference_netlist_sha256,
+        reference_local_path,
     })
 }
 
@@ -502,6 +559,34 @@ fn verify_profile_bytes(root: &Path, summary: &ProfileSummary) -> Result<Value, 
             "path": summary.subject_local_path,
             "sha256": summary.netlist_sha256,
         }));
+    }
+
+    match (
+        summary.reference_netlist_sha256.as_deref(),
+        summary.reference_local_path.as_deref(),
+    ) {
+        (Some(digest), Some(path)) => {
+            let key = format!("{path}:{digest}");
+            if unique.insert(key) {
+                verify_file_under_root(
+                    &canonical_root,
+                    path,
+                    digest,
+                    "equivalence reference netlist",
+                )?;
+                verified.push(json!({
+                    "role": "equivalence_reference_netlist",
+                    "path": path,
+                    "sha256": digest,
+                }));
+            }
+        }
+        (None, None) => {}
+        _ => {
+            return Err(
+                "equivalence reference digest/path must appear together".to_owned(),
+            );
+        }
     }
 
     for item in &summary.evidence {
