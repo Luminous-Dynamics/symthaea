@@ -59,7 +59,7 @@ def supportDeclarationJson (lctx : LocalContext) (id : FVarId) : MetaM Json := d
 syntax "pitb_prove_and_record_support " str " => " tacticSeq : tactic
 
 elab_rules : tactic
-  | `(tactic| pitb_prove_and_record_support $label:str => $sequence:tacticSeq) => do
+  | `(tactic| pitb_prove_and_record_support $label:str => $sequence:tacticSeq) => withMainContext do
       let goal ← getMainGoal
       let declaration ← goal.getDecl
       evalTactic sequence
