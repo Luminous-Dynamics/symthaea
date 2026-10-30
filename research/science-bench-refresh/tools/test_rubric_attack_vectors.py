@@ -24,7 +24,7 @@ class RubricAttackVectorTests(unittest.TestCase):
         self.assertEqual(plan["purpose"], "example_only")
         self.assertEqual(plan["planned_case_count"], len(plan["cases"]))
         self.assertEqual(len(plan["cases"]), 11)
-        self.assertEqual(len({item["case_id"] for item in plan["cases"]}), 10)
+        self.assertEqual(len({item["case_id"] for item in plan["cases"]}), 11)
         self.assertEqual(len(corpus["artifacts"]), len(plan["cases"]))
         self.assertFalse(any(case["expected_judge_behavior"] == "accept" for case in plan["cases"]))
 
