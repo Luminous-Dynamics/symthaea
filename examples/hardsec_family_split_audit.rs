@@ -566,7 +566,6 @@ mod tests {
     struct Fixture {
         base: PathBuf,
         manifest: PathBuf,
-        output: PathBuf,
     }
 
     impl Fixture {
@@ -577,16 +576,10 @@ mod tests {
                 std::process::id()
             ));
             let input = base.join("input");
-            let output = base.join("output");
             fs::create_dir_all(&input).unwrap();
-            fs::create_dir_all(&output).unwrap();
             let manifest = input.join("manifest.json");
             fs::write(&manifest, serde_json::to_vec_pretty(value).unwrap()).unwrap();
-            Self {
-                base,
-                manifest,
-                output: output.join("receipt.json"),
-            }
+            Self { base, manifest }
         }
 
         fn audit(&self, value: &Value) -> Result<Value, String> {
@@ -748,11 +741,10 @@ mod tests {
     fn counts_same_split_content_aliases() {
         let fixture = Fixture::new(&base_manifest("diagnostic_random"));
         let mut manifest = base_manifest("diagnostic_random");
-        manifest["records"][1]["netlist_sha256"] = manifest["records"][0]["netlist_sha256"].clone();
-        manifest["records"][1]["label"] = json!("trojan");
-        manifest["records"][1]["normalized_structure_sha256"] =
-            manifest["records"][0]["normalized_structure_sha256"].clone();
-        manifest["records"][1]["source_sha256"] = manifest["records"][0]["source_sha256"].clone();
+        let mut alias = manifest["records"][0].clone();
+        alias["sample_id"] = json!("tr-a-alias");
+        alias["design_id"] = json!("design-tr-a-alias");
+        manifest["records"].as_array_mut().unwrap().push(alias);
         let receipt = fixture.audit(&manifest).unwrap();
         assert!(receipt["duplicate_same_split_content_aliases"].as_u64().unwrap() >= 3);
     }
