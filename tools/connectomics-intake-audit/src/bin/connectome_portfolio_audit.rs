@@ -68,7 +68,7 @@ enum QueryMetric {
     PathExists { source: u64, target: u64 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 struct QueryRankingSpec {
     weight: f64,
     normalization_scale: f64,
@@ -112,6 +112,7 @@ struct Report {
     schema_version: u32,
     tool: &'static str,
     input_sha256: String,
+    ranking_view_sha256: String,
     dataset_id: String,
     dataset_revision_commit_sha: String,
     source_graph_sha256: String,
@@ -636,6 +637,14 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         normalization_scale: query.normalization_scale,
         metric: query.metric.clone(),
     }).collect::<Vec<_>>();
+    // The random baseline is keyed only by the reference-free ranking view.
+    // The raw input digest above remains an audit binding and is not exposed to rankers.
+    let ranking_view_bytes = serde_json::to_vec(&(
+        &input.candidates,
+        &baseline_graph,
+        &ranking_specs,
+    )).map_err(|error| format!("could not serialize reference-free ranking view: {error}"))?;
+    let ranking_view_sha256 = sha256(&ranking_view_bytes);
     let rankings = policy_names
         .iter()
         .map(|name| (
@@ -644,7 +653,7 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 &input.candidates,
                 &baseline_graph,
                 &ranking_specs,
-                input_sha_str,
+                &ranking_view_sha256,
                 name,
             ),
         ))
@@ -685,6 +694,7 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         schema_version: 1,
         tool: "connectome-portfolio-audit",
         input_sha256: input_sha,
+        ranking_view_sha256,
         dataset_id: input.dataset_id.clone(),
         dataset_revision_commit_sha: input.dataset_revision_commit_sha.clone(),
         source_graph_sha256: input.source_graph_sha256.clone(),
@@ -695,7 +705,7 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         pairwise_interactions: pairwise_interactions(input, baseline_error),
         budget_results,
         status: "EVALUATED_NOT_PROMOTED",
-        ranking_information_flow: "Candidate ranking uses predicted error probability, review cost, baseline query sensitivity, and deterministic input hashing only. Evaluator reference values are used only for utility, interactions, regret, and the exact oracle optimum.",
+        ranking_information_flow: "Candidate ranking uses predicted error probability, review cost, baseline query sensitivity, and a SHA-256 of the reference-free ranking view only. Held-out query reference values are absent from ranker inputs and the random seed. Evaluator references are used only for utility, interactions, regret, and the exact oracle optimum.",
         optimization_scope: "Exact optimum is restricted to the supplied candidate pool, review budget, declared graph mutations, canonical candidate-ID application order, and supplied query reference bundle. It is not a whole-connectome optimum or biological truth certificate.",
     })
 }
@@ -966,10 +976,28 @@ mod tests {
             reference_value: 1.0, metric: QueryMetric::EdgeWeight { source: 1, target: 2 },
         };
         let input = base_input(candidates, vec![query], vec![Edge { source: 9, target: 10, weight: 1.0 }]);
-        let ranking_a = rank_candidates(&input.candidates, &graph_from_edges(&input.graph), &ranking_specs(&input), &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
+        let ranking_specs_a = ranking_specs(&input);
+        let baseline_a = graph_from_edges(&input.graph);
+        let view_a = sha256(&serde_json::to_vec(&(&input.candidates, &baseline_a, &ranking_specs_a)).unwrap());
+        let policies = [
+            "probability_weighted_query_sensitivity_per_minute",
+            "probability_per_minute",
+            "uncertainty_per_minute",
+            "deterministic_random",
+        ];
+        let rankings_a = policies.iter().map(|policy| {
+            rank_candidates(&input.candidates, &baseline_a, &ranking_specs_a, &view_a, policy)
+        }).collect::<Vec<_>>();
+
         let mut changed_reference = input;
         changed_reference.queries[0].reference_value = 99.0;
-        let ranking_b = rank_candidates(&changed_reference.candidates, &graph_from_edges(&changed_reference.graph), &ranking_specs(&changed_reference), &"f".repeat(64), "probability_weighted_query_sensitivity_per_minute");
-        assert_eq!(ranking_a, ranking_b);
+        let ranking_specs_b = ranking_specs(&changed_reference);
+        let baseline_b = graph_from_edges(&changed_reference.graph);
+        let view_b = sha256(&serde_json::to_vec(&(&changed_reference.candidates, &baseline_b, &ranking_specs_b)).unwrap());
+        assert_eq!(view_a, view_b);
+        let rankings_b = policies.iter().map(|policy| {
+            rank_candidates(&changed_reference.candidates, &baseline_b, &ranking_specs_b, &view_b, policy)
+        }).collect::<Vec<_>>();
+        assert_eq!(rankings_a, rankings_b);
     }
 }
