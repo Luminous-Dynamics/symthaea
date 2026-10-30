@@ -28,11 +28,16 @@ use serde::Serialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Semaphore;
 
 const OFFICIAL_MAX_TOP_K: usize = 100;
 const DEFAULT_MAX_BODY_BYTES: usize = 8 * 1024 * 1024;
 const DEFAULT_MAX_CONCURRENCY: usize = 16;
+/// Purge AML evaluation rows at 29 days to leave margin under the 30-day
+/// post-evaluation deletion requirement, allowing for a daily worker interval.
+const RETENTION_AGE_MS: u64 = 29 * 24 * 60 * 60 * 1000;
+const RETENTION_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Configuration for one local SQLite/WAL AML service instance.
 #[derive(Debug, Clone)]
@@ -257,29 +262,84 @@ async fn health_handler() -> Json<HealthResponse> {
     Json(HealthResponse { status: "ok" })
 }
 
-/// Construct the router for integration testing or embedding.
-pub fn router(config: AmlHttpServerConfig) -> Result<Router, String> {
-    config.validate()?;
+fn build_state(config: AmlHttpServerConfig) -> Result<Arc<AmlHttpState>, String> {
     let backend = SqliteAmlMemoryBackend::open(&config.database_path, &config.payload_root)?;
-    let state = Arc::new(AmlHttpState {
+    Ok(Arc::new(AmlHttpState {
         backend: Arc::new(Mutex::new(backend)),
         api_key: config.api_key,
         request_slots: Arc::new(Semaphore::new(config.max_concurrency)),
-    });
-    Ok(Router::new()
+    }))
+}
+
+fn build_router(state: Arc<AmlHttpState>, max_body_bytes: usize) -> Router {
+    Router::new()
         .route("/health", get(health_handler))
         .route("/add", post(add_handler))
         .route("/search", post(search_handler))
-        .layer(DefaultBodyLimit::max(config.max_body_bytes))
-        .with_state(state))
+        .layer(DefaultBodyLimit::max(max_body_bytes))
+        .with_state(state)
+}
+
+/// Construct the router for integration testing or embedding. The retention
+/// worker is started by serve(), not by this router factory.
+pub fn router(config: AmlHttpServerConfig) -> Result<Router, String> {
+    config.validate()?;
+    let max_body_bytes = config.max_body_bytes;
+    Ok(build_router(build_state(config)?, max_body_bytes))
+}
+
+fn retention_cutoff_unix_ms(now_unix_ms: u64) -> u64 {
+    now_unix_ms.saturating_sub(RETENTION_AGE_MS)
+}
+
+fn current_unix_ms() -> Result<u64, String> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("system clock is before Unix epoch: {error}"))?;
+    u64::try_from(elapsed.as_millis())
+        .map_err(|_| "system timestamp exceeds u64 milliseconds".into())
+}
+
+async fn run_retention_worker(backend: Arc<Mutex<SqliteAmlMemoryBackend>>) {
+    let mut interval = tokio::time::interval(RETENTION_INTERVAL);
+    loop {
+        interval.tick().await;
+        let cutoff = match current_unix_ms() {
+            Ok(now) => retention_cutoff_unix_ms(now),
+            Err(error) => {
+                eprintln!("AML retention worker could not determine current time: {error}");
+                continue;
+            }
+        };
+        let backend = backend.clone();
+        match tokio::task::spawn_blocking(move || {
+            let mut backend = backend
+                .lock()
+                .map_err(|_| "SQLite backend mutex is poisoned".to_string())?;
+            backend.purge_stored_before(cutoff)
+        }).await {
+            Ok(Ok(removed)) => {
+                if removed > 0 {
+                    eprintln!("AML retention worker logically purged {removed} expired Add batches");
+                }
+            }
+            Ok(Err(error)) => eprintln!("AML retention worker purge failed: {error}"),
+            Err(error) => eprintln!("AML retention worker task failed: {error}"),
+        }
+    }
 }
 
 /// Run the participant API on the configured address. TLS termination must
 /// happen at a public reverse proxy; do not expose this plain HTTP listener
-/// directly to the public Internet.
+/// directly to the public Internet. The server starts a 24-hour logical
+/// retention worker that deletes Add batches older than 29 days.
 pub async fn serve(config: AmlHttpServerConfig) -> Result<(), String> {
+    config.validate()?;
     let bind = config.bind;
-    let app = router(config)?;
+    let max_body_bytes = config.max_body_bytes;
+    let state = build_state(config)?;
+    tokio::spawn(run_retention_worker(state.backend.clone()));
+    let app = build_router(state, max_body_bytes);
     let listener = tokio::net::TcpListener::bind(bind)
         .await
         .map_err(|error| format!("failed to bind AML HTTP server: {error}"))?;
@@ -476,6 +536,13 @@ mod tests {
                 .body(Body::from(serde_json::to_vec(&request).unwrap())).unwrap()
         ).await.unwrap();
         assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn retention_cutoff_leaves_one_day_safety_margin() {
+        assert_eq!(retention_cutoff_unix_ms(RETENTION_AGE_MS + 123), 123);
+        assert_eq!(retention_cutoff_unix_ms(RETENTION_AGE_MS - 1), 0);
+        assert_eq!(RETENTION_AGE_MS, 29 * 24 * 60 * 60 * 1000);
     }
 
     #[test]
