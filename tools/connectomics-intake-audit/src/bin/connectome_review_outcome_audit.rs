@@ -207,6 +207,7 @@ struct EvaluatedPolicyBudget {
     applied_correction_precision: Option<f64>,
     correct_proposal_review_recall: Option<f64>,
     correct_proposal_acceptance_recall: Option<f64>,
+    correct_proposal_application_recall: Option<f64>,
     incorrect_proposal_acceptance_rate: Option<f64>,
     baseline_weighted_query_error: Option<f64>,
     final_weighted_query_error: Option<f64>,
@@ -280,6 +281,10 @@ fn validate_proposals(input: &ProposalInput) -> Result<(), String> {
         || input.review_budgets_minutes.iter().any(|budget| !budget.is_finite() || *budget <= 0.0)
     {
         return Err("proposal review budgets must be finite, positive, and non-empty".into());
+    }
+    let unique_budgets: BTreeSet<u64> = input.review_budgets_minutes.iter().map(|budget| budget.to_bits()).collect();
+    if unique_budgets.len() != input.review_budgets_minutes.len() {
+        return Err("proposal review budgets must be unique".into());
     }
     let mut edge_ids = BTreeSet::new();
     for edge in &input.graph {
@@ -570,6 +575,7 @@ fn evaluate_policy_budget(
         applied_correction_precision: ratio(counts.applied_correct, applied_adjudicated),
         correct_proposal_review_recall: ratio(counts.reviewed_correct, pool_correct),
         correct_proposal_acceptance_recall: ratio(counts.accepted_correct, pool_correct),
+        correct_proposal_application_recall: ratio(counts.applied_correct, pool_correct),
         incorrect_proposal_acceptance_rate: ratio(counts.accepted_incorrect, pool_incorrect),
         baseline_weighted_query_error: baseline_error,
         final_weighted_query_error: final_error,
@@ -614,6 +620,15 @@ fn evaluate(
     }
     if ranking.policy_budget_results.is_empty() {
         return Err("ranking report has no policy/budget replay rows".into());
+    }
+    let expected_budgets: BTreeSet<u64> = proposals.review_budgets_minutes.iter().map(|budget| budget.to_bits()).collect();
+    if ranking.policy_budget_results.iter().any(|row| !expected_budgets.contains(&row.review_budget_minutes.to_bits())) {
+        return Err("ranking report contains a budget not declared in proposal input".into());
+    }
+    let policies: BTreeSet<String> = ranking.policy_budget_results.iter().map(|row| row.policy.clone()).collect();
+    let expected_pairs = policies.len() * expected_budgets.len();
+    if seen_orders.len() != expected_pairs {
+        return Err("ranking report must contain exactly one row for each policy and declared budget".into());
     }
 
     let pool_correct = outcomes.candidate_outcomes.iter().filter(|outcome| matches!(outcome.adjudication, Adjudication::Correct)).count();
