@@ -120,3 +120,23 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 The example file contains placeholder source digests and synthetic records. Replace all placeholders and bind it to the exact frozen study artifacts before evaluation.
+
+
+## Spatial frame prerequisite (SCI-CONNECTOMICS-013)
+
+Before collecting or estimating candidate-generation recall, run [the spatial PSU lattice frame auditor](CONNECTOME_SPATIAL_FRAME_AUDIT_PROTOCOL_V1.md) and use its exported eligible `population_frame` verbatim. The coverage audit now requires `--spatial-frame-report` and binds the exact report bytes, complete spatial lattice digest, and eligible PSU population digest. It rejects a separately maintained population list or a failed spatial-frame report.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-spatial-frame-audit -- \
+  --frame spatial-frame.json --output spatial-frame-report.json
+
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-candidate-coverage-audit -- \
+  --proposals frozen-proposals.json --ranking-report frozen-ranking-report.json \
+  --sampling-protocol CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md \
+  --spatial-frame-report spatial-frame-report.json \
+  --audit independent-volume-search-audit.json --output candidate-coverage-report.json
+```
+
+This proves no gaps/overlaps in the declared integer voxel bounding box; it does not prove the box or eligibility mask covers all biologically eligible tissue.
