@@ -213,13 +213,13 @@
     "input": {
       "f_star": 0.5,
       "bar_f": 1,
-      "b_infinity": 0.5,
+      "b_infinity": 0.6,
       "tau0": 0,
       "c": 2,
       "tau2": 0,
       "kappa": 1
     },
-    "derived_threshold": 1,
+    "derived_threshold": 1.2,
     "candidates": [
       {
         "id": "offsetting-L",
@@ -230,7 +230,10 @@
         "component_sum": 4.25,
         "actual_squared_error": 2.25,
         "interaction_direction": "offsetting",
-        "expected_dea_weight": 0.7310585786300049
+        "expected_dea_weight": 0.7310585786300049,
+        "pointwise_error_at_x0": 2.25,
+        "pointwise_error_at_x1": 0.36,
+        "target_expected_squared_error": 0.8325
       },
       {
         "id": "reinforcing-H",
@@ -241,58 +244,92 @@
         "component_sum": 4.25,
         "actual_squared_error": 6.25,
         "interaction_direction": "reinforcing",
-        "expected_dea_weight": 0.7310585786300049
+        "expected_dea_weight": 0.7310585786300049,
+        "pointwise_error_at_x0": 6.25,
+        "pointwise_error_at_x1": 0.36,
+        "target_expected_squared_error": 1.8325
       }
     ],
     "conclusion": "The printed absolute-gap DeA gate cannot identify the sign of the squared-error interaction. The two candidates receive identical DeA weights despite different signed interactions and different true squared errors. This is a mathematical negative control, not a correction claim.",
     "model_class_witness": {
       "design_domain": [
-        "x0"
+        "x0",
+        "x1"
       ],
-      "true_function_value": 0.5,
+      "true_function_values": [
+        0.5,
+        -0.1
+      ],
+      "test_distribution_probabilities": [
+        0.25,
+        0.75
+      ],
       "finite_model_class": [
         {
-          "model_id": "constant-minus-one",
-          "prediction": -1,
-          "true_squared_error": 2.25
+          "model_id": "constant-minus-one-at-x0",
+          "predictions": [
+            -1,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            2.25,
+            0.36
+          ],
+          "target_expected_squared_error": 0.8325
         },
         {
-          "model_id": "constant-one",
-          "prediction": 1,
-          "true_squared_error": 0.25,
+          "model_id": "best-in-class",
+          "predictions": [
+            1,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            0.25,
+            0.36
+          ],
+          "target_expected_squared_error": 0.3325,
           "best_in_class": true
         },
         {
-          "model_id": "constant-three",
-          "prediction": 3,
-          "true_squared_error": 6.25
+          "model_id": "constant-three-at-x0",
+          "predictions": [
+            3,
+            0.5
+          ],
+          "pointwise_squared_errors": [
+            6.25,
+            0.36
+          ],
+          "target_expected_squared_error": 1.8325
         }
       ],
-      "best_in_class_prediction": 1,
-      "misspecification_sup_bound": 0.5,
-      "outcome_model": "At x0, observations equal the true mean 0.5 plus noise taking values -2.5 or +2.5 with equal probability. Outcomes -2 and 3 are within the declared outcome bound y_infinity=3.",
+      "misspecification_sup_bound": 0.6,
+      "tested_point_misspecification_error": 0.5,
+      "strict_bound_at_tested_point": true,
+      "outcome_model": "At x0, y equals f_star(x0)=0.5 plus symmetric noise of +/-2.5. Observations -2 and 3 are within y_infinity=3. At x1, f_star=-0.1. The target/test distribution weights x0=0.25 and x1=0.75 make the middle predictor uniquely best-in-class among the three functions.",
       "empirical_erm_witnesses": [
         {
-          "observed_target": -2,
+          "observed_target_at_x0": -2,
           "empirical_squared_losses": {
-            "constant-minus-one": 1,
-            "constant-one": 9,
-            "constant-three": 25
+            "constant-minus-one-at-x0": 1,
+            "best-in-class": 9,
+            "constant-three-at-x0": 25
           },
-          "erm": "constant-minus-one"
+          "erm": "constant-minus-one-at-x0"
         },
         {
-          "observed_target": 3,
+          "observed_target_at_x0": 3,
           "empirical_squared_losses": {
-            "constant-minus-one": 16,
-            "constant-one": 4,
-            "constant-three": 0
+            "constant-minus-one-at-x0": 16,
+            "best-in-class": 4,
+            "constant-three-at-x0": 0
           },
-          "erm": "constant-three"
+          "erm": "constant-three-at-x0"
         }
       ],
-      "interpretation": "Both fitted predictors can be empirical risk minimizers for admissible finite observations, while constant-one is the unique best-in-class predictor under the target distribution."
-    }
+      "interpretation": "The point x0 has misspecification error 0.5 which is strictly below the global B_infinity=0.6 attained at x1. Both extreme predictors are ERMs for admissible one-point training observations at x0, while the best-in-class predictor remains the minimizer under the target test distribution."
+    },
+    "prohibited_claim": "This is a counterexample to the stated subset implication under the declared finite-class assumptions, not evidence against unrelated parts of R-IDeA."
   },
   "prohibited_claims": [
     "The primitive module does not implement or optimize the proxy predictor g.",
