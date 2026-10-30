@@ -760,6 +760,14 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
     for (index, evaluation) in evaluations.iter_mut().enumerate() {
         evaluation.rank = index + 1;
     }
+    let policy_budget_results = evaluate_policy_budgets(
+        &graph,
+        &input.queries,
+        &input.candidates,
+        &evaluations,
+        &input.review_budgets_minutes,
+        &input_hash,
+    )?;
 
     let mut warnings = vec![
         "Candidate probabilities are caller-supplied and are not calibrated by this tool.".to_string(),
@@ -770,6 +778,10 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
     if evaluations.iter().any(|evaluation| !evaluation.overlaps_with_candidates.is_empty()) {
         warnings.push("At least two candidates touch the same baseline edge; review their interaction before treating queue scores as independent.".to_string());
     }
+    if !input.queries.iter().any(|query| query.reference_value.is_some_and(|_| query.weight > 0.0)) {
+        warnings.push("No positive-weight query oracle values are present; matched-budget policy replay is descriptive only and query-error reductions are not estimable.".to_string());
+    }
+    warnings.push("Matched-budget replay sequentially applies every reviewed proposal that is valid on the evolving graph; rejected conflicts still consume review time. It is a retrospective proposal replay, not a model of human acceptance decisions.".to_string());
     warnings.sort();
 
     Ok(Report {
@@ -786,6 +798,7 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
         candidate_count: input.candidates.len(),
         scoring_semantics: "probability_weighted_mean_normalized_query_sensitivity_per_review_minute",
         candidate_evaluations: evaluations,
+        policy_budget_results,
         warnings,
         status: "RANKED_FOR_HUMAN_REVIEW_ONLY",
         scope_note: "This tool evaluates predicted weighted-edge mutations against an explicit directed-graph query bundle. It does not infer corrections, calibrate probabilities, validate evidence, model morphology/segmentation geometry, evaluate actual post-review outcomes, or authorize annotation writes. Query impact is conditional on the frozen graph, query definitions, weights, scales, and predicted mutation. Every candidate remains human-review-only.",
@@ -844,6 +857,7 @@ mod tests {
                 {"query_id":"output_1","weight":1.0,"normalization_scale":4.0,"metric":{"kind":"out_degree","node":1}},
                 {"query_id":"reach_1_to_3","weight":3.0,"normalization_scale":1.0,"metric":{"kind":"path_exists","source":1,"target":3}}
             ],
+            "review_budgets_minutes": [2.0, 3.5, 10.0],
             "candidates": [
                 {
                     "candidate_id":"remove_direct_edge",
