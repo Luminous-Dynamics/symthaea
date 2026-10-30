@@ -36,7 +36,7 @@ The action floor is 0.02 for all model-derived logger policies. Uniform logging 
 
 ### Logger and estimator arms
 
-Logger designs: uniform, raw pilot model, held-out shrinkage, leaky shrinkage, and known-source MSE-oracle shrinkage.
+Logger designs: uniform, raw pilot model, held-out shrinkage, leaky shrinkage, and known-source MSE-oracle shrinkage. Every model-derived logger is target-policy aware: for each context it allocates action mass proportional to the target-policy probability times the square root of the corresponding predicted reward, then clips to the 0.02 exploration floor. This is the plug-in form of the target-aware Neyman allocation, rather than a reward-greedy logger independent of the target policy.
 
 Estimators: IPS with exact propensities; DM with the pilot model; DR with the same pilot/shrunk model used to design the logger; DM with an in-sample evaluation nuisance fit; DR with an in-sample evaluation nuisance fit; and two-fold cross-fitted DR. In cross-fitting, each evaluation fold is scored using a reward model fitted only on the opposite fold.
 
@@ -52,11 +52,11 @@ For a fixed reward model q, the DR score is
 
 With known logging propensities and full target support, its conditional expectation equals the target-policy value for any fixed q. Its variance, finite-sample behavior, and performance under fitted nuisance models remain empirical questions. This benchmark treats in-sample DR separately from cross-fitted DR instead of assuming they are interchangeable.
 
-Score-based normal intervals are reported only for IPS and estimators whose reward-model nuisance fit is external to the evaluation rows (pilot DR/DM and two-fold cross-fitted DR). These are empirical diagnostics, not finite-sample guarantees. The deliberately in-sample DM/DR arms have no reported confidence interval: their nuisance model is fitted on the same evaluation rows, so a standard error calculated from those same scores would not be a defensible interval. Their point-estimate bias, variance across replicates, and MSE remain reported.
+Score-based normal intervals are reported only for IPS, pilot DR with a fixed externally fitted nuisance model, and two-fold cross-fitted DR. For pilot DR, the score interval is conditional on the fitted pilot model and known propensities. These are empirical diagnostics, not finite-sample guarantees. Model-only DM has no interval because score dispersion does not include reward-model estimation error. The deliberately in-sample DM/DR arms also have no interval: their nuisance model is fitted on the same evaluation rows, so a standard error calculated from those same scores would not be a defensible interval. Their point-estimate bias, variance across replicates, and MSE remain reported.
 
 ## Output
 
-Full and smoke runs emit deterministic TSV. Summary rows contain one row per scenario × sample size × logger × target policy × estimator, with mean shrinkage weight, expected logger reward, mean of replicate-level minimum action propensities, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, identification status, and inference status. In-sample DM/DR use NA for interval coverage and width.
+Full and smoke runs emit deterministic TSV. Summary rows contain one row per scenario × sample size × logger × target policy × estimator, with mean shrinkage weight, expected logger reward, mean of replicate-level minimum action propensities, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, identification status, and inference status. DM pilot uses NA for intervals because model uncertainty is omitted from score dispersion; in-sample DM/DR use NA because same-sample nuisance fitting invalidates the score-only interval.
 
 Expected summary rows: 5 scenarios × 2 sample sizes × 5 loggers × 4 target policies × 6 estimators = 1,200. A separate per-replicate trace records each estimate, truth, signed error, squared error, score-dispersion standard error, valid interval endpoints (or NA when same-sample nuisance fitting invalidates score-based inference), and the independent pilot-fit, shrinkage-calibration, and evaluation seeds. That is 153,600 replicate rows for the 128-replicate full run and 14,400 for the 12-replicate smoke run.
 
@@ -64,7 +64,7 @@ All registered loggers preserve a positive action floor, so rows are labelled id
 
 ## Falsification and interpretation rules
 
-- Cross-fitting is not presumed to dominate; compare its MSE and coverage against fixed-pilot and in-sample DR across every registered scenario.
+- Cross-fitting is not presumed to dominate; compare its MSE and empirical interval coverage against pilot DR and in-sample DR across every registered scenario. Pilot DR intervals are conditional on the external pilot fit; in-sample nuisance intervals are omitted.
 - Shrinkage is not presumed to help. Compare held-out and leaky weights with the oracle source-domain prediction-MSE reference and downstream OPE metrics.
 - Reward drift can make source-calibrated shrinkage stale. DR's residual correction should be evaluated separately from DM's model-only estimate.
 - The benchmark assumes the logging propensities are known exactly. It does not establish robustness to propensity-estimation error.
