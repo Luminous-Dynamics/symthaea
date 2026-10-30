@@ -813,7 +813,7 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
 
     let mut warnings = vec![
         "Candidate probabilities are caller-supplied and are not calibrated by this tool.".to_string(),
-        "Each candidate is evaluated independently against the same baseline graph; scores are not additive and interacting edits are not jointly simulated.".to_string(),
+        "Single-candidate sensitivity scores are computed independently against the same baseline graph and are not additive; matched-budget replay separately applies selected valid proposals sequentially on the evolving graph.".to_string(),
         "Query weights and normalization scales are scientific-policy inputs and must be preregistered before evaluation.".to_string(),
         "A large query delta measures sensitivity of the declared query suite, not biological correctness or the truth of the proposed edit.".to_string(),
     ];
@@ -1373,6 +1373,15 @@ mod tests {
         ).unwrap();
         assert_eq!(query_order.len(), 3);
         assert_eq!(degree_order.len(), 3);
+    }
+
+    #[test]
+    fn replay_report_discloses_that_valid_proposals_are_assumed_accepted() {
+        let input = fixture_with_oracle();
+        let report = score(&input, "d".repeat(64)).unwrap();
+        assert!(report.warnings.iter().any(|warning|
+            warning.contains("assumes") && warning.contains("valid") && warning.contains("accepted")
+        ));
     }
 
 }
