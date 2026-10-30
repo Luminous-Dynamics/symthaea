@@ -1399,6 +1399,82 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_adversarial_mutation_corpus_rejects_1000_invalid_statements() {
+        let valid: Value = serde_json::from_str(include_str!(
+            "../../../docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json"
+        ))
+        .expect("baseline fixture must be valid JSON");
+
+        const MUTATION_COUNT: usize = 1_000;
+        for seed in 0..MUTATION_COUNT {
+            let mut statement = valid.clone();
+            let mutation = seed % 10;
+            let expected_code = match mutation {
+                0 => {
+                    statement["predicate"]["target"]["source"]["revision"] = json!("main");
+                    statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+                        json!("main");
+                    "SOURCE_REVISION_NOT_IMMUTABLE"
+                }
+                1 => {
+                    statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+                        json!(format!("{:040x}", seed + 1));
+                    "LEP_TARGET_MISMATCH"
+                }
+                2 => {
+                    statement["predicate"]["target"]["configurationDigest"]["sha256"] =
+                        json!(format!("g{:063x}", seed));
+                    "INVALID_DIGEST_VALUE"
+                }
+                3 => {
+                    statement["predicate"]["execution"]["status"] = json!("queued");
+                    statement["predicate"]["execution"]["result"] = json!("passed");
+                    "EXECUTION_STATUS_RESULT_CONFLICT"
+                }
+                4 => {
+                    statement["predicate"]["execution"]["runId"] = Value::Null;
+                    "COMPLETED_RUN_ID_REQUIRED"
+                }
+                5 => {
+                    statement["predicate"]["verification"]["checks"] = json!([]);
+                    "EXECUTED_VERIFICATION_HAS_NO_CHECKS"
+                }
+                6 => {
+                    let first_id =
+                        statement["predicate"]["verification"]["checks"][0]["id"].clone();
+                    statement["predicate"]["verification"]["checks"][1]["id"] = first_id;
+                    "DUPLICATE_CHECK_ID"
+                }
+                7 => {
+                    statement["predicate"]["verification"]["outcome"] = json!("inconclusive");
+                    statement["predicate"]["verification"]["checks"][0]["outcome"] =
+                        json!("failed");
+                    "INCONCLUSIVE_VERIFICATION_CHECK_CONFLICT"
+                }
+                8 => {
+                    statement["predicate"]["target"] = Value::Null;
+                    "MISSING_TARGET"
+                }
+                _ => {
+                    statement["predicate"]["unrecognizedCoreField"] = json!(true);
+                    "PREDICATE_SCHEMA_VALIDATION_FAILED"
+                }
+            };
+
+            let report = verify_statement(&statement);
+            assert!(
+                !report.conforms,
+                "mutation seed {seed} (operator {mutation}) was falsely accepted"
+            );
+            assert!(
+                has_code(&report, expected_code),
+                "mutation seed {seed} (operator {mutation}) missed {expected_code}: {:?}",
+                report.violations
+            );
+        }
+    }
+
+    #[test]
     fn duplicate_check_ids_are_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["verification"]["checks"] = json!([
