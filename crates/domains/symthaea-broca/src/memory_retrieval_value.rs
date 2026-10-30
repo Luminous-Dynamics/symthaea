@@ -666,6 +666,24 @@ mod tests {
     }
 
     #[test]
+    fn preserves_negative_conservative_benefit_bounds_without_clamping() {
+        let mut value = estimate();
+        value.correctness_gain_prediction_micro = 100;
+        value.correctness_gain_lcb_micro = -25;
+        value.lifecycle_risk_reduction_prediction_micro = 50;
+        value.lifecycle_risk_reduction_lcb_micro = -10;
+        value.retrieval_harm_prediction_micro = 20;
+        value.retrieval_harm_ucb_micro = 30;
+        value.retrieval_cost_micro = 0;
+        value.minimum_net_value_micro = 0;
+
+        let decision = evaluate_retrieval_value(value).unwrap();
+        assert_eq!(decision.conservative_net_value_micro, -65);
+        assert_eq!(decision.action, RetrievalValueAction::Stop);
+        assert_eq!(decision.reason, RetrievalValueReason::NetValueBelowMinimumMargin);
+    }
+
+    #[test]
     fn stops_when_marginal_utility_is_equal_to_or_below_margin() {
         let mut value = estimate();
         value.correctness_gain_lcb_micro = 300;
