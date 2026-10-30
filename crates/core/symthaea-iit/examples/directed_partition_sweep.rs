@@ -20,12 +20,13 @@ struct Fixture {
     unique_cuts: usize,
 }
 
-const FIXTURES: [Fixture; 5] = [
+const FIXTURES: [Fixture; 6] = [
     Fixture { units: 2, raw_direction_assignments: 9, canonical_assignments: 3, unique_cuts: 3 },
     Fixture { units: 3, raw_direction_assignments: 54, canonical_assignments: 22, unique_cuts: 22 },
     Fixture { units: 4, raw_direction_assignments: 306, canonical_assignments: 150, unique_cuts: 150 },
     Fixture { units: 5, raw_direction_assignments: 1_863, canonical_assignments: 1_061, unique_cuts: 1_061 },
     Fixture { units: 6, raw_direction_assignments: 12_348, canonical_assignments: 7_896, unique_cuts: 7_896 },
+    Fixture { units: 7, raw_direction_assignments: 88_560, canonical_assignments: 61_888, unique_cuts: 61_888 },
 ];
 
 fn median_duration(samples: &mut [Duration]) -> Duration {
