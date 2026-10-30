@@ -31,7 +31,7 @@ services:
       retries: 3
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.7-alpine
     restart: unless-stopped
     environment:
       AML_DOMAIN: "\${AML_DOMAIN:?Set AML_DOMAIN in deploy/aml/.env}"
