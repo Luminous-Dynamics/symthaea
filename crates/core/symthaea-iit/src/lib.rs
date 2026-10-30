@@ -1614,7 +1614,10 @@ impl BinaryCausalModel {
                 );
                 *value = (report.factor.log_values()[local_index] - posterior_log_normalizer).exp();
             }
-            if cause_factor.iter().any(|value| !value.is_finite()) {
+            if cause_factor
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0 + 1e-12)
+            {
                 return Err(RepertoireError::UndefinedBackgroundPosterior);
             }
             per_mechanism_unit.push(cause_factor);
