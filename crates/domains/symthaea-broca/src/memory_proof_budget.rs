@@ -100,6 +100,9 @@ impl ProofEvidenceCandidate {
         if self.token_cost == 0 {
             return Err("token_cost must be greater than zero".into());
         }
+        if self.retrieval_rank == 0 {
+            return Err("retrieval_rank is one-based and must be greater than zero".into());
+        }
         if self.valid_from_unix_ms.zip(self.valid_until_unix_ms)
             .is_some_and(|(start, end)| end <= start)
         {
@@ -425,8 +428,12 @@ impl<'a> ExactSearch<'a> {
         if obligation_index == self.request.obligations.len() {
             let mut evidence_ids: Vec<_> = selected_evidence_ids.iter().cloned().collect();
             evidence_ids.sort();
+            let Some(total_token_cost) = self.cost_of_set(selected_evidence_ids) else {
+                self.budget_blocked = true;
+                return;
+            };
             let plan = CandidatePlan {
-                total_token_cost: self.cost_of(&evidence_ids),
+                total_token_cost,
                 evidence_ids,
                 selected_proofs: selected_proofs.to_vec(),
             };
@@ -447,7 +454,7 @@ impl<'a> ExactSearch<'a> {
 
             let mut missing = false;
             let mut ineligible = false;
-            let mut families = BTreeSet::new();
+            let mut families = BTreeSet::<String>::new();
             for evidence_id in &alternative.evidence_dependencies {
                 let Some(candidate) = self.candidate_by_id.get(evidence_id.as_str()) else {
                     missing = true;
@@ -457,7 +464,7 @@ impl<'a> ExactSearch<'a> {
                     ineligible = true;
                     continue;
                 }
-                families.insert(candidate.source_family_id.as_str());
+                families.insert(candidate.source_family_id.clone());
             }
 
             if missing || ineligible {
@@ -483,7 +490,10 @@ impl<'a> ExactSearch<'a> {
 
             let mut next_evidence = selected_evidence_ids.clone();
             next_evidence.extend(alternative.evidence_dependencies.iter().cloned());
-            let next_cost = self.cost_of_set(&next_evidence);
+            let Some(next_cost) = self.cost_of_set(&next_evidence) else {
+                self.budget_blocked = true;
+                continue;
+            };
             if next_cost > self.request.token_budget {
                 self.budget_blocked = true;
                 continue;
@@ -503,17 +513,11 @@ impl<'a> ExactSearch<'a> {
         }
     }
 
-    fn cost_of_set(&self, evidence_ids: &BTreeSet<String>) -> u64 {
-        evidence_ids
-            .iter()
-            .filter_map(|id| self.candidate_by_id.get(id.as_str()))
-            .map(|candidate| candidate.token_cost as u64)
-            .sum()
-    }
-
-    fn cost_of(&self, evidence_ids: &[String]) -> u64 {
-        let set: BTreeSet<_> = evidence_ids.iter().cloned().collect();
-        self.cost_of_set(&set)
+    fn cost_of_set(&self, evidence_ids: &BTreeSet<String>) -> Option<u64> {
+        evidence_ids.iter().try_fold(0u64, |total, id| {
+            let candidate = self.candidate_by_id.get(id.as_str())?;
+            total.checked_add(candidate.token_cost as u64)
+        })
     }
 
     fn consider(&mut self, candidate: CandidatePlan) {
@@ -1168,6 +1172,45 @@ mod tests {
         assert_eq!(result.status, ProofBudgetStatus::SearchLimitReached);
         assert_eq!(result.packet_sha256, None);
         assert!(result.evidence.is_empty());
+    }
+
+    #[test]
+    fn exact_solver_matches_exhaustive_oracle_for_small_shared_proof_graph() {
+        let req = request(
+            vec![
+                candidate("A", "family-A", 2),
+                candidate("B", "family-B", 3),
+                candidate("C", "family-C", 1),
+                candidate("D", "family-D", 2),
+                candidate("E", "family-E", 1),
+            ],
+            vec![
+                obligation(
+                    "claim-1",
+                    vec![
+                        justification("p1-AB", &["A", "B"]),
+                        justification("p1-C", &["C"]),
+                    ],
+                ),
+                obligation(
+                    "claim-2",
+                    vec![
+                        justification("p2-CD", &["C", "D"]),
+                        justification("p2-E", &["E"]),
+                    ],
+                ),
+            ],
+            20,
+        );
+        // Exhaustive four-combination oracle:
+        // AB+CD=8, AB+E=6, C+CD=3, C+E=2.
+        let result = solve_proof_budget(req).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 2);
+        assert_eq!(
+            result.selected_proofs.iter().map(|proof| proof.justification_id.as_str()).collect::<Vec<_>>(),
+            vec!["p1-C", "p2-E"]
+        );
     }
 
     #[test]
