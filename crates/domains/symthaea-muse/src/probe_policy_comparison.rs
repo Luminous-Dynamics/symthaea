@@ -545,7 +545,7 @@ fn build_comparison(
     {
         return Err(ProbePolicyComparisonError::EventCountMismatch);
     }
-    if total_frames != factorial_report.input_frame_count as u64 {
+    if total_frames != factorial_report.output_frame_count as u64 {
         return Err(ProbePolicyComparisonError::FrameCountMismatch);
     }
     if budgets.is_empty() || seeds.is_empty() || seeds.len() > MAX_COMPARISON_SEEDS {
@@ -1092,6 +1092,107 @@ mod tests {
         let oracle = find_row(&report, ProbeSelectionPolicy::OracleTopK, 31, 3);
         assert_eq!(oracle.selected_pair_count, 3);
         assert_eq!(oracle.recall, Some(1.0));
+    }
+
+    #[test]
+    fn support_horizon_uses_fir_output_frames_not_source_frames() {
+        let events = vec![
+            event_window(0, 0.2, 60, 64),
+            event_window(1, 0.3, 60, 64),
+        ];
+        let effect = SyntheticEffect::LinearFir {
+            impulse_response: vec![1.0, 0.5, 0.25, 0.125],
+        };
+        let config = FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
+            spectral_window_frames: 64,
+        };
+        let factorial = crate::factorial_ground_truth::build_factorial_ground_truth(
+            &events,
+            &effect,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(factorial.input_frame_count, 64);
+        assert_eq!(factorial.output_frame_count, 67);
+
+        let supports = vec![support(0, 60, 67), support(1, 60, 67)];
+        let planner = planner_config();
+        let metric = InteractionProbeBenchmarkConfig::default();
+        let score = digest("score");
+        let renderer = digest("renderer");
+        let seeds = [37u64];
+        let budgets = [1usize];
+        let report = compare_probe_policies(
+            &factorial,
+            &events,
+            &effect,
+            &config,
+            &score,
+            &renderer,
+            67,
+            &supports,
+            &planner,
+            &budgets,
+            &seeds,
+            &metric,
+        )
+        .unwrap();
+
+        assert!(verify_probe_policy_comparison(
+            &report,
+            &factorial,
+            &events,
+            &effect,
+            &config,
+            &score,
+            &renderer,
+            67,
+            &supports,
+            &planner,
+            &budgets,
+            &seeds,
+            &metric,
+        )
+        .unwrap());
+        assert_eq!(
+            compare_probe_policies(
+                &factorial,
+                &events,
+                &effect,
+                &config,
+                &score,
+                &renderer,
+                64,
+                &supports,
+                &planner,
+                &budgets,
+                &seeds,
+                &metric,
+            )
+            .unwrap_err(),
+            ProbePolicyComparisonError::FrameCountMismatch,
+        );
+
+        let out_of_range = vec![support(0, 60, 68), support(1, 60, 67)];
+        assert_eq!(
+            compare_probe_policies(
+                &factorial,
+                &events,
+                &effect,
+                &config,
+                &score,
+                &renderer,
+                67,
+                &out_of_range,
+                &planner,
+                &budgets,
+                &seeds,
+                &metric,
+            )
+            .unwrap_err(),
+            ProbePolicyComparisonError::InvalidSupport,
+        );
     }
 
     #[test]
