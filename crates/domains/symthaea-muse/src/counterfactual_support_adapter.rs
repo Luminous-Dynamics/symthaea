@@ -452,7 +452,7 @@ pub fn verify_counterfactual_event_support(
 /// report/input/calibration. The opaque token is not deserialized from a digest.
 pub fn verify_counterfactual_event_support_evidence(
     supplied: &CounterfactualEventSupportEvidence,
-    report: &CounterfactualInfluenceReport,
+    report: &CounterfactualInfluenceSegmentedReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
     calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<bool, CounterfactualSupportAdapterError> {
