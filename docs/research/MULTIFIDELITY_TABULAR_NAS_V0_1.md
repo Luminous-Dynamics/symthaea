@@ -244,7 +244,48 @@ For equal-budget experiments, run random, single-best-proxy, consensus, trajecto
 
 The comparison runner now has common candidate-pool selectors for public-catalog random sampling, single-proxy ranking and trajectory-promotion plans. The multi-fidelity constructor permits an empty proxy schema, so random search is a real no-proxy baseline rather than a synthetic "random proxy" column. All pool strategies can feed the same preflighted Successive Halving schedule.
 
-## 11. External benchmark and data limitations
+## 11. Calibrated learning-curve promotion and false-elimination risk
+
+HiP-BO (Cai et al., available online 16 October 2026) identifies a central weakness of ordinary Successive Halving/Hyperband: early scores can be sparse, noisy or rank-reversing, so eliminating a candidate from its current rung can discard a model that later finishes well. HiP-BO combines task-level historical priors with a pretrained learning-curve predictor (LCPFN) for cost-aware fidelity decisions. This branch does not reproduce HiP-BO; it adds an inspectable statistical baseline to isolate the value of calibration and guarded exploration.
+
+The new Rust module is `learning_curve_promotion.rs`. It implements:
+- per-rung linear regression of final performance from the latest observed score; from rung 1 onward it also uses score-per-resource slope;
+- separate architecture-disjoint model-fit and residual-calibration samples, plus a third held-out evaluation split;
+- normalized split-conformal absolute-residual quantiles from the residual-calibration set;
+- candidate-dependent interval radii based on regression leverage, so out-of-calibration-range curves can receive wider intervals;
+- objective-direction-aware conservative and optimistic bounds for maximize/minimize metrics;
+- promotion by the strongest conservative bounds, followed by explicit optimistic-bound guard slots for promising uncertain candidates;
+- data, configuration, coefficient, interval and selection digests; inference and selection recompute the model/prediction content before use.
+
+The calibration contract requires a pinned source artifact digest, benchmark/metric identity, fidelity IDs/costs, three pairwise disjoint architecture split IDs, minimum fit/calibration counts and a declared miscoverage level `alpha`. The normalized split-conformal interval's marginal coverage is only justified under the relevant exchangeability assumptions. Search-space or task shift can invalidate coverage; therefore OOD coverage must be measured rather than assumed.
+
+The multi-fidelity evaluator now exposes `run_calibrated_successive_halving(initial_ids, rung_populations, guard_slots_per_rung, calibrator)`. It validates calibration provenance against the target benchmark, uses the same target-query capability and final-quality evaluator as raw-score Successive Halving, preflights the complete resource schedule, and hashes the calibration, every promotion stage and the target-query receipt together. Twenty Rust tests are authored in the multi-fidelity module (including calibrated runner integration and fail-closed split/guard checks); twelve are authored in the learning-curve module. They have not been compiled or executed.
+
+### Required ablation and benchmark targets
+
+Compare all policies on identical candidate pools, seed commitments, final-query budgets and total target-resource schedules:
+1. Random initial pool + raw-score Successive Halving.
+2. Single-proxy pool + raw-score Successive Halving.
+3. CoRA-style consensus pool + raw-score Successive Halving.
+4. Trajectory-preserving pool + raw-score Successive Halving.
+5. Raw-score Successive Halving (reference promotion policy).
+6. Calibrated conservative-bound promotion without guard slots.
+7. Calibrated conservative-bound plus optimistic guard-slot promotion.
+8. Pinned HiP-BO/LCPFN, BOHB/DEHB or other applicable learned curve/multi-fidelity baselines.
+
+Use learning-curve-capable tasks rather than a single final-score-only table. NAS-Bench-x11 provides curve information through NAS-Bench-111, NAS-Bench-311 and NAS-Bench-NLP11 surrogate benchmarks; NAS-Bench-201's full epoch trajectories can serve as a separate tabular benchmark after raw artifacts and seed semantics are pinned. Include NB201 CIFAR-10, CIFAR-100 and ImageNet16-120, then NB101/311 and NAS-Bench-NLP11 for search-space transfer. Do not train the calibrator on the evaluation architectures or tune its coverage level after seeing the challenge split.
+
+Report:
+- empirical marginal and conditional interval coverage at each rung, interval width and normalized residuals;
+- false-elimination rate: fraction of architectures that would finish in true final top-K but were eliminated before final fidelity;
+- top-1/top-10 survival by rung, final-confirmed P@1/P@10/P@100, best-found simple/normalized regret and CVaR-10% regret;
+- rank-crossing and late-bloomer retention separately from average cases;
+- paired-seed anytime quality versus declared resource, with proxy time and target-training cost kept separate;
+- worst-task and worst-seed regressions, not only aggregate means.
+
+Initial qualification targets (prospective, not achieved): empirical interval coverage within 5 percentage points of the declared nominal level on in-distribution development-disjoint evaluation; materially lower false-elimination rate than raw-score SH on rank-crossing families; at least 10% relative improvement in median normalized regret at equal declared target cost without more than 5% regression on a preregistered critical task; positive paired effect on at least two held-out benchmark families before claiming transfer.
+
+## 12. External benchmark and data limitations
 
 The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201, CoRA-NAS or R-MF-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
 
@@ -262,6 +303,6 @@ HiP-BO (Cai, Xian & Huang, *Neurocomputing*, available online 16 October 2026, D
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
-## 12. Claim ceiling
+## 13. Claim ceiling
 
 This module makes multi-fidelity resource use auditable. It does not implement ZAPS, CoRA, Hyperband, BOHB, DEHB or an optimizer. Passing its synthetic tests would qualify only the evaluator contract, not NAS search quality, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
