@@ -533,6 +533,7 @@ pub fn trajectory_candidate_pool(
     };
     if digest_plan_from_archive(
         &plan.archive_sha256,
+        &plan.proxy_id,
         &reconstructed_mix,
         &plan.candidates,
     ) != plan.plan_sha256
@@ -1287,17 +1288,19 @@ fn digest_plan(
     mix: &PromotionMix,
     candidates: &[PromotionCandidate],
 ) -> String {
-    digest_plan_from_archive(&archive.archive_sha256, mix, candidates)
+    digest_plan_from_archive(&archive.archive_sha256, &archive.proxy_id, mix, candidates)
 }
 
 fn digest_plan_from_archive(
     archive_sha256: &str,
+    proxy_id: &str,
     mix: &PromotionMix,
     candidates: &[PromotionCandidate],
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.nasbench201.trajectory-promotion-plan.v0.1");
     update_string(&mut hasher, archive_sha256);
+    update_string(&mut hasher, proxy_id);
     hasher.update((mix.promotion_count as u64).to_be_bytes());
     hasher.update((mix.proxy_elite_quota as u64).to_be_bytes());
     hasher.update((mix.trajectory_quota as u64).to_be_bytes());
@@ -1470,6 +1473,10 @@ mod tests {
         let mut plan = plan_promotions(&features, &archive, &mix).unwrap();
         plan.candidates[0].architecture_id = "changed-after-planning".into();
         assert!(trajectory_candidate_pool(&plan).is_err());
+
+        let mut metadata_tampered = plan_promotions(&features, &archive, &mix).unwrap();
+        metadata_tampered.proxy_id = "different-proxy".into();
+        assert!(trajectory_candidate_pool(&metadata_tampered).is_err());
     }
 
     #[test]
