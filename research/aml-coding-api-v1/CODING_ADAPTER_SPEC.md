@@ -179,6 +179,26 @@ WAL mode also creates `-wal` and `-shm` sidecar files. Logical row deletion is n
 
 `memory_challenge_sled.rs` remains available as an experimental backend comparison. Sled 0.34 documents itself as beta; keep it for research comparison only. Prefer SQLite/WAL for the local single-node persistence baseline. Neither backend is yet the final public competition service, and neither removes the requirement to use `text-embedding-v4` for embeddings in Open-source Methods.
 
+## 5D. Optional Axum HTTP service
+
+The optional `aml-http-server` feature exposes `memory_challenge_http.rs` and the `broca-aml-server` binary. It is built on Axum 0.8 and uses the SQLite/WAL backend.
+
+Routes:
+- `GET /health`: unauthenticated health response.
+- `POST /add`: synchronous typed AML Add; returns HTTP 200 only after durable commit and immediate Search visibility.
+- `POST /search`: typed AML Search; returns the top-level `data` array and rejects `top_k > 100`.
+
+Authentication accepts `Authorization: Bearer`, `Authorization: Token`, and `X-Api-Key`. A configured key of at least 32 bytes is required at process start. Body size and in-flight request concurrency are bounded. SQLite work runs in `spawn_blocking` so the async executor is not blocked by database calls.
+
+Build command:
+```sh
+cargo run -p symthaea-broca --features aml-http-server --bin broca-aml-server
+```
+
+Environment: `AML_DB_PATH` and `AML_API_KEY` are required; optional `AML_BIND`, `AML_PAYLOAD_ROOT`, `AML_MAX_BODY_BYTES`, and `AML_MAX_CONCURRENCY` have documented defaults in [HTTP_SERVER_DEPLOYMENT.md](./HTTP_SERVER_DEPLOYMENT.md).
+
+This executable is a plain HTTP listener intended to sit behind public HTTPS ingress. It is not deployed by CI and is not a public endpoint by virtue of merging the PR. The server starts a daily logical-retention worker when run through `serve()`, purging Add batches older than 29 days and dependent lifecycle events to leave a one-day margin under the organizer's 30-day rule. This is not forensic erasure: WAL/SHM sidecars, backups and snapshots retain separate operator-controlled deletion policies. A successful local router test does not replace the official AML Smoke or Full evaluation.
+
 ## 6. Conformance artifacts
 
 - [JSON Schema](./coding-api-schema.json)

@@ -49,7 +49,11 @@ pub struct AmlMessage {
 
 impl AmlMessage {
     fn validate(&self, index: usize) -> Result<(), String> {
-        require_non_empty(&self.content, &format!("messages[{index}].content"))
+        require_non_empty(&self.content, &format!("messages[{index}].content"))?;
+        if self.timestamp.is_some_and(|timestamp| timestamp < 0) {
+            return Err(format!("messages[{index}].timestamp must be non-negative Unix milliseconds"));
+        }
+        Ok(())
     }
 }
 
@@ -407,6 +411,13 @@ mod tests {
         ) -> Result<AmlSearchResponse, String> {
             Ok(self.search_response.clone())
         }
+    }
+
+    #[test]
+    fn add_rejects_negative_source_timestamp_as_invalid_input() {
+        let mut request = add_request();
+        request.messages[0].timestamp = Some(-1);
+        assert!(request.validate().unwrap_err().contains("timestamp must be non-negative"));
     }
 
     #[test]
