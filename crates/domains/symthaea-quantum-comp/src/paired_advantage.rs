@@ -103,6 +103,8 @@ pub struct HolmAdjustedPValue {
 pub enum PairedAdvantageError {
     /// No independent paired workload blocks were supplied.
     EmptyObservations,
+    /// At least two independent blocks are required for an inferential comparison.
+    InsufficientIndependentBlocks,
     /// A required identifier is blank.
     EmptyIdentifier,
     /// An independent block identifier is duplicated.
@@ -129,6 +131,7 @@ impl std::fmt::Display for PairedAdvantageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
             Self::EmptyObservations => "no independent paired workload blocks",
+            Self::InsufficientIndependentBlocks => "at least two independent blocks are required",
             Self::EmptyIdentifier => "required identifier is blank",
             Self::DuplicateBlockId => "duplicate independent block identifier",
             Self::DuplicateWorkloadFingerprint => "duplicate workload fingerprint",
@@ -159,6 +162,9 @@ pub fn analyze_paired_advantage(
 ) -> Result<PairedAdvantageReport, PairedAdvantageError> {
     if observations.is_empty() {
         return Err(PairedAdvantageError::EmptyObservations);
+    }
+    if observations.len() < 2 {
+        return Err(PairedAdvantageError::InsufficientIndependentBlocks);
     }
     if !config.min_relative_resource_gain.is_finite()
         || config.min_relative_resource_gain < 0.0
@@ -214,12 +220,23 @@ pub fn analyze_paired_advantage(
             return Err(PairedAdvantageError::InvalidQuality);
         }
 
-        quality_differences.push(observation.quantum_quality - observation.classical_quality);
+        let quality_difference = observation.quantum_quality - observation.classical_quality;
+        if !quality_difference.is_finite() {
+            return Err(PairedAdvantageError::InvalidQuality);
+        }
+        quality_differences.push(quality_difference);
         resource_log_ratios.push(classical_resource.ln() - quantum_resource.ln());
     }
 
     let quality_threshold = -config.quality_non_inferiority_margin;
     let resource_threshold = config.min_relative_resource_gain.ln_1p();
+    if !(quality_threshold - config.quality_difference_tie_tolerance).is_finite()
+        || !(quality_threshold + config.quality_difference_tie_tolerance).is_finite()
+        || !(resource_threshold - config.resource_log_ratio_tie_tolerance).is_finite()
+        || !(resource_threshold + config.resource_log_ratio_tie_tolerance).is_finite()
+    {
+        return Err(PairedAdvantageError::InvalidConfig);
+    }
     let quality_non_inferiority = exact_margin_sign_test(
         &quality_differences,
         quality_threshold,
@@ -414,6 +431,25 @@ mod tests {
             resource_log_ratio_tie_tolerance: 1e-12,
             quality_difference_tie_tolerance: 1e-12,
         }
+    }
+
+    #[test]
+    fn ties_remain_in_the_exact_test_denominator() {
+        let report = exact_margin_sign_test(&[1.0, 0.0, -1.0], 0.0, 0.0);
+        assert_eq!(report.wins, 1);
+        assert_eq!(report.losses, 1);
+        assert_eq!(report.ties, 1);
+        assert_eq!(report.effective_n, 3);
+        assert!((report.p_value_one_sided - 0.875).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_single_independent_block_is_not_enough() {
+        let observation = fixture_observations().remove(0);
+        assert_eq!(
+            analyze_paired_advantage(&[observation], fixture_config()).unwrap_err(),
+            PairedAdvantageError::InsufficientIndependentBlocks
+        );
     }
 
     #[test]
