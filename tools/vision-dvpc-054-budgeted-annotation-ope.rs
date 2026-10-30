@@ -2861,8 +2861,8 @@ fn selection_regret_benchmark_rows_with_config(
         &world,
         &profiles,
         &portfolio,
-        REGRET_SAA_EVALUATION_N,
-        REGRET_SAA_REPLICATES,
+        saa_evaluation_n,
+        saa_replicates,
         saa_seed,
     )?;
 
@@ -2959,8 +2959,8 @@ fn selection_regret_benchmark_rows_with_config(
                 world.name,
                 profile.name,
                 method,
-                REGRET_SAA_REPLICATES,
-                REGRET_HOLDOUT_REPLICATES,
+                saa_replicates,
+                holdout_replicates,
                 world.budget,
                 allocation.cost(&world),
                 allocation.total_count(),
