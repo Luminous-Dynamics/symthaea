@@ -222,6 +222,8 @@ This evaluator binds the exact proposal bytes, ranking-report bytes, sampling pr
 
 The complete `error_families` vocabulary must be unique and preregistered in the audit input; every sampled error must belong to it. Declared families with no sampled observations remain visible with zero estimated count and undefined recall when the denominator is zero.
 
+The report exposes sampled per-family counts and keeps declared families with no observed sample errors in the report. For non-census strata, it withholds normal-approximation intervals not only for samples below 30 PSUs but also when the observed total or ratio-residual sample variance is zero; a zero sample variance is not evidence that rare errors are absent from unsampled PSUs.
+
 The report estimates:
 - finite-frame total, covered, and uncovered error counts using stratified Horvitz–Thompson totals;
 - candidate-generation recall as a ratio of covered to total estimated errors;
