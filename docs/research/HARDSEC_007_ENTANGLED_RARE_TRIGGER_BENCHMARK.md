@@ -408,7 +408,7 @@ cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-au
 
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
 
-The trigger-budget suite has **9 tests**. The evidence-packet auditor has **26 tests**, including the SeqCube witness-only fixture and negative controls for claim inflation. Both suites have now been compiled and passed in the focused GitHub Actions job described below.
+The trigger-budget suite has **9 tests**. The evidence-packet auditor has **32 tests**, including the SeqCube witness-only fixture, local evidence-byte verification, and negative controls for claim inflation. Both suites have been compiled and passed in the focused GitHub Actions job described below.
 
 ### Isolated focused Rust test harness
 
@@ -422,17 +422,63 @@ cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --exa
 cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
 ```
 
-On exact PR head `d8b58a7b27ea38786c0e7b08f45853f76188030a`, GitHub Actions run [41035491438](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41035491438) completed successfully: **rustfmt check passed**, **9/9** trigger-budget tests passed, and **26/26** evidence-packet tests passed. The previous focused compile/test run [41034832167](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41034832167) also passed both suites before formatting was made a required step.
+On exact PR head `ff051d49a22a9defbbaacd8a8ceb38ecfc8ff921`, GitHub Actions run [41047752417](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41047752417) completed successfully: **rustfmt check passed**, **9/9** trigger-budget tests passed, **32/32** evidence-packet tests passed, and the pinned SeqCube package replay, byte audit, and negative controls all passed.
 
 The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12967771808`, archive digest `sha256:b849390c04deb6c94278bf53d4b34d67f1779d377799893b3a4f67f713078262`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
 
-The independent SeqCube package verifier remains **not run** here. The passing Rust test validates only the evidence packet's handling of publisher-listed digests and claim scopes; it does not fetch the package's files or reproduce Z3/Icarus outputs.
+## 14. Independent SeqCube-HT reference-package replay
+
+The focused workflow has now independently fetched and replayed the exact public reference package at commit `e5acac37af6dbe1fa53b0be93199bb81a62c5320`. This remains a **single known-answer reference design**, not a member of the paper's 3,240-instance experimental corpus; its upstream manifest says `reported_corpus_member: false` and `generator_included: false`.
+
+### Byte-level source reconciliation
+
+The workflow downloaded the GitHub archive for the pinned commit and compared every path in the publisher's 25-entry `checksums/SHA256SUMS` file:
+
+- **13/25** extracted files matched the publisher digest byte-for-byte.
+- **12/25** extracted files were LF-only; their LF-to-CRLF reconstructed copies matched the publisher digest exactly.
+- **0/25** digest mismatches remained.
+- The original extracted archive was preserved unchanged; the verifier ran against a separate canonical copy with only those 12 proven line-ending conversions.
+- The pinned GitHub archive SHA-256 was `f061e2f126fc407324fcd89c1bc906b37316aab5587ffc3cb902e0f5a95362ad`.
+
+The line-ending reconciliation is explicit and included in the run receipt; it is not represented as 25 exact byte matches.
+
+### Independent functional and bounded-formal replay
+
+The pinned upstream `verify/verify_package.py` was executed with Z3 and Icarus Verilog installed in the runner. It returned:
+
+- `VERIFICATION PASSED`;
+- active reconstruction: **SAT**, 352 reconstructed assertions;
+- inactive reconstruction: **UNSAT**, 351 reconstructed assertions;
+- Icarus Verilog replay: **passed**;
+- the active reset-consistent trigger phases were observed at cycles **2, 4 and 6**;
+- the first clean/infected primary-output difference was observed at cycle **8**;
+- the inactive ten-cycle control produced no primary-output difference.
+
+The inactive result is bounded to the package's recorded sequence/query and assumptions. It is not a proof of global trigger unreachability.
+
+### HARDSEC-007 packet replay and tamper control
+
+The Rust evidence-packet auditor ran in detector-free `witness_validation` mode against the canonical source package and verified **9 local files**: the infected netlist, replay traces, expected observation record, inactive SMT input, and assumptions/configuration bytes. The packet receipt has SHA-256 `c5759eee51c250d26506c17f4c97f506d5e172c9f5b5dd1ee2b449239876df85`. It supports five distinct, narrowly scoped claims: active trigger observed; active payload effect observed; inactive trigger not observed in ten cycles; inactive payload effect not observed in ten cycles; and bounded inactive no-counterexample.
+
+A deliberate mutation appended to `replay/active.csv` was rejected by both the HARDSEC evidence auditor and the upstream SeqCube verifier. Both negative-control processes exited nonzero and reported the expected SHA-256 mismatch. This checks that a corrupted trace cannot pass merely because its packet metadata still looks valid.
+
+### Durable workflow receipt
+
+The successful run was [41047752417](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41047752417), job `124035928014`, on PR head `ff051d49a22a9defbbaacd8a8ceb38ecfc8ff921`. Its uploaded evidence artifact was `hardsec-seqcubewitness-validation-receipt`, artifact ID `12973167457`, GitHub-reported archive digest `sha256:1bb0c5a10a577a0583cc83e4d3ebec2657c20003557bba27e0d19eb2bd40f5b0`.
+
+The artifact contains the publisher-checksum reconciliation, independent verifier report and stdout/stderr, toolchain versions, evidence-audit receipt, and both negative-control error logs. The artifact was retrieved and inspected after the run.
+
+**Scope ceiling:** this proves a pinned reference package can be checksum-reconciled, replayed, and represented in a byte-verified detector-free evidence packet. It does not reproduce SeqCube-HT's 3,240 generated instances, establish detector performance, validate the complete paper corpus, or certify hardware.
+
+### Cryptographic provenance
+
+The focused workflow is being extended to create a deterministic evidence bundle and attach a Sigstore-signed GitHub artifact attestation with a custom HARDSEC predicate. The attestation is intended to bind the bundle digest to the repository, workflow and source commit. Even after signature verification, the predicate remains a workflow-authored claim; reviewers must still inspect the bundle's evidence and limits. The attestation run is pending for this revision.
 
 Useful tool references:
 - SymbiYosys: https://symbiyosys.readthedocs.io/en/latest/ (bounded/unbounded safety, cover and liveness)
 - EQY equivalence tutorial: https://formal.org/tutorials/symbiyosys/equivalence-checking (gold/gate comparison, partition proofs and counterexamples)
 - SeqCube-HT (2026): https://doi.org/10.1186/s42400-026-00676-2 (state-cube-guided sequential Trojan benchmark methodology)
 
-## 14. Scope boundary
+## 15. Scope boundary
 
 This is defensive benchmark and evaluation infrastructure. It does not construct or deploy Trojan payloads, claim a Trojan is absent because finite simulation was quiet, or certify silicon. Formal results must preserve assumptions, bounds and solver provenance. The public contest repository's code/checkpoint/data must not be redistributed until a license or explicit permission is established.
