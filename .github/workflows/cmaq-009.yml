@@ -96,7 +96,7 @@ jobs:
           assert adaptive["p90_detection_delay_steps"] <= 16.0
           assert adaptive["mean_utility_delta_vs_passive"] > 0.0
           assert adaptive["utility_delta_ci95_low"] > 0.0
-          assert by_key[("stationary", "adaptive_probe")]["false_revocation_episode_rate"] <= 0.05
+          assert by_key[("stationary", "adaptive_probe_32")]["false_revocation_episode_rate"] <= 0.05
 
           # Zero-information probes cost resources but must not alter decisions.
           zero = by_key[(abrupt, "zero_info_probe_32")]
