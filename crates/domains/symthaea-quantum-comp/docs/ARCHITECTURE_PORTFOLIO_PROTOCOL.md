@@ -195,3 +195,30 @@ Direct measurement requires a device, toolchain and runner identity. Published p
 A SHA-256 digest is content identity only. It does not authenticate the submitter, certify the meter, prove chain of custody or prove that a publication's reported measurement is correct. Published results may retain unknown repeat counts, toolchains, interval methods and aggregation methods as absent values. Such records remain visible as references, but the evidence-bound system comparison/routing path refuses to rank them until repeat counts and uncertainty/aggregation provenance are available. Cryptographic attestation and trusted measurement capture are separate capabilities.
 
 All fixture hashes and identities are fabricated test values. They do not refer to actual devices, benchmark submissions or measurements.
+
+
+## Workload regime profiles and held-out generalization (QARCH-021)
+
+The capability atlas must describe the operating condition of a workload separately from the architecture observation. A regime profile binds to the exact observation ID, workload fingerprint, workload-family ID, holdout-group ID and comparison-contract digest.
+
+The v1 profile supports optional event rate, burst peak-to-mean ratio plus its window, active fraction, temporal horizon, working-set bytes, state-update rate, deadline, batch-size interval, numeric-precision contract, and communication-boundary records. Missing values remain absent (unknown); they are never converted to zero.
+
+### Temporal and memory co-design hypothesis
+
+The 16 June 2026 Nature Machine Intelligence study *Algorithm–hardware co-design of neuromorphic networks with dual memory pathways* (DOI: 10.1038/s42256-026-01255-3) separates fast sparse event activity from a compact slow contextual state and co-designs a near-memory datapath. It evaluates S-MNIST/PS-MNIST and event-audio SHD/SSC; the paper reports parameter reductions and hardware efficiency relative to its selected baselines, with the hardware efficiency claims based on post-layout simulation in 22FDX.
+
+For Symthaea, this is a hypothesis to test—not evidence that a spiking architecture will improve HDC-LTC. Reuse #7749's active HDC-LTC implementation and trajectory gates. Compare full-state, fast-only, slow-only and fast-plus-compact-slow-context ablations; preserve continuous-time semantics; record temporal-horizon coverage, state bytes, tier traffic, update cost and task utility.
+
+For HDC retrieval, reuse #7864's exact BinaryHV oracle. Compare host-resident, streamed, persistent-local and two-tier profiles. A local-cache miss must trigger a measured fallback or an explicitly incomplete outcome; it must never silently omit codebook candidates.
+
+### Communication is orthogonal to compute
+
+Each communication-boundary row has a distinct boundary identifier, optional fabric family, read/write bytes per unit of work, bandwidth, latency and directly measured energy/bit. Do not double-count the same bytes across duplicate boundary labels.
+
+Co-packaged optical interconnect is represented as a communication fabric, not photonic matrix compute. The 2026 Nature Electronics co-packaged-optics review identifies electro-optic conversion, optical transmission, thermal management and packaging as system-level determinants (DOI: 10.1038/s41928-026-01681-6). A link-level result must not be substituted for end-to-end application performance.
+
+### Holdout discipline
+
+A workload-family ID and source dataset/holdout-group ID may appear multiple times inside one partition, but neither may cross development, validation, confirmatory or test partitions. Split on families/datasets, not randomly across repeats from the same fixture. Report interpolation and extrapolation separately, and report per-regime frontiers before any cross-regime aggregation.
+
+Unknown regime attributes fail a constrained slice query: absence is not treated as zero, average, or unconstrained compatibility. The profile is metadata only; it does not create benchmark measurements, validate hardware, or establish architecture advantage.

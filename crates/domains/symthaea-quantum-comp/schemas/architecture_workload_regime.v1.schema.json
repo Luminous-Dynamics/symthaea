@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.quantum_comp.architecture_workload_regime.v1",
+  "title": "QARCH architecture workload-regime profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "regime_profile_id",
+    "observation_record_id",
+    "workload_fingerprint",
+    "workload_family_id",
+    "holdout_group_id",
+    "comparison_contract_fingerprint",
+    "origin",
+    "source_reference",
+    "source_artifact_sha256",
+    "execution_mode",
+    "temporal_pattern",
+    "unit_of_work",
+    "precision_profile",
+    "precision_contract_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.quantum_comp.architecture_workload_regime.v1"
+    },
+    "regime_profile_id": {"type": "string", "minLength": 1},
+    "observation_record_id": {"type": "string", "minLength": 1},
+    "workload_fingerprint": {"type": "string", "minLength": 1},
+    "workload_family_id": {"type": "string", "minLength": 1},
+    "holdout_group_id": {"type": "string", "minLength": 1},
+    "comparison_contract_fingerprint": {"type": "string", "minLength": 1},
+    "origin": {
+      "enum": [
+        "declared_workload",
+        "measured_input_trace",
+        "dataset_derived",
+        "published_description"
+      ]
+    },
+    "source_reference": {"type": "string", "minLength": 1},
+    "source_artifact_sha256": {"$ref": "#/$defs/sha256"},
+    "extraction_procedure_sha256": {"$ref": "#/$defs/sha256"},
+    "execution_mode": {"enum": ["batch", "streaming", "hybrid"]},
+    "temporal_pattern": {
+      "enum": [
+        "static",
+        "periodic",
+        "continuous",
+        "bursty",
+        "event_driven",
+        "irregular"
+      ]
+    },
+    "unit_of_work": {"type": "string", "minLength": 1},
+    "event_rate_hz": {"$ref": "#/$defs/non_negative_interval"},
+    "burst_peak_to_mean_ratio": {"$ref": "#/$defs/non_negative_interval"},
+    "burst_window_seconds": {"$ref": "#/$defs/positive_interval"},
+    "active_fraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": {"type": "number", "minimum": 0, "maximum": 1},
+        "upper": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "temporal_horizon_seconds": {"$ref": "#/$defs/positive_interval"},
+    "working_set_bytes": {"$ref": "#/$defs/byte_interval"},
+    "state_update_rate_hz": {"$ref": "#/$defs/non_negative_interval"},
+    "deadline_seconds": {"$ref": "#/$defs/positive_interval"},
+    "batch_size": {"$ref": "#/$defs/count_interval"},
+    "precision_profile": {
+      "enum": [
+        "exact",
+        "fixed_point",
+        "float16",
+        "bfloat16",
+        "float32",
+        "float64",
+        "mixed"
+      ]
+    },
+    "precision_contract_id": {"type": "string", "minLength": 1},
+    "communication_boundaries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/communication_boundary"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "origin": {"enum": ["measured_input_trace", "dataset_derived"]}
+        }
+      },
+      "then": {"required": ["extraction_procedure_sha256"]}
+    },
+    {
+      "if": {"required": ["burst_peak_to_mean_ratio"]},
+      "then": {"required": ["burst_window_seconds", "event_rate_hz"]}
+    },
+    {
+      "if": {"required": ["burst_window_seconds"]},
+      "then": {"required": ["burst_peak_to_mean_ratio", "event_rate_hz"]}
+    },
+    {
+      "if": {
+        "properties": {"execution_mode": {"const": "batch"}}
+      },
+      "then": {"required": ["batch_size"]}
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "non_negative_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": {"type": "number", "minimum": 0},
+        "upper": {"type": "number", "minimum": 0}
+      }
+    },
+    "positive_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": {"type": "number", "exclusiveMinimum": 0},
+        "upper": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "byte_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower_bytes", "upper_bytes"],
+      "properties": {
+        "lower_bytes": {"type": "integer", "minimum": 0},
+        "upper_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "count_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper"],
+      "properties": {
+        "lower": {"type": "integer", "minimum": 1},
+        "upper": {"type": "integer", "minimum": 1}
+      }
+    },
+    "communication_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary_id"],
+      "properties": {
+        "boundary_id": {"type": "string", "minLength": 1},
+        "fabric": {
+          "enum": [
+            "on_chip_network",
+            "ddr_memory_channel",
+            "hbm_memory_channel",
+            "pcie",
+            "cxl",
+            "ethernet",
+            "infiniband",
+            "optical_chip_to_chip",
+            "event_address_network",
+            "other"
+          ]
+        },
+        "read_bytes_per_unit": {"$ref": "#/$defs/byte_interval"},
+        "written_bytes_per_unit": {"$ref": "#/$defs/byte_interval"},
+        "bandwidth_bytes_per_second": {"$ref": "#/$defs/positive_interval"},
+        "latency_seconds": {"$ref": "#/$defs/positive_interval"},
+        "energy_joules_per_bit": {"$ref": "#/$defs/non_negative_interval"}
+      },
+      "anyOf": [
+        {"required": ["read_bytes_per_unit"]},
+        {"required": ["written_bytes_per_unit"]},
+        {"required": ["bandwidth_bytes_per_second"]},
+        {"required": ["latency_seconds"]},
+        {"required": ["energy_joules_per_bit"]}
+      ]
+    }
+  }
+}

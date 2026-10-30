@@ -1,0 +1,167 @@
+{
+  "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+  "purpose": "synthetic_workload_regime_fixture_only",
+  "claim_ceiling": "All profile values and digests are fabricated; no workload was measured.",
+  "profiles": [
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
+      "regime_profile_id": "synthetic-event-bursty-stream",
+      "observation_record_id": "synthetic-event-cpu",
+      "workload_fingerprint": "synthetic-event-workload-01",
+      "workload_family_id": "synthetic-event-family",
+      "holdout_group_id": "synthetic-event-dataset-session-01",
+      "comparison_contract_fingerprint": "synthetic-event-contract",
+      "origin": "measured_input_trace",
+      "source_reference": "https://example.invalid/synthetic/event-trace",
+      "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "extraction_procedure_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "execution_mode": "streaming",
+      "temporal_pattern": "bursty",
+      "unit_of_work": "one accepted event window",
+      "event_rate_hz": {"lower": 100.0, "upper": 1000.0},
+      "burst_peak_to_mean_ratio": {"lower": 2.0, "upper": 5.0},
+      "burst_window_seconds": {"lower": 0.01, "upper": 0.02},
+      "active_fraction": {"lower": 0.05, "upper": 0.4},
+      "temporal_horizon_seconds": {"lower": 1.0, "upper": 4.0},
+      "working_set_bytes": {"lower_bytes": 4096, "upper_bytes": 8192},
+      "state_update_rate_hz": {"lower": 50.0, "upper": 100.0},
+      "deadline_seconds": {"lower": 0.001, "upper": 0.005},
+      "precision_profile": "exact",
+      "precision_contract_id": "synthetic-exact-event-count-v1",
+      "communication_boundaries": [
+        {
+          "boundary_id": "sensor-to-host",
+          "fabric": "pcie",
+          "read_bytes_per_unit": {"lower_bytes": 128, "upper_bytes": 256},
+          "bandwidth_bytes_per_second": {"lower": 100000000, "upper": 200000000}
+        },
+        {
+          "boundary_id": "host-to-accelerator",
+          "fabric": "optical_chip_to_chip",
+          "read_bytes_per_unit": {"lower_bytes": 64, "upper_bytes": 128},
+          "latency_seconds": {"lower": 0.000001, "upper": 0.000002},
+          "energy_joules_per_bit": {"lower": 0.0000000000001, "upper": 0.0000000000002}
+        }
+      ]
+    },
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
+      "regime_profile_id": "synthetic-hdc-retrieval-batch",
+      "observation_record_id": "synthetic-hdc-retrieval-cpu",
+      "workload_fingerprint": "synthetic-hdc-retrieval-workload-02",
+      "workload_family_id": "synthetic-hdc-retrieval-family",
+      "holdout_group_id": "synthetic-hdc-codebook-dataset-02",
+      "comparison_contract_fingerprint": "synthetic-hdc-retrieval-contract",
+      "origin": "dataset_derived",
+      "source_reference": "https://example.invalid/synthetic/hdc-codebook",
+      "source_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "extraction_procedure_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "execution_mode": "batch",
+      "temporal_pattern": "static",
+      "unit_of_work": "one exact nearest-match query",
+      "working_set_bytes": {"lower_bytes": 131072, "upper_bytes": 33554432},
+      "deadline_seconds": {"lower": 0.001, "upper": 0.05},
+      "batch_size": {"lower": 1, "upper": 64},
+      "precision_profile": "exact",
+      "precision_contract_id": "synthetic-binaryhv-hamming-v1",
+      "communication_boundaries": [
+        {
+          "boundary_id": "host-dram-to-accelerator",
+          "fabric": "pcie",
+          "read_bytes_per_unit": {"lower_bytes": 2048, "upper_bytes": 131072},
+          "written_bytes_per_unit": {"lower_bytes": 16, "upper_bytes": 64}
+        },
+        {
+          "boundary_id": "accelerator-local-sram",
+          "fabric": "on_chip_network",
+          "read_bytes_per_unit": {"lower_bytes": 131072, "upper_bytes": 33554432},
+          "written_bytes_per_unit": {"lower_bytes": 2, "upper_bytes": 16}
+        },
+        {
+          "boundary_id": "accelerator-hbm",
+          "fabric": "hbm_memory_channel",
+          "read_bytes_per_unit": {"lower_bytes": 0, "upper_bytes": 33554432}
+        }
+      ]
+    },
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
+      "regime_profile_id": "synthetic-hdc-ltc-fast-slow",
+      "observation_record_id": "synthetic-hdc-ltc-cpu",
+      "workload_fingerprint": "synthetic-hdc-ltc-workload-03",
+      "workload_family_id": "synthetic-hdc-ltc-family",
+      "holdout_group_id": "synthetic-hdc-ltc-sequence-source-03",
+      "comparison_contract_fingerprint": "synthetic-hdc-ltc-contract",
+      "origin": "declared_workload",
+      "source_reference": "https://example.invalid/synthetic/hdc-ltc-task-spec",
+      "source_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "execution_mode": "streaming",
+      "temporal_pattern": "continuous",
+      "unit_of_work": "one state update",
+      "temporal_horizon_seconds": {"lower": 5.0, "upper": 60.0},
+      "working_set_bytes": {"lower_bytes": 32768, "upper_bytes": 1048576},
+      "state_update_rate_hz": {"lower": 10.0, "upper": 1000.0},
+      "deadline_seconds": {"lower": 0.001, "upper": 0.02},
+      "precision_profile": "float32",
+      "precision_contract_id": "synthetic-continuoushv-f32-v1",
+      "communication_boundaries": [
+        {
+          "boundary_id": "fast-state-to-slow-context",
+          "fabric": "on_chip_network",
+          "read_bytes_per_unit": {"lower_bytes": 64, "upper_bytes": 4096},
+          "written_bytes_per_unit": {"lower_bytes": 64, "upper_bytes": 4096}
+        },
+        {
+          "boundary_id": "host-to-device-context",
+          "fabric": "cxl",
+          "read_bytes_per_unit": {"lower_bytes": 0, "upper_bytes": 65536}
+        }
+      ]
+    },
+    {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
+      "regime_profile_id": "synthetic-published-dual-memory-snn",
+      "observation_record_id": "synthetic-published-dmp-snn",
+      "workload_fingerprint": "synthetic-published-temporal-snn-workload-04",
+      "workload_family_id": "synthetic-published-snn-family",
+      "holdout_group_id": "synthetic-published-snn-paper-corpus-04",
+      "comparison_contract_fingerprint": "synthetic-published-snn-contract",
+      "origin": "published_description",
+      "source_reference": "https://example.invalid/synthetic-published-dual-memory-study",
+      "source_artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "execution_mode": "streaming",
+      "temporal_pattern": "event_driven",
+      "unit_of_work": "one event sequence",
+      "precision_profile": "mixed",
+      "precision_contract_id": "synthetic-published-description-only"
+    }
+  ],
+  "holdout_assignments": {
+    "valid": [
+      {"workload_family_id": "family-a", "holdout_group_id": "dataset-a", "partition": "development"},
+      {"workload_family_id": "family-a", "holdout_group_id": "dataset-a", "partition": "development"},
+      {"workload_family_id": "family-b", "holdout_group_id": "dataset-b", "partition": "validation"},
+      {"workload_family_id": "family-c", "holdout_group_id": "dataset-c", "partition": "confirmatory"},
+      {"workload_family_id": "family-d", "holdout_group_id": "dataset-d", "partition": "test"}
+    ],
+    "invalid_family_leakage": [
+      {"workload_family_id": "same-family", "holdout_group_id": "dataset-a", "partition": "development"},
+      {"workload_family_id": "same-family", "holdout_group_id": "dataset-b", "partition": "confirmatory"}
+    ],
+    "invalid_group_leakage": [
+      {"workload_family_id": "family-a", "holdout_group_id": "same-dataset", "partition": "development"},
+      {"workload_family_id": "family-b", "holdout_group_id": "same-dataset", "partition": "test"}
+    ]
+  },
+  "limitations": [
+    "All values and identifiers are synthetic.",
+    "Optional numeric fields left absent are unknown, not zero.",
+    "Communication boundary profiles must not double-count the same bytes at the same boundary.",
+    "Optical chip-to-chip fabric is not optical compute.",
+    "The fixture does not establish an empirical architecture advantage."
+  ]
+}
