@@ -273,7 +273,9 @@ The repository includes an author-supplied `logs/verification_report.json` with:
 - active primary-output difference first observed at cycle 8;
 - no output difference in the inactive trace.
 
-These are the **publisher-supplied recorded results**, not an independent run by this project. The local environment used for this research did not have Z3, Icarus Verilog or VVP available, and the archive could not be retrieved for local execution. Do not present the supplied log as our independent verification. The package's own README provides the replay command:
+These are the **publisher-supplied recorded results**, not an independent result from this project. The focused HARDSEC workflow is now configured to fetch the exact upstream commit, verify its `checksums/SHA256SUMS`, install the declared Z3 dependency and Icarus Verilog, and run the upstream verifier with `--require-iverilog`. Its stdout/stderr, toolchain versions and regenerated report are uploaded as an artifact. The result for the current byte-verification revision is **not yet recorded**; until its exact-head job completes successfully, do not present the upstream report as independently reproduced.
+
+The package's own README provides the replay command:
 
 ```bash
 python -m pip install -r verify/requirements.txt
@@ -296,9 +298,13 @@ A dedicated Rust test constructs a detector-free `witness_validation` packet aga
 The fixture binds these records to the publisher-listed infected-netlist SHA-256:
 `17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33aa04b65ea9941de`.
 
-It also references the publisher-listed digests for the active trace, inactive trace, boundary result, inactive SMT input and configuration. This tests packet shape, exact-subject binding, claim ceilings and bounded-vs-observed semantics. **It does not independently re-fetch or hash those GitHub files**, run their Verilog, re-run the Z3 queries, or verify the publisher's checksums. That remains a separate replay task.
+It also references the publisher-listed digests for the active trace, inactive trace, boundary result, inactive SMT input and configuration. The URIs are pinned to the upstream commit, and the packet includes local relative paths for the evaluated netlist, each evidence artifact, the active witnesses and the formal assumptions file.
 
-The evidence-packet auditor now has 25 authored unit tests, including detector-free witness-mode rejection of detector objects and model-detection claims. The nine trigger-budget tests remain separate. Neither test suite has been compiled or executed in this environment.
+The auditor now accepts `--evidence-root DIR`. In that mode it opens and SHA-256 checks the subject netlist and every referenced evidence, witness and assumptions file. It rejects absolute/parent paths, non-regular files, symlinked path components, missing local locators and digest mismatches. The receipt enumerates each verified relative path and digest and changes its claim scope to `packet_schema_claim_and_referenced_byte_integrity_only`. This establishes **local byte integrity**, not source authenticity, tool execution, solver correctness, signatures, or truth of the recorded outcome. The path walk and subsequent open are not protected against a hostile concurrent filesystem replacement; CI therefore verifies an immutable extracted package in a controlled runner.
+
+The focused workflow downloads the pinned package archive, verifies the publisher's full checksum inventory, runs the package verifier with mandatory Icarus, then invokes the Rust auditor using that extracted package as `--evidence-root`. The expanded exact-head result is pending.
+
+The evidence-packet auditor now has **32 authored unit tests**, including six new byte-integrity tests for correct bytes, altered evidence, altered netlist, missing locators, path traversal and symlinks. The trigger-budget utility has nine tests. Before byte verification was added, a prior exact-head run passed rustfmt, 9/9 trigger-budget tests and 26/26 evidence-packet tests; the six new tests and upstream replay are not yet represented by a completed exact-head run.
 
 ## 10. Multi-axis benchmark report
 
@@ -313,6 +319,8 @@ The evidence-packet auditor now has 25 authored unit tests, including detector-f
 | Augmentation validity | Truth-table and whole-design equivalence, label-map completeness |
 | Data validity | Unknown/invalid count, provenance checks, exact hashes and group leaks |
 | Generalization | LOCO/LOFO/Trojan-family/toolchain/library strata and worst group |
+| Witness provenance | Fraction of subjects/evidence/witness/assumption bytes checked against exact local paths and hashes |
+| Active/inactive pairing | Paired trigger and payload outcomes under matched reset, vector length and observation boundary |
 | Efficiency | Training/inference/simulation/formal cost, model size, memory, wall time, energy only if measured |
 
 Publish Pareto frontiers rather than hiding verdict, localization, activation and resource cost in a single composite score.
@@ -333,7 +341,46 @@ These are research targets, not achieved results, industry standards or certific
 
 The exact effect size and minimum independent design/family support must be set before the confirmatory split is opened.
 
-## 12. Reproduction commands
+## 12. SOTA targets and industrial comparison
+
+### What the published numbers actually say
+
+Three 2026 results change how this programme should benchmark itself:
+
+1. **Split leakage is not hypothetical.** Xiao et al. report Random-Forest gate F1 of 0.914 on pooled cross-validation, 0.636 on leave-one-circuit-out, and 0.460 on leave-one-base-family-out; average precision falls from 0.978 to 0.577 under the family holdout. The study covers 49,124 gates across 16 netlists and five base-circuit families. It makes LOFO/LOCO the confirmatory protocol; pooled/random splits are diagnostics only.
+2. **Sequential witness generation has a concrete baseline.** SeqCube-HT reports 3,240 witness-validated instances from 4,500 attempts (72.0%) and 20.9 seconds per accepted instance, compared with 50.6% and 39.5 seconds for the best matched comparator. Its detector probes also show a source-transfer penalty: SeqCube F1 falls from 69.2% instance-random to 47.8% source-held-out; localization recall falls from 55.7% to 31.4%. The paper's covariate-matched 77.2% F1 is a different protocol and must not be compared as if it were the held-out result.
+3. **Industrial scale exposes another failure regime.** A DATE 2026 paper describes function-preserving stress patterns in large netlists using SCOAP testability and graph transformations, and reports that representative graph-learning detectors fail on its generated challenge instances. This is evidence that academic-sized benchmark success is not sufficient—not proof that a particular Symthaea detector is better.
+
+### Confirmatory targets
+
+These are proposed research gates, not measured results, standards or certification criteria:
+
+- **Detection:** on untouched leave-one-base-family-out and leave-one-insertion-source-out splits, improve macro F1 by at least 5 absolute points over the strongest tuned baseline at the same validation-selected false-positive rate; report average precision, MCC, per-family intervals and worst-family performance. The target only counts if there are enough independent families to estimate uncertainty.
+- **Localization:** improve gate/net/cone recall by at least 5 absolute points at a fixed analyst false-positive burden, without sacrificing whole-design precision. Explainability is a separate endpoint.
+- **Sequential witness generation:** on the same nine hosts, matched 4,500-attempt budget and identical validation rules, target >72% witness yield and <20.9 seconds per accepted witness. Report the full rejection-stage profile, not just successful instances. These are deliberate stretch gates against SeqCube-HT's matched experiment.
+- **Evidence completeness:** 100% of supported claims must bind to the exact subject hash and all referenced evidence bytes; 0 silent unknown-label-to-clean conversions; 0 lineage leakage across held-out groups. Unknown remains unknown.
+- **Negative controls:** every deliberately altered trace, netlist, assumption digest, bound, reset model or observation endpoint must be rejected or downgrade the claim to unknown. No finite no-witness result may become unbounded unreachability.
+- **Operational efficiency:** compare CPU time, peak memory, detector latency, simulator cost and proof cost at matched acceptance/false-positive levels. Only report energy when measured on a named platform.
+
+### Industry comparison: complement the sign-off stack
+
+OpenTitan is a useful open-source industrial-methodology reference, not a directly comparable Trojan classifier. Its verification methodology combines constrained-random simulation, formal property verification, IP/core/chip tiers, functional and code coverage closure, security/error tests and review/sign-off checkpoints. Its security model also includes physical penetration testing, attestation and lifecycle guarantees. Our target should be **interoperable assurance evidence that plugs into such flows**, not a claim that a classifier replaces UVM, formal sign-off, synthesis checks, physical testing or human design review.
+
+NIST IR 8615's September 2026 workshop report likewise emphasizes interoperable evidence-based trust models, lifecycle provenance/traceability, scalable verification and validation, and public-private collaboration. The HARDSEC packet is intended to make these assurance claims portable across tools; it is not itself a certification scheme.
+
+### The paradigm shift
+
+The research object should be a **paired, provenance-bearing security experiment**, not a labelled netlist row. For every challenge, retain:
+- exact clean/infected subject identities and synthesis lineage;
+- reset model, active trigger trace, payload-effect witness and matched inactive counterfactual;
+- formal property, bounds, assumptions and counterexample/cover artifacts;
+- detector output and localization as separate predictions;
+- local byte-integrity receipt, toolchain identities and replay status;
+- family/source split assignment and negative-control outcomes.
+
+That makes it possible to study detection, localization, rare-trigger coverage, payload observability, provenance and operational cost independently. Symthaea should be judged against Random Forest, XGBoost, graph models and simple rarity/testability baselines under exactly the same splits. A novel architecture earns a claim only when it beats those baselines on the held-out families and preserves evidence quality.
+
+## 13. Reproduction commands
 
 ```bash
 cargo test --example hardsec_trigger_budget
@@ -345,6 +392,12 @@ cargo test --example hardsec_evidence_packet_audit --features hardsec-evidence-a
 cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-audit -- \
   --packet /path/to/evidence-packet.json \
   --receipt /path/outside/packet/evidence-audit.json
+
+# When the packet supplies local_path locators for every artifact:
+cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-audit -- \
+  --packet /path/to/evidence-packet.json \
+  --evidence-root /path/to/extracted-source-package \
+  --receipt /path/outside/packet/byte-verified-audit.json
 ```
 
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
@@ -374,6 +427,6 @@ Useful tool references:
 - EQY equivalence tutorial: https://formal.org/tutorials/symbiyosys/equivalence-checking (gold/gate comparison, partition proofs and counterexamples)
 - SeqCube-HT (2026): https://doi.org/10.1186/s42400-026-00676-2 (state-cube-guided sequential Trojan benchmark methodology)
 
-## 13. Scope boundary
+## 14. Scope boundary
 
 This is defensive benchmark and evaluation infrastructure. It does not construct or deploy Trojan payloads, claim a Trojan is absent because finite simulation was quiet, or certify silicon. Formal results must preserve assumptions, bounds and solver provenance. The public contest repository's code/checkpoint/data must not be redistributed until a license or explicit permission is established.
