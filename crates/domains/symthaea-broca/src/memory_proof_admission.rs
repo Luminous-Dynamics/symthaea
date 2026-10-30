@@ -16,7 +16,7 @@
 //! usable evidence. A caller must bind the lexical index snapshot to the same
 //! known_at coordinate as the request or this adapter refuses the batch.
 
-use crate::memory_evidence::{LexicalEvidenceHit, MemoryContextType};
+use crate::memory_evidence::{EvidenceLifecycle, LexicalEvidenceHit, MemoryContextType};
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofEvidenceCandidate,
 };
@@ -146,6 +146,27 @@ pub fn admit_lexical_hits_for_proof_budget(
                 "lexical hit {:?} has no trusted admission envelope",
                 hit.evidence_id
             ))?;
+
+        if hit.lifecycle != EvidenceLifecycle::Active {
+            return Err(format!(
+                "lexical hit {:?} is not active in its index snapshot",
+                hit.evidence_id
+            ));
+        }
+        if hit.scope_id != request.scope_id || hit.scope_id != admission.scope_id {
+            return Err(format!(
+                "lexical hit {:?} scope does not match its request/admission",
+                hit.evidence_id
+            ));
+        }
+        if hit.valid_from_unix_ms != admission.valid_from_unix_ms
+            || hit.valid_until_unix_ms != admission.valid_until_unix_ms
+        {
+            return Err(format!(
+                "lexical hit {:?} validity interval does not match its admission",
+                hit.evidence_id
+            ));
+        }
 
         if hit.source.trajectory_id.trim().is_empty()
             || !hit.source.source_pointer.starts_with('/')
@@ -290,6 +311,7 @@ mod tests {
         LexicalEvidenceHit {
             hdc_id: id.as_bytes().first().copied().map(u64::from).unwrap_or(0),
             evidence_id: id.into(),
+            scope_id: "scope-1".into(),
             source: EvidenceSource {
                 trajectory_id: "trajectory-1".into(),
                 step_id: Some("step-2".into()),
@@ -298,6 +320,9 @@ mod tests {
                 source_pointer: "/messages/2/content".into(),
             },
             content_sha256: digest(text),
+            lifecycle: EvidenceLifecycle::Active,
+            valid_from_unix_ms: Some(50),
+            valid_until_unix_ms: Some(500),
             bm25_score: rank_score,
             context: MemoryContextItem {
                 kind: MemoryContextType::Text,
@@ -441,6 +466,29 @@ mod tests {
         let result = solve_proof_budget(proof_request).unwrap();
         assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
         assert!(result.candidate_rejections["A"].contains(&ProofCandidateRejection::Unauthorized));
+    }
+
+    #[test]
+    fn rejects_scope_and_validity_metadata_drift_between_hit_and_admission() {
+        let mut wrong_scope = hit("A", "evidence", 1.0);
+        wrong_scope.scope_id = "scope-2".into();
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[wrong_scope],
+            &[admission("A")],
+            200,
+        ).unwrap_err();
+        assert!(error.contains("scope does not match"));
+
+        let mut wrong_validity = hit("A", "evidence", 1.0);
+        wrong_validity.valid_until_unix_ms = Some(400);
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[wrong_validity],
+            &[admission("A")],
+            200,
+        ).unwrap_err();
+        assert!(error.contains("validity interval does not match"));
     }
 
     #[test]
