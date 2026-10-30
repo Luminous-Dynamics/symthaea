@@ -61,6 +61,18 @@ pub struct ProbePolicyComparisonRow {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProbePolicyCurveSummary {
+    pub policy: ProbeSelectionPolicy,
+    pub seed: u64,
+    /// Trapezoidal area over observed recall versus actual render-cost fraction.
+    /// No extrapolation is made to an unobserved cost range.
+    pub observed_auc_recall_cost: Option<f64>,
+    pub maximum_observed_render_cost_fraction: Option<f64>,
+    /// First observed actual cost at which recall reaches the preregistered target.
+    pub cost_fraction_to_target_recall: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProbePolicyComparisonReport {
     pub version: String,
     pub factorial_report_sha256: String,
@@ -77,7 +89,9 @@ pub struct ProbePolicyComparisonReport {
     pub contextual_positive_pair_count: usize,
     pub global_order_two_harsanyi_count: usize,
     pub higher_order_harsanyi_count: usize,
+    pub recall_target: f64,
     pub rows: Vec<ProbePolicyComparisonRow>,
+    pub curves: Vec<ProbePolicyCurveSummary>,
     pub receipt_sha256: String,
 }
 
@@ -443,6 +457,66 @@ fn make_row(
     }
 }
 
+fn summarize_curves(
+    rows: &[ProbePolicyComparisonRow],
+    recall_target: f64,
+) -> Vec<ProbePolicyCurveSummary> {
+    let mut keys = BTreeSet::new();
+    for row in rows {
+        keys.insert((row.policy, row.seed));
+    }
+
+    let mut summaries = Vec::with_capacity(keys.len());
+    for (policy, seed) in keys {
+        let mut points: Vec<(f64, f64)> = rows.iter()
+            .filter(|row| row.policy == policy && row.seed == seed)
+            .filter_map(|row| row.recall.map(|recall| {
+                (row.render_cost_fraction_of_exhaustive, recall)
+            }))
+            .collect();
+        points.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+        // Multiple requested budgets can underfill to the same actual cost.
+        // Collapse duplicate x-values and keep their best observed recall.
+        let mut unique_points: Vec<(f64, f64)> = Vec::with_capacity(points.len());
+        for (cost, recall) in points {
+            if let Some(last) = unique_points.last_mut() {
+                if (last.0 - cost).abs() <= f64::EPSILON {
+                    last.1 = last.1.max(recall);
+                    continue;
+                }
+            }
+            unique_points.push((cost, recall));
+        }
+
+        let auc = if unique_points.is_empty() {
+            None
+        } else {
+            let area = unique_points.windows(2)
+                .map(|window| {
+                    let width = window[1].0 - window[0].0;
+                    width * (window[0].1 + window[1].1) * 0.5
+                })
+                .sum::<f64>();
+            Some(area)
+        };
+        let maximum_observed_render_cost_fraction =
+            unique_points.last().map(|point| point.0);
+        let cost_fraction_to_target_recall = unique_points.iter()
+            .find(|(_, recall)| *recall >= recall_target)
+            .map(|(cost, _)| *cost);
+
+        summaries.push(ProbePolicyCurveSummary {
+            policy,
+            seed,
+            observed_auc_recall_cost: auc,
+            maximum_observed_render_cost_fraction,
+            cost_fraction_to_target_recall,
+        });
+    }
+    summaries
+}
+
 fn build_comparison(
     factorial_report: &FactorialGroundTruthReport,
     events: &[SyntheticEventSignal],
@@ -629,6 +703,8 @@ fn build_comparison(
 
     let support_bytes = serde_json::to_vec(event_supports)
         .map_err(|_| ProbePolicyComparisonError::SerializationFailure)?;
+    let recall_target = 0.95;
+    let curves = summarize_curves(&rows, recall_target);
     let mut report = ProbePolicyComparisonReport {
         version: PROBE_POLICY_COMPARISON_VERSION.to_owned(),
         factorial_report_sha256: factorial_report.receipt_sha256.clone(),
@@ -645,7 +721,9 @@ fn build_comparison(
         contextual_positive_pair_count: truth.len(),
         global_order_two_harsanyi_count: global_order_two_count,
         higher_order_harsanyi_count: higher_order_count,
+        recall_target,
         rows,
+        curves,
         receipt_sha256: String::new(),
     };
     report.receipt_sha256 = canonical_digest(&report)?;
@@ -883,6 +961,14 @@ mod tests {
         let no_probe = find_row(&report, ProbeSelectionPolicy::NoProbe, seeds[0], 0);
         assert_eq!(no_probe.selected_pair_count, 0);
         assert_eq!(no_probe.recall, Some(0.0));
+        let eval019_curve = report.curves.iter()
+            .find(|curve| curve.policy == ProbeSelectionPolicy::Eval019 && curve.seed == seeds[0])
+            .unwrap();
+        assert_eq!(eval019_curve.cost_fraction_to_target_recall, Some(10.0 / 37.0));
+        let exhaustive_curve = report.curves.iter()
+            .find(|curve| curve.policy == ProbeSelectionPolicy::Exhaustive && curve.seed == seeds[0])
+            .unwrap();
+        assert_eq!(exhaustive_curve.maximum_observed_render_cost_fraction, Some(1.0));
         assert!(verify_probe_policy_comparison(
             &report,
             &factorial,
