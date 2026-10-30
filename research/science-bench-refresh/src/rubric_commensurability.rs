@@ -224,6 +224,9 @@ pub struct RubricCommensurabilityReportFieldsV1 {
     pub right_unmapped_criterion_count: u64,
     pub left_weight_total_millionths: u64,
     pub right_weight_total_millionths: u64,
+    pub left_right_mapping_adjudicator_overlap_count: u64,
+    pub mapping_adjudicator_ids_disjoint: bool,
+    pub mapping_panel_independence_proven: bool,
     pub shared_anchor_item_count: u64,
     pub minimum_anchor_items_per_construct: u32,
     pub direct_score_comparison_allowed: bool,
@@ -453,6 +456,7 @@ pub fn validate_rubric_commensurability_plan_fields(
     }
 
     let mut anchor_ids = BTreeSet::new();
+    let mut anchor_semantics = BTreeSet::new();
     for anchor in &fields.shared_anchor_items {
         if !nonempty(&anchor.anchor_id, 128) || !anchor_ids.insert(anchor.anchor_id.as_str()) {
             issues.push("shared anchor IDs must be non-empty, bounded and unique".to_owned());
@@ -462,6 +466,9 @@ pub fn validate_rubric_commensurability_plan_fields(
         }
         if !valid_digest(&anchor.semantics_sha256, allow_zero) {
             issues.push(format!("anchor {} has invalid semantics digest", anchor.anchor_id));
+        }
+        if !anchor_semantics.insert((anchor.construct_id.as_str(), anchor.semantics_sha256.as_str())) {
+            issues.push(format!("anchor {} duplicates semantic content for its construct", anchor.anchor_id));
         }
     }
     if issues.is_empty() { Ok(()) } else { Err(issues) }
@@ -523,6 +530,7 @@ fn construct_result(
     right: &[&RubricCriterionV1],
     anchor_count: u64,
     required_anchors: u64,
+    mapping_adjudicators_disjoint: bool,
 ) -> ConstructCommensurabilityResultV1 {
     let left_relations = relation_list(left);
     let right_relations = relation_list(right);
@@ -560,6 +568,7 @@ fn construct_result(
         ConstructCommensurabilityV1::Incompatible
     } else if all_equivalent && exact_measurement_spec_match && normalized_scale_anchor_match
         && left_weight == right_weight && anchor_count >= required_anchors
+        && mapping_adjudicators_disjoint
     {
         ConstructCommensurabilityV1::DirectlyCommensurable
     } else if all_equivalent {
@@ -574,6 +583,9 @@ fn construct_result(
         }
         if anchor_count < required_anchors {
             reasons.push("shared anchor-item coverage is below the preregistered minimum".to_owned());
+        }
+        if !mapping_adjudicators_disjoint {
+            reasons.push("left and right rubric mapping panels share adjudicator identity commitments".to_owned());
         }
         ConstructCommensurabilityV1::CalibrationRequired
     } else {
@@ -644,6 +656,14 @@ pub fn audit_rubric_commensurability(
     let left = instrument_construct_map(&plan.left_instrument);
     let right = instrument_construct_map(&plan.right_instrument);
     let anchors = shared_anchors_by_construct(&fields);
+    let left_adjudicators: BTreeSet<&str> = plan.left_instrument.criteria.iter()
+        .map(|criterion| criterion.construct_mapping.adjudicator_id_sha256.as_str())
+        .collect();
+    let right_adjudicators: BTreeSet<&str> = plan.right_instrument.criteria.iter()
+        .map(|criterion| criterion.construct_mapping.adjudicator_id_sha256.as_str())
+        .collect();
+    let adjudicator_overlap: BTreeSet<&str> = left_adjudicators.intersection(&right_adjudicators).copied().collect();
+    let mapping_adjudicators_disjoint = adjudicator_overlap.is_empty();
     let mut results = Vec::new();
     for construct in &plan.constructs {
         let left_rows = left.get(construct.construct_id.as_str()).cloned().unwrap_or_default();
@@ -654,6 +674,7 @@ pub fn audit_rubric_commensurability(
             &right_rows,
             anchors.get(construct.construct_id.as_str()).copied().unwrap_or(0),
             u64::from(plan.minimum_anchor_items_per_construct),
+            mapping_adjudicators_disjoint,
         ));
     }
 
@@ -689,7 +710,8 @@ pub fn audit_rubric_commensurability(
     let direct_allowed = overall == OverallCommensurabilityV1::FullyCommensurable
         && direct == plan.constructs.len() as u64
         && left_unmapped == 0
-        && right_unmapped == 0;
+        && right_unmapped == 0
+        && mapping_adjudicators_disjoint;
     let report_fields = RubricCommensurabilityReportFieldsV1 {
         schema: RUBRIC_COMMENSURABILITY_REPORT_SCHEMA.to_owned(),
         analyzer_source_revision: plan.analyzer_source_revision,
@@ -713,6 +735,9 @@ pub fn audit_rubric_commensurability(
         right_unmapped_criterion_count: right_unmapped,
         left_weight_total_millionths: left_weight,
         right_weight_total_millionths: right_weight,
+        left_right_mapping_adjudicator_overlap_count: adjudicator_overlap.len() as u64,
+        mapping_adjudicator_ids_disjoint: mapping_adjudicators_disjoint,
+        mapping_panel_independence_proven: false,
         shared_anchor_item_count: plan.shared_anchor_items.len() as u64,
         minimum_anchor_items_per_construct: plan.minimum_anchor_items_per_construct,
         direct_score_comparison_allowed: direct_allowed,
@@ -723,7 +748,7 @@ pub fn audit_rubric_commensurability(
         scoring_eligible_declared: false,
         external_anchor_required: true,
         construct_results: results,
-        claim_boundary: "Structural rubric commensurability audit only. Declared mapping, measurement-specification and score-anchor digests are checked, but the analyzer does not establish the truth of those declarations, human construct validity, human alignment, generalized accuracy or scoring eligibility.".to_owned(),
+        claim_boundary: "Structural rubric commensurability audit only. Declared mapping, measurement-specification and score-anchor digests are checked, and adjudicator identity commitments are required to be disjoint across instruments for direct comparison; identity disjointness does not prove actual reviewer independence. The analyzer does not establish the truth of declarations, human construct validity, human alignment, generalized accuracy or scoring eligibility.".to_owned(),
     };
     let payload = serde_json::to_vec(&report_fields)
         .map_err(|error| format!("cannot serialize commensurability report: {error}"))?;
