@@ -71,6 +71,7 @@ The focused workflow runs tests at the exact PR head, verifies deterministic out
 - Independently enumerated formulas agree with code fixtures.
 - The minimax grid search matches exhaustive enumeration on a smaller test grid and is never worse than any point on its own registered grid.
 - A skewed candidate portfolio can produce a non-uniform minimax logger; the code must not hard-code uniformity as the answer.
+- **Proxy-mismatch known-answer control:** on the frozen balanced M=8 portfolio, the weight-second-moment minimizer must improve its optimized weight-moment objective versus uniform while *worsening* the exact reward-weighted worst-policy IPS variance. This is a deliberate positive control showing that weight-only ESS can be an insufficient design objective on reward-heterogeneous worlds.
 - Every logger retains the floor; invalid floor and empty target portfolios fail closed.
 - Oracle-only arms are always clearly identified and are not compared as deployable methods.
 - Report reward–variance–support tradeoffs across all target regimes and M values. No universal winner claim from a finite synthetic panel.
