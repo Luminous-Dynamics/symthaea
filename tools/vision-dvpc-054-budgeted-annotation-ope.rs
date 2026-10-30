@@ -892,7 +892,7 @@ fn monte_carlo_evaluate(
     naive_annotation_residual_source: Option<usize>,
 ) -> MonteCarloMetrics {
     let truth = target_value(world);
-    let mut errors = Vec::with_capacity(replicates);
+    let mut errors: Vec<[f64; PORTFOLIO_POLICIES]> = Vec::with_capacity(replicates);
     for replicate in 0..replicates {
         let q = annotation_reward_model(world, allocation, mix_seed(seed, replicate, 11));
         let estimate = one_ope_estimate(
@@ -1763,16 +1763,42 @@ fn world_with_target(
     updated
 }
 
+fn validate_portfolio(portfolio: &PolicyPortfolio) -> Result<(), String> {
+    if (portfolio.prior_weights.iter().sum::<f64>() - 1.0).abs() > 1e-10
+        || portfolio
+            .prior_weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0 || *weight > 1.0)
+    {
+        return Err("policy portfolio prior weights must be a probability vector".into());
+    }
+    for policy in 0..PORTFOLIO_POLICIES {
+        for context in 0..CONTEXTS {
+            let probabilities = portfolio.targets[policy][context];
+            if (probabilities.iter().sum::<f64>() - 1.0).abs() > 1e-10
+                || probabilities
+                    .iter()
+                    .any(|probability| !probability.is_finite() || *probability < 0.0 || *probability > 1.0)
+            {
+                return Err(format!("invalid target policy {} in context {}", portfolio.names[policy], context));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn portfolio_policy_mses(
     world: &World,
     allocation: &Allocation,
     portfolio: &PolicyPortfolio,
     evaluation_n: usize,
 ) -> Result<[f64; PORTFOLIO_POLICIES], String> {
-    std::array::try_from_fn(|policy| {
+    let mut output = [0.0; PORTFOLIO_POLICIES];
+    for policy in 0..PORTFOLIO_POLICIES {
         let target_world = world_with_target(world, portfolio.targets[policy]);
-        analytic_mse(&target_world, allocation, evaluation_n)
-    })
+        output[policy] = analytic_mse(&target_world, allocation, evaluation_n)?;
+    }
+    Ok(output)
 }
 
 fn portfolio_objective(
@@ -1797,6 +1823,7 @@ fn exact_portfolio_allocation(
     objective: PortfolioObjective,
 ) -> Result<PortfolioExactResult, String> {
     world.validate()?;
+    validate_portfolio(portfolio)?;
     let left = enumerate_context_options(world, 0, [true; SOURCES]);
     let right = enumerate_context_options(world, 1, [true; SOURCES]);
     let mut best_score = f64::INFINITY;
@@ -1926,7 +1953,7 @@ fn multi_policy_monte_carlo(
         for estimate in &mut estimates {
             *estimate /= evaluation_n as f64;
         }
-        let errors_for_replicate =
+        let errors_for_replicate: [f64; PORTFOLIO_POLICIES] =
             std::array::from_fn(|policy| estimates[policy] - true_values[policy]);
         let selected = (0..PORTFOLIO_POLICIES)
             .max_by(|left, right| estimates[*left].total_cmp(&estimates[*right]))
@@ -1947,7 +1974,7 @@ fn multi_policy_monte_carlo(
     });
     let variance: [f64; PORTFOLIO_POLICIES] =
         std::array::from_fn(|policy| (mse[policy] - bias[policy] * bias[policy]).max(0.0));
-    let covariance = std::array::from_fn(|left| {
+    let covariance: [[f64; PORTFOLIO_POLICIES]; PORTFOLIO_POLICIES] = std::array::from_fn(|left| {
         std::array::from_fn(|right| {
             let product = errors
                 .iter()
@@ -1972,6 +1999,7 @@ fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<Strin
     let mut output = String::new();
     for (scenario_index, world) in correlated_stress_worlds().iter().enumerate() {
         let portfolio = policy_portfolio(world);
+        validate_portfolio(&portfolio)?;
         let balanced_world = world_with_target(world, portfolio.targets[1]);
         let balanced_plan = exact_dynamic_program(&balanced_world, [true; SOURCES])?.allocation;
         let prior_exact =
