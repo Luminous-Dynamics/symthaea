@@ -1393,7 +1393,7 @@ impl BinaryCausalModel {
                 .iter()
                 .zip(mechanism)
                 .all(|(slot, unit)| {
-                    (((candidate_state_index >> slot) & 1) != 0) == current_state[*unit]
+                    (((candidate_state_index >> *slot) & 1) != 0) == current_state[*unit]
                 });
             if !mechanism_matches {
                 continue;
@@ -1475,20 +1475,38 @@ impl BinaryCausalModel {
         let background_state_count = 1usize << background.len();
         let mut background_posterior = vec![0.0; background_state_count];
 
-        // P(observed whole-substrate state | full past), marginalized by
-        // background-past assignment. The TPM is factored across next units.
+        // Accumulate likelihoods in log space, then scale by the largest full-
+        // state likelihood before exponentiating. This preserves the posterior
+        // when every direct product would otherwise underflow to zero.
+        let mut log_likelihoods = Vec::with_capacity(self.n_states());
+        let mut maximum_log_likelihood = f64::NEG_INFINITY;
         for past_index in 0..self.n_states() {
-            let mut whole_state_likelihood = 1.0;
+            let mut log_likelihood = 0.0;
             for target_unit in 0..self.n_units {
                 let p_on = self.transition_probabilities
                     [past_index * self.n_units + target_unit];
-                whole_state_likelihood *= if current_state[target_unit] {
+                let observed_probability = if current_state[target_unit] {
                     p_on
                 } else {
                     1.0 - p_on
                 };
+                if observed_probability == 0.0 {
+                    log_likelihood = f64::NEG_INFINITY;
+                    break;
+                }
+                log_likelihood += observed_probability.ln();
             }
+            maximum_log_likelihood = maximum_log_likelihood.max(log_likelihood);
+            log_likelihoods.push(log_likelihood);
+        }
+        if !maximum_log_likelihood.is_finite() {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
 
+        for (past_index, log_likelihood) in log_likelihoods.into_iter().enumerate() {
+            if !log_likelihood.is_finite() {
+                continue;
+            }
             let background_state_index = background
                 .iter()
                 .enumerate()
@@ -1499,7 +1517,8 @@ impl BinaryCausalModel {
                         index
                     }
                 });
-            background_posterior[background_state_index] += whole_state_likelihood;
+            background_posterior[background_state_index] +=
+                (log_likelihood - maximum_log_likelihood).exp();
         }
 
         let posterior_mass: f64 = background_posterior.iter().sum();
