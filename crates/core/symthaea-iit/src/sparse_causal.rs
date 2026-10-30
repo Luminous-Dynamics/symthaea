@@ -570,6 +570,67 @@ mod tests {
         }
     }
 
+    fn brute_force_eq4(
+        model: &SparseBinaryCausalModel,
+        candidate: &[usize],
+        current: &[bool],
+    ) -> Vec<f64> {
+        // Independent full-joint oracle: enumerate every past state, accumulate
+        // P(observed whole-system state | past) by external-background state,
+        // normalize that background posterior, then evaluate each candidate
+        // target's observation likelihood under every candidate-past state.
+        let n = model.n_units();
+        let background = (0..n)
+            .filter(|unit| !candidate.contains(unit))
+            .collect::<Vec<_>>();
+        let mut background_mass = vec![0.0; 1usize << background.len()];
+        for past_index in 0..(1usize << n) {
+            let past = (0..n)
+                .map(|unit| ((past_index >> unit) & 1) != 0)
+                .collect::<Vec<_>>();
+            let mut likelihood = 1.0;
+            for target in 0..n {
+                let p_on = model.probability_next_one(&past, target).unwrap();
+                likelihood *= if current[target] { p_on } else { 1.0 - p_on };
+            }
+            let background_index = background.iter().enumerate().fold(
+                0usize,
+                |index, (slot, unit)| {
+                    if past[*unit] { index | (1usize << slot) } else { index }
+                },
+            );
+            background_mass[background_index] += likelihood;
+        }
+        let normalizer = background_mass.iter().sum::<f64>();
+        assert!(normalizer.is_finite() && normalizer > 0.0);
+        for mass in &mut background_mass {
+            *mass /= normalizer;
+        }
+
+        let mut forward = vec![1.0; 1usize << candidate.len()];
+        for (candidate_state, joint) in forward.iter_mut().enumerate() {
+            for target in candidate.iter().copied() {
+                let mut cause_factor = 0.0;
+                for (background_index, posterior_mass) in
+                    background_mass.iter().copied().enumerate()
+                {
+                    let mut past = current.to_vec();
+                    for (slot, unit) in candidate.iter().copied().enumerate() {
+                        past[unit] = ((candidate_state >> slot) & 1) != 0;
+                    }
+                    for (slot, unit) in background.iter().copied().enumerate() {
+                        past[unit] = ((background_index >> slot) & 1) != 0;
+                    }
+                    let p_on = model.probability_next_one(&past, target).unwrap();
+                    let likelihood = if current[target] { p_on } else { 1.0 - p_on };
+                    cause_factor += posterior_mass * likelihood;
+                }
+                *joint *= cause_factor;
+            }
+        }
+        forward
+    }
+
     #[test]
     fn sparse_eq4_matches_dense_oracle_for_full_and_embedded_systems() {
         let dense = dense_ring_model(5);
@@ -587,6 +648,29 @@ mod tests {
                 assert!(
                     (expected - actual).abs() <= expected.abs().max(1.0) * 1e-12,
                     "candidate={candidate:?}, index={index}: dense={expected:.17}, sparse={actual:.17}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_eq4_matches_independent_full_joint_posterior_oracle() {
+        let sparse = sparse_ring_model(5);
+        let state = [true, false, true, false, true];
+        for candidate in [&[0, 1][..], &[0, 2, 4][..], &[0, 1, 2, 3, 4][..]] {
+            let expected = brute_force_eq4(&sparse, candidate, &state);
+            let actual = sparse
+                .forward_cause_likelihood_iit4(candidate, &state, 1 << 16)
+                .unwrap();
+            assert_eq!(expected.len(), actual.forward_likelihood.len());
+            for (index, (expected, actual)) in expected
+                .iter()
+                .zip(&actual.forward_likelihood)
+                .enumerate()
+            {
+                assert!(
+                    (expected - actual).abs() <= expected.abs().max(1.0) * 1e-12,
+                    "candidate={candidate:?}, index={index}: oracle={expected:.17}, sparse={actual:.17}"
                 );
             }
         }
