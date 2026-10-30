@@ -927,6 +927,42 @@ mod tests {
     }
 
     #[test]
+    fn proof_token_cannot_be_reused_for_a_different_principal_scope_or_time() {
+        let proof_request = real_proof_request();
+        let result = solve_proof_budget(proof_request.clone()).unwrap();
+        let token = verify_proof_packet_for_lifecycle(&proof_request, &result).unwrap();
+
+        let mut lifecycle_request = LifecyclePolicyRequest {
+            decision_id: proof_request.decision_id.clone(),
+            principal_id: proof_request.principal_id.clone(),
+            scope_id: proof_request.scope_id.clone(),
+            valid_at_unix_ms: proof_request.valid_at_unix_ms,
+            known_at_unix_ms: proof_request.known_at_unix_ms,
+            proof_status: ProofVerificationState::VerifiedOptimal,
+            proof_packet_sha256: result.packet_sha256.clone(),
+            retrieval: progress(true, false),
+            required_claims: vec![ClaimLifecycleLedgerEntry {
+                conclusion_id: "C1".into(),
+                state: ClaimLifecycleState::SupportedCurrent,
+                selected_justification_id: Some("proof-C1".into()),
+                current_evidence_ids: BTreeSet::from(["E1".into()]),
+                stale_evidence_ids: BTreeSet::new(),
+                conflicting_evidence_ids: BTreeSet::new(),
+                rejected_evidence_ids: BTreeSet::new(),
+            }],
+        };
+        lifecycle_request.principal_id = "other-principal".into();
+        assert!(decide_lifecycle_action(lifecycle_request.clone(), Some(&token))
+            .unwrap_err()
+            .contains("identity or time"));
+        lifecycle_request.principal_id = "principal-1".into();
+        lifecycle_request.known_at_unix_ms += 1;
+        assert!(decide_lifecycle_action(lifecycle_request, Some(&token))
+            .unwrap_err()
+            .contains("identity or time"));
+    }
+
+    #[test]
     fn verified_proof_token_is_created_only_from_the_independent_packet_verifier() {
         let proof_request = real_proof_request();
         let result = solve_proof_budget(proof_request.clone()).unwrap();
@@ -1125,6 +1161,66 @@ mod tests {
         )).unwrap();
         decision.action = LifecycleAction::Abstain;
         assert!(decision.verify_internal_consistency().unwrap_err().contains("SHA-256 mismatch"));
+    }
+
+    #[test]
+    fn exhaustive_lifecycle_action_truth_table_matches_policy_precedence() {
+        let proof_states = [
+            ProofVerificationState::NotRun,
+            ProofVerificationState::SearchLimitReached,
+            ProofVerificationState::NoEligibleProof,
+            ProofVerificationState::BudgetInsufficient,
+            ProofVerificationState::Rejected,
+        ];
+        let claim_cases: Vec<(ClaimLifecycleState, fn(&str) -> ClaimLifecycleLedgerEntry)> = vec![
+            (ClaimLifecycleState::SupportedCurrent, supported_claim),
+            (ClaimLifecycleState::StaleOnly, stale_claim),
+            (ClaimLifecycleState::Conflicted, conflict_claim),
+            (ClaimLifecycleState::Missing, missing_claim),
+            (
+                ClaimLifecycleState::Unauthorized,
+                |id| rejected_claim(id, ClaimLifecycleState::Unauthorized),
+            ),
+            (
+                ClaimLifecycleState::ProvenanceInvalid,
+                |id| rejected_claim(id, ClaimLifecycleState::ProvenanceInvalid),
+            ),
+        ];
+
+        let mut evaluated = 0usize;
+        for proof_status in proof_states {
+            for (claim_state, make_claim) in &claim_cases {
+                for can_continue in [false, true] {
+                    let retrieval = progress(!can_continue, can_continue);
+                    let decision = decide_with_test_token(request(
+                        proof_status,
+                        vec![make_claim("C1")],
+                        retrieval,
+                    )).unwrap();
+
+                    let expected = if can_continue {
+                        LifecycleAction::RetrieveMore
+                    } else {
+                        match claim_state {
+                            ClaimLifecycleState::SupportedCurrent
+                            | ClaimLifecycleState::Missing
+                            | ClaimLifecycleState::Unauthorized
+                            | ClaimLifecycleState::ProvenanceInvalid => LifecycleAction::Abstain,
+                            ClaimLifecycleState::StaleOnly => LifecycleAction::WarnStale,
+                            ClaimLifecycleState::Conflicted => LifecycleAction::ExplainConflict,
+                        }
+                    };
+                    assert_eq!(
+                        decision.action,
+                        expected,
+                        "policy mismatch: proof={proof_status:?}, claim={claim_state:?}, can_continue={can_continue}",
+                    );
+                    assert!(!decision.answer_is_permitted(None).unwrap());
+                    evaluated += 1;
+                }
+            }
+        }
+        assert_eq!(evaluated, 60);
     }
 
     #[test]
