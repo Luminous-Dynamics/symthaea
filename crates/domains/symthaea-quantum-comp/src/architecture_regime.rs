@@ -225,6 +225,10 @@ pub enum WorkloadRegimeError {
     WorkloadMismatch,
     /// Profile refers to a different comparison contract.
     ContractMismatch,
+    /// Workload family or holdout dataset group crosses evaluation partitions.
+    HoldoutLeakage,
+    /// A regime query contains an invalid interval or domain value.
+    InvalidQuery,
     /// A required digest is not exactly 64 hexadecimal characters.
     InvalidDigest,
     /// Trace/dataset origin has no extraction procedure digest.
@@ -473,6 +477,9 @@ pub fn workload_regime_matches_query(
     profile: &ArchitectureWorkloadRegime,
     query: &WorkloadRegimeQuery,
 ) -> bool {
+    if validate_workload_regime_query(query).is_err() {
+        return false;
+    }
     if query.execution_mode.is_some_and(|value| value != profile.execution_mode)
         || query.temporal_pattern.is_some_and(|value| value != profile.temporal_pattern)
     {
@@ -555,6 +562,32 @@ pub enum WorkloadHoldoutError {
     EmptyIdentifier,
 }
 
+/// Validate every supplied filter bound before querying the atlas.
+pub fn validate_workload_regime_query(
+    query: &WorkloadRegimeQuery,
+) -> Result<(), WorkloadRegimeError> {
+    if !valid_non_negative(query.event_rate_hz)
+        || !valid_non_negative(query.state_update_rate_hz)
+        || !valid_non_negative(query.active_fraction)
+    {
+        return Err(WorkloadRegimeError::InvalidQuery);
+    }
+    if query.active_fraction.is_some_and(|value| value.upper > 1.0)
+        || !valid_positive(query.temporal_horizon_seconds)
+        || !valid_positive(query.deadline_seconds)
+    {
+        return Err(WorkloadRegimeError::InvalidQuery);
+    }
+    if query
+        .working_set_bytes
+        .is_some_and(|value| value.lower_bytes > value.upper_bytes)
+        || query.batch_size.is_some_and(|value| !value.is_valid())
+    {
+        return Err(WorkloadRegimeError::InvalidQuery);
+    }
+    Ok(())
+}
+
 /// Validate that workload families and data groups are disjoint across partitions.
 ///
 /// Multiple records from the same family/group may appear within one partition;
@@ -608,7 +641,7 @@ pub fn validate_regime_record_holdout_separation(
         WorkloadHoldoutError::EmptyIdentifier => WorkloadRegimeError::EmptyField,
         WorkloadHoldoutError::WorkloadFamilyLeakage
         | WorkloadHoldoutError::HoldoutGroupLeakage => {
-            WorkloadRegimeError::InvalidMetricInterval
+            WorkloadRegimeError::HoldoutLeakage
         }
     })
 }
@@ -1000,6 +1033,20 @@ mod tests {
             ..empty_query()
         };
         assert!(workload_regime_matches_query(&profile, &query));
+    }
+
+    #[test]
+    fn invalid_regime_query_fails_closed() {
+        let profile = regime();
+        let query = WorkloadRegimeQuery {
+            event_rate_hz: Some(interval(10.0, 1.0)),
+            ..empty_query()
+        };
+        assert_eq!(
+            validate_workload_regime_query(&query),
+            Err(WorkloadRegimeError::InvalidQuery)
+        );
+        assert!(!workload_regime_matches_query(&profile, &query));
     }
 
     #[test]
