@@ -1448,13 +1448,12 @@ impl BinaryCausalModel {
     /// `variable_map[global_unit]` gives the factor-graph variable representing
     /// that unit's past state. Only declared incoming edges are included in the
     /// scope; model construction guarantees the TPM has no omitted influence.
-    fn observation_factor_iit4(
+    fn observation_log_factor_iit4(
         &self,
         target_unit: usize,
         current_state: &[bool],
         variable_map: &[usize],
-        scale_by_maximum: bool,
-    ) -> Result<BinaryFactor, RepertoireError> {
+    ) -> Result<BinaryLogFactor, RepertoireError> {
         let mut parents = (0..self.n_units)
             .filter(|source| self.connectivity[*source * self.n_units + target_unit])
             .map(|source| (variable_map[source], source))
@@ -1481,24 +1480,19 @@ impl BinaryCausalModel {
             );
             let probability_on = self.transition_probabilities
                 [past_index * self.n_units + target_unit];
-            values.push(if current_state[target_unit] {
+            let likelihood = if current_state[target_unit] {
                 probability_on
             } else {
                 1.0 - probability_on
+            };
+            values.push(if likelihood == 0.0 {
+                f64::NEG_INFINITY
+            } else {
+                likelihood.ln()
             });
         }
 
-        if scale_by_maximum {
-            let maximum = values.iter().copied().fold(0.0_f64, f64::max);
-            if !maximum.is_finite() || maximum <= 0.0 {
-                return Err(RepertoireError::UndefinedBackgroundPosterior);
-            }
-            for value in &mut values {
-                *value /= maximum;
-            }
-        }
-
-        Ok(BinaryFactor::new(variables, values)?)
+        Ok(BinaryLogFactor::new(variables, values)?)
     }
 
     /// Exact Eq. 4 system cause factors by sum-product elimination.
@@ -1561,14 +1555,14 @@ impl BinaryCausalModel {
         // contributes to the Eq. 4 cause factor.
         let posterior_factors = (0..self.n_units)
             .map(|target| {
-                self.observation_factor_iit4(target, current_state, &x_map, true)
+                self.observation_log_factor_iit4(target, current_state, &x_map)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
         // The normalization is independent of the duplicated Y copy and shared
         // by every target factor.
         let factor_entry_budget = 1usize << MAX_DENSE_UNITS;
-        let normalizer_report = min_fill_sum_product(
+        let normalizer_report = min_fill_log_sum_product(
             &posterior_factors,
             &eliminate_posterior,
             factor_entry_budget,
@@ -1576,8 +1570,8 @@ impl BinaryCausalModel {
         if !normalizer_report.factor.variables().is_empty() {
             return Err(RepertoireError::UndefinedBackgroundPosterior);
         }
-        let posterior_normalizer = normalizer_report.factor.values()[0];
-        if !posterior_normalizer.is_finite() || posterior_normalizer <= 0.0 {
+        let posterior_log_normalizer = normalizer_report.factor.log_values()[0];
+        if !posterior_log_normalizer.is_finite() {
             return Err(RepertoireError::UndefinedBackgroundPosterior);
         }
 
@@ -1589,10 +1583,10 @@ impl BinaryCausalModel {
         let mut per_mechanism_unit = Vec::with_capacity(candidate_count);
         for target in candidate_system.iter().copied() {
             let target_factor =
-                self.observation_factor_iit4(target, current_state, &y_map, false)?;
+                self.observation_log_factor_iit4(target, current_state, &y_map)?;
             let mut factors = posterior_factors.clone();
             factors.push(target_factor);
-            let report = min_fill_sum_product(
+            let report = min_fill_log_sum_product(
                 &factors,
                 &eliminate_posterior,
                 factor_entry_budget,
@@ -1617,7 +1611,7 @@ impl BinaryCausalModel {
                         }
                     },
                 );
-                *value = report.factor.values()[local_index] / posterior_normalizer;
+                *value = (report.factor.log_values()[local_index] - posterior_log_normalizer).exp();
             }
             if cause_factor.iter().any(|value| !value.is_finite()) {
                 return Err(RepertoireError::UndefinedBackgroundPosterior);
