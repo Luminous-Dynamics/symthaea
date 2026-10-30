@@ -473,7 +473,7 @@ fn majority_relation(
     intended: IntendedSemanticRelationV1,
     reviewers: &[HumanAdjudicationV1],
     threshold_permille: u16,
-) -> (AdjudicatedRelationV1, u64, u64) {
+) -> AdjudicatedRelationV1 {
     let mut preserving = 0_u64;
     let mut changing = 0_u64;
     let mut ambiguous = 0_u64;
@@ -486,21 +486,24 @@ fn majority_relation(
     }
     let total = reviewers.len() as u64;
     let (winner, count) = [
-        (AdjudicatedRelationV1::Valid, preserving),
-        (AdjudicatedRelationV1::Invalid, changing),
-        (AdjudicatedRelationV1::Ambiguous, ambiguous),
-    ].into_iter().max_by_key(|(_, count)| *count).unwrap_or((AdjudicatedRelationV1::Ambiguous, 0));
+        (ReviewerVerdictV1::MeaningPreserving, preserving),
+        (ReviewerVerdictV1::MeaningChanging, changing),
+        (ReviewerVerdictV1::Ambiguous, ambiguous),
+    ]
+    .into_iter()
+    .max_by_key(|(_, count)| *count)
+    .unwrap_or((ReviewerVerdictV1::Ambiguous, 0));
     if count * 1_000 < u64::from(threshold_permille) * total {
-        return (AdjudicatedRelationV1::Ambiguous, preserving, changing + ambiguous);
+        return AdjudicatedRelationV1::Ambiguous;
     }
-    let adjudicated = match winner {
-        AdjudicatedRelationV1::Valid if intended == IntendedSemanticRelationV1::SemanticInvariant => AdjudicatedRelationV1::Valid,
-        AdjudicatedRelationV1::Valid => AdjudicatedRelationV1::Invalid,
-        AdjudicatedRelationV1::Invalid if intended == IntendedSemanticRelationV1::SemanticChange => AdjudicatedRelationV1::Valid,
-        AdjudicatedRelationV1::Invalid => AdjudicatedRelationV1::Invalid,
-        AdjudicatedRelationV1::Ambiguous => AdjudicatedRelationV1::Ambiguous,
-    };
-    (adjudicated, preserving, changing + ambiguous)
+    match (intended, winner) {
+        (_, ReviewerVerdictV1::Ambiguous) => AdjudicatedRelationV1::Ambiguous,
+        (IntendedSemanticRelationV1::SemanticInvariant, ReviewerVerdictV1::MeaningPreserving)
+        | (IntendedSemanticRelationV1::SemanticChange, ReviewerVerdictV1::MeaningChanging) => {
+            AdjudicatedRelationV1::Valid
+        }
+        _ => AdjudicatedRelationV1::Invalid,
+    }
 }
 
 fn pairwise_agreement(reviewers: &[HumanAdjudicationV1]) -> (u64, u64) {
@@ -647,7 +650,7 @@ pub fn analyze_intervention_quality(
                 return Err(format!("candidate {} contains a non-blinded adjudication", candidate.candidate_id));
             }
         }
-        let (relation, _, _) = majority_relation(
+        let relation = majority_relation(
             candidate.intended_relation,
             &adjudication.reviewers,
             policy.consensus_threshold_permille,
