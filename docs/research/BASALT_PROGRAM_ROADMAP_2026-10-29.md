@@ -38,11 +38,12 @@ The roadmap now has a versioned task-level run-record contract:
 - Rust validator source: [xtask/src/basalt_validate.rs](../../xtask/src/basalt_validate.rs), invoked as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json`.
 - Validator implementation task: [#9021](https://github.com/Luminous-Dynamics/symthaea/issues/9021); signed provenance follow-up: [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034).
 
-The validator source now checks cross-record pairing, verifier/evaluated-tree digest equality, budget ceilings, outcome/verifier consistency, exact task-set/specification/audit matching, and task-specific required verifier obligations against the supplied manifest; attempt count, seed policy, and one seed per attempt are frozen in the manifest; nullable and optional-but-non-null fields are distinguished. It contains 37 authored test cases. **Neither compilation nor those tests have been executed here**: no Rust toolchain or local checkout is available, and workflow results for this draft PR were skipped. Hash matching does not authenticate the issuer; signed, independently pinned receipts remain a prerequisite for confirmatory scoring.
+The validator source checks cross-record pairing, verifier/evaluated-tree digest equality, budget ceilings, outcome/verifier consistency, exact task-set/specification/audit matching, task-specific required verifier obligations, and every trial against the manifest's frozen attempt count and seed schedule. It also bounds file reads and distinguishes required-but-nullable fields from optional-but-non-null fields. It contains 37 authored tests. **Neither compilation nor those tests have been executed in this environment**: no Rust toolchain or local checkout is available. For the current ready-for-review PR head, Showroom Integrity and PR Governance were pending and CI was queued when inspected; earlier attempts were skipped or cancelled. Hash matching does not authenticate the issuer; signed, independently pinned receipts remain a prerequisite for confirmatory scoring.
 
 ## Existing work to compose
 - Paired task-cluster statistics and cost-quality frontier analysis: [#9057](https://github.com/Luminous-Dynamics/symthaea/issues/9057)
 - Leakage-resistant temporal holdouts and task-cohort lifecycle: [#9080](https://github.com/Luminous-Dynamics/symthaea/issues/9080)
+- Non-compensatory verified success plus task-specific patch-quality rubrics: [#9084](https://github.com/Luminous-Dynamics/symthaea/issues/9084)
 - Fail-closed Rust validation of run records and cross-record evidence invariants: [#9021](https://github.com/Luminous-Dynamics/symthaea/issues/9021)
 
 - VLEB family-stratified paired inference: [#8900](https://github.com/Luminous-Dynamics/symthaea/pull/8900)
@@ -202,6 +203,27 @@ Secondary:
 - robustness to file moves, renames, dependency updates, malformed syntax and intervention position.
 
 Report effect sizes and intervals, correct for multiplicity where appropriate, and retain unresolved outcomes in the denominators.
+
+## Current industry comparison and stretch targets (2026-10-30)
+
+Public leaderboard percentages are properties of a full evaluation configuration—task cohort, agent harness, tools, budget, retries, verifier and integrity policy—not of a model name alone.
+
+- [Terminal-Bench 4.0](https://www.tbench.ai/?version=4.0) lists Opus 5.5 + Claude Code at **64.8% ± 3.1%**, Sonnet 5.5 + Claude Code at 61.8% ± 2.9%, and GPT-6 Astra + Codex at 58.2% ± 2.8%. These are benchmark/harness-specific results, not a universal software-engineering score.
+- [Artificial Analysis Coding Agent Index v2.0](https://artificialanalysis.ai/methodology/coding-agents-benchmarking) equal-weights FrontierCode v1.1 (100 repository-engineering tasks), Terminal-Bench 4.0 (66 terminal tasks), and SWE-Atlas-QnA-AA (124 repository-Q&A tasks). It runs three attempts per task, reports pooled cost/token/time, and audits trajectories for solution retrieval and test/verifier tampering. FrontierCode uses non-compensatory blockers followed by a bounded quality score when blockers pass.
+- [SWE-Shift](https://arxiv.org/abs/2610.32196), published 23 October 2026, evaluates 120 scenarios across 12 change families and nine intervention positions. All 17 evaluated systems had lower shifted than clean success; GPT-6 Astra is reported at 67.35% clean versus 24.79% shifted, with 20.34% paired success. Tool/session changes and stale-evidence scenarios had zero paired success across that evaluated cohort.
+- [SWE-bench Multilingual](https://www.swebench.com/multilingual) supplies a cross-language reference of 300 tasks from 42 repositories across nine languages.
+
+These are not matched head-to-head comparisons. BASALT should reproduce selected public setups where permitted, match budgets and execution identities, publish per-task results and uncertainty, and measure the differentiated capabilities separately.
+
+Proposed stretch targets—not achievements or universal standards:
+- **Verified engineering:** +3 to +5 percentage points over a strong matched baseline, supported by a predeclared paired interval.
+- **Efficiency:** 25% lower cost per strict verified fix under a predeclared non-inferiority margin.
+- **Shift adaptation:** at least 50% clean-success retention on a qualified BASALT shift cohort, while reporting paired success and family-level failures separately.
+- **Metamorphic robustness:** no more than 5 percentage points of degradation under validated semantics-preserving transformations.
+- **Integrity:** zero false accepts across at least 300 genuinely independent adversarial negative controls as an initial gate.
+- **Patch quality:** separate blinded, calibrated non-blocking quality rubric; no quality score can compensate for a failed blocker.
+
+Targets require pre-run power/precision analysis and independent cohort qualification. Zero false accepts in 300 controls is an initial hurdle, not proof of zero risk. The SWE-Shift retention target is a BASALT stretch goal, not a directly comparable external result.
 
 ## Proposed acceptance gates
 
