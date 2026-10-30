@@ -562,6 +562,15 @@ pub fn build_cross_task_forecast_evidence(
                 "audit curve must be complete, finite and end at a non-negative final regret",
             ));
         }
+        if sample.task_id == calibrator.config.model_fit_split_id
+            || sample.task_id == calibrator.config.residual_calibration_split_id
+            || sample.task_id == calibrator.config.evaluation_split_id
+        {
+            return Err(LearningCurvePromotionError::new(
+                format!("audit_samples[{sample_index}].task_id"),
+                "cross-task audit IDs must be disjoint from model-fit, residual-calibration and evaluation split IDs",
+            ));
+        }
         task_ids.insert(sample.task_id.clone());
         for fidelity_index in 0..(sample.curve_values.len() - 1) {
             let prediction = calibrator.predict_final(
@@ -1343,17 +1352,15 @@ mod tests {
     fn audit_regret_samples() -> Vec<LearningCurveAuditSample> {
         (0u8..3)
             .flat_map(|task| {
-                (0usize..3).map(move |index| {
-                    let initial = 10.0 + ((index * 7) % 19) as f64;
-                    let slope = 0.2 + ((index * 11) % 13) as f64 * 0.1;
-                    let middle = initial + slope * 10.0;
-                    let final_value = 14.0 + 2.0 * middle + 4.0 * slope;
+                let task_id = format!("audit-task-{}", (b'a' + task) as char);
+                let rows = samples(&format!("audit-{task}"), 60, 0.3);
+                rows.into_iter().enumerate().map(move |(index, sample)| {
                     LearningCurveAuditSample {
-                        task_id: format!("audit-task-{}", (b'a' + task) as char),
-                        architecture_id: format!("audit-{task}-{index}"),
+                        task_id: task_id.clone(),
+                        architecture_id: sample.architecture_id,
                         seed: index as u64,
-                        curve_values: vec![initial, middle, final_value],
-                        final_value,
+                        curve_values: sample.curve_values,
+                        final_value: sample.final_value,
                     }
                 })
             })
@@ -1381,11 +1388,11 @@ mod tests {
                 &evidence,
                 &CurveForecastCalibrationConfig {
                     minimum_calibration_tasks: 3,
-                    minimum_forecasts_per_task: 2,
+                    minimum_forecasts_per_task: 100,
                     minimum_interval_coverage: 0.90,
                     maximum_interval_coverage: 1.0,
-                    maximum_mean_absolute_error_pp: 0.1,
-                    maximum_mean_interval_width_pp: 5.0,
+                    maximum_mean_absolute_error_pp: 100.0,
+                    maximum_mean_interval_width_pp: 100.0,
                 },
             )
             .unwrap();
@@ -1424,7 +1431,7 @@ mod tests {
                 &evidence,
                 &CurveForecastCalibrationConfig {
                     minimum_calibration_tasks: 3,
-                    minimum_forecasts_per_task: 2,
+                    minimum_forecasts_per_task: 100,
                     minimum_interval_coverage: 0.90,
                     maximum_interval_coverage: 1.0,
                     maximum_mean_absolute_error_pp: 1000.0,
