@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::paired_advantage::{
-    ExactSignTest, PairedAdvantageError, exact_one_sided_sign_test_p_value,
+    ExactSignTest, exact_one_sided_sign_test_p_value,
 };
 
 /// One paired quantum/classical workload instance nested in an independent cluster.
@@ -312,8 +312,10 @@ pub fn analyze_clustered_advantage(
         .p_value_one_sided
         .max(resource_superiority.p_value_one_sided);
 
-    let cluster_balanced_median_quality_difference = median(&mut cluster_quality.clone());
-    let cluster_balanced_median_log_resource_ratio = median(&mut cluster_resource.clone());
+    let mut cluster_quality_for_median = cluster_quality.clone();
+    let mut cluster_resource_for_median = cluster_resource.clone();
+    let cluster_balanced_median_quality_difference = median(&mut cluster_quality_for_median);
+    let cluster_balanced_median_log_resource_ratio = median(&mut cluster_resource_for_median);
 
     let quality_leave_one_out = leave_one_cluster_out_range(&cluster_quality);
     let resource_leave_one_out = leave_one_cluster_out_range(&cluster_resource);
