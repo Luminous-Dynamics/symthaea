@@ -485,6 +485,8 @@ The evidence contract is now published as JSON Schema Draft 2020-12, so CI syste
 
 - `schemas/hardsec-evidence-packet-v1.schema.json` — detector-alert and detector-free witness-validation packet shape;
 - `schemas/hardsec-evidence-audit-receipt-v1.schema.json` — packet-audit and optional referenced-byte-integrity receipt;
+- `schemas/hardsec-challenge-profile-v1.schema.json` — multi-axis evidence/difficulty/scale profile;
+- `schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json` — semantic and optional byte-integrity audit receipt;
 - `schemas/hardsec-seqcubewitness-attestation-v1.schema.json` — custom predicate for the signed reproducibility bundle.
 
 The focused workflow validates the witness fixture, generated packet receipt and generated attestation predicate against these schemas. Structural schema validation complements, but does not replace, the Rust semantic validator: JSON Schema cannot decide whether a bounded no-counterexample result was promoted to an unbounded claim or whether the cited evidence actually proves the statement.
@@ -502,6 +504,39 @@ The nested harness now commits `tools/hardsec-audit-harness/Cargo.lock` (raw SHA
 
 **Current revision status:** action-pin enforcement, committed lockfile, three schemas and three distinct negative controls are committed to the draft branch. The exact-head focused workflow result is pending; the earlier successful run does not validate these newer changes or the signature step.
 
-## 16. Scope boundary
+## 16. Multi-axis challenge profile: first executable implementation
+
+HARDSEC-009 is tracked in [issue #9261](https://github.com/Luminous-Dynamics/symthaea/issues/9261). It turns the research proposal into a machine-readable, fail-closed profile rather than adding another classifier score.
+
+New artifacts:
+- `schemas/hardsec-challenge-profile-v1.schema.json` — Draft 2020-12 profile schema;
+- `schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json` — validation receipt schema;
+- `tests/fixtures/hardsec/seqcube-challenge-profile.json` — profile for the replayed SeqCube reference fixture;
+- `examples/hardsec_challenge_profile_audit.rs` — Rust semantic auditor, optional local-byte verification and deterministic receipt;
+- an isolated harness target and 19 unit tests.
+
+The profile separates:
+- dataset role (`evaluation_corpus_member`, `reference_fixture_only`, `exploratory_only`);
+- evidence validity (`witness_validated`, `partially_evidenced`, `benign_equivalent`, `unknown_invalid`);
+- trigger activation, SCOAP metrics and temporal structure;
+- payload observation and paired inactive control;
+- netlist-scale versus graph-scale measurements;
+- equivalence proof state;
+- host/family/source/split provenance;
+- resource measurements.
+
+The SeqCube profile is marked **reference_fixture_only** even though its recorded trigger and payload witnesses passed replay. It records 3 trigger phases, a cycle-8 primary-output difference, a paired ten-cycle inactive control, and the bounded inactive SMT result. SCOAP, graph counts and resource metrics are explicitly `not_measured`; they are not guessed from the Verilog or paper. The evidence profile binds its local netlist, active/inactive traces, boundary record, SMT query and assumption/config file to their SHA-256 digests.
+
+The Rust auditor enforces semantic gates JSON Schema alone cannot express conveniently:
+- `witness_validated` requires an observed active trigger, observed payload effect, passed inactive control and a typed bounded no-counterexample record;
+- active/payload hashes must match their referenced evidence;
+- the inactive control must explicitly say its payload effect was not observed;
+- bounded proofs require a positive cycle bound and hashed assumption bytes;
+- `benign_equivalent` requires a typed equivalence report, and a bounded proof cannot certify whole-design benign equivalence;
+- unknown/invalid profiles remain non-confirmatory.
+
+The current exact-head workflow is pending. It now checks rustfmt, runs the new 19-test profile suite, validates the profile and receipt schemas, byte-audits the six unique local source files, and includes the profile receipt in the run manifest and signed predicate. Do not count these tests as passing until that exact run completes.
+
+## 17. Scope boundary
 
 This is defensive benchmark and evaluation infrastructure. It does not construct or deploy Trojan payloads, claim a Trojan is absent because finite simulation was quiet, or certify silicon. Formal results must preserve assumptions, bounds and solver provenance. The public contest repository's code/checkpoint/data must not be redistributed until a license or explicit permission is established.
