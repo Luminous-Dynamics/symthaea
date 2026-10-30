@@ -454,6 +454,7 @@ struct ExactSearch<'a> {
     justification_rejections: BTreeSet<JustificationRejection>,
     nodes: u64,
     budget_blocked: bool,
+    arithmetic_error: bool,
     search_limit_reached: bool,
     best: Option<CandidatePlan>,
 }
@@ -486,6 +487,7 @@ impl<'a> ExactSearch<'a> {
             justification_rejections: BTreeSet::new(),
             nodes: 0,
             budget_blocked: false,
+            arithmetic_error: false,
             search_limit_reached: false,
             best: None,
         }
@@ -510,7 +512,7 @@ impl<'a> ExactSearch<'a> {
             let mut evidence_ids: Vec<_> = selected_evidence_ids.iter().cloned().collect();
             evidence_ids.sort();
             let Some(total_token_cost) = self.cost_of_plan(selected_evidence_ids, selected_proofs) else {
-                self.budget_blocked = true;
+                self.arithmetic_error = true;
                 return;
             };
             if total_token_cost > self.request.token_budget {
@@ -592,7 +594,7 @@ impl<'a> ExactSearch<'a> {
                 evidence_dependencies: alternative.evidence_dependencies.clone(),
             });
             let Some(next_cost) = self.cost_of_plan(&next_evidence, &next_proofs) else {
-                self.budget_blocked = true;
+                self.arithmetic_error = true;
                 continue;
             };
             if self.best.as_ref()
@@ -669,6 +671,9 @@ pub fn solve_proof_budget(
     let request_sha256 = sha256_json(&request, "canonical proof budget request")?;
     let mut search = ExactSearch::new(&request);
     search.explore(0, &BTreeSet::new(), &[]);
+    if search.arithmetic_error {
+        return Err("proof packet token-cost arithmetic overflow or inconsistent selected plan".into());
+    }
 
     let candidate_rejections = search.candidate_rejections;
     let justification_rejections: Vec<_> =
@@ -1296,6 +1301,39 @@ mod tests {
         verify_proof_budget_result(&req, &result).unwrap();
         result.evidence[0].payload_sha256 = digest('f');
         assert!(verify_proof_budget_result(&req, &result).is_err());
+    }
+
+    #[test]
+    fn rendered_packet_header_and_proof_envelope_costs_are_included() {
+        let mut claim = obligation("claim-1", vec![justification("p1", &["A", "B"])]);
+        claim.selection_overhead_tokens = 2;
+        let mut req = request(
+            vec![candidate("A", "family-A", 1), candidate("B", "family-B", 1)],
+            vec![claim],
+            5,
+        );
+        req.fixed_packet_overhead_tokens = 1;
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.total_token_cost, 5);
+        verify_proof_budget_result(&req, &result).unwrap();
+
+        req.token_budget = 4;
+        let insufficient = solve_proof_budget(req).unwrap();
+        assert_eq!(insufficient.status, ProofBudgetStatus::BudgetInsufficient);
+        assert!(insufficient.evidence.is_empty());
+    }
+
+    #[test]
+    fn changed_resolved_excerpt_is_rejected_by_recomputed_span_digest() {
+        let mut item = candidate("A", "family-A", 1);
+        item.source_span_text = "tampered".into();
+        let req = request(
+            vec![item],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        assert!(solve_proof_budget(req).unwrap_err().contains("source span byte offsets"));
     }
 
     #[test]
