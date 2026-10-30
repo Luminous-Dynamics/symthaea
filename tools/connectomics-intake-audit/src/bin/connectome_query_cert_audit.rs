@@ -152,6 +152,10 @@ struct AuditReport {
     tool: &'static str,
     certificate_id: Option<String>,
     certificate_sha256: String,
+    dependency_root_count: usize,
+    dependency_node_count: usize,
+    dependency_edge_count: usize,
+    dependency_graph_sha256: String,
     status: &'static str,
     certificate_consistency_check_passed: bool,
     checks_failed: usize,
@@ -191,6 +195,56 @@ fn dependency_key(reference: &DependencyRef) -> DependencyKey {
         reference.object_kind.clone(),
         reference.object_id.clone(),
         reference.source_revision_sha256.clone(),
+    )
+}
+
+fn hash_field(hasher: &mut Sha256, value: &str) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn dependency_graph_summary(certificate: &Certificate) -> (usize, usize, usize, String) {
+    let roots = certificate.query.dependency_roots.iter()
+        .map(dependency_key)
+        .collect::<BTreeSet<_>>();
+    let nodes = certificate.dependency_closure.iter()
+        .map(|dependency| {
+            (
+                (
+                    dependency.object_kind.clone(),
+                    dependency.object_id.clone(),
+                    dependency.source_revision_sha256.clone(),
+                ),
+                dependency.depends_on.iter().map(dependency_key).collect::<BTreeSet<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let edge_count = nodes.values().map(BTreeSet::len).sum();
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-query-dependency-graph-v1");
+    for (kind, object_id, revision_sha256) in &roots {
+        hasher.update(b"ROOT");
+        hash_field(&mut hasher, kind);
+        hash_field(&mut hasher, object_id);
+        hash_field(&mut hasher, revision_sha256);
+    }
+    for ((kind, object_id, revision_sha256), children) in &nodes {
+        hasher.update(b"NODE");
+        hash_field(&mut hasher, kind);
+        hash_field(&mut hasher, object_id);
+        hash_field(&mut hasher, revision_sha256);
+        for (child_kind, child_id, child_revision_sha256) in children {
+            hasher.update(b"EDGE");
+            hash_field(&mut hasher, child_kind);
+            hash_field(&mut hasher, child_id);
+            hash_field(&mut hasher, child_revision_sha256);
+        }
+    }
+    (
+        certificate.query.dependency_roots.len(),
+        certificate.dependency_closure.len(),
+        edge_count,
+        hex::encode(hasher.finalize()),
     )
 }
 
@@ -679,11 +733,17 @@ fn run(args: Args) -> Result<i32, String> {
     let errors = validate(&certificate);
     let checks_failed = errors.len();
     let status = if checks_failed == 0 { "PASS" } else { "FAIL" };
+    let (dependency_root_count, dependency_node_count, dependency_edge_count, dependency_graph_sha256) =
+        dependency_graph_summary(&certificate);
     let report = AuditReport {
         schema_version: 1,
         tool: "connectome-query-cert-audit",
         certificate_id: Some(certificate.certificate_id.clone()),
         certificate_sha256: sha256(&bytes),
+        dependency_root_count,
+        dependency_node_count,
+        dependency_edge_count,
+        dependency_graph_sha256,
         status,
         certificate_consistency_check_passed: checks_failed == 0,
         checks_failed,
@@ -726,6 +786,25 @@ mod tests {
     fn fixture() -> Certificate {
         let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json");
         serde_json::from_slice(bytes).expect("synthetic certificate should parse")
+    }
+
+    #[test]
+    fn dependency_graph_digest_is_stable_under_node_and_edge_serialization_order() {
+        let mut certificate = fixture();
+        let digest = dependency_graph_summary(&certificate).3;
+        certificate.dependency_closure.reverse();
+        for dependency in &mut certificate.dependency_closure {
+            dependency.depends_on.reverse();
+        }
+        assert_eq!(dependency_graph_summary(&certificate).3, digest);
+    }
+
+    #[test]
+    fn dependency_graph_digest_changes_when_a_child_edge_changes() {
+        let mut certificate = fixture();
+        let digest = dependency_graph_summary(&certificate).3;
+        certificate.dependency_closure[2].depends_on.pop();
+        assert_ne!(dependency_graph_summary(&certificate).3, digest);
     }
 
     #[test]
