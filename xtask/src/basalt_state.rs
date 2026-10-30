@@ -712,6 +712,10 @@ mod tests {
         assert_eq!(freshness(&report, "build-before-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "tests-before-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "report-before-change"), EvidenceFreshness::StaleTransitive);
+        let report_evidence = report.evidence.iter().find(|item| item.evidence_id == "report-before-change").unwrap();
+        assert!(report_evidence.stale_ancestor_evidence_ids.iter().any(|id| id == "tests-before-change"));
+        assert!(report_evidence.stale_ancestor_evidence_ids.iter().any(|id| id == "build-before-change"));
+        assert!(report_evidence.invalidation_event_ids.iter().any(|id| id == "source-edit-001"));
         assert_eq!(freshness(&report, "lint-before-change"), EvidenceFreshness::StaleDirect);
         assert_eq!(freshness(&report, "build-after-change"), EvidenceFreshness::Fresh);
         assert_eq!(freshness(&report, "tests-after-change"), EvidenceFreshness::Fresh);
