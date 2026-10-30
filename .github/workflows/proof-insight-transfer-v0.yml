@@ -9,6 +9,8 @@ on:
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
       - "scripts/research/pitb_component_allocation_sensitivity_v0.py"
+      - "scripts/research/pitb_build_coverage_review_docket_v0.py"
+      - "docs/research/pitb-coverage-review-docket-2026-10-30.md"
       - "scripts/research/pitb_missingness_bounds_v0.py"
       - "docs/research/pitb-missingness-bounds-2026-10-29.md"
       - "docs/research/pitb-eligible-target-component-feasibility-2026-10-29.md"
@@ -3683,6 +3685,61 @@ jobs:
               raise SystemExit("report schema accepted a synthetic candidate paired with a reviewed census")
           print("PITB_ELIGIBLE_COMPONENT_FEASIBILITY_PASS: underpowered_case_detected=true universe_pin=true confirmatory=false")
           PY
+      - name: Build deterministic full-universe coverage review docket
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_build_coverage_review_docket_v0.py"
+          splits="$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/splits.json"
+          first="$RUNNER_TEMP/pitb-coverage-review-docket.first.json"
+          second="$RUNNER_TEMP/pitb-coverage-review-docket.second.json"
+          python3 -m py_compile "$script"
+          python3 "$script" --self-test
+          python3 "$script" "$splits" "$first"
+          python3 "$script" "$splits" "$second"
+          cmp "$first" "$second"
+          python3 - "$splits" "$first" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+
+          split_path, docket_path = map(Path, sys.argv[1:])
+          split_bytes = split_path.read_bytes()
+          manifest = json.loads(split_bytes)
+          docket = json.loads(docket_path.read_text())
+          families = docket.get("families")
+          if len(families) != 372 or docket["coverage_contract"]["family_count"] != 372:
+              raise SystemExit("coverage docket must contain exactly 372 families")
+          if docket["coverage_contract"]["required_family_review_rows"] != 744:
+              raise SystemExit("coverage docket must enumerate 744 independent family-review obligations")
+          if docket["coverage_status"] != "incomplete" or docket["confirmatory_eligible"] is not False:
+              raise SystemExit("review docket must remain non-confirmatory")
+          if docket["status"] != "pending_independent_review":
+              raise SystemExit("review docket must remain pending")
+          if docket["source_artifacts"]["split_manifest_sha256"] != hashlib.sha256(split_bytes).hexdigest():
+              raise SystemExit("docket does not bind the exact split-manifest bytes")
+          if docket["source_artifacts"]["partition_digest_sha256"] != manifest["split_plan"]["partition_digest_sha256"]:
+              raise SystemExit("docket partition digest differs from the frozen manifest")
+          source = {row["family_id"]: row for row in manifest["families"]}
+          seen = set()
+          for family in families:
+              family_id = family["family_id"]
+              if family_id in seen or family_id not in source:
+                  raise SystemExit("docket family IDs must be unique and exactly match the frozen universe")
+              seen.add(family_id)
+              original = source[family_id]
+              if family["split"] != original["split"] or family["title"] != original["title"]:
+                  raise SystemExit(f"{family_id}: source metadata differs from the frozen split manifest")
+              if family["linked_paths"] != sorted(set(original["linked_paths"])):
+                  raise SystemExit(f"{family_id}: linked paths differ from the frozen split manifest")
+              passes = family["review_passes"]
+              if [row["pass_id"] for row in passes] != ["independent_candidate_derivation", "false_negative_challenge"]:
+                  raise SystemExit(f"{family_id}: review passes missing or reordered")
+              if any(row["status"] != "pending" or row["reviewer_id"] is not None or row["organization_id"] is not None for row in passes):
+                  raise SystemExit(f"{family_id}: generated docket fabricated completed review evidence")
+          if seen != set(source):
+              raise SystemExit("docket does not cover the complete frozen family universe")
+          print("PITB_COVERAGE_REVIEW_DOCKET_PASS: families=372 review_rows=744 reproducible=true status=pending confirmatory=false")
+          PY
       - name: Test paired-outcome missingness bounds diagnostic
         shell: bash
         run: |
@@ -3736,5 +3793,6 @@ jobs:
             ${{ runner.temp }}/proof-insight-isolated/Cargo.lock
             ${{ runner.temp }}/dalek-temporal-timeline-audit.json
             ${{ runner.temp }}/dalek-temporal-dataset-audit.json
+            ${{ runner.temp }}/pitb-coverage-review-docket.first.json
           if-no-files-found: error
           retention-days: 30
