@@ -376,6 +376,8 @@ NIST IR 8615's September 2026 workshop report likewise emphasizes interoperable 
 
 ### The paradigm shift
 
+A related next step is now tracked as [HARDSEC-009](https://github.com/Luminous-Dynamics/symthaea/issues/9202): validation-frozen selective-risk evaluation. A detector should be able to clear, suspect, or abstain; choose both decision thresholds on validation only under false-alert and false-clear caps; then report frozen test performance and worst held-out-family behavior. The standalone evaluator specification is [HARDSEC_009_SELECTIVE_RISK_EVALUATION.md](HARDSEC_009_SELECTIVE_RISK_EVALUATION.md). This is a proposed evaluation layer, not a measured Symthaea advantage.
+
 The research object should be a **paired, provenance-bearing security experiment**, not a labelled netlist row. For every challenge, retain:
 - exact clean/infected subject identities and synthesis lineage;
 - reset model, active trigger trace, payload-effect witness and matched inactive counterfactual;
@@ -399,6 +401,13 @@ cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-au
   --packet /path/to/evidence-packet.json \
   --receipt /path/outside/packet/evidence-audit.json
 
+cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml \
+  --features hardsec-selective-eval --example hardsec_selective_eval
+cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml \
+  --features hardsec-selective-eval --example hardsec_selective_eval -- \
+  --ledger /path/to/predictions.json --receipt /path/new-receipt.json \
+  --max-false-alert-rate 0.005 --max-false-clear-rate 0.01
+
 # When the packet supplies local_path locators for every artifact:
 cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-audit -- \
   --packet /path/to/evidence-packet.json \
@@ -408,7 +417,7 @@ cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-au
 
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
 
-The trigger-budget suite has **9 tests**. The evidence-packet auditor has **26 tests**, including the SeqCube witness-only fixture and negative controls for claim inflation. Both suites have now been compiled and passed in the focused GitHub Actions job described below.
+The trigger-budget suite has **9 tests**. The evidence-packet auditor has **32 tests**, including the SeqCube witness-only fixture and negative controls for claim inflation. Both suites have now been compiled and passed in the focused GitHub Actions job described below.
 
 ### Isolated focused Rust test harness
 
@@ -422,11 +431,13 @@ cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --exa
 cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
 ```
 
-On exact PR head `d8b58a7b27ea38786c0e7b08f45853f76188030a`, GitHub Actions run [41035491438](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41035491438) completed successfully: **rustfmt check passed**, **9/9** trigger-budget tests passed, and **26/26** evidence-packet tests passed. The previous focused compile/test run [41034832167](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41034832167) also passed both suites before formatting was made a required step.
+On exact PR head `ff051d49a22a9defbbaacd8a8ceb38ecfc8ff921`, GitHub Actions run [41047752417](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41047752417) completed successfully: **rustfmt check passed**, **9/9** trigger-budget tests passed, and **32/32** evidence-packet tests passed. The same run independently replayed the pinned SeqCube package, including its Z3 and mandatory Icarus Verilog cross-checks, and completed the tamper negative control.
 
-The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12967771808`, archive digest `sha256:b849390c04deb6c94278bf53d4b34d67f1779d377799893b3a4f67f713078262`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
+The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12973665876`, archive digest `sha256:0c75fd82cab8782e19f132f2dee987e33dfd2b67acf8b23b3e30ff5b09f8c7dd`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
 
-The independent SeqCube package verifier remains **not run** here. The passing Rust test validates only the evidence packet's handling of publisher-listed digests and claim scopes; it does not fetch the package's files or reproduce Z3/Icarus outputs.
+The SeqCube archive's publisher checksum file lists 25 entries: 13 extracted files matched byte-for-byte and 12 differed only by LF/CRLF representation. A separate canonical CRLF copy reproduced all 25 published digests; no unexplained mismatch remained. The pinned upstream verifier then printed `VERIFICATION PASSED`, with active SAT, inactive UNSAT, and Icarus replay passed. The detector-free evidence packet verified nine referenced local files and emitted five scoped claims. An intentionally modified active trace was rejected by both the packet auditor and the upstream verifier. These are independent reproductions at the pinned upstream commit, not corpus-scale or detector-performance results.
+
+The independent SeqCube replay is now **completed** in the exact-head workflow described above. It validates the one author-created witness reference design only; it does not reproduce the SeqCube paper's 3,240-instance corpus generation, the detector study, or generalize to other netlists.
 
 Useful tool references:
 - SymbiYosys: https://symbiyosys.readthedocs.io/en/latest/ (bounded/unbounded safety, cover and liveness)
