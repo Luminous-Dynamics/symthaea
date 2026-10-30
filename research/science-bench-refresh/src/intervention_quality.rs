@@ -187,6 +187,9 @@ pub struct FamilyQualityMetricsV1 {
     pub rejected_valid_count: u64,
     pub rejected_invalid_count: u64,
     pub rejected_ambiguous_count: u64,
+    pub abstained_valid_count: u64,
+    pub abstained_invalid_count: u64,
+    pub abstained_ambiguous_count: u64,
     pub abstained_count: u64,
     pub unique_semantic_cluster_count: u64,
     pub unique_valid_accepted_test_unit_count: u64,
@@ -206,6 +209,9 @@ pub struct FailureModeQualityMetricsV1 {
     pub rejected_valid_count: u64,
     pub rejected_invalid_count: u64,
     pub rejected_ambiguous_count: u64,
+    pub abstained_valid_count: u64,
+    pub abstained_invalid_count: u64,
+    pub abstained_ambiguous_count: u64,
     pub abstained_count: u64,
     pub unique_valid_accepted_test_unit_count: u64,
 }
@@ -232,6 +238,9 @@ pub struct InterventionQualityReportFieldsV1 {
     pub rejected_valid_count: u64,
     pub rejected_invalid_count: u64,
     pub rejected_ambiguous_count: u64,
+    pub abstained_valid_count: u64,
+    pub abstained_invalid_count: u64,
+    pub abstained_ambiguous_count: u64,
     /// Lower bound: ambiguous accepted candidates remain in the denominator,
     /// and are not counted as validated successes.
     pub accepted_valid_precision_lower_bound_ppm: Option<u32>,
@@ -277,7 +286,9 @@ struct DispositionCountsV1 {
     rejected_valid: u64,
     rejected_invalid: u64,
     rejected_ambiguous: u64,
-    abstained: u64,
+    abstained_valid: u64,
+    abstained_invalid: u64,
+    abstained_ambiguous: u64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -564,7 +575,9 @@ fn add_disposition(
         (PipelineDispositionV1::Rejected, AdjudicatedRelationV1::Valid) => counts.rejected_valid += 1,
         (PipelineDispositionV1::Rejected, AdjudicatedRelationV1::Invalid) => counts.rejected_invalid += 1,
         (PipelineDispositionV1::Rejected, AdjudicatedRelationV1::Ambiguous) => counts.rejected_ambiguous += 1,
-        (PipelineDispositionV1::Abstained, _) => counts.abstained += 1,
+        (PipelineDispositionV1::Abstained, AdjudicatedRelationV1::Valid) => counts.abstained_valid += 1,
+        (PipelineDispositionV1::Abstained, AdjudicatedRelationV1::Invalid) => counts.abstained_invalid += 1,
+        (PipelineDispositionV1::Abstained, AdjudicatedRelationV1::Ambiguous) => counts.abstained_ambiguous += 1,
     }
 }
 
@@ -585,7 +598,12 @@ fn family_report(
         rejected_valid_count: aggregate.disposition.rejected_valid,
         rejected_invalid_count: aggregate.disposition.rejected_invalid,
         rejected_ambiguous_count: aggregate.disposition.rejected_ambiguous,
-        abstained_count: aggregate.disposition.abstained,
+        abstained_valid_count: aggregate.disposition.abstained_valid,
+        abstained_invalid_count: aggregate.disposition.abstained_invalid,
+        abstained_ambiguous_count: aggregate.disposition.abstained_ambiguous,
+        abstained_count: aggregate.disposition.abstained_valid
+            + aggregate.disposition.abstained_invalid
+            + aggregate.disposition.abstained_ambiguous,
         unique_semantic_cluster_count: aggregate.cluster_ids.len() as u64,
         unique_valid_accepted_test_unit_count: valid_unique,
         generation_tokens: aggregate.generation_tokens,
@@ -749,7 +767,7 @@ pub fn analyze_intervention_quality(
 
     let accepted = total.accepted_valid + total.accepted_invalid + total.accepted_ambiguous;
     let rejected = total.rejected_valid + total.rejected_invalid + total.rejected_ambiguous;
-    let abstained = total.abstained;
+    let abstained = total.abstained_valid + total.abstained_invalid + total.abstained_ambiguous;
     let valid_count = valid_relation_count;
     let valid_accepted = total.accepted_valid;
     let unique_valid_accepted = valid_accepted_units.len() as u64;
@@ -768,7 +786,12 @@ pub fn analyze_intervention_quality(
                 rejected_valid_count: aggregate.disposition.rejected_valid,
                 rejected_invalid_count: aggregate.disposition.rejected_invalid,
                 rejected_ambiguous_count: aggregate.disposition.rejected_ambiguous,
-                abstained_count: aggregate.disposition.abstained,
+                abstained_valid_count: aggregate.disposition.abstained_valid,
+                abstained_invalid_count: aggregate.disposition.abstained_invalid,
+                abstained_ambiguous_count: aggregate.disposition.abstained_ambiguous,
+                abstained_count: aggregate.disposition.abstained_valid
+                    + aggregate.disposition.abstained_invalid
+                    + aggregate.disposition.abstained_ambiguous,
                 unique_valid_accepted_test_unit_count: valid_units,
             }
         })
@@ -795,6 +818,9 @@ pub fn analyze_intervention_quality(
         rejected_valid_count: total.rejected_valid,
         rejected_invalid_count: total.rejected_invalid,
         rejected_ambiguous_count: total.rejected_ambiguous,
+        abstained_valid_count: total.abstained_valid,
+        abstained_invalid_count: total.abstained_invalid,
+        abstained_ambiguous_count: total.abstained_ambiguous,
         accepted_valid_precision_lower_bound_ppm: ratio_ppm(total.accepted_valid, accepted),
         accepted_confirmed_invalid_rate_ppm: ratio_ppm(total.accepted_invalid, accepted),
         accepted_ambiguous_rate_ppm: ratio_ppm(total.accepted_ambiguous, accepted),
