@@ -71,6 +71,7 @@ pub mod memory_attestation;
 pub mod memory_derivation;
 pub mod memory_justifications;
 pub mod memory_use_validity;
+pub mod memory_proof_budget;
 pub mod memory_challenge_api;
 pub mod memory_challenge_sled;
 pub mod memory_challenge_sqlite;
