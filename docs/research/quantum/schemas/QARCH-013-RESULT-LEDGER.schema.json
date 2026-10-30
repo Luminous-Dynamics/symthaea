@@ -1,0 +1,721 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QARCH-013 cross-suite quantum application result ledger",
+  "description": "A thin interoperability projection over existing workload, architecture and utility owners. It is not a simulator or a universal score. Semantic verification of matched tasks, denominator arithmetic, evidence identities and resource completeness is required in addition to JSON Schema validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "comparison_status",
+    "external_mapping",
+    "workload",
+    "platform",
+    "quantum_result",
+    "evidence",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "qarch-013-result-ledger/1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparison_status": {
+      "enum": [
+        "matched_fixture_only",
+        "matched_measured_comparison",
+        "not_comparable",
+        "requires_adapter",
+        "not_evaluated"
+      ]
+    },
+    "external_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "suite_version",
+        "instance_id",
+        "instance_digest",
+        "mapping_notes"
+      ],
+      "properties": {
+        "suite_id": {
+          "enum": [
+            "QOBLIB",
+            "JUNIQ",
+            "IONQ_APPLICATION",
+            "QUOPS",
+            "PHOTONIC_COMPONENT_REFERENCE",
+            "INTERNAL_FIXTURE",
+            "NONE"
+          ]
+        },
+        "suite_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instance_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "instance_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mapping_notes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_protocol_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "workload_fingerprint",
+        "objective_digest",
+        "output_quality_contract",
+        "verifier"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workload_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_distribution_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_quality_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metric",
+            "unit",
+            "acceptance_predicate",
+            "threshold"
+          ],
+          "properties": {
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "acceptance_predicate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "threshold": {
+              "type": "number"
+            }
+          }
+        },
+        "verifier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "verifier_id",
+            "version",
+            "independent_of_candidate"
+          ],
+          "properties": {
+            "verifier_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independent_of_candidate": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "candidate_class",
+        "architecture_family",
+        "configuration_fingerprint",
+        "software_stack"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_class": {
+          "enum": [
+            "quantum",
+            "classical",
+            "hybrid",
+            "photonic_component_reference"
+          ]
+        },
+        "architecture_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hardware_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "configuration_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compiler_or_software_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "software_stack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "conditional_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "estimate",
+          "unit",
+          "conditioned_on",
+          "denominator_description",
+          "claim_scope"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "estimate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "uncertainty_plus_minus": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conditioned_on": {
+            "type": "string",
+            "minLength": 1
+          },
+          "denominator_description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_scope": {
+            "const": "conditional_component_only"
+          },
+          "source_locator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "end_to_end": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "attempted_instances",
+        "verified_acceptable_answers",
+        "total_wall_clock_seconds",
+        "total_energy_joules",
+        "total_cost_usd",
+        "resource_scope_includes",
+        "missing_resource_terms"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "measured",
+            "calibrated_simulation",
+            "analytic_estimate",
+            "synthetic_fixture",
+            "not_reported"
+          ]
+        },
+        "attempted_instances": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "verified_acceptable_answers": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_wall_clock_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_energy_joules": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "resource_scope_includes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "setup",
+              "compilation",
+              "data_loading",
+              "encoding",
+              "source_preparation",
+              "optical_execution",
+              "feedforward",
+              "retries",
+              "readout",
+              "error_mitigation",
+              "post_processing",
+              "verification"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "missing_resource_terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "p50_wall_clock_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95_wall_clock_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p99_wall_clock_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "uncertainty_method": {
+          "type": "string"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "unit",
+        "lower",
+        "upper",
+        "threshold",
+        "gate"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "gate": {
+          "enum": [
+            "meets",
+            "fails",
+            "uncertain",
+            "not_evaluated"
+          ]
+        }
+      }
+    },
+    "classical_baseline": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "method",
+        "software_version",
+        "configuration",
+        "workload_fingerprint",
+        "quality",
+        "end_to_end"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "software_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workload_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metric",
+            "unit",
+            "lower",
+            "upper",
+            "threshold",
+            "gate"
+          ],
+          "properties": {
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            },
+            "threshold": {
+              "type": "number"
+            },
+            "gate": {
+              "enum": [
+                "meets",
+                "fails",
+                "uncertain",
+                "not_evaluated"
+              ]
+            }
+          }
+        },
+        "end_to_end": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attempted_instances",
+            "verified_acceptable_answers",
+            "total_wall_clock_seconds",
+            "total_energy_joules",
+            "total_cost_usd"
+          ],
+          "properties": {
+            "attempted_instances": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verified_acceptable_answers": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_wall_clock_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "total_energy_joules": {
+              "type": "number",
+              "minimum": 0
+            },
+            "total_cost_usd": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "source_revision",
+        "artifact_digests",
+        "calibration_status",
+        "independent_reproduction"
+      ],
+      "properties": {
+        "evidence_class": {
+          "enum": [
+            "measured_physical",
+            "calibrated_simulation",
+            "independent_simulation",
+            "paper_reported",
+            "analytic_model",
+            "synthetic_analytic_fixture"
+          ]
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_digests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "calibration_status": {
+          "enum": [
+            "qualified",
+            "not_applicable",
+            "not_calibrated",
+            "unknown"
+          ]
+        },
+        "independent_reproduction": {
+          "type": "boolean"
+        },
+        "uncertainty_note": {
+          "type": "string"
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "comparison_status": {
+            "const": "matched_measured_comparison"
+          }
+        },
+        "required": [
+          "comparison_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "classical_baseline",
+          "end_to_end",
+          "quality"
+        ],
+        "properties": {
+          "evidence": {
+            "properties": {
+              "evidence_class": {
+                "const": "measured_physical"
+              },
+              "calibration_status": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "evidence_class",
+              "calibration_status"
+            ]
+          },
+          "end_to_end": {
+            "properties": {
+              "status": {
+                "const": "measured"
+              },
+              "attempted_instances": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "verified_acceptable_answers": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "status",
+              "attempted_instances",
+              "verified_acceptable_answers"
+            ]
+          },
+          "quality": {
+            "properties": {
+              "gate": {
+                "const": "meets"
+              }
+            }
+          },
+          "classical_baseline": {
+            "properties": {
+              "quality": {
+                "properties": {
+                  "gate": {
+                    "const": "meets"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison_status": {
+            "const": "matched_fixture_only"
+          }
+        },
+        "required": [
+          "comparison_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "classical_baseline",
+          "end_to_end",
+          "quality"
+        ],
+        "properties": {
+          "evidence": {
+            "properties": {
+              "evidence_class": {
+                "const": "synthetic_analytic_fixture"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison_status": {
+            "enum": [
+              "not_comparable",
+              "requires_adapter",
+              "not_evaluated"
+            ]
+          }
+        },
+        "required": [
+          "comparison_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "classical_baseline": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
