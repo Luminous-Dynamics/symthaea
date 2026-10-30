@@ -959,7 +959,7 @@ mod tests {
         for variable_count in 2..=7 {
             for seed in 0..16u64 {
                 let eliminate = (0..variable_count)
-                    .filter(|variable| (variable as u64 + seed) % 3 != 0)
+                    .filter(|variable| (*variable as u64 + seed) % 3 != 0)
                     .collect::<Vec<_>>();
                 let retained = (0..variable_count)
                     .filter(|variable| !eliminate.contains(variable))
