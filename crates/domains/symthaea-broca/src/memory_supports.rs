@@ -627,6 +627,373 @@ impl SupportGraph {
     }
 }
 
+/// Point-in-time support state. Unlike SupportSnapshot, this does not
+/// materialize complete intervals; it answers a fixed valid_at query.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PointSupportSnapshot {
+    pub valid_at: String,
+    pub supported_propositions: BTreeSet<String>,
+    pub active_justifications: BTreeSet<String>,
+    pub active_justification_counts: BTreeMap<String, usize>,
+}
+
+/// Work counters for the incremental reference session. They count actual
+/// proposition and justification reevaluations, not elapsed time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SupportWorkMetrics {
+    pub proposition_recomputations: u64,
+    pub justification_evaluations: u64,
+}
+
+/// Incremental support evaluator for one fixed valid-time query.
+///
+/// It maintains justification counts and reverse dependency indexes. A source
+/// retraction or rule-version retirement first identifies directly affected
+/// propositions. Dependents are reconsidered only when a proposition changes
+/// between supported and unsupported: losing one proof while another remains
+/// does not cause needless downstream recomputation.
+///
+/// This is a correctness-first in-memory prototype. Each mutation still uses
+/// clone-validate-swap for atomic publication; durable transactions and
+/// concurrency are outside this type's contract.
+#[derive(Debug, Clone)]
+pub struct IncrementalSupportSession {
+    graph: SupportGraph,
+    valid_at: NaiveDate,
+    proposition_order: Vec<String>,
+    justifications_by_proposition: BTreeMap<String, BTreeSet<String>>,
+    reverse_source_outputs: BTreeMap<String, BTreeSet<String>>,
+    reverse_proposition_outputs: BTreeMap<String, BTreeSet<String>>,
+    rule_version_outputs: BTreeMap<(String, String), BTreeSet<String>>,
+    supported: BTreeSet<String>,
+    active_justifications: BTreeSet<String>,
+    active_justification_counts: BTreeMap<String, usize>,
+    metrics: SupportWorkMetrics,
+}
+
+fn proposition_topological_order(graph: &SupportGraph) -> Result<Vec<String>, String> {
+    let mut parents_by_output: BTreeMap<String, BTreeSet<String>> = graph
+        .propositions
+        .keys()
+        .map(|id| (id.clone(), BTreeSet::new()))
+        .collect();
+
+    for justification in graph.justifications.values() {
+        let parents = parents_by_output
+            .get_mut(&justification.proposition_id)
+            .ok_or_else(|| format!("unknown output proposition {:?}", justification.proposition_id))?;
+        for dependency in &justification.dependencies {
+            if let SupportDependency::Proposition(parent_id) = dependency {
+                parents.insert(parent_id.clone());
+            }
+        }
+    }
+
+    fn visit(
+        proposition_id: &str,
+        parents_by_output: &BTreeMap<String, BTreeSet<String>>,
+        marks: &mut BTreeMap<String, u8>,
+        order: &mut Vec<String>,
+    ) -> Result<(), String> {
+        match marks.get(proposition_id).copied() {
+            Some(1) => return Err(format!("cycle detected at proposition {proposition_id:?}")),
+            Some(2) => return Ok(()),
+            _ => {}
+        }
+        marks.insert(proposition_id.to_owned(), 1);
+        let parents = parents_by_output
+            .get(proposition_id)
+            .ok_or_else(|| format!("unknown proposition {proposition_id:?}"))?;
+        for parent_id in parents {
+            visit(parent_id, parents_by_output, marks, order)?;
+        }
+        marks.insert(proposition_id.to_owned(), 2);
+        order.push(proposition_id.to_owned());
+        Ok(())
+    }
+
+    let mut marks = BTreeMap::new();
+    let mut order = Vec::with_capacity(graph.propositions.len());
+    for proposition_id in graph.propositions.keys() {
+        visit(proposition_id, &parents_by_output, &mut marks, &mut order)?;
+    }
+    Ok(order)
+}
+
+impl IncrementalSupportSession {
+    pub fn new(graph: &SupportGraph, valid_at: &str) -> Result<Self, String> {
+        graph.verify_consistency()?;
+        let valid_at = NaiveDate::parse_from_str(valid_at, "%Y-%m-%d")
+            .map_err(|error| format!("valid_at must be YYYY-MM-DD: {error}"))?;
+        let proposition_order = proposition_topological_order(graph)?;
+
+        let mut session = Self {
+            graph: graph.clone(),
+            valid_at,
+            proposition_order,
+            justifications_by_proposition: BTreeMap::new(),
+            reverse_source_outputs: BTreeMap::new(),
+            reverse_proposition_outputs: BTreeMap::new(),
+            rule_version_outputs: BTreeMap::new(),
+            supported: BTreeSet::new(),
+            active_justifications: BTreeSet::new(),
+            active_justification_counts: BTreeMap::new(),
+            metrics: SupportWorkMetrics::default(),
+        };
+
+        for proposition_id in graph.propositions.keys() {
+            session
+                .active_justification_counts
+                .insert(proposition_id.clone(), 0);
+        }
+
+        for (justification_id, justification) in &graph.justifications {
+            session
+                .justifications_by_proposition
+                .entry(justification.proposition_id.clone())
+                .or_default()
+                .insert(justification_id.clone());
+            session
+                .rule_version_outputs
+                .entry((justification.rule_id.clone(), justification.rule_version.clone()))
+                .or_default()
+                .insert(justification.proposition_id.clone());
+
+            for dependency in &justification.dependencies {
+                match dependency {
+                    SupportDependency::SourceEvent(event_id) => {
+                        session
+                            .reverse_source_outputs
+                            .entry(event_id.clone())
+                            .or_default()
+                            .insert(justification.proposition_id.clone());
+                    }
+                    SupportDependency::Proposition(parent_id) => {
+                        session
+                            .reverse_proposition_outputs
+                            .entry(parent_id.clone())
+                            .or_default()
+                            .insert(justification.proposition_id.clone());
+                    }
+                }
+            }
+        }
+
+        // A topological pass is sufficient for the initial point-in-time
+        // evaluation: every proposition is evaluated after all its premises.
+        for proposition_id in session.proposition_order.clone() {
+            session.recompute_proposition(&proposition_id)?;
+        }
+        Ok(session)
+    }
+
+    fn interval_contains(&self, interval: &ValidInterval) -> Result<bool, String> {
+        let interval = interval.parse()?;
+        Ok(interval.start <= self.valid_at
+            && interval.end.is_none_or(|end| self.valid_at < end))
+    }
+
+    fn justification_is_active(&self, justification: &JustificationInput) -> Result<bool, String> {
+        if self.graph.retired_rule_versions.contains(&(
+            justification.rule_id.clone(),
+            justification.rule_version.clone(),
+        )) {
+            return Ok(false);
+        }
+
+        if !self.interval_contains(&ValidInterval {
+            valid_from: justification.valid_from.clone(),
+            valid_to: justification.valid_to.clone(),
+        })? {
+            return Ok(false);
+        }
+
+        for dependency in &justification.dependencies {
+            let eligible = match dependency {
+                SupportDependency::SourceEvent(event_id) => {
+                    let source = self
+                        .graph
+                        .source_events
+                        .get(event_id)
+                        .ok_or_else(|| format!("missing source event {event_id:?}"))?;
+                    !source.retracted && self.interval_contains(&source.valid_interval)?
+                }
+                SupportDependency::Proposition(proposition_id) => {
+                    self.supported.contains(proposition_id)
+                }
+            };
+            if !eligible {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn recompute_proposition(&mut self, proposition_id: &str) -> Result<bool, String> {
+        self.metrics.proposition_recomputations += 1;
+        let justification_ids = self
+            .justifications_by_proposition
+            .get(proposition_id)
+            .cloned()
+            .unwrap_or_default();
+
+        // Remove this proposition's old proof state before inserting the newly
+        // evaluated set. Dependents only observe the proposition's support bit.
+        for justification_id in &justification_ids {
+            self.active_justifications.remove(justification_id);
+        }
+
+        let mut active_count = 0usize;
+        for justification_id in &justification_ids {
+            self.metrics.justification_evaluations += 1;
+            let justification = self
+                .graph
+                .justifications
+                .get(justification_id)
+                .ok_or_else(|| format!("missing justification {justification_id:?}"))?;
+            if self.justification_is_active(justification)? {
+                active_count += 1;
+                self.active_justifications.insert(justification_id.clone());
+            }
+        }
+
+        let was_supported = self.supported.contains(proposition_id);
+        if active_count > 0 {
+            self.supported.insert(proposition_id.to_owned());
+        } else {
+            self.supported.remove(proposition_id);
+        }
+        self.active_justification_counts
+            .insert(proposition_id.to_owned(), active_count);
+        Ok(was_supported != (active_count > 0))
+    }
+
+    fn refresh_from_roots(
+        &mut self,
+        roots: BTreeSet<String>,
+    ) -> Result<(), String> {
+        let mut scheduled = roots;
+        // One deterministic topological sweep is sufficient. New dependents
+        // can only occur after the proposition whose support just changed.
+        for proposition_id in self.proposition_order.clone() {
+            if !scheduled.remove(&proposition_id) {
+                continue;
+            }
+            let support_changed = self.recompute_proposition(&proposition_id)?;
+            if support_changed {
+                if let Some(dependents) =
+                    self.reverse_proposition_outputs.get(&proposition_id)
+                {
+                    scheduled.extend(dependents.iter().cloned());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn mutation_since(
+        &self,
+        previous_supported: &BTreeSet<String>,
+        previous_active: &BTreeSet<String>,
+    ) -> SupportMutation {
+        let affected_propositions = previous_supported
+            .symmetric_difference(&self.supported)
+            .cloned()
+            .collect();
+        let affected_justifications = previous_active
+            .symmetric_difference(&self.active_justifications)
+            .cloned()
+            .collect();
+        SupportMutation {
+            affected_propositions,
+            affected_justifications,
+        }
+    }
+
+    pub fn snapshot(&self) -> PointSupportSnapshot {
+        PointSupportSnapshot {
+            valid_at: self.valid_at.format("%Y-%m-%d").to_string(),
+            supported_propositions: self.supported.clone(),
+            active_justifications: self.active_justifications.clone(),
+            active_justification_counts: self.active_justification_counts.clone(),
+        }
+    }
+
+    pub fn metrics(&self) -> SupportWorkMetrics {
+        self.metrics
+    }
+
+    pub fn reset_metrics(&mut self) {
+        self.metrics = SupportWorkMetrics::default();
+    }
+
+    pub fn graph(&self) -> &SupportGraph {
+        &self.graph
+    }
+
+    pub fn retract_source_event(
+        &mut self,
+        event_id: &str,
+    ) -> Result<SupportMutation, String> {
+        if !self.graph.source_events.contains_key(event_id) {
+            return Err(format!("cannot retract unknown source event {event_id:?}"));
+        }
+        if self.graph.source_events.get(event_id).is_some_and(|source| source.retracted) {
+            return Ok(SupportMutation::default());
+        }
+
+        let previous_supported = self.supported.clone();
+        let previous_active = self.active_justifications.clone();
+        let mut candidate = self.clone();
+        candidate
+            .graph
+            .source_events
+            .get_mut(event_id)
+            .expect("validated source event exists")
+            .retracted = true;
+        candidate.graph.verify_consistency()?;
+
+        let roots = candidate
+            .reverse_source_outputs
+            .get(event_id)
+            .cloned()
+            .unwrap_or_default();
+        candidate.refresh_from_roots(roots)?;
+        let mutation = candidate.mutation_since(&previous_supported, &previous_active);
+        *self = candidate;
+        Ok(mutation)
+    }
+
+    pub fn invalidate_rule_version(
+        &mut self,
+        rule_id: &str,
+        rule_version: &str,
+    ) -> Result<SupportMutation, String> {
+        non_empty(rule_id, "rule ID")?;
+        non_empty(rule_version, "rule version")?;
+        let key = (rule_id.to_owned(), rule_version.to_owned());
+        if self.graph.retired_rule_versions.contains(&key) {
+            return Ok(SupportMutation::default());
+        }
+
+        let previous_supported = self.supported.clone();
+        let previous_active = self.active_justifications.clone();
+        let mut candidate = self.clone();
+        candidate.graph.retired_rule_versions.insert(key.clone());
+        candidate.graph.verify_consistency()?;
+
+        let roots = candidate
+            .rule_version_outputs
+            .get(&key)
+            .cloned()
+            .unwrap_or_default();
+        candidate.refresh_from_roots(roots)?;
+        let mutation = candidate.mutation_since(&previous_supported, &previous_active);
+        *self = candidate;
+        Ok(mutation)
+    }
+}
+
 fn support_difference(
     before: &SupportSnapshot,
     after: &SupportSnapshot,
