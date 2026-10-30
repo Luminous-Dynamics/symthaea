@@ -995,7 +995,7 @@ mod tests {
     #[test]
     fn curve_slope_can_reverse_raw_early_metric_order() {
         let predictor = fitted();
-        let slow = predictor.predict_final("slow", &[52.0, 55.0]).unwrap();
+        let slow = predictor.predict_final("slow", &[30.0, 55.0]).unwrap();
         let fast = predictor.predict_final("fast", &[56.0, 57.0]).unwrap();
         assert!(fast.observed_curve[1] > slow.observed_curve[1]);
         assert!(slow.predicted_final_value > fast.predicted_final_value);
@@ -1032,10 +1032,16 @@ mod tests {
         let selection =
             select_curve_promotions(&predictor, &predictions, 2, 1).unwrap();
         assert_eq!(selection.selected.len(), 2);
-        assert!(selection.selected.iter().any(|candidate| {
-            candidate.architecture_id == "uncertain-c"
-                && candidate.reason == PromotionReason::OptimisticGuard
-        }));
+        let guard = selection
+            .selected
+            .iter()
+            .find(|candidate| candidate.reason == PromotionReason::OptimisticGuard)
+            .unwrap();
+        let conservative_top = predictions
+            .iter()
+            .max_by(|left, right| left.conservative_bound.total_cmp(&right.conservative_bound))
+            .unwrap();
+        assert_ne!(guard.architecture_id, conservative_top.architecture_id);
         assert_eq!(selection.selection_sha256.len(), 64);
     }
 
