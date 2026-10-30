@@ -36,9 +36,9 @@ The JSON contract is `CONNECTOME_CORRECTION_PORTFOLIO.schema.json`. Inputs bind 
 1. `probability_weighted_query_sensitivity_per_minute`: predicted error probability × clipped baseline query sensitivity / review minutes.
 2. `probability_per_minute`: predicted error probability / review minutes.
 3. `uncertainty_per_minute`: binary probability uncertainty / review minutes.
-4. `deterministic_random`: SHA-256 keyed candidate order using the exact input digest.
+4. `deterministic_random`: SHA-256 keyed candidate order using the canonical reference-free ranking-view digest.
 
-Ranking uses no oracle reference values. The ranker function receives only candidate fields, the baseline graph, and a reduced query-ranking view containing query metric, weight, and normalization scale; the reference-value field is absent from its type-level inputs. The evaluator uses references only for query error, pairwise interactions, regret, and exact optimum. The exact optimum is an evaluation ceiling and must never be made available to the ranker during model selection or lockbox evaluation.
+Ranking uses no oracle reference values. The ranker function receives only candidate fields, the baseline graph, and a reduced query-ranking view containing query metric, weight, and normalization scale; the reference-value field is absent from its type-level inputs. The random policy seed is the SHA-256 of the serialized candidate/graph/query-ranking view (which excludes references), not the full input-file digest. The report carries both `input_sha256` and `ranking_view_sha256). The evaluator uses references only for query error, pairwise interactions, regret, and exact optimum. The exact optimum is an evaluation ceiling and must never be made available to the ranker during model selection or lockbox evaluation.
 
 The report includes per-budget policy utility and regret to the exact candidate-pool optimum; selected IDs and canonical application order; baseline/final query error; reverse-order error and order sensitivity; plus pairwise interaction estimates:
 
