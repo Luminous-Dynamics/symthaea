@@ -610,6 +610,7 @@ wait-timeout = "0.2"
 [features]
 default = ["default-mind"]
 hardsec-graph-audit = ["dep:sha2"] # HARDSEC-010: hash and audit streamed graph edge inventories
+hardsec-graph-audit = ["dep:sha2"] # HARDSEC-010: hash and audit streamed graph edge inventories
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
@@ -2546,6 +2547,11 @@ name = "recurrent_mask_recovery"
 name = "action_semantics_probe"
 
 # HARDSEC-010: streaming graph edge accounting and declared path retention.
+[[example]]
+name = "hardsec_graph_path_retention_audit"
+required-features = ["hardsec-graph-audit"]
+
+# HARDSEC-010: streaming graph edge accounting and reference-path retention.
 [[example]]
 name = "hardsec_graph_path_retention_audit"
 required-features = ["hardsec-graph-audit"]
