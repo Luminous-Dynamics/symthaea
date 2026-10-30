@@ -389,7 +389,9 @@ mod tests {
             source_sha256: digest("canonical source"),
             source_pointer: "/messages/2/content".into(),
             source_family_id: format!("family-{id}"),
-            source_session_id: Some(format!("session-{id}")),
+            // In the AML Text/Coding ingestion adapter, trajectory_id is the
+            // immutable session_id copied from the Add request.
+            source_session_id: Some("trajectory-1".into()),
             scope_id: "scope-1".into(),
             index_state_sha256: digest("index state"),
             recorded_at_unix_ms: 100,
@@ -528,6 +530,69 @@ mod tests {
 
         assert_eq!(result.status, ProofBudgetStatus::Supported);
         assert_eq!(result.evidence[0].source_span_text, text);
+    }
+
+    #[test]
+    fn trusted_session_provenance_flows_from_admission_into_multisession_proof_packet() {
+        let mut proof_request = request();
+        proof_request.obligations[0].minimum_independent_families = 2;
+        proof_request.obligations[0].minimum_distinct_sessions = 2;
+        proof_request.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "two-session-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+
+        let hit_a = hit("A", "evidence from first session", 1.0);
+        let mut hit_b = hit("B", "evidence from second session", 0.9);
+        hit_b.source.trajectory_id = "trajectory-2".into();
+
+        let mut admission_a = admission("A");
+        admission_a.source_session_id = Some("session-1".into());
+        let mut admission_b = admission("B");
+        admission_b.source_trajectory_id = "trajectory-2".into();
+        admission_b.source_sha256 = hit_b.source.source_sha256.clone();
+        admission_b.source_pointer = hit_b.source.source_pointer.clone();
+        admission_b.source_step_id = hit_b.source.step_id.clone();
+        admission_b.source_step_index = hit_b.source.step_index;
+        admission_b.source_session_id = Some("session-2".into());
+
+        let admitted = admit_lexical_hits_for_proof_budget(
+            proof_request,
+            &[hit_a, hit_b],
+            &[admission_a, admission_b],
+            &snapshot_receipt(),
+        ).unwrap();
+        let result = solve_proof_budget(admitted).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(
+            result.evidence
+                .iter()
+                .map(|evidence| evidence.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-1", "session-2"]
+        );
+    }
+
+    #[test]
+    fn refuses_to_satisfy_multisession_claim_without_trusted_session_provenance() {
+        let mut proof_request = request();
+        proof_request.obligations[0].minimum_distinct_sessions = 1;
+        let mut no_session = admission("A");
+        no_session.source_session_id = None;
+
+        let admitted = admit_lexical_hits_for_proof_budget(
+            proof_request,
+            &[hit("A", "evidence", 1.0)],
+            &[no_session],
+            &snapshot_receipt(),
+        ).unwrap();
+        let result = solve_proof_budget(admitted).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.justification_rejections.iter().any(|rejection| {
+            rejection.reason == crate::memory_proof_budget::JustificationRejectionReason::SessionProvenanceMissing
+        }));
     }
 
     #[test]
