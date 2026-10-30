@@ -3031,6 +3031,81 @@ mod tests {
     }
 
     #[test]
+    fn min_fill_partitioned_eq4_likelihoods_match_independent_dense_projection() {
+        let model = sparse_five_unit_model();
+        let candidate = [0, 2, 4];
+        let current_state = [true, false, true, false, true];
+        let state_count = 1usize << candidate.len();
+        let dense_factors = model
+            .forward_cause_likelihood_iit4_factors_dense(
+                &candidate,
+                &candidate,
+                &current_state,
+                &candidate,
+            )
+            .unwrap();
+        let partitions =
+            enumerate_iit4_system_partitions(&candidate, model.n_units, true, 1_000)
+                .unwrap();
+        assert!(!partitions.is_empty());
+
+        for partition in &partitions {
+            let actual = model
+                .partitioned_forward_cause_likelihood_iit4(partition, &current_state)
+                .unwrap();
+            assert_eq!(actual.len(), state_count);
+
+            for (candidate_state, actual_value) in actual.iter().copied().enumerate() {
+                let mut expected_joint = 1.0;
+                for (target_slot, target_unit) in candidate.iter().copied().enumerate() {
+                    let retained_sources = (0..candidate.len())
+                        .filter(|source_slot| {
+                            let source = candidate[*source_slot];
+                            model.connectivity[source * model.n_units + target_unit]
+                                && !partition.cut_matrix()
+                                    [*source_slot * candidate.len() + target_slot]
+                        })
+                        .collect::<Vec<_>>();
+                    let projected_state = retained_sources.iter().enumerate().fold(
+                        0usize,
+                        |index, (slot, source_slot)| {
+                            if ((candidate_state >> source_slot) & 1) != 0 {
+                                index | (1usize << slot)
+                            } else {
+                                index
+                            }
+                        },
+                    );
+                    let mut expected_factor = 0.0;
+                    for full_state in 0..state_count {
+                        let full_projection = retained_sources.iter().enumerate().fold(
+                            0usize,
+                            |index, (slot, source_slot)| {
+                                if ((full_state >> source_slot) & 1) != 0 {
+                                    index | (1usize << slot)
+                                } else {
+                                    index
+                                }
+                            },
+                        );
+                        if full_projection == projected_state {
+                            expected_factor += dense_factors[target_slot][full_state];
+                        }
+                    }
+                    expected_factor /= (1usize << (candidate.len() - retained_sources.len())) as f64;
+                    expected_joint *= expected_factor;
+                }
+                let tolerance = expected_joint.abs().max(1.0) * 1e-12;
+                assert!(
+                    (actual_value - expected_joint).abs() <= tolerance,
+                    "partition={:?}, candidate_state={candidate_state}: sparse={actual_value:.17}, dense_projection={expected_joint:.17}",
+                    partition.cut_matrix()
+                );
+            }
+        }
+    }
+
+    #[test]
     fn min_fill_iit4_eq4_factors_match_dense_oracle_when_joint_likelihood_underflows() {
         let n_units = 4;
         let mut tpm = Vec::with_capacity((1usize << n_units) * n_units);
