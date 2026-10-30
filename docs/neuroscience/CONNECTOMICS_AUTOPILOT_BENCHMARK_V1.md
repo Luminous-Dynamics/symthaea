@@ -418,7 +418,8 @@ A separate, evaluator-only probability audit now defines the missing estimand:
 - Independently search every selected PSU exhaustively, retaining selected empty units rather than dropping them.
 - Map each independently verified error to zero or more candidate IDs in the frozen proposal pool. Empty mapping means the generator missed the error; duplicate or unknown candidate references invalidate the run.
 - Estimate finite-frame error totals, covered totals, missed totals, and independent panel person-time with stratified Horvitz–Thompson estimators.
-- Require the complete error-family vocabulary to be preregistered; retain families with no sampled observations as zero-estimate/undefined-recall rows rather than silently omitting them.
+- Require the complete error-family vocabulary to be preregistered; retain families with no sampled observations as zero-estimate/undefined-recall rows rather than silently omitting them. Their sampled counts must be visible; an unseen rare family is not proven absent.
+- Withhold normal intervals for non-census totals/ratios when sample count is below 30 in any non-census stratum or observed residual sample variance is zero.
 - Report candidate-generation recall and **impact-weighted candidate-generation recall** separately, with first-order Taylor ratio variance and conservative interval gating.
 - Keep this evaluator isolated from candidate generation and ranking, and distinguish it from #9187's residual-risk sample within the generated candidate pool.
 
