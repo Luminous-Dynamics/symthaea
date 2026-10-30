@@ -823,7 +823,7 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
     if !input.queries.iter().any(|query| query.reference_value.is_some_and(|_| query.weight > 0.0)) {
         warnings.push("No positive-weight query oracle values are present; matched-budget policy replay is descriptive only and query-error reductions are not estimable.".to_string());
     }
-    warnings.push("Matched-budget replay sequentially applies every reviewed proposal that is valid on the evolving graph; rejected conflicts still consume review time. It is a retrospective proposal replay, not a model of human acceptance decisions.".to_string());
+    warnings.push("Matched-budget replay is retrospective and assumes every selected proposal that remains valid on the evolving graph is accepted; rejected conflicts still consume review time. It does not model human rejection or evidence acquired during review.".to_string());
     warnings.sort();
 
     Ok(Report {
