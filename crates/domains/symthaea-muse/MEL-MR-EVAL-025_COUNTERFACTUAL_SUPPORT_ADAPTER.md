@@ -39,7 +39,7 @@ The adapter rebuilds and replay-verifies the EVAL-029 `FluidSynthEffectsGroupAss
 - If the requested guard exceeds `base_report.total_frames`, the event and aggregate report set `tail_guard_was_clipped=true`. The opaque verified planner token refuses `planner_event_supports()` rather than handing truncated support to EVAL-019.
 - Every event receives a domain-separated SHA-256 support evidence digest, even when its measured interval list is empty.
 - Empty intervals plus digest mean the full output scan replayed and found no windows above the declared repeatability/absolute thresholds. It does not prove zero physical influence.
-- The per-event digest commits to the influence report receipt, source Score, event identity, baseline/counterfactual render receipts/audio, repeatability calibration, renderer profile, effects-group assignment, output format/horizon, measured intervals and route-domain metadata.
+- The per-event digest commits to the v0.1 and v0.2 influence receipts, source Score, event identity, baseline/counterfactual render receipts/audio, repeatability calibration, segmentation configuration (including the RMS/spectral combination rule and tail-profile digest), all four interval sets, clipping state, renderer profile, effects-group assignment, output format/horizon and route-domain metadata.
 - The aggregate receipt commits to the canonical ordered event records and common baseline/render context.
 - The serialized report is not itself a planner authorization. A caller must replay it to obtain `VerifiedCounterfactualSupportAdapterReport`.
 
@@ -50,6 +50,8 @@ The adapter emits diagnostic domains of the form `fluidsynth:effects-group:N`, b
 Every event therefore has `routing_complete = false`, and the aggregate says the same. EVAL-019 must conservatively expand pair scope globally rather than prune pairs on the basis of incomplete routing. This preserves the useful measured acoustic support while preventing an unproven route graph from being used as an exclusion certificate.
 
 ## Adversarial source tests authored
+
+Eight adapter tests cover:
 
 - An empty measured support still has a mandatory evidence digest and retains the `NoEffectAboveNoiseFloor` disposition.
 - Changing a measured interval invalidates the per-event evidence digest.
@@ -74,4 +76,4 @@ The existing `validate_intervention` currently admits only `EventIntervention::R
 
 ## Validation and claim boundary
 
-The adapter code and six focused tests are authored, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, held-out tail-profile qualification, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
+The adapter code and eight focused tests are authored, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, held-out tail-profile qualification, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
