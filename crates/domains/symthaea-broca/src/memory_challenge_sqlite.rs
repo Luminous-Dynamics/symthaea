@@ -69,7 +69,7 @@ impl std::fmt::Debug for SqliteAmlMemoryBackend {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("SqliteAmlMemoryBackend")
-            .field("indexed_evidence", &self.indexed_evidence_count())
+            .field("persisted_batches", &self.persisted_batch_count())
             .field("payload_root", &self.payload_root)
             .finish()
     }
@@ -142,12 +142,7 @@ impl SqliteAmlMemoryBackend {
         usize::try_from(count).map_err(|_| "negative or oversized SQLite batch count".into())
     }
 
-    /// Number of indexed source messages currently in the process-local cache.
-    pub fn indexed_evidence_count(&self) -> usize {
-        self.indexed_count()
-    }
-
-    /// Explicit logical retention purge. Invoke no later than 30 days after an
+remove incorrect indexed evidence count    /// Explicit logical retention purge. Invoke no later than 30 days after an
     /// evaluation run completes. SQLite transaction commit is durable under
     /// synchronous=FULL; the process-local index is rebuilt before returning.
     pub fn purge_stored_before(&mut self, cutoff_unix_ms: u64) -> Result<usize, String> {
@@ -189,13 +184,7 @@ impl SqliteAmlMemoryBackend {
         Ok(removed)
     }
 
-    fn indexed_count(&self) -> usize {
-        // The lexical index currently has no public count method. A diagnostic
-        // count is derived from the persisted row count, which is authoritative.
-        self.persisted_batch_count().unwrap_or(0)
-    }
-
-    fn read_persisted_rows(&self) -> Result<Vec<PersistedRow>, String> {
+remove incorrect index count helper    fn read_persisted_rows(&self) -> Result<Vec<PersistedRow>, String> {
         let mut statement = self.connection
             .prepare(
                 "SELECT request_id, payload_sha256, stored_at_unix_ms, body_json
@@ -597,7 +586,6 @@ mod tests {
             let response = execute_aml_add(&mut backend, request.clone()).unwrap();
             response.validate_echo(&request).unwrap();
             assert_eq!(backend.persisted_batch_count().unwrap(), 1);
-            assert_eq!(backend.indexed_evidence_count(), 2);
             let persisted = backend.lookup_existing("request-1").unwrap().unwrap();
             assert_eq!(persisted.records[0].source.step_id.as_deref(), Some("user-0"));
             assert_eq!(persisted.records[1].source.step_id.as_deref(), Some("assistant-1"));
