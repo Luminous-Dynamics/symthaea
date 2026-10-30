@@ -650,12 +650,12 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                         if source.lifecycle != SourceLifecycleV1::Active {
                             issues.push(format!("resolution {} uses a non-active source as current support without a source-validity interval", resolution.resolution_id));
                         }
-                        if let (Some(claim), Some(target), Some(published)) = (
-                            claims.get(resolution.claim_id.as_str()),
-                            claims.get(resolution.claim_id.as_str()).and_then(|item| item.scope.target_date.as_deref()),
-                            source.publication_date.as_deref(),
-                        ) {
-                            let _ = claim;
+                        let target_date = claims
+                            .get(resolution.claim_id.as_str())
+                            .and_then(|claim| claim.scope.target_date.as_deref());
+                        if let (Some(target), Some(published)) =
+                            (target_date, source.publication_date.as_deref())
+                        {
                             if published > target {
                                 issues.push(format!("resolution {} uses a source published after the claim target date", resolution.resolution_id));
                             }
