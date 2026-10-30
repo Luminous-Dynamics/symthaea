@@ -266,3 +266,17 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 This verifies internal consistency only; it does not independently fetch artifacts or prove biological correctness. The checked-in example is synthetic and intentionally conditional.
+
+
+## Spatial PSU frame audit
+
+The `connectome-spatial-frame-audit` binary verifies exact, disjoint 3D lattice tiling of a declared integer voxel bounding box, checks eligible/excluded dispositions and exports the eligible `population_frame` using the exact digest contract consumed by `connectome-candidate-coverage-audit`.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-spatial-frame-audit -- \
+  --frame docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME.example.json \
+  --output spatial-frame-report.json
+```
+
+Then pass the exact report bytes to candidate coverage with `--spatial-frame-report spatial-frame-report.json`. The coverage audit rejects any report whose SHA-256, complete lattice digest, eligible population digest, or exact PSU/stratum export does not match the audit input. A frame pass proves tiling only inside the declared box; source-volume and eligibility-mask completeness must be independently verified.
