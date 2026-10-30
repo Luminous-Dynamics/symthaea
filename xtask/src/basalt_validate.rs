@@ -63,6 +63,9 @@ struct SuiteManifest {
     suite_id: String,
     version: String,
     split: String,
+    seed_policy: SeedPolicy,
+    attempts_per_task: usize,
+    attempt_seeds: Vec<Seed>,
     tasks: Vec<ManifestTask>,
 }
 
@@ -613,6 +616,11 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
                     error(report, "E_SEED_EMPTY", format!("{trial_path}.seed"), "string seeds must be non-empty");
                 }
             }
+            match manifest.attempt_seeds.get(trial.attempt_index.saturating_sub(1)) {
+                Some(expected_seed) if expected_seed == &trial.seed => {}
+                Some(_) => error(report, "E_TRIAL_SEED_SCHEDULE", format!("{trial_path}.seed"), "trial seed differs from the frozen pre-run seed schedule"),
+                None => error(report, "E_TRIAL_SEED_INDEX", format!("{trial_path}.seed"), "attempt has no corresponding predeclared manifest seed"),
+            }
             if trial.paired_group_id.trim().is_empty() {
                 error(report, "E_PAIR_ID_EMPTY", format!("{trial_path}.paired_group_id"), "paired_group_id must be non-empty");
             } else {
@@ -661,41 +669,13 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
                             if first.paired_group_id != other.paired_group_id {
                                 error(report, "E_PAIR_ID_MISMATCH", format!("{task_path}.trials"), format!("all system arms in attempt {attempt} must share paired_group_id"));
                             }
-                            match run.suite.seed_policy {
-                                SeedPolicy::FixedPaired | SeedPolicy::PredeclaredRandom => {
-                                    if first.seed != other.seed {
-                                        error(
-                                            report,
-                                            "E_PAIR_SEED_MISMATCH",
-                                            format!("{task_path}.trials"),
-                                            format!("paired arms must share the same predeclared seed for attempt {attempt}"),
-                                        );
-                                    }
-                                }
-                                SeedPolicy::Unseeded => {
-                                    if first.seed != Seed::String("unseeded".to_string())
-                                        || other.seed != Seed::String("unseeded".to_string())
-                                    {
-                                        error(
-                                            report,
-                                            "E_UNSEEDED_SENTINEL",
-                                            format!("{task_path}.trials"),
-                                            "unseeded policy must use the literal seed marker 'unseeded' for every paired arm",
-                                        );
-                                    }
-                                }
-                                SeedPolicy::NotApplicable => {
-                                    if first.seed != Seed::String("not_applicable".to_string())
-                                        || other.seed != Seed::String("not_applicable".to_string())
-                                    {
-                                        error(
-                                            report,
-                                            "E_SEED_NOT_APPLICABLE_SENTINEL",
-                                            format!("{task_path}.trials"),
-                                            "not_applicable policy must use the literal seed marker 'not_applicable' for every paired arm",
-                                        );
-                                    }
-                                }
+                            if first.seed != other.seed {
+                                error(
+                                    report,
+                                    "E_PAIR_SEED_MISMATCH",
+                                    format!("{task_path}.trials"),
+                                    format!("paired system arms must use the same manifest-declared seed for attempt {attempt}"),
+                                );
                             }
                         }
                     }
@@ -738,6 +718,34 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
     }
     if manifest.suite_id != run.suite.suite_id || manifest.version != run.suite.version || manifest.split != run.suite.split {
         error(report, "E_MANIFEST_SUITE_MISMATCH", "manifest", "suite_id, version, and split must match the frozen suite manifest");
+    }
+    if manifest.seed_policy != run.suite.seed_policy {
+        error(report, "E_MANIFEST_SEED_POLICY", "suite.seed_policy", "run seed policy must match the frozen manifest seed policy");
+    }
+    if manifest.attempts_per_task != run.suite.attempts_per_task {
+        error(report, "E_MANIFEST_ATTEMPT_COUNT", "suite.attempts_per_task", "attempt count must match the frozen manifest");
+    }
+    if manifest.attempts_per_task == 0 || manifest.attempts_per_task > 10_000 {
+        error(report, "E_MANIFEST_ATTEMPT_LIMIT", "manifest.attempts_per_task", "manifest attempts_per_task must be in 1..=10000");
+    }
+    if manifest.attempt_seeds.len() != manifest.attempts_per_task {
+        error(report, "E_MANIFEST_SEED_SCHEDULE_LENGTH", "manifest.attempt_seeds", "attempt_seeds must contain exactly one predeclared seed per attempt");
+    }
+    for (index, seed) in manifest.attempt_seeds.iter().enumerate() {
+        if let Seed::String(value) = seed {
+            if value.trim().is_empty() {
+                error(report, "E_MANIFEST_SEED_EMPTY", format!("manifest.attempt_seeds[{index}]"), "predeclared string seed must be non-empty");
+            }
+        }
+        match manifest.seed_policy {
+            SeedPolicy::Unseeded if seed != &Seed::String("unseeded".to_string()) => {
+                error(report, "E_MANIFEST_UNSEEDED_SEED", format!("manifest.attempt_seeds[{index}]"), "unseeded policy requires the literal 'unseeded' marker");
+            }
+            SeedPolicy::NotApplicable if seed != &Seed::String("not_applicable".to_string()) => {
+                error(report, "E_MANIFEST_NOT_APPLICABLE_SEED", format!("manifest.attempt_seeds[{index}]"), "not_applicable policy requires the literal 'not_applicable' marker");
+            }
+            _ => {}
+        }
     }
     if manifest.tasks.len() != run.suite.expected_task_count {
         error(report, "E_MANIFEST_TASK_COUNT", "suite.expected_task_count", "expected_task_count must equal the task count in the frozen suite manifest");
@@ -1201,31 +1209,48 @@ mod tests {
     }
 
     #[test]
-    fn predeclared_random_seed_must_match_across_paired_systems() {
-        let report = validate_value(|v| {
-            v["suite"]["seed_policy"] = Value::String("predeclared_random".into());
-            v["task_records"][0]["trials"][1]["seed"] = Value::from(18);
+    fn predeclared_random_seed_must_match_frozen_schedule_and_all_arms() {
+        let report = validate_value_and_manifest(|run, manifest| {
+            run["suite"]["seed_policy"] = Value::String("predeclared_random".into());
+            manifest["seed_policy"] = Value::String("predeclared_random".into());
+            run["task_records"][0]["trials"][1]["seed"] = Value::from(18);
         });
         assert!(!report.valid);
+        assert!(has_code(&report, "E_TRIAL_SEED_SCHEDULE"));
         assert!(has_code(&report, "E_PAIR_SEED_MISMATCH"));
     }
 
     #[test]
-    fn unseeded_policy_requires_explicit_unseeded_marker() {
-        let report = validate_value(|v| {
-            v["suite"]["seed_policy"] = Value::String("unseeded".into());
+    fn unseeded_policy_uses_predeclared_unseeded_marker() {
+        let report = validate_value_and_manifest(|run, manifest| {
+            run["suite"]["seed_policy"] = Value::String("unseeded".into());
+            manifest["seed_policy"] = Value::String("unseeded".into());
+            manifest["attempt_seeds"] = Value::Array(vec![Value::String("unseeded".into())]);
+            for trial in run["task_records"][0]["trials"].as_array_mut().unwrap() {
+                trial["seed"] = Value::String("unseeded".into());
+            }
         });
-        assert!(!report.valid);
-        assert!(has_code(&report, "E_UNSEEDED_SENTINEL"));
+        assert!(report.valid, "{:?}", report.errors);
     }
 
     #[test]
-    fn not_applicable_seed_policy_requires_explicit_marker() {
-        let report = validate_value(|v| {
-            v["suite"]["seed_policy"] = Value::String("not_applicable".into());
+    fn unseeded_policy_rejects_posthoc_numeric_seed() {
+        let report = validate_value_and_manifest(|run, manifest| {
+            run["suite"]["seed_policy"] = Value::String("unseeded".into());
+            manifest["seed_policy"] = Value::String("unseeded".into());
+            manifest["attempt_seeds"] = Value::Array(vec![Value::String("unseeded".into())]);
         });
         assert!(!report.valid);
-        assert!(has_code(&report, "E_SEED_NOT_APPLICABLE_SENTINEL"));
+        assert!(has_code(&report, "E_TRIAL_SEED_SCHEDULE"));
+    }
+
+    #[test]
+    fn trial_seed_cannot_be_changed_after_manifest_was_frozen() {
+        let report = validate_value(|run| {
+            run["task_records"][0]["trials"][1]["seed"] = Value::from(18);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_TRIAL_SEED_SCHEDULE"));
     }
 
     #[test]
