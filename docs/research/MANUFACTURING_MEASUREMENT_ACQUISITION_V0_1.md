@@ -59,6 +59,8 @@ The prediction closure must use a common measurand and unit for every hypothesis
 
 The current Symtropy ledger stores event evidence IDs and digest syntax; those references still require actual artifact hashing, provenance and authorization before they can establish eligibility. The candidate interface is a contract, not an assertion that the current ledger already emits all fields.
 
+Symtropy's crossed MSA implementation is tracked in [PWR-TX-MFG-003 #2969](https://github.com/Luminous-Dynamics/symtropy/issues/2969). Its v0.1 balanced ANOVA diagnostic can provide a GRR standard deviation for a specific study when the measurement-system study is independently reviewed and accepted for the intended decision. Its guidance bands are not a universal acceptance rule. Symthaea must not infer calibration validity, MSA adequacy or eligibility from an EIG score; it receives observation standard deviation and eligibility only as externally controlled inputs.
+
 ## Benchmark
 
 Compare at identical held-out product/lot/campaign pools and identical total acquisition budgets:
