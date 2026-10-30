@@ -346,7 +346,7 @@ fn simulate_episode(
         let pool = &tape.pools[step];
         let selected = selected_candidate(pool);
         let q_used = match policy {
-            Policy::OracleSelectedQuantile => calibration.oracle_q(factor),
+            Policy::OracleSelectedQuantile => calibration.oracle_q(scenario.factor(step)),
             _ => q,
         };
         let lower_bound = selected.predicted - q_used * selected.sigma_reported;
@@ -581,6 +581,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paired_episode_tape_is_shared_by_all_methods() {
+        let a = make_episode_tape(Scenario::AbruptErrorShift, 32, 17);
+        let b = make_episode_tape(Scenario::AbruptErrorShift, 32, 17);
+        assert_eq!(a.pools.len(), HORIZON);
+        assert_eq!(a.feedback_dropped, b.feedback_dropped);
+        for (left, right) in a.pools.iter().zip(b.pools.iter()) {
+            assert_eq!(left.len(), 32);
+            assert_eq!(left[0].predicted.to_bits(), right[0].predicted.to_bits());
+        }
+    }
 
     #[test]
     fn deterministic_rng_and_candidate_generation() {
