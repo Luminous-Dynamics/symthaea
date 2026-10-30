@@ -186,7 +186,7 @@ fn environment_sha256(environment: &[(OsString, OsString)]) -> String {
     let mut ordered = environment.to_vec();
     ordered.sort_by(|left, right| left.0.cmp(&right.0));
     let mut hasher = Sha256::new();
-    hasher.update(b"muse-fluidsynth-child-environment-v1\\0");
+    hasher.update(b"muse-fluidsynth-child-environment-v1\0");
     for (key, value) in ordered {
         let key = os_str_bytes(&key);
         let value = os_str_bytes(&value);
