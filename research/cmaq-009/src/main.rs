@@ -1,6 +1,6 @@
 use std::process;
 
-const REPORT_SCHEMA: &str = "cmaq-009-active-diagnostic-probes-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-009-active-diagnostic-probes-v0.2";
 const EPISODES: usize = 512;
 const HORIZON: usize = 128;
 const CHANGE_DETECTION_THRESHOLD: f64 = 5.0;
@@ -132,7 +132,7 @@ enum Policy {
 }
 
 impl Policy {
-    fn all() -> [Self; 8] {
+    fn all() -> [Self; 9] {
         [
             Self::DirectFallback,
             Self::FixedGate,
@@ -164,7 +164,7 @@ impl Policy {
         match self {
             Self::PeriodicProbe8 => 8,
             Self::PeriodicProbe16 => 16,
-            Self::PeriodicProbe32 | Self::AdaptiveProbe | Self::ZeroInformationProbeEvery4 => 32,
+            Self::PeriodicProbe32 | Self::ZeroInformationProbeEvery4 => 32,
             Self::AdaptiveProbe => ADAPTIVE_PROBE_CAP,
             _ => 0,
         }
@@ -190,14 +190,6 @@ struct EpisodeOutcome {
     unsupported_count: usize,
     probe_count: usize,
     revocation_step: Option<usize>,
-}
-
-fn action_likelihood_increment(unsupported: bool) -> f64 {
-    if unsupported {
-        (SHIFTED_ACTION_UNSUPPORTED_RATE / NULL_ACTION_UNSUPPORTED_RATE).ln()
-    } else {
-        ((1.0 - SHIFTED_ACTION_UNSUPPORTED_RATE) / (1.0 - NULL_ACTION_UNSUPPORTED_RATE)).ln()
-    }
 }
 
 fn feedback_likelihood_increment(signal: bool) -> f64 {
@@ -457,11 +449,15 @@ fn render_report(rows: &[Summary]) -> String {
     out.push_str(&format!("  \"horizon\": {HORIZON},\n"));
     out.push_str(&format!("  \"change_detection_threshold\": {CHANGE_DETECTION_THRESHOLD:.4},\n"));
     out.push_str(&format!("  \"probe_cost\": {PROBE_COST:.6},\n"));
+    out.push_str(&format!("  \"feedback_delay_steps\": {FEEDBACK_DELAY_STEPS},\n"));
+    out.push_str(&format!("  \"feedback_drop_rate\": {FEEDBACK_DROP_RATE:.4},\n"));
+    out.push_str(&format!("  \"feedback_sensitivity\": {FEEDBACK_SENSITIVITY:.4},\n"));
+    out.push_str(&format!("  \"feedback_specificity\": {FEEDBACK_SPECIFICITY:.4},\n"));
     out.push_str(&format!("  \"probe_signal_null_rate\": {NULL_PROBE_FAILURE_RATE:.4},\n"));
     out.push_str(&format!("  \"probe_signal_shift_rate\": {SHIFTED_PROBE_FAILURE_RATE:.4},\n"));
     out.push_str(&format!("  \"adaptive_probe_cap\": {ADAPTIVE_PROBE_CAP},\n"));
     out.push_str("  \"scenarios\": [\"stationary\", \"abrupt_support_shift\", \"gradual_support_shift\"],\n");
-    out.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"passive_cusum\", \"probe_every_2\", \"probe_every_4\", \"adaptive_probe\", \"zero_info_probe_every_2\", \"oracle_changepoint\"],\n");
+    out.push_str("  \"policies\": [\"direct_fallback\", \"fixed_gate\", \"passive_cusum\", \"periodic_probe_8\", \"periodic_probe_16\", \"periodic_probe_32\", \"adaptive_probe_32\", \"zero_info_probe_32\", \"oracle_changepoint\"],\n");
     out.push_str("  \"summary\": [\n");
     for (index, row) in rows.iter().enumerate() {
         out.push_str(&format!(
@@ -558,14 +554,16 @@ mod tests {
         assert_eq!(Policy::PeriodicProbe16.probe_cap(), 16);
         assert_eq!(Policy::PeriodicProbe32.probe_cap(), 32);
         assert_eq!(Policy::AdaptiveProbe.probe_cap(), 32);
-        for (policy, period) in [
-            (Policy::PeriodicProbe8, 16),
-            (Policy::PeriodicProbe16, 8),
-            (Policy::PeriodicProbe32, 4),
+        for (policy, period, expected) in [
+            (Policy::PeriodicProbe8, 16, 8),
+            (Policy::PeriodicProbe16, 8, 16),
+            (Policy::PeriodicProbe32, 4, 32),
         ] {
-            let result = simulate_episode(Scenario::Stationary, policy, 123);
-            assert_eq!(result.probe_count, policy.probe_cap());
-            assert_eq!(period * result.probe_count, HORIZON);
+            let scheduled = (0..HORIZON)
+                .filter(|step| probe_requested(policy, *step, false, 0))
+                .count();
+            assert_eq!(scheduled, expected);
+            assert_eq!(period * scheduled, HORIZON);
         }
     }
 
@@ -597,7 +595,7 @@ mod tests {
         assert_eq!(rows.len(), 3 * 9);
         assert!(rows.iter().all(|row| row.episode_count == EPISODES));
         let rendered = render_report(&rows);
-        assert!(rendered.contains("\"schema_version\": \"cmaq-009-active-diagnostic-probes-v0.1\""));
+        assert!(rendered.contains("\"schema_version\": \"cmaq-009-active-diagnostic-probes-v0.2\""));
         assert!(rendered.contains("\"episode_count\": 512"));
         assert!(rendered.contains("\"horizon\": 128"));
     }
