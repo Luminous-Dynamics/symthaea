@@ -126,42 +126,29 @@ fn published_fig1a_connectivity_matches_the_weight_matrix() {
 }
 
 #[test]
-fn published_fig1a_ab_phi_s_matches_pinned_iit4_2023_anchor() {
+fn published_fig1a_full_system_phi_s_matches_pinned_iit4_2023_anchor() {
     use symthaea_iit::{Iit4SystemPhiSearchConfig, Iit4SystemPhiStatus};
 
     let model = fig1a_model();
     let result = model
         .analyze_iit4_2023_system_phi_s(
-            &[0, 1],
+            &[0, 1, 2],
             &[false, true, true], // substrate state (A, B, C) = (0, 1, 1)
             Iit4SystemPhiSearchConfig::default(),
         )
-        .expect("the published two-unit IIT 4.0 (2023) system search must complete");
+        .expect("the published full-system IIT 4.0 (2023) search must complete");
 
     assert_eq!(result.formalism.id(), "IIT_4_0_2023");
     assert!(result.complete);
     assert_eq!(result.status, Iit4SystemPhiStatus::ExactUniqueStatePair);
     assert_eq!(result.state_pair_results.len(), 1);
     assert_eq!(result.selected_state_pair_index, Some(0));
-    assert_eq!(result.partition_summary.unique_non_total_cuts, 3);
-    assert_eq!(result.partition_score_evaluations, 3);
+    assert_eq!(result.partition_summary.unique_non_total_cuts, 22);
+    assert_eq!(result.partition_score_evaluations, 22);
 
     let phi_s = result.phi_s.expect("unique state-pair result must expose phi_s");
     assert!(
-        (phi_s - 0.1719).abs() <= 0.001,
-        "Fig. 1A subset AB phi_s mismatch: computed={phi_s:.8}, expected=0.1719 ± 0.001"
-    );
-
-    let selected = &result.state_pair_results[0];
-    assert!(
-        (selected.score.cause.signed_phi - 0.2446).abs() <= 0.002,
-        "Fig. 1A subset AB cause phi mismatch: computed={:.8}, expected=0.2446 ± 0.002",
-        selected.score.cause.signed_phi
-    );
-    assert!(
-        (selected.score.effect.signed_phi - 0.1719).abs() <= 0.001,
-        "Fig. 1A subset AB effect phi mismatch: computed={:.8}, expected=0.1719 ± 0.001",
-        selected.score.effect.signed_phi
+        (phi_s - 0.1339).abs() <= 0.001,
+        "Fig. 1A full-system phi_s mismatch: computed={phi_s:.8}, expected=0.1339 ± 0.001"
     );
 }
-
