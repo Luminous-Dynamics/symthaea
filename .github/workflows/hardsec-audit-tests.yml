@@ -87,8 +87,8 @@ jobs:
               raw_sha256 = hashlib.sha256(raw).hexdigest()
               if raw_sha256 == expected:
                   mode = "exact_bytes"
-              elif b"\\r" not in raw and b"\\n" in raw:
-                  crlf_sha256 = hashlib.sha256(raw.replace(b"\\n", b"\\r\\n")).hexdigest()
+              elif b"\r" not in raw and b"\n" in raw:
+                  crlf_sha256 = hashlib.sha256(raw.replace(b"\n", b"\r\n")).hexdigest()
                   if crlf_sha256 == expected:
                       mode = "lf_archive_matches_published_crlf_digest"
                   else:
@@ -125,7 +125,7 @@ jobs:
               "entries": entries,
               "rule": "Accept exact bytes or LF-only extracted bytes whose LF-to-CRLF representation matches the publisher digest; never rewrite source files.",
           }
-          output.write_text(json.dumps(receipt, indent=2) + "\\n", encoding="utf-8")
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
           print(json.dumps({
               "manifest_entries": receipt["manifest_entries"],
               "exact_byte_matches": receipt["exact_byte_matches"],
