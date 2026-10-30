@@ -92,11 +92,18 @@ impl AmlHttpServerConfig {
     }
 }
 
+fn parse_usize_value(name: &str, value: Option<&str>, default: usize) -> Result<usize, String> {
+    match value {
+        Some(value) => value.parse::<usize>()
+            .map_err(|error| format!("{name} must be an unsigned integer: {error}")),
+        None => Ok(default),
+    }
+}
+
 fn parse_env_usize(name: &str, default: usize) -> Result<usize, String> {
     match std::env::var(name) {
-        Ok(value) => value.parse::<usize>()
-            .map_err(|error| format!("{name} must be an unsigned integer: {error}")),
-        Err(std::env::VarError::NotPresent) => Ok(default),
+        Ok(value) => parse_usize_value(name, Some(&value), default),
+        Err(std::env::VarError::NotPresent) => parse_usize_value(name, None, default),
         Err(error) => Err(format!("failed to read {name}: {error}")),
     }
 }
@@ -522,13 +529,10 @@ mod tests {
     }
 
     #[test]
-    fn environment_integer_parser_rejects_negative_and_non_numeric_values() {
-        assert!(parse_env_usize("AML_INVALID_TEST_VALUE", usize::MAX).is_ok());
-        // Parsing helper is tested with a temporary scoped environment variable
-        // by the integration harness; this unit test verifies its default path.
-        assert_eq!(
-            parse_env_usize("AML_TEST_MISSING_ENV_8B5A", 17).unwrap(),
-            17
-        );
+    fn environment_integer_parser_is_deterministic_for_defaults_and_invalid_values() {
+        assert_eq!(parse_usize_value("AML_LIMIT", None, 17).unwrap(), 17);
+        assert_eq!(parse_usize_value("AML_LIMIT", Some("42"), 17).unwrap(), 42);
+        assert!(parse_usize_value("AML_LIMIT", Some("-1"), 17).is_err());
+        assert!(parse_usize_value("AML_LIMIT", Some("many"), 17).is_err());
     }
 }
