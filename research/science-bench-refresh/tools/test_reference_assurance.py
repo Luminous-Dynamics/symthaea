@@ -246,7 +246,7 @@ def validate_package(package: dict[str, Any]) -> list[str]:
             for span_id in record["evidence_span_ids"]:
                 span = span_by_id.get(span_id)
                 source = source_by_id.get(span["source_id"]) if span else None
-                if source and source["lifecycle"] in {"deleted", "retracted"}:
+                if source and source["lifecycle"] != "active":
                     issues.append(f"adjudication {record['record_id']} uses withdrawn source")
                 if source and target and source["publication_date"] and source["publication_date"] > target:
                     issues.append(f"adjudication {record['record_id']} uses future source")
@@ -314,6 +314,11 @@ class ReferenceAssuranceOracleTests(unittest.TestCase):
     def test_retracted_source_cannot_support_current_claim(self) -> None:
         value = copy.deepcopy(self.fixture)
         value["sources"][0]["lifecycle"] = "retracted"
+        self.assertTrue(any("withdrawn source" in issue for issue in validate_package(value)))
+
+    def test_superseded_source_cannot_support_current_claim(self) -> None:
+        value = copy.deepcopy(self.fixture)
+        value["sources"][0]["lifecycle"] = "superseded"
         self.assertTrue(any("withdrawn source" in issue for issue in validate_package(value)))
 
     def test_future_source_cannot_support_past_claim(self) -> None:
