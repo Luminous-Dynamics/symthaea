@@ -531,7 +531,7 @@ New artifacts:
 - `schemas/hardsec-challenge-profile-audit-receipt-v1.schema.json` — validation receipt schema;
 - `tests/fixtures/hardsec/seqcube-challenge-profile.json` — profile for the replayed SeqCube reference fixture;
 - `examples/hardsec_challenge_profile_audit.rs` — Rust semantic auditor, optional local-byte verification and deterministic receipt;
-- an isolated harness target and 19 unit tests.
+- an isolated harness target and 25 unit tests, including a synthetic benign-equivalence positive and negative controls for bounded-only proof, candidate/reference digest mismatch, assumptions mismatch and missing reference path.
 
 The profile separates:
 - dataset role (`evaluation_corpus_member`, `reference_fixture_only`, `exploratory_only`);
@@ -550,7 +550,9 @@ The Rust auditor enforces semantic gates JSON Schema alone cannot express conven
 - active/payload hashes must match their referenced evidence;
 - the inactive control must explicitly say its payload effect was not observed;
 - bounded proofs require a positive cycle bound and hashed assumption bytes;
-- `benign_equivalent` requires a typed equivalence report, and a bounded proof cannot certify whole-design benign equivalence;
+- `benign_equivalent` requires a typed equivalence report bound to the exact candidate netlist digest and golden reference digest;
+- benign equivalence proof scope must be unbounded or explicitly assumption-scoped; bounded-only evidence is rejected;
+- proof assumptions must have a matching digest and local byte path, and the golden reference must have a distinct digest and local path;
 - unknown/invalid profiles remain non-confirmatory.
 
 The current exact-head workflow is pending. It now checks rustfmt, runs the new 19-test profile suite, validates the profile and receipt schemas, byte-audits the six unique local source files, and includes the profile receipt in the run manifest and signed predicate. Do not count these tests as passing until that exact run completes.
