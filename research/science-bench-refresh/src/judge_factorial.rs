@@ -876,7 +876,7 @@ fn pairwise_interactions(
                 complete_11_count: counts[3],
                 candidate_a_choice_interaction_millionths: m11_choice.zip(m10_choice)
                     .zip(m01_choice.zip(m00_choice)).map(|((m11, m10), (m01, m00))| m11 - m10 - m01 + m00),
-                ineligible_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
+                excluded_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
             });
         }
     }
@@ -1203,6 +1203,16 @@ mod tests {
         fields.analyzer_source_revision = "b".repeat(40);
         let issues = validate_judge_factorial_plan_fields(&fields).unwrap_err();
         assert!(issues.iter().any(|issue| issue.contains("exact compiled validator revision")));
+    }
+
+    #[test]
+    fn rejects_receipt_from_a_different_analyzer_revision() {
+        let (_, plan, receipt) = make_plan();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["analyzer_source_revision"] = serde_json::json!("b".repeat(40));
+        let altered = serde_json::to_vec(&value).unwrap();
+        assert!(analyze_judge_factorial(&plan, &altered).unwrap_err()
+            .contains("exact compiled validator revision"));
     }
 
     #[test]
