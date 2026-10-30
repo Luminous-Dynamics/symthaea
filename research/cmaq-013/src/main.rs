@@ -565,6 +565,13 @@ mod tests {
     }
 
     #[test]
+    fn oracle_reference_rollout_continues_after_direct_policy_terminates() {
+        let pack = model_pack(Scenario::DelayedReward, 0.0, 11);
+        let direct = run_episode(Scenario::DelayedReward, Policy::DirectGreedy, &pack);
+        assert!(direct.oracle_return > direct.total_return);
+    }
+
+    #[test]
     fn report_has_one_row_per_scenario_error_policy() {
         let rows = run_benchmark();
         assert_eq!(rows.len(), Scenario::all().len() * ERROR_LEVELS.len() * Policy::all().len());
