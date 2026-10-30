@@ -39,6 +39,8 @@ pub struct RunWidePruningRiskConfig {
     pub max_false_prune_rate_per_event: f64,
     /// Minimum number of uniformly sampled discarded candidates at every event.
     pub min_audit_samples: usize,
+    /// Ordered fidelity IDs. Every audit event must bind its numeric index to this exact ID.
+    pub fidelity_ids: Vec<String>,
 }
 
 /// A chained, aggregate-only receipt for one pruning decision.
@@ -192,6 +194,9 @@ impl RunWidePruningRiskLedger {
         if fidelity_id.trim().is_empty() {
             return self.fail_closed("fidelity_id", "must be a non-empty string");
         }
+        if !self.config.fidelity_ids.iter().any(|known| known == fidelity_id) {
+            return self.fail_closed("fidelity_id", "is not present in the frozen fidelity ladder");
+        }
         if self.events.len() >= self.config.max_audit_events {
             return self.fail_closed(
                 "max_audit_events",
@@ -227,6 +232,15 @@ impl RunWidePruningRiskLedger {
                 return self.fail_closed(&field, &message);
             }
         };
+
+        if self.config.fidelity_ids.get(report.target_fidelity_index).map(String::as_str)
+            != Some(fidelity_id)
+        {
+            return self.fail_closed(
+                "fidelity_id",
+                "named fidelity does not match the numeric index measured by the audit",
+            );
+        }
 
         let selected_frontier_sha256 = match digest_selected_frontier(selected_scores) {
             Ok(digest) => digest,
@@ -329,6 +343,8 @@ impl RunWidePruningRiskLedger {
                 || event.event_id.trim().is_empty()
                 || !seen_event_ids.insert(event.event_id.as_str())
                 || event.fidelity_id.trim().is_empty()
+                || self.config.fidelity_ids.get(event.fidelity_index).map(String::as_str)
+                    != Some(event.fidelity_id.as_str())
             {
                 return Err(RunWidePruningRiskError::new(
                     format!("events[{index}]"),
@@ -503,6 +519,21 @@ fn validate_config(
             "must be positive",
         ));
     }
+    if config.fidelity_ids.is_empty() {
+        return Err(RunWidePruningRiskError::new(
+            "fidelity_ids",
+            "must contain the ordered fidelity ladder",
+        ));
+    }
+    let mut fidelity_ids = HashSet::with_capacity(config.fidelity_ids.len());
+    for (index, fidelity_id) in config.fidelity_ids.iter().enumerate() {
+        if fidelity_id.trim().is_empty() || !fidelity_ids.insert(fidelity_id.as_str()) {
+            return Err(RunWidePruningRiskError::new(
+                format!("fidelity_ids[{index}]"),
+                "fidelity IDs must be non-empty and unique",
+            ));
+        }
+    }
     let per_event_budget =
         config.run_confidence_failure_budget / config.max_audit_events as f64;
     if per_event_budget <= 0.0
@@ -558,6 +589,10 @@ fn digest_ledger_genesis(config: &RunWidePruningRiskConfig) -> String {
     hasher.update((config.max_audit_events as u64).to_be_bytes());
     hasher.update(config.max_false_prune_rate_per_event.to_bits().to_be_bytes());
     hasher.update((config.min_audit_samples as u64).to_be_bytes());
+    hasher.update((config.fidelity_ids.len() as u64).to_be_bytes());
+    for fidelity_id in &config.fidelity_ids {
+        update_string(&mut hasher, fidelity_id);
+    }
     hex_digest(hasher.finalize().as_slice())
 }
 
@@ -639,6 +674,11 @@ mod tests {
             max_audit_events,
             max_false_prune_rate_per_event,
             min_audit_samples: 2,
+            fidelity_ids: vec![
+                "epoch-5".to_owned(),
+                "epoch-15".to_owned(),
+                "epoch-30".to_owned(),
+            ],
         }
     }
 
@@ -680,7 +720,7 @@ mod tests {
         let sample = make_sample(&["a", "b", "c", "d"], 11);
         let report = ledger.record_event(
             "rung-0",
-            "epoch-15",
+            "epoch-30",
             &selected(0.8),
             &sample,
             &audited(&sample, &[0.1, 0.2, 0.3, 0.4]),
@@ -705,7 +745,7 @@ mod tests {
             let event_id = format!("rung-{index}");
             ledger.record_event(
                 &event_id,
-                "epoch-15",
+                "epoch-30",
                 &selected(0.8),
                 &sample,
                 &audited(&sample, &[0.1, 0.2]),
@@ -724,7 +764,7 @@ mod tests {
         let sample = make_sample(&["a", "b"], 2);
         let result = ledger.record_event(
             "rung-0",
-            "epoch-15",
+            "epoch-30",
             &selected(0.8),
             &sample,
             &audited(&sample, &[0.9, 0.1]),
@@ -750,7 +790,7 @@ mod tests {
         let sample = make_sample(&["a", "b"], 3);
         let result = ledger.record_event(
             "rung-0",
-            "epoch-15",
+            "epoch-30",
             &selected(0.8),
             &sample,
             &audited(&sample, &[0.1, 0.2]),
@@ -775,7 +815,7 @@ mod tests {
         }];
         assert!(ledger.record_event(
             "rung-0",
-            "epoch-15",
+            "epoch-30",
             &selected(0.8),
             &sample,
             &wrong_fidelity,
@@ -790,7 +830,7 @@ mod tests {
         for _ in 0..1 {
             ledger.record_event(
                 "same-event",
-                "epoch-15",
+                "epoch-30",
                 &selected(0.8),
                 &sample,
                 &audited(&sample, &[0.1, 0.2]),
@@ -813,7 +853,7 @@ mod tests {
         let sample = make_sample(&["a", "b"], 7);
         ledger.record_event(
             "rung-0",
-            "epoch-15",
+            "epoch-30",
             &selected(0.8),
             &sample,
             &audited(&sample, &[0.1, 0.2]),
