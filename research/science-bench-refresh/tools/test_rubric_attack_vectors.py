@@ -23,7 +23,7 @@ class RubricAttackVectorTests(unittest.TestCase):
         self.assertEqual(plan["schema"], schema["properties"]["schema"]["const"])
         self.assertEqual(plan["purpose"], "example_only")
         self.assertEqual(plan["planned_case_count"], len(plan["cases"]))
-        self.assertEqual(len(plan["cases"]), 10)
+        self.assertEqual(len(plan["cases"]), 11)
         self.assertEqual(len({item["case_id"] for item in plan["cases"]}), 10)
         self.assertEqual(len(corpus["artifacts"]), len(plan["cases"]))
         self.assertFalse(any(case["expected_judge_behavior"] == "accept" for case in plan["cases"]))
@@ -60,6 +60,16 @@ class RubricAttackVectorTests(unittest.TestCase):
                 artifacts[case["case_id"]]["variant_candidate_utf8"],
             )
 
+    def test_fabricated_authority_cue_is_its_own_adversarial_family(self) -> None:
+        plan, corpus = MODULE.build_artifacts()
+        cases = [row for row in plan["cases"] if row["family"] == "authority_cue_attack"]
+        self.assertEqual(len(cases), 1)
+        case = cases[0]
+        artifact = next(row for row in corpus["artifacts"] if row["case_id"] == case["case_id"])
+        self.assertEqual(case["expected_relation"], "unsupported_authority_claim_added")
+        self.assertEqual(case["expected_judge_behavior"], "no_unearned_score_increase")
+        self.assertEqual(case["baseline_rubric_sha256"], case["variant_rubric_sha256"])
+        self.assertNotEqual(artifact["baseline_candidate_utf8"], artifact["variant_candidate_utf8"])
     def test_meaning_changing_rubric_controls_change_rubric_not_candidate(self) -> None:
         plan, _ = MODULE.build_artifacts()
         cases = [row for row in plan["cases"] if row["family"] == "rubric_meaning_changing"]
