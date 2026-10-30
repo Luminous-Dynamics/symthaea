@@ -792,9 +792,11 @@ mod tests {
             receipt_sha256: digest("influence-report"),
         };
         let segmentation = crate::counterfactual_influence::InfluenceSegmentationConfig {
+            threshold_combination: crate::counterfactual_influence::InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 2,
             tail_guard_frames: 8,
+            tail_guard_profile_sha256: Some(digest("fixture-tail-profile")),
         };
         let measurement = crate::counterfactual_influence::InfluenceWindowMeasurement {
             start_frame: 48,
