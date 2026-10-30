@@ -56,7 +56,7 @@ c_{joint}=\max(0,c_g+c_f-1).
 
 No independence assumption is required. If joint coverage misses the preregistered minimum, status is INSUFFICIENT_COVERAGE even if the numerical interval has a clear sign.
 
-Four immutable artifact IDs are required and must be distinct: proxy fit, proxy-bound certificate, true-function validation and evaluator. The upstream provenance verifier must confirm artifact content, target domain, model version, interval construction and coverage statements. The Rust function accepts verification flags from that upstream verifier; it does not independently establish the validity of a certificate.
+Four immutable artifact IDs and four split IDs are required and must each be distinct: proxy fit, proxy-bound validation, true-function validation and evaluator. Distinct digests alone do not prove row-level separation; the upstream provenance verifier must resolve the source manifests and confirm disjoint partitions, artifact content, target domain, model version, interval construction and coverage statements. The Rust function accepts verification flags from that upstream verifier; it does not independently establish the validity of a certificate.
 
 Importantly, the deployable API takes a **true-function validation interval**, never an evaluator-only true-function point value. The evaluator artifact is recorded for downstream scoring only.
 
@@ -81,4 +81,4 @@ These are synthetic analytic inputs for the interval arithmetic and gate logic. 
 
 ## Current implementation boundary
 
-The module implements conservative interval arithmetic, distinct-artifact checks, evidence-verification gating, union-bound coverage composition and eight unit tests. It does not build the proxy model, estimate the true-function interval, prove the proxy sup-norm bound, or guarantee lower global test risk. Rust compilation/tests have not been run in this environment because the Rust toolchain is unavailable.
+The module implements conservative interval arithmetic, distinct-artifact checks, evidence-verification gating, union-bound coverage composition and nine unit tests. It does not build the proxy model, estimate the true-function interval, prove the proxy sup-norm bound, or guarantee lower global test risk. Rust compilation/tests have not been run in this environment because the Rust toolchain is unavailable.
