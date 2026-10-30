@@ -167,6 +167,9 @@ struct Summary {
     regret_delta_vs_greedy: f64,
     regret_delta_ci95_low: f64,
     regret_delta_ci95_high: f64,
+    calibration_marginal_q: f64,
+    calibration_joint_q: f64,
+    fixed_k8_joint_q: f64,
 }
 
 fn episode_seed(base: u64, scenario: Scenario, candidate_count: usize, episode: usize) -> u64 {
@@ -371,6 +374,8 @@ fn summarize(
     policy: Policy,
     outcomes: &[EpisodeOutcome],
     greedy: &[EpisodeOutcome],
+    calibration: Calibration,
+    fixed_k8: Calibration,
 ) -> Summary {
     let n = outcomes.len() as f64;
     let mean_regret = outcomes.iter().map(|x| x.decision_regret).sum::<f64>() / n;
@@ -431,6 +436,9 @@ fn summarize(
         regret_delta_vs_greedy: delta_mean,
         regret_delta_ci95_low: delta_mean - margin,
         regret_delta_ci95_high: delta_mean + margin,
+        calibration_marginal_q: calibration.marginal_q,
+        calibration_joint_q: calibration.joint_q,
+        fixed_k8_joint_q: fixed_k8.joint_q,
     }
 }
 
@@ -478,6 +486,8 @@ fn run_benchmark() -> Vec<Summary> {
                     *policy,
                     &outcomes_by_policy[index],
                     &greedy,
+                    calibration,
+                    fixed_k8,
                 ));
             }
         }
@@ -528,7 +538,9 @@ fn render_report(rows: &[Summary]) -> String {
                 "\"mean_realized_reward\":{},\"cvar05_realized_reward\":{},",
                 "\"model_use_rate\":{},\"joint_candidate_set_coverage\":{},",
                 "\"selected_action_error_coverage\":{},\"regret_delta_vs_greedy\":{},",
-                "\"regret_delta_ci95_low\":{},\"regret_delta_ci95_high\":{}}}{}"
+                "\"regret_delta_ci95_low\":{},\"regret_delta_ci95_high\":{},",
+                "\"calibration_marginal_q\":{},\"calibration_joint_q\":{},",
+                "\"fixed_k8_joint_q\":{}}}{}"
             ),
             row.scenario,
             row.candidate_count,
@@ -543,6 +555,9 @@ fn render_report(rows: &[Summary]) -> String {
             row.regret_delta_vs_greedy,
             row.regret_delta_ci95_low,
             row.regret_delta_ci95_high,
+            row.calibration_marginal_q,
+            row.calibration_joint_q,
+            row.fixed_k8_joint_q,
             comma
         )
         .unwrap();
@@ -617,9 +632,11 @@ mod tests {
     #[test]
     fn report_contains_all_scenario_count_policy_rows() {
         let expected = Scenario::all().len() * CANDIDATE_COUNTS.len() * Policy::all().len();
-        let rows = vec![];
+        let rows = run_benchmark();
+        assert_eq!(rows.len(), expected);
         let report = render_report(&rows);
         assert!(report.contains(&format!("\"schema_version\": \"{SCHEMA}\"")));
-        assert_eq!(expected, 112);
+        assert!(report.contains("\"candidate_count\":8"));
+        assert!(report.contains("\"candidate_count\":64"));
     }
 }
