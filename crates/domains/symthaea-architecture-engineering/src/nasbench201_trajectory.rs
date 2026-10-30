@@ -119,6 +119,22 @@ pub struct PromotionMix {
     pub topology_diversity_quota: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitialPoolStrategy {
+    Random,
+    SingleProxyRanked,
+    TrajectoryPortfolio,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitialCandidatePool {
+    pub strategy: InitialPoolStrategy,
+    pub candidate_ids: Vec<String>,
+    pub seed: Option<u64>,
+    pub source_evidence_sha256: String,
+    pub pool_sha256: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PromotionPlan {
     pub proxy_id: String,
@@ -328,6 +344,243 @@ pub fn build_trajectory_archive(
         events,
         archive_sha256,
     })
+}
+
+/// Construct a reproducible random candidate pool from public IDs/topologies only.
+/// No proxy score, target label or training observation is read.
+pub fn random_candidate_pool(
+    candidates: &[ArchitectureFeatures],
+    pool_size: usize,
+    seed: u64,
+) -> Result<InitialCandidatePool, TrajectorySearchError> {
+    validate_public_catalog(candidates, pool_size)?;
+    let mut candidate_ids: Vec<String> = candidates
+        .iter()
+        .map(|candidate| candidate.architecture_id.clone())
+        .collect();
+    candidate_ids.sort();
+    let source_evidence_sha256 = digest_public_catalog(candidates);
+    let mut rng = SplitMix64::new(seed);
+    shuffle(&mut candidate_ids, &mut rng);
+    candidate_ids.truncate(pool_size);
+    let pool_sha256 = digest_initial_pool(
+        InitialPoolStrategy::Random,
+        &candidate_ids,
+        Some(seed),
+        &source_evidence_sha256,
+    );
+    Ok(InitialCandidatePool {
+        strategy: InitialPoolStrategy::Random,
+        candidate_ids,
+        seed: Some(seed),
+        source_evidence_sha256,
+        pool_sha256,
+    })
+}
+
+/// Build a deterministic top-k candidate pool using one declared proxy. The target metric is
+/// explicitly supplied so it cannot be accidentally used as a ranking feature.
+pub fn proxy_ranked_candidate_pool(
+    candidates: &[ArchitectureFeatures],
+    proxy_id: &str,
+    target_metric_id: &str,
+    direction: ProxyDirection,
+    pool_size: usize,
+) -> Result<InitialCandidatePool, TrajectorySearchError> {
+    validate_public_catalog(candidates, pool_size)?;
+    if proxy_id.trim().is_empty() || proxy_id == target_metric_id {
+        return Err(TrajectorySearchError::new(
+            "proxy_id",
+            "proxy must be non-empty and distinct from target metric",
+        ));
+    }
+    for (index, candidate) in candidates.iter().enumerate() {
+        let Some(score) = candidate.proxy_scores.get(proxy_id) else {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].proxy_scores"),
+                format!("missing proxy {proxy_id:?}"),
+            ));
+        };
+        if !score.is_finite() {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].proxy_scores.{proxy_id}"),
+                "proxy score must be finite",
+            ));
+        }
+    }
+    let mut ranked: Vec<&ArchitectureFeatures> = candidates.iter().collect();
+    ranked.sort_by(|left, right| {
+        let left_score = left.proxy_scores[proxy_id];
+        let right_score = right.proxy_scores[proxy_id];
+        let order = match direction {
+            ProxyDirection::Maximize => right_score.total_cmp(&left_score),
+            ProxyDirection::Minimize => left_score.total_cmp(&right_score),
+        };
+        order.then_with(|| left.architecture_id.cmp(&right.architecture_id))
+    });
+    let candidate_ids: Vec<String> = ranked
+        .into_iter()
+        .take(pool_size)
+        .map(|candidate| candidate.architecture_id.clone())
+        .collect();
+    let source_evidence_sha256 = digest_single_proxy_catalog(candidates, proxy_id, direction);
+    let pool_sha256 = digest_initial_pool(
+        InitialPoolStrategy::SingleProxyRanked,
+        &candidate_ids,
+        None,
+        &source_evidence_sha256,
+    );
+    Ok(InitialCandidatePool {
+        strategy: InitialPoolStrategy::SingleProxyRanked,
+        candidate_ids,
+        seed: None,
+        source_evidence_sha256,
+        pool_sha256,
+    })
+}
+
+/// Convert a validated quota-based promotion plan to the common initial-pool interface.
+pub fn trajectory_candidate_pool(
+    plan: &PromotionPlan,
+) -> Result<InitialCandidatePool, TrajectorySearchError> {
+    if plan.candidates.is_empty() || plan.plan_sha256.len() != 64 {
+        return Err(TrajectorySearchError::new(
+            "promotion_plan",
+            "must contain candidates and a 64-character plan digest",
+        ));
+    }
+    let mut seen = HashSet::with_capacity(plan.candidates.len());
+    let candidate_ids: Vec<String> = plan
+        .candidates
+        .iter()
+        .map(|candidate| candidate.architecture_id.clone())
+        .collect();
+    if candidate_ids
+        .iter()
+        .any(|candidate_id| candidate_id.trim().is_empty() || !seen.insert(candidate_id.as_str()))
+    {
+        return Err(TrajectorySearchError::new(
+            "promotion_plan.candidates",
+            "candidate IDs must be non-empty and unique",
+        ));
+    }
+    let source_evidence_sha256 = plan.plan_sha256.clone();
+    let pool_sha256 = digest_initial_pool(
+        InitialPoolStrategy::TrajectoryPortfolio,
+        &candidate_ids,
+        None,
+        &source_evidence_sha256,
+    );
+    Ok(InitialCandidatePool {
+        strategy: InitialPoolStrategy::TrajectoryPortfolio,
+        candidate_ids,
+        seed: None,
+        source_evidence_sha256,
+        pool_sha256,
+    })
+}
+
+fn validate_public_catalog(
+    candidates: &[ArchitectureFeatures],
+    pool_size: usize,
+) -> Result<(), TrajectorySearchError> {
+    if candidates.is_empty() || pool_size == 0 || pool_size > candidates.len() {
+        return Err(TrajectorySearchError::new(
+            "pool_size",
+            "candidate catalog must be non-empty and pool_size must be in 1..=candidate_count",
+        ));
+    }
+    let mut ids = HashSet::with_capacity(candidates.len());
+    let mut topologies = HashSet::with_capacity(candidates.len());
+    for (index, candidate) in candidates.iter().enumerate() {
+        if candidate.architecture_id.trim().is_empty()
+            || !ids.insert(candidate.architecture_id.as_str())
+        {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].architecture_id"),
+                "candidate IDs must be non-empty and unique",
+            ));
+        }
+        if candidate.topology_encoding.len() != NB201_EDGES
+            || candidate.topology_encoding.iter().any(|operation| *operation >= NB201_OPERATIONS)
+        {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].topology_encoding"),
+                "must contain six NAS-Bench-201 operation indices in 0..5",
+            ));
+        }
+        if !topologies.insert(candidate.topology_encoding.as_slice()) {
+            return Err(TrajectorySearchError::new(
+                format!("candidates[{index}].topology_encoding"),
+                "topology encodings must be unique",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn digest_public_catalog(candidates: &[ArchitectureFeatures]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nasbench201.public-candidate-catalog.v0.1");
+    let mut ordered: Vec<&ArchitectureFeatures> = candidates.iter().collect();
+    ordered.sort_by(|left, right| left.architecture_id.cmp(&right.architecture_id));
+    hasher.update((ordered.len() as u64).to_be_bytes());
+    for candidate in ordered {
+        update_string(&mut hasher, &candidate.architecture_id);
+        hasher.update((candidate.topology_encoding.len() as u64).to_be_bytes());
+        hasher.update(&candidate.topology_encoding);
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
+fn digest_single_proxy_catalog(
+    candidates: &[ArchitectureFeatures],
+    proxy_id: &str,
+    direction: ProxyDirection,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nasbench201.single-proxy-catalog.v0.1");
+    update_string(&mut hasher, proxy_id);
+    hasher.update([direction_byte(direction)]);
+    let mut ordered: Vec<&ArchitectureFeatures> = candidates.iter().collect();
+    ordered.sort_by(|left, right| left.architecture_id.cmp(&right.architecture_id));
+    hasher.update((ordered.len() as u64).to_be_bytes());
+    for candidate in ordered {
+        update_string(&mut hasher, &candidate.architecture_id);
+        hasher.update(candidate.proxy_scores[proxy_id].to_bits().to_be_bytes());
+        hasher.update(candidate.proxy_times_seconds[proxy_id].to_bits().to_be_bytes());
+        hasher.update((candidate.topology_encoding.len() as u64).to_be_bytes());
+        hasher.update(&candidate.topology_encoding);
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
+fn digest_initial_pool(
+    strategy: InitialPoolStrategy,
+    candidate_ids: &[String],
+    seed: Option<u64>,
+    source_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nasbench201.initial-candidate-pool.v0.1");
+    hasher.update([match strategy {
+        InitialPoolStrategy::Random => 0,
+        InitialPoolStrategy::SingleProxyRanked => 1,
+        InitialPoolStrategy::TrajectoryPortfolio => 2,
+    }]);
+    match seed {
+        Some(value) => {
+            hasher.update([1]);
+            hasher.update(value.to_be_bytes());
+        }
+        None => hasher.update([0]),
+    }
+    update_string(&mut hasher, source_digest);
+    hasher.update((candidate_ids.len() as u64).to_be_bytes());
+    for candidate_id in candidate_ids {
+        update_string(&mut hasher, candidate_id);
+    }
+    hex_digest(hasher.finalize().as_slice())
 }
 
 /// Build a final-fidelity promotion set from proxy elites, trajectory memory and topology
@@ -1036,6 +1289,43 @@ mod tests {
             max_moves_per_walk: 20,
             max_escapes_per_walk: 2,
         }
+    }
+
+    #[test]
+    fn random_initial_pool_is_reproducible_and_uses_only_public_catalog() {
+        let mut metadata_only = binary_catalog();
+        for feature in &mut metadata_only {
+            feature.proxy_scores.clear();
+            feature.proxy_times_seconds.clear();
+        }
+        let first = random_candidate_pool(&metadata_only, 12, 77).unwrap();
+        let second = random_candidate_pool(&metadata_only, 12, 77).unwrap();
+        assert_eq!(first.candidate_ids, second.candidate_ids);
+        assert_eq!(first.pool_sha256, second.pool_sha256);
+        assert_eq!(first.strategy, InitialPoolStrategy::Random);
+        assert_eq!(first.candidate_ids.len(), 12);
+    }
+
+    #[test]
+    fn single_proxy_candidate_pool_is_direction_aware_and_rejects_target() {
+        let candidates = binary_catalog();
+        let highest = proxy_ranked_candidate_pool(
+            &candidates,
+            "landscape",
+            "validation_accuracy",
+            ProxyDirection::Maximize,
+            3,
+        )
+        .unwrap();
+        assert_eq!(highest.candidate_ids.len(), 3);
+        assert_eq!(highest.strategy, InitialPoolStrategy::SingleProxyRanked);
+        assert!(proxy_ranked_candidate_pool(
+            &candidates,
+            "validation_accuracy",
+            "validation_accuracy",
+            ProxyDirection::Maximize,
+            3,
+        ).is_err());
     }
 
     #[test]
