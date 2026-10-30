@@ -430,3 +430,70 @@ Artifacts:
 - [Tracking issue #9204](https://github.com/Luminous-Dynamics/symthaea/issues/9204)
 
 This estimates recall only over the finite declared PSU frame and only to the extent that the independent search protocol can detect and adjudicate errors. It is not whole-connectome recall. It does not measure causal queue-policy effects, because the policies do not control this independent sampling process. No biological coverage sample has been evaluated and no SOTA result is claimed.
+
+
+## New research frontier: beyond single-candidate recall
+
+The next phase adds four orthogonal research questions. They are deliberately separated so a gain in one layer cannot conceal a failure in another.
+
+### Morphology-conditioned candidate discovery (SCI-CONNECTOMICS-007)
+
+- [Protocol V1](CONNECTOME_MORPHOLOGY_CANDIDATE_GENERATION_V1.md)
+- [Issue #9241](https://github.com/Luminous-Dynamics/symthaea/issues/9241)
+
+Compare the current generator, EM-only, rendered-geometry-only, full-mesh/skeleton morphology rules, NEURD-compatible rules, and the union of independent specialists. Preserve detector provenance and use the #9204 independent PSU sample to estimate recall by error family, region, species, and impact. The generator and ranker must not receive audit outcomes.
+
+**Representation limit:** the ConnectomeBench2 card describes local geometry renderings as three 2D views with seven channels at 224×224 and EM as 2D image slices. Those are not whole-neuron morphology graphs. Resolve full meshes, skeletons, and synapse sidecars from the original volume and pin their provenance before claiming NEURD-like morphology evaluation. The dataset card also reports that EM availability differs by sample type; modality comparisons must use a matched eligible subset and report missingness by task/class to avoid selection confounding. Verify these properties again against the exact v2 revision before intake promotion.
+
+### Errors missed by every discovery channel (SCI-CONNECTOMICS-009)
+
+- [Protocol V1](CONNECTOME_MULTI_LIST_UNSEEN_ERROR_SENSITIVITY_V1.md)
+- [Issue #9248](https://github.com/Luminous-Dynamics/symthaea/issues/9248)
+
+An expert-declared exhaustive search can itself miss errors. Use multiple independently frozen discovery lists—specialist image model, morphology rules, current generator, and blinded expert teams—and preserve each event's capture history. Multiple-systems estimation is a sensitivity layer only: list dependence, unequal detectability, identity linkage, and the unobserved all-zero cell are difficult or non-identifiable without assumptions. Report model-sensitivity ranges and explicit NOT_IDENTIFIABLE states. Do not replace the #9204 design-based estimator.
+
+### Incomplete neurite extension and false-split recovery (SCI-CONNECTOMICS-010)
+
+- [Protocol V1](CONNECTOME_NEURITE_EXTENSION_BENCHMARK_V1.md)
+- [Issue #9249](https://github.com/Luminous-Dynamics/symthaea/issues/9249)
+
+Separate cleaning false merges from recovering true incomplete processes. Benchmark against NEURD, RoboEM, mesh-tip extension methods, Autoproof where reproducible, and expert continuation. Evaluate endpoint recall, recovered cable length and synapses, false joins, branchpoint preservation, path-level uncertainty, and expert time. Boundary-truncated processes must not be mistaken for internal segmentation errors.
+
+### Joint correction interactions and portfolio selection (SCI-CONNECTOMICS-011)
+
+- [Protocol V1](CONNECTOME_JOINT_CORRECTION_PORTFOLIO_BENCHMARK_V1.md)
+- [Issue #9250](https://github.com/Luminous-Dynamics/symthaea/issues/9250)
+
+Individual counterfactual scores are not generally additive. Evaluate pairwise synergy/antagonism, higher-order residuals, edit order, stale references, and compatible correction portfolios. Compare isolated-score greedy ranking with conflict-aware, interaction-aware, and bounded portfolio search under identical review-minute budgets. Retrospective utility is not a causal human-efficiency claim.
+
+### Prospective causal workflow evaluation (SCI-CONNECTOMICS-008)
+
+- [Protocol V1](CONNECTOME_PROSPECTIVE_QUEUE_TRIAL_PROTOCOL_V1.md)
+- [Issue #9242](https://github.com/Luminous-Dynamics/symthaea/issues/9242)
+
+A blocked-randomized workflow trial holds the interface and safety permissions fixed while comparing the existing workflow with the frozen morphology-conditioned workflow. Use independent adjudication, intention-to-treat analysis, and both in-pool (#9187) and out-of-pool (#9204) probability audits. Count audit, adjudication, compute, storage, and reviewer time in the all-in cost.
+
+## Industry comparison update
+
+The key comparators are not interchangeable:
+
+- **ConnectomeBench2** is the strongest broad local proofreading classification benchmark currently in this workstream: over 716,000 expert decisions and more than 4.5 million associated images in the paper. Its dataset card describes 401,170 released operation-level samples, with local image/geometry renderings. The 2026 VLM preprint reports Gemma 4 12B LoRA balanced accuracy of 95.0% for split-error and 90.9% for merge-error tasks, compared with 94.2% and 91.1% for the EM-only ViT-B comparator. This is task/protocol-specific; it is not a complete morphology or workflow comparison.
+- **NEURD** provides decomposed neuron meshes and morphology/graph rules; the 99%/95% human agreement is restricted to two high-confidence merge-rule subsets. It also reports a trade-off in some axonal synapse recall after cleaning, and its current method does not repair incomplete neurites.
+- **RoboEM** is a strong continuation/tracing comparator. Its paper reports approximately 400-fold lower computational annotation cost than manual correction for the evaluated cortical connectomes and 3.5-fold better split reduction than the compared agglomeration baseline. These are its paper-specific task and cost definitions.
+- **Autoproof** reports, in a 2025 preprint, about 90% of the value of a guided workflow at 80% of its cost and large-scale fragment attachment on the Drosophila male central nervous system. Treat as a preprint comparator until independently replicated on matched tasks.
+- **SynAnno** shows that guided neuron-centric navigation and review interfaces can materially change expert throughput and cognitive load; its user evaluation involved seven experts.
+
+The strategic target is therefore not "beat every published headline." It is a fair Pareto comparison on matched data and endpoints: high-impact search coverage, safe false-join/false-correction control, completeness, scientific-query accuracy, actual expert minutes, label burden, and all-in cost. Preserve each comparator's task boundaries and report unmatched metrics as not comparable.
+
+## Proposed integrated promotion gates
+
+These remain research targets, not measured Symthaea results:
+
+1. Candidate-generation recall ≥95% point estimate and design-adjusted lower 95% bound ≥90% on a declared frame, with family-specific support and bounds.
+2. Incomplete-process extension: critical-family lower 95% endpoint-recall bound ≥90%, while false-join rate is no worse than the strongest compatible baseline at matched completeness.
+3. Correction portfolio: zero regret on enumerable synthetic portfolios up to 20 candidates; ≥10% held-out query-error reduction over the strongest greedy baseline on larger portfolios at matched budget before any biological promotion.
+4. MSE: calibrated synthetic sensitivity analysis with explicit refusal under non-identifiability; no unsupported natural-data point estimate.
+5. Human workflow: ≥20% reduction in actual expert time at independently matched quality and coverage, or ≥15% relative gain in signed query-error reduction per expert-minute, confirmed prospectively with design-aware intervals.
+6. No authoritative automatic mutations, no hidden audit-label leakage, and exact provenance for every input, model, policy, sample, correction, and output.
+
+A pooled pass cannot override a failed critical-family, false-correction, false-join, or integrity gate.
