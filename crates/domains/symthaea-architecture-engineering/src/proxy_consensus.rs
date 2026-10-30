@@ -14,7 +14,10 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
-use super::nasbench201_trajectory::ProxyDirection;
+use super::nasbench201_trajectory::{
+    build_trajectory_archive, plan_promotions, ProxyDirection, PromotionMix,
+    TrajectorySearchConfig,
+};
 use super::tabular_nas_firewall::ArchitectureFeatures;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -723,6 +726,44 @@ mod tests {
             .proxy_directions
             .insert("val_accuracy".into(), ProxyDirection::Maximize);
         assert!(build_proxy_consensus(&rows, &invalid).is_err());
+    }
+
+    #[test]
+    fn consensus_trajectory_and_promotion_pipeline_composes_without_target_labels() {
+        let mut rows = features();
+        for (index, row) in rows.iter_mut().enumerate() {
+            row.topology_encoding = vec![
+                (index / 5) as u8,
+                (index % 5) as u8,
+                0,
+                0,
+                0,
+                0,
+            ];
+        }
+        let consensus = build_proxy_consensus(&rows, &config()).unwrap();
+        let derived = apply_consensus_prior(&rows, &consensus, "cora_consensus").unwrap();
+        let search = TrajectorySearchConfig {
+            proxy_id: "cora_consensus".into(),
+            target_metric_id: "val_accuracy".into(),
+            proxy_direction: ProxyDirection::Maximize,
+            seed: 19,
+            max_walks: 3,
+            max_unique_visits: 6,
+            max_moves_per_walk: 8,
+            max_escapes_per_walk: 1,
+        };
+        let archive = build_trajectory_archive(&derived, &search).unwrap();
+        let mix = PromotionMix {
+            promotion_count: 4,
+            proxy_elite_quota: 1,
+            trajectory_quota: 1,
+            topology_diversity_quota: 2,
+        };
+        let plan = plan_promotions(&derived, &archive, &mix).unwrap();
+        assert_eq!(plan.candidates.len(), 4);
+        assert_eq!(plan.proxy_id, "cora_consensus");
+        assert_eq!(plan.archive_sha256, archive.archive_sha256);
     }
 
     #[test]
