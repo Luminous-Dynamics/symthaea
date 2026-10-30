@@ -70,6 +70,7 @@ pub mod schema;
 pub mod significance;
 pub mod paired_advantage;
 pub mod clustered_advantage;
+pub mod adaptive_evaluation;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -157,6 +158,12 @@ pub use schema::{
     RESEARCH_BUNDLE_SCHEMA, RESEARCH_RECEIPT_SCHEMA, known_schema_labels,
 };
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
+pub use adaptive_evaluation::{
+    ADAPTIVE_EVALUATION_SCHEMA, AdaptiveEvaluationAuthorization,
+    AdaptiveEvaluationDisposition as _, AdaptiveEvaluationError, AdaptiveEvaluationPlan,
+    AdaptiveEvaluationRecord, AdaptiveEvaluationRequest, EvaluationDisposition,
+    EvaluationLane, authorize_adaptive_evaluation,
+};
 pub use paired_advantage::{
     ExactSignTest, HolmAdjustedPValue, PairedAdvantageConfig, PairedAdvantageError,
     PairedAdvantageReport, PairedBenchmarkObservation, RawHypothesis,
