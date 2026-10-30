@@ -65,3 +65,17 @@ Expected body: \`{"status":"ok"}\`.
 7. Keep the deployed version frozen during evaluation; do not report repository CI or local smoke as organizer acceptance.
 
 No public deployment, challenge acceptance, benchmark score, capacity guarantee, availability SLA or SOTA result is claimed by this scaffold.
+
+## External operator smoke check
+
+After the public endpoint is reachable, run this from an external client with `curl`, `jq`, `openssl` and `sed` installed:
+
+```sh
+export AML_BASE_URL=https://YOUR_DOMAIN
+export AML_API_KEY='YOUR_MEMORY_SYSTEM_KEY'
+bash deploy/aml/external-smoke.sh
+```
+
+The script verifies public HTTPS health, that unauthenticated Add is rejected, authenticated Add response echoes, read-after-write Search visibility, and isolation from a second `user_id`. It creates one random, non-sensitive smoke message under a unique user ID. That record remains subject to the configured retention worker; the API does not provide a per-user immediate delete route.
+
+This is a local operator check only. It is not the organizer's official Smoke/Full test, an access review, or evidence that the endpoint has been accepted for evaluation.
