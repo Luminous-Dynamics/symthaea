@@ -31,6 +31,16 @@ Sources:
 
 **Reproducibility note:** the linked Zenodo record currently lists the 403.5 kB conference PDF. It does not expose the underlying netlists or executable code as files on that record. The paper's “reproducibility artifact” reference must therefore be resolved to an actual artifact URI and digest before claiming that the experiment has been locally reproduced.
 
+### Newer candidate corpus: 28 October 2026
+
+A newer versioned corpus is now the priority candidate for dataset-specific reproduction: [Mendeley Data Version 1, “Shift-controlled gate-level hardware Trojan corpus, per-fold detector scores and synthesized netlists for robust, resource-aware AI-based Trojan detection”](https://data.mendeley.com/datasets/37fdy2k7cj/1), DOI [10.17632/37fdy2k7cj.1](https://doi.org/10.17632/37fdy2k7cj.1), published 28 October 2026.
+
+Its indexed catalogue description states 283 synthesized gate-level circuits, 232,967 gates and 3,373 Trojan gates; 25 open host designs in four families (ISCAS-85, EPFL arithmetic, EPFL control and sequential IP); four inserted Trojan families (combinational XOR, leakage, denial of service and sequential counter); a second synthesis library; real Trust-Hub RTL Trojans in two hosts; and per-fold detector scores plus synthesized netlists.
+
+This appears to provide a more useful in-corpus test bed for host-design, Trojan-family and synthesis-library shift than the older 16-netlist / five-host-family example alone. It still has only four broad host-design families, so the effective number of independent groups must be reported honestly.
+
+**Qualification caveat:** only the indexed catalogue description has been inspected so far. The exact archive/file inventory, license/redistribution terms, archive SHA-256, associated article DOI, executable code, author split files and per-fold predictions have not yet been retrieved or independently verified. Do not call the corpus audited or reproduce its results until those artifacts are pinned. Dataset-specific intake and reproduction is tracked in [HARDSEC-006 / issue #9100](https://github.com/Luminous-Dynamics/symthaea/issues/9100).
+
 ## 3. Paradigm shift: the independent unit is design lineage
 
 A benchmark can contain tens of thousands of gates but only a handful of independent host designs. Sibling Trojan variants can share most of their benign logic. Randomly assigning gates to train and test can evaluate recognition of a known host circuit rather than detection on a new design.
