@@ -177,7 +177,31 @@
           ],
           "maxLength": 128
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "relation_rule": {
+                "enum": [
+                  "support_non_decreasing",
+                  "support_non_increasing"
+                ]
+              }
+            },
+            "required": [
+              "relation_rule"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expected_variant_decision": {
+                "$ref": "#/$defs/decision"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "allOf": [
