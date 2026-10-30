@@ -68,6 +68,8 @@ pub struct PairedAdvantageReport {
     pub quality_non_inferiority: ExactSignTest,
     /// Exact test that quantum resource reduction exceeds the minimum margin.
     pub resource_superiority: ExactSignTest,
+    /// Intersection-union p-value: max(quality p, resource p) for the joint claim.
+    pub composite_claim_p_value: f64,
     /// Shared contract digest carried by every paired observation.
     pub comparison_contract_fingerprint: String,
 }
@@ -229,6 +231,9 @@ pub fn analyze_paired_advantage(
         config.resource_log_ratio_tie_tolerance,
     );
 
+    let composite_claim_p_value = quality_non_inferiority
+        .p_value_one_sided
+        .max(resource_superiority.p_value_one_sided);
     let median_quality_difference = median(&mut quality_differences);
     let median_log_classical_over_quantum_resource = median(&mut resource_log_ratios);
     let exponentiated = median_log_classical_over_quantum_resource.exp();
@@ -240,6 +245,7 @@ pub fn analyze_paired_advantage(
         median_classical_over_quantum_resource_ratio: exponentiated.is_finite().then_some(exponentiated),
         quality_non_inferiority,
         resource_superiority,
+        composite_claim_p_value,
         comparison_contract_fingerprint: contract.to_owned(),
     })
 }
@@ -425,6 +431,7 @@ mod tests {
         assert_eq!(report.resource_superiority.losses, 3);
         assert_eq!(report.quality_non_inferiority.wins, 14);
         assert_eq!(report.quality_non_inferiority.losses, 2);
+        assert!((report.composite_claim_p_value - 697.0 / 65_536.0).abs() < 1e-12);
         assert!((report.median_classical_over_quantum_resource_ratio.unwrap() - 1.25).abs() < 1e-12);
         assert!((report.resource_superiority.p_value_one_sided - 697.0 / 65_536.0).abs() < 1e-12);
         assert!((report.quality_non_inferiority.p_value_one_sided - 106.0 / 16_384.0).abs() < 1e-12);
