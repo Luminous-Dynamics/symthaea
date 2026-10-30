@@ -847,7 +847,7 @@ mod tests {
     fn streams_large_edge_sets_with_small_witness_ledger() {
         use std::io::BufWriter;
 
-        const EDGE_COUNT: usize = 250_000;
+        const EDGE_COUNT: usize = 1_000_000;
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
         let root = env::temp_dir().join(format!(
             "hardsec-stream-scale-{}-{id}",
@@ -865,7 +865,7 @@ mod tests {
             let mut writer = BufWriter::new(file);
             writeln!(writer, "{ORIGINAL_HEADER}").unwrap();
             for index in 0..EDGE_COUNT {
-                writeln!(writer, "e{index:08}\ta\tb").unwrap();
+                writeln!(writer, "e{index:08}\tn00000000\tn{:08}", index + 1).unwrap();
             }
             writer.flush().unwrap();
         }
@@ -874,18 +874,29 @@ mod tests {
             let mut writer = BufWriter::new(file);
             writeln!(writer, "{PARTITIONED_HEADER}").unwrap();
             for index in 0..EDGE_COUNT {
-                writeln!(writer, "e{index:08}\ta\tb\tinternal").unwrap();
+                let target_partition = (index + 1) / 1000;
+                let representation = if target_partition == 0 { "internal" } else { "bridge" };
+                writeln!(
+                    writer,
+                    "e{index:08}\tn00000000\tn{:08}\t{representation}",
+                    index + 1
+                )
+                .unwrap();
+            }
+            writer.flush().unwrap();
+        }
+        {
+            let file = File::create(&partitions).unwrap();
+            let mut writer = BufWriter::new(file);
+            writeln!(writer, "{PARTITION_HEADER}").unwrap();
+            for node in 0..=EDGE_COUNT {
+                writeln!(writer, "n{node:08}\tp{:04}", node / 1000).unwrap();
             }
             writer.flush().unwrap();
         }
         fs::write(
-            &partitions,
-            "node_id\tpartition_id\na\tp1\nb\tp1\n",
-        )
-        .unwrap();
-        fs::write(
             &witnesses,
-            "path_id\tsequence_index\tedge_id\tsrc_node_id\tdst_node_id\nw1\t0\te00000000\ta\tb\n",
+            "path_id\tsequence_index\tedge_id\tsrc_node_id\tdst_node_id\nw1\t0\te00000000\tn00000000\tn00000001\n",
         )
         .unwrap();
 
@@ -901,6 +912,8 @@ mod tests {
             serde_json::from_slice(&fs::read(&receipt).unwrap()).unwrap();
         assert_eq!(output["audit"]["original_edge_count"], EDGE_COUNT);
         assert_eq!(output["audit"]["partitioned_edge_count"], EDGE_COUNT);
+        assert_eq!(output["audit"]["node_partition_assignments"], EDGE_COUNT + 1);
+        assert_eq!(output["audit"]["partition_count"], (EDGE_COUNT / 1000) + 1);
         assert_eq!(output["audit"]["total_witness_edges"], 1);
         assert_eq!(output["audit"]["lost_witness_edge_count"], 0);
         fs::remove_dir_all(root).unwrap();
