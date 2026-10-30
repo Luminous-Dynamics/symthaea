@@ -105,7 +105,7 @@ A separate adjudicator may review disagreements after the initial votes are comm
 - remain blind to candidate/judge identity where feasible;
 - show the original evidence packet and rubric, not the model's preferred answer;
 - retain all original labels unchanged;
-- record a resolution event, the evidence/rule used, and whether uncertainty remains;
+- record a resolution event with a separately identified resolver outside the initial voting set, the evidence/rule used, and whether uncertainty remains;
 - permit unresolved disagreement and not-evaluable outcomes.
 
 Majority vote is a descriptive aggregation, not a truth oracle. A high agreement rate among raters sharing the same assumptions or source packet can still encode common error.
@@ -291,3 +291,10 @@ These findings lead to the following measurable targets, all to be treated as pr
 - report cost, latency, tokens, retrieval and human-review effort without allowing cost to compensate for critical evidence failures.
 
 A meaningful competitive win is not simply a higher judge-human correlation. It is improved held-out human alignment and evidence correctness under adversarial rubric/source interventions, with no increase in unsupported false acceptance, and a better quality-versus-cost frontier at matched evaluation budgets.
+
+
+### Resolution-event enforcement refinement
+
+A resolution event now identifies its own `adjudicator_id_sha256`. The validator requires at least two distinct initial adjudicators among its predecessors, rejects a resolver who was in the initial voting set, and (for audit-candidate packages) requires a distinct declared independence group from all predecessor raters. A supported/contradicted/mixed resolution must cite evidence spans; temporal-staleness resolutions must point to a non-active source. The fixture includes three original votes (two support, one mixed/contested) and a fourth independently declared resolver whose separate outcome remains mixed/contested. All original votes remain present.
+
+This is a declared-process constraint, not proof that the resolver is actually independent or qualified. The report's independence flag remains false.
