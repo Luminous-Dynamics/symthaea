@@ -690,7 +690,14 @@ mod tests {
             "cmaq-008-residual-ablation-v0.2"
         );
         assert_eq!(parsed["objectives"].as_array().unwrap().len(), 2);
-        assert!(parsed["linear_arx_baseline"]["source"]["mse"].is_finite());
+        let linear_source_mse = parsed["linear_arx_baseline"]["source"]["mse"]
+            .as_f64().expect("linear ARX source MSE must be numeric");
+        let linear_source_persistence = parsed["linear_arx_baseline"]["source"]["persistence_mse"]
+            .as_f64().expect("persistence source MSE must be numeric");
+        assert!(linear_source_mse.is_finite());
+        assert!(linear_source_persistence.is_finite());
+        assert!(linear_source_mse < linear_source_persistence);
+
         for objective in parsed["objectives"].as_array().unwrap() {
             for regime in ["source", "action_effect_reversal"] {
                 for metric in [
@@ -702,8 +709,17 @@ mod tests {
                     "mse_delta_vs_persistence",
                     "mse_delta_vs_persistence_ci95_low",
                     "mse_delta_vs_persistence_ci95_high",
+                    "paired_mse_delta_vs_absolute",
+                    "paired_mse_delta_ci95_low",
+                    "paired_mse_delta_ci95_high",
+                    "paired_mse_delta_vs_linear_arx",
+                    "paired_linear_ci95_low",
+                    "paired_linear_ci95_high",
                 ] {
-                    assert!(objective[regime][metric].is_finite());
+                    let value = objective[regime][metric]
+                        .as_f64()
+                        .unwrap_or_else(|| panic!("{} {} must be numeric", regime, metric));
+                    assert!(value.is_finite());
                 }
             }
         }
