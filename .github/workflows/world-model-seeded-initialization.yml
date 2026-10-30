@@ -47,6 +47,11 @@ jobs:
           cargo test --lib
           dynamics::crate_world_model::tests::seeded_initialization_replays_weights_and_predictions
 
+      - name: Test CfC gradient update ordering
+        run: >-
+          cargo test --lib
+          dynamics::crate_world_model::tests::target_head_gradient_uses_pre_update_output_projection
+
       - name: Test the real-world-model transfer smoke binary
         run: cargo test --bin cmaq-008-world-model-smoke
 
