@@ -71,7 +71,7 @@ struct ExecutionEvidence {
 }
 
 #[derive(Debug, Serialize)]
-struct WorkerOutput {
+pub struct WorkerOutput {
     format_version: u32,
     task_mode: String,
     output_digest: String,
