@@ -369,6 +369,58 @@ fn hash_file(path: &PathBuf) -> Result<(String, u64), String> {
     Ok((hex::encode(hasher.finalize()), byte_count))
 }
 
+fn mask_tile_counts(frame: &FrameInput, scan: &MaskScan) -> Result<Vec<MaskTileCount>, String> {
+    let dimensions = grid_dimensions(frame.extent_voxels, frame.tile_shape_voxels)?;
+    let mut counts = Vec::with_capacity(frame.cells.len());
+    for cell in &frame.cells {
+        let tile_index = (u128::from(cell.grid_index[2]) * u128::from(dimensions[1])
+            + u128::from(cell.grid_index[1])) * u128::from(dimensions[0])
+            + u128::from(cell.grid_index[0]);
+        let tile_index = usize::try_from(tile_index)
+            .map_err(|_| "mask tile index exceeds usize while checking dispositions".to_string())?;
+        let foreground = scan.tile_foreground_counts[tile_index];
+        match cell.disposition.as_str() {
+            "eligible" if foreground == 0 => {
+                return Err(format!("PSU {} is marked eligible but contains zero eligible-mask voxels", cell.psu_id));
+            }
+            "excluded" if foreground > 0 => {
+                return Err(format!("PSU {} is marked excluded but contains {foreground} eligible-mask voxels", cell.psu_id));
+            }
+            "eligible" | "excluded" => {}
+            _ => return Err(format!("PSU {} has invalid disposition", cell.psu_id)),
+        }
+        counts.push(MaskTileCount {
+            psu_id: cell.psu_id.clone(),
+            tile_voxel_count: tile_voxel_count(frame, cell.grid_index)?.to_string(),
+            eligible_voxel_count: foreground.to_string(),
+        });
+    }
+    if scan.foreground_voxels == 0 {
+        return Err("eligibility mask contains no foreground voxels".into());
+    }
+    Ok(counts)
+}
+
+fn apply_mask_summary(
+    frame: &FrameInput,
+    scan: MaskScan,
+    actual_sha256: String,
+    artifact_bytes: u64,
+    report: &mut AuditReport,
+) -> Result<(), String> {
+    let counts = mask_tile_counts(frame, &scan)?;
+    let total_voxels = checked_product(frame.extent_voxels, "mask")?;
+    report.eligibility_mask_verified = true;
+    report.eligibility_mask_actual_sha256 = actual_sha256;
+    report.eligibility_mask_artifact_byte_count = artifact_bytes.to_string();
+    report.eligibility_foreground_voxel_count = scan.foreground_voxels.to_string();
+    report.eligibility_foreground_voxel_fraction = scan.foreground_voxels as f64 / total_voxels as f64;
+    report.mask_tile_counts = counts;
+    report.status = "PASS";
+    report.scope_note = "Proves exactly-once lattice tiling inside the declared box and verifies exact eligibility-mask artifact bytes, bit order, voxel count, padding, and per-PSU eligible/excluded consistency. Does not prove the declared box covers all biologically eligible tissue, that the mask selection rule is biologically valid, source volume/segmentation digests are truthful, or PSUs are independent.";
+    Ok(())
+}
+
 fn validate_mask_file(
     frame: &FrameInput,
     path: &PathBuf,
@@ -402,51 +454,40 @@ fn validate_mask_file(
         _ => return Err("unsupported eligibility mask encoding".into()),
     };
     let scan = scan_mask(frame, decoded_reader)?;
-    let dimensions = grid_dimensions(frame.extent_voxels, frame.tile_shape_voxels)?;
-    let mut mask_tile_counts = Vec::with_capacity(frame.cells.len());
-    let mut eligible_tile_count = 0_u64;
-    let mut excluded_tile_count = 0_u64;
+    apply_mask_summary(frame, scan, actual_sha256, artifact_bytes, report)
+}
 
-    for cell in &frame.cells {
-        let tile_index = (u128::from(cell.grid_index[2]) * u128::from(dimensions[1])
-            + u128::from(cell.grid_index[1])) * u128::from(dimensions[0])
-            + u128::from(cell.grid_index[0]);
-        let tile_index = usize::try_from(tile_index)
-            .map_err(|_| "mask tile index exceeds usize while checking dispositions".to_string())?;
-        let foreground = scan.tile_foreground_counts[tile_index];
-        match cell.disposition.as_str() {
-            "eligible" if foreground == 0 => {
-                return Err(format!("PSU {} is marked eligible but contains zero eligible-mask voxels", cell.psu_id));
-            }
-            "excluded" if foreground > 0 => {
-                return Err(format!("PSU {} is marked excluded but contains {foreground} eligible-mask voxels", cell.psu_id));
-            }
-            "eligible" => eligible_tile_count += 1,
-            "excluded" => excluded_tile_count += 1,
-            _ => return Err(format!("PSU {} has invalid disposition", cell.psu_id)),
+fn validate_mask_bytes(
+    frame: &FrameInput,
+    artifact: &[u8],
+    report: &mut AuditReport,
+) -> Result<(), String> {
+    let actual_sha256 = sha256(artifact);
+    if actual_sha256 != frame.eligibility_mask.artifact_sha256 {
+        return Err("eligibility mask SHA-256 does not match manifest".into());
+    }
+    let expected_packed = expected_mask_bytes(frame)?;
+    let expected_artifact_bytes = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => expected_packed,
+        "hex_bitset_lsb0_x_fastest_v1" => expected_packed.checked_mul(2)
+            .ok_or_else(|| "hex mask byte count overflows u128".to_string())?,
+        other => return Err(format!("unsupported eligibility mask encoding {other}")),
+    };
+    if artifact.len() as u128 != expected_artifact_bytes {
+        return Err(format!("eligibility mask artifact has {} bytes; expected {expected_artifact_bytes}", artifact.len()));
+    }
+    let decoded: Vec<u8> = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => artifact.to_vec(),
+        "hex_bitset_lsb0_x_fastest_v1" => {
+            let mut reader = HexBitsetReader { inner: Cursor::new(artifact) };
+            let mut decoded = Vec::new();
+            reader.read_to_end(&mut decoded).map_err(|error| format!("could not decode hex eligibility mask: {error}"))?;
+            decoded
         }
-        mask_tile_counts.push(MaskTileCount {
-            psu_id: cell.psu_id.clone(),
-            tile_voxel_count: tile_voxel_count(frame, cell.grid_index)?.to_string(),
-            eligible_voxel_count: foreground.to_string(),
-        });
-    }
-    if scan.foreground_voxels == 0 {
-        return Err("eligibility mask contains no foreground voxels".into());
-    }
-    let total_voxels = checked_product(frame.extent_voxels, "mask")?;
-    report.eligibility_mask_verified = true;
-    report.eligibility_mask_actual_sha256 = actual_sha256;
-    report.eligibility_mask_artifact_byte_count = artifact_bytes.to_string();
-    report.eligibility_foreground_voxel_count = scan.foreground_voxels.to_string();
-    report.eligibility_foreground_voxel_fraction = scan.foreground_voxels as f64 / total_voxels as f64;
-    report.mask_tile_counts = mask_tile_counts;
-    report.status = "PASS";
-    report.scope_note = "Proves exactly-once lattice tiling inside the declared box and verifies the exact eligibility-mask artifact bytes, packed bit order, voxel count, padding, and per-PSU eligible/excluded consistency. Does not prove the declared box covers all biologically eligible tissue, the mask selection rule is biologically valid, source volume/segmentation digests are truthful, or PSUs are independent.";
-    if report.eligible_grid_cells != eligible_tile_count || report.excluded_grid_cells != excluded_tile_count {
-        return Err("eligibility mask tile counts differ from the frame audit".into());
-    }
-    Ok(())
+        _ => return Err("unsupported eligibility mask encoding".into()),
+    };
+    let scan = scan_mask(frame, Cursor::new(decoded))?;
+    apply_mask_summary(frame, scan, actual_sha256, artifact.len() as u64, report)
 }
 
 fn validate_mask_bytes(frame: &FrameInput, artifact_bytes: &[u8]) -> Result<MaskScan, String> {
@@ -486,6 +527,9 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
     }
     if frame.edge_policy != "clip_last_tile" {
         return Err("edge_policy must equal clip_last_tile".into());
+    }
+    if !matches!(frame.eligibility_mask.encoding.as_str(), "packed_bitset_lsb0_x_fastest_v1" | "hex_bitset_lsb0_x_fastest_v1") {
+        return Err("eligibility_mask.encoding must be packed_bitset_lsb0_x_fastest_v1 or hex_bitset_lsb0_x_fastest_v1".into());
     }
     for (name, digest) in [
         ("volume_content_sha256", frame.source.volume_content_sha256.as_str()),
@@ -637,6 +681,13 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
         tile_shape_voxels: frame.tile_shape_voxels,
         eligibility_mask_artifact_id: frame.eligibility_mask.artifact_id.clone(),
         eligibility_mask_sha256: frame.eligibility_mask.artifact_sha256.clone(),
+        eligibility_mask_encoding: frame.eligibility_mask.encoding.clone(),
+        eligibility_mask_verified: false,
+        eligibility_mask_actual_sha256: String::new(),
+        eligibility_mask_artifact_byte_count: String::new(),
+        eligibility_foreground_voxel_count: String::new(),
+        eligibility_foreground_voxel_fraction: 0.0,
+        mask_tile_counts: Vec::new(),
         eligibility_selection_rule_sha256: frame.eligibility_mask.selection_rule_sha256.clone(),
         frame_protocol_sha256: frame.frame_protocol_sha256.clone(),
         frame_generator_tool_id: frame.frame_generator.tool_id.clone(),
@@ -653,8 +704,8 @@ fn validate(frame: &FrameInput) -> Result<AuditReport, String> {
         excluded_tile_voxel_fraction: excluded_tile_voxels as f64 / total_voxels_f64,
         population_frame_sha256: population_digest,
         population_frame,
-        status: "PASS",
-        scope_note: "Proves exactly-once lattice tiling and eligible/excluded tile partitioning only within the declared integer voxel bounding box. Tile voxel counts are full geometric tile volumes, not foreground voxel counts from the external eligibility mask. Does not prove the box or mask covers all biologically eligible tissue, or that source digests are truthful.",
+        status: "FRAME_GEOMETRY_PASS_MASK_UNVERIFIED",
+        scope_note: "Geometry-only stage: proves exactly-once lattice tiling inside the declared voxel box. The eligibility mask bytes have not yet been read or verified, so this report is not eligible for candidate-generation coverage certification.",
     };
     Ok(report)
 }
@@ -664,7 +715,10 @@ fn run(args: Args) -> Result<i32, String> {
         .map_err(|error| format!("could not read {}: {error}", args.frame.display()))?;
     let frame: FrameInput = serde_json::from_slice(&bytes)
         .map_err(|error| format!("could not parse spatial frame JSON: {error}"))?;
-    let mut report = match validate(&frame) {
+    let mut report = match validate(&frame).and_then(|mut report| {
+        validate_mask_file(&frame, &args.eligibility_mask, &mut report)?;
+        Ok(report)
+    }) {
         Ok(report) => report,
         Err(message) => {
             let failure = serde_json::json!({
@@ -745,6 +799,7 @@ mod tests {
                 artifact_id: "synthetic-eligibility-mask".into(),
                 artifact_sha256: "d".repeat(64),
                 selection_rule_sha256: "e".repeat(64),
+                encoding: "packed_bitset_lsb0_x_fastest_v1".into(),
             },
             frame_protocol_sha256: "f".repeat(64),
             frame_generator: FrameGenerator {
@@ -766,7 +821,7 @@ mod tests {
         let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME.example.json");
         let frame: FrameInput = serde_json::from_slice(bytes).expect("fixture JSON should parse");
         let report = validate(&frame).expect("checked-in synthetic frame should pass");
-        assert_eq!(report.status, "PASS");
+        assert_eq!(report.status, "FRAME_GEOMETRY_PASS_MASK_UNVERIFIED");
         assert_eq!(report.eligible_grid_cells, 3);
         assert_eq!(report.excluded_grid_cells, 1);
         assert_eq!(report.population_frame.len(), 3);
@@ -937,7 +992,7 @@ mod tests {
     #[test]
     fn negative_origin_is_allowed_and_preserved() {
         let report = validate(&fixture()).unwrap();
-        assert_eq!(report.status, "PASS");
+        assert_eq!(report.status, "FRAME_GEOMETRY_PASS_MASK_UNVERIFIED");
         assert_eq!(fixture().origin_voxel, [-100, 200, 300]);
     }
 }
