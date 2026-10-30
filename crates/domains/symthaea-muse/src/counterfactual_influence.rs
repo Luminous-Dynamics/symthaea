@@ -1670,6 +1670,20 @@ fn hysteresis_segment(
         for window_index in 0..window_count {
             let measurement_index = window_index * channels + channel;
             let measurement = &measurements[measurement_index];
+            if measurement.channel != channel
+                || measurement.start_frame >= measurement.end_frame
+                || measurement.end_frame > total_frames
+            {
+                return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+            }
+            if channel > 0 {
+                let first = &measurements[window_index * channels];
+                if measurement.start_frame != first.start_frame
+                    || measurement.end_frame != first.end_frame
+                {
+                    return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+                }
+            }
             let onset_rms_exceeded =
                 measurement.rms_delta > measurement.calibrated_rms_threshold;
             let onset_spectral_exceeded =
