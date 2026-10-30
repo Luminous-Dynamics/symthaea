@@ -651,7 +651,7 @@ fn binomial_cdf(max_events: u64, trials: u64, probability: f64) -> f64 {
 }
 
 fn minimum_zero_failure_groups(target_upper_bound: f64, alpha: f64) -> Result<Option<u64>, String> {
-    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err("alpha must be finite and in (0, 1)".to_owned());
     }
     if !target_upper_bound.is_finite() || !(0.0..=1.0).contains(&target_upper_bound) {
