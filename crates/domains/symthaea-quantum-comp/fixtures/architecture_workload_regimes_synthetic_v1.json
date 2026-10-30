@@ -4,6 +4,8 @@
   "claim_ceiling": "All profile values and digests are fabricated; no workload was measured.",
   "profiles": [
     {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
       "regime_profile_id": "synthetic-event-bursty-stream",
       "observation_record_id": "synthetic-event-cpu",
       "workload_fingerprint": "synthetic-event-workload-01",
@@ -44,6 +46,8 @@
       ]
     },
     {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
       "regime_profile_id": "synthetic-hdc-retrieval-batch",
       "observation_record_id": "synthetic-hdc-retrieval-cpu",
       "workload_fingerprint": "synthetic-hdc-retrieval-workload-02",
@@ -83,6 +87,8 @@
       ]
     },
     {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
       "regime_profile_id": "synthetic-hdc-ltc-fast-slow",
       "observation_record_id": "synthetic-hdc-ltc-cpu",
       "workload_fingerprint": "synthetic-hdc-ltc-workload-03",
@@ -116,6 +122,8 @@
       ]
     },
     {
+      "schema_version": "symthaea.quantum_comp.architecture_workload_regime.v1",
+
       "regime_profile_id": "synthetic-published-dual-memory-snn",
       "observation_record_id": "synthetic-published-dmp-snn",
       "workload_fingerprint": "synthetic-published-temporal-snn-workload-04",
