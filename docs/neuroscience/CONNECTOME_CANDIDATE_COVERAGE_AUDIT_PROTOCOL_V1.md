@@ -131,7 +131,7 @@ Before collecting or estimating candidate-generation recall, run [the spatial PS
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome-spatial-frame-audit -- \
-  --frame spatial-frame.json \\
+  --frame spatial-frame.json \
   --eligibility-mask eligibility-mask.bitset --output spatial-frame-report.json
 
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
