@@ -1,6 +1,6 @@
 # PITB v0: industry benchmark gap and qualification roadmap
 
-Date: 2026-10-29  
+Date: 2026-10-30  
 Status: research and preregistration guidance; **not an empirical model comparison**.
 
 ## Executive decision
@@ -146,3 +146,46 @@ The branch now includes `pitb_missingness_bounds_v0.py`, a research-only diagnos
 On the synthetic eight-target negative-control fixture, only three of eight target pairs had both outcomes observed. The complete-pair estimate was 0pp while the sharp full-cohort identification interval was -37.5pp to +50pp; this correctly demonstrates that incomplete evidence does not support a narrow claim. This calculation is a finite-cohort identified set, not a confidence interval, and it does not replace the existing fail-closed outcome/receipt gate.
 
 Methodological grounding includes general partial-identification research ([Manski overview](https://www.sciencedirect.com/science/article/pii/S0888613X04001124)), systematic missing-outcome tipping-point analysis ([2025 paper](https://pubmed.ncbi.nlm.nih.gov/40140629/)), and 2026 cluster missing-outcome sensitivity methodology ([open article](https://pmc.ncbi.nlm.nih.gov/articles/PMC13108325/)). PITB is not a randomized clinical trial; these are methodological references only. The local authoring copy passed seven unit tests, and an exact check was run on the fixture and missing-row negative control. The newly added GitHub Actions step is still pending exact-head execution, so no CI pass is claimed.
+
+
+## Literature and design refresh — 2026-10-30
+
+The latest comparison strengthens the case for separating **proving**, **retrieving**, **semantically preserving**, and **constructively solving**. They are related capabilities, but their reported metrics are not interchangeable.
+
+| Frontier | Current evidence | How PITB should respond |
+|---|---|---|
+| High-budget prover capability | Goedel-Prover-V2 reports 90.4% MiniF2F pass@32 for its 32B self-correction setup and 86 PutnamBench problems at pass@184 in the ICLR 2026 paper. | Treat this as a strong proof-generation reference, not a PITB baseline unless the exact same tasks, toolchain, compute budget and checker are rerun. Do not claim PITB superiority from a score on a different corpus. |
+| Global premise retrieval | LeanSearch v2 reports nDCG@10 = 0.62 versus 0.53 for the next system in its Standard retrieval benchmark. On 69 research-level Mathlib theorems it recovers 46.1% of ground-truth premise groups within ten candidates; a fixed downstream prover loop reports 20% proof success versus 16% for the next retriever and 4% with no retrieval. | Arm I must remain a pinned, competitive global-premise retrieval comparator. Freeze retriever version, corpus/index digest, candidate budget and context policy. Measure both complete premise-set coverage and downstream semantic-gate success. |
+| Semantic theorem correctness | T² evaluates dependent successor theorems over five Lean repositories: 2,206 problems, about 41 successors per target on average. Its best reported testing accuracy is 38.9%, materially below the high compilation success observed in the study. | Preserve the dual metric: trusted-kernel acceptance and dependent-successor semantic acceptance. A compiled proof is not automatically a semantically faithful theorem. |
+| Long theorem structure | TheoremBench provides nearly 100 classical Lean theorems in plain-main and premised forms, plus theorem-level coverage and token-efficiency metrics. Its analysis finds a bias toward easier subtheorems and long, inefficient tactic traces. | Report proof-obligation coverage, solved-subgoal structure, theorem completion, tokens and verified cost per solve. Avoid counting many trivial subgoals as broad theorem competence. |
+| Constructive problem solving | D-FPS separates solving from proving by representing an unknown answer as a metavariable plus proof obligation; it proposes RPE for semantic answer equivalence and supplies three benchmarks with over 1,000 problems. | Keep witness discovery as a separate track. The system must produce the witness and prove the specification, not merely prove a supplied proposition. |
+| Benchmark validity | The ICML 2026 audit of five Lean benchmarks/forks reports 4,833 findings, including 398 mechanically certified issues such as counterexamples, vacuous statements and unsound axioms. | Make statement fidelity, dependency/axiom policy, mutation kill rate, and harness negative controls reported benchmark properties—not hidden assumptions. |
+
+Primary sources: [Goedel-Prover-V2, ICLR 2026](https://proceedings.iclr.cc/paper_files/paper/2026/hash/13e8be77982beb73d7ed0bbf122f9f3c-Abstract-Conference.html); [LeanSearch v2](https://arxiv.org/abs/2605.13137); [T², ACL 2026 Industry](https://aclanthology.org/2026.acl-industry.150/); [TheoremBench](https://arxiv.org/abs/2606.09450); [D-FPS, ICML 2026](https://proceedings.mlr.press/v306/liu26gl.html); [Faults in Our Formal Benchmarking, ICML 2026](https://proceedings.mlr.press/v306/ammanamanchi26a.html).
+
+### Strongest paradigm shift for PITB
+
+The distinctive product should not be “another prover” or “another proof-summary retriever.” It should be an **auditable theorem-knowledge transfer system** where every proposed insight behaves like an executable, typed contract:
+
+1. **Represent proof knowledge as a dependency-aware obligation graph.** Each insight records source/target object types, hypotheses, invariant direction, quantifier scope, intermediate obligations, evidence anchors, and known failure boundaries. It should be possible to see exactly which target obligation an insight claims to discharge.
+2. **Make transfer selective and counterfactual.** Before using an insight, check its preconditions; when a premise or invariant is missing, abstain or explicitly re-plan. Evaluate compatible positives and adversarial near-miss negatives, including polarity, quantifier, domain, and hidden-premise mutations. A high similarity score must never substitute for compatibility.
+3. **Measure causal utility, not attribution by anecdote.** Randomize or pair the same eligible targets across no-insight, retrieval-only, typed-insight, and full treatment under identical model/checker/tool/token/time/cost caps. The primary effect remains the difference in exact-target semantic-gate success over the frozen target denominator, with audited connected components as the inferential unit.
+4. **Prove preservation downstream.** Retain exact target statement identity, checker and axiom receipts, two-reviewer statement correspondence, and successor/integration tests. Record raw proof compilation separately from semantically accepted proof outcomes.
+5. **Treat witness synthesis as a different endpoint.** The constructive track should score witness validity, proof obligations, and RPE/formal answer equivalence. Do not blend these into a theorem-pass percentage.
+6. **Optimize the full verified-solve frontier.** Report success against model calls, generated tokens, wall time, checker time, memory and spend. A shorter proof or a lower-cost run is useful only when the semantic and correctness gates remain intact.
+
+### Concrete industry comparison rule
+
+Use external results in three separate ways:
+
+- **Contextual frontier:** publish MiniF2F, PutnamBench, TheoremBench, D-FPS, T² and retrieval results with their own task counts, model versions, pass@k settings, context and budgets. These are contextual references, not a single leaderboard.
+- **Matched local baselines:** rerun the strongest compatible retriever (LeanSearch v2 or a documented equivalent), BM25/lexical, syntax/AST, dependency-graph retrieval, proof-only and no-retrieval arms using the exact PITB targets and caps. If an external service cannot expose deterministic versioning or budgets, label it contextual rather than confirmatory.
+- **Independent replication:** after a clean source/relationship audit, replicate on a later release snapshot or a separately maintained Lean repository. This is the evidence needed to claim generalization beyond the one pinned catalogue.
+
+### Immediate decision — finish the audit before another model experiment
+
+The 30 October code addition makes the next human dependency explicit: `pitb_build_coverage_review_docket_v0.py` generates 744 pending review obligations (two independent passes for each of the 372 frozen families), and the CI workflow checks deterministic regeneration and complete family accounting. It does not discover dependencies, adjudicate edges, authenticate reviewers, or qualify the holdout. The real relationship inventory, independently governed trust root and signed coverage receipt remain absent.
+
+Therefore the next meaningful milestone is not another retrieval arm, schema, or synthetic simulation. It is completing the two real full-universe review passes, preserving their evidence, adjudicating all candidates conservatively, and signing the exact edge payload with independently provisioned reviewer identities. Only after the resulting connected-component manifest has been independently reconciled should the current nine-arm matched-budget pilot proceed.
+
+**Current status remains unchanged scientifically:** no real PITB transfer outcomes, no measured effect, no completed real leakage audit, and no claim to beat state of the art. The latest docket tooling and workflow are committed on the draft PR; no exact-head CI run has been observed.
