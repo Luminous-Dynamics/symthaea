@@ -1,8 +1,10 @@
 //! HARDSEC-005 design-lineage split auditor.
 //!
 //! Audits a strict TSV manifest before hardware-Trojan model training. It verifies
-//! exact source files and enforces the group boundary declared by the split
-//! protocol. It does not parse RTL/netlists, infer Trojan labels, prove semantic
+//! exact evaluated design artifacts (normally the netlist) and enforces the group
+//! boundary declared by the split protocol. Shared upstream RTL ancestry belongs
+//! in the lineage inventory, not in the evaluated-artifact path/hash columns.
+//! It does not parse RTL/netlists, infer Trojan labels, prove semantic
 //! graph similarity, or certify a design.
 //!
 //! cargo run --example hardsec_design_lineage_audit --features hardsec-design-audit -- \
@@ -600,6 +602,7 @@ fn run(args: Args) -> Result<(), String> {
         "lineage_metadata_status": "caller_declared_not_independently_inferred",
         "notes": [
             "Exact source file hashes and the declared split group were checked.",
+            "source_path/source_sha256 bind the evaluated input artifact; upstream parent RTL hashes belong in a separate lineage inventory.",
             "Design-lineage IDs are caller-declared metadata; ancestry is not inferred.",
             "Structural similarity and semantic netlist equivalence were not evaluated.",
             "A pass does not establish detector quality, Trojan absence, or design security.",
