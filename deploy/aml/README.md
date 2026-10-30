@@ -29,8 +29,8 @@ The \`.env\` file is excluded from the Docker build context and must never be co
 ## Build and run
 
 \`\`\`sh
-docker compose -f deploy/aml/compose.yaml build
-docker compose -f deploy/aml/compose.yaml up -d
+docker compose --env-file deploy/aml/.env -f deploy/aml/compose.yaml build
+docker compose --env-file deploy/aml/.env -f deploy/aml/compose.yaml up -d
 docker compose -f deploy/aml/compose.yaml ps
 \`\`\`
 
