@@ -1632,6 +1632,20 @@ mod tests {
     }
 
     #[test]
+    fn counts_invalidated_disposition_as_a_false_invalidation() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][1]["disposition"] = json!("invalidated");
+        receipt_value["records"][1]["reuse_decision"] = json!("reused");
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert_eq!(report.metrics.false_invalidations, 1);
+        assert_eq!(report.metrics.unrelated_evidence_not_retained, 1);
+    }
+
+    #[test]
     fn rejects_cross_run_receipts() {
         let (catalog, oracle, receipts) = fixture_inputs();
         let mut receipt_value: Value =
