@@ -971,6 +971,19 @@ fn run(args: Args) -> Result<(), String> {
     let value: Value = serde_json::from_slice(&packet_bytes)
         .map_err(|error| format!("parse evidence packet JSON: {error}"))?;
     let summary = validate_packet(&value, packet_sha256)?;
+    let byte_integrity = match args.evidence_root.as_deref() {
+        Some(root) => verify_evidence_bytes(root, &summary)?,
+        None => json!({
+            "status": "not_requested",
+            "verified_file_count": 0,
+            "files": []
+        }),
+    };
+    let claim_scope = if args.evidence_root.is_some() {
+        "packet_schema_claim_and_referenced_byte_integrity_only"
+    } else {
+        CLAIM_SCOPE
+    };
     let receipt_path = receipt_target(&args.packet, &args.receipt)?;
 
     let claims = summary
@@ -988,12 +1001,13 @@ fn run(args: Args) -> Result<(), String> {
     let receipt = json!({
         "schema_version": "hardsec-evidence-audit-receipt-v1",
         "result": "pass",
-        "claim_scope": CLAIM_SCOPE,
+        "claim_scope": claim_scope,
         "packet_id": summary.packet_id,
         "evaluation_mode": summary.evaluation_mode,
         "packet_sha256": summary.packet_sha256,
         "design_id": summary.design_id,
         "netlist_sha256": summary.netlist_sha256,
+        "subject_local_path": summary.subject_local_path,
         "model_sha256": summary.model_sha256,
         "evidence_count": summary.evidence_count,
         "evidence": summary.evidence.iter().map(|item| json!({
@@ -1020,11 +1034,12 @@ fn run(args: Args) -> Result<(), String> {
             "bound_cycles": item.bound_cycles
         })).collect::<Vec<_>>(),
         "claims": claims,
+        "byte_integrity": byte_integrity,
         "signature": null,
         "security_verdict": null,
         "notes": [
             "This validates packet schema and internal claim/evidence consistency only.",
-            "Evidence bytes, tool execution, signatures, provenance authenticity and claim truth were not independently verified.",
+            "Tool execution, signatures, upstream provenance authenticity and claim truth were not independently verified.",
             "A supported model_suspects_trojan claim is a model alert, not proof that a Trojan exists.",
             "trigger_not_observed_under_budget is not evidence of unreachability.",
             "bounded_reachability_not_found is limited to its encoded bound and assumptions."
@@ -1053,7 +1068,7 @@ fn run(args: Args) -> Result<(), String> {
     println!("evidence items: {}", summary.evidence_count);
     println!("claims: {}", summary.claims.len());
     println!("receipt: {}", receipt_path.display());
-    println!("claim scope: {}", CLAIM_SCOPE);
+    println!("claim scope: {claim_scope}");
     Ok(())
 }
 
@@ -1067,7 +1082,7 @@ fn main() -> ExitCode {
             }
         },
         Ok(None) => {
-            println!("usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE");
+            println!("usage: hardsec_evidence_packet_audit --packet FILE --receipt NEW_FILE [--evidence-root DIR]");
             ExitCode::SUCCESS
         }
         Err(error) => {
