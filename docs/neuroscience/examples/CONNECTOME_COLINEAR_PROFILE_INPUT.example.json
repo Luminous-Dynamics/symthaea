@@ -10,8 +10,8 @@
   "noise": {
     "radius_nm": 5,
     "tangent_degrees": 5,
-    "membrane_integrity": 1,
-    "synapse_density": 1
+    "membrane_integrity": 0.2,
+    "synapse_density": 0.2
   },
   "tracks": [
     {
