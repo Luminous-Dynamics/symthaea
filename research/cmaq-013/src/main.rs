@@ -90,7 +90,6 @@ impl SplitMix64 {
         z ^ (z >> 31)
     }
     fn unit(&mut self) -> f64 { (self.next_u64() >> 11) as f64 / ((1u64 << 53) as f64) }
-    fn index(&mut self, upper: usize) -> usize { (self.next_u64() % upper as u64) as usize }
 }
 
 fn normal(rng: &mut SplitMix64) -> f64 {
