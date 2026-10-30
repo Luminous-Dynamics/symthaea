@@ -1325,6 +1325,36 @@ mod tests {
     }
 
     #[test]
+    fn add_and_lifecycle_transaction_times_are_strictly_monotonic() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        execute_aml_add(
+            &mut backend,
+            add_request("request-1", "user-1", "session-1", &["first immutable memory event"]),
+        ).unwrap();
+        let first = backend.lookup_existing("request-1").unwrap().unwrap()
+            .stored_at_unix_ms;
+
+        execute_aml_add(
+            &mut backend,
+            add_request("request-2", "user-1", "session-2", &["second immutable memory event"]),
+        ).unwrap();
+        let second = backend.lookup_existing("request-2").unwrap().unwrap()
+            .stored_at_unix_ms;
+        assert!(second > first, "Add transaction time must be strictly increasing");
+
+        let first_id = backend.lookup_existing("request-1").unwrap().unwrap()
+            .records[0].evidence_id.clone();
+        backend.revoke_evidence("revoke-monotonic", &first_id).unwrap();
+        let third: i64 = backend.connection.query_row(
+            "SELECT recorded_at_unix_ms FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+            params!["revoke-monotonic"],
+            |row| row.get(0),
+        ).unwrap();
+        assert!(u64::try_from(third).unwrap() > second);
+    }
+
+    #[test]
     fn schema_v1_add_store_migrates_to_v2_lifecycle_table() {
         let root = tempdir().unwrap();
         let path = root.path().join("v1.sqlite3");
