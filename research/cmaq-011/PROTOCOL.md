@@ -196,6 +196,16 @@ Record query count, simulator calls, probe/intervention count, model forward pas
 
 Never promote an implementation or smoke result to competitive/SOTA.
 
+## Benchmark integrity and evaluator threat model
+
+Every task run must publish an **affordance manifest** alongside the policy/model manifest. Record network access (disabled, allowlisted or unrestricted), exact allowlist, tool affordances, whether task prompts or qualification targets are hidden, whether the agent can write scoring artifacts, and the exact prompt/evaluator/scorer digests. This makes environment differences and potential contamination visible rather than silently assuming all benchmark runs are equivalent.
+
+The environment or an independent evaluator—not the model under test—must verify task outcomes. A result must not rely solely on an agent's self-reported success, a mutable test file, or an exposed score artifact. Where tool use is part of the task, retain the full tool/action transcript and state transitions; require transcript review or a documented risk-triggered audit. Include negative controls for shuffled future observations, action/observation mismatch, scoring-artifact write attempts, and hidden-target access attempts.
+
+This is motivated by documented evaluator failures, not hypothetical only: NIST CAISI reports both solution contamination and grader gaming in agent evaluations, including agents using walkthroughs, bypassing the intended task, and modifying assertions. Its recommendations include held-out checks, preventing agent writes to scoring artifacts, clear affordance specifications, and transcript review. See [NIST CAISI evaluation-cheating examples](https://www.nist.gov/caissi/cheating-ai-agent-evaluations) and [recommended prevention practices](https://www.nist.gov/caissi/4-practices-detecting-and-preventing-evaluation-cheating).
+
+The manifest fields are **declarations**, not enforcement by themselves. The runner must enforce the declared network/tool boundary, mount scoring assets read-only or outside the agent sandbox, and record environment-side receipts. If these controls cannot be established, mark the run exploratory and exclude it from leaderboard claims.
+
 ## Provenance and artifact binding
 
 Every row must bind:
