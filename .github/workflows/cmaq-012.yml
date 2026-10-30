@@ -1,0 +1,123 @@
+name: CMAQ-012 causal world-model advantage benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-model-advantage:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-012
+        run: cargo test --locked
+      - name: Generate report and validate paired causal controls
+        working-directory: research/cmaq-012
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-012-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          assert report["schema_version"] == "cmaq-012-world-model-advantage-v0.1"
+          assert report["episode_count"] == 512
+          assert report["horizon"] == 64
+          assert report["shift_step"] == 32
+          assert report["scenarios"] == [
+              "predictive_signal", "action_invariant", "low_information", "sensor_shift"
+          ]
+          assert report["policies"] == [
+              "direct_controller", "action_blind_placebo",
+              "frozen_calibration_action_model", "calibration_oracle_action_model",
+              "shuffled_action_labels", "hidden_state_oracle"
+          ]
+
+          rows = report["summary"]
+          assert len(rows) == 24
+          by_key = {(row["scenario"], row["policy"]): row for row in rows}
+          assert len(by_key) == 24
+
+          for scenario in report["scenarios"]:
+              for policy in report["policies"]:
+                  row = by_key[(scenario, policy)]
+                  for key in [
+                      "mean_return", "paired_delta_vs_direct", "delta_ci95_low",
+                      "delta_ci95_high", "cvar95_return", "success_rate",
+                      "mean_conditional_regret_per_step", "action_disagreement_rate",
+                      "mean_model_queries_per_episode"
+                  ]:
+                      assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+                  assert 0.0 <= row["success_rate"] <= 1.0
+                  assert 0.0 <= row["action_disagreement_rate"] <= 1.0
+                  assert row["delta_ci95_low"] <= row["paired_delta_vs_direct"] <= row["delta_ci95_high"]
+                  assert row["mean_model_queries_per_episode"] <= 2 * report["horizon"]
+
+          for scenario in report["scenarios"]:
+              direct = by_key[(scenario, "direct_controller")]
+              placebo = by_key[(scenario, "action_blind_placebo")]
+              assert abs(placebo["paired_delta_vs_direct"]) < 1e-10
+              assert placebo["mean_model_queries_per_episode"] == 2 * report["horizon"]
+              assert direct["mean_model_queries_per_episode"] == 0.0
+
+          predictive = "predictive_signal"
+          useful = by_key[(predictive, "frozen_calibration_action_model")]
+          shuffled = by_key[(predictive, "shuffled_action_labels")]
+          assert useful["paired_delta_vs_direct"] > 0.0
+          assert useful["delta_ci95_low"] > 0.0
+          assert shuffled["paired_delta_vs_direct"] < useful["paired_delta_vs_direct"]
+
+          invariant = by_key[("action_invariant", "frozen_calibration_action_model")]
+          assert abs(invariant["paired_delta_vs_direct"]) < 1e-10
+
+          low_info = by_key[("low_information", "frozen_calibration_action_model")]
+          low_info_calibrated = by_key[("low_information", "calibration_oracle_action_model")]
+          assert low_info["paired_delta_vs_direct"] < 0.0
+          assert abs(low_info_calibrated["paired_delta_vs_direct"]) < 1e-10
+
+          shifted = by_key[("sensor_shift", "frozen_calibration_action_model")]
+          shifted_calibrated = by_key[("sensor_shift", "calibration_oracle_action_model")]
+          assert shifted["paired_delta_vs_direct"] < 0.0
+          assert shifted_calibrated["paired_delta_vs_direct"] > 0.0
+
+          print("CMAQ-012 paired causal-attribution schema and negative controls validated")
+          print(json.dumps({
+              scenario: {
+                  policy: {
+                      "mean_return": by_key[(scenario, policy)]["mean_return"],
+                      "delta_vs_direct": by_key[(scenario, policy)]["paired_delta_vs_direct"],
+                      "delta_ci95": [
+                          by_key[(scenario, policy)]["delta_ci95_low"],
+                          by_key[(scenario, policy)]["delta_ci95_high"]
+                      ],
+                      "cvar95_return": by_key[(scenario, policy)]["cvar95_return"],
+                      "queries_per_episode": by_key[(scenario, policy)]["mean_model_queries_per_episode"],
+                      "prediction_mae": by_key[(scenario, policy)]["mean_prediction_mae"],
+                      "rank_accuracy": by_key[(scenario, policy)]["action_rank_accuracy"]
+                  }
+                  for policy in [
+                      "direct_controller", "frozen_calibration_action_model",
+                      "calibration_oracle_action_model", "shuffled_action_labels",
+                      "hidden_state_oracle"
+                  ]
+              }
+              for scenario in report["scenarios"]
+          }, sort_keys=True))
+          PY
