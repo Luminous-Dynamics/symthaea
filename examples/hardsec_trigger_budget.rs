@@ -6,7 +6,9 @@
 //!     P(no activation in N trials) = (1 - p)^N
 //!
 //! This is a sampling-budget calculator, not a trigger-probability estimator,
-//! formal reachability checker, or proof of Trojan absence. The IID assumption
+//! formal reachability checker, or proof of Trojan absence. It helps select a
+//! finite stimulus budget before simulation; it cannot certify that a trigger
+//! is reachable or unreachable. The IID assumption
 //! must be stated and justified by the experiment.
 //!
 //! Example:
