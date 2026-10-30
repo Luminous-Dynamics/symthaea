@@ -59,6 +59,7 @@ struct RankingInput {
 #[derive(Debug, Deserialize)]
 struct SpatialFrameReport {
     schema_version: u32,
+    input_sha256: String,
     canonical_frame_sha256: String,
     population_frame_sha256: String,
     eligibility_mask_sha256: String,
@@ -79,6 +80,7 @@ struct AuditInput {
     source_ranking_report_sha256: String,
     sampling_protocol_sha256: String,
     source_spatial_frame_report_sha256: String,
+    source_spatial_frame_input_sha256: String,
     source_spatial_frame_sha256: String,
     source_population_frame_sha256: String,
     sample_seed: String,
@@ -181,6 +183,7 @@ struct AuditReport {
     ranking_report_sha256: String,
     sampling_protocol_sha256: String,
     spatial_frame_report_sha256: String,
+    spatial_frame_input_sha256: String,
     spatial_frame_sha256: String,
     sampling_frame_sha256: String,
     audit_input_sha256: String,
@@ -255,6 +258,7 @@ fn validate_spatial_frame_binding(
         return Err("spatial frame report must be schema v1 with status PASS".into());
     }
     if !is_lower_hex(spatial_report_hash, 64)
+        || !is_lower_hex(&spatial_report.input_sha256, 64)
         || !is_lower_hex(&spatial_report.canonical_frame_sha256, 64)
         || !is_lower_hex(&spatial_report.population_frame_sha256, 64)
         || !is_lower_hex(&spatial_report.eligibility_mask_sha256, 64)
@@ -268,6 +272,9 @@ fn validate_spatial_frame_binding(
     }
     if audit.source_spatial_frame_report_sha256 != spatial_report_hash {
         return Err("coverage audit spatial-frame report digest does not match exact report bytes".into());
+    }
+    if audit.source_spatial_frame_input_sha256 != spatial_report.input_sha256 {
+        return Err("coverage audit spatial-frame input digest does not match the exact frame manifest".into());
     }
     if audit.source_spatial_frame_sha256 != spatial_report.canonical_frame_sha256 {
         return Err("coverage audit spatial-frame digest does not match the audited lattice frame".into());
@@ -393,6 +400,7 @@ fn validate(
         || !is_lower_hex(ranking_hash, 64)
         || !is_lower_hex(protocol_hash, 64)
         || !is_lower_hex(&audit.source_spatial_frame_report_sha256, 64)
+        || !is_lower_hex(&audit.source_spatial_frame_input_sha256, 64)
         || !is_lower_hex(&audit.source_spatial_frame_sha256, 64)
         || !is_lower_hex(&audit.source_population_frame_sha256, 64)
         || !is_lower_hex(&audit.sample_seed_commitment_sha256, 64)
@@ -909,6 +917,7 @@ fn evaluate(
         ranking_report_sha256: ranking_hash,
         sampling_protocol_sha256: protocol_hash,
         spatial_frame_report_sha256: audit.source_spatial_frame_report_sha256.clone(),
+        spatial_frame_input_sha256: audit.source_spatial_frame_input_sha256.clone(),
         spatial_frame_sha256: audit.source_spatial_frame_sha256.clone(),
         sampling_frame_sha256: frame_sha256(&audit.population_frame),
         audit_input_sha256: audit_hash,
@@ -1035,6 +1044,7 @@ mod tests {
             source_ranking_report_sha256: ranking_hash.clone(),
             sampling_protocol_sha256: protocol_hash.clone(),
             source_spatial_frame_report_sha256: "1".repeat(64),
+            source_spatial_frame_input_sha256: "7".repeat(64),
             source_spatial_frame_sha256: "2".repeat(64),
             source_population_frame_sha256: population_frame_digest,
             sample_seed_commitment_sha256: sha256(seed.as_bytes()),
@@ -1103,6 +1113,7 @@ mod tests {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
         let report = SpatialFrameReport {
             schema_version: 1,
+            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
             eligibility_mask_sha256: "3".repeat(64),
@@ -1126,6 +1137,7 @@ mod tests {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
         let report = SpatialFrameReport {
             schema_version: 1,
+            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
             eligibility_mask_sha256: "3".repeat(64),
@@ -1148,6 +1160,7 @@ mod tests {
         population_frame[0].stratum_id = "tampered-stratum".into();
         let report = SpatialFrameReport {
             schema_version: 1,
+            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
             eligibility_mask_sha256: "3".repeat(64),
@@ -1171,6 +1184,7 @@ mod tests {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
         let report = SpatialFrameReport {
             schema_version: 1,
+            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
             eligibility_mask_sha256: "3".repeat(64),
