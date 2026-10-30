@@ -48,8 +48,8 @@ The cost ratio is planned renders divided by exhaustive renders. Pair counts des
 
 ## Known-answer fixtures authored
 
-1. **Sparse pair case:** eight events; only events 0 and 1 interact through a quadratic shared processor. Their synthetic acoustic supports overlap; all other supports are disjoint. The expected result is one true pair found, no candidate false positives, candidate precision/recall 1.0, and 10 planned renders versus 37 exhaustive pairwise renders (10/37 ≈ 27.0%). These are asserted source-level expectations, not executed results.
-2. **Higher-order blind spot:** three non-overlapping events with a pure third-order product. Pairwise truth is empty, while one higher-order interaction remains. The report must expose this instead of awarding pairwise recall or hiding it.
+1. **Sparse pair case:** eight events; only events 0 and 1 interact through a quadratic shared processor. Their nonzero source samples exactly match their overlapping synthetic acoustic supports; all other event supports are disjoint. The expected result is one true pair found, no candidate false positives, candidate precision/recall 1.0, and 10 planned renders versus 37 exhaustive pairwise renders (10/37 ≈ 27.0%). These are asserted source-level expectations, not executed results.
+2. **Higher-order blind spot:** three co-supported events with a pure third-order product. Every pair overlaps in time, but no order-2 PCM dividend exists; the three-way dividend is nonzero. The planner therefore proposes pair probes that do not reveal the true third-order effect. The report exposes this structural limitation rather than awarding pairwise recall or hiding it.
 3. **Receipt hard negative:** changing a report count without recomputing the receipt must be rejected.
 
 ## Proposed benchmark targets — not achieved results
