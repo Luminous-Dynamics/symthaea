@@ -4,7 +4,7 @@
   "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "detector": {
     "half_window_samples": 4,
-    "score_threshold": 4,
+    "score_threshold": 2.5,
     "min_separation_nm": 400
   },
   "noise": {
