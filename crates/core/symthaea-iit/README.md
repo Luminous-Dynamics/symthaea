@@ -95,7 +95,11 @@ are duplicated, external-background variables are shared, and the original
 system observation likelihood is normalized before the target-wise cause
 factors are multiplied. Zero likelihoods remain exact negative-infinity log
 weights. All local and intermediate factor tables, plus the returned candidate
-state vector, are checked against the explicit factor-entry budget.
+state vector, are checked against the explicit factor-entry budget. Each result
+also exposes a deterministic receipt that binds the sparse model identity,
+observed state, candidate-system order, algorithm version, factor-entry budget,
+likelihood vector, and elimination telemetry. This is an integrity receipt,
+not a proof of the model's scientific validity.
 
 This is an independently usable Eq. 4 primitive, **not yet the complete
 Integration-level phi_s search path**. The main system search still uses the
