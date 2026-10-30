@@ -139,6 +139,9 @@ struct StratumEstimate {
 
 #[derive(Debug, Serialize)]
 struct FamilyCoverage {
+    sampled_error_count: usize,
+    sampled_covered_error_count: usize,
+    sampled_uncovered_error_count: usize,
     estimated_total_errors: Estimate,
     estimated_covered_errors: Estimate,
     estimated_uncovered_errors: Estimate,
@@ -494,14 +497,18 @@ fn estimate(values: &[f64], population_psus: usize) -> Result<Estimate, String> 
     }
     let scale = population_psus as f64 / sample_psus as f64;
     let total = scale * values.iter().sum::<f64>();
-    let variance = if sample_psus == population_psus {
-        0.0
+    let (variance, residual_sample_variance) = if sample_psus == population_psus {
+        (0.0, None)
     } else {
         let sampling_fraction = sample_psus as f64 / population_psus as f64;
-        (population_psus as f64).powi(2)
-            * (1.0 - sampling_fraction)
-            * sample_variance(values)?
-            / sample_psus as f64
+        let sample_var = sample_variance(values)?;
+        (
+            (population_psus as f64).powi(2)
+                * (1.0 - sampling_fraction)
+                * sample_var
+                / sample_psus as f64,
+            Some(sample_var),
+        )
     };
     if !total.is_finite() || !variance.is_finite() || variance < 0.0 {
         return Err("Horvitz-Thompson estimate or design variance is non-finite".into());
@@ -509,7 +516,7 @@ fn estimate(values: &[f64], population_psus: usize) -> Result<Estimate, String> 
     let standard_error = variance.sqrt();
     let normal_approx_95_interval = if sample_psus == population_psus {
         Some([total, total])
-    } else if sample_psus >= 30 {
+    } else if sample_psus >= 30 && residual_sample_variance.is_some_and(|value| value > 0.0) {
         Some([total - 1.96 * standard_error, total + 1.96 * standard_error])
     } else {
         None
@@ -606,10 +613,14 @@ where
                 numerator_metric(&outcomes[psu_id]) - ratio * denominator_metric(&outcomes[psu_id])
             })
             .collect();
+        let residual_sample_variance = sample_variance(&residuals)?;
+        if residual_sample_variance == 0.0 {
+            interval_available = false;
+        }
         let sampling_fraction = sample_psus as f64 / population_psus as f64;
         ratio_variance_numerator += (population_psus as f64).powi(2)
             * (1.0 - sampling_fraction)
-            * sample_variance(&residuals)?
+            * residual_sample_variance
             / sample_psus as f64;
     }
 
@@ -758,6 +769,23 @@ fn evaluate(
                 error.error_family == family && error.proposal_candidate_ids.is_empty()
             }).map(|error| error.impact_weight).sum::<f64>()
         };
+        let mut sampled_family_error_count = 0usize;
+        let mut sampled_family_covered_count = 0usize;
+        let mut sampled_family_uncovered_count = 0usize;
+        for sampled_psus in selected.values() {
+            for psu_id in sampled_psus {
+                for error in &outcomes[psu_id].errors {
+                    if error.error_family == family {
+                        sampled_family_error_count += 1;
+                        if error.proposal_candidate_ids.is_empty() {
+                            sampled_family_uncovered_count += 1;
+                        } else {
+                            sampled_family_covered_count += 1;
+                        }
+                    }
+                }
+            }
+        }
 
         let (family_total, _) = estimate_metric(&plans, frame, outcomes, selected, family_count)?;
         let (family_covered_total, _) = estimate_metric(&plans, frame, outcomes, selected, family_covered)?;
@@ -773,6 +801,9 @@ fn evaluate(
         )?;
 
         error_family_coverage.insert(family.clone(), FamilyCoverage {
+            sampled_error_count: sampled_family_error_count,
+            sampled_covered_error_count: sampled_family_covered_count,
+            sampled_uncovered_error_count: sampled_family_uncovered_count,
             estimated_total_errors: family_total,
             estimated_covered_errors: family_covered_total,
             estimated_uncovered_errors: family_uncovered_total,
@@ -789,7 +820,7 @@ fn evaluate(
         "Estimates cover only the complete, declared finite search frame; they are not whole-connectome recall.".to_string(),
         "Exhaustive-search attestations and proposal-to-error coverage mappings require independent human protocol enforcement.".to_string(),
         "Audit-panel person-minutes are separate from normal review-queue effort and must be included in all-in cost.".to_string(),
-        "Ratio confidence intervals use first-order Taylor linearization and are withheld when any non-census stratum has fewer than 30 sampled PSUs.".to_string(),
+        "Normal-approximation intervals are withheld for non-census estimates when any stratum has fewer than 30 sampled PSUs or zero observed sample variance; zero sample variance is not evidence of no unseen rare errors.".to_string(),
         "Audit outcomes, sampled locations, uncovered-error identities, and impact weights must remain unavailable to proposal generation and ranking.".to_string(),
     ];
 
@@ -1067,6 +1098,49 @@ mod tests {
     }
 
     #[test]
+    fn zero_variance_non_census_total_withholds_a_zero_width_interval() {
+        let values = vec![0.0; 30];
+        let estimate = estimate(&values, 40).unwrap();
+        assert_eq!(estimate.total, 0.0);
+        assert_eq!(estimate.design_variance, 0.0);
+        assert_eq!(estimate.normal_approx_95_interval, None);
+    }
+
+    #[test]
+    fn ratio_interval_is_withheld_when_sampled_psu_residuals_have_zero_variance() {
+        let plan = vec![StratumPlan { stratum_id: "s".into(), sampled_psu_count: 30 }];
+        let frame = BTreeMap::from([(
+            "s".into(),
+            (0..40).map(|index| format!("psu-{index}")).collect::<Vec<_>>(),
+        )]);
+        let selected_ids: BTreeSet<String> = (0..30).map(|index| format!("psu-{index}")).collect();
+        let selected = BTreeMap::from([("s".into(), selected_ids.clone())]);
+        let outcomes: BTreeMap<String, SampledPsuOutcome> = selected_ids
+            .into_iter()
+            .map(|psu_id| (
+                psu_id.clone(),
+                SampledPsuOutcome {
+                    psu_id,
+                    exhaustive_search_completed: true,
+                    audit_panel_person_minutes: 1.0,
+                    errors: vec![],
+                },
+            ))
+            .collect();
+        let ratio = ratio_estimate(
+            &plan,
+            &frame,
+            &outcomes,
+            &selected,
+            |_| 1.0,
+            |_| 1.0,
+        ).unwrap();
+        assert_eq!(ratio.ratio, Some(1.0));
+        assert_eq!(ratio.delta_method_design_variance, Some(0.0));
+        assert_eq!(ratio.normal_approx_95_interval, None);
+    }
+
+    #[test]
     fn horvitz_thompson_total_is_exactly_unbiased_over_all_two_of_three_samples() {
         let population_total = 1.0 + 2.0 + 3.0;
         let samples = [vec![1.0, 2.0], vec![1.0, 3.0], vec![2.0, 3.0]];
@@ -1210,6 +1284,9 @@ mod tests {
             proposal, ranking_hash, protocol, "audit".into(),
         ).unwrap();
         let rare = &report.error_family_coverage["axon_fragment"];
+        assert_eq!(rare.sampled_error_count, 0);
+        assert_eq!(rare.sampled_covered_error_count, 0);
+        assert_eq!(rare.sampled_uncovered_error_count, 0);
         assert_eq!(rare.estimated_total_errors.total, 0.0);
         assert_eq!(rare.candidate_generation_recall.ratio, None);
     }
