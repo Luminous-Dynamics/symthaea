@@ -82,6 +82,8 @@ struct PopulationUnit {
 struct SampledOutcome {
     candidate_id: String,
     adjudication: Adjudication,
+    /// Sum of measured person-minutes for all independent audit-panel work on this item.
+    audit_panel_person_minutes: f64,
     /// Signed reduction in the preregistered normalized query-error objective if
     /// the proposed mutation were applied against the independent reference.
     /// Positive is beneficial; negative is harmful. Null only for indeterminate.
@@ -104,6 +106,7 @@ struct ClusterTotals {
     positive_opportunity: f64,
     negative_harm: f64,
     signed_net_reduction: f64,
+    audit_panel_person_minutes: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -128,6 +131,7 @@ struct StratumEstimate {
     estimated_positive_query_opportunity_mass: Estimate,
     estimated_negative_query_harm_mass: Estimate,
     estimated_signed_net_query_error_reduction: Estimate,
+    estimated_audit_panel_person_minutes: Estimate,
 }
 
 #[derive(Debug, Serialize)]
@@ -137,6 +141,7 @@ struct AuditReport {
     proposal_input_sha256: String,
     sampling_protocol_sha256: String,
     sampling_frame_sha256: String,
+    sampling_audit_input_sha256: String,
     sampled_outcomes_sha256: String,
     sample_seed_commitment_sha256: String,
     candidate_count: usize,
@@ -363,6 +368,9 @@ fn validate(
                 outcome.candidate_id
             ));
         }
+        if !outcome.audit_panel_person_minutes.is_finite() || outcome.audit_panel_person_minutes <= 0.0 {
+            return Err(format!("candidate {} has invalid audit_panel_person_minutes", outcome.candidate_id));
+        }
         if let Some(value) = outcome.signed_query_error_reduction_if_applied {
             if !value.is_finite() {
                 return Err(format!("candidate {} has non-finite query-error reduction", outcome.candidate_id));
@@ -469,6 +477,7 @@ fn evaluate(
     proposal_hash: String,
     protocol_hash: String,
     frame_hash: String,
+    audit_input_hash: String,
     outcomes_hash: String,
 ) -> AuditReport {
     let mut stratum_estimates = Vec::new();
@@ -510,23 +519,25 @@ fn evaluate(
                     }
                     totals.signed_net_reduction += delta;
                 }
+                totals.audit_panel_person_minutes += outcome.audit_panel_person_minutes;
             }
             cluster_values.push(totals);
         }
 
-        let fields: [Vec<f64>; 6] = [
+        let fields: [Vec<f64>; 7] = [
             cluster_values.iter().map(|v| v.correct).collect(),
             cluster_values.iter().map(|v| v.incorrect).collect(),
             cluster_values.iter().map(|v| v.indeterminate).collect(),
             cluster_values.iter().map(|v| v.positive_opportunity).collect(),
             cluster_values.iter().map(|v| v.negative_harm).collect(),
             cluster_values.iter().map(|v| v.signed_net_reduction).collect(),
+            cluster_values.iter().map(|v| v.audit_panel_person_minutes).collect(),
         ];
-        let estimates: [Estimate; 6] = std::array::from_fn(|index| {
+        let estimates: [Estimate; 7] = std::array::from_fn(|index| {
             estimate(&fields[index], population_clusters)
         });
 
-        for index in 0..6 {
+        for index in 0..7 {
             global_estimates[index].push(Estimate {
                 total: estimates[index].total,
                 design_variance: estimates[index].design_variance,
@@ -555,6 +566,7 @@ fn evaluate(
             estimated_positive_query_opportunity_mass: estimates[3].clone(),
             estimated_negative_query_harm_mass: estimates[4].clone(),
             estimated_signed_net_query_error_reduction: estimates[5].clone(),
+            estimated_audit_panel_person_minutes: estimates[6].clone(),
         });
 
         population_cluster_count += population_clusters;
@@ -595,6 +607,7 @@ fn evaluate(
         proposal_input_sha256: proposal_hash,
         sampling_protocol_sha256: protocol_hash,
         sampling_frame_sha256: frame_hash,
+        sampling_audit_input_sha256: audit_input_hash,
         sampled_outcomes_sha256: outcomes_hash,
         sample_seed_commitment_sha256: audit.sample_seed_commitment_sha256.clone(),
         candidate_count: proposals.candidates.len(),
@@ -739,6 +752,7 @@ mod tests {
                     audit.sampled_outcomes.push(SampledOutcome {
                         candidate_id: candidate_id.clone(),
                         adjudication,
+                        audit_panel_person_minutes: 4.0,
                         signed_query_error_reduction_if_applied: match adjudication {
                             Adjudication::Indeterminate => None,
                             Adjudication::Correct => Some(0.2),
@@ -898,6 +912,7 @@ mod tests {
         assert_eq!(report.status,"DESIGN_BASED_CLUSTER_AUDIT_ESTIMATED");
         assert!(report.estimated_incorrect_candidate_fraction.total >= 0.0);
         assert_eq!(report.strata.len(),2);
+        assert!(report.strata.iter().all(|row| row.estimated_audit_panel_person_minutes.total > 0.0));
     }
 
     #[test]
@@ -921,6 +936,7 @@ mod tests {
                 for id in &frame[sid].clusters[cluster] {
                     audit.sampled_outcomes.push(SampledOutcome {
                         candidate_id:id.clone(),adjudication:Adjudication::Correct,
+                        audit_panel_person_minutes: 3.0,
                         signed_query_error_reduction_if_applied:Some(0.1)
                     });
                 }
