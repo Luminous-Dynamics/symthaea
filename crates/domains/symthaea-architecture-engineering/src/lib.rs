@@ -16,6 +16,7 @@ pub mod multi_fidelity;
 pub mod multi_fidelity_benchmark;
 pub mod analytical_benchmark;
 pub mod direction_board;
+pub mod direction_board_benchmark;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
