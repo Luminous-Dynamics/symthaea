@@ -258,18 +258,18 @@ fn vote_counts<T: Copy + Ord>(
     counts
 }
 
-/// Pair-count-weighted nominal Krippendorff alpha.
+/// Nominal Krippendorff alpha using the finite-sample coincidence formulation.
 ///
-/// Observed disagreement is the proportion of disagreeing within-candidate unordered
-/// rater pairs. Expected disagreement is the proportion of disagreeing pairs among
-/// all pooled ratings. Ties/abstentions remain categories; missing ratings are not
-/// imputed. Alpha is not estimable when chance disagreement is zero.
+/// For candidate i with n_i ratings and d_i disagreeing unordered pairs,
+/// Do = sum_i(2*d_i/(n_i-1)) / N. For N pooled ratings and D disagreeing
+/// unordered pairs across the pooled category counts, De = 2*D/(N*(N-1)).
+/// Ties/abstentions remain categories; missing ratings are not imputed.
 fn nominal_alpha(units: &[Vec<String>]) -> ReliabilityMetrics {
     let mut pooled = BTreeMap::<String, usize>::new();
     let mut rating_count = 0usize;
     let mut rated_candidate_count = 0usize;
     let mut candidate_pair_count = 0usize;
-    let mut observed_disagreeing_pairs = 0usize;
+    let mut observed_disagreement_sum = 0.0f64;
 
     for unit in units {
         if unit.len() < 2 {
@@ -285,11 +285,14 @@ fn nominal_alpha(units: &[Vec<String>]) -> ReliabilityMetrics {
             *pooled.entry(label.clone()).or_default() += 1;
         }
         let local_counts: Vec<usize> = local.values().copied().collect();
+        let mut local_disagreeing_pairs = 0usize;
         for left in 0..local_counts.len() {
             for right in (left + 1)..local_counts.len() {
-                observed_disagreeing_pairs += local_counts[left] * local_counts[right];
+                local_disagreeing_pairs += local_counts[left] * local_counts[right];
             }
         }
+        observed_disagreement_sum +=
+            2.0 * local_disagreeing_pairs as f64 / (unit.len() - 1) as f64;
     }
 
     let mut pooled_disagreeing_pairs = 0usize;
@@ -300,11 +303,12 @@ fn nominal_alpha(units: &[Vec<String>]) -> ReliabilityMetrics {
         }
     }
 
-    let observed = (candidate_pair_count > 0)
-        .then_some(observed_disagreeing_pairs as f64 / candidate_pair_count as f64);
+    let observed = (rating_count > 0).then_some(observed_disagreement_sum / rating_count as f64);
     let pooled_pair_count = rating_count * rating_count.saturating_sub(1) / 2;
-    let expected = (pooled_pair_count > 0)
-        .then_some(pooled_disagreeing_pairs as f64 / pooled_pair_count as f64);
+    let expected = (pooled_pair_count > 0).then_some(
+        2.0 * pooled_disagreeing_pairs as f64
+            / (rating_count * rating_count.saturating_sub(1)) as f64,
+    );
     let alpha = match (observed, expected) {
         (Some(do_value), Some(de_value)) if de_value > f64::EPSILON => {
             Some(1.0 - do_value / de_value)
@@ -844,6 +848,19 @@ mod tests {
         ];
         let metrics = nominal_alpha(&units);
         assert_eq!(metrics.nominal_krippendorff_alpha, Some(1.0));
+    }
+
+
+    #[test]
+    fn nominal_alpha_uses_finite_sample_correction_for_unequal_panel_sizes() {
+        let units = vec![
+            vec!["a".into(), "a".into()],
+            vec!["a".into(), "b".into(), "b".into()],
+        ];
+        let metrics = nominal_alpha(&units);
+        assert!((metrics.nominal_krippendorff_alpha.unwrap() - (1.0 / 3.0)).abs() < 1e-12);
+        assert!((metrics.observed_pairwise_disagreement.unwrap() - 0.4).abs() < 1e-12);
+        assert!((metrics.expected_pairwise_disagreement.unwrap() - 0.6).abs() < 1e-12);
     }
 
     #[test]
