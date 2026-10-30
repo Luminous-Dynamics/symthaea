@@ -179,7 +179,7 @@ Never promote an answer just because the budget expired.
 
 POAR measures whether proof-aware scheduling achieves better correctness/resource trade-offs than generic adaptive reasoning. It is a custom benchmark, not a substitute for LongCoT, GRACE, or official memory benchmarks.
 
-The research crate now includes a public deterministic POAR-v1 conformance runner with 16 fixtures. It checks expected scheduler choices and one receipt lifecycle (valid promotion, later revocation, stale replay rejection). This is a contract smoke suite, not an evaluation of a learned model, not a hidden-label benchmark, and not an independent proof verifier. The confirmatory benchmark still requires separate hidden source-truth labels, held-out source/rule families, independently implemented evaluators, and matched baselines.
+The research crate now includes a public deterministic POAR-v1 conformance runner with 16 fixtures. Fifteen fixtures assert routing/stopping choices for synthetic obligation states; one exercises a receipt lifecycle (valid promotion, later revocation, stale replay rejection). Fixture names describe the decision pattern, not a full simulation of bitemporal storage, proof-graph cascade, source-independence analysis, or long-dependency reasoning. This is a contract smoke suite, not an evaluation of a learned model, not a hidden-label benchmark, and not an independent proof verifier. The confirmatory benchmark still requires separate hidden source-truth labels, held-out source/rule families, independently implemented evaluators, and matched baselines.
 
 ### Deterministic task families
 
