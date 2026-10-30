@@ -1,0 +1,181 @@
+{
+  "schema_version": "qarch-016-cluster-null-stress/1",
+  "record_id": "QARCH-016-ICC-NULL-STRESS-10x10-10000",
+  "evidence_class": "synthetic_monte_carlo",
+  "claim_ceiling": "method_diagnostic_for_declared_exchangeable_null_only",
+  "protocol": {
+    "independent_clusters": 10,
+    "instances_per_cluster": 10,
+    "replicates_per_icc_cell": 10000,
+    "significance_level_one_sided": 0.05,
+    "seed_hex": "0x00516016",
+    "prng": "Mulberry32-compatible 32-bit wraparound generator",
+    "icc_grid": [
+      0,
+      0.05,
+      0.15,
+      0.3,
+      0.6,
+      1
+    ],
+    "latent_cluster_probability": "p_j = 0.5 +/- 0.5*sqrt(ICC), with the two signs selected equiprobably and independently per cluster",
+    "conditional_instance_model": "Bernoulli(p_j) within cluster; clusters independent; marginal win probability is 0.5 and within-cluster Bernoulli ICC equals the configured value",
+    "signed_effect_magnitude": "Uniform(0.5, 1.5), independent of sign, to avoid deterministic median ties",
+    "naive_method": "Exact one-sided sign test on all 100 instance-level signs as if independent",
+    "cluster_method": "Take the median signed effect within each family, then exact one-sided sign test across 10 independent family medians",
+    "monte_carlo_interval": "95% Wilson score interval for empirical rejection proportion",
+    "family_reduction": "Sort signed continuous effects within each family and use their median; for even family sizes, the median is the arithmetic mean of the two central signed effects.",
+    "random_draw_order": "For each instance, draw its Bernoulli sign and then draw its independent Uniform(0.5, 1.5) magnitude before proceeding to the next instance."
+  },
+  "results": [
+    {
+      "icc": 0,
+      "replicates": 10000,
+      "naive_rejections": 473,
+      "naive_type_i_rate": 0.0473,
+      "naive_wilson_95": {
+        "lower": 0.0433103968,
+        "upper": 0.0516372753
+      },
+      "cluster_rejections": 119,
+      "cluster_type_i_rate": 0.0119,
+      "cluster_wilson_95": {
+        "lower": 0.0099542788,
+        "upper": 0.0142205804
+      }
+    },
+    {
+      "icc": 0.05,
+      "replicates": 10000,
+      "naive_rejections": 849,
+      "naive_type_i_rate": 0.0849,
+      "naive_wilson_95": {
+        "lower": 0.0795950583,
+        "upper": 0.0905237371
+      },
+      "cluster_rejections": 120,
+      "cluster_type_i_rate": 0.012,
+      "cluster_wilson_95": {
+        "lower": 0.0100454761,
+        "upper": 0.0143293063
+      }
+    },
+    {
+      "icc": 0.15,
+      "replicates": 10000,
+      "naive_rejections": 1373,
+      "naive_type_i_rate": 0.1373,
+      "naive_wilson_95": {
+        "lower": 0.1306936473,
+        "upper": 0.1441849051
+      },
+      "cluster_rejections": 110,
+      "cluster_type_i_rate": 0.011,
+      "cluster_wilson_95": {
+        "lower": 0.00913527,
+        "upper": 0.0132402805
+      }
+    },
+    {
+      "icc": 0.3,
+      "replicates": 10000,
+      "naive_rejections": 1913,
+      "naive_type_i_rate": 0.1913,
+      "naive_wilson_95": {
+        "lower": 0.1837100868,
+        "upper": 0.1991269938
+      },
+      "cluster_rejections": 103,
+      "cluster_type_i_rate": 0.0103,
+      "cluster_wilson_95": {
+        "lower": 0.0085006323,
+        "upper": 0.0124754557
+      }
+    },
+    {
+      "icc": 0.6,
+      "replicates": 10000,
+      "naive_rejections": 2542,
+      "naive_type_i_rate": 0.2542,
+      "naive_wilson_95": {
+        "lower": 0.2457616131,
+        "upper": 0.2628271605
+      },
+      "cluster_rejections": 105,
+      "cluster_type_i_rate": 0.0105,
+      "cluster_wilson_95": {
+        "lower": 0.0086817322,
+        "upper": 0.0126942022
+      }
+    },
+    {
+      "icc": 1,
+      "replicates": 10000,
+      "naive_rejections": 3714,
+      "naive_type_i_rate": 0.3714,
+      "naive_wilson_95": {
+        "lower": 0.3619809356,
+        "upper": 0.3809178288
+      },
+      "cluster_rejections": 103,
+      "cluster_type_i_rate": 0.0103,
+      "cluster_wilson_95": {
+        "lower": 0.0085006323,
+        "upper": 0.0124754557
+      }
+    }
+  ],
+  "exact_perfect_dependence_enumeration": [
+    {
+      "independent_clusters": 5,
+      "instances_per_cluster": 10,
+      "total_instances": 50,
+      "naive_critical_positive_clusters": 4,
+      "naive_exact_type_i": 0.1875,
+      "cluster_critical_positive_clusters": 5,
+      "cluster_exact_type_i": 0.03125,
+      "null_family_sign_patterns": 32
+    },
+    {
+      "independent_clusters": 10,
+      "instances_per_cluster": 10,
+      "total_instances": 100,
+      "naive_critical_positive_clusters": 6,
+      "naive_exact_type_i": 0.376953125,
+      "cluster_critical_positive_clusters": 9,
+      "cluster_exact_type_i": 0.0107421875,
+      "null_family_sign_patterns": 1024
+    },
+    {
+      "independent_clusters": 20,
+      "instances_per_cluster": 10,
+      "total_instances": 200,
+      "naive_critical_positive_clusters": 12,
+      "naive_exact_type_i": 0.2517223358154297,
+      "cluster_critical_positive_clusters": 15,
+      "cluster_exact_type_i": 0.020694732666015625,
+      "null_family_sign_patterns": 1048576
+    },
+    {
+      "independent_clusters": 30,
+      "instances_per_cluster": 10,
+      "total_instances": 300,
+      "naive_critical_positive_clusters": 17,
+      "naive_exact_type_i": 0.292332355864346,
+      "cluster_critical_positive_clusters": 20,
+      "cluster_exact_type_i": 0.04936857335269451,
+      "null_family_sign_patterns": 1073741824
+    }
+  ],
+  "interpretation": {
+    "main_finding": "Using the specified cluster-median reduction, the naive instance-level sign test becomes increasingly anti-conservative as within-family dependence increases under this declared null model. The cluster-median test remains below 5% in every tested ICC cell.",
+    "discreteness": "At 10 independent clusters, a one-sided exact sign test rejects at alpha=0.05 only with at least 9 cluster wins; its attainable type-I error is 11/1024 (about 1.07%), so the cluster result is deliberately conservative and may have low power.",
+    "limitations": [
+      "Only one balanced cluster-size design is used in the Monte Carlo ICC sweep",
+      "The exchangeable two-point latent-probability model is not a universal model of benchmark dependence",
+      "No power analysis, heterogeneous treatment effects or missingness stress is included here",
+      "Simulation does not validate independence or representativeness of a real quantum benchmark suite",
+      "The frozen results use the exact signed-magnitude median reduction, including the sign of the mean of the two central values for even cluster sizes; a count-majority-only implementation will not reproduce the fixture."
+    ]
+  }
+}

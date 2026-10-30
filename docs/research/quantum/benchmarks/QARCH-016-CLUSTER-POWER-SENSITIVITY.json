@@ -1,0 +1,260 @@
+{
+  "schema_version": "qarch-016-cluster-power/1",
+  "record_id": "QARCH-016-JOINT-SIGN-POWER-80PCT",
+  "evidence_class": "exact_analytic_power_calculation",
+  "design": {
+    "alpha_per_claim": 0.05,
+    "desired_joint_power": 0.8,
+    "minimum_independent_clusters": 2,
+    "maximum_independent_clusters": 1000,
+    "joint_power_lower_bound": "max(0, quality_component_power + resource_component_power - 1)",
+    "quality_resource_dependence_assumption": "no independence assumption; Frechet/union lower bound",
+    "family_win_probability_definition": "Probability that an independent workload family’s preregistered within-family median clears the relevant quality or practical-resource margin. This is a family-level probability, not an instance-level win probability."
+  },
+  "cases": [
+    {
+      "case_id": "equal-p-0.55",
+      "quality_cluster_win_probability": 0.55,
+      "resource_cluster_win_probability": 0.55,
+      "required_independent_clusters": 866,
+      "quality_critical_wins": 458,
+      "resource_critical_wins": 458,
+      "quality_component_power": 0.9003384683906934,
+      "resource_component_power": 0.9003384683906934,
+      "joint_power_lower_bound": 0.8006769367813868
+    },
+    {
+      "case_id": "equal-p-0.60",
+      "quality_cluster_win_probability": 0.6,
+      "resource_cluster_win_probability": 0.6,
+      "required_independent_clusters": 213,
+      "quality_critical_wins": 119,
+      "resource_critical_wins": 119,
+      "quality_component_power": 0.90284482716719,
+      "resource_component_power": 0.90284482716719,
+      "joint_power_lower_bound": 0.8056896543343799
+    },
+    {
+      "case_id": "equal-p-0.65",
+      "quality_cluster_win_probability": 0.65,
+      "resource_cluster_win_probability": 0.65,
+      "required_independent_clusters": 93,
+      "quality_critical_wins": 55,
+      "resource_critical_wins": 55,
+      "quality_component_power": 0.901024930396184,
+      "resource_component_power": 0.901024930396184,
+      "joint_power_lower_bound": 0.8020498607923681
+    },
+    {
+      "case_id": "equal-p-0.70",
+      "quality_cluster_win_probability": 0.7,
+      "resource_cluster_win_probability": 0.7,
+      "required_independent_clusters": 53,
+      "quality_critical_wins": 33,
+      "resource_critical_wins": 33,
+      "quality_component_power": 0.9137724545145016,
+      "resource_component_power": 0.9137724545145016,
+      "joint_power_lower_bound": 0.8275449090290032
+    },
+    {
+      "case_id": "equal-p-0.75",
+      "quality_cluster_win_probability": 0.75,
+      "resource_cluster_win_probability": 0.75,
+      "required_independent_clusters": 33,
+      "quality_critical_wins": 22,
+      "resource_critical_wins": 22,
+      "quality_component_power": 0.9012785313933738,
+      "resource_component_power": 0.9012785313933738,
+      "joint_power_lower_bound": 0.8025570627867475
+    }
+  ],
+  "fixed_cluster_sensitivity": [
+    {
+      "independent_clusters": 5,
+      "critical_wins": 5,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.05032843750000003,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.07775999999999998,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.11602906250000002,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.16806999999999994,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.23730468750000003,
+          "joint_power_lower_bound": 0
+        }
+      ]
+    },
+    {
+      "independent_clusters": 10,
+      "critical_wins": 9,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.023257101249121115,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.04635740159999998,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.08595443827724611,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.14930834589999994,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.2440252304077149,
+          "joint_power_lower_bound": 0
+        }
+      ]
+    },
+    {
+      "independent_clusters": 20,
+      "critical_wins": 15,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.055334187718390514,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.12559897272303744,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.24539574514843937,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.41637082944748116,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.6171726543871044,
+          "joint_power_lower_bound": 0.2343453087742089
+        }
+      ]
+    },
+    {
+      "independent_clusters": 30,
+      "critical_wins": 20,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.13504470288679252,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.2914718612234967,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.5077582144883535,
+          "joint_power_lower_bound": 0.015516428976706909
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.730370386302723,
+          "joint_power_lower_bound": 0.460740772605446
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.89427187730734,
+          "joint_power_lower_bound": 0.7885437546146801
+        }
+      ]
+    },
+    {
+      "independent_clusters": 50,
+      "critical_wins": 32,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.12734511466246598,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.3356132635690672,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.6215870506059707,
+          "joint_power_lower_bound": 0.2431741012119415
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.8594401236111054,
+          "joint_power_lower_bound": 0.7188802472222109
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.9712668401644692,
+          "joint_power_lower_bound": 0.9425336803289384
+        }
+      ]
+    },
+    {
+      "independent_clusters": 100,
+      "critical_wins": 59,
+      "component_power_by_equal_cluster_win_probability": [
+        {
+          "p": 0.55,
+          "exact_power": 0.24149057549224337,
+          "joint_power_lower_bound": 0
+        },
+        {
+          "p": 0.6,
+          "exact_power": 0.6225326761221721,
+          "joint_power_lower_bound": 0.24506535224434423
+        },
+        {
+          "p": 0.65,
+          "exact_power": 0.912321901516706,
+          "joint_power_lower_bound": 0.824643803033412
+        },
+        {
+          "p": 0.7,
+          "exact_power": 0.9928264374006265,
+          "joint_power_lower_bound": 0.985652874801253
+        },
+        {
+          "p": 0.75,
+          "exact_power": 0.9998529257015586,
+          "joint_power_lower_bound": 0.9997058514031172
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "sample_size_sensitivity_under_independent_clusters_and_sign-test_model"
+}
