@@ -79,3 +79,6 @@ No candidate-generation recall estimate is promoted unless its spatial PSU frame
 ## Downstream binding
 
 The coverage auditor accepts this tool's exact report through `--spatial-frame-report`. Its report binds the complete canonical spatial-frame digest and an eligible population digest computed with the same length-prefixed SHA-256 encoding as #9204. The population frame in the coverage audit must be byte-semantically identical after sorting by PSU ID; no second hand-maintained frame is accepted.
+
+
+The spatial-frame report records the SHA-256 of the exact input manifest bytes. The downstream candidate-coverage command requires both `--spatial-frame` and `--spatial-frame-report`, recomputes the input manifest digest, and checks it against the report before accepting the eligible population export. It also binds the exact report bytes, full frame digest, and eligible population digest.
