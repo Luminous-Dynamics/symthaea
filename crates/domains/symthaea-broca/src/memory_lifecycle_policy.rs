@@ -896,6 +896,8 @@ mod tests {
             evidence_index_state_sha256: digest("evidence index state"),
             unresolved_claims_sha256: RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap(),
             unresolved_required_claim_ids: unresolved,
+            calibration_method_sha256: digest("BROCA-GROUP-CONFORMAL-VOI-V1"),
+            calibration_joint_coverage_percent: 90,
             estimator_id: "test-estimator".into(),
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator"),
