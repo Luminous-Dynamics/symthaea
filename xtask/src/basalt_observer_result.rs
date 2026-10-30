@@ -1852,6 +1852,54 @@ mod tests {
     }
 
     #[test]
+    fn accepts_complete_paired_subset_without_claiming_full_profile_qualification() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["selected_case_ids"] =
+            json!(["hidden-input-read", "unused-neighbor"]);
+        oracle_value["records"].as_array_mut().expect("oracle records").truncate(2);
+        let oracle = serde_json::to_vec(&oracle_value).expect("scoped oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["selected_case_ids"] =
+            json!(["hidden-input-read", "unused-neighbor"]);
+        receipt_value["records"].as_array_mut().expect("receipt records").truncate(2);
+        let receipts = serde_json::to_vec(&receipt_value).expect("scoped receipts serialize");
+
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(report.adjudication_complete, "{:?}", report.errors);
+        assert!(report.adjudication_passed, "{:?}", report.errors);
+        assert_eq!(report.counts.challenge_cases, 4);
+        assert_eq!(report.counts.selected_cases, 2);
+        assert_eq!(report.counts.passed_cases, 2);
+        assert!(!report.qualification_eligible);
+    }
+
+    #[test]
+    fn rejects_scoped_run_with_only_one_member_of_a_reciprocal_pair() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["selected_case_ids"] = json!(["hidden-input-read"]);
+        oracle_value["records"].as_array_mut().expect("oracle records").truncate(1);
+        let oracle = serde_json::to_vec(&oracle_value).expect("scoped oracle serializes");
+
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["selected_case_ids"] = json!(["hidden-input-read"]);
+        receipt_value["records"].as_array_mut().expect("receipt records").truncate(1);
+        let receipts = serde_json::to_vec(&receipt_value).expect("scoped receipts serialize");
+
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_PAIR_SCOPE_INCOMPLETE"
+        }));
+    }
+
+    #[test]
     fn rejects_cross_run_receipts() {
         let (catalog, oracle, receipts) = fixture_inputs();
         let mut receipt_value: Value =
