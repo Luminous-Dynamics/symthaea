@@ -1686,6 +1686,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         replicates,
         seed ^ 0x0580_c011_2026_1030,
     )?);
+    output.push_str(&entropy_stopping_benchmark_rows()?);
     Ok(output)
 }
 
@@ -2429,6 +2430,228 @@ fn robust_portfolio_benchmark_rows(
                     worst_gap,
                 );
             }
+        }
+    }
+    Ok(output)
+}
+
+const APRIL_ENTROPY_STOP_EPSILON: f64 = 1e-3;
+const ROBUST_VALUE_STOP_EPSILON: f64 = 1e-10;
+
+fn entropy_saturation_counterexample_world() -> World {
+    let mut world = World::heterogeneous_source_quality();
+    world.name = "global_entropy_saturated_rare_context";
+    world.context_probability = [0.99, 0.01];
+    world.target = [[0.34, 0.33, 0.33], [0.05, 0.05, 0.90]];
+    world.behavior = [[0.34, 0.33, 0.33], [0.98, 0.019, 0.001]];
+    world.reward_mean = [[0.20, 0.50, 0.80], [0.20, 0.50, 0.95]];
+    world.factual_count = [[100, 100, 100], [2, 0, 0]];
+    world.context_annotation_cap = [3, 2];
+    world.budget = 8;
+    world.shared_factor_variance = [0.015, 0.0];
+    world.source_shared_loadings = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0]];
+    world
+}
+
+fn entropy_from_counts(counts: [u32; ACTIONS]) -> f64 {
+    let total = counts.iter().sum::<u32>() as f64;
+    if total <= 0.0 {
+        return 0.0;
+    }
+    counts
+        .iter()
+        .filter(|count| **count > 0)
+        .map(|count| {
+            let probability = *count as f64 / total;
+            -probability * probability.ln()
+        })
+        .sum()
+}
+
+fn global_action_entropy(world: &World, allocation: &Allocation) -> f64 {
+    let counts = std::array::from_fn(|action| {
+        (0..CONTEXTS)
+            .map(|context| {
+                world.factual_count[context][action] as u32
+                    + (0..SOURCES)
+                        .map(|source| allocation.count(context, action, source) as u32)
+                        .sum::<u32>()
+            })
+            .sum::<u32>()
+    });
+    entropy_from_counts(counts)
+}
+
+fn context_weighted_action_entropy(world: &World, allocation: &Allocation) -> f64 {
+    let mut entropy = 0.0;
+    for context in 0..CONTEXTS {
+        let counts = std::array::from_fn(|action| {
+            world.factual_count[context][action] as u32
+                + (0..SOURCES)
+                    .map(|source| allocation.count(context, action, source) as u32)
+                    .sum::<u32>()
+        });
+        entropy += world.context_probability[context] * entropy_from_counts(counts);
+    }
+    entropy
+}
+
+fn target_weighted_evidence_coverage(
+    world: &World,
+    allocation: &Allocation,
+    portfolio: &PolicyPortfolio,
+) -> f64 {
+    let mut coverage = 0.0;
+    for context in 0..CONTEXTS {
+        for action in 0..ACTIONS {
+            let count = world.factual_count[context][action] as f64
+                + (0..SOURCES)
+                    .map(|source| allocation.count(context, action, source) as f64)
+                    .sum::<f64>();
+            let cell_coverage = count / (count + 1.0);
+            let prior_target_mass = (0..PORTFOLIO_POLICIES)
+                .map(|policy| {
+                    portfolio.prior_weights[policy] * portfolio.targets[policy][context][action]
+                })
+                .sum::<f64>();
+            coverage += world.context_probability[context] * prior_target_mass * cell_coverage;
+        }
+    }
+    coverage
+}
+
+#[derive(Clone, Copy)]
+struct NextAnnotation {
+    allocation: Allocation,
+    context: usize,
+    action: usize,
+    source: usize,
+    cost: u32,
+    gain: f64,
+    gain_per_cost: f64,
+}
+
+fn best_next_robust_annotation(
+    world: &World,
+    allocation: &Allocation,
+    profiles: &[ProfileScenario],
+    portfolio: &PolicyPortfolio,
+) -> Result<Option<NextAnnotation>, String> {
+    let current = robust_portfolio_objective(
+        allocation,
+        profiles,
+        portfolio,
+        RobustPortfolioObjective::WorstProfileWorstPolicy,
+    )?;
+    let mut best: Option<NextAnnotation> = None;
+    for context in 0..CONTEXTS {
+        for action in 0..ACTIONS {
+            for source in 0..SOURCES {
+                let mut candidate = *allocation;
+                candidate.counts[context][action][source] += 1;
+                if !candidate.feasible(world) {
+                    continue;
+                }
+                let next = robust_portfolio_objective(
+                    &candidate,
+                    profiles,
+                    portfolio,
+                    RobustPortfolioObjective::WorstProfileWorstPolicy,
+                )?;
+                let gain = (current - next).max(0.0);
+                let cost = world.source_cost[source];
+                let gain_per_cost = gain / cost as f64;
+                if best.is_none_or(|incumbent| {
+                    gain_per_cost > incumbent.gain_per_cost + EPS
+                }) {
+                    best = Some(NextAnnotation {
+                        allocation: candidate,
+                        context,
+                        action,
+                        source,
+                        cost,
+                        gain,
+                        gain_per_cost,
+                    });
+                }
+            }
+        }
+    }
+    Ok(best)
+}
+
+/// APRIL-style marginal action entropy is compared against actual worst-profile
+/// portfolio OPE value. The benchmark intentionally continues an oracle
+/// acquisition path after an entropy-only stop would fire, exposing false stops.
+fn entropy_stopping_benchmark_rows() -> Result<String, String> {
+    let world = entropy_saturation_counterexample_world();
+    world.validate()?;
+    let portfolio = policy_portfolio(&world);
+    validate_portfolio(&portfolio)?;
+    let profiles = coherent_profile_scenarios(&world)?;
+    let mut allocation = Allocation::default();
+    let mut output = String::new();
+    let max_entropy = (ACTIONS as f64).ln();
+
+    for step in 0..=2 {
+        let entropy = global_action_entropy(&world, &allocation);
+        let conditional_entropy = context_weighted_action_entropy(&world, &allocation);
+        let coverage = target_weighted_evidence_coverage(&world, &allocation, &portfolio);
+        let current_value = robust_portfolio_objective(
+            &allocation,
+            &profiles,
+            &portfolio,
+            RobustPortfolioObjective::WorstProfileWorstPolicy,
+        )?;
+        let next = best_next_robust_annotation(&world, &allocation, &profiles, &portfolio)?;
+        let (next_entropy, next_context, next_action, next_source, next_cost, next_value, gain, gain_per_cost) =
+            if let Some(next) = next {
+                (
+                    global_action_entropy(&world, &next.allocation),
+                    next.context,
+                    next.action,
+                    next.source,
+                    next.cost,
+                    current_value - next.gain,
+                    next.gain,
+                    next.gain_per_cost,
+                )
+            } else {
+                (entropy, usize::MAX, usize::MAX, usize::MAX, 0, current_value, 0.0, 0.0)
+            };
+        let entropy_stop = entropy >= max_entropy - APRIL_ENTROPY_STOP_EPSILON;
+        let value_stop = gain_per_cost <= ROBUST_VALUE_STOP_EPSILON;
+        use std::fmt::Write;
+        let _ = writeln!(
+            output,
+            "ENTROPY_STOP\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}",
+            world.name,
+            step,
+            entropy,
+            max_entropy,
+            conditional_entropy,
+            coverage,
+            entropy_stop,
+            current_value,
+            next_value,
+            gain,
+            gain_per_cost,
+            if next_context == usize::MAX { 999 } else { next_context },
+            if next_action == usize::MAX { 999 } else { next_action },
+            if next_source == usize::MAX { 999 } else { next_source },
+            next_cost,
+            next_entropy,
+            next_entropy - entropy,
+        );
+        if let Some(next) = best_next_robust_annotation(
+            &world,
+            &allocation,
+            &profiles,
+            &portfolio,
+        )? {
+            allocation = next.allocation;
+        } else {
+            break;
         }
     }
     Ok(output)
