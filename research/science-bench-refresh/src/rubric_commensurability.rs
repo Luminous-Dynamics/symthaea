@@ -842,24 +842,26 @@ mod tests {
     }
 
     fn make_fields() -> RubricCommensurabilityPlanFieldsV1 {
+        let constructs = vec![
+            ConstructDefinitionV1 {
+                construct_id: "factual_accuracy".to_owned(),
+                definition_sha256: digest("factual-accuracy-definition"),
+                scope_sha256: digest("factual-accuracy-scope"),
+            },
+            ConstructDefinitionV1 {
+                construct_id: "evidence_support".to_owned(),
+                definition_sha256: digest("evidence-support-definition"),
+                scope_sha256: digest("evidence-support-scope"),
+            },
+        ];
+        let ontology_sha256 = construct_ontology_commitment(&constructs).unwrap();
         RubricCommensurabilityPlanFieldsV1 {
             schema: RUBRIC_COMMENSURABILITY_PLAN_SCHEMA.to_owned(),
             analyzer_source_revision: crate::BUILT_GENERATOR_SOURCE_REVISION.to_owned(),
             purpose: CommensurabilityPurposeV1::QualifiedRun,
             comparison_id: "rubric-commensurability-example".to_owned(),
-            construct_ontology_sha256: digest("ontology-v1"),
-            constructs: vec![
-                ConstructDefinitionV1 {
-                    construct_id: "factual_accuracy".to_owned(),
-                    definition_sha256: digest("factual-accuracy-definition"),
-                    scope_sha256: digest("factual-accuracy-scope"),
-                },
-                ConstructDefinitionV1 {
-                    construct_id: "evidence_support".to_owned(),
-                    definition_sha256: digest("evidence-support-definition"),
-                    scope_sha256: digest("evidence-support-scope"),
-                },
-            ],
+            construct_ontology_sha256: ontology_sha256,
+            constructs,
             left_instrument: RubricInstrumentV1 {
                 rubric_id: "rubric-A".to_owned(),
                 rubric_revision: "rev-1".to_owned(),
