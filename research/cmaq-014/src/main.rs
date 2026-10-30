@@ -42,6 +42,11 @@ impl Probe {
             Self::Invasive => 0.98,
         }
     }
+    fn information_gain_bits(self) -> f64 {
+        let p = self.accuracy();
+        let entropy = -p * p.log2() - (1.0 - p) * (1.0 - p).log2();
+        1.0 - entropy
+    }
     fn disturbance(self, fragile: bool) -> f64 {
         match (self, fragile) {
             (Self::None | Self::Visual, _) => 0.0,
@@ -126,7 +131,7 @@ fn choose_probe(policy: Policy, lane: Lane, hidden_fragile: Option<bool>) -> Pro
         Policy::VisualOnly => Probe::Visual,
         Policy::InformationGreedy => Probe::Invasive,
         Policy::CostOnly => Probe::all().into_iter()
-            .max_by(|a, b| (a.accuracy() - a.cost()).total_cmp(&(b.accuracy() - b.cost())))
+            .max_by(|a, b| (a.information_gain_bits() - a.cost()).total_cmp(&(b.information_gain_bits() - b.cost())))
             .unwrap(),
         Policy::DisturbanceAware => [Probe::Visual, Probe::GentleContact, Probe::ForceContact, Probe::Invasive]
             .into_iter().max_by(|a,b| expected_utility(*a,p_fragile).total_cmp(&expected_utility(*b,p_fragile))).unwrap(),
@@ -181,6 +186,7 @@ struct Summary {
     damage_rate: f64,
     risk_budget_violation_rate: f64,
     mean_probe_accuracy: f64,
+    mean_information_gain_bits: f64,
     probe_counts: [usize; 5],
 }
 
@@ -193,6 +199,7 @@ fn run_policy(policy: Policy, lane: Lane, tape: &[Episode]) -> Summary {
     let mut damage_count = 0usize;
     let mut risk_violations = 0usize;
     let mut probe_accuracy_sum = 0.0;
+    let mut information_gain_sum = 0.0;
     let mut counts = [0usize; 5];
 
     for episode in tape {
@@ -221,6 +228,7 @@ fn run_policy(policy: Policy, lane: Lane, tape: &[Episode]) -> Summary {
         total_disturbance += damage;
         total_cost += probe.cost();
         probe_accuracy_sum += probe.accuracy();
+        information_gain_sum += probe.information_gain_bits();
     }
 
     let n = tape.len() as f64;
@@ -234,6 +242,7 @@ fn run_policy(policy: Policy, lane: Lane, tape: &[Episode]) -> Summary {
         damage_rate: damage_count as f64 / n,
         risk_budget_violation_rate: risk_violations as f64 / n,
         mean_probe_accuracy: probe_accuracy_sum / n,
+        mean_information_gain_bits: information_gain_sum / n,
         probe_counts: counts,
     }
 }
@@ -282,13 +291,13 @@ fn render_report(cells: &[Cell]) -> String {
                 concat!(
                     "      {{\"policy\":\"{}\",\"mean_task_success\":{},\"mean_decision_accuracy\":{},",
                     "\"mean_net_utility\":{},\"mean_disturbance\":{},\"mean_probe_cost\":{},",
-                    "\"damage_rate\":{},\"risk_budget_violation_rate\":{},\"mean_probe_accuracy\":{},",
+                    "\"damage_rate\":{},\"risk_budget_violation_rate\":{},\"mean_probe_accuracy\":{},\"mean_information_gain_bits\":{},"
                     "\"probe_counts\":[{},{},{},{},{}]}}{}"
                 ),
                 row.policy, number(row.mean_task_success), number(row.mean_decision_accuracy),
                 number(row.mean_net_utility), number(row.mean_disturbance), number(row.mean_probe_cost),
                 number(row.damage_rate), number(row.risk_budget_violation_rate),
-                number(row.mean_probe_accuracy),
+                number(row.mean_probe_accuracy), number(row.mean_information_gain_bits),
                 row.probe_counts[0], row.probe_counts[1], row.probe_counts[2], row.probe_counts[3], row.probe_counts[4], row_comma
             ).unwrap();
         }
