@@ -40,6 +40,7 @@ jobs:
           rustfmt --check --edition 2024
           research/science-bench-refresh/src/main.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
+          research/science-bench-refresh/src/reference_assurance.rs
 
       - name: Unit tests
         run: cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
@@ -1019,4 +1020,42 @@ jobs:
             /tmp/sbr-judge-robustness
           jq -e '.synthetic_positive_control == true and .planned_cases == 6 and .planned_observations == 36 and .repeat_verification_deterministic == true and .repeatability_control_passed == true and .position_swap_identity_control_passed == true and .confidence_style_bias_detected == true and .semantic_sensitivity_control_passed == true and .tampered_plan_rejected == true and .wrong_revision_rejected == true and .duplicate_and_missing_observations_rejected == true and .wrong_input_digest_rejected == true and .tampered_report_rejected == true and .runner_execution_proven == false and .external_anchor_required == true and .empirical_judge_result == false' \
             /tmp/sbr-judge-robustness/summary.json >/dev/null
+          
+      - name: Reference assurance schema and example package
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="research/science-bench-refresh/schema/reference-assurance-package.schema.json"
+          fixture="research/science-bench-refresh/fixtures/reference-assurance-package.example.json"
+          jq empty "$schema" "$fixture"
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reference-assurance-package "$fixture" > /tmp/sbr-reference-assurance-report.json
+          jq -e '.valid == true and .package_commitment_matches == true and .claim_count == 1 and .material_claim_count == 1 and .initial_adjudication_count == 3 and .claims_with_disagreement == 1 and .claims_missing_minimum_panel == 0 and .adjudicator_independence_proven == false and .source_authenticity_proven == false and .source_span_bytes_verified == false and .runner_execution_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false' \
+            /tmp/sbr-reference-assurance-report.json >/dev/null
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reference-assurance-package "$fixture" > /tmp/sbr-reference-assurance-report-repeat.json
+          cmp /tmp/sbr-reference-assurance-report.json /tmp/sbr-reference-assurance-report-repeat.json
+
+      - name: Reference assurance hostile controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="research/science-bench-refresh/fixtures/reference-assurance-package.example.json"
+          cargo_manifest="research/science-bench-refresh/Cargo.toml"
+          jq '.claims += [.claims[0]]' "$fixture" > /tmp/sbr-ref-duplicate-claim.json
+          jq '.spans[0].source_id = "unknown-source"' "$fixture" > /tmp/sbr-ref-orphan-span.json
+          jq '.spans[0].end_offset = 0' "$fixture" > /tmp/sbr-ref-invalid-range.json
+          jq '.sources[0].lifecycle = "retracted"' "$fixture" > /tmp/sbr-ref-retracted-support.json
+          jq '.adjudicators[0].blind_to_judge_output = false' "$fixture" > /tmp/sbr-ref-blinding-failure.json
+          jq '.initial_adjudications[0].decision = "abstain" | .initial_adjudications[0].abstention_reason = null' "$fixture" > /tmp/sbr-ref-invalid-abstention.json
+          for name in duplicate-claim orphan-span invalid-range retracted-support blinding-failure invalid-abstention; do
+            set +e
+            cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+              verify-reference-assurance-package "/tmp/sbr-ref-$name.json" > "/tmp/sbr-ref-$name-report.json"
+            exit_code=$?
+            set -e
+            test "$exit_code" -eq 11
+            jq -e '.valid == false and .scoring_eligible_declared == false and .external_anchor_required == true' \
+              "/tmp/sbr-ref-$name-report.json" >/dev/null
+          done
 
