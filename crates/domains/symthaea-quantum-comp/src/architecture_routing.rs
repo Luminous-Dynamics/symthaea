@@ -530,6 +530,7 @@ mod tests {
     fn ties_are_deterministic_by_architecture_then_record_identity() {
         let mut candidates = two_candidates();
         candidates[1].resources = candidates[0].resources;
+        candidates[1].quality = candidates[0].quality;
         candidates[0].architecture_id = "same-family-a".to_owned();
         candidates[1].architecture_id = "same-family-b".to_owned();
         let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &candidates).unwrap();
