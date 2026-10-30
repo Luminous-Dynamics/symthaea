@@ -11,6 +11,8 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | CPU / GPU / NPU / FPGA | Conventional digital | General-purpose, dense vector/matrix, fixed-function and reconfigurable execution |
 | Digital neuromorphic | Event-driven digital spiking/local-state | Sparse temporal events, continuous streams, local state and online updates |
 | Mixed-signal neuromorphic | Accelerated analog neural dynamics | Low-latency dynamical systems, but with calibration and variability costs |
+| Digital processing-in-memory | Digital logic in DRAM/SRAM banks, memory modules or stacked-memory logic layers | Data-movement-bound reductions, matrix/vector operations and bank-local primitives with explicit precision and bank-level parallelism |
+| Digital near-memory compute | Digital logic adjacent to memory arrays/modules, but not inside the arrays | Partial reductions, filtering and data-local scheduling where local-link traffic is still accounted for |
 | Analog compute-in-memory | RRAM/memristor, PCM, flash/NOR arrays | Data-local matrix/vector operations where conversion and correction costs do not erase array gains |
 | Classical photonic linear | Interferometric, diffractive or wavelength-multiplexed optics | High-throughput linear transforms and low-latency optical paths |
 | Photonic / physical reservoir | Physical dynamical substrate | Temporal feature expansion and reservoir tasks with cheap readout |
@@ -19,6 +21,10 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | Spintronic / probabilistic | Spin devices and p-bits | Stochastic sampling or specialized low-energy probabilistic inference |
 | Reversible / adiabatic | Reversible logic and adiabatic circuits | Workloads where switching energy, clocking and physical overhead make a practical comparison possible |
 | Hybrid heterogeneous | Explicit multi-family system | Workloads that benefit from deliberate placement/scheduling across substrates |
+
+Memory-centric designs require separate labels for where computation occurs (in-array, in-module/stack, or adjacent to memory), how it is computed (digital or analog), and the memory substrate (SRAM, DRAM, flash, RRAM, PCM, etc.). Digital HBM/DRAM processing-in-memory is not analog memristor compute-in-memory; near-memory logic is not in-array compute.
+
+For these workloads, report bytes moved at each hierarchy boundary, bank bandwidth/parallelism, precision, host/device transfers, and end-to-end energy/latency. For analog arrays, include ADC/DAC, sensing, calibration, programming, correction and readout. Do not compare an array-only peak with a full-system PIM or GPU result.
 
 An event camera is a sensor modality, not a neuromorphic compute family. Classical photonic matrix multiplication is not quantum photonics. Quantum-inspired software on CPU/GPU remains a classical implementation. A CfC or continuous-time model must not be forced into a spiking-network representation merely to qualify as neuromorphic.
 
