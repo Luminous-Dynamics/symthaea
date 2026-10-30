@@ -872,6 +872,13 @@ mod tests {
                     "review_minutes":1.5,
                     "evidence_sha256":"e".repeat(64),
                     "changes":[{"operation":"remove_weight","source":2,"target":3,"weight":3.0}]
+                },
+                {
+                    "candidate_id":"remove_part_of_second_leg",
+                    "estimated_error_probability":0.4,
+                    "review_minutes":1.0,
+                    "evidence_sha256":"f".repeat(64),
+                    "changes":[{"operation":"remove_weight","source":2,"target":3,"weight":1.0}]
                 }
             ]
         })).expect("fixture deserializes")
@@ -895,7 +902,7 @@ mod tests {
         validate_input(&input).expect("fixture validates");
         let report = score(&input, "f".repeat(64)).expect("fixture scores");
         assert_eq!(report.status, "RANKED_FOR_HUMAN_REVIEW_ONLY");
-        assert_eq!(report.candidate_count, 2);
+        assert_eq!(report.candidate_count, 3);
         assert_eq!(report.candidate_evaluations[0].rank, 1);
     }
 
@@ -1051,7 +1058,8 @@ mod tests {
         }
         let report = score(&input, "f".repeat(64)).unwrap();
         assert_eq!(report.candidate_evaluations[0].candidate_id, "remove_direct_edge");
-        assert_eq!(report.candidate_evaluations[1].candidate_id, "remove_second_leg");
+        assert_eq!(report.candidate_evaluations[1].candidate_id, "remove_part_of_second_leg");
+        assert_eq!(report.candidate_evaluations[2].candidate_id, "remove_second_leg");
     }
 
     #[test]
@@ -1226,6 +1234,72 @@ mod tests {
             weighted_triad_motif_count(&graph, &TriadMotif::FeedForwardLoop),
             6.0
         );
+    }
+
+    #[test]
+    fn matched_budget_policy_replay_never_exceeds_review_minutes() {
+        let input = fixture_with_oracle();
+        let report = score(&input, "a".repeat(64)).unwrap();
+        assert_eq!(report.policy_budget_results.len(), 15);
+        for result in &report.policy_budget_results {
+            assert!(result.actual_review_minutes <= result.review_budget_minutes + 1e-9);
+            assert_eq!(
+                result.reviewed_candidate_count,
+                result.applied_candidate_count + result.rejected_conflict_count
+            );
+        }
+    }
+
+    #[test]
+    fn sequential_policy_replay_rejects_conflicting_edit_but_charges_review_time() {
+        let input = fixture_with_oracle();
+        let report = score(&input, "b".repeat(64)).unwrap();
+        let replay = report.policy_budget_results.iter()
+            .find(|result| result.policy == "query_sensitivity_per_minute"
+                && result.review_budget_minutes == 10.0)
+            .expect("query sensitivity 10-minute replay");
+        assert_eq!(replay.reviewed_candidate_count, 3);
+        assert_eq!(replay.applied_candidate_count, 2);
+        assert_eq!(replay.rejected_conflict_count, 1);
+        assert_eq!(replay.actual_review_minutes, 4.5);
+        assert!(replay.weighted_query_error_reduction.is_some());
+    }
+
+    #[test]
+    fn matched_budget_outcomes_are_not_estimable_without_oracle_values() {
+        let input = fixture();
+        let report = score(&input, "c".repeat(64)).unwrap();
+        assert!(report.policy_budget_results.iter().all(|result|
+            result.weighted_query_error_reduction.is_none()
+                && result.baseline_weighted_query_error.is_none()
+                && result.final_weighted_query_error.is_none()
+        ));
+        assert!(report.warnings.iter().any(|warning| warning.contains("not estimable")));
+    }
+
+    #[test]
+    fn deterministic_random_policy_replays_for_frozen_input_and_seed() {
+        let input = fixture_with_oracle();
+        let first = score(&input, "random-seed".into()).unwrap();
+        let second = score(&input, "random-seed".into()).unwrap();
+        let first_random: Vec<_> = first.policy_budget_results.iter()
+            .filter(|result| result.policy == "deterministic_random")
+            .map(|result| (result.review_budget_minutes, result.reviewed_candidate_ids.clone()))
+            .collect();
+        let second_random: Vec<_> = second.policy_budget_results.iter()
+            .filter(|result| result.policy == "deterministic_random")
+            .map(|result| (result.review_budget_minutes, result.reviewed_candidate_ids.clone()))
+            .collect();
+        assert_eq!(first_random, second_random);
+    }
+
+    #[test]
+    fn review_budgets_must_be_positive_and_unique() {
+        let mut input = fixture();
+        input.review_budgets_minutes = vec![1.0, 1.0];
+        assert!(validate_input(&input).unwrap_err().contains("unique"));
+        input.review_budgets_minutes = vec![0.0];
+        assert!(validate_input(&input).unwrap_err().contains("positive"));
     }
 
 }
