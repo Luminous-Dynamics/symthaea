@@ -129,11 +129,11 @@ struct CandidateEvaluation {
     evidence_sha256: String,
     estimated_error_probability: f64,
     review_minutes: f64,
-    weighted_query_impact: f64,
+    weighted_query_sensitivity: f64,
     reference_query_count: usize,
     weighted_query_error_reduction: Option<f64>,
-    expected_weighted_query_impact: f64,
-    expected_query_impact_per_review_minute: f64,
+    probability_weighted_query_sensitivity: f64,
+    probability_weighted_query_sensitivity_per_review_minute: f64,
     counterfactual_graph_canonical_sha256: String,
     query_impacts: Vec<QueryImpact>,
     overlaps_with_candidates: Vec<String>,
@@ -457,12 +457,12 @@ fn evaluate_candidate(
             normalized_query_error_reduction,
         });
     }
-    let weighted_query_impact = weighted_sum / total_query_weight;
-    let expected_weighted_query_impact =
-        candidate.estimated_error_probability * weighted_query_impact;
-    let expected_query_impact_per_review_minute =
-        expected_weighted_query_impact / candidate.review_minutes;
-    if !expected_query_impact_per_review_minute.is_finite() {
+    let weighted_query_sensitivity = weighted_sum / total_query_weight;
+    let probability_weighted_query_sensitivity =
+        candidate.estimated_error_probability * weighted_query_sensitivity;
+    let probability_weighted_query_sensitivity_per_review_minute =
+        probability_weighted_query_sensitivity / candidate.review_minutes;
+    if !probability_weighted_query_sensitivity_per_review_minute.is_finite() {
         return Err(format!("candidate {} produced a non-finite priority score", candidate.candidate_id));
     }
     Ok(CandidateEvaluation {
@@ -471,12 +471,12 @@ fn evaluate_candidate(
         evidence_sha256: candidate.evidence_sha256.clone(),
         estimated_error_probability: candidate.estimated_error_probability,
         review_minutes: candidate.review_minutes,
-        weighted_query_impact,
+        weighted_query_sensitivity,
         reference_query_count,
         weighted_query_error_reduction: (reference_weight_total > 0.0)
             .then_some(reference_weighted_sum / reference_weight_total),
-        expected_weighted_query_impact,
-        expected_query_impact_per_review_minute,
+        probability_weighted_query_sensitivity,
+        probability_weighted_query_sensitivity_per_review_minute,
         counterfactual_graph_canonical_sha256: canonical_graph_sha256(&counterfactual),
         query_impacts,
         overlaps_with_candidates: overlaps.to_vec(),
@@ -501,8 +501,8 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
     }
     evaluations.sort_by(|left, right| {
         right
-            .expected_query_impact_per_review_minute
-            .total_cmp(&left.expected_query_impact_per_review_minute)
+            .probability_weighted_query_sensitivity_per_review_minute
+            .total_cmp(&left.probability_weighted_query_sensitivity_per_review_minute)
             .then_with(|| left.candidate_id.cmp(&right.candidate_id))
     });
     for (index, evaluation) in evaluations.iter_mut().enumerate() {
@@ -532,7 +532,7 @@ fn score(input: &Input, input_hash: String) -> Result<Report, String> {
         graph_edge_count: input.graph.len(),
         query_count: input.queries.len(),
         candidate_count: input.candidates.len(),
-        scoring_semantics: "probability_weighted_mean_normalized_query_delta_per_review_minute",
+        scoring_semantics: "probability_weighted_mean_normalized_query_sensitivity_per_review_minute",
         candidate_evaluations: evaluations,
         warnings,
         status: "RANKED_FOR_HUMAN_REVIEW_ONLY",
@@ -671,8 +671,8 @@ mod tests {
         let graph = graph_from_edges(&input.graph);
         let total_weight: f64 = input.queries.iter().map(|query| query.weight).sum();
         let evaluation = evaluate_candidate(&graph, &input.queries, &input.candidates[0], total_weight, &[]).unwrap();
-        assert_eq!(evaluation.weighted_query_impact, 0.0);
-        assert_eq!(evaluation.expected_query_impact_per_review_minute, 0.0);
+        assert_eq!(evaluation.weighted_query_sensitivity, 0.0);
+        assert_eq!(evaluation.probability_weighted_query_sensitivity_per_review_minute, 0.0);
     }
 
     #[test]
@@ -686,7 +686,7 @@ mod tests {
         higher.estimated_error_probability = 0.8;
         let a = evaluate_candidate(&graph, &input.queries, &lower, total_weight, &[]).unwrap();
         let b = evaluate_candidate(&graph, &input.queries, &higher, total_weight, &[]).unwrap();
-        assert!(b.expected_weighted_query_impact > a.expected_weighted_query_impact);
+        assert!(b.probability_weighted_query_sensitivity > a.probability_weighted_query_sensitivity);
     }
 
     #[test]
@@ -700,7 +700,7 @@ mod tests {
         slow.review_minutes = 2.0;
         let a = evaluate_candidate(&graph, &input.queries, &fast, total_weight, &[]).unwrap();
         let b = evaluate_candidate(&graph, &input.queries, &slow, total_weight, &[]).unwrap();
-        assert_eq!(a.expected_query_impact_per_review_minute, 2.0 * b.expected_query_impact_per_review_minute);
+        assert_eq!(a.probability_weighted_query_sensitivity_per_review_minute, 2.0 * b.probability_weighted_query_sensitivity_per_review_minute);
     }
 
     #[test]
@@ -809,8 +809,8 @@ mod tests {
         let mut candidate = input.candidates[0].clone();
         candidate.estimated_error_probability = 0.0;
         let evaluation = evaluate_candidate(&graph, &input.queries, &candidate, total_weight, &[]).unwrap();
-        assert!(evaluation.weighted_query_impact > 0.0);
-        assert_eq!(evaluation.expected_weighted_query_impact, 0.0);
+        assert!(evaluation.weighted_query_sensitivity > 0.0);
+        assert_eq!(evaluation.probability_weighted_query_sensitivity, 0.0);
     }
     #[test]
     fn checked_in_query_impact_fixture_is_scored_and_flags_interacting_candidates() {
@@ -849,9 +849,9 @@ mod tests {
         let helpful = evaluate_candidate(&graph, &input.queries, &input.candidates[0], total_weight, &[]).unwrap();
         let harmful = evaluate_candidate(&graph, &input.queries, &input.candidates[1], total_weight, &[]).unwrap();
         assert_eq!(helpful.reference_query_count, 4);
-        assert!(helpful.weighted_query_impact > 0.0);
+        assert!(helpful.weighted_query_sensitivity > 0.0);
         assert!(helpful.weighted_query_error_reduction.unwrap() > 0.0);
-        assert!(harmful.weighted_query_impact > 0.0);
+        assert!(harmful.weighted_query_sensitivity > 0.0);
         assert!(harmful.weighted_query_error_reduction.unwrap() < 0.0);
     }
 
@@ -872,8 +872,8 @@ mod tests {
         let with_oracle = fixture_with_oracle();
         let plain = score(&without_oracle, "a".repeat(64)).unwrap();
         let evaluated = score(&with_oracle, "b".repeat(64)).unwrap();
-        let plain_order: Vec<_> = plain.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.expected_query_impact_per_review_minute)).collect();
-        let oracle_order: Vec<_> = evaluated.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.expected_query_impact_per_review_minute)).collect();
+        let plain_order: Vec<_> = plain.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.probability_weighted_query_sensitivity_per_review_minute)).collect();
+        let oracle_order: Vec<_> = evaluated.candidate_evaluations.iter().map(|row| (&row.candidate_id, row.probability_weighted_query_sensitivity_per_review_minute)).collect();
         assert_eq!(plain_order, oracle_order);
     }
 
