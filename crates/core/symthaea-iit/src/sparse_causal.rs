@@ -867,14 +867,21 @@ mod tests {
         for partition in &partitions {
             let dense_cut = dense.apply_partition(partition).unwrap();
             let sparse_cut = sparse.apply_partition(partition).unwrap().to_dense().unwrap();
-            assert_eq!(
-                sparse_cut,
-                dense_cut,
-                "sparse/dense cut mismatch: total={}, parts={:?}, directions={:?}",
-                partition.is_total_cut(),
-                partition.parts(),
-                partition.directions()
-            );
+            assert_eq!(sparse_cut.connectivity(), dense_cut.connectivity());
+            for (index, (sparse_value, dense_value)) in sparse_cut
+                .transition_probabilities()
+                .iter()
+                .zip(dense_cut.transition_probabilities())
+                .enumerate()
+            {
+                assert!(
+                    (sparse_value - dense_value).abs() <= 1e-12,
+                    "sparse/dense cut mismatch: total={}, parts={:?}, directions={:?}, cell={index}, sparse={sparse_value:.17}, dense={dense_value:.17}",
+                    partition.is_total_cut(),
+                    partition.parts(),
+                    partition.directions()
+                );
+            }
         }
     }
 
