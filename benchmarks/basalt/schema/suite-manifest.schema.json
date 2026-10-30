@@ -10,6 +10,9 @@
     "suite_id",
     "version",
     "split",
+    "seed_policy",
+    "attempts_per_task",
+    "attempt_seeds",
     "tasks"
   ],
   "properties": {
@@ -157,6 +160,33 @@
             }
           }
         }
+      }
+    },
+    "seed_policy": {
+      "enum": [
+        "fixed_paired",
+        "predeclared_random",
+        "unseeded",
+        "not_applicable"
+      ]
+    },
+    "attempts_per_task": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "attempt_seeds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "string",
+            "minLength": 1
+          }
+        ]
       }
     }
   }
