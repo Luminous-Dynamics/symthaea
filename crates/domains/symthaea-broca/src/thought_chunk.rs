@@ -5,6 +5,11 @@
 //!
 //! A ThoughtChunk represents a semantic unit of meaning (roughly 8–20 tokens).
 //! The goal is to move from token-level to chunk-level prediction.
+//!
+//! Important research boundary: `psi` is a consciousness-related control signal,
+//! and `confidence` is a caller-supplied scalar. Neither field is, by itself, a
+//! calibrated probability that the chunk is correct or supported by evidence.
+//! Chunks do not yet carry proof dependencies or source citations.
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
@@ -26,7 +31,9 @@ pub struct ThoughtChunk {
     pub thought_hv: ContinuousHV,
     pub token_ids: Vec<u32>,
     pub token_span: Option<(usize, usize)>,
+    /// Caller-supplied consciousness/control scalar; not answer correctness.
     pub psi: f32,
+    /// Caller-supplied confidence scalar; not calibrated without an external evaluator.
     pub confidence: f32,
     pub spectral_entropy: f32,
     pub target: Option<String>,
@@ -137,7 +144,8 @@ impl ThoughtChunkSequence {
             .collect()
     }
 
-    /// Convert to a topological skeleton (for Geodesic skeleton synthesis).
+    /// Convert to the current linear predecessor skeleton (not a general proof DAG).
+    /// Each chunk after the first depends only on its immediately previous chunk.
     pub fn to_topological_skeleton(&self) -> Vec<(String, Vec<String>)> {
         self.chunks
             .iter()

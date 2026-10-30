@@ -73,7 +73,7 @@ pub struct LanguageControllerConfig {
     pub network_layers: usize,
     /// Neurons per layer.
     pub neurons_per_layer: usize,
-    /// Learning rate for BPTT training.
+    /// Learning rate for CfC per-token local target updates.
     pub learning_rate: f32,
     /// Vocabulary size (number of token embeddings).
     pub vocab_size: usize,
@@ -290,7 +290,7 @@ pub struct LanguageController {
     current_pos: usize,
     /// Coherence feedback from the generator (Phase 3: adaptive dt).
     coherence_for_dt: f32,
-    /// Last effective dt used in forward_step_with_dt (for BPTT consistency).
+    /// Last effective dt used in forward_step_with_dt (paired local-update metadata).
     last_effective_dt: f32,
     /// Cached refined output HV from last forward_step (for coherence measurement).
     last_logit_hv: Option<ContinuousHV>,
@@ -676,7 +676,7 @@ impl LanguageController {
         }
     }
 
-    /// Get the effective dt used in the last forward_step (for BPTT consistency).
+    /// Get the effective dt used in the last forward step, for its paired local update.
     pub fn last_effective_dt(&self) -> f32 {
         self.last_effective_dt
     }
@@ -836,8 +836,8 @@ impl LanguageController {
     #[cfg(not(feature = "highway-projection"))]
     pub fn restore_highway_weights(&mut self, _weights: Vec<f32>) {}
 
-    /// Reset momentum on all CfC neurons. Call between BPTT training epochs
-    /// to prevent accumulated directional bias from 67K+ gradient steps.
+    /// Reset momentum on all CfC neurons between training epochs to prevent
+    /// accumulated directional bias from 67K+ per-token local update steps.
     pub fn reset_network_momentum(&mut self) {
         self.network.reset_momentum();
     }
@@ -986,12 +986,12 @@ impl LanguageController {
         self.config.dt_per_token = dt;
     }
 
-    /// Get reference to the underlying network (for BPTT training).
+    /// Get reference to the underlying network (for training and device synchronization).
     pub fn network(&self) -> &HdcLtcUnifiedNetwork {
         &self.network
     }
 
-    /// Get mutable reference to the underlying network (for BPTT training).
+    /// Get mutable reference to the underlying network (for training and device synchronization).
     pub fn network_mut(&mut self) -> &mut HdcLtcUnifiedNetwork {
         &mut self.network
     }

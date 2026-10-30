@@ -42,9 +42,9 @@ pub struct GpuCfcLayer {
     pub input_mask: Tensor,
     /// Tau modulator hypervectors [N, D] — trainable (scalar gradient projected)
     pub tau_modulator: Tensor,
-    /// Gate weight hypervectors [N, D] — fixed during BPTT
+    /// Gate weight hypervectors [N, D] — fixed by the current local update rule
     pub gate_weight: Tensor,
-    /// Gate bias hypervectors [N, D] — fixed during BPTT
+    /// Gate bias hypervectors [N, D] — fixed by the current local update rule
     pub gate_bias: Tensor,
     /// Weight momentum [N, D] — optimizer state
     pub weight_momentum: Tensor,
@@ -188,7 +188,14 @@ impl GpuCfcLayer {
         self.states.mean(0) // [D] — mean across neurons
     }
 
-    /// Backward pass: compute gradients for all neurons in the layer.
+    /// Compute a local, single-step learning signal for all neurons in this layer.
+    ///
+    /// This reads the current `states` only. It stores no temporal activation
+    /// history and cannot propagate a token-position loss to earlier recurrent
+    /// states. Its recomputed transition uses `sigma = 1 - exp(-dt / tau)` and
+    /// omits the gated `sigma_base` contribution used by `evolve_closed_form`;
+    /// this is therefore a simplified local surrogate, not the exact derivative
+    /// of the full gated CfC transition.
     ///
     /// Returns (dw, du, dtau_scalar, d_input) as tensors.
     /// - dw: [N, D] — gradient w.r.t. weight_hv
@@ -266,7 +273,7 @@ impl GpuCfcLayer {
         })
     }
 
-    /// Apply gradients with momentum (no weight decay for BPTT).
+    /// Apply the current step's local target gradients with momentum (no weight decay).
     pub fn apply_gradients(&mut self, grads: &GpuCfcGradients, lr: f32) -> Result<()> {
         let m = self.momentum as f64;
         let neg_lr = -(lr as f64);
@@ -515,13 +522,20 @@ impl GpuCfcNetwork {
         Ok(())
     }
 
-    /// Full BPTT: backprop d_output through normalize, then through each layer.
+    /// Single-step output and inter-layer error update for the current recurrent state.
     ///
-    /// This replaces `LanguageController::backward_step()` for GPU training.
-    /// `d_output` is the gradient of CE loss w.r.t. the normalized output HV [1, D].
-    /// `input` is the composed input HV (thought ⊗ token ⊗ pos) [1, D].
-    /// `dt` is the time step. `lr` is the network learning rate.
-    /// `gradient_attenuation` scales gradients for earlier layers (0.0-1.0).
+    /// This is **not backpropagation through time**: the method receives no sequence
+    /// tape, does not restore prior states, and does not propagate a loss at position t
+    /// into recurrent states from positions t-1 and earlier. It backpropagates through
+    /// output normalization and propagates a local error signal across layers, then
+    /// constructs per-layer targets from the current states. The cell backward pass
+    /// uses a simplified local evolution derivative rather than differentiating the
+    /// complete gated forward transition.
+    ///
+    /// `d_output` is the current-position CE gradient with respect to normalized output
+    /// HV [1, D]. `input` is the current composed HV (thought ⊗ token ⊗ position) [1, D].
+    /// `dt` is the current time step; `lr` is the network learning rate.
+    /// `gradient_attenuation` damps the approximate signal propagated to earlier layers.
     pub fn backward_and_update(
         &mut self,
         d_output: &Tensor,
@@ -600,7 +614,7 @@ impl GpuCfcNetwork {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GpuTrainer: Full on-device training loop (forward + backward per token)
+// GpuTrainer: On-device sequence loop (forward + local update per token)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Detect best available device with automatic CPU fallback.
@@ -623,8 +637,9 @@ pub fn detect_device() -> Device {
 
 /// Full GPU trainer: keeps all state on device, syncs once per training pair.
 ///
-/// The entire BPTT window (forward + backward for each token position) runs
-/// on GPU without CPU↔GPU sync. Only transfers:
+/// The full teacher-forced token window (forward + local update for each position)
+/// runs on the selected device without CPU↔device sync between positions. This is
+/// a sequential recurrent training loop, not a temporal BPTT window. Only transfers:
 /// - Thought HV: once per pair (CPU → GPU, 64KB)
 /// - Logits: per token (GPU → CPU, 16KB for loss computation)
 /// - Weights: once per pair (GPU → CPU for checkpointing)
@@ -801,7 +816,8 @@ impl GpuTrainer {
         logits_tensor.squeeze(0)?.to_vec1()
     }
 
-    /// Backward step: CE gradient → BPTT on GPU.
+    /// Apply one position's CE gradient through the local current-state update on GPU.
+    /// This does not propagate gradients across earlier token positions.
     pub fn backward_step(
         &mut self,
         logits: &[f32],
@@ -866,7 +882,7 @@ impl GpuTrainer {
             .unsqueeze(0)?;
         let input = (thought_gpu * &token_emb)?.mul(&pos_emb)?;
 
-        // Full BPTT on GPU (no CPU sync)
+        // Local current-position update on device; no temporal gradient tape.
         self.network.backward_and_update(
             &d_output,
             &input,

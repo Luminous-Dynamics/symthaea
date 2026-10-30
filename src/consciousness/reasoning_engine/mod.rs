@@ -22,9 +22,16 @@
 //!
 //! ## Budget Tiers
 //!
-//! - **Tier 0** (≤2ms): Steps 1-2 + gate + fallback (always completes)
-//! - **Tier 1** (≤8ms): + micro-MCTS (K=5, N=50)
-//! - **Tier 2** (≤20ms): + full MCTS + counterfactuals + narrative (best-effort)
+//! - **Tier 0** (≤2ms): epistemic detection/reliability assessment and safe
+//!   fallback telemetry. Planning does not run and no tool gate is inferred
+//!   from a missing plan.
+//! - **Tier 1** (≤8ms): reduced-budget epistemic assessment. The current
+//!   `reason()` implementation explicitly skips MCTS for Tier 1 (see the
+//!   `budget.tier != BudgetTier::Tier1` guard and
+//!   `test_gate_none_when_tier1_never_plans`). `MctsConfig::tier1()` exists,
+//!   but is not currently exercised by this path.
+//! - **Tier 2** (≤20ms): EVS-gated full MCTS, followed by tool authorization
+//!   and best-effort counterfactual analysis/narrative.
 
 pub mod narrative;
 pub mod telemetry;

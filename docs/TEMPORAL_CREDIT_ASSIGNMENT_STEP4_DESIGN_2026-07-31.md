@@ -30,6 +30,26 @@ implied a sequence-learning capacity the trainer does not have — consistent wi
 Keystone A/B conclusion that training signal, not architecture, is the binding
 constraint.
 
+### GPU path audit (2026-10-30)
+
+The optional Candle GPU path was also read at source; it does not close the temporal
+credit gap. `GpuTrainer::backward_step` is called independently after each token's
+forward step. It reconstructs the current token input, reads the current
+`layer_outputs` and neuron states, and calls
+`GpuCfcNetwork::backward_and_update`. That function propagates the current
+position's output error through normalization and an approximate inter-layer
+signal, then constructs local targets from the current layer states. It stores no
+per-position activation tape and never sends the position-*t* loss gradient into
+recurrent states from positions *t-1* and earlier.
+
+There is a second limitation: `GpuCfcLayer::backward` uses a simplified local
+evolution derivative (it omits the full gated `sigma_base` term used by the
+forward transition). It is therefore not an exact gradient of the complete gated
+CfC transition even at the current time step. GPU execution batches the neuron
+operations and reduces transfer overhead; it does not make the update temporal
+BPTT. The misleading "Full BPTT on GPU" comments have been corrected in
+`gpu_cfc.rs` and `training.rs` on the research branch.
+
 ### Correction to the existing in-source note
 
 `training.rs` previously stated that cross-layer credit "uses a hand-tuned
