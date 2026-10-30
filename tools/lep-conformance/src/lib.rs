@@ -1109,7 +1109,11 @@ mod tests {
             match chars.next() {
                 Some('0') => decoded.push('~'),
                 Some('1') => decoded.push('/'),
-                _ => return Err(format!("invalid JSON Pointer escape in segment {segment:?}")),
+                _ => {
+                    return Err(format!(
+                        "invalid JSON Pointer escape in segment {segment:?}"
+                    ));
+                }
             }
         }
         Ok(decoded)
@@ -1144,7 +1148,11 @@ mod tests {
                         format!("array JSON Pointer index {index} is out of range")
                     })?
                 }
-                _ => return Err(format!("parent JSON Pointer segment {segment:?} is not a container")),
+                _ => {
+                    return Err(format!(
+                        "parent JSON Pointer segment {segment:?} is not a container"
+                    ));
+                }
             };
         }
 
@@ -1171,7 +1179,9 @@ mod tests {
                 }
                 Ok(())
             }
-            _ => Err(format!("terminal JSON Pointer parent is not a container: {pointer}")),
+            _ => Err(format!(
+                "terminal JSON Pointer parent is not a container: {pointer}"
+            )),
         }
     }
 
@@ -1226,7 +1236,10 @@ mod tests {
             if let Some(mutation) = &case.mutation {
                 set_json_pointer(&mut statement, &mutation.path, mutation.value.clone())
                     .unwrap_or_else(|error| {
-                        panic!("{}: cannot apply mutation {}: {error}", case.id, mutation.path)
+                        panic!(
+                            "{}: cannot apply mutation {}: {error}",
+                            case.id, mutation.path
+                        )
                     });
             }
 
