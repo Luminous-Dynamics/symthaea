@@ -169,7 +169,37 @@ Compare at least:
 
 The repo has no explicit root LICENSE file, so it is a literature/reference comparator until code/weight/data rights are confirmed. Its synthesis flows require commercial Synopsys Design Compiler and Cadence Genus licences. Do not imply the synthesis corpus can be recreated on an unlicensed environment.
 
-## 8. Multi-axis benchmark report
+## 8. Workstream E — engineer-actionable evidence, not generic heatmaps
+
+A recent explainability study provides a useful baseline for this requirement: Whitten et al., “Explainability Methods for Hardware Trojan Detection: A Systematic Comparison” (published 3 August 2026; DOI 10.1007/s10836-026-06245-2). On its 30-circuit / 19-package Trust-Hub corpus, a 60/20/20 random gate split gave XGBoost F1=0.568 (precision 48.08%, recall 69.44%, AUPRC 0.637); with the paper's fixed thresholds under leave-one-family-out evaluation, XGBoost micro-F1 fell to 0.033 and Random Forest to 0.003. The authors note only five host families and synthetic digital combinational cases; this is a boundary study, not an industrial population estimate.
+
+The same study reports only moderate gate-level rank agreement between LIME/SHAP explanations (mean Spearman rho=0.30). It found value in circuit-domain properties and retrieval of similar labelled examples, while noting that explanations need to translate into actionable hardware-engineering judgments. This motivates a different target: every alert should carry a **reviewable evidence packet**, not just a saliency image.
+
+An evidence packet should contain:
+- exact design/netlist hash, model/configuration digest, prediction threshold and score;
+- predicted affected gates/nets/cones with mapping confidence and localization metrics where ground truth is available;
+- circuit-domain properties supporting the alert (fanin/fanout, register boundaries, I/O reachability, component/cone context, trigger-path depth), with raw values and units;
+- a small set of precedent examples with exact dataset/split/source provenance, clearly marked as similar cases rather than proof;
+- a stimulus/activation witness or formal counterexample where one exists; timeout/unknown must be explicit;
+- source/derived artifact and label-map receipts, augmentation-equivalence status, and exact tool provenance;
+- explicit alternatives and uncertainty: why the signal may be benign, which evidence is missing, and what an engineer should verify next.
+
+### Explanation-quality evaluation
+
+Score explanations independently from detector accuracy:
+- localization overlap: gate/net/cone precision, recall, IoU and support;
+- evidence sufficiency: fraction of alerts with all required provenance, domain measurements and model lineage;
+- stability: explanation changes under verified benign-equivalent transformations and harmless identifier/synthesis perturbations;
+- counterfactual faithfulness: whether removing or neutralizing the claimed evidence in a controlled copy changes the prediction as described, while independent equivalence/functional checks ensure the control is valid;
+- reviewer actionability: time-to-triage, fraction of alerts accepted/rejected with a cited reason, disagreement and inter-reviewer consistency in a controlled human study;
+- false-alert burden at fixed analyst capacity, e.g. false positive gates/cones per 1,000 gates reviewed.
+
+Do not call an attribution “causal” solely because it has SHAP values or saliency. Do not claim improved human interpretability without a controlled study with hardware-security practitioners. Case retrieval must not leak test labels or public answers.
+
+Reference:
+- Whitten et al. (2026): https://doi.org/10.1007/s10836-026-06245-2
+
+## 9. Multi-axis benchmark report
 
 | Axis | Required metrics |
 |---|---|
@@ -186,7 +216,7 @@ The repo has no explicit root LICENSE file, so it is a literature/reference comp
 
 Publish Pareto frontiers rather than hiding verdict, localization, activation and resource cost in a single composite score.
 
-## 9. Proposed project gates
+## 10. Proposed project gates
 
 These are research targets, not achieved results, industry standards or certification criteria:
 
@@ -194,14 +224,15 @@ These are research targets, not achieved results, industry standards or certific
 2. Every training augmentation accepted into a confirmatory run has exact source/output hashes, passed equivalence at the appropriate semantic level, and a complete label map.
 3. Family-held-out evaluation has no sibling-design leakage; random-gate splits are diagnostic only.
 4. Show a measurable improvement in the predeclared entangled-case macro metric at the same false-positive budget, with worst-host results and group-aware uncertainty.
-5. Plot random/directed/constrained/sequential activation coverage against stimulus budget. A rare-trigger claim requires an activation witness or a sound formal result under explicit assumptions.
-6. Report detection and localization as distinct endpoints; a correct circuit verdict does not grant localization credit.
-7. All public answer lookups, hash caches and test-time labels are excluded from model predictions.
-8. The official contest result remains non-reproducible while hidden testcases are unavailable.
+5. Every detector alert has an evidence packet; explanation stability and localization are measured independently from classifier F1.
+6. Plot random/directed/constrained/sequential activation coverage against stimulus budget. A rare-trigger claim requires an activation witness or a sound formal result under explicit assumptions.
+7. Report detection and localization as distinct endpoints; a correct circuit verdict does not grant localization credit.
+8. All public answer lookups, hash caches and test-time labels are excluded from model predictions.
+9. The official contest result remains non-reproducible while hidden testcases are unavailable.
 
 The exact effect size and minimum independent design/family support must be set before the confirmatory split is opened.
 
-## 10. Reproduction commands
+## 11. Reproduction commands
 
 ```bash
 cargo test --example hardsec_trigger_budget
@@ -214,6 +245,6 @@ Expected mathematical result for the example: at p=10^-4, 1,000 independent tria
 
 The test suite checks known-answer miss probabilities, the minimum trial count, stable small-probability arithmetic, edge cases p=0 and p=1, invalid inputs and unrepresentably large budgets. These tests are authored but have not been compiled or executed in this environment.
 
-## 11. Scope boundary
+## 12. Scope boundary
 
 This is defensive benchmark and evaluation infrastructure. It does not construct or deploy Trojan payloads, claim a Trojan is absent because finite simulation was quiet, or certify silicon. Formal results must preserve assumptions, bounds and solver provenance. The public contest repository's code/checkpoint/data must not be redistributed until a license or explicit permission is established.
