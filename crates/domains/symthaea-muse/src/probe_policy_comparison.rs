@@ -476,18 +476,23 @@ fn summarize_curves(
             .collect();
         points.sort_by(|left, right| left.0.total_cmp(&right.0));
 
-        // Multiple requested budgets can underfill to the same actual cost.
-        // Collapse duplicate x-values and keep their best observed recall.
-        let mut unique_points: Vec<(f64, f64)> = Vec::with_capacity(points.len());
+        // Different requested budgets can have the same actual render cost.
+        // Average those observations at the shared x-coordinate instead of
+        // selecting the best one, which would bias an underfilled policy upward.
+        let mut unique_points: Vec<(f64, f64, usize)> = Vec::with_capacity(points.len());
         for (cost, recall) in points {
             if let Some(last) = unique_points.last_mut() {
                 if (last.0 - cost).abs() <= f64::EPSILON {
-                    last.1 = last.1.max(recall);
+                    last.1 += recall;
+                    last.2 += 1;
                     continue;
                 }
             }
-            unique_points.push((cost, recall));
+            unique_points.push((cost, recall, 1));
         }
+        let unique_points: Vec<(f64, f64)> = unique_points.into_iter()
+            .map(|(cost, recall_sum, count)| (cost, recall_sum / count as f64))
+            .collect();
 
         let auc = if unique_points.is_empty() {
             None
@@ -582,21 +587,20 @@ fn build_comparison(
         .map(|pair| (pair.left, pair.right))
         .collect();
 
-    // Validate renderer support metadata through the real EVAL-019 validator too.
-    if canonical_budgets.iter().any(|budget| *budget > 0) {
-        let mut validation_config = planner_config.clone();
-        validation_config.pair_probe_budget = 1;
-        validation_config.audit_pair_budget = 0;
-        validation_config.seed = canonical_seeds[0];
-        build_interaction_probe_plan(
-            source_score_sha256,
-            renderer_profile_sha256,
-            total_frames,
-            event_supports,
-            &validation_config,
-        )
-        .map_err(ProbePolicyComparisonError::ProbePlan)?;
-    }
+    // Validate the support evidence and planner configuration even when the
+    // requested curve contains only the no-probe point.
+    let mut validation_config = planner_config.clone();
+    validation_config.pair_probe_budget = 1;
+    validation_config.audit_pair_budget = 0;
+    validation_config.seed = canonical_seeds[0];
+    build_interaction_probe_plan(
+        source_score_sha256,
+        renderer_profile_sha256,
+        total_frames,
+        event_supports,
+        &validation_config,
+    )
+    .map_err(ProbePolicyComparisonError::ProbePlan)?;
 
     let exhaustive_render_count = 1u128
         .saturating_add(events.len() as u128)
