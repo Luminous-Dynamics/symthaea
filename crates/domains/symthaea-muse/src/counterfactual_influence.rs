@@ -24,7 +24,6 @@ use crate::audio_preservation::{AudioView, FrameInterval};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
     "mel-mr-eval-017-counterfactual-influence-v0.1";
@@ -102,6 +101,8 @@ pub struct RepeatabilityCalibration {
     pub channels: usize,
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
+    pub renderer_identity_sha256: String,
+    pub renderer_config_sha256: String,
     pub anchor_audio_sha256: String,
     /// Exact PCM digests for every no-op rerender, in supplied order.
     pub noop_audio_sha256: Vec<String>,
@@ -166,7 +167,7 @@ pub struct CounterfactualInfluenceReport {
 /// Exact artifacts and audio supplied to the paired measurement. The caller
 /// must create the counterfactual schedule by changing only the declared event;
 /// this module binds the bytes but does not independently parse the schedule.
-pub struct CounterfactualInfluenceInput<'a> {
+pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub source_event_id: &'a str,
     pub intervention: EventIntervention,
     pub source_score_bytes: &'a [u8],
@@ -175,8 +176,8 @@ pub struct CounterfactualInfluenceInput<'a> {
     pub counterfactual_schedule_bytes: &'a [u8],
     pub renderer_identity_bytes: &'a [u8],
     pub renderer_config_bytes: &'a [u8],
-    pub baseline_audio: &'a AudioView<'a>,
-    pub counterfactual_audio: &'a AudioView<'a>,
+    pub baseline_audio: &'view AudioView<'audio>,
+    pub counterfactual_audio: &'view AudioView<'audio>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -273,41 +274,39 @@ fn audio_sha256(audio: &AudioView<'_>) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn seal_digest<T: Serialize>(
+fn canonical_digest<T: Serialize>(
     value: &T,
-    receipt_field: &mut String,
     domain: &[u8],
-) -> Result<(), CounterfactualInfluenceError> {
-    receipt_field.clear();
+) -> Result<String, CounterfactualInfluenceError> {
     let bytes = serde_json::to_vec(value)
         .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
     let mut hasher = Sha256::new();
     hasher.update(domain);
     hasher.update(bytes);
-    *receipt_field = format!("{:x}", hasher.finalize());
-    Ok(())
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn verify_digest<T: Serialize>(
-    value: &T,
-    receipt: &str,
-    domain: &[u8],
+fn calibration_digest_valid(
+    calibration: &RepeatabilityCalibration,
 ) -> Result<bool, CounterfactualInfluenceError> {
-    if receipt.len() != 64
-        || !receipt
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
+    let mut unsealed = calibration.clone();
+    let expected = std::mem::take(&mut unsealed.receipt_sha256);
+    if expected.len() != 64 {
         return Ok(false);
     }
-    let bytes = serde_json::to_vec(value)
-        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    hasher.update(bytes);
-    Ok(format!("{:x}", hasher.finalize()) == receipt)
+    Ok(canonical_digest(&unsealed, CALIBRATION_DOMAIN)? == expected)
 }
 
+fn influence_digest_valid(
+    report: &CounterfactualInfluenceReport,
+) -> Result<bool, CounterfactualInfluenceError> {
+    let mut unsealed = report.clone();
+    let expected = std::mem::take(&mut unsealed.receipt_sha256);
+    if expected.len() != 64 {
+        return Ok(false);
+    }
+    Ok(canonical_digest(&unsealed, INFLUENCE_DOMAIN)? == expected)
+}
 fn validate_config(
     config: &InfluenceAnalysisConfig,
 ) -> Result<(), CounterfactualInfluenceError> {
@@ -519,11 +518,7 @@ fn seal_calibration(
     mut calibration: RepeatabilityCalibration,
 ) -> Result<RepeatabilityCalibration, CounterfactualInfluenceError> {
     calibration.receipt_sha256.clear();
-    seal_digest(
-        &calibration,
-        &mut calibration.receipt_sha256,
-        CALIBRATION_DOMAIN,
-    )?;
+    calibration.receipt_sha256 = canonical_digest(&calibration, CALIBRATION_DOMAIN)?;
     Ok(calibration)
 }
 
@@ -534,9 +529,22 @@ fn seal_calibration(
 pub fn calibrate_repeatability(
     anchor: &AudioView<'_>,
     noop_renders: &[AudioView<'_>],
+    renderer_identity_bytes: &[u8],
+    renderer_config_bytes: &[u8],
     analysis: &InfluenceAnalysisConfig,
 ) -> Result<RepeatabilityCalibration, CounterfactualInfluenceError> {
     validate_config(analysis)?;
+    for (name, bytes) in [
+        ("renderer_identity", renderer_identity_bytes),
+        ("renderer_config", renderer_config_bytes),
+    ] {
+        if bytes.is_empty() {
+            return Err(CounterfactualInfluenceError::EmptyArtifact(name));
+        }
+        if bytes.len() > MAX_ARTIFACT_BYTES {
+            return Err(CounterfactualInfluenceError::ArtifactTooLarge(name));
+        }
+    }
     let total_frames = validate_audio(anchor)?;
     if noop_renders.len() < MINIMUM_NOOP_RENDERS {
         return Err(CounterfactualInfluenceError::TooFewNoopRenders);
@@ -582,6 +590,8 @@ pub fn calibrate_repeatability(
         channels: anchor.channels,
         total_frames,
         analysis: analysis.clone(),
+        renderer_identity_sha256: sha256_hex(renderer_identity_bytes),
+        renderer_config_sha256: sha256_hex(renderer_config_bytes),
         anchor_audio_sha256: audio_sha256(anchor),
         noop_audio_sha256,
         cells,
@@ -597,11 +607,19 @@ pub fn verify_repeatability_calibration(
     calibration: &RepeatabilityCalibration,
     anchor: &AudioView<'_>,
     noop_renders: &[AudioView<'_>],
+    renderer_identity_bytes: &[u8],
+    renderer_config_bytes: &[u8],
 ) -> Result<VerifiedRepeatabilityCalibration, CounterfactualInfluenceError> {
-    if !verify_digest(calibration, &calibration.receipt_sha256, CALIBRATION_DOMAIN)? {
+    if !calibration_digest_valid(calibration)? {
         return Err(CounterfactualInfluenceError::InvalidCalibrationReceipt);
     }
-    let expected = calibrate_repeatability(anchor, noop_renders, &calibration.analysis)?;
+    let expected = calibrate_repeatability(
+        anchor,
+        noop_renders,
+        renderer_identity_bytes,
+        renderer_config_bytes,
+        &calibration.analysis,
+    )?;
     if &expected != calibration {
         return Err(CounterfactualInfluenceError::CalibrationReplayMismatch);
     }
@@ -624,7 +642,7 @@ fn validate_intervention(
 }
 
 fn validate_input(
-    input: &CounterfactualInfluenceInput<'_>,
+    input: &CounterfactualInfluenceInput<'_, '_>,
     calibration: &RepeatabilityCalibration,
 ) -> Result<usize, CounterfactualInfluenceError> {
     validate_intervention(&input.intervention)?;
@@ -662,6 +680,11 @@ fn validate_input(
     if audio_sha256(input.baseline_audio) != calibration.anchor_audio_sha256 {
         return Err(CounterfactualInfluenceError::CalibrationAnchorMismatch);
     }
+    if sha256_hex(input.renderer_identity_bytes) != calibration.renderer_identity_sha256
+        || sha256_hex(input.renderer_config_bytes) != calibration.renderer_config_sha256
+    {
+        return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
+    }
     Ok(frames)
 }
 
@@ -669,7 +692,7 @@ fn seal_report(
     mut report: CounterfactualInfluenceReport,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
     report.receipt_sha256.clear();
-    seal_digest(&report, &mut report.receipt_sha256, INFLUENCE_DOMAIN)?;
+    report.receipt_sha256 = canonical_digest(&report, INFLUENCE_DOMAIN)?;
     Ok(report)
 }
 
@@ -678,7 +701,7 @@ fn seal_report(
 /// declared intervention and renderer configuration, not exclusive ownership
 /// of affected audio samples.
 pub fn measure_counterfactual_influence(
-    input: &CounterfactualInfluenceInput<'_>,
+    input: &CounterfactualInfluenceInput<'_, '_>,
     verified_calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
     let calibration = &verified_calibration.calibration;
@@ -773,10 +796,10 @@ pub fn measure_counterfactual_influence(
 /// event-map, schedule, renderer, configuration, calibration and PCM inputs.
 pub fn verify_counterfactual_influence(
     report: &CounterfactualInfluenceReport,
-    input: &CounterfactualInfluenceInput<'_>,
+    input: &CounterfactualInfluenceInput<'_, '_>,
     verified_calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<bool, CounterfactualInfluenceError> {
-    if !verify_digest(report, &report.receipt_sha256, INFLUENCE_DOMAIN)? {
+    if !influence_digest_valid(report)? {
         return Err(CounterfactualInfluenceError::InvalidInfluenceReceipt);
     }
     let expected = measure_counterfactual_influence(input, verified_calibration)?;
@@ -812,14 +835,28 @@ mod tests {
         anchor: &AudioView<'a>,
         repeats: &[AudioView<'a>],
     ) -> VerifiedRepeatabilityCalibration {
-        let calibration = calibrate_repeatability(anchor, repeats, &config()).unwrap();
-        verify_repeatability_calibration(&calibration, anchor, repeats).unwrap()
+        let calibration = calibrate_repeatability(
+            anchor,
+            repeats,
+            b"renderer-fixture-v1",
+            b"config-seed-4-samplerate-48000",
+            &config(),
+        )
+        .unwrap();
+        verify_repeatability_calibration(
+            &calibration,
+            anchor,
+            repeats,
+            b"renderer-fixture-v1",
+            b"config-seed-4-samplerate-48000",
+        )
+        .unwrap()
     }
 
-    fn input<'a>(
-        baseline: &'a AudioView<'a>,
-        candidate: &'a AudioView<'a>,
-    ) -> CounterfactualInfluenceInput<'a> {
+    fn input<'view, 'audio>(
+        baseline: &'view AudioView<'audio>,
+        candidate: &'view AudioView<'audio>,
+    ) -> CounterfactualInfluenceInput<'view, 'audio> {
         CounterfactualInfluenceInput {
             source_event_id: "score-event-17",
             intervention: EventIntervention::Remove,
@@ -845,13 +882,29 @@ mod tests {
         );
 
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibrate_repeatability(&anchor, &repeats, &config()).unwrap();
+        let calibration = calibrate_repeatability(
+            &anchor,
+            &repeats,
+            b"renderer-fixture-v1",
+            b"config-seed-4-samplerate-48000",
+            &config(),
+        )
+        .unwrap();
         assert_eq!(calibration.noop_audio_sha256.len(), 3);
         assert_eq!(
             calibration.cells.iter().map(|cell| cell.maximum_noop_rms_delta).fold(0.0f32, f32::max),
             0.0
         );
-        assert!(verify_repeatability_calibration(&calibration, &anchor, &repeats).is_ok());
+        assert!(
+            verify_repeatability_calibration(
+                &calibration,
+                &anchor,
+                &repeats,
+                b"renderer-fixture-v1",
+                b"config-seed-4-samplerate-48000",
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -904,6 +957,22 @@ mod tests {
             InfluenceDisposition::NoEffectAboveNoiseFloor
         );
         assert_eq!(report.affected_channel_windows, 0);
+    }
+
+    #[test]
+    fn renderer_identity_or_configuration_mismatch_is_rejected() {
+        let base = vec![0.0f32; 256];
+        let anchor = audio(&base);
+        let repeats = [audio(&base), audio(&base), audio(&base)];
+        let calibration = calibration_for(&anchor, &repeats);
+        let candidate = audio(&base);
+        let mut experiment = input(&anchor, &candidate);
+        experiment.renderer_config_bytes = b"substituted-config";
+
+        assert_eq!(
+            measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::CalibrationConfigMismatch
+        );
     }
 
     #[test]
