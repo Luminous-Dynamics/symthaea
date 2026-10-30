@@ -501,6 +501,17 @@ mod tests {
     }
 
     #[test]
+    fn reader_context_requires_matching_request_identity_and_time() {
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+        context.verify_request_binding("principal-1", "scope-1", 200, 200).unwrap();
+        assert!(context.verify_request_binding("other-principal", "scope-1", 200, 200).is_err());
+        assert!(context.verify_request_binding("principal-1", "other-scope", 200, 200).is_err());
+        assert!(context.verify_request_binding("principal-1", "scope-1", 201, 200).is_err());
+        assert!(context.verify_request_binding("principal-1", "scope-1", 200, 199).is_err());
+    }
+    #[test]
     fn reader_context_rejects_non_supported_search_results() {
         let mut req = request();
         req.max_search_nodes = 1;
