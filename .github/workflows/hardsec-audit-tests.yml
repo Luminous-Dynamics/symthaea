@@ -264,42 +264,90 @@ jobs:
           PY
           cp "$RUNNER_TEMP/seqcube-evidence-audit.json" "$RUNNER_TEMP/hardsec-seqcube/"
 
-      - name: Reject a deliberately altered SeqCube trace (negative control)
+      - name: Reject independent SeqCube evidence mutations (negative controls)
         run: |
           set -euo pipefail
-          tampered_root="$RUNNER_TEMP/seqcube-tampered"
-          cp -a "$SEQCUBE_PACKAGE_ROOT" "$tampered_root"
-          printf '\n# intentional tamper negative control\n' >> "$tampered_root/replay/active.csv"
+          mkdir -p "$RUNNER_TEMP/hardsec-seqcube/negative-controls"
+          for mutation in active_vector observation_boundary inactive_smt; do
+            tampered_root="$RUNNER_TEMP/seqcube-tampered-$mutation"
+            cp -a "$SEQCUBE_PACKAGE_ROOT" "$tampered_root"
 
-          set +e
-          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
-            --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
-            --evidence-root "$tampered_root" \
-            --receipt "$RUNNER_TEMP/tampered-evidence-audit.json" \
-            > "$RUNNER_TEMP/tampered-auditor.stdout" \
-            2> "$RUNNER_TEMP/tampered-auditor.stderr"
-          auditor_status=$?
-          set -e
-          test "$auditor_status" -ne 0
-          grep -F "SHA-256 mismatch" "$RUNNER_TEMP/tampered-auditor.stderr"
+            case "$mutation" in
+              active_vector)
+                python3 - "$tampered_root/replay/active.csv" <<'PY'
+          import csv
+          import sys
+          from pathlib import Path
 
-          set +e
-          "$RUNNER_TEMP/seqcube-venv/bin/python" \
-            "$tampered_root/verify/verify_package.py" \
-            --package "$tampered_root" --require-iverilog \
-            > "$RUNNER_TEMP/tampered-upstream.stdout" \
-            2> "$RUNNER_TEMP/tampered-upstream.stderr"
-          upstream_status=$?
-          set -e
-          test "$upstream_status" -ne 0
-          grep -F "hash mismatch" "$RUNNER_TEMP/tampered-upstream.stderr"
+          path = Path(sys.argv[1])
+          rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+          targets = [row for row in rows if row["cycle"] == "2"]
+          if len(targets) != 1 or targets[0]["d1"] != "1":
+              raise SystemExit("expected exactly one active-vector cycle-2 d1=1 row")
+          targets[0]["d1"] = "0"
+          with path.open("w", newline="", encoding="utf-8") as handle:
+              writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\r\n")
+              writer.writeheader()
+              writer.writerows(rows)
+          PY
+                relative_path="replay/active.csv"
+                ;;
+              observation_boundary)
+                python3 - "$tampered_root/replay/expected_boundary.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
 
-          cp "$RUNNER_TEMP/tampered-auditor.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
-          cp "$RUNNER_TEMP/tampered-auditor.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
-          cp "$RUNNER_TEMP/tampered-upstream.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
-          cp "$RUNNER_TEMP/tampered-upstream.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
-          printf 'auditor_exit=%s\nupstream_exit=%s\n' "$auditor_status" "$upstream_status" \
-            > "$RUNNER_TEMP/hardsec-seqcube/negative-control-status.txt"
+          path = Path(sys.argv[1])
+          value = json.loads(path.read_text(encoding="utf-8"))
+          if value["observation_cycle"] != 8 or value["active_first_difference_cycle"] != 8:
+              raise SystemExit("unexpected baseline observation-cycle metadata")
+          value["observation_cycle"] = 7
+          value["active_first_difference_cycle"] = 7
+          path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+          PY
+                relative_path="replay/expected_boundary.json"
+                ;;
+              inactive_smt)
+                printf '\n; deliberate inactive SMT query corruption\n' >> "$tampered_root/audit/inactive.smt2"
+                relative_path="audit/inactive.smt2"
+                ;;
+              *)
+                echo "unsupported mutation: $mutation" >&2
+                exit 2
+                ;;
+            esac
+
+            set +e
+            cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+              --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+              --evidence-root "$tampered_root" \
+              --receipt "$RUNNER_TEMP/$mutation-evidence-audit.json" \
+              > "$RUNNER_TEMP/$mutation-auditor.stdout" \
+              2> "$RUNNER_TEMP/$mutation-auditor.stderr"
+            auditor_status=$?
+            set -e
+            test "$auditor_status" -ne 0
+            grep -F "SHA-256 mismatch" "$RUNNER_TEMP/$mutation-auditor.stderr"
+
+            set +e
+            "$RUNNER_TEMP/seqcube-venv/bin/python" \
+              "$tampered_root/verify/verify_package.py" \
+              --package "$tampered_root" --require-iverilog \
+              > "$RUNNER_TEMP/$mutation-upstream.stdout" \
+              2> "$RUNNER_TEMP/$mutation-upstream.stderr"
+            upstream_status=$?
+            set -e
+            test "$upstream_status" -ne 0
+            grep -F "hash mismatch" "$RUNNER_TEMP/$mutation-upstream.stderr"
+
+            cp "$RUNNER_TEMP/$mutation-auditor.stdout" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-auditor.stderr" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-upstream.stdout" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            cp "$RUNNER_TEMP/$mutation-upstream.stderr" "$RUNNER_TEMP/hardsec-seqcube/negative-controls/"
+            printf '%s\t%s\t%s\t%s\n' "$mutation" "$relative_path" "$auditor_status" "$upstream_status" \
+              >> "$RUNNER_TEMP/hardsec-seqcube/negative-controls/results.tsv"
+          done
 
       - name: Build machine-readable run manifest
         run: |
@@ -319,10 +367,22 @@ jobs:
           audit = json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
           verification = json.loads((output / "verification_report.json").read_text(encoding="utf-8"))
           upstream_manifest = json.loads((archive_root / "manifest.json").read_text(encoding="utf-8"))
-          negative = dict(
-              line.split("=", 1)
-              for line in (output / "negative-control-status.txt").read_text(encoding="utf-8").splitlines()
-          )
+          negative_lines = [
+              line.split("\\t")
+              for line in (output / "negative-controls/results.tsv").read_text(encoding="utf-8").splitlines()
+          ]
+          negative = [
+              {
+                  "mutation": mutation,
+                  "relative_path": relative_path,
+                  "evidence_auditor_exit": int(auditor_exit),
+                  "upstream_verifier_exit": int(upstream_exit),
+                  "both_rejected": int(auditor_exit) != 0 and int(upstream_exit) != 0,
+              }
+              for mutation, relative_path, auditor_exit, upstream_exit in negative_lines
+          ]
+          if len(negative) != 3 or not all(item["both_rejected"] for item in negative):
+              raise SystemExit(f"not all three independent negative controls rejected: {negative}")
 
           def digest(path):
               return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -392,9 +452,9 @@ jobs:
                   "security_verdict": audit["security_verdict"],
               },
               "negative_controls": {
-                  "our_evidence_auditor_exit": int(negative["auditor_exit"]),
-                  "upstream_verifier_exit": int(negative["upstream_exit"]),
-                  "expected": "both reject tampered replay/active.csv by SHA-256 mismatch",
+                  "expected_case_count": 3,
+                  "rejected_case_count": sum(item["both_rejected"] for item in negative),
+                  "cases": negative,
               },
               "claim_ceiling": [
                   "This is one author-created reference design, not a reported SeqCube-HT corpus member.",
