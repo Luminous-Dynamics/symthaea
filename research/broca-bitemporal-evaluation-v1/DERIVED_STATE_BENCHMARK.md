@@ -347,6 +347,36 @@ The implementation stores monotonic transaction coordinates across Add and lifec
 
 This is a current-state reference slice, not a complete general bitemporal database: it uses millisecond coordinates, does not yet model correction chains for arbitrary source events, and does not provide multi-clock interval joins. The public competition Search ABI remains unchanged and exposes the current view; historical query is a separate internal method.
 
+## 8E. Proof-aware minimum sufficient context (D41-D47)
+
+The companion [proof-budget-fixtures-v1.json](./proof-budget-fixtures-v1.json) defines 7 synthetic cases / 35 variants. It measures whether the retriever can assemble the least-cost sufficient set of evidence for every required conclusion, rather than returning top-k similarity-ranked passages.
+
+| Case | Failure mode | Required behavior |
+|---|---|---|
+| D41: alternative proof cost | A lower-ranked OR branch may be cheaper than the most similar proof | Select the minimum-token sufficient alternative that fits the budget |
+| D42: missing premise | A low-ranked source completes the only valid conjunctive proof | Include every required premise even when it is not among the highest similarity hits |
+| D43: fake corroboration | Multiple revisions from one source family appear independent | Count distinct source families, not revision multiplicity |
+| D44: delayed retraction | A source is retracted after the query's knowledge time | Preserve the earlier as-known proof; suppress it after the retraction is known |
+| D45: exact budget boundary | Complete proof cost exceeds budget by one token | Return BudgetInsufficient; never truncate a proof and label it complete |
+| D46: span mutation | A resolved source span differs from its committed digest | Reject the source candidate before packet construction |
+| D47: shared-premise deduplication | Two conclusions use the same premise | Charge the shared evidence once while preserving both proof dependencies |
+
+### Retrieval comparison arms
+
+B0 BM25 top-k; B1 dense/vector top-k; B2 hybrid lexical/vector/HDC reranking; B3 graph-expanded top-k; B4 source-linked alternative-proof retrieval; B5 exact proof-aware minimum-cost packet; B6 oracle-minimal packet for diagnostics only.
+
+Hold reader, source corpus, total tokens, model calls, latency limits and output contract constant. Report retrieval sufficiency separately from end-to-end answer correctness. A top-k result with high nDCG but a missing required premise is a retrieval failure for proof sufficiency.
+
+### Proposed project gates
+
+- 100% oracle agreement on deterministic D41-D47.
+- Zero invalid source, temporal, scope, authorization or source-span references in a Supported packet.
+- Zero partial/truncated packets reported as Supported.
+- Exact token accounting and shared-evidence deduplication.
+- Exact solver must return SearchLimitReached rather than claim an optimum when its node bound is exhausted.
+- Independently verify packet sufficiency; separately verify minimum-cost optimality.
+- Demonstrate improved strict evidence recall-all and downstream correctness over BM25 top-k at matched context budget, with paired uncertainty.
+
 ## 9. Implementation sequence
 
 1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
