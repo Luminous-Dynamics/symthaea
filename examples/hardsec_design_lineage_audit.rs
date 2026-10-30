@@ -602,7 +602,8 @@ fn run(args: Args) -> Result<(), String> {
         "lineage_metadata_status": "caller_declared_not_independently_inferred",
         "notes": [
             "Exact source file hashes and the declared split group were checked.",
-            "source_path/source_sha256 bind the evaluated input artifact; upstream parent RTL hashes belong in a separate lineage inventory.",
+            "source_path/source_sha256 bind the evaluated input artifact.",
+            "Upstream parent RTL hashes belong in a separate lineage inventory.",
             "Design-lineage IDs are caller-declared metadata; ancestry is not inferred.",
             "Structural similarity and semantic netlist equivalence were not evaluated.",
             "A pass does not establish detector quality, Trojan absence, or design security.",
