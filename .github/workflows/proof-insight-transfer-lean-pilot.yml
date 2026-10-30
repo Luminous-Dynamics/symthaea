@@ -186,6 +186,10 @@ jobs:
               "alternate-route-after-required-hypothesis-withdrawal": ("hEq", "h"),
               "original-route-after-irrelevant-context-removal": ("h", "hIrrelevant")
           }
+          expected_support_constants = {
+              "alternate-route-after-required-hypothesis-withdrawal": "Nat.le_refl",
+              "original-route-after-irrelevant-context-removal": "Nat.succ_le_succ"
+          }
           proof_support_receipts = []
           support_by_label = {}
           for raw in support_lines:
@@ -202,8 +206,13 @@ jobs:
                   raise SystemExit(f"proof-term support receipt {label} has no proof term")
               direct = support.get("direct_free_variable_support")
               closure = support.get("transitive_local_dependency_closure")
-              if not isinstance(direct, list) or not isinstance(closure, list):
+              constants = support.get("direct_global_constants")
+              if not isinstance(direct, list) or not isinstance(closure, list) or not isinstance(constants, list):
                   raise SystemExit(f"proof-term support receipt {label} has malformed dependency sets")
+              if len(constants) != len(set(constants)) or not all(isinstance(name, str) and name for name in constants):
+                  raise SystemExit(f"proof-term support receipt {label} has malformed global constant references")
+              if expected_support_constants[label] not in constants:
+                  raise SystemExit(f"proof term {label} does not directly reference expected move constant {expected_support_constants[label]}")
               for name, rows in (("direct", direct), ("transitive", closure)):
                   ids = [row.get("fvar_id") for row in rows if isinstance(row, dict)]
                   if len(ids) != len(rows) or len(ids) != len(set(ids)):
@@ -462,8 +471,12 @@ jobs:
                   closure_names = {row.get("user_name") for row in closure if isinstance(row, dict)}
                   required_names = set(contract.get("must_include_direct_declarations", []))
                   forbidden_names = set(contract.get("must_exclude_direct_declarations", []))
+                  required_constants = set(contract.get("must_include_direct_constants", []))
+                  constants = set(support.get("direct_global_constants", []))
                   if not required_names.issubset(direct_names) or forbidden_names.intersection(direct_names):
-                      errors.append(f"proof-term support contract failed for {label}")
+                      errors.append(f"proof-term local support contract failed for {label}")
+                  if not required_constants.issubset(constants):
+                      errors.append(f"proof-term global constant contract failed for {label}")
                   if not direct_names.issubset(closure_names):
                       errors.append(f"transitive support closure omits direct dependencies for {label}")
               trace_id = trace.get("case_id")
