@@ -52,5 +52,8 @@ jobs:
       - name: Exercise deterministic partition sweep
         run: cargo run --locked -p symthaea-iit --example directed_partition_sweep -- --repeats 2
 
+      - name: Exercise bounded factor-graph elimination sweep
+        run: cargo run --locked -p symthaea-iit --example factor_elimination_sweep
+
       - name: Clippy the isolated crate
         run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings
