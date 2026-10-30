@@ -2624,7 +2624,7 @@ fn entropy_stopping_benchmark_rows() -> Result<String, String> {
         use std::fmt::Write;
         let _ = writeln!(
             output,
-            "ENTROPY_STOP\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}",
+            "ENTROPY_STOP\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}",
             world.name,
             step,
             entropy,
@@ -2632,6 +2632,7 @@ fn entropy_stopping_benchmark_rows() -> Result<String, String> {
             conditional_entropy,
             coverage,
             entropy_stop,
+            value_stop,
             current_value,
             next_value,
             gain,
