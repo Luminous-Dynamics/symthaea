@@ -13,20 +13,23 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const BENCHMARK_SCHEMA: &str = "symthaea.tabular-nas.benchmark";
 const BENCHMARK_VERSION: &str = "0.1.0";
 
 /// Target metric orientation used for top-K ranking and regret.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MetricDirection {
     Maximize,
     Minimize,
 }
 
 /// Source and evaluation contract for one imported tabular benchmark split.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TabularBenchmarkManifest {
     pub schema: String,
     pub version: String,
@@ -48,7 +51,8 @@ pub struct TabularBenchmarkManifest {
 }
 
 /// Public-to-policy architecture information. It deliberately contains no target metric.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArchitectureFeatures {
     pub architecture_id: String,
     /// Precomputed, permitted zero-cost proxy values. Every architecture has the same keys.
@@ -60,7 +64,8 @@ pub struct ArchitectureFeatures {
 }
 
 /// One target metric record supplied only to the benchmark constructor/evaluator.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TargetLabel {
     pub architecture_id: String,
     pub value: f64,
@@ -87,7 +92,8 @@ impl fmt::Display for QueryError {
 impl Error for QueryError {}
 
 /// A revealed observation. The value is returned only for a successful unique query.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueryObservation {
     pub architecture_id: String,
     pub metric_id: String,
@@ -98,7 +104,8 @@ pub struct QueryObservation {
 }
 
 /// Recorded outcome of every query attempt. Raw target values are never copied into the trace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum QueryAttemptStatus {
     Revealed,
     UnknownArchitecture,
@@ -108,7 +115,8 @@ pub enum QueryAttemptStatus {
 
 /// One query attempt in policy order. observation_sha256 binds the returned value without
 /// placing that value itself in the receipt.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueryAttempt {
     pub attempt_index: usize,
     pub architecture_id: String,
@@ -119,9 +127,11 @@ pub struct QueryAttempt {
 
 /// Evaluator-owned receipt of the full request trace. It contains no raw target values and no
 /// unqueried target labels.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueryReceipt {
     pub benchmark_id: String,
+    pub canonical_import_sha256: String,
     pub metric_id: String,
     pub metric_direction: MetricDirection,
     pub split_id: String,
@@ -137,7 +147,8 @@ pub struct QueryReceipt {
 }
 
 /// Coverage of the true top-k architectures among the distinct architectures actually queried.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TopKCapture {
     pub k: usize,
     pub true_top_k_count: usize,
@@ -146,7 +157,8 @@ pub struct TopKCapture {
 }
 
 /// Evaluator-only metrics computed after the policy callback has returned.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TabularNasEvaluation {
     pub unique_queries: usize,
     pub query_budget: usize,
@@ -168,7 +180,8 @@ pub struct TabularNasEvaluation {
 }
 
 /// One complete, policy-independent run result.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TabularNasRun {
     pub receipt: QueryReceipt,
     pub evaluation: TabularNasEvaluation,
@@ -286,6 +299,18 @@ impl QueryOracle<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalTabularImport {
+    schema: String,
+    version: String,
+    manifest: TabularBenchmarkManifest,
+    architectures: Vec<ArchitectureFeatures>,
+    target_labels: Vec<TargetLabel>,
+}
+
+const CANONICAL_IMPORT_SCHEMA: &str = "symthaea.tabular-nas.canonical-import";
+
 /// Full evaluator. Fields containing labels and the oracle ranking are private. The only
 /// policy callback receives feature rows and a QueryOracle capability.
 pub struct TabularNasBenchmark {
@@ -296,9 +321,31 @@ pub struct TabularNasBenchmark {
     true_top_k_ids: Vec<String>,
     global_best_metric: f64,
     proxy_feature_bank_total_seconds: f64,
+    canonical_import_sha256: String,
 }
 
 impl TabularNasBenchmark {
+    /// Read the stable canonical JSON interchange format. Unknown fields are rejected so a
+    /// target label or unreviewed metadata field cannot silently enter the feature interface.
+    pub fn from_canonical_json(source: &str) -> Result<Self, TabularNasError> {
+        let imported: CanonicalTabularImport = serde_json::from_str(source).map_err(|error| {
+            TabularNasError::new("$", format!("invalid canonical NAS import JSON: {error}"))
+        })?;
+        if imported.schema != CANONICAL_IMPORT_SCHEMA {
+            return Err(TabularNasError::new(
+                "schema",
+                format!("expected canonical import schema {CANONICAL_IMPORT_SCHEMA:?}"),
+            ));
+        }
+        if imported.version != BENCHMARK_VERSION {
+            return Err(TabularNasError::new(
+                "version",
+                format!("expected canonical import version {BENCHMARK_VERSION:?}"),
+            ));
+        }
+        Self::new(imported.manifest, imported.architectures, imported.target_labels)
+    }
+
     /// Validate and seal a complete tabular benchmark.
     pub fn new(
         manifest: TabularBenchmarkManifest,
@@ -457,6 +504,9 @@ impl TabularNasBenchmark {
             .collect();
         let global_best_metric = ranked[0].1;
 
+        let canonical_import_sha256 =
+            digest_canonical_import(&features, &labels);
+
         Ok(Self {
             manifest,
             features,
@@ -465,6 +515,7 @@ impl TabularNasBenchmark {
             true_top_k_ids,
             global_best_metric,
             proxy_feature_bank_total_seconds,
+            canonical_import_sha256,
         })
     }
 
@@ -510,6 +561,7 @@ impl TabularNasBenchmark {
             digest_query_trace(&self.manifest, &parts.queried_order, &parts.attempts);
         QueryReceipt {
             benchmark_id: self.manifest.benchmark_id.clone(),
+            canonical_import_sha256: self.canonical_import_sha256.clone(),
             metric_id: self.manifest.metric_id.clone(),
             metric_direction: self.manifest.metric_direction,
             split_id: self.manifest.split_id.clone(),
@@ -663,6 +715,47 @@ fn capture_metric(
             queried_count as f64 / denominator as f64
         },
     }
+}
+
+/// Canonical digest of the imported feature and target tables. Architecture and label
+/// order are normalized; BTreeMap keeps proxy keys deterministic.
+fn digest_canonical_import(
+    features: &[ArchitectureFeatures],
+    labels: &HashMap<String, f64>,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.tabular-nas.canonical-import.v0.1");
+
+    let mut ordered_features: Vec<&ArchitectureFeatures> = features.iter().collect();
+    ordered_features.sort_by(|left, right| left.architecture_id.cmp(&right.architecture_id));
+    hasher.update((ordered_features.len() as u64).to_be_bytes());
+    for feature in ordered_features {
+        update_string(&mut hasher, &feature.architecture_id);
+        hasher.update((feature.topology_encoding.len() as u64).to_be_bytes());
+        hasher.update(&feature.topology_encoding);
+
+        hasher.update((feature.proxy_scores.len() as u64).to_be_bytes());
+        for (proxy_id, value) in &feature.proxy_scores {
+            update_string(&mut hasher, proxy_id);
+            hasher.update(value.to_bits().to_be_bytes());
+        }
+
+        hasher.update((feature.proxy_times_seconds.len() as u64).to_be_bytes());
+        for (proxy_id, seconds) in &feature.proxy_times_seconds {
+            update_string(&mut hasher, proxy_id);
+            hasher.update(seconds.to_bits().to_be_bytes());
+        }
+    }
+
+    let mut ordered_labels: Vec<(&String, &f64)> = labels.iter().collect();
+    ordered_labels.sort_by(|(left, _), (right, _)| left.cmp(right));
+    hasher.update((ordered_labels.len() as u64).to_be_bytes());
+    for (architecture_id, value) in ordered_labels {
+        update_string(&mut hasher, architecture_id);
+        hasher.update(value.to_bits().to_be_bytes());
+    }
+
+    hex_digest(hasher.finalize().as_slice())
 }
 
 fn digest_observation(metric_id: &str, architecture_id: &str, value: f64) -> String {
@@ -820,6 +913,46 @@ mod tests {
 
     fn benchmark() -> TabularNasBenchmark {
         TabularNasBenchmark::new(manifest(), features(12), targets(12)).unwrap()
+    }
+
+    #[test]
+    fn canonical_json_import_validates_schema_and_binds_content_digest() {
+        let imported = CanonicalTabularImport {
+            schema: CANONICAL_IMPORT_SCHEMA.into(),
+            version: BENCHMARK_VERSION.into(),
+            manifest: manifest(),
+            architectures: features(12),
+            target_labels: targets(12),
+        };
+        let source = serde_json::to_string(&imported).unwrap();
+        let benchmark = TabularNasBenchmark::from_canonical_json(&source).unwrap();
+        let run = benchmark.run_search(|_, oracle| {
+            oracle.query("arch-011").unwrap();
+        });
+        assert_eq!(run.receipt.canonical_import_sha256.len(), 64);
+    }
+
+    #[test]
+    fn canonical_json_import_rejects_unknown_fields_and_wrong_outer_schema() {
+        let imported = CanonicalTabularImport {
+            schema: "wrong".into(),
+            version: BENCHMARK_VERSION.into(),
+            manifest: manifest(),
+            architectures: features(12),
+            target_labels: targets(12),
+        };
+        let source = serde_json::to_string(&imported).unwrap();
+        assert!(TabularNasBenchmark::from_canonical_json(&source).is_err());
+
+        let mut value: serde_json::Value = serde_json::from_str(&serde_json::to_string(&CanonicalTabularImport {
+            schema: CANONICAL_IMPORT_SCHEMA.into(),
+            version: BENCHMARK_VERSION.into(),
+            manifest: manifest(),
+            architectures: features(12),
+            target_labels: targets(12),
+        }).unwrap()).unwrap();
+        value["unreviewed_target_column"] = serde_json::json!({"arch-011": 11.0});
+        assert!(TabularNasBenchmark::from_canonical_json(&value.to_string()).is_err());
     }
 
     #[test]
