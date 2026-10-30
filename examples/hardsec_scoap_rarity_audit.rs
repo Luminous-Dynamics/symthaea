@@ -408,9 +408,9 @@ fn parse_node(value: &Value, header: &Header) -> Result<(String, Node), String> 
 
     if metric_status == "unknown" {
         for field in ["cc0", "cc1", "co"] {
-            if value.get(field).is_some_and(|entry| !entry.is_null()) {
+            if value.get(field).is_some() {
                 return Err(format!(
-                    "node {design_id}/{node_id}: unknown metric_status must not supply {field}"
+                    "node {design_id}/{node_id}: unknown metric_status must omit {field}"
                 ));
             }
         }
@@ -1351,6 +1351,110 @@ mod tests {
         assert_eq!(tails[0].selected_labeled_nodes, 1);
         assert_eq!(tails[0].selected_unknown_label_nodes, 1);
         assert_eq!(tails[0].trigger_precision, Some(1.0));
+    }
+
+    #[test]
+    fn rejects_null_metric_fields_when_metric_status_is_unknown() {
+        let header = header(1_000);
+        let value = json!({
+            "design_id": "design-a",
+            "node_id": 5,
+            "metric_status": "unknown",
+            "cc0": null,
+            "label": "unknown"
+        });
+        assert!(parse_node(&value, &header)
+            .unwrap_err()
+            .contains("unknown metric_status must omit cc0"));
+    }
+
+    #[test]
+    fn verifies_exact_source_netlist_bytes() {
+        let base = env::temp_dir().join(format!(
+            "hardsec-scoap-source-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let path = base.join("design.v");
+        fs::write(&path, b"module fixture; endmodule\\n").unwrap();
+        let digest = sha256_file(&path).unwrap();
+        let design = DesignMeta {
+            design_id: "design-a".to_owned(),
+            base_design_family_id: "family-a".to_owned(),
+            split: "train".to_owned(),
+            netlist_sha256: digest,
+            netlist_path: Some("design.v".to_owned()),
+        };
+        verify_source_file(&base, &design).unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn rejects_source_netlist_hash_mismatch() {
+        let base = env::temp_dir().join(format!(
+            "hardsec-scoap-source-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&base).unwrap();
+        fs::write(base.join("design.v"), b"module fixture; endmodule\\n").unwrap();
+        let design = DesignMeta {
+            design_id: "design-a".to_owned(),
+            base_design_family_id: "family-a".to_owned(),
+            split: "train".to_owned(),
+            netlist_sha256: "a".repeat(64),
+            netlist_path: Some("design.v".to_owned()),
+        };
+        let error = verify_source_file(&base, &design).unwrap_err();
+        assert!(error.contains("SHA-256 mismatch"));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn rejects_source_path_traversal() {
+        let base = env::temp_dir().join(format!(
+            "hardsec-scoap-source-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let design = DesignMeta {
+            design_id: "design-a".to_owned(),
+            base_design_family_id: "family-a".to_owned(),
+            split: "train".to_owned(),
+            netlist_sha256: "a".repeat(64),
+            netlist_path: Some("../outside.v".to_owned()),
+        };
+        assert!(verify_source_file(&base, &design)
+            .unwrap_err()
+            .contains("must not contain"));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_source_netlist_symlink() {
+        let base = env::temp_dir().join(format!(
+            "hardsec-scoap-source-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let actual = base.join("actual.v");
+        fs::write(&actual, b"module fixture; endmodule\\n").unwrap();
+        std::os::unix::fs::symlink(&actual, base.join("design.v")).unwrap();
+        let design = DesignMeta {
+            design_id: "design-a".to_owned(),
+            base_design_family_id: "family-a".to_owned(),
+            split: "train".to_owned(),
+            netlist_sha256: sha256_file(&actual).unwrap(),
+            netlist_path: Some("design.v".to_owned()),
+        };
+        assert!(verify_source_file(&base, &design)
+            .unwrap_err()
+            .contains("symlink is forbidden"));
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
