@@ -594,7 +594,7 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                             aggregates[index].add(result, truth);
                             let error = result.value - truth;
                             output.push_str(&format!(
-                                "REPLICATE\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\tidentified_full_support\\n",
+                                "REPLICATE\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\tidentified_full_support\n",
                                 scenario.name(),
                                 sample_size,
                                 logger_kind.name(),
