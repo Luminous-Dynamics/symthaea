@@ -275,7 +275,7 @@ fn coordinate(metadata: &Value, bank: &str) -> Option<[f64; 3]> {
     Some(out)
 }
 
-fn cube_key(row: &Row, point: [f64; 3], edge_nm: f64, bank: &str) -> Option<String> {
+fn cube_key(row: &Row, point: [f64; 3], edge_nm: f64) -> Option<String> {
     let mut indices = [0_i64; 3];
     for (index, value) in point.iter().enumerate() {
         let scaled = (*value / edge_nm).floor();
@@ -285,8 +285,8 @@ fn cube_key(row: &Row, point: [f64; 3], edge_nm: f64, bank: &str) -> Option<Stri
         indices[index] = scaled as i64;
     }
     Some(format!(
-        "{}|{}|{},{},{}",
-        row.species, bank, indices[0], indices[1], indices[2]
+        "{}|{},{},{}",
+        row.species, indices[0], indices[1], indices[2]
     ))
 }
 
@@ -484,7 +484,7 @@ fn audit_rows(rows: &[ParsedRow], input_hash: String, cube_edge_nm: f64, dataset
         }
 
         match coordinate(metadata, bank) {
-            Some(point) => match cube_key(row, point, cube_edge_nm, bank) {
+            Some(point) => match cube_key(row, point, cube_edge_nm) {
                 Some(key) => {
                     cube_splits.entry(key).or_default().insert(split.clone());
                 }
@@ -920,6 +920,15 @@ mod tests {
         assert_eq!(report.dataset_revision, "v2");
         assert_eq!(report.dataset_revision_commit_sha, revision);
         assert_eq!(report.pinned_upstream_commit, "5679b39aa2641d8d0afeed88b441e696f87a66df");
+    }
+
+    #[test]
+    fn rejects_spatial_cube_crossing_partitions_across_different_sample_banks() {
+        let mut rows = valid_dataset();
+        rows[4].metadata["synapse_ctr_pt_nm"] = json!([20.0, 20.0, 20.0]);
+        rows[4].row.metadata = rows[4].metadata.to_string();
+        let report = report(&rows);
+        assert!(report.errors.iter().any(|finding| finding.code == "spatial_cube_cross_split"));
     }
 
 }
