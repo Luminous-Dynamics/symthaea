@@ -174,8 +174,39 @@ References:
 - [ ] Baseline results reproduced with exact code/data/model lineage or marked irreproducible.
 - [ ] No unqualified zero-day or industrial-transfer claim.
 
-## 14. Scope boundary
+## 14. Initial Rust audit implementation
+
+The branch now includes an opt-in generic manifest auditor:
+
+- `examples/hardsec_design_lineage_audit.rs`
+- Cargo feature: `hardsec-design-audit`
+- Example target: `hardsec_design_lineage_audit`
+
+Run its authored fixtures with:
+
+```bash
+cargo test --example hardsec_design_lineage_audit --features hardsec-design-audit
+```
+
+Run an audit after producing a manifest:
+
+```bash
+cargo run --example hardsec_design_lineage_audit --features hardsec-design-audit -- \
+  --manifest /path/to/design-samples.tsv \
+  --root /path/to/pinned-dataset \
+  --receipt /path/outside/dataset/design-lineage-receipt.json
+```
+
+The first schema is intentionally narrow and strict (14 tab-separated fields, exact order): `dataset_id, source_artifact_id, source_path, source_sha256, sample_id, design_id, base_design_family_id, netlist_id, trojan_family_id, synthesis_config_id, cell_library_id, split_protocol, split, label`.
+
+The auditor supports `random_gate` (diagnostic only), `loco_netlist`, `lofo_base_family`, `leave_trojan_family_out`, `leave_toolchain_out`, and `leave_library_out`. It verifies exact source bytes against SHA-256, rejects unsafe paths/symlinks and duplicate sample IDs, enforces the selected group holdout, and rejects exact source-file hash reuse across splits for non-random protocols. For random gate splits, exact-content and declared-lineage overlaps are reported rather than rejected because that split is diagnostic only.
+
+The JSON receipt is deterministic and unsigned. Its claim scope is source-file integrity plus the declared group-split check only. The lineage group identifiers are caller-supplied; the tool does not independently infer design ancestry. It does not parse Verilog, perform canonical graph comparison, detect non-identical near-duplicate logic, prove that the metadata is truthful, or evaluate a Trojan detector.
+
+Thirteen unit tests are authored for valid manifests, base-family/netlist/Trojan-family leakage, exact source-hash reuse, source tampering, path traversal, symlink rejection, duplicate sample IDs, missing toolchain identity, receipt overwrite/path safety, and the diagnostic random-gate mode. **They have not been compiled or run in this environment.**
+
+## 15. Scope boundary
 
 This work evaluates benchmark integrity and generalization of design-level hardware-Trojan detection. It does not modify hardware, create Trojan payloads or certify a design. It is not merged with RISC-V runtime telemetry metrics in HARDSEC-001/004 or secure generation in HARDSEC-002.
 
-Implementation follows only after obtaining and pinning the exact Trust-Hub release and its actual executable reproducibility artifacts.
+The generic manifest auditor is implemented, but a dataset-specific importer, canonical structural-overlap screening and independent verification of lineage metadata require the pinned Trust-Hub release and its actual executable reproducibility artifacts.
