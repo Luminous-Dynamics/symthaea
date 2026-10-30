@@ -113,13 +113,45 @@ The first Rust module provides:
 - a hard unique-query budget;
 - traceable duplicate, unknown and exhausted-budget attempts;
 - per-observation digests without raw labels in the receipt;
+- strict canonical JSON input with unknown-field rejection and a deterministic content digest over sorted architecture features, topology, proxy scores/times and target labels;
+- per-proxy computation times in seconds, kept separate from full-fidelity query counts;
+- metric direction (maximize/minimize), plus raw simple regret and normalized regret percentage (for positive best accuracy, matching the ZAPS definition).
 - deterministic query receipts;
 - evaluator-only P@1/P@10/P@100 and direction-aware simple regret;
 - constructor validation of source, metric, split, calibration provenance, IDs and finite values.
 
-Eighteen unit tests are authored for budget enforcement, attempt logging, top-K capture, no credit for unqueried predictions, deterministic traces, regret, calibration/evaluation split separation, invalid proxy/target schemas and receipt provenance. They have not been compiled or executed.
+Twenty-two unit tests are authored for budget enforcement, attempt logging, top-K capture, no credit for unqueried predictions, deterministic traces, regret, calibration/evaluation split separation, invalid proxy/target schemas and receipt provenance. They have not been compiled or executed.
 
-## 7. Qualification plan
+## 7. One-time NASLib SuiteZero importer
+
+The importer is `scripts/research/import_naslib_suite_zero.py` and uses only the Python standard library. It does not run inside the production Rust search runtime.
+
+It follows the actual observed NASLib `zerocost` loader:
+- `data[dataset]` selects a task such as `cifar10` or `cifar100`;
+- each architecture key is the string form of the NAS-Bench-201 six-operation-index tuple;
+- each architecture record contains `val_accuracy`;
+- each of the 13 proxy records contains `score` and `time`, with the latter in seconds.
+
+The converter checks the tuple length (six), operation range (0 through 4), exact one-to-one target-label coverage, all chosen proxy records, finite target values, nonnegative finite runtimes, and duplicate JSON object keys. It applies the same `+/-inf -> +/-1e9` proxy-score substitution observed in NASLib's ZeroCost evaluators, rejects NaN, and records the normalization count. It preserves proxy runtime values in `proxy_times_seconds`.
+
+Example invocation (the calibration digest must be the actual digest of the separate development/calibration artifact plus frozen proxy-selection decision):
+
+```bash
+python3 scripts/research/import_naslib_suite_zero.py \
+  --input data/zc_nasbench201.json \
+  --output data/symthaea-nb201-cifar10-v0.json \
+  --dataset cifar10 \
+  --benchmark-id suitezero-nb201-cifar10-v1 \
+  --evaluation-split-id challenge-cifar10 \
+  --proxy-calibration-split-id development-cifar100 \
+  --proxy-calibration-sha256 <64-hex-digest> \
+  --query-budget 200 \
+  --top-k 100
+```
+
+The tool records the raw input SHA-256 in the manifest, emits deterministic canonical JSON, writes the canonical output SHA-256 and counts of normalized infinite proxy scores to stderr, and refuses to overwrite an existing output unless `--force` is provided. The raw SuiteZero artifact is still not acquired or pinned in this repository; the importer is validated only against local synthetic fixtures until that artifact is fetched, hashed and schema-audited.
+
+## 8. Qualification plan
 
 Before connecting real tables:
 
@@ -134,6 +166,6 @@ Before connecting real tables:
 
 For NAS-Bench-201, reproduce ZAPS at budgets such as 50, 100, 200 and 400 (using its exact published settings where available), then compare a strict no-oracle variant with proxy calibration frozen on a disjoint task. Add at least one held-out search space (for example NAS-Bench-101 or NAS-Bench-301), with all methods using the same evaluator and query firewall. All benchmark results must include 100+ paired seeds or justify a power-based alternative.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 Synthetic tests qualify only the evaluator contract. They do not qualify the real benchmark import, prove a ZAPS reproduction, establish NAS generalization, improve architecture quality, or demonstrate SOTA. A successful query firewall makes comparisons more credible; it is not itself a better search algorithm.
