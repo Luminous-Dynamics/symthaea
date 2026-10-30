@@ -45,7 +45,7 @@ The reward-envelope arm uses a registered upper bound u(x,a) on each Bernoulli r
 
 `E_mu[(w_pi R)^2] <= 1/2 * sum_x (q_x^2*u(x,1)/p_x + (1-q_x)^2*u(x,0)/(1-p_x))`.
 
-The envelope is fixed at u(0,0)=0.20, u(0,1)=0.95, u(1,0)=0.98, u(1,1)=0.20, which contains all four true means in this frozen synthetic world. This is an explicit information assumption, not a learned guarantee. In a real system, these values would need to come from a valid external bound or a correctly constructed upper confidence bound available at logger-design time. An uncalibrated reward model is not a safety guarantee.
+The envelope is fixed at u(0,0)=0.20, u(0,1)=0.95, u(1,0)=0.98, u(1,1)=0.20, which contains all four true means in this frozen synthetic world. The benchmark validates this condition at startup and fails closed if the envelope undercovers, contains non-finite/out-of-range values, or the true reward table itself is invalid. A dedicated negative test raises one true mean above its registered envelope and requires rejection. This is an explicit information assumption, not a learned guarantee. In a real system, these values would need to come from a valid external bound or a correctly constructed upper confidence bound available at logger-design time. An uncalibrated reward model is not a safety guarantee.
 
 Even a valid envelope bound is not the exact variance: it upper-bounds the score's second moment and omits the policy-specific V(pi)² subtraction. It can therefore be conservative. The exact reward-aware arm uses true synthetic reward means and must remain oracle-only.
 
@@ -91,7 +91,7 @@ The focused exact-head workflow verifies test results, deterministic TSV output,
 - Independent formulas agree with code fixtures.
 - The minimax grid search matches exhaustive enumeration on a smaller test grid and is no worse than any point on its own registered grid.
 - The weight-proxy mismatch and reward-envelope known-answer controls pass as registered.
-- The reward envelope is explicitly validated against the four synthetic true means; no claim that this synthetic envelope is statistically estimated.
+- The reward envelope is explicitly validated against the four synthetic true means; a negative control with undercoverage is rejected before emitting design results. No claim that this synthetic envelope is statistically estimated.
 - Every logger retains the action-propensity floor; invalid floor and empty portfolio fail closed.
 - Oracle-only arms remain clearly identified and are not compared as deployable methods.
 - Report reward–variance–support tradeoffs across all regimes and portfolio sizes. No universal winner claim from a finite synthetic panel.
