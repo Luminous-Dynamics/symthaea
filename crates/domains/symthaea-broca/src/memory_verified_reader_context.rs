@@ -33,6 +33,8 @@ pub struct VerifiedReaderEvidence {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
+    #[serde(default)]
+    pub source_session_id: Option<String>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
     pub authorization_receipt_sha256: String,
@@ -365,6 +367,7 @@ pub fn build_verified_proof_reader_context(
             source_span_start: evidence.source_span_start,
             source_span_end: evidence.source_span_end,
             source_family_id: evidence.source_family_id.clone(),
+            source_session_id: evidence.source_session_id.clone(),
             payload_sha256: evidence.payload_sha256.clone(),
             source_span_sha256: evidence.source_span_sha256.clone(),
             authorization_receipt_sha256: evidence.authorization_receipt_sha256.clone(),
@@ -433,6 +436,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: excerpt.len() as u64,
             source_family_id: format!("family-{id}"),
+            source_session_id: Some(format!("session-{id}")),
             scope_id: "scope-1".into(),
             payload_sha256: digest("payload"),
             source_span_sha256: span_sha256.clone(),
@@ -480,6 +484,7 @@ mod tests {
                     },
                 ],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 0,
                 selection_overhead_tokens: 2,
             }],
         }
