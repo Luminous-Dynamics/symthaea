@@ -180,13 +180,15 @@ fn sha256_reader(mut reader: impl Read) -> Result<String, String> {
 }
 
 fn sha256_file_stable(path: &Path) -> Result<String, String> {
-    let before = fs::metadata(path).map_err(|error| format!("stat {} before hashing: {error}", path.display()))?;
+    let before = fs::metadata(path)
+        .map_err(|error| format!("stat {} before hashing: {error}", path.display()))?;
     if !before.is_file() {
         return Err(format!("source is not a regular file: {}", path.display()));
     }
     let file = File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
     let digest = sha256_reader(file)?;
-    let after = fs::metadata(path).map_err(|error| format!("stat {} after hashing: {error}", path.display()))?;
+    let after = fs::metadata(path)
+        .map_err(|error| format!("stat {} after hashing: {error}", path.display()))?;
     if before.len() != after.len() || before.modified().ok() != after.modified().ok() {
         return Err(format!("source changed while hashing: {}", path.display()));
     }
@@ -199,7 +201,9 @@ fn valid_sha256(value: &str) -> bool {
 
 fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
     if value.is_empty() || value.contains('\\') {
-        return Err(format!("source_path must be a non-empty slash-separated relative path: {value:?}"));
+        return Err(format!(
+            "source_path must be a non-empty slash-separated relative path: {value:?}"
+        ));
     }
     let path = Path::new(value);
     if path.is_absolute() {
@@ -238,7 +242,8 @@ fn resolve_source(root: &Path, relative: &str) -> Result<PathBuf, String> {
 }
 
 fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
-    let text = std::str::from_utf8(bytes).map_err(|error| format!("manifest is not UTF-8: {error}"))?;
+    let text = std::str::from_utf8(bytes)
+        .map_err(|error| format!("manifest is not UTF-8: {error}"))?;
     let mut lines = text.split_terminator('\n');
     let first = lines.next().ok_or("manifest is empty")?.trim_end_matches('\r');
     let actual_header: Vec<_> = first.split('\t').collect();
@@ -301,7 +306,9 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
         }
 
         if !valid_sha256(&source_sha256) {
-            return Err(format!("line {line_number}: source_sha256 must be 64 hexadecimal characters"));
+            return Err(format!(
+                "line {line_number}: source_sha256 must be 64 hexadecimal characters"
+            ));
         }
         safe_relative_path(&source_path)
             .map_err(|error| format!("line {line_number}: {error}"))?;
@@ -320,10 +327,14 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
         }
         match row_protocol {
             SplitProtocol::LeaveToolchainOut if synthesis_config_id.is_empty() => {
-                return Err(format!("line {line_number}: leave_toolchain_out requires synthesis_config_id"));
+                return Err(format!(
+                    "line {line_number}: leave_toolchain_out requires synthesis_config_id"
+                ));
             }
             SplitProtocol::LeaveLibraryOut if cell_library_id.is_empty() => {
-                return Err(format!("line {line_number}: leave_library_out requires cell_library_id"));
+                return Err(format!(
+                    "line {line_number}: leave_library_out requires cell_library_id"
+                ));
             }
             _ => {}
         }
@@ -349,7 +360,9 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
         let identity = (source_path.clone(), source_sha256.clone());
         if let Some(previous) = source_id_map.insert(source_artifact_id.clone(), identity.clone()) {
             if previous != identity {
-                return Err(format!("line {line_number}: source_artifact_id maps to inconsistent path/hash"));
+                return Err(format!(
+                    "line {line_number}: source_artifact_id maps to inconsistent path/hash"
+                ));
             }
         }
 
@@ -385,7 +398,10 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
     Ok(samples)
 }
 
-fn audit_groups(samples: &[Sample], protocol: SplitProtocol) -> Result<BTreeMap<String, usize>, String> {
+fn audit_groups(
+    samples: &[Sample],
+    protocol: SplitProtocol,
+) -> Result<BTreeMap<String, usize>, String> {
     let Some(field) = protocol.group_field() else {
         return Ok(BTreeMap::new());
     };
@@ -418,7 +434,10 @@ fn audit_groups(samples: &[Sample], protocol: SplitProtocol) -> Result<BTreeMap<
     Ok(counts)
 }
 
-fn audit_exact_source_hash_splits(samples: &[Sample], protocol: SplitProtocol) -> Result<usize, String> {
+fn audit_exact_source_hash_splits(
+    samples: &[Sample],
+    protocol: SplitProtocol,
+) -> Result<usize, String> {
     let mut hash_to_splits: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for sample in samples {
         hash_to_splits
@@ -467,7 +486,10 @@ fn lineage_overlap_counts(samples: &[Sample], field: &str) -> BTreeMap<String, u
 }
 
 fn receipt_path_outside_root(root: &Path, receipt: &Path) -> Result<PathBuf, String> {
-    let parent = receipt.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let parent = receipt
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     let filename = receipt.file_name().ok_or("receipt path must include a filename")?;
     let parent = fs::canonicalize(parent)
         .map_err(|error| format!("canonicalize receipt parent {}: {error}", parent.display()))?;
@@ -508,7 +530,11 @@ fn run(args: Args) -> Result<(), String> {
                 sample.source_path, sample.source_sha256, actual
             ));
         }
-        source_records.insert((sample.source_artifact_id.clone(), sample.source_path.clone(), actual));
+        source_records.insert((
+            sample.source_artifact_id.clone(),
+            sample.source_path.clone(),
+            actual,
+        ));
     }
 
     let cross_split_source_hash_count = audit_exact_source_hash_splits(&samples, protocol)?;
@@ -566,10 +592,10 @@ fn run(args: Args) -> Result<(), String> {
         "lineage_metadata_status": "caller_declared_not_independently_inferred",
         "notes": [
             "Exact source file hashes and the declared split group were checked.",
-            "Design-lineage IDs are caller-declared metadata; this tool does not independently infer source ancestry.",
+            "Design-lineage IDs are caller-declared metadata; ancestry is not inferred.",
             "Structural similarity and semantic netlist equivalence were not evaluated.",
             "A pass does not establish detector quality, Trojan absence, or design security.",
-            "random_gate is diagnostic only; cross-split lineage overlaps are reported, not rejected."
+            "random_gate is diagnostic only; overlaps are reported, not rejected."
         ]
     });
 
@@ -632,7 +658,10 @@ mod tests {
     impl Fixture {
         fn new(protocol: &str, rows: &[(&str, &str, &str, &str)]) -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let base = env::temp_dir().join(format!("hardsec-design-audit-{}-{id}", std::process::id()));
+            let base = env::temp_dir().join(format!(
+                "hardsec-design-audit-{}-{id}",
+                std::process::id()
+            ));
             let root = base.join("dataset");
             fs::create_dir_all(&root).unwrap();
             let manifest = base.join("manifest.tsv");
