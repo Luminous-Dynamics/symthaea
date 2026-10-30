@@ -10,6 +10,7 @@ on:
       - "tests/fixtures/hardsec/*.json"
       - "schemas/hardsec-*.schema.json"
       - "tools/hardsec-audit-harness/Cargo.toml"
+      - "tools/hardsec-audit-harness/Cargo.lock"
       - "tools/hardsec-audit-harness/requirements-validation.txt"
       - "tools/hardsec-audit-harness/actions.lock.json"
       - ".github/workflows/hardsec-audit-tests.yml"
@@ -51,8 +52,14 @@ jobs:
       - name: Prepare evidence result directory
         run: mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
 
-      - name: Resolve isolated harness dependencies
-        run: cargo generate-lockfile --manifest-path tools/hardsec-audit-harness/Cargo.toml
+      - name: Verify pinned isolated harness lockfile
+        run: |
+          set -euo pipefail
+          expected="004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82"
+          actual="$(sha256sum tools/hardsec-audit-harness/Cargo.lock | cut -d' ' -f1)"
+          test "$actual" = "$expected"
+          cp tools/hardsec-audit-harness/Cargo.lock "$RUNNER_TEMP/hardsec-seqcube/Cargo.lock"
+          printf 'harness_lock_sha256=%s\n' "$actual" > "$RUNNER_TEMP/hardsec-seqcube/harness-lock.sha256"
 
       - name: Test random-trigger sampling budget
         run: |
@@ -508,6 +515,7 @@ jobs:
                   "trigger_budget": tests(output / "trigger-budget-tests.log"),
                   "evidence_packet": tests(output / "evidence-packet-tests.log"),
                   "rustfmt": "pass",
+                  "harness_lock_sha256": digest(Path("tools/hardsec-audit-harness/Cargo.lock")),
               },
               "replay": {
                   "upstream_verifier": verification["result"],
@@ -653,14 +661,4 @@ jobs:
             ${{ runner.temp }}/hardsec-seqcubewitness-validation-receipt.tar.gz
             ${{ runner.temp }}/hardsec-attestation/
 
-      - name: Record resolved harness dependency lock
-        if: always()
-        run: sha256sum tools/hardsec-audit-harness/Cargo.lock || true
 
-      - name: Upload exact harness lockfile
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: hardsec-audit-harness-lock
-          path: tools/hardsec-audit-harness/Cargo.lock
-          if-no-files-found: ignore
