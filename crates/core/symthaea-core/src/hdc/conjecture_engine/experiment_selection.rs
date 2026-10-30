@@ -363,7 +363,8 @@ pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility
             continue;
         };
         let score = information_gain / experiment_cost;
-        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score) {
+        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score)
+        {
             best = Some((experiment, score));
         }
     }
