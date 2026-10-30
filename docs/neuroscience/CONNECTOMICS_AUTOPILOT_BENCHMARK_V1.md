@@ -566,3 +566,6 @@ Two additional assurance components now have executable implementations on the C
 - [Spatial eligibility-mask audit](CONNECTOME_SPATIAL_FRAME_AUDIT_PROTOCOL_V1.md): the frame report only emits PASS after streaming and hashing the exact mask artifact, validating bit order/length/padding, and checking that every eligible PSU contains mask foreground voxels while every excluded PSU contains none. This still does not certify that the mask's biological selection rule is correct or that the declared box is complete.
 
 The combined target is an auditable chain from a declared tissue sampling frame to candidate-generation recall and downstream query reliability. A numerical recall estimate is not promoted if the frame or mask integrity gate fails.
+
+
+- [Hidden co-linear merge executable baseline](CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md): separate evaluator-only truth, radius-only versus multifeature change-point proposals, and negative controls for taper, bouton pulses, imaging artifacts, and compartment transitions. Synthetic only; not a biological detector.
