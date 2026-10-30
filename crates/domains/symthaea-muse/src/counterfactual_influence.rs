@@ -1756,6 +1756,7 @@ mod tests {
         assert_eq!(verified.audio_sha256(), audio_sha256(&audio(&samples)));
         assert_eq!(verified.receipt_sha256(), render.receipt.receipt_sha256);
         assert_eq!(verified.performed_event_lineage().len(), 2);
+        assert_eq!(verified.fluid_synth_effects_groups(), Some(1));
 
         let mut altered = samples.clone();
         altered[10] = 0.25;
