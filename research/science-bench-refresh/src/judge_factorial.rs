@@ -92,15 +92,6 @@ impl JudgeNuisanceFactorV1 {
         Self::PresentationFormat,
     ];
 
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::CandidateOrder => "candidate_order",
-            Self::ScoreOptionOrder => "score_option_order",
-            Self::CriterionOrder => "criterion_order",
-            Self::ProvenanceCue => "provenance_cue",
-            Self::PresentationFormat => "presentation_format",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -346,7 +337,7 @@ pub struct FactorialInteractionV1 {
     pub complete_01_count: u64,
     pub complete_10_count: u64,
     pub complete_11_count: u64,
-    pub incomplete_factorial_groups: u64,
+    pub ineligible_conditions_across_four_cells: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -601,7 +592,6 @@ pub fn verify_judge_factorial_plan(
 
 #[derive(Debug, Clone)]
 struct CompletedMetricV1 {
-    block_id: String,
     factors: JudgeNuisanceFactorsV1,
     candidate_score_gap: f64,
     mean_criterion_score: f64,
@@ -653,7 +643,6 @@ fn metric_for_observation(
     }
     let criterion_count = block.criterion_ids.len() as f64;
     Ok(CompletedMetricV1 {
-        block_id: block.block_id.clone(),
         factors: condition.factors,
         candidate_score_gap: f64::from(candidate_a) - f64::from(candidate_b),
         mean_criterion_score: score_sum / criterion_count,
@@ -756,7 +745,7 @@ fn main_effects(
         let canonical_mean = mean(canonical.iter().copied());
         let reversed_mean = mean(reversed.iter().copied());
         criterion_effects.push(CriterionOrderEffectV1 {
-            criterion_id: criterion_id.clone(),
+            criterion_id: criterion_id.to_string(),
             canonical_mean_millionths: canonical_mean,
             reversed_mean_millionths: reversed_mean,
             reversed_minus_canonical_millionths: reversed_mean.zip(canonical_mean)
@@ -768,7 +757,10 @@ fn main_effects(
     (effects, counts, criterion_effects)
 }
 
-fn pairwise_interactions(metrics: &[CompletedMetricV1]) -> Vec<FactorialInteractionV1> {
+fn pairwise_interactions(
+    plan: &JudgeFactorialPlanV1,
+    metrics: &[CompletedMetricV1],
+) -> Vec<FactorialInteractionV1> {
     let mut output = Vec::new();
     for first in 0..FACTOR_COUNT {
         for second in (first + 1)..FACTOR_COUNT {
@@ -794,8 +786,11 @@ fn pairwise_interactions(metrics: &[CompletedMetricV1]) -> Vec<FactorialInteract
                 count_at(false, false), count_at(false, true),
                 count_at(true, false), count_at(true, true),
             ];
-            let complete_groups = *counts.iter().min().unwrap_or(&0);
-            let total_groups = metrics.len() as u64 / 4;
+            let completed_in_four_cells = counts.iter().copied().sum::<u64>();
+            let planned_per_cell = plan.blocks.len() as u64
+                * u64::from(plan.repeats_per_condition)
+                * (FACTORIAL_CELLS as u64 / 4);
+            let planned_in_four_cells = planned_per_cell * 4;
             output.push(FactorialInteractionV1 {
                 factor_a,
                 factor_b,
@@ -807,7 +802,7 @@ fn pairwise_interactions(metrics: &[CompletedMetricV1]) -> Vec<FactorialInteract
                 complete_01_count: counts[1],
                 complete_10_count: counts[2],
                 complete_11_count: counts[3],
-                incomplete_factorial_groups: total_groups.saturating_sub(complete_groups),
+                ineligible_conditions_across_four_cells: planned_in_four_cells.saturating_sub(completed_in_four_cells),
             });
         }
     }
@@ -842,9 +837,7 @@ pub fn analyze_judge_factorial(
     }
 
     let mut expected = BTreeMap::new();
-    let mut block_map = BTreeMap::new();
     for block in &plan.blocks {
-        block_map.insert(block.block_id.as_str(), block);
         for condition in &block.conditions {
             expected.insert(condition.condition_id.as_str(), (block, condition));
         }
@@ -906,7 +899,7 @@ pub fn analyze_judge_factorial(
     }
     let (main_effects, level_counts, criterion_order_effects) =
         main_effects(&plan, &metrics, &observations_by_id);
-    let interactions = pairwise_interactions(&metrics);
+    let interactions = pairwise_interactions(&plan, &metrics);
 
     let mut block_summaries = Vec::new();
     let mut completed_total = 0_u64;
