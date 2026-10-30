@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "program": "BASALT",
   "suite_id": "basalt-smoke",
   "version": "0.1.0",
@@ -32,7 +32,119 @@
           "kind": "scope",
           "blocking": true
         }
-      ]
+      ],
+      "quality_rubric": {
+        "rubric_id": "compiler-repair-quality-v1",
+        "version": "1.0.0",
+        "total_weight_basis_points": 10000,
+        "criteria": [
+          {
+            "criterion_id": "maintainability",
+            "dimension": "maintainability",
+            "applicability": "scored",
+            "weight_basis_points": 4000,
+            "applicability_rationale": "A compiler repair should leave the affected code understandable and maintainable.",
+            "evidence_sources": [
+              "diff",
+              "static_analysis",
+              "human_review"
+            ],
+            "reviewer_guidance": "Assess clarity, local reasoning burden, and avoidable complexity without rewarding line-count minimization.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "The change is opaque, misleading, or materially harder to maintain."
+              },
+              {
+                "score": 1,
+                "description": "The change works only through brittle special cases or substantial unnecessary complexity."
+              },
+              {
+                "score": 2,
+                "description": "The change is understandable but leaves notable avoidable complexity or unclear structure."
+              },
+              {
+                "score": 3,
+                "description": "The change is clear and locally maintainable with only minor shortcomings."
+              },
+              {
+                "score": 4,
+                "description": "The change is exceptionally clear, cohesive, and easy to maintain without unnecessary abstraction."
+              }
+            ]
+          },
+          {
+            "criterion_id": "test_quality",
+            "dimension": "test_quality",
+            "applicability": "scored",
+            "weight_basis_points": 3000,
+            "applicability_rationale": "A repair should add or improve regression evidence beyond merely satisfying hidden acceptance tests.",
+            "evidence_sources": [
+              "diff",
+              "test_results",
+              "human_review"
+            ],
+            "reviewer_guidance": "Evaluate whether tests target the underlying fault, meaningful boundaries, and plausible regressions; do not treat hidden verifier checks as authored test quality.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "No useful regression evidence is added or existing coverage is weakened."
+              },
+              {
+                "score": 1,
+                "description": "Tests are superficial, brittle, or weakly connected to the repaired behavior."
+              },
+              {
+                "score": 2,
+                "description": "Tests cover the basic repair but miss important boundaries or regressions."
+              },
+              {
+                "score": 3,
+                "description": "Tests cover the repair and its principal regression boundaries."
+              },
+              {
+                "score": 4,
+                "description": "Tests are focused, robust, and exercise the key failure modes and relevant boundaries."
+              }
+            ]
+          },
+          {
+            "criterion_id": "scope_discipline",
+            "dimension": "scope_discipline",
+            "applicability": "scored",
+            "weight_basis_points": 3000,
+            "applicability_rationale": "The task requires a bounded repair that avoids unrelated edits while still fixing all specified behavior.",
+            "evidence_sources": [
+              "diff",
+              "static_analysis",
+              "human_review"
+            ],
+            "reviewer_guidance": "Judge scope against the frozen task specification; a small incomplete patch and a broad unnecessary patch are both low quality.",
+            "anchors": [
+              {
+                "score": 0,
+                "description": "The patch violates scope or bypasses required behavior."
+              },
+              {
+                "score": 1,
+                "description": "The patch contains major unrelated changes or omits substantial required work."
+              },
+              {
+                "score": 2,
+                "description": "The patch is mostly in scope but includes avoidable edits or leaves a limited requirement under-addressed."
+              },
+              {
+                "score": 3,
+                "description": "The patch addresses the task with only minor scope inefficiency."
+              },
+              {
+                "score": 4,
+                "description": "The patch is tightly scoped and complete, with no unnecessary edits."
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "seed_policy": "fixed_paired",
