@@ -185,8 +185,10 @@ struct OracleRecord {
 #[serde(deny_unknown_fields)]
 struct MutationWitness {
     applied: bool,
-    before_digest: Option<String>,
-    after_digest: Option<String>,
+    #[serde(default)]
+    before_digest: RequiredNullable<String>,
+    #[serde(default)]
+    after_digest: RequiredNullable<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -293,6 +295,18 @@ pub fn audit_bytes(
             return report;
         }
     };
+    let catalog_audit = crate::basalt_observer::audit_bytes(catalog_bytes);
+    if !catalog_audit.structurally_valid {
+        push_error(
+            &mut report,
+            None,
+            "E_CATALOG_STRUCTURAL",
+            "catalog",
+            "challenge catalog failed the independent structural auditor",
+        );
+        return report;
+    }
+
     let oracle: OracleLedger = match serde_json::from_slice(oracle_bytes) {
         Ok(value) => value,
         Err(error) => {
@@ -491,6 +505,26 @@ pub fn audit_bytes(
         &receipts_by_id,
         &mut report,
     );
+
+    report.counts.passed_cases = 0;
+    report.counts.failed_cases = 0;
+    for assessment in &mut report.cases {
+        let codes = report
+            .errors
+            .iter()
+            .filter(|error| error.case_id.as_deref() == Some(assessment.case_id.as_str()))
+            .map(|error| error.code.clone())
+            .collect::<BTreeSet<_>>();
+        assessment.error_codes = codes.into_iter().collect();
+        assessment.passed = assessment.error_codes.is_empty()
+            && assessment.oracle_ground_truth.is_some()
+            && assessment.observer_disposition.is_some();
+        if assessment.passed {
+            report.counts.passed_cases += 1;
+        } else {
+            report.counts.failed_cases += 1;
+        }
+    }
 
     report.adjudication_complete = complete
         && report.counts.adjudicated_cases == catalog.cases.len();
@@ -715,10 +749,19 @@ fn adjudicate_case(
             "dependency and unrelated-control cases require an applied resource mutation",
         );
     }
+    if !oracle.mutation.before_digest.present || !oracle.mutation.after_digest.present {
+        push_error(
+            report,
+            Some(case_id),
+            "E_MUTATION_DIGEST_FIELDS_REQUIRED",
+            &format!("{path}.oracle.mutation"),
+            "before_digest and after_digest must be present, using null when no mutation was applied",
+        );
+    }
     match (
         oracle.mutation.applied,
-        oracle.mutation.before_digest.as_deref(),
-        oracle.mutation.after_digest.as_deref(),
+        oracle.mutation.before_digest.value.as_deref(),
+        oracle.mutation.after_digest.value.as_deref(),
     ) {
         (true, Some(before), Some(after)) => {
             if !valid_digest(before) || !valid_digest(after) || before == after {
@@ -769,6 +812,7 @@ fn adjudicate_case(
             );
         }
     }
+    let mut hidden_dependency_missed = false;
     for required in &case.required_receipt_facts {
         if !fact_set.contains(required.as_str()) {
             push_error(
@@ -778,9 +822,7 @@ fn adjudicate_case(
                 &format!("{path}.receipt.facts"),
                 "observer receipt is missing a catalog-required fact",
             );
-            if case.expected_disposition == "capture_dependency" {
-                report.metrics.hidden_dependency_misses += 1;
-            }
+            hidden_dependency_missed |= case.expected_disposition == "capture_dependency";
         }
     }
 
@@ -843,10 +885,14 @@ fn adjudicate_case(
         })
         .unwrap_or_default();
 
+    if hidden_dependency_missed {
+        report.metrics.hidden_dependency_misses += 1;
+    }
+
     match case.expected_disposition.as_str() {
         "capture_dependency" => {
             if matching_observations.len() != 1 {
-                report.metrics.hidden_dependency_misses += 1;
+                hidden_dependency_missed = true;
                 push_error(
                     report,
                     Some(case_id),
@@ -854,9 +900,9 @@ fn adjudicate_case(
                     &format!("{path}.receipt.observed_resources"),
                     "consumed ground-truth resource must be represented exactly once in the observer receipt",
                 );
-            } else if let Some(expected_digest) = oracle.mutation.after_digest.as_deref() {
+            } else if let Some(expected_digest) = oracle.mutation.after_digest.value.as_deref() {
                 if matching_observations[0].digest != expected_digest {
-                    report.metrics.hidden_dependency_misses += 1;
+                    hidden_dependency_missed = true;
                     push_error(
                         report,
                         Some(case_id),
@@ -1064,8 +1110,8 @@ fn validate_pairs(
             };
             if left_oracle.injected_resource_id.value
                 != right_oracle.injected_resource_id.value
-                || left_oracle.mutation.before_digest != right_oracle.mutation.before_digest
-                || left_oracle.mutation.after_digest != right_oracle.mutation.after_digest
+                || left_oracle.mutation.before_digest.value != right_oracle.mutation.before_digest.value
+                || left_oracle.mutation.after_digest.value != right_oracle.mutation.after_digest.value
                 || !left_oracle.mutation.applied
                 || !right_oracle.mutation.applied
             {
