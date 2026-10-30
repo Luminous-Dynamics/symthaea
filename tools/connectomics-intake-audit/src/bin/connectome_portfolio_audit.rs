@@ -660,7 +660,7 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         source_graph_sha256: input.source_graph_sha256.clone(),
         baseline_graph_canonical_sha256: canonical_graph_sha256(&baseline_graph),
         candidate_count: input.candidates.len(),
-        subset_count_evaluated: (1_u64 << input.candidates.len()) - 1,
+        subset_count_evaluated: ((1_u64 << input.candidates.len()) - 1) * input.review_budgets_minutes.len() as u64,
         baseline_weighted_query_error: baseline_error,
         pairwise_interactions: pairwise_interactions(input, baseline_error),
         budget_results,
@@ -773,7 +773,7 @@ mod tests {
     fn exact_optimum_respects_budget_and_never_reports_oracle_as_ranking_input() {
         let candidates = vec![
             candidate("expensive-correct", 0.99, 3.0, EdgeChange::AddWeight { source: 1, target: 2, weight: 1.0 }),
-            candidate("cheap-correct", 0.7, 1.0, EdgeChange::AddWeight { source: 2, target: 3, weight: 1.0 }),
+            candidate("cheap-correct", 0.7, 1.0, EdgeChange::AddWeight { source: 1, target: 2, weight: 1.0 }),
         ];
         let queries = vec![Query {
             query_id: "edge".into(), weight: 1.0, normalization_scale: 1.0,
