@@ -143,3 +143,5 @@ Sources: [BEAM ICLR 2026 paper](https://proceedings.iclr.cc/paper_files/paper/20
 ## Policy V2: cross-session proof coverage
 
 V2 extends the opaque proof capability and claim ledger to bind the exact distinct session IDs behind each selected claim proof. A session threshold is a separate constraint from independent source-family count: two families in one session do not count as multi-session coverage, and two sessions from one family do not establish independent-source diversity. The capability checks the session set again at the final ANSWER gate. See [CROSS_SESSION_PROOF_COVERAGE.md](CROSS_SESSION_PROOF_COVERAGE.md) and [cross-session-proof-fixtures-v1.json](cross-session-proof-fixtures-v1.json).
+
+The V2 proof capability is derived only after the verified reader context's canonical `context_sha256` has been recomputed and checked. That digest commits to the session provenance handed to the reader; the final answer gate still requires the original in-process capability.
