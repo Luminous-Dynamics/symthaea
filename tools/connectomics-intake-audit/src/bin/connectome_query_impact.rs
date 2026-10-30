@@ -140,6 +140,7 @@ struct PolicyBudgetResult {
     reviewed_candidate_count: usize,
     applied_candidate_count: usize,
     rejected_conflict_count: usize,
+    policy_order_candidate_ids: Vec<String>,
     reviewed_candidate_ids: Vec<String>,
     applied_candidate_ids: Vec<String>,
     rejected_conflict_candidate_ids: Vec<String>,
@@ -707,6 +708,7 @@ fn replay_policy_budget(
     input_hash: &str,
 ) -> Result<PolicyBudgetResult, String> {
     let order = ranked_candidate_indices(graph, policy, candidates, evaluations, input_hash)?;
+    let policy_order_candidate_ids = order.iter().map(|index| candidates[*index].candidate_id.clone()).collect();
     let baseline_error = weighted_query_error(graph, queries)?;
     let mut current_graph = graph.clone();
     let mut actual_minutes = 0.0;
@@ -742,6 +744,7 @@ fn replay_policy_budget(
         reviewed_candidate_count: reviewed_ids.len(),
         applied_candidate_count: applied_ids.len(),
         rejected_conflict_count: rejected_ids.len(),
+        policy_order_candidate_ids,
         reviewed_candidate_ids: reviewed_ids,
         applied_candidate_ids: applied_ids,
         rejected_conflict_candidate_ids: rejected_ids,
