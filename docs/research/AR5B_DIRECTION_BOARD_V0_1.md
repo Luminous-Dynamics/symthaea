@@ -100,7 +100,9 @@ This is deliberately not a global score leaderboard. Local yield asks whether a 
 
 ## Evidence and determinism
 
-The board uses ordered maps/sets for stable serialization. Its digest binds:
+The board uses ordered maps/sets for stable serialization. Before a recommendation or digest can be exported, `validate_integrity` now reconstructs every direction's counters, local-best score, total record improvement, cost and yield from the full attempt records. It independently reconstructs NEW-arm proposal counts, admission credit, cost and yield from every proposal, including rejected, duplicate and inconclusive proposals. It rejects noncanonical registered descriptors and multiple admissions of the same canonical direction. This prevents a deserialized board from presenting altered summary counters while retaining apparently well-shaped receipt references.
+
+The full board digest binds:
 - schema/version and frozen config;
 - canonical direction descriptors and verifier receipt references;
 - all full attempt records;
@@ -127,7 +129,7 @@ The module includes tests for:
 - board digest changes after evidence is recorded;
 - board digest binding the semantic-delta receipt, not only summary aggregates.
 
-These tests validate deterministic board semantics, not the superiority of this allocation policy. They have not been executed yet.
+The follow-up integrity tests also require direction aggregates to reconcile with all attempt receipts, NEW-arm aggregates to reconcile with all proposal receipts, duplicate admissions to fail, and registered descriptors to be canonical. These tests validate deterministic board semantics and serialized-evidence integrity, not the superiority of this allocation policy. They have not been executed yet.
 
 ## Next benchmark tranche
 
