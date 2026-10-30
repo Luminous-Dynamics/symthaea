@@ -106,6 +106,168 @@ fn dataset(seed: u64, count: usize, law: Law) -> Vec<Experience> {
         .collect()
 }
 
+const LINEAR_FEATURES: usize = DIM * 2 + 1;
+const LINEAR_RIDGE: f64 = 1.0e-3;
+
+/// A low-compute ARX baseline fitted by ridge least squares on the same support tape.
+/// Features are current state, action and intercept; predictions are state + delta.
+#[derive(Clone, Debug, PartialEq)]
+struct LinearArxBaseline {
+    weights: Vec<Vec<f64>>, // output dimension × feature dimension
+}
+
+impl LinearArxBaseline {
+    fn features(state: &[f32], action: &[f32]) -> [f64; LINEAR_FEATURES] {
+        let mut features = [0.0_f64; LINEAR_FEATURES];
+        for index in 0..DIM {
+            features[index] = state[index] as f64;
+            features[DIM + index] = action[index] as f64;
+        }
+        features[LINEAR_FEATURES - 1] = 1.0;
+        features
+    }
+
+    fn fit(data: &[Experience], ridge: f64) -> Result<Self, String> {
+        if data.is_empty() {
+            return Err("linear ARX training data must not be empty".to_owned());
+        }
+        if !ridge.is_finite() || ridge < 0.0 {
+            return Err("linear ARX ridge penalty must be finite and nonnegative".to_owned());
+        }
+
+        // Normal equations for all outputs at once:
+        // (X'X + λI) B = X' ΔY. Keep the intercept unpenalized.
+        let mut gram = vec![vec![0.0_f64; LINEAR_FEATURES]; LINEAR_FEATURES];
+        let mut rhs = vec![vec![0.0_f64; DIM]; LINEAR_FEATURES];
+        for row in data {
+            if row.state.len() != DIM || row.action.len() != DIM || row.next_state.len() != DIM {
+                return Err("linear ARX row dimension mismatch".to_owned());
+            }
+            let features = Self::features(&row.state, &row.action);
+            for left in 0..LINEAR_FEATURES {
+                for right in 0..LINEAR_FEATURES {
+                    gram[left][right] += features[left] * features[right];
+                }
+                for output in 0..DIM {
+                    let delta = row.next_state[output] as f64 - row.state[output] as f64;
+                    rhs[left][output] += features[left] * delta;
+                }
+            }
+        }
+        for feature in 0..LINEAR_FEATURES - 1 {
+            gram[feature][feature] += ridge;
+        }
+
+        let mut augmented = vec![vec![0.0_f64; LINEAR_FEATURES + DIM]; LINEAR_FEATURES];
+        for row in 0..LINEAR_FEATURES {
+            for column in 0..LINEAR_FEATURES {
+                augmented[row][column] = gram[row][column];
+            }
+            for output in 0..DIM {
+                augmented[row][LINEAR_FEATURES + output] = rhs[row][output];
+            }
+        }
+
+        // Gauss-Jordan elimination with partial pivoting. No matrix inversion
+        // dependency is needed for this small, deterministic baseline.
+        for pivot_column in 0..LINEAR_FEATURES {
+            let pivot_row = (pivot_column..LINEAR_FEATURES)
+                .max_by(|left, right| {
+                    augmented[*left][pivot_column]
+                        .abs()
+                        .total_cmp(&augmented[*right][pivot_column].abs())
+                })
+                .ok_or_else(|| "linear ARX pivot selection failed".to_owned())?;
+            let pivot_value = augmented[pivot_row][pivot_column];
+            if !pivot_value.is_finite() || pivot_value.abs() < 1.0e-12 {
+                return Err(format!("linear ARX singular normal matrix at column {pivot_column}"));
+            }
+            augmented.swap(pivot_column, pivot_row);
+
+            let scale = augmented[pivot_column][pivot_column];
+            for column in pivot_column..(LINEAR_FEATURES + DIM) {
+                augmented[pivot_column][column] /= scale;
+            }
+
+            for row in 0..LINEAR_FEATURES {
+                if row == pivot_column {
+                    continue;
+                }
+                let factor = augmented[row][pivot_column];
+                if factor == 0.0 {
+                    continue;
+                }
+                for column in pivot_column..(LINEAR_FEATURES + DIM) {
+                    augmented[row][column] -= factor * augmented[pivot_column][column];
+                }
+            }
+        }
+
+        let mut weights = vec![vec![0.0_f64; LINEAR_FEATURES]; DIM];
+        for feature in 0..LINEAR_FEATURES {
+            for output in 0..DIM {
+                weights[output][feature] = augmented[feature][LINEAR_FEATURES + output];
+            }
+        }
+        if weights.iter().flatten().any(|weight| !weight.is_finite()) {
+            return Err("linear ARX fit produced non-finite weights".to_owned());
+        }
+        Ok(Self { weights })
+    }
+
+    fn predict(&self, state: &[f32], action: &[f32]) -> Result<Vec<f32>, String> {
+        if state.len() != DIM || action.len() != DIM {
+            return Err(format!(
+                "linear ARX expects state/action dimensions {DIM}, got {}/{}",
+                state.len(), action.len()
+            ));
+        }
+        let features = Self::features(state, action);
+        Ok((0..DIM)
+            .map(|output| {
+                let delta = self.weights[output]
+                    .iter()
+                    .zip(features.iter())
+                    .map(|(weight, feature)| weight * feature)
+                    .sum::<f64>();
+                state[output] + delta as f32
+            })
+            .collect())
+    }
+
+    fn evaluate(&self, data: &[Experience]) -> Result<Metrics, String> {
+        let mut squared_error = 0.0_f64;
+        let mut absolute_error = 0.0_f64;
+        let mut persistence_squared_error = 0.0_f64;
+        let mut zero_squared_error = 0.0_f64;
+        let mut count = 0_usize;
+        for row in data {
+            let prediction = self.predict(&row.state, &row.action)?;
+            for index in 0..DIM {
+                let error = prediction[index] as f64 - row.next_state[index] as f64;
+                let persistence_error = row.state[index] as f64 - row.next_state[index] as f64;
+                let zero_error = row.next_state[index] as f64;
+                squared_error += error * error;
+                absolute_error += error.abs();
+                persistence_squared_error += persistence_error * persistence_error;
+                zero_squared_error += zero_error * zero_error;
+                count += 1;
+            }
+        }
+        if count == 0 {
+            return Err("linear ARX evaluation data must not be empty".to_owned());
+        }
+        let denominator = count as f64;
+        Ok(Metrics {
+            mse: squared_error / denominator,
+            mae: absolute_error / denominator,
+            persistence_mse: persistence_squared_error / denominator,
+            zero_mse: zero_squared_error / denominator,
+            sample_count: data.len(),
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Objective {
     AbsoluteNextState,
