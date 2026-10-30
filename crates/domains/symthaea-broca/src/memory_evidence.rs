@@ -133,8 +133,12 @@ impl Bm25Config {
 pub struct LexicalEvidenceHit {
     pub hdc_id: u64,
     pub evidence_id: String,
+    pub scope_id: String,
     pub source: EvidenceSource,
     pub content_sha256: String,
+    pub lifecycle: EvidenceLifecycle,
+    pub valid_from_unix_ms: Option<u64>,
+    pub valid_until_unix_ms: Option<u64>,
     pub bm25_score: f64,
     pub context: MemoryContextItem,
 }
@@ -593,8 +597,12 @@ impl EvidenceIndex {
             hits.push(LexicalEvidenceHit {
                 hdc_id,
                 evidence_id: record.evidence_id.clone(),
+                scope_id: record.scope_id.clone(),
                 source: record.source.clone(),
                 content_sha256: record.content_sha256.clone(),
+                lifecycle: record.lifecycle.clone(),
+                valid_from_unix_ms: record.valid_from_unix_ms,
+                valid_until_unix_ms: record.valid_until_unix_ms,
                 bm25_score: score,
                 context: MemoryContextItem {
                     kind: MemoryContextType::Text,
