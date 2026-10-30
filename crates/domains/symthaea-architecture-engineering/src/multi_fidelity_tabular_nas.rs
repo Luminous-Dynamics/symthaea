@@ -20,7 +20,6 @@ use super::tabular_nas_firewall::{
 };
 use super::learning_curve_promotion::{
     select_curve_promotions, CurvePromotionSelection, LearningCurveCalibrator,
-    LearningCurveCalibrationError, PromotionReason,
 };
 
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.tabular-nas.multi-fidelity-query-trace.v0.1";
