@@ -92,7 +92,6 @@ struct EpisodeResult {
     rejected_stale: usize,
     rejected_duplicate: usize,
     max_evidence_updates: usize,
-    max_claims_in_step: usize,
     mean_independent_groups: f64,
 }
 
@@ -225,8 +224,12 @@ fn make_tape(scenario: Scenario, episode: usize) -> Vec<Vec<Report>> {
 }
 
 fn by_claim_majority(reports: &[Report]) -> bool {
-    let positive = reports.iter().filter(|r| r.positive).count();
-    positive * 2 > reports.len()
+    let mut claims = BTreeMap::new();
+    for report in reports {
+        claims.entry(report.claimed_source).or_insert(report.positive);
+    }
+    let positive = claims.values().filter(|value| **value).count();
+    positive * 2 > claims.len()
 }
 
 fn first_per_provenance_group(reports: &[Report]) -> BTreeMap<usize, bool> {
@@ -271,12 +274,10 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
     let mut rejected_stale = 0;
     let mut rejected_duplicate = 0;
     let mut max_evidence_updates = 0;
-    let mut max_claims_in_step = 0;
     let mut total_independent_groups = 0usize;
 
     for step in 0..HORIZON {
         let reports = &tape[step];
-        max_claims_in_step = max_claims_in_step.max(reports.len());
         let active = match policy {
             Policy::DirectFallback => false,
             _ => risk_alarm_step.is_none() && provenance_fallback_step.is_none(),
@@ -376,7 +377,6 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
         rejected_stale,
         rejected_duplicate,
         max_evidence_updates,
-        max_claims_in_step,
         mean_independent_groups: total_independent_groups as f64 / HORIZON as f64,
     }
 }
