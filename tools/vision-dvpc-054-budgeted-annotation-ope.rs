@@ -195,6 +195,44 @@ impl World {
     }
 }
 
+fn correlated_stress_worlds() -> [World; 3] {
+    let mut within_family = World::heterogeneous_source_quality();
+    within_family.name = "within_family_panel";
+    within_family.shared_factor_variance = [0.025, 0.0];
+    within_family.source_shared_loadings = [[0.0, 0.0], [1.0, 0.0], [0.0, 0.0]];
+
+    let mut shared_rubric = World::heterogeneous_source_quality();
+    shared_rubric.name = "shared_rubric_multi_family";
+    shared_rubric.shared_factor_variance = [0.015, 0.012];
+    shared_rubric.source_shared_loadings =
+        [[0.25, 1.0], [1.0, 0.5], [0.20, 0.0]];
+
+    let mut common_mode = World::mixed_bias_cancellation();
+    common_mode.name = "high_common_mode";
+    common_mode.shared_factor_variance = [0.03, 0.0];
+    common_mode.source_shared_loadings = [[0.70, 0.0], [1.0, 0.0], [0.15, 0.0]];
+
+    [within_family, shared_rubric, common_mode]
+}
+
+fn independent_profile(world: &World) -> World {
+    let mut profile = *world;
+    profile.shared_factor_variance = [0.0; 2];
+    profile
+}
+
+fn upper_correlation_profile(world: &World, radius: f64) -> Result<World, String> {
+    if !radius.is_finite() || radius < 1.0 {
+        return Err("correlation uncertainty radius must be finite and at least one".into());
+    }
+    let mut upper = *world;
+    for factor in 0..2 {
+        upper.shared_factor_variance[factor] *= radius * radius;
+    }
+    upper.validate()?;
+    Ok(upper)
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Allocation {
     /// Number of annotations from each source for each context-action cell.
@@ -875,6 +913,36 @@ fn allocation_profile_bias(world: &World, allocation: &Allocation) -> f64 {
     weighted_abs_model_bias(world, allocation)
 }
 
+fn weighted_q_variance_component(world: &World, allocation: &Allocation) -> f64 {
+    let mut total = 0.0;
+    for x in 0..CONTEXTS {
+        for a in 0..ACTIONS {
+            let pi = world.target[x][a];
+            let mu = world.behavior[x][a];
+            let alpha3 = world.context_probability[x] * pi * pi * (1.0 / mu - 1.0);
+            let (_, q_variance) = cell_bias_and_variance(world, allocation, x, a);
+            total += alpha3 * q_variance;
+        }
+    }
+    total
+}
+
+/// Ratio of the OPE-weighted reward-model variance under correlated versus
+/// independent source errors for exactly the same allocation. This is a
+/// design-effect diagnostic, not a confidence interval or literal vote count.
+fn weighted_q_variance_inflation(world: &World, allocation: &Allocation) -> f64 {
+    let independent = independent_profile(world);
+    let base = weighted_q_variance_component(&independent, allocation);
+    let correlated = weighted_q_variance_component(world, allocation);
+    if base > EPS {
+        correlated / base
+    } else if correlated <= EPS {
+        1.0
+    } else {
+        f64::INFINITY
+    }
+}
+
 fn context_bias_sums(world: &World, allocation: &Allocation) -> [f64; CONTEXTS] {
     std::array::from_fn(|x| {
         (0..ACTIONS)
@@ -1532,6 +1600,106 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
     }
 
     output.push_str(&local_regime_rows());
+    output.push_str(&correlation_benchmark_rows(
+        replicates,
+        seed ^ 0x0560_c011_2026_1030,
+    )?);
+    Ok(output)
+}
+
+fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, String> {
+    let mut output = String::new();
+    for (scenario_index, world) in correlated_stress_worlds().iter().enumerate() {
+        world.validate()?;
+        let independent = independent_profile(world);
+        let robust_profile = upper_correlation_profile(world, 1.5)?;
+
+        let greedy_true = greedy_allocate(world, GreedyRule::MaxGain)?;
+        let true_exact = exact_dynamic_program(world, [true; SOURCES])?.allocation;
+        let independent_exact =
+            exact_dynamic_program(&independent, [true; SOURCES])?.allocation;
+        let robust_exact =
+            exact_dynamic_program(&robust_profile, [true; SOURCES])?.allocation;
+        let mm_zero = mm_allocate(world, Allocation::default(), 24, 128)?;
+        let mm_greedy = mm_allocate(world, greedy_true, 24, 128)?;
+
+        let plans = [
+            ("independent_profile_exact", independent_exact, 0usize),
+            ("correlation_aware_greedy", greedy_true, 0usize),
+            ("correlation_aware_exact", true_exact, 0usize),
+            ("robust_upper_bound_exact", robust_exact, 0usize),
+            ("mm_true_from_zero", mm_zero.allocation, mm_zero.iterations),
+            ("mm_true_from_greedy", mm_greedy.allocation, mm_greedy.iterations),
+        ];
+        let exact_mse = analytic_mse(world, &true_exact, EVAL_N)?;
+        for (method_index, (method, allocation, iterations)) in plans.iter().enumerate() {
+            if !allocation.feasible(world) {
+                return Err(format!("correlation plan is infeasible: {method}"));
+            }
+            let analytic_true = analytic_mse(world, allocation, EVAL_N)?;
+            let empirical = monte_carlo_evaluate(
+                world,
+                allocation,
+                EVAL_N,
+                replicates,
+                seed ^ (scenario_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                    ^ (method_index as u64).wrapping_mul(0x94d0_49bb_1331_11eb),
+                None,
+            );
+            let factor0 = world.shared_factor_variance[0];
+            let factor1 = world.shared_factor_variance[1];
+            let profile0 = if *method == "independent_profile_exact" {
+                0.0
+            } else if *method == "robust_upper_bound_exact" {
+                robust_profile.shared_factor_variance[0]
+            } else {
+                factor0
+            };
+            let profile1 = if *method == "independent_profile_exact" {
+                0.0
+            } else if *method == "robust_upper_bound_exact" {
+                robust_profile.shared_factor_variance[1]
+            } else {
+                factor1
+            };
+            let objective_profile = match *method {
+                "independent_profile_exact" => &independent,
+                "robust_upper_bound_exact" => &robust_profile,
+                _ => world,
+            };
+            let worst_case_mse = analytic_mse(&robust_profile, allocation, EVAL_N)?;
+            let sources = allocation_sources(allocation);
+            let gap = ((analytic_true - exact_mse) / exact_mse.max(EPS)).max(0.0);
+            let inflation = weighted_q_variance_inflation(world, allocation);
+            let _ = objective_profile; // Documents which profile selected the allocation.
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "CORR_RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{:.8}\t{:.8}\t{:.8}\t{:.8}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{:.10}\t{}",
+                world.name,
+                method,
+                replicates,
+                world.budget,
+                allocation.cost(world),
+                allocation.total_count(),
+                factor0,
+                factor1,
+                profile0,
+                profile1,
+                analytic_true,
+                empirical.bias,
+                empirical.variance,
+                empirical.mse,
+                inflation,
+                gap,
+                sources[0],
+                sources[1],
+                sources[2],
+                worst_case_mse,
+                iterations,
+            );
+        }
+    }
     Ok(output)
 }
 
