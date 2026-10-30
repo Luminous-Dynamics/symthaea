@@ -156,6 +156,42 @@ The tactic emits structured JSON snapshots for both before/after pairs. The Lean
 
 The scientific differentiator is not another retrieval score. It is a falsifiable, context-conditioned contract for proof actions: each move states what it requires, the evaluator changes one requirement at a time, and the system must reject, preserve, adapt, or replan in the way the checked proof state warrants. This is a research hypothesis and benchmark extension, not an established first or current SOTA claim.
 
+
+### Latest benchmark and systems frontier — 2026-10-30
+
+Two additional benchmark directions strengthen the case for a multi-axis PITB evaluation:
+
+| Work | Published scope/result | PITB response |
+|---|---|---|
+| [FormalMATH, EMNLP 2026 Findings](https://aclanthology.org/2026.findings-emnlp.579/) | 5,560 semantically validated Lean 4 statements spanning competition and undergraduate mathematics; the strongest reported model, DeepSeek-Prover-V2-671B, reaches 28.31% Pass@32. | Use as a broad formal-reasoning generalization reference. Its semantic curation and larger task mix are valuable context, but PITB should not compare its utility percentage directly with FormalMATH Pass@32. |
+| [FormalML, ICLR 2026](https://proceedings.iclr.cc/paper_files/paper/2026/hash/55d4e6e1a0557d3d9e3140966c1db533-Abstract-Conference.html) | 4,937 Lean 4 subgoal-completion tasks from machine-learning theory, with complex research-level contexts and premise retrieval. | Add a separate research-subgoal cohort where the target is a missing intermediate obligation in a human proof sketch. Measure support accuracy and proof completion, not just end-to-end theorem pass rate. |
+| [Keep the Proof State Live](https://arxiv.org/abs/2605.25556) | A Lean 4 snapshotting method for reusing an elaborated proof state across search branches reports 5.6–50× wall-time speedups on 48 miniF2F-v2 problems (14× average, 9.7× median) in its reported setup. | Treat proof-state acquisition and reuse as a systems benchmark dimension. PITB's textual/JSON evidence snapshots are audit records, not reusable live Lean metavariable states; a separate runtime prototype would be required before claiming this optimization. |
+
+#### New systems research track — cost of mathematical branching
+
+The live-state snapshotting result suggests a second axis of improvement beyond better theorem decisions: make each verified decision cheaper to explore. In branch-heavy proof search, repeated import loading and theorem-body elaboration can dominate useful tactic work. A prover that can branch from a verified live state may explore more counterfactual routes within the same time/token/compute budget.
+
+A PITB systems cohort should compare:
+1. **Cold reconstruction:** re-import and re-elaborate the exact theorem context for every branch.
+2. **Warm import reuse:** cache/import the environment but reconstruct the theorem-body proof state.
+3. **Live proof-state reuse:** branch from an exact, versioned elaborated state when the Lean runtime permits it.
+4. **Selective branch scheduling:** allocate additional branches only when the proof-state contract predicts a meaningful difference in likely utility.
+
+Measure cold/warm state-acquisition time, branch-start latency, branches per second, p50/p95 wall time, peak memory, proof-check time, verified solves per compute budget, and the overhead of snapshot creation/restoration. Every branch must retain the exact goal, environment, local context and source identity; a stale or mismatched state is a correctness failure, not a cache miss to silently ignore.
+
+The research distinction is important: the current Lean pilot emits content-addressed representations of the goal and local context. It does **not** persist or restore Lean's live metavariable context. Reusing those JSON records as though they were live proof states would be a category error. The published Lean snapshotting work is therefore a systems direction to prototype separately, not a capability already implemented in PITB.
+
+#### Three evidence layers for proof support
+
+The new Lean pilot now distinguishes:
+- **Available context:** declarations present in the elaborated proof state.
+- **Actual proof-term support:** free variables referenced by the accepted proof expression, plus their transitive local type/value dependencies.
+- **Minimal sufficient support:** the smallest support set that preserves the declared strategy or theorem under a specified ablation and replanning policy.
+
+The first is captured by the structured state snapshots; the second by the new Lean proof-term support receipt; the third requires controlled ablation/reproof and cannot be inferred from syntactic use. This separation enables a model-predicted support set to be evaluated against both the actual proof construction and independently reviewed counterfactual necessity.
+
+**Strategic implication:** PITB can become a benchmark for both *causal mathematical reasoning* and *efficient verified search*, while keeping their estimands separate. Do not trade proof correctness for speed, or treat greater branch throughput as evidence of better mathematical transfer.
+
 ### Revised benchmark decision
 
 1. **Primary:** paired, component-clustered change in exact-target semantic-gate success from typed insight versus the strongest validation-selected retrieval baseline, at identical budgets.
