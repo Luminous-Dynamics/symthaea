@@ -683,7 +683,7 @@ mod tests {
     fn source_score() -> Score {
         let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
         score.push(note(60, 0.0, 1.0));
-        score.push(note(64, 1.0, 1.0));
+        score.push(note(62, 1.0, 1.0));
         score.push(note(67, 2.0, 1.0));
         score
     }
@@ -885,7 +885,7 @@ mod tests {
                 "no-op-allowed",
                 &source,
                 1,
-                vec![60, 64, 71],
+                vec![60, 62, 71],
                 None,
             ),
             Err(SymbolicRealizationError::InvalidContract(_))
