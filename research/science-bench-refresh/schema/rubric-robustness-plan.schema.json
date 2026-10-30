@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/rubric-robustness-plan.schema.json",
+  "title": "Symthaea Rubric Robustness Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "purpose",
+    "audit_set_id",
+    "rubric_source_revision",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "resource_budget",
+    "planned_case_count",
+    "cases",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_rubric_robustness_plan.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "audit_set_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "rubric_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "resource_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_judge_calls",
+        "max_tokens"
+      ],
+      "properties": {
+        "max_judge_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "planned_case_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "family": {
+      "enum": [
+        "rubric_meaning_preserving",
+        "surface_cue_attack",
+        "rubric_meaning_changing",
+        "evidence_semantic_change"
+      ]
+    },
+    "relation": {
+      "enum": [
+        "same_construct_decision",
+        "candidate_construct_invariant",
+        "rubric_construct_changes",
+        "evidence_support_decreases"
+      ]
+    },
+    "behavior": {
+      "enum": [
+        "score_invariant_within_tolerance",
+        "no_unearned_score_increase",
+        "directional_criterion_sensitivity",
+        "priority_change_is_observable",
+        "lower_score_or_abstain"
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "family",
+        "expected_relation",
+        "expected_judge_behavior",
+        "change_axis",
+        "baseline_candidate_sha256",
+        "variant_candidate_sha256",
+        "baseline_rubric_sha256",
+        "variant_rubric_sha256"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "expected_relation": {
+          "$ref": "#/$defs/relation"
+        },
+        "expected_judge_behavior": {
+          "$ref": "#/$defs/behavior"
+        },
+        "change_axis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseline_candidate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_candidate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "baseline_rubric_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "variant_rubric_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rubric_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "judge_source_revision": {
+            "allOf": [
+              {
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "not": {
+                  "pattern": "^0{40}$"
+                }
+              }
+            ]
+          },
+          "judge_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "cases": {
+            "items": {
+              "properties": {
+                "baseline_candidate_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_candidate_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "baseline_rubric_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "variant_rubric_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
