@@ -80,3 +80,10 @@ Where a defensible joint uncertainty model is unavailable, report components sep
 ConnectomeBench2 measures task-specific local proofreading decisions. NEURD and RoboEM provide morphology / tracing and correction mechanisms. SynAnno provides structured human workflow. CAVE provides versioned reconstruction and derived annotation update infrastructure. A query-scoped certificate layer composes these capabilities while making the scientific scope, uncertainty, and invalidation semantics explicit.
 
 No certificate implementation or biological certification is claimed by this document.
+
+## Machine-readable contract
+
+- [JSON Schema](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json)
+- [Synthetic fixture](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json)
+
+The example is synthetic and intentionally `CONDITIONAL`: a critical coverage gate is not estimable. It is not a biological certificate. V1 forbids a single aggregate-confidence field; uncertainty components remain separate unless a validated joint model exists.
