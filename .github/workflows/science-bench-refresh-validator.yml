@@ -1111,4 +1111,17 @@ jobs:
           jq empty research/science-bench-refresh/schema/rubric-robustness-plan.schema.json
           jq empty research/science-bench-refresh/schema/rubric-specification.schema.json
           jq empty research/science-bench-refresh/schema/judge-score-geometry-input.schema.json
+          jq empty research/science-bench-refresh/schema/metamorphic-evaluator-plan.schema.json
+          jq empty research/science-bench-refresh/schema/metamorphic-evaluator-receipt.schema.json
+
+          python3 research/science-bench-refresh/tools/metamorphic_evaluator_fixture.py /tmp/sbr-metamorphic
+          python3 research/science-bench-refresh/tools/metamorphic_evaluator_fixture.py /tmp/sbr-metamorphic-repeat
+          cmp /tmp/sbr-metamorphic/metamorphic-plan.example.json /tmp/sbr-metamorphic-repeat/metamorphic-plan.example.json
+          cmp /tmp/sbr-metamorphic/metamorphic-receipt.example.json /tmp/sbr-metamorphic-repeat/metamorphic-receipt.example.json
+          python3 research/science-bench-refresh/tools/metamorphic_evaluator_audit.py \
+            /tmp/sbr-metamorphic/metamorphic-plan.example.json \
+            /tmp/sbr-metamorphic/metamorphic-receipt.example.json \
+            --output /tmp/sbr-metamorphic-report.json
+          jq -e '.valid == true and .all_relations_pass == true and .planned_pair_count == 7 and .observed_pair_count == 7 and .passed_pair_count == 7 and .failed_pair_count == 0 and .evaluator_execution_proven == false and .receipt_authenticity_proven == false and .causal_effect_identified == false and .generalized_accuracy_estimated == false and .construct_validity_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false' \
+            /tmp/sbr-metamorphic-report.json >/dev/null
           python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_*.py' -v
