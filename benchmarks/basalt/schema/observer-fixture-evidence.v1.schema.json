@@ -11,7 +11,7 @@
     "selected_case_ids",
     "harness_binary_digest",
     "worker_binary_digest",
-    "worker_subcommand",
+    "worker_binary_name",
     "workspace_relative_path",
     "gitignore_content_digest",
     "executions",
@@ -141,8 +141,8 @@
     "qualification_eligible": {
       "const": false
     },
-    "worker_subcommand": {
-      "const": "basalt-observer-fixture-worker"
+    "worker_binary_name": {
+      "const": "basalt_observer_fixture_worker"
     }
   }
 }
