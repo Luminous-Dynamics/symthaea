@@ -35,7 +35,7 @@ It does **not** receive:
 
 One successful unique target query reveals one target value and consumes one unit of the fixed query budget. The manifest also freezes whether the target metric is maximize-is-better or minimize-is-better; top-K ranking and simple regret use that direction, and both direction and top-K definition are bound into the query receipt. Duplicate, unknown-ID and over-budget attempts return typed errors, never return a target value, and remain in the query trace. The receipt contains query IDs, attempt statuses and hashes of revealed observations, but not raw target values or unqueried labels.
 
-The evaluator retains the full target table privately. It runs the policy callback first; only after that callback returns does it calculate top-K capture and regret from the set of *distinct architectures actually queried*. A policy prediction or a recommended architecture that it never queried receives no P@K credit.
+The evaluator retains the full target table privately. The runner consumes the benchmark object while the policy callback executes; this prevents the same benchmark value from also being captured by reference and used for a nested evaluator call. Only after the callback returns does it calculate top-K capture and regret from the set of *distinct architectures actually queried*. A policy prediction or a recommended architecture that it never queried receives no P@K credit.
 
 ### Important security boundary
 
