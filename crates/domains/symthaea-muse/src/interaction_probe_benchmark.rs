@@ -52,7 +52,7 @@ pub struct InteractionProbeBenchmarkReport {
     pub event_count: usize,
     pub possible_pair_count: u128,
 
-    /// Exact pairwise PCM interactions from EVAL-020, using the configured floor.
+    /// Exact contextual four-coalition PCM pair effects, using the configured floor.
     pub ground_truth_interacting_pair_count: usize,
     /// Candidate-policy output only; audit-only pairs are kept in separate fields.
     pub candidate_pair_count: usize,
