@@ -167,7 +167,6 @@ struct EpisodeStats {
     feedback_count: usize,
     feedback_dropped: usize,
     bound_width_sum: f64,
-    q_sum: f64,
     selected_overprediction_sum: f64,
     coverage_tape: Vec<bool>,
 }
@@ -375,7 +374,6 @@ fn simulate_episode(
             if covered { stats.pre_shift_covered += 1; }
         }
         stats.bound_width_sum += q_used * selected.sigma_reported;
-        stats.q_sum += q_used;
         stats.selected_overprediction_sum += selected.predicted - selected.truth;
         stats.coverage_tape.push(covered);
 
