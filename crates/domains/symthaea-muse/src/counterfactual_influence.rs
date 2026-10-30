@@ -2615,6 +2615,42 @@ mod tests {
     }
 
     #[test]
+    fn RMS_and_spectral_combination_mode_is_explicit_and_replayable() {
+        let measurements = vec![
+            influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
+        ];
+        let any_config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
+            release_threshold_ratio: 0.5,
+            release_persistence_windows: 1,
+            tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
+        };
+        let both_config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::BothMetricsExceed,
+            ..any_config.clone()
+        };
+        let (_, any_support, _, _, _) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &any_config,
+            10,
+        )
+        .unwrap();
+        let (_, both_support, _, _, _) = hysteresis_segment(
+            &measurements,
+            1,
+            &InfluenceAnalysisConfig::default(),
+            &both_config,
+            10,
+        )
+        .unwrap();
+        assert_eq!(any_support, vec![FrameInterval { start_frame: 0, end_frame: 10 }]);
+        assert!(both_support.is_empty());
+    }
+
+    #[test]
     fn tail_guard_is_separate_from_measured_and_hysteresis_support() {
         let measurements = vec![
             influence_measurement(0, 10, 2.0, 0.0, 1.0, true),
@@ -2673,6 +2709,11 @@ mod tests {
         assert!(validate_segmentation_config(&config).is_err());
 
         config.release_threshold_ratio = 0.5;
+        config.tail_guard_frames = 1;
+        config.tail_guard_profile_sha256 = None;
+        assert!(validate_segmentation_config(&config).is_err());
+
+        config.tail_guard_frames = 0;
         config.release_persistence_windows = 0;
         assert!(validate_segmentation_config(&config).is_err());
 
