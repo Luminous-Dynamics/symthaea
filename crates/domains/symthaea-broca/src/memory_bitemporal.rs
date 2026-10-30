@@ -338,6 +338,72 @@ impl BitemporalSourceLedger {
         &self.events
     }
 
+    /// Return assertion revision IDs that are both known at the supplied
+    /// transaction-time coordinate and valid at the supplied world-time date.
+    ///
+    /// A supersede/retract event affects its target only when that mutation is
+    /// itself visible at known_at. This is therefore suitable for reconstructing
+    /// historical evidence eligibility after later corrections have arrived.
+    pub fn active_assertion_revision_ids_at(
+        &self,
+        valid_at: NaiveDate,
+        known_at: DateTime<Utc>,
+        scope: &str,
+    ) -> Result<BTreeSet<String>, String> {
+        self.verify_consistency()?;
+        non_empty(scope, "scope")?;
+        let visible_events: Vec<&SourceEventRevision> = self.events
+            .iter()
+            .filter(|event| event.recorded_at <= known_at)
+            .collect();
+        let invalidated_revision_ids: BTreeSet<String> = visible_events
+            .iter()
+            .filter_map(|event| event.operation.target_revision_id())
+            .map(str::to_owned)
+            .collect();
+
+        let active_events: Vec<&SourceEventRevision> = visible_events
+            .into_iter()
+            .filter(|event| !invalidated_revision_ids.contains(&event.revision_id))
+            .filter(|event| event.operation.assertion()
+                .is_some_and(|assertion| assertion.is_valid_at(valid_at)
+                    && assertion.scope == scope))
+            .collect();
+
+        // The proof graph has not yet integrated an explicit contradiction
+        // resolver. Conservatively remove every revision for a key with two
+        // distinct active values rather than allowing either value to certify
+        // a derived conclusion. Call query() to inspect the Contested result.
+        let mut values_by_key = BTreeMap::<(String, String, String), BTreeSet<String>>::new();
+        for event in &active_events {
+            if let Some(assertion) = event.operation.assertion() {
+                values_by_key
+                    .entry((assertion.subject.clone(), assertion.attribute.clone(), assertion.scope.clone()))
+                    .or_default()
+                    .insert(assertion.value.clone());
+            }
+        }
+        let contested_keys: BTreeSet<(String, String, String)> = values_by_key
+            .into_iter()
+            .filter_map(|(key, values)| (values.len() > 1).then_some(key))
+            .collect();
+
+        let active_ids = active_events
+            .into_iter()
+            .filter(|event| {
+                event.operation.assertion().is_some_and(|assertion| {
+                    !contested_keys.contains(&(
+                        assertion.subject.clone(),
+                        assertion.attribute.clone(),
+                        assertion.scope.clone(),
+                    ))
+                })
+            })
+            .map(|event| event.revision_id.clone())
+            .collect();
+        Ok(active_ids)
+    }
+
     /// Recheck revision uniqueness, transaction ordering, target ancestry,
     /// one-time mutation, and assertion invariants without mutating the ledger.
     pub fn verify_consistency(&self) -> Result<(), String> {
