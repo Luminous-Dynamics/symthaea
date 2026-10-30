@@ -55,6 +55,10 @@ fn sha256_json<T: Serialize>(value: &T, field: &str) -> Result<String, String> {
 #[serde(deny_unknown_fields)]
 pub struct ProofEvidenceCandidate {
     pub evidence_id: String,
+    pub source_revision_id: String,
+    pub source_pointer: String,
+    pub source_span_start: u64,
+    pub source_span_end: u64,
     pub source_family_id: String,
     pub scope_id: String,
     pub payload_sha256: String,
@@ -86,6 +90,8 @@ impl ProofEvidenceCandidate {
     fn validate(&self) -> Result<(), String> {
         for (field, value) in [
             ("evidence_id", self.evidence_id.as_str()),
+            ("source_revision_id", self.source_revision_id.as_str()),
+            ("source_pointer", self.source_pointer.as_str()),
             ("source_family_id", self.source_family_id.as_str()),
             ("scope_id", self.scope_id.as_str()),
             ("authorized_principal_id", self.authorized_principal_id.as_str()),
@@ -105,6 +111,9 @@ impl ProofEvidenceCandidate {
             &self.authorization_receipt_sha256,
             "authorization_receipt_sha256",
         )?;
+        if self.source_span_end <= self.source_span_start {
+            return Err("source_span_end must be greater than source_span_start".into());
+        }
         if self.token_cost == 0 {
             return Err("token_cost must be greater than zero".into());
         }
@@ -343,11 +352,17 @@ pub enum ProofBudgetStatus {
 pub struct SelectedProof {
     pub conclusion_id: String,
     pub justification_id: String,
+    /// Conjunctive dependency edges carried in the packet, not inferred later.
+    pub evidence_dependencies: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofPacketEvidenceRef {
     pub evidence_id: String,
+    pub source_revision_id: String,
+    pub source_pointer: String,
+    pub source_span_start: u64,
+    pub source_span_end: u64,
     pub source_family_id: String,
     pub payload_sha256: String,
     pub source_span_sha256: String,
@@ -562,6 +577,7 @@ impl<'a> ExactSearch<'a> {
             next_proofs.push(SelectedProof {
                 conclusion_id: conclusion_id.clone(),
                 justification_id: alternative.justification_id.clone(),
+                evidence_dependencies: alternative.evidence_dependencies.clone(),
             });
             self.explore(obligation_index + 1, &next_evidence, &next_proofs);
         }
@@ -664,6 +680,10 @@ pub fn solve_proof_budget(
             let candidate = candidate_map[evidence_id.as_str()];
             ProofPacketEvidenceRef {
                 evidence_id: candidate.evidence_id.clone(),
+                source_revision_id: candidate.source_revision_id.clone(),
+                source_pointer: candidate.source_pointer.clone(),
+                source_span_start: candidate.source_span_start,
+                source_span_end: candidate.source_span_end,
                 source_family_id: candidate.source_family_id.clone(),
                 payload_sha256: candidate.payload_sha256.clone(),
                 source_span_sha256: candidate.source_span_sha256.clone(),
@@ -751,6 +771,12 @@ pub fn verify_proof_packet(
             .iter()
             .find(|alternative| alternative.justification_id == selected.justification_id)
             .ok_or_else(|| format!("unknown selected justification {:?}", selected.justification_id))?;
+        if selected.evidence_dependencies != justification.evidence_dependencies {
+            return Err(format!(
+                "selected proof {:?} does not carry its exact conjunctive dependency edges",
+                selected.justification_id
+            ));
+        }
 
         let mut independent_families = BTreeSet::new();
         for evidence_id in &justification.evidence_dependencies {
@@ -793,6 +819,10 @@ pub fn verify_proof_packet(
             .ok_or_else(|| "proof packet token cost overflow".to_string())?;
         expected_evidence.push(ProofPacketEvidenceRef {
             evidence_id: candidate.evidence_id.clone(),
+            source_revision_id: candidate.source_revision_id.clone(),
+            source_pointer: candidate.source_pointer.clone(),
+            source_span_start: candidate.source_span_start,
+            source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
@@ -862,6 +892,10 @@ mod tests {
     fn candidate(id: &str, family: &str, token_cost: u32) -> ProofEvidenceCandidate {
         ProofEvidenceCandidate {
             evidence_id: id.into(),
+            source_revision_id: format!("revision-{id}"),
+            source_pointer: format!("/messages/{id}/content"),
+            source_span_start: 0,
+            source_span_end: 10,
             source_family_id: family.into(),
             scope_id: "scope-1".into(),
             payload_sha256: digest('a'),
@@ -1229,9 +1263,14 @@ mod tests {
         non_minimal.selected_proofs = vec![SelectedProof {
             conclusion_id: "claim-1".into(),
             justification_id: "proof-valid-but-costlier".into(),
+            evidence_dependencies: vec!["B-valid".into()],
         }];
         non_minimal.evidence = vec![ProofPacketEvidenceRef {
             evidence_id: candidate.evidence_id.clone(),
+            source_revision_id: candidate.source_revision_id.clone(),
+            source_pointer: candidate.source_pointer.clone(),
+            source_span_start: candidate.source_span_start,
+            source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
             payload_sha256: candidate.payload_sha256.clone(),
             source_span_sha256: candidate.source_span_sha256.clone(),
