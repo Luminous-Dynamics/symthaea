@@ -40,7 +40,9 @@ Do not log request bodies. The evaluation payload contains private test memories
 
 ## Retention and deletion
 
-The SQLite backend exposes explicit cutoff and full logical purge methods, but the HTTP server does **not** expose a public purge endpoint and does not yet run an automatic retention worker. Before a real AML run, an operator must schedule and verify `purge_stored_before` no later than 30 days after the evaluation finishes. Logical deletion is not forensic erasure: also handle SQLite WAL/SHM sidecars, backups, snapshots, and storage according to the organizer's deletion rules. Do not use this evaluation-only database for permanent user memory.
+When the actual server is started through `serve()`, it runs a daily retention worker and logically purges Add batches older than **29 days**. The extra day is a safety margin under the organizer's 30-day post-evaluation deletion rule; the SQLite backend also removes lifecycle events that reference expired evidence. The router factory used by tests does not start a background worker.
+
+Logical deletion is not forensic erasure. The operator must separately handle SQLite WAL/SHM sidecars, backups, snapshots, and storage according to the organizer's deletion rules. Verify that backups and snapshots have their own expiration policy. Do not use this evaluation-only database for permanent user memory.
 
 ## Release gate before applying
 
