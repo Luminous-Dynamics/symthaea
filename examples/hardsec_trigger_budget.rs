@@ -28,10 +28,13 @@ struct Config {
 }
 
 fn usage() -> &'static str {
-    "usage: hardsec_trigger_budget --activation-probability P [--trials N] [--target-miss-probability A]\n\
-     P is the assumed per-trial activation probability in [0, 1].\n\
-     N is the number of independent trials (default: 1000).\n\
-     A is the maximum tolerated probability of zero activations (default: 0.05)."
+    concat!(
+        "usage: hardsec_trigger_budget --activation-probability P ",
+        "[--trials N] [--target-miss-probability A]\n",
+        "P is the assumed per-trial activation probability in [0, 1].\n",
+        "N is the number of independent trials (default: 1000).\n",
+        "A is the maximum tolerated probability of zero activations (default: 0.05)."
+    )
 }
 
 fn parse_probability(name: &str, value: &str, allow_one: bool) -> Result<f64, String> {
@@ -188,7 +191,10 @@ fn run(config: Config) {
         None => println!("  \"minimum_trials_for_target\": null,"),
     }
     println!(
-        "  \"interpretation\": \"sampling_budget_only_not_trigger_probability_estimation_or_formal_reachability\""
+        concat!(
+            "  \"interpretation\": ",
+            "\"sampling_budget_only_not_trigger_probability_estimation_or_formal_reachability\""
+        )
     );
     println!("}}");
 }
