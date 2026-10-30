@@ -102,6 +102,7 @@ impl SledAmlMemoryBackend {
         for item in self.batches.iter() {
             let (key, value) = item.map_err(|error| format!("failed to iterate AML store: {error}"))?;
             let batch = decode_and_validate_batch(&value)?;
+            validate_batch_key(&key, &batch)?;
             if batch.stored_at_unix_ms < cutoff_unix_ms {
                 expired_keys.push(key);
             }
@@ -135,9 +136,10 @@ impl SledAmlMemoryBackend {
     fn rebuild_index(&mut self) -> Result<(), String> {
         let mut rebuilt = EvidenceIndex::new();
         for item in self.batches.iter() {
-            let (_key, value) =
+            let (key, value) =
                 item.map_err(|error| format!("failed to read AML persisted batch: {error}"))?;
             let batch = decode_and_validate_batch(&value)?;
+            validate_batch_key(&key, &batch)?;
             let source_bytes = serde_json::to_vec(&batch.request)
                 .map_err(|error| format!("failed to serialize persisted Add source: {error}"))?;
             rebuilt.insert_batch_atomic(batch.records, &source_bytes)?;
@@ -405,6 +407,13 @@ fn decode_and_validate_batch(bytes: &[u8]) -> Result<PersistedAmlAddBatch, Strin
     Ok(batch)
 }
 
+fn validate_batch_key(key: &[u8], batch: &PersistedAmlAddBatch) -> Result<(), String> {
+    if key != request_key(&batch.request.request_id).as_slice() {
+        return Err("persisted AML Add batch is stored under a non-canonical request key".into());
+    }
+    Ok(())
+}
+
 fn request_key(request_id: &str) -> Vec<u8> {
     let digest = sha256_hex(request_id.as_bytes());
     let mut key = Vec::with_capacity(ADD_KEY_PREFIX.len() + digest.len());
@@ -597,6 +606,30 @@ mod tests {
             top_k: 10,
         }).unwrap();
         assert!(result.data.is_empty());
+    }
+
+    #[test]
+    fn persisted_batch_under_noncanonical_key_fails_rebuild_closed() {
+        let root = tempdir().unwrap();
+        let path = root.path().join("db");
+        let request = add_request("request-1", "user-1", "session-1", &["canonical stored content"]);
+        let payload_sha256 = request.payload_sha256().unwrap();
+        let records = build_evidence_records(&request, &payload_sha256).unwrap();
+        let batch = PersistedAmlAddBatch {
+            request,
+            payload_sha256,
+            stored_at_unix_ms: current_unix_ms().unwrap(),
+            records,
+        };
+        {
+            let db = sled::open(&path).unwrap();
+            let tree = db.open_tree(ADD_BATCH_TREE).unwrap();
+            tree.insert(b"wrong-key", serde_json::to_vec(&batch).unwrap()).unwrap();
+            tree.flush().unwrap();
+        }
+        assert!(SledAmlMemoryBackend::open(&path, root.path())
+            .unwrap_err()
+            .contains("non-canonical request key"));
     }
 
     #[test]
