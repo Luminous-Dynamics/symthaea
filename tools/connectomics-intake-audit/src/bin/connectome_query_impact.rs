@@ -982,4 +982,24 @@ mod tests {
         assert!(validate_input(&input).unwrap_err().contains("4096"));
     }
 
+    #[test]
+    fn bidirected_three_node_graph_counts_both_cycle_orientations_and_six_feedforward_orders() {
+        let graph = BTreeMap::from([
+            ((1, 2), 1.0),
+            ((2, 1), 1.0),
+            ((1, 3), 1.0),
+            ((3, 1), 1.0),
+            ((2, 3), 1.0),
+            ((3, 2), 1.0),
+        ]);
+        assert_eq!(
+            weighted_triad_motif_count(&graph, &TriadMotif::DirectedThreeCycle),
+            2.0
+        );
+        assert_eq!(
+            weighted_triad_motif_count(&graph, &TriadMotif::FeedForwardLoop),
+            6.0
+        );
+    }
+
 }
