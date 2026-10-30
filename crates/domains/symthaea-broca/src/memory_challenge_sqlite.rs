@@ -251,12 +251,40 @@ impl SqliteAmlMemoryBackend {
         let transaction = self.connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| format!("failed to begin AML retention transaction: {error}"))?;
+        let mut expired_evidence_ids = BTreeSet::new();
+        for row in self.read_persisted_rows()? {
+            if row.stored_at_unix_ms < cutoff {
+                let batch = decode_and_validate_batch(&row.body_json)?;
+                validate_row_metadata(&row, &batch)?;
+                expired_evidence_ids.extend(
+                    batch.records.iter().map(|record| record.evidence_id.clone()),
+                );
+            }
+        }
+        let mut expired_event_ids = Vec::new();
+        for row in self.read_persisted_lifecycle_rows()? {
+            let event = decode_and_validate_lifecycle_row(&row)?;
+            if row.recorded_at_unix_ms < cutoff
+                || event.operation.references_any(&expired_evidence_ids)
+            {
+                expired_event_ids.push(row.event_id);
+            }
+        }
+
         let removed = transaction
             .execute(
                 "DELETE FROM aml_add_batches WHERE stored_at_unix_ms < ?1",
                 params![cutoff],
             )
             .map_err(|error| format!("failed to delete expired AML batches: {error}"))?;
+        for event_id in expired_event_ids {
+            transaction
+                .execute(
+                    "DELETE FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+                    params![event_id],
+                )
+                .map_err(|error| format!("failed to purge expired lifecycle event: {error}"))?;
+        }
         transaction
             .commit()
             .map_err(|error| format!("failed to commit AML retention transaction: {error}"))?;
@@ -278,10 +306,153 @@ impl SqliteAmlMemoryBackend {
             .execute("DELETE FROM aml_add_batches", [])
             .map_err(|error| format!("failed to delete AML batches: {error}"))?;
         transaction
+            .execute("DELETE FROM aml_evidence_lifecycle_events", [])
+            .map_err(|error| format!("failed to delete AML lifecycle events: {error}"))?;
+        transaction
             .commit()
             .map_err(|error| format!("failed to commit AML full-purge transaction: {error}"))?;
         self.index = EvidenceIndex::new();
         Ok(removed)
+    }
+
+    /// Number of lifecycle transitions retained in the append-only event log.
+    pub fn lifecycle_event_count(&self) -> Result<usize, String> {
+        let count: i64 = self.connection
+            .query_row("SELECT COUNT(*) FROM aml_evidence_lifecycle_events", [], |row| row.get(0))
+            .map_err(|error| format!("failed to count AML lifecycle events: {error}"))?;
+        usize::try_from(count).map_err(|_| "negative or oversized lifecycle event count".into())
+    }
+
+    /// Persist and apply a source retraction. Repeating the same event_id and
+    /// operation is an idempotent replay; reusing the ID for a different
+    /// operation is rejected.
+    pub fn revoke_evidence(
+        &mut self,
+        event_id: &str,
+        evidence_id: &str,
+    ) -> Result<(), String> {
+        self.append_lifecycle_event(
+            event_id,
+            EvidenceLifecycleOperation::Revoke { evidence_id: evidence_id.into() },
+        )
+    }
+
+    /// Persist and apply an active-index deletion tombstone. The event remains
+    /// auditable and is replayed before Search after restart.
+    pub fn delete_evidence(
+        &mut self,
+        event_id: &str,
+        evidence_id: &str,
+    ) -> Result<(), String> {
+        self.append_lifecycle_event(
+            event_id,
+            EvidenceLifecycleOperation::Delete { evidence_id: evidence_id.into() },
+        )
+    }
+
+    /// Persist and apply an explicit supersession relation. Both source records
+    /// must exist, be active, and satisfy EvidenceIndex's scope constraints.
+    pub fn supersede_evidence(
+        &mut self,
+        event_id: &str,
+        old_evidence_id: &str,
+        new_evidence_id: &str,
+    ) -> Result<(), String> {
+        self.append_lifecycle_event(
+            event_id,
+            EvidenceLifecycleOperation::Supersede {
+                old_evidence_id: old_evidence_id.into(),
+                new_evidence_id: new_evidence_id.into(),
+            },
+        )
+    }
+
+    fn append_lifecycle_event(
+        &mut self,
+        event_id: &str,
+        operation: EvidenceLifecycleOperation,
+    ) -> Result<(), String> {
+        require_non_empty(event_id, "lifecycle event_id")?;
+        operation.validate()?;
+        let transaction = self.connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| format!("failed to begin AML lifecycle transaction: {error}"))?;
+        let existing = transaction
+            .query_row(
+                "SELECT sequence, event_id, recorded_at_unix_ms, body_json
+                 FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+                params![event_id],
+                |row| Ok(PersistedLifecycleRow {
+                    sequence: row.get(0)?,
+                    event_id: row.get(1)?,
+                    recorded_at_unix_ms: row.get(2)?,
+                    body_json: row.get(3)?,
+                }),
+            )
+            .optional()
+            .map_err(|error| format!("failed to read AML lifecycle idempotency key: {error}"))?;
+
+        if let Some(row) = existing {
+            let existing_event = decode_and_validate_lifecycle_row(&row)?;
+            if existing_event.operation != operation {
+                return Err("lifecycle event_id was reused for a different operation".into());
+            }
+            transaction
+                .commit()
+                .map_err(|error| format!("failed to end AML lifecycle replay transaction: {error}"))?;
+            self.rebuild_index()?;
+            return Ok(());
+        }
+
+        let mut candidate_index = self.index.clone();
+        operation.apply(&mut candidate_index)?;
+        let event = PersistedEvidenceLifecycleEvent {
+            event_id: event_id.into(),
+            recorded_at_unix_ms: current_unix_ms()?,
+            operation,
+        };
+        let recorded_at = i64::try_from(event.recorded_at_unix_ms)
+            .map_err(|_| "lifecycle timestamp exceeds SQLite signed integer range".to_string())?;
+        let body_json = serde_json::to_vec(&event)
+            .map_err(|error| format!("failed to serialize AML lifecycle event: {error}"))?;
+        transaction
+            .execute(
+                "INSERT INTO aml_evidence_lifecycle_events
+                    (event_id, recorded_at_unix_ms, body_json)
+                 VALUES (?1, ?2, ?3)",
+                params![event.event_id, recorded_at, body_json],
+            )
+            .map_err(|error| format!("failed to persist AML lifecycle event: {error}"))?;
+        transaction
+            .commit()
+            .map_err(|error| format!("failed to commit AML lifecycle event: {error}"))?;
+        self.index = candidate_index;
+        Ok(())
+    }
+
+    fn read_persisted_lifecycle_rows(&self) -> Result<Vec<PersistedLifecycleRow>, String> {
+        let mut statement = self.connection
+            .prepare(
+                "SELECT sequence, event_id, recorded_at_unix_ms, body_json
+                 FROM aml_evidence_lifecycle_events
+                 ORDER BY sequence ASC",
+            )
+            .map_err(|error| format!("failed to prepare AML lifecycle scan: {error}"))?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok(PersistedLifecycleRow {
+                    sequence: row.get(0)?,
+                    event_id: row.get(1)?,
+                    recorded_at_unix_ms: row.get(2)?,
+                    body_json: row.get(3)?,
+                })
+            })
+            .map_err(|error| format!("failed to query AML lifecycle events: {error}"))?;
+        let mut output = Vec::new();
+        for row in rows {
+            output.push(row.map_err(|error| format!("failed to decode AML lifecycle row: {error}"))?);
+        }
+        Ok(output)
     }
 
     fn read_persisted_rows(&self) -> Result<Vec<PersistedRow>, String> {
@@ -318,6 +489,10 @@ impl SqliteAmlMemoryBackend {
             let source_bytes = serde_json::to_vec(&batch.request)
                 .map_err(|error| format!("failed to serialize persisted Add source: {error}"))?;
             rebuilt.insert_batch_atomic(batch.records, &source_bytes)?;
+        }
+        for row in self.read_persisted_lifecycle_rows()? {
+            let event = decode_and_validate_lifecycle_row(&row)?;
+            event.operation.apply(&mut rebuilt)?;
         }
         self.index = rebuilt;
         Ok(())
