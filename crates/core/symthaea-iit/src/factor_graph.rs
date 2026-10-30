@@ -259,10 +259,8 @@ fn min_fill_order(
         for variable in factor.variables.iter().copied() {
             adjacency.entry(variable).or_default();
         }
-        for left in 0..factor.variables.len() {
-            for right in left + 1..factor.variables.len() {
-                let a = factor.variables[left];
-                let b = factor.variables[right];
+        for (left_index, a) in factor.variables.iter().copied().enumerate() {
+            for b in factor.variables.iter().copied().skip(left_index + 1) {
                 adjacency.entry(a).or_default().insert(b);
                 adjacency.entry(b).or_default().insert(a);
             }
@@ -284,9 +282,9 @@ fn min_fill_order(
                 .filter(|neighbour| adjacency.contains_key(neighbour))
                 .collect::<Vec<_>>();
             let mut fill_edges = 0usize;
-            for left in 0..neighbours.len() {
-                for right in left + 1..neighbours.len() {
-                    if !adjacency[&neighbours[left]].contains(&neighbours[right]) {
+            for (left_index, left) in neighbours.iter().copied().enumerate() {
+                for right in neighbours.iter().copied().skip(left_index + 1) {
+                    if !adjacency[&left].contains(&right) {
                         fill_edges += 1;
                     }
                 }
@@ -308,10 +306,8 @@ fn min_fill_order(
         induced_width = induced_width.max(degree);
 
         // Elimination makes the active neighbours a clique.
-        for left in 0..neighbours.len() {
-            for right in left + 1..neighbours.len() {
-                let a = neighbours[left];
-                let b = neighbours[right];
+        for (left_index, a) in neighbours.iter().copied().enumerate() {
+            for b in neighbours.iter().copied().skip(left_index + 1) {
                 adjacency.entry(a).or_default().insert(b);
                 adjacency.entry(b).or_default().insert(a);
             }
@@ -428,12 +424,12 @@ mod tests {
         let report = min_fill_sum_product(&[f0.clone(), f1.clone()], &[0, 1], 8).unwrap();
 
         let mut expected = vec![0.0; 2]; // retain x2
-        for x0 in 0..2 {
-            for x1 in 0..2 {
-                for x2 in 0..2 {
+        for (x2, expected_value) in expected.iter_mut().enumerate() {
+            for x0 in 0..2 {
+                for x1 in 0..2 {
                     let left_index = x0 | (x1 << 1);
                     let right_index = x1 | (x2 << 1);
-                    expected[x2] += f0.values[left_index] * f1.values[right_index];
+                    *expected_value += f0.values[left_index] * f1.values[right_index];
                 }
             }
         }
