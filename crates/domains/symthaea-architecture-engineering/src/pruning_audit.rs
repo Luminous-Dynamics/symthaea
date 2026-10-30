@@ -228,20 +228,25 @@ fn digest_ids(domain: &[u8], ids: &[String]) -> String {
         hasher.update((candidate_id.len() as u64).to_be_bytes());
         hasher.update(candidate_id.as_bytes());
     }
-    hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    let digest = hasher.finalize();
+    let alphabet = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(alphabet[(byte >> 4) as usize] as char);
+        encoded.push(alphabet[(byte & 0x0f) as usize] as char);
+    }
+    encoded
 }
 
 /// Audit whether a uniformly sampled subset of the pruned population would have crossed the
 /// observed promotion frontier at the same target fidelity.
 ///
 /// selected_scores must contain the entire promoted cohort's target-fidelity scores.
-/// pruned_population_ids must contain every candidate excluded at the rung.
-/// audited_pruned_scores must contain the preselected uniform sample, evaluated at exactly
-/// the same fidelity as selected_scores.
+/// audit_sample must be the private receipt produced by prepare_pruning_audit_sample (or
+/// reconstituted with verify_pruning_audit_sample) from the complete pruned population.
+/// audited_pruned_scores must contain exactly one result for every receipt sentinel, evaluated
+/// at exactly the same fidelity as selected_scores. Missing or failed sentinel evaluations
+/// produce an error; the caller must then fail closed rather than continue pruning.
 ///
 /// A false-pruned sentinel is one whose score is strictly greater than the worst selected
 /// score. Ties do not count as false-prunes; deterministic tie-breaking remains the caller's
@@ -707,6 +712,50 @@ mod tests {
             ).unwrap(),
             first
         );
+    }
+
+    #[test]
+    fn sample_receipt_rejects_cherry_picking_and_missing_outcomes() {
+        let population = ids("pruned", 100);
+        let receipt = prepare_pruning_audit_sample(&population, 20, 123).unwrap();
+        let mut altered = receipt.sampled_candidate_ids().to_vec();
+        let unselected = population
+            .iter()
+            .find(|candidate_id| !receipt.sampled_candidate_ids().contains(candidate_id))
+            .unwrap()
+            .clone();
+        altered[0] = unselected;
+        assert!(verify_pruning_audit_sample(&population, &altered, receipt.seed()).is_err());
+
+        let selected = selected_scores(1);
+        let complete: Vec<AuditScore> = receipt
+            .sampled_candidate_ids()
+            .iter()
+            .map(|candidate_id| AuditScore {
+                candidate_id: candidate_id.clone(),
+                fidelity_index: 1,
+                score: 0.1,
+            })
+            .collect();
+        assert!(audit_pruning(
+            &selected,
+            &receipt,
+            &complete[..complete.len() - 1],
+            &config(1, 1.0)
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn sample_receipt_is_invariant_to_population_input_order() {
+        let population = ids("pruned", 80);
+        let mut reversed = population.clone();
+        reversed.reverse();
+        let forward = prepare_pruning_audit_sample(&population, 24, 77).unwrap();
+        let backward = prepare_pruning_audit_sample(&reversed, 24, 77).unwrap();
+        assert_eq!(forward.population_sha256(), backward.population_sha256());
+        assert_eq!(forward.sample_sha256(), backward.sample_sha256());
+        assert_eq!(forward.sampled_candidate_ids(), backward.sampled_candidate_ids());
     }
 
     #[test]
