@@ -93,6 +93,28 @@ impl VerifiedProofReaderContext {
         &self.context_items
     }
 
+    /// Require the caller to match the exact request identity and time coordinates.
+    pub fn verify_request_binding(
+        &self,
+        principal_id: &str,
+        scope_id: &str,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+    ) -> Result<(), String> {
+        if self.principal_id != principal_id {
+            return Err("reader context principal does not match request".into());
+        }
+        if self.scope_id != scope_id {
+            return Err("reader context scope does not match request".into());
+        }
+        if self.valid_at_unix_ms != valid_at_unix_ms {
+            return Err("reader context valid_at does not match request".into());
+        }
+        if self.known_at_unix_ms != known_at_unix_ms {
+            return Err("reader context known_at does not match request".into());
+        }
+        Ok(())
+    }
     /// Check each declared claim against the exact selected proof dependencies.
     ///
     /// This rejects unknown conclusions, wrong alternative proofs, omitted
