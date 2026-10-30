@@ -29,7 +29,7 @@ Public API:
 - `build_factorial_ground_truth(events, effect, config)`
 - `verify_factorial_ground_truth(report, events, effect, config)`
 
-The input fixture contains event-indexed, equal-length, finite source-isolated signals. Event indices must be canonical and complete. Small-scene exhaustive enumeration is bounded to 2–8 events; sample frames are bounded to 8,192, and the spectral window must be a power of two.
+The input fixture contains event-indexed, equal-length, finite source-isolated signals with an explicit sample rate. Event indices must be canonical and complete. Small-scene exhaustive enumeration is bounded to 2–8 events; sample frames are bounded to 8,192, and the sample rate is explicit and bounded to 768 kHz, and the spectral window must be a power of two.
 
 ### Effects implemented
 
