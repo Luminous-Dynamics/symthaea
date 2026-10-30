@@ -286,6 +286,8 @@ pub fn evaluate_calibrated_retrieval_value(
     calibration.verify_estimate_binding(
         &estimate.estimator_sha256,
         &estimate.calibration_split_sha256,
+        &estimate.feature_schema_sha256,
+        &estimate.utility_schema_sha256,
         &estimate.calibration_report_sha256,
     )?;
     evaluate_retrieval_value(estimate)
@@ -318,6 +320,8 @@ pub fn decide_lifecycle_action_with_voi(
     calibration.verify_estimate_binding(
         &value_decision.estimate.estimator_sha256,
         &value_decision.estimate.calibration_split_sha256,
+        &value_decision.estimate.feature_schema_sha256,
+        &value_decision.estimate.utility_schema_sha256,
         &value_decision.estimate.calibration_report_sha256,
     )?;
     value_decision.verify_request_binding(
@@ -489,6 +493,8 @@ mod tests {
             estimator_id: "utility-estimator".into(),
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator"),
+            feature_schema_sha256: digest("features"),
+            utility_schema_sha256: digest("micro-utility-v1"),
             training_split_sha256: digest("training split"),
             calibration_split_sha256: digest("heldout calibration split"),
             audit_split_sha256: digest("audit split"),
