@@ -66,7 +66,7 @@ impl EvidenceSourceRef {
         if self.valid_to.is_some_and(|end| end <= self.valid_from) {
             return Err("source valid_to must be strictly after valid_from".into());
         }
-        if self.retracted_at.is_some_and(|retracted| retracted < self.recorded_at) {
+        if self.retracted_at.as_ref().is_some_and(|retracted| retracted < &self.recorded_at) {
             return Err("source retracted_at cannot precede recorded_at".into());
         }
         Ok(())
@@ -448,7 +448,7 @@ fn source_eligibility(
         if source.recorded_at > request.known_at {
             reasons.insert(UseValidityReason::SourceNotKnownAtQueryTime);
         }
-        if source.retracted_at.is_some_and(|retracted| retracted <= request.known_at) {
+        if source.retracted_at.as_ref().is_some_and(|retracted| retracted <= &request.known_at) {
             reasons.insert(UseValidityReason::SourceRetractedByQueryTime);
         }
         if source.scope != request.scope {
@@ -490,7 +490,7 @@ fn assess_governing_evidence(evidence: &GoverningEvidence) -> Result<EvidenceUse
             outcome_accessed_by_decision_maker,
         } => {
             if *outcome_accessed_by_decision_maker
-                && first_outcome_access_at.is_some_and(|access| access < *plan_locked_at)
+                && first_outcome_access_at.as_ref().is_some_and(|access| access < plan_locked_at)
             {
                 reasons.insert(UseValidityReason::OutcomeAccessBeforePlanLock);
                 UseValidityStatus::ExploratoryOnly
@@ -913,6 +913,87 @@ mod tests {
         });
         assert_eq!(result.assessment.status, UseValidityStatus::Contested);
         assert_eq!(result.assessment.proposed_action, None);
+    }
+
+    #[test]
+    fn preregistered_adaptive_selection_is_limited_not_falsely_exploratory() {
+        let result = assess(GoverningEvidence::OutcomeSelection {
+            registered_family_size: 20,
+            inspected_outcome_count: 20,
+            selected_after_inspection: true,
+            stopping_rule_preregistered: true,
+        });
+        assert_eq!(result.assessment.status, UseValidityStatus::AdmissibleWithLimitations);
+        assert_eq!(
+            result.assessment.reasons,
+            vec![UseValidityReason::SelectionAfterInspectionUnderPreregisteredRule]
+        );
+    }
+
+    #[test]
+    fn conversion_receipt_must_bind_exact_metric_definitions() {
+        let result = assess_evidence_use(
+            request(),
+            EvidenceUseInput {
+                source_revisions: vec![source("revision-1")],
+                governing_evidence: GoverningEvidence::MetricComparability {
+                    left_definition_sha256: "a".repeat(64),
+                    right_definition_sha256: "b".repeat(64),
+                    left_unit: "percent".into(),
+                    right_unit: "ratio".into(),
+                    conversion_receipt: Some(MetricConversionReceipt {
+                        receipt_sha256: "c".repeat(64),
+                        left_definition_sha256: "x".repeat(64),
+                        right_definition_sha256: "b".repeat(64),
+                        left_unit: "percent".into(),
+                        right_unit: "ratio".into(),
+                    }),
+                },
+            },
+        );
+        assert!(result.unwrap_err().contains("does not bind the exact metric"));
+    }
+
+    #[test]
+    fn evidence_families_must_partition_exact_source_revision_set() {
+        let result = assess_evidence_use(
+            request(),
+            EvidenceUseInput {
+                source_revisions: vec![source("revision-1")],
+                governing_evidence: GoverningEvidence::EvidenceIndependence {
+                    source_families: vec![EvidenceFamilyRef {
+                        family_id: "family-A".into(),
+                        source_revision_ids: BTreeSet::from(["revision-other".into()]),
+                    }],
+                    minimum_independent_families: 1,
+                    lineage_receipt_sha256: Some("d".repeat(64)),
+                },
+            },
+        );
+        assert!(result.unwrap_err().contains("partition the exact source revision set"));
+    }
+
+    #[test]
+    fn prospective_choice_digest_is_invariant_to_alternative_order() {
+        let alternatives = vec![
+            ProspectiveAlternative {
+                alternative_id: "B".into(),
+                action_id: "choose-B".into(),
+                future_benefit_units: 45,
+                future_cost_units: 30,
+            },
+            ProspectiveAlternative {
+                alternative_id: "A".into(),
+                action_id: "choose-A".into(),
+                future_benefit_units: 40,
+                future_cost_units: 20,
+            },
+        ];
+        let mut reversed = alternatives.clone();
+        reversed.reverse();
+        let left = assess(GoverningEvidence::ProspectiveChoice { alternatives });
+        let right = assess(GoverningEvidence::ProspectiveChoice { alternatives: reversed });
+        assert_eq!(left, right);
     }
 
     #[test]
