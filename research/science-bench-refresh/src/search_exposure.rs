@@ -235,10 +235,10 @@ fn validate_receipt_shape(receipt: &SearchExposureReceiptV1) -> Result<(), Strin
         if !valid_digest(&event.previous_event_sha256) || !valid_digest(&event.event_sha256) {
             return Err(format!("events[{index}] contains an invalid chain digest"));
         }
-        if let Some(response) = &event.response_sha256 {
-            if !valid_digest(response) {
-                return Err(format!("events[{index}].response_sha256 must be a lowercase SHA-256 digest"));
-            }
+        if let Some(response) = &event.response_sha256
+            && !valid_digest(response)
+        {
+            return Err(format!("events[{index}].response_sha256 must be a lowercase SHA-256 digest"));
         }
         match (event.decision.as_str(), event.response_sha256.is_some()) {
             ("allow", false) => {
