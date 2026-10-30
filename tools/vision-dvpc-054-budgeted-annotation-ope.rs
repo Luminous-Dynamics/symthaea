@@ -2481,14 +2481,36 @@ fn selection_inference(
 
 fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<String, String> {
     let mut output = String::new();
-    let base_world = correlated_stress_worlds()[1];
-    let portfolio_default = policy_portfolio(&base_world);
-    let portfolio_near_tie = near_tie_policy_portfolio(&base_world);
-    let portfolio_tie = exact_tie_policy_portfolio(&base_world);
+    let worlds = correlated_stress_worlds();
+    let within_family = worlds[0];
+    let shared_rubric = worlds[1];
+    let common_mode = worlds[2];
     let scenarios = [
-        ("distinct_policy_gap", base_world, portfolio_default),
-        ("near_tie_policy_gap", base_world, portfolio_near_tie),
-        ("exact_policy_tie", base_world, portfolio_tie),
+        (
+            "within_family_distinct_gap",
+            within_family,
+            policy_portfolio(&within_family),
+        ),
+        (
+            "shared_rubric_distinct_gap",
+            shared_rubric,
+            policy_portfolio(&shared_rubric),
+        ),
+        (
+            "common_mode_distinct_gap",
+            common_mode,
+            policy_portfolio(&common_mode),
+        ),
+        (
+            "near_tie_policy_gap",
+            shared_rubric,
+            near_tie_policy_portfolio(&shared_rubric),
+        ),
+        (
+            "exact_policy_tie",
+            shared_rubric,
+            exact_tie_policy_portfolio(&shared_rubric),
+        ),
     ];
     let inference_replicates = if replicates <= SMOKE_REPLICATES {
         48
@@ -3192,7 +3214,7 @@ mod tests {
             .lines()
             .filter(|line| line.starts_with("INFERENCE_RESULT\t"))
             .collect();
-        assert_eq!(rows.len(), 9);
+        assert_eq!(rows.len(), 15);
         for row in rows {
             assert_eq!(row.split('\t').count(), 20);
         }
