@@ -829,12 +829,31 @@ mod tests {
     }
 
     #[test]
-    fn pooled_batch_design_preserves_forward_monotonicity_and_budget_when_unclipped() {
+    fn stratified_two_batch_design_charges_pilot_and_adaptive_batches_to_one_budget() {
         let world = World::branch_reversal();
-        let target = exact_history_adaptive(world, world.variance).unwrap().design;
-        let pooled = pooled_two_batch_design(target, 0.25, 0.10, 0.02).unwrap();
-        pooled.validate().unwrap();
-        assert!(expected_label_cost(pooled, world.branch_probability) <= world.budget + 1e-8);
+        let kappa = PILOT_FRACTION;
+        let pilot_p = PILOT_ANNOTATION_PROBABILITY;
+        let adaptive_budget = adaptive_batch_budget(world.budget, kappa, pilot_p).unwrap();
+        assert!((adaptive_budget - 1.0).abs() < 1e-12);
+
+        let mut adaptive_world = world;
+        adaptive_world.budget = adaptive_budget;
+        let adaptive = exact_history_adaptive(adaptive_world, world.variance).unwrap().design;
+        let pilot = pilot_design(pilot_p).unwrap();
+        adaptive.validate().unwrap();
+        let combined_cost = kappa * expected_label_cost(pilot, world.branch_probability)
+            + (1.0 - kappa) * expected_label_cost(adaptive, world.branch_probability);
+        assert!(combined_cost <= world.budget + EPS);
+
+        let combined_variance = two_batch_variance_objective(
+            world.variance,
+            pilot_p,
+            adaptive,
+            world.branch_probability,
+            kappa,
+        )
+        .unwrap();
+        assert!(combined_variance > 0.0);
     }
 
     #[test]
@@ -845,6 +864,7 @@ mod tests {
         assert_ne!(first.profile.stage1, second.profile.stage1);
         assert!(first.profile.stage2[1] > first.profile.stage2[0] * 2.0);
         assert_eq!(first.stage1_count, first.stage2_count.iter().sum());
+        assert!(first.score_mean.is_finite());
     }
 
     #[test]
@@ -855,6 +875,30 @@ mod tests {
         let relative_error = (metrics.mse - metrics.analytic_mse) / metrics.analytic_mse.max(EPS);
         assert!(relative_error.abs() < 0.15, "empirical={}, analytic={}, relative={relative_error}", metrics.mse, metrics.analytic_mse);
         assert!(metrics.bias.abs() < 0.04);
+        assert_eq!(metrics.prefix_violations, 0);
+    }
+
+    #[test]
+    fn stratified_two_batch_estimator_matches_analytic_variance_and_is_unbiased() {
+        let world = World::branch_reversal();
+        let metrics = evaluate_batch_adaptive(
+            world,
+            MC_TEST_REPLICATES,
+            ADAPTIVE_BATCH_N,
+            PILOT_N,
+            0x0590_ba7c,
+        )
+        .unwrap();
+        let relative_error =
+            (metrics.mse - metrics.analytic_mse).abs() / metrics.analytic_mse.max(EPS);
+        assert!(
+            relative_error < 0.18,
+            "two-batch empirical MSE={}, analytic={}, relative={relative_error}",
+            metrics.mse,
+            metrics.analytic_mse
+        );
+        assert!(metrics.bias.abs() < 0.04, "two-batch estimator bias={}", metrics.bias);
+        assert!(metrics.expected_labels <= world.budget + 1e-10);
         assert_eq!(metrics.prefix_violations, 0);
     }
 
@@ -870,7 +914,8 @@ mod tests {
             lambda12: [0.4, 0.2],
         };
         assert!(invalid_prefix.validate().is_err());
-        assert!(adaptive_probability(0.1, 0.05, 0.25, 0.10, 0.02) <= 0.05);
+        assert!(adaptive_batch_budget(0.01, 0.25, 0.10).is_err());
+        assert!(pilot_design(0.0).is_err());
     }
 
     #[test]
@@ -892,7 +937,8 @@ mod tests {
         world.variance.stage2[0] = f64::NAN;
         assert!(world.validate().is_err());
         let world = World::branch_reversal();
-        assert!(pooled_two_batch_design(exact_history_adaptive(world, world.variance).unwrap().design, 1.0, 0.1, 0.02).is_err());
+        assert!(adaptive_batch_budget(world.budget, 1.0, 0.1).is_err());
+        assert!(adaptive_batch_budget(world.budget, 0.25, f64::NAN).is_err());
         assert!(evaluate_design(world, uniform_prefix_design(world), 1, 10, 1).is_err());
     }
 }
