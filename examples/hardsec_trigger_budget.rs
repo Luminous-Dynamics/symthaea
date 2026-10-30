@@ -107,6 +107,19 @@ fn miss_probability(activation_probability: f64, trials: u64) -> f64 {
     ((trials as f64) * (-activation_probability).ln_1p()).exp()
 }
 
+fn activation_probability_at_least_once(
+    activation_probability: f64,
+    trials: u64,
+) -> f64 {
+    if activation_probability == 0.0 {
+        return 0.0;
+    }
+    if activation_probability == 1.0 {
+        return 1.0;
+    }
+    -(((trials as f64) * (-activation_probability).ln_1p()).exp_m1())
+}
+
 fn minimum_trials(
     activation_probability: f64,
     target_miss_probability: f64,
@@ -144,7 +157,8 @@ fn scientific(value: f64) -> String {
 
 fn run(config: Config) {
     let miss = miss_probability(config.activation_probability, config.trials);
-    let activation_at_least_once = 1.0 - miss;
+    let activation_at_least_once =
+        activation_probability_at_least_once(config.activation_probability, config.trials);
     let required_trials = minimum_trials(
         config.activation_probability,
         config.target_miss_probability,
@@ -216,6 +230,12 @@ mod tests {
     fn one_in_a_million_activation_is_almost_always_missed_at_1000_trials() {
         let miss = miss_probability(1e-6, 1_000);
         assert!((miss - 0.9990).abs() < 0.0001, "actual miss={miss}");
+    }
+
+    #[test]
+    fn at_least_once_probability_uses_stable_small_probability_arithmetic() {
+        let value = activation_probability_at_least_once(1e-16, 1_000);
+        assert!((value - 1e-13).abs() < 1e-26, "actual activation={value}");
     }
 
     #[test]
