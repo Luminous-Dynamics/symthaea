@@ -474,6 +474,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
 
                 let mut parent_ids = BTreeSet::new();
                 let mut stale_ancestors = BTreeSet::new();
+                let mut inherited_events = BTreeSet::new();
                 let mut blocked_by = BTreeSet::new();
                 for parent_id in evidence_dependencies {
                     if !valid_identifier(parent_id) || !parent_ids.insert(parent_id.clone()) {
@@ -485,6 +486,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     if parent.assessment.freshness != EvidenceFreshness::Fresh {
                         stale_ancestors.insert(parent_id.clone());
                         stale_ancestors.extend(parent.assessment.stale_ancestor_evidence_ids.iter().cloned());
+                        inherited_events.extend(parent.assessment.invalidation_event_ids.iter().cloned());
                     }
                     if !parent.assessment.usable_for_success {
                         blocked_by.insert(parent_id.clone());
@@ -508,7 +510,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                         && blocked_by.is_empty(),
                     stale_resources: Vec::new(),
                     stale_ancestor_evidence_ids: stale_ancestors.into_iter().collect(),
-                    invalidation_event_ids: Vec::new(),
+                    invalidation_event_ids: inherited_events.into_iter().collect(),
                     blocked_by_evidence_ids: blocked_by.into_iter().collect(),
                 };
 
@@ -622,13 +624,32 @@ fn invalidate_dependents(
     }
 
     while let Some(stale_parent_id) = queue.pop_front() {
-        let Some(children) = reverse_evidence.get(&stale_parent_id) else {
-            continue;
-        };
-        for child_id in children {
+        let children = reverse_evidence
+            .get(&stale_parent_id)
+            .cloned()
+            .unwrap_or_default();
+        let (mut inherited_ancestors, inherited_events) = evidence
+            .get(&stale_parent_id)
+            .map(|parent| {
+                (
+                    parent.assessment.stale_ancestor_evidence_ids.clone(),
+                    parent.assessment.invalidation_event_ids.clone(),
+                )
+            })
+            .unwrap_or_default();
+        inherited_ancestors.push(stale_parent_id.clone());
+
+        for child_id in &children {
             let pinned_resource_ids = if let Some(child) = evidence.get_mut(child_id) {
-                if !child.assessment.stale_ancestor_evidence_ids.contains(&stale_parent_id) {
-                    child.assessment.stale_ancestor_evidence_ids.push(stale_parent_id.clone());
+                for ancestor_id in &inherited_ancestors {
+                    if !child.assessment.stale_ancestor_evidence_ids.contains(ancestor_id) {
+                        child.assessment.stale_ancestor_evidence_ids.push(ancestor_id.clone());
+                    }
+                }
+                for invalidation_id in &inherited_events {
+                    if !child.assessment.invalidation_event_ids.contains(invalidation_id) {
+                        child.assessment.invalidation_event_ids.push(invalidation_id.clone());
+                    }
                 }
                 if child.assessment.freshness == EvidenceFreshness::Fresh {
                     child.assessment.freshness = EvidenceFreshness::StaleTransitive;
