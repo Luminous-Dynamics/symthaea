@@ -492,7 +492,11 @@ mod tests {
         assert_eq!(hits.len(), 1);
 
         let mut admission = admission("A");
-        admission.source_pointer = "/messages/0/content".into();
+        admission.source_trajectory_id = hits[0].source.trajectory_id.clone();
+        admission.source_step_id = hits[0].source.step_id.clone();
+        admission.source_step_index = hits[0].source.step_index;
+        admission.source_sha256 = hits[0].source.source_sha256.clone();
+        admission.source_pointer = hits[0].source.source_pointer.clone();
         admission.index_state_sha256 = snapshot.index_state_sha256.clone();
         let proof_request = admit_lexical_hits_for_proof_budget(
             request(),
@@ -515,6 +519,19 @@ mod tests {
             &EvidenceIndexSnapshotReceipt { known_at_unix_ms: 199, index_state_sha256: digest("index state") },
         ).unwrap_err();
         assert!(error.contains("snapshot known_at"));
+    }
+
+    #[test]
+    fn refuses_admission_from_a_different_index_state() {
+        let mut wrong_state = admission("A");
+        wrong_state.index_state_sha256 = digest("different index state");
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[hit("A", "evidence", 1.0)],
+            &[wrong_state],
+            &snapshot_receipt(),
+        ).unwrap_err();
+        assert!(error.contains("different lexical index state"));
     }
 
     #[test]
