@@ -822,8 +822,18 @@ mod tests {
         assert!((reinforcing.signed_interaction - 1.0).abs() < 1.0e-12);
         assert!((risks[0] - 0.8325).abs() < 1.0e-12);
         assert!((risks[2] - 1.8325).abs() < 1.0e-12);
-        assert!((risks[0] - (risks[1] + test_weights[0] * (-2.0))).abs() < 1.0e-12);
-        assert!((risks[2] - (risks[1] + test_weights[0] * 2.0)).abs() < 1.0e-12);
+        assert!(
+            (risks[0]
+                - (risks[1] + test_weights[0] * (4.0 - 2.0)))
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (risks[2]
+                - (risks[1] + test_weights[0] * (4.0 + 2.0)))
+                .abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
