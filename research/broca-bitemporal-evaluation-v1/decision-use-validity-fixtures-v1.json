@@ -361,7 +361,7 @@
             "measurement": {
               "reported_numeric_value": 0,
               "censoring": null,
-              "detection_limit": null,
+              "detection_limit": 0,
               "observation_state": "failed"
             },
             "instrument": {
@@ -399,7 +399,7 @@
             "measurement": {
               "reported_numeric_value": 0,
               "censoring": null,
-              "detection_limit": null,
+              "detection_limit": 0,
               "observation_state": "failed"
             },
             "instrument": {
@@ -437,7 +437,7 @@
             "measurement": {
               "reported_numeric_value": 0,
               "censoring": null,
-              "detection_limit": null,
+              "detection_limit": 0,
               "observation_state": "failed"
             },
             "instrument": {
