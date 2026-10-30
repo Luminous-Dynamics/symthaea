@@ -204,8 +204,7 @@ fn correlated_stress_worlds() -> [World; 3] {
     let mut shared_rubric = World::heterogeneous_source_quality();
     shared_rubric.name = "shared_rubric_multi_family";
     shared_rubric.shared_factor_variance = [0.015, 0.012];
-    shared_rubric.source_shared_loadings =
-        [[0.25, 1.0], [1.0, 0.5], [0.20, 0.0]];
+    shared_rubric.source_shared_loadings = [[0.25, 1.0], [1.0, 0.5], [0.20, 0.0]];
 
     let mut common_mode = World::mixed_bias_cancellation();
     common_mode.name = "high_common_mode";
@@ -408,18 +407,14 @@ fn shared_annotation_covariance_numerator(
     let mut extra = 0.0;
     for factor in 0..2 {
         let weighted_sum = (0..SOURCES)
-            .map(|k| {
-                allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor]
-            })
+            .map(|k| allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor])
             .sum::<f64>();
         let diagonal = (0..SOURCES)
             .map(|k| {
-                allocation.count(x, a, k) as f64
-                    * world.source_shared_loadings[k][factor].powi(2)
+                allocation.count(x, a, k) as f64 * world.source_shared_loadings[k][factor].powi(2)
             })
             .sum::<f64>();
-        extra += world.shared_factor_variance[factor]
-            * (weighted_sum * weighted_sum - diagonal);
+        extra += world.shared_factor_variance[factor] * (weighted_sum * weighted_sum - diagonal);
     }
     extra
 }
@@ -1626,10 +1621,8 @@ fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, St
 
         let greedy_true = greedy_allocate(world, GreedyRule::MaxGain)?;
         let true_exact = exact_dynamic_program(world, [true; SOURCES])?.allocation;
-        let independent_exact =
-            exact_dynamic_program(&independent, [true; SOURCES])?.allocation;
-        let robust_exact =
-            exact_dynamic_program(&robust_profile, [true; SOURCES])?.allocation;
+        let independent_exact = exact_dynamic_program(&independent, [true; SOURCES])?.allocation;
+        let robust_exact = exact_dynamic_program(&robust_profile, [true; SOURCES])?.allocation;
         let mm_zero = mm_allocate(world, Allocation::default(), 24, 128)?;
         let mm_greedy = mm_allocate(world, greedy_true, 24, 128)?;
 
@@ -1639,7 +1632,11 @@ fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, St
             ("correlation_aware_exact", true_exact, 0usize),
             ("robust_upper_bound_exact", robust_exact, 0usize),
             ("mm_true_from_zero", mm_zero.allocation, mm_zero.iterations),
-            ("mm_true_from_greedy", mm_greedy.allocation, mm_greedy.iterations),
+            (
+                "mm_true_from_greedy",
+                mm_greedy.allocation,
+                mm_greedy.iterations,
+            ),
         ];
         let exact_mse = analytic_mse(world, &true_exact, EVAL_N)?;
         for (method_index, (method, allocation, iterations)) in plans.iter().enumerate() {
@@ -2001,7 +1998,11 @@ mod tests {
         let x = 0;
         let a = 0;
         let nf = world.factual_count[x][a] as f64;
-        let n = nf + allocation.counts[x][a].iter().map(|count| *count as f64).sum::<f64>();
+        let n = nf
+            + allocation.counts[x][a]
+                .iter()
+                .map(|count| *count as f64)
+                .sum::<f64>();
         let sigma2 = reward_variance(world.reward_mean[x][a]);
         let independent_numerator = nf * sigma2
             + (0..SOURCES)
@@ -2018,10 +2019,9 @@ mod tests {
     fn low_rank_shared_source_covariance_is_positive_semidefinite() {
         for world in correlated_stress_worlds() {
             world.validate().unwrap();
-            let covariance: [[f64; SOURCES]; SOURCES] =
-                std::array::from_fn(|k| {
-                    std::array::from_fn(|l| shared_source_covariance(&world, k, l))
-                });
+            let covariance: [[f64; SOURCES]; SOURCES] = std::array::from_fn(|k| {
+                std::array::from_fn(|l| shared_source_covariance(&world, k, l))
+            });
             for vector in [
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
@@ -2081,7 +2081,12 @@ mod tests {
                 world.name,
                 mc.mse
             );
-            assert!(mc.bias.abs() < 0.04, "scenario={}, bias={}", world.name, mc.bias);
+            assert!(
+                mc.bias.abs() < 0.04,
+                "scenario={}, bias={}",
+                world.name,
+                mc.bias
+            );
         }
     }
 
