@@ -358,10 +358,12 @@ fn validate_inputs(
             "must be finite and in [-1,1]",
         ));
     }
-    if config.minimum_retained_proxies == 0 {
+    if config.minimum_retained_proxies == 0
+        || config.minimum_retained_proxies > config.proxy_directions.len()
+    {
         return Err(ProxyConsensusError::new(
             "minimum_retained_proxies",
-            "must be positive",
+            "must be between one and the declared proxy count",
         ));
     }
     for proxy_id in config.proxy_directions.keys() {
@@ -398,6 +400,18 @@ fn validate_inputs(
             return Err(ProxyConsensusError::new(
                 format!("features[{index}]"),
                 "target metric cannot appear in target-free proxy values or runtimes",
+            ));
+        }
+        let declared_proxy_ids: BTreeSet<&str> =
+            config.proxy_directions.keys().map(String::as_str).collect();
+        let score_proxy_ids: BTreeSet<&str> =
+            feature.proxy_scores.keys().map(String::as_str).collect();
+        let runtime_proxy_ids: BTreeSet<&str> =
+            feature.proxy_times_seconds.keys().map(String::as_str).collect();
+        if score_proxy_ids != declared_proxy_ids || runtime_proxy_ids != declared_proxy_ids {
+            return Err(ProxyConsensusError::new(
+                format!("features[{index}]"),
+                "proxy score and runtime keys must exactly match the declared proxy-direction schema",
             ));
         }
         if feature.topology_encoding.len() != 6
@@ -718,6 +732,8 @@ mod tests {
     fn average_ranks_are_used_for_ties() {
         let mut rows = features();
         for row in &mut rows {
+            row.proxy_scores.retain(|key, _| key == "p");
+            row.proxy_times_seconds.retain(|key, _| key == "p");
             row.proxy_scores.insert("p".into(), 1.0);
             row.proxy_times_seconds.insert("p".into(), 0.01);
         }
@@ -741,6 +757,8 @@ mod tests {
     fn minimum_retained_fallback_is_explicit() {
         let mut rows = features();
         for (index, row) in rows.iter_mut().enumerate() {
+            row.proxy_scores.retain(|key, _| key == "proxy_a" || key == "proxy_b");
+            row.proxy_times_seconds.retain(|key, _| key == "proxy_a" || key == "proxy_b");
             row.proxy_scores.insert("anti_a".into(), (5 - index) as f64);
             row.proxy_scores.insert("anti_b".into(), (5 - index) as f64);
             row.proxy_times_seconds.insert("anti_a".into(), 0.05);
@@ -846,6 +864,18 @@ mod tests {
         for row in &mut rows {
             row.proxy_times_seconds.insert("val_accuracy".into(), 0.0);
         }
+        assert!(build_proxy_consensus(&rows, &config()).is_err());
+    }
+
+    #[test]
+    fn exact_proxy_schema_rejects_unused_or_missing_columns() {
+        let mut rows = features();
+        rows[0].proxy_scores.insert("unselected_extra".into(), 0.0);
+        rows[0].proxy_times_seconds.insert("unselected_extra".into(), 0.01);
+        assert!(build_proxy_consensus(&rows, &config()).is_err());
+
+        let mut rows = features();
+        rows[0].proxy_times_seconds.remove("proxy_a");
         assert!(build_proxy_consensus(&rows, &config()).is_err());
     }
 
