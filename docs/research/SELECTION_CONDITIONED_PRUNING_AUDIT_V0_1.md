@@ -102,7 +102,7 @@ The first code increment provides:
 - exact one-outcome-per-sentinel enforcement, preventing silent omission of failed or missing audit results;
 - explicit cumulative-cost audit accounting.
 
-Thirteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
+Fifteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
 
 Authored unit tests cover reproducible sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow.
 
