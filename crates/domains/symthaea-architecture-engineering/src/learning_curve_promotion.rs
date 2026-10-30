@@ -246,6 +246,53 @@ impl LearningCurveCalibrator {
         })
     }
 
+    /// Recompute and verify the frozen model and interval-calibration digest.
+    pub fn verify_integrity(&self) -> Result<(), LearningCurvePromotionError> {
+        validate_config(&self.config)?;
+        if self.model_fit_data_sha256.len() != 64
+            || self.residual_calibration_data_sha256.len() != 64
+            || self.rung_models.len() + 1 != self.config.fidelity_levels.len()
+        {
+            return Err(LearningCurvePromotionError::new(
+                "calibrator",
+                "calibration provenance or rung-model count is invalid",
+            ));
+        }
+        for (index, model) in self.rung_models.iter().enumerate() {
+            let expected_parameters = if index == 0 { 2 } else { 3 };
+            if model.fidelity_index != index
+                || model.coefficients.len() != expected_parameters
+                || model.inverse_gram.len() != expected_parameters
+                || model.inverse_gram.iter().any(|row| row.len() != expected_parameters)
+                || model.coefficients.iter().any(|value| !value.is_finite())
+                || model.inverse_gram.iter().flatten().any(|value| !value.is_finite())
+                || !model.normalized_residual_quantile.is_finite()
+                || model.normalized_residual_quantile < 0.0
+                || model.fit_sample_count < self.config.minimum_model_fit_samples
+                || model.residual_calibration_count
+                    < self.config.minimum_residual_calibration_samples
+            {
+                return Err(LearningCurvePromotionError::new(
+                    format!("rung_models[{index}]"),
+                    "model dimensions, coefficients, quantile or calibration counts are invalid",
+                ));
+            }
+        }
+        let expected = digest_calibrator(
+            &self.config,
+            &self.model_fit_data_sha256,
+            &self.residual_calibration_data_sha256,
+            &self.rung_models,
+        );
+        if expected != self.calibration_sha256 {
+            return Err(LearningCurvePromotionError::new(
+                "calibration_sha256",
+                "calibrator content does not match its digest",
+            ));
+        }
+        Ok(())
+    }
+
     /// Predict final-fidelity performance from a candidate's observed prefix.
     /// The prefix must end before final fidelity.
     pub fn predict_final(
@@ -253,6 +300,7 @@ impl LearningCurveCalibrator {
         architecture_id: &str,
         observed_curve: &[f64],
     ) -> Result<CurvePrediction, LearningCurvePromotionError> {
+        self.verify_integrity()?;
         if architecture_id.trim().is_empty() {
             return Err(LearningCurvePromotionError::new(
                 "architecture_id",
@@ -317,6 +365,7 @@ pub fn select_curve_promotions(
     promotion_count: usize,
     guard_slot_count: usize,
 ) -> Result<CurvePromotionSelection, LearningCurvePromotionError> {
+    calibrator.verify_integrity()?;
     if predictions.is_empty() || promotion_count == 0 || promotion_count > predictions.len() {
         return Err(LearningCurvePromotionError::new(
             "promotion_count",
@@ -1050,6 +1099,13 @@ mod tests {
         let mut wrong_rung = prediction.clone();
         wrong_rung.fidelity_index = 9;
         assert!(select_curve_promotions(&predictor, &[wrong_rung], 1, 0).is_err());
+    }
+
+    #[test]
+    fn calibrator_integrity_rejects_modified_coefficients() {
+        let mut predictor = fitted();
+        predictor.rung_models[0].coefficients[0] += 1.0;
+        assert!(predictor.verify_integrity().is_err());
     }
 
     #[test]
