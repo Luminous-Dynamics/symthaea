@@ -117,6 +117,22 @@ The latest relevant work strengthens the case for PITB's central hypothesis—bu
 | [LeanLean (2026)](https://www.sri.inf.ethz.ch/publications/rognvaldsson2026leanlean) | Repository-scale proof compression over 64 real Lean repositories (up to 174k lines), with a 12-hour budget; the best reported model averages a 48.3% compression score. | Add an adjacent proof-refactoring/lemma-reuse track, preserving main-theorem validity and dependencies. Do not compare compression scores to exact-target solve rates. |
 | [ProofOptimizer (ICLR 2026)](https://proceedings.iclr.cc/paper_files/paper/2026/hash/60917970c4257e50aff60d1d7bde2edf-Abstract-Conference.html) | Reports proof-length reductions of 87% on miniF2F, 57% on PutnamBench and 50% on Seed-Prover's IMO 2025 proofs in its own setup. | Add proof concision/check time as a secondary engineering outcome only after semantic success is held constant; shorter code is not automatically a stronger proof or a better transfer result. |
 
+
+## Additional frontier check — cross-prover portability (2026-10-30)
+
+[ITPEval](https://arxiv.org/abs/2607.19407) adds an important adjacent frontier: formal statement and proof translation across Lean 4, Rocq, Isabelle, and HOL Light. It covers 1,560 source files and 6,848 theorems across a controlled tier and a real-library ecosystem tier. The paper reports up to 29.1% statement-translation pass@1 and 10.5% proof-translation pass@1 across its directed prover pairs; its Lean statement-equivalence check also shows that a subset of kernel-accepted translations can fail a stronger equivalence test. These figures are not PITB results and are not directly comparable to the v0 same-Lean transfer endpoint.
+
+**V1 research opportunity — prover-neutral proof-insight IR:** represent the mathematical move in a kernel-independent intermediate form containing object sorts, assumptions, quantifier scope, invariant direction, derived obligations, and counterconditions. Then compile or instantiate that contract into each prover's native type/term language and independently check:
+- statement and assumption correspondence;
+- the obligations discharged by the move;
+- native kernel acceptance and downstream semantic checks;
+- portability loss, adapter effort, and proof cost;
+- whether the same insight yields incremental utility over a native same-prover baseline.
+
+Keep this as a separate portability cohort after PITB v0 is qualified. Lean, Rocq, Isabelle, and HOL Light differ in foundational logic, type systems, and library ecosystems; failure to translate may reflect foundation or library mismatch rather than failure of the underlying mathematical strategy. A cross-ITP result must therefore distinguish logical incompatibility, missing library support, translation failure, and genuine strategy non-transfer.
+
+This gives PITB a longer-term route from a Lean-specific retrieval/transfer benchmark toward a testable theory of **prover-independent mathematical knowledge representation**. It is a research direction, not an implemented feature or current benchmark claim.
+
 ### Revised benchmark decision
 
 1. **Primary:** paired, component-clustered change in exact-target semantic-gate success from typed insight versus the strongest validation-selected retrieval baseline, at identical budgets.
