@@ -1,7 +1,7 @@
 # BASALT Evaluation Contract
 ## Version 1 — task-level evidence, pairing, and decision rules
 
-**Status:** Proposed protocol; initial offline Rust validator source is staged, but compilation and tests have not yet been executed  
+**Status:** Proposed protocol; the initial run-record contract remains version 1, while the frozen suite-manifest contract is version 2 to freeze task-specific patch-quality rubrics. Validator compilation and tests have not yet been executed  
 **Date:** 2026-10-29  
 **Scope:** Offline evaluation record and analysis rules for repository-level coding agents
 
@@ -10,7 +10,7 @@ This contract turns the BASALT roadmap into a concrete interchange format. It do
 ## Files
 
 - [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json)
-- [Frozen suite-manifest JSON Schema](../../benchmarks/basalt/schema/suite-manifest.schema.json)
+- [Frozen suite-manifest JSON Schema (version 2)](../../benchmarks/basalt/schema/suite-manifest.schema.json)
 - [Synthetic run record](../../benchmarks/basalt/examples/run-record.example.json)
 - [Synthetic frozen suite manifest](../../benchmarks/basalt/examples/suite-manifest.example.json)
 - Rust validation command in `xtask`: `cargo run -p xtask -- basalt-validate --input PATH --manifest PATH`
@@ -61,6 +61,16 @@ Seed-policy semantics are explicit and predeclared in the frozen manifest: `fixe
 The Rust module now contains 37 unit-test cases, including paired-arm omissions, duplicate cells, manifest-bound reclassification, digest mismatches, budget violations, unknown fields and verifier/integrity contradictions. They are authored but **not executed** in this environment because no Rust toolchain or mounted checkout was available and the draft PR workflows were skipped. Do not treat these tests as passing evidence.
 
 The manifest digest establishes byte identity, not authenticity. An actor who can rewrite both the manifest and run record can recompute the digest. Signed, independently pinned pre-run and post-run receipts are tracked in [#9034](https://github.com/Luminous-Dynamics/symthaea/issues/9034); confirmatory scoring must remain disabled until that trust boundary is qualified.
+
+## Frozen task-specific patch-quality rubric
+
+Suite-manifest schema version 2 freezes a task-specific rubric before any system outcome is observed. Each task declares a rubric ID/version, a 10000-basis-point total, unique criteria, an explicit applicability decision and rationale, admissible evidence sources, reviewer guidance, and five ordered anchors (scores 0 through 4) for every criterion.
+
+Only criteria marked `scored` carry positive weight; their weights must sum exactly to 10000 basis points. A `not_applicable` criterion must carry zero weight and a non-empty pre-run rationale. Criterion IDs and evidence sources are unique. The validator rejects duplicate criteria, missing evidence, missing guidance, unordered anchors, invalid applicability weights, and weight totals that drift from the declared total. Changing any rubric byte changes the manifest digest and therefore invalidates a record pinned to the previous manifest.
+
+The rubric definition is a frozen measurement instrument, not a score. This validator does not yet accept reviewer ratings or calculate a quality composite. A later scoring/receipt contract must preserve blinded first-pass ratings, reviewer role, evidence digests, adjudication, agreement, and judge-to-human calibration. Quality is reported only conditional on strict verified success; it can never rescue a failed correctness, security, scope, or integrity blocker. LLM ratings remain advisory until independently calibrated.
+
+The synthetic example rubric is illustrative only. Its criterion weights and anchors are not empirical or validated rating standards.
 
 ## Analysis plan
 Patch-quality ratings are a separate secondary endpoint tracked in [#9084](https://github.com/Luminous-Dynamics/symthaea/issues/9084). Report them only conditional on strict verified success; no maintainability/readability score may compensate for a failed blocking obligation. Preserve raw criterion ratings, evidence, adjudication, and reviewer agreement rather than publishing only a composite.
