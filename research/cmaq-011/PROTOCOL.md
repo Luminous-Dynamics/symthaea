@@ -13,9 +13,11 @@ Every reported result must identify which link it measures. Do not pool results 
 
 ## External reference points
 
-- **MRS.Q (ICML 2026):** an important model-based RL/search baseline. Its authors report that search can hurt despite high model accuracy and that pessimistic ensemble value aggregation is critical. Its repository declares CC BY-NC 4.0; benchmark it as an external dependency at a pinned revision and preserve its license, rather than copying its implementation into Symthaea.
-- **World-In-World (ICLR 2026 Oral):** a separate closed-loop visual/embodied track covering Active Recognition, Active Embodied QA, Image-Goal Navigation, and Robotic Manipulation. It emphasizes task success and controllability, not visual realism alone. The upstream repository declares MIT; pin the upstream revision and its environment stack before any local result.
-- **World-model benchmark survey (2018–2026 snapshot):** distinguishes evaluation target, protocol, metric family, and data source. Its snapshot lists 102 representative benchmarks, 13 with closed-loop protocols and 14 with downstream outcome metrics. These are survey-scoped counts, not a census of every benchmark.
+- **MRS.Q (ICML 2026):** an important model-based RL/search baseline. Its authors report that search can harm despite high model accuracy and that pessimistic ensemble value aggregation is critical. Its repository README declares CC BY-NC 4.0; benchmark it as an external dependency at a pinned revision and preserve its license, rather than copying its implementation into Symthaea.
+- **World-In-World (ICLR 2026 Oral):** a separate closed-loop visual/embodied track covering Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. Its standardized online planning/action interface emphasizes task success and controllability, not visual realism alone. Adapter readiness and exact upstream code/license must still be verified before reproduction.
+- **WorldArena 2.0 (2026 benchmark protocol):** the published [WorldArena 2.0 page](https://world-arena.ai/) extends evaluation across vision-to-visuotactile reasoning, offline metrics to online RL rollouts, and simulation to real-robot deployment. It names RoboTwin 2.0, LIBERO and an AgileX split-type ALOHA platform. This is a high-value manipulation/contact track. However, the linked [WorldArena GitHub repository](https://github.com/tsinghua-fib-lab/WorldArena) has latest inspected commit `2da2ae253b8637ba9de3afc7bea4e087f778ee4d` (2026-07-22), and the GitHub API did not identify a license. We have not established that the published 2.0 protocol, its full code, datasets and reuse terms align. Treat the website as a protocol reference only until a versioned release and reuse terms are confirmed.
+- **LIBERO via LeRobot:** current LeRobot docs list five suites and 130 tasks: Spatial, Object, Goal, LIBERO-90 and Long. Linux and MuJoCo are required; the documented install path uses the `libero` extra and EGL for headless rendering. This provides a concrete manipulation adapter, but evaluation must use policy-visible observations and avoid privileged simulator state.
+- **World-model benchmark surveys:** the 2018–2026 survey reports 102 representative world-model benchmarks, with 13 closed-loop protocols and 14 downstream-outcome metric tracks. A separate robotics benchmark survey posted 30 August 2026 lists 160 benchmarks, 11 explicit VLA/world-model contrasts and four prediction-to-action bridges. These counts are survey-scoped, not universal censuses.
 
 ## Tracks
 
@@ -32,9 +34,16 @@ Start with continuous-control tasks for which state snapshots and counterfactual
 
 The first two tasks are the minimum useful cross-suite slice. Exact task IDs, package versions, physics versions, wrappers, reward transforms, observation normalization and reset semantics belong in a lockfile generated from the environment adapter—not inferred from a task name.
 
-### B. Visual / embodied control (separate scorecard)
+### B. Manipulation / embodied control (separate scorecard)
 
-Use World-In-World's four task families: Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation. This is a separate track because image/video model interfaces, actions and costs are not commensurate with vector-control tasks. Where Symthaea cannot supply a compatible observation/action interface, report adapter infeasibility rather than manufacture a proxy score.
+Use a staged path rather than trying to reproduce a large vision-model leaderboard immediately:
+
+1. **LIBERO-Spatial and LIBERO-Long** as the first manipulation slices. The current LeRobot docs list 10 tasks per suite. Freeze policy-visible camera/state inputs, language instruction, action representation, reward/termination, reset and physics versions. The Long suite tests multi-step dependencies; Spatial isolates geometric reasoning.
+2. **RoboTwin 2.0 / WorldArena 2.0** as the contact-rich extension. Add visuo-tactile input only after the same D0/D1/W1/W2/W3 protocol works without tactile input. Separate slip, contact, force and object-interaction strata.
+3. **World-In-World** as a separate visual closed-loop suite: Active Recognition, Active Embodied QA, Image-Goal Navigation and Robotic Manipulation.
+4. **AgileX ALOHA sim-to-real** only after simulation results are independently reproducible and a robot-specific safety case, action limits and emergency-stop procedure exist.
+
+Do not pool image/video, visuo-tactile, vector-state and physical-robot scores. Where Symthaea cannot supply a compatible observation/action interface, report adapter infeasibility rather than manufacture a proxy score. Do not use privileged simulator state as input to a deployed policy; it is allowed only for oracle scoring and clearly labelled upper bounds.
 
 ## Model and policy arms
 
@@ -180,8 +189,8 @@ A result without complete provenance is exploratory, not leaderboard eligible. A
 ## Implementation sequence
 
 1. Land the canonical JSON schemas and validator contract.
-2. Build one environment adapter at a time; the first pair is Gymnasium/MuJoCo HalfCheetah and DMC quadruped-walk.
-3. Add no-model, MPC/CEM, MRS.Q (pinned external baseline) and Symthaea variants.
-4. Produce paired L1–L4 reports under fixed query/compute budgets.
-5. Add HumanoidBench only after the first pair's split, state-capture and scoring contracts are stable.
-6. Assess World-In-World adapter feasibility as a separate visual/embodied track.
+2. Build the vector-control pair first: Gymnasium/MuJoCo HalfCheetah-v4 and DMC quadruped-walk, with pinned MRS.Q and strong direct-policy controls.
+3. Add no-model, compute-matched direct, MPC/CEM, MRS.Q, TD-MPC2/TD7 controls and Symthaea D0/D1/W1/W2/W3 variants where the task APIs support them.
+4. Produce paired L1–L4 and advantage-of-prediction reports under fixed query/compute budgets.
+5. Build LIBERO-Spatial/Long adapters as a separate manipulation track; keep all observation interfaces policy-visible.
+6. Assess WorldArena 2.0's versioned code/data/license correspondence before treating it as a reproduced baseline. Add contact/tactile and ALOHA only as independently validated extensions.
