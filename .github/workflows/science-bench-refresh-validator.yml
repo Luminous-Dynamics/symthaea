@@ -46,6 +46,7 @@ jobs:
           research/science-bench-refresh/src/main.rs
           research/science-bench-refresh/src/lib.rs
           research/science-bench-refresh/src/judge_factorial.rs
+          research/science-bench-refresh/src/rubric_commensurability.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
           research/science-bench-refresh/src/reference_assurance.rs
 
@@ -1028,6 +1029,34 @@ jobs:
           jq -e '.synthetic_positive_control == true and .planned_cases == 6 and .planned_observations == 36 and .repeat_verification_deterministic == true and .repeatability_control_passed == true and .position_swap_identity_control_passed == true and .confidence_style_bias_detected == true and .semantic_sensitivity_control_passed == true and .tampered_plan_rejected == true and .wrong_revision_rejected == true and .duplicate_and_missing_observations_rejected == true and .wrong_input_digest_rejected == true and .tampered_report_rejected == true and .runner_execution_proven == false and .external_anchor_required == true and .empirical_judge_result == false' \
             /tmp/sbr-judge-robustness/summary.json >/dev/null
           
+      - name: Rubric construct and measurement commensurability controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty research/science-bench-refresh/schema/rubric-commensurability-plan.schema.json
+          jq empty research/science-bench-refresh/schema/rubric-commensurability-report.schema.json
+          python3 research/science-bench-refresh/tools/rubric_commensurability_fixture.py /tmp/sbr-rubric-commensurability
+          python3 research/science-bench-refresh/tools/rubric_commensurability_fixture.py /tmp/sbr-rubric-commensurability-repeat
+          cmp /tmp/sbr-rubric-commensurability/rubric-commensurability-plan.example.json /tmp/sbr-rubric-commensurability-repeat/rubric-commensurability-plan.example.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-rubric-commensurability-plan /tmp/sbr-rubric-commensurability/rubric-commensurability-plan.example.json \
+            > /tmp/sbr-rubric-commensurability-verification.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            audit-rubric-commensurability /tmp/sbr-rubric-commensurability/rubric-commensurability-plan.example.json \
+            > /tmp/sbr-rubric-commensurability-report.json
+          jq -e '.valid == true and .construct_count == 2 and .left_rubric_id == "rubric-independent-left" and .right_rubric_id == "rubric-independent-right" and .overall_status == "fully_commensurable" and .directly_commensurable_construct_count == 2 and .calibration_required_construct_count == 0 and .incompatible_construct_count == 0 and .unmapped_construct_count == 0 and .left_right_mapping_adjudicator_overlap_count == 0 and .mapping_adjudicator_ids_disjoint == true and .mapping_panel_independence_proven == false and .shared_anchor_item_count == 4 and .direct_score_comparison_allowed == true and .model_ranking_comparison_allowed == true and .construct_validity_proven == false and .human_alignment_proven == false and .generalized_accuracy_estimated == false and .scoring_eligible_declared == false and .external_anchor_required == true and .analyzer_worktree_clean == true and (.report_commitment_sha256 | test("^[0-9a-f]{64}$"))' /tmp/sbr-rubric-commensurability-report.json >/dev/null
+          jq --arg bad "$(printf '%064d' 0 | tr '0' 'b')" '.right_instrument.criteria[0].construct_mapping.mapping_evidence_sha256 = $bad' \
+            /tmp/sbr-rubric-commensurability/rubric-commensurability-plan.example.json \
+            > /tmp/sbr-rubric-commensurability-mutated-plan.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            audit-rubric-commensurability /tmp/sbr-rubric-commensurability-mutated-plan.json \
+            > /tmp/sbr-rubric-commensurability-mutated-report.json 2> /tmp/sbr-rubric-commensurability-mutated.stderr
+          mutation_exit=$?
+          set -e
+          test "$mutation_exit" -eq 2
+          grep -q 'plan commitment mismatch' /tmp/sbr-rubric-commensurability-mutated.stderr
+
       - name: Judge nuisance factorial design and analysis controls
         shell: bash
         run: |
