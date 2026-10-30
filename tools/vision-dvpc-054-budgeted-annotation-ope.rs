@@ -2635,16 +2635,16 @@ mod tests {
         assert_eq!(first, second);
         let results: Vec<_> = first
             .lines()
-            .filter(|line| line.starts_with("PORTFOLIO_RESULT\\\t"))
+            .filter(|line| line.starts_with("PORTFOLIO_RESULT\t"))
             .collect();
         let configs: Vec<_> = first
             .lines()
-            .filter(|line| line.starts_with("PORTFOLIO_CONFIG\\\t"))
+            .filter(|line| line.starts_with("PORTFOLIO_CONFIG\t"))
             .collect();
         assert_eq!(results.len(), 12);
         assert_eq!(configs.len(), 9);
         for row in results {
-            assert_eq!(row.split('\\\t').count(), 31);
+            assert_eq!(row.split('\t').count(), 31);
         }
     }
 
