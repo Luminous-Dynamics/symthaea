@@ -1,0 +1,5 @@
+case_id	pred_do0_milli	pred_do1_milli	pred_safe_do0_ppm	pred_safe_do1_ppm
+a1	100	100	1000000	1000000
+a2	200	200	1000000	0
+b1	50	50	1000000	1000000
+b2	-100	-100	0	1000000

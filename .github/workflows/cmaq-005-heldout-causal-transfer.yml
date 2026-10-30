@@ -1,0 +1,35 @@
+name: CMAQ-005 held-out causal transfer
+
+on:
+  pull_request:
+    paths:
+      - 'research/cmaq-005/**'
+      - '.github/workflows/cmaq-005-heldout-causal-transfer.yml'
+  push:
+    paths:
+      - 'research/cmaq-005/**'
+      - '.github/workflows/cmaq-005-heldout-causal-transfer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  causal-transfer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/cmaq-005
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Rust unit tests
+        run: cargo test --locked
+      - name: Exact intervention known-answer fixture
+        run: |
+          cargo run --locked -- --truth fixtures/truth.tsv --predictions fixtures/predictions-exact.tsv --split qualification > /tmp/cmaq-005-exact.tsv
+          diff -u fixtures/expected-exact.tsv /tmp/cmaq-005-exact.tsv
+      - name: No-effect negative control
+        run: |
+          cargo run --locked -- --truth fixtures/truth.tsv --predictions fixtures/predictions-no-effect.tsv --split qualification > /tmp/cmaq-005-no-effect.tsv
+          diff -u fixtures/expected-no-effect.tsv /tmp/cmaq-005-no-effect.tsv

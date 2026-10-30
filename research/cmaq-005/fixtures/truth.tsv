@@ -1,0 +1,6 @@
+case_id	mechanism_id	split	y_do0_milli	y_do1_milli	safe_do0	safe_do1
+a1	lawA	qualification	100	300	true	true
+a2	lawA	qualification	200	100	true	false
+b1	lawB	qualification	50	450	true	true
+b2	lawB	qualification	-100	100	false	true
+d1	devLaw	development	0	100	true	true
