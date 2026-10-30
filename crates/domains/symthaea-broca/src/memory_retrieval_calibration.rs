@@ -573,6 +573,27 @@ mod tests {
     }
 
     #[test]
+    fn capability_rejects_a_different_feature_or_utility_schema() {
+        let (report, capability) =
+            audit_retrieval_value_estimator(request_with(covered_observations(300))).unwrap();
+        let capability = capability.unwrap();
+        assert!(capability.verify_estimate_binding(
+            &report.estimator_sha256,
+            &report.calibration_split_sha256,
+            &digest("different feature schema"),
+            &report.utility_schema_sha256,
+            &report.report_sha256,
+        ).unwrap_err().contains("feature schema"));
+        assert!(capability.verify_estimate_binding(
+            &report.estimator_sha256,
+            &report.calibration_split_sha256,
+            &report.feature_schema_sha256,
+            &digest("different utility schema"),
+            &report.report_sha256,
+        ).unwrap_err().contains("utility schema"));
+    }
+
+    #[test]
     fn capability_rejects_a_different_estimator_or_calibration_split() {
         let (report, capability) =
             audit_retrieval_value_estimator(request_with(covered_observations(300))).unwrap();
@@ -580,6 +601,8 @@ mod tests {
         assert!(capability.verify_estimate_binding(
             &digest("different estimator"),
             &report.calibration_split_sha256,
+            &report.feature_schema_sha256,
+            &report.utility_schema_sha256,
             &report.report_sha256,
         ).unwrap_err().contains("estimator"));
         assert!(capability.verify_estimate_binding(
