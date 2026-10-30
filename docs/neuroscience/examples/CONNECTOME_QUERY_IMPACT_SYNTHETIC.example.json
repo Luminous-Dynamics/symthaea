@@ -118,5 +118,10 @@
         }
       ]
     }
+  ],
+  "review_budgets_minutes": [
+    2,
+    3.5,
+    10
   ]
 }
