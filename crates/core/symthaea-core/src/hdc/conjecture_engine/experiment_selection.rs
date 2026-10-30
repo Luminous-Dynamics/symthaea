@@ -188,7 +188,12 @@ fn log_sum_exp(values: &[f64]) -> f64 {
     if maximum == f64::NEG_INFINITY {
         return maximum;
     }
-    maximum + values.iter().map(|value| (*value - maximum).exp()).sum::<f64>().ln()
+    maximum
+        + values
+            .iter()
+            .map(|value| (*value - maximum).exp())
+            .sum::<f64>()
+            .ln()
 }
 
 /// Limit of the uniform-prior information gain as the observation noise tends to zero.
@@ -358,10 +363,7 @@ pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility
             continue;
         };
         let score = information_gain / experiment_cost;
-        if score.is_finite()
-            && score > 0.0
-            && best.is_none_or(|(_, best_score)| score > best_score)
-        {
+        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score) {
             best = Some((experiment, score));
         }
     }
@@ -390,7 +392,6 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
         cost,
     )
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -487,7 +488,10 @@ mod tests {
         let hypotheses = [0_i32, 1, 2, 3];
         let score = expected_information_gain_nats(&(), &hypotheses, 1.0, |_, _| Some(42.0))
             .expect("valid noise and complete predictions");
-        assert!(score.abs() < 1.0e-12, "identical predictions should teach nothing: {score}");
+        assert!(
+            score.abs() < 1.0e-12,
+            "identical predictions should teach nothing: {score}"
+        );
     }
 
     #[test]
@@ -498,20 +502,16 @@ mod tests {
         let balanced = [0.0, 0.0, 10.0, 10.0];
         assert!(variance(&outlier) > variance(&balanced));
         let hypotheses = [0_usize, 1, 2, 3];
-        let outlier_gain = expected_information_gain_nats(
-            &0_usize,
-            &hypotheses,
-            1.0,
-            |hypothesis, _| Some(outlier[*hypothesis]),
-        )
-        .expect("complete finite predictions");
-        let balanced_gain = expected_information_gain_nats(
-            &0_usize,
-            &hypotheses,
-            1.0,
-            |hypothesis, _| Some(balanced[*hypothesis]),
-        )
-        .expect("complete finite predictions");
+        let outlier_gain =
+            expected_information_gain_nats(&0_usize, &hypotheses, 1.0, |hypothesis, _| {
+                Some(outlier[*hypothesis])
+            })
+            .expect("complete finite predictions");
+        let balanced_gain =
+            expected_information_gain_nats(&0_usize, &hypotheses, 1.0, |hypothesis, _| {
+                Some(balanced[*hypothesis])
+            })
+            .expect("complete finite predictions");
         assert!(
             balanced_gain > outlier_gain + 0.05,
             "balanced split should reduce hypothesis uncertainty more: outlier={outlier_gain}, balanced={balanced_gain}"
@@ -537,17 +537,18 @@ mod tests {
     fn information_gain_fails_closed_on_invalid_noise_or_incomplete_predictions() {
         let hypotheses = [0_i32, 1, 2];
         assert!(
-            expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64))
-                .is_none()
+            expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64)).is_none()
         );
         assert!(
             expected_information_gain_nats(&(), &hypotheses, f64::NAN, |h, _| Some(*h as f64))
                 .is_none()
         );
-        assert!(expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
-            (*h != 1).then_some(*h as f64)
-        })
-        .is_none());
+        assert!(
+            expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
+                (*h != 1).then_some(*h as f64)
+            })
+            .is_none()
+        );
         assert!(
             expected_information_gain_nats(&(), &[1_i32], 1.0, |h, _| Some(*h as f64)).is_none()
         );
@@ -557,18 +558,16 @@ mod tests {
     fn information_gain_selector_maximizes_information_per_cost_not_raw_information() {
         let hypotheses = [0_usize, 1, 2, 3];
         let candidates = [1_u8, 2, 3];
-        let predict = |hypothesis: &usize, experiment: &u8| {
-            match (*experiment, *hypothesis) {
-                (1, 0 | 1) => Some(0.0),
-                (1, 2 | 3) => Some(1.0),
-                (2, 0 | 1) => Some(0.0),
-                (2, 2 | 3) => Some(10.0),
-                (3, 0) => Some(-100.0),
-                (3, 1) => Some(-50.0),
-                (3, 2) => Some(50.0),
-                (3, 3) => Some(100.0),
-                _ => None,
-            }
+        let predict = |hypothesis: &usize, experiment: &u8| match (*experiment, *hypothesis) {
+            (1, 0 | 1) => Some(0.0),
+            (1, 2 | 3) => Some(1.0),
+            (2, 0 | 1) => Some(0.0),
+            (2, 2 | 3) => Some(10.0),
+            (3, 0) => Some(-100.0),
+            (3, 1) => Some(-50.0),
+            (3, 2) => Some(50.0),
+            (3, 3) => Some(100.0),
+            _ => None,
         };
         let low_cost_information =
             expected_information_gain_nats(&1, &hypotheses, 1.0, predict).unwrap();
@@ -640,15 +639,24 @@ mod tests {
         let candidates = ["blocked", "eligible"];
         let hypotheses = [0_usize, 1];
         let predict = |hypothesis: &usize, candidate: &&str| {
-            assert_ne!(*candidate, "blocked", "blocked candidates must not be scored");
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidates must not be scored"
+            );
             Some(*hypothesis as f64)
         };
         let cost = |candidate: &&str| {
-            assert_ne!(*candidate, "blocked", "blocked candidate cost must not be queried");
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidate cost must not be queried"
+            );
             1.0
         };
         let noise = |candidate: &&str| {
-            assert_ne!(*candidate, "blocked", "blocked candidate noise must not be queried");
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidate noise must not be queried"
+            );
             1.0
         };
         let selected = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
@@ -662,15 +670,17 @@ mod tests {
         .expect("one eligible informative candidate");
         assert_eq!(*selected.0, "eligible");
 
-        assert!(select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
-            &candidates,
-            &hypotheses,
-            |_| false,
-            noise,
-            predict,
-            cost,
-        )
-        .is_none());
+        assert!(
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| false,
+                noise,
+                predict,
+                cost,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -692,15 +702,17 @@ mod tests {
         .expect("candidate 1 is admissible and informative");
         assert_eq!(*selected.0, 1);
 
-        assert!(select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
-            &candidates,
-            &hypotheses,
-            |_| true,
-            |_| f64::NAN,
-            |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
-            |_| 1.0,
-        )
-        .is_none());
+        assert!(
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| true,
+                |_| f64::NAN,
+                |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
+                |_| 1.0,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -758,13 +770,9 @@ mod tests {
         }
 
         assert!(
-            expected_information_gain_with_steps(
-                &(),
-                &[0.0_f64, 1.0],
-                1.0,
-                0,
-                |prediction, _| Some(*prediction),
-            )
+            expected_information_gain_with_steps(&(), &[0.0_f64, 1.0], 1.0, 0, |prediction, _| {
+                Some(*prediction)
+            },)
             .is_none()
         );
     }
