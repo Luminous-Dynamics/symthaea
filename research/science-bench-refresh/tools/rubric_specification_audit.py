@@ -176,6 +176,7 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
         test_type = test.get("test_type")
         if not isinstance(test_type, str) or test_type not in {"positive", "negative", "edge_case", "adversarial", "meaning_preserving", "meaning_changing"}:
             issues.append(f"test {test_id} has unsupported test_type")
+            test_type = ""
         candidate_digest = test.get("candidate_pair_sha256")
         if not isinstance(candidate_digest, str) or HEX64.fullmatch(candidate_digest) is None:
             issues.append(f"test {test_id} has invalid candidate_pair_sha256")
@@ -205,7 +206,11 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
 
     for criterion_id, criterion in criteria_by_id.items():
         planned = criterion.get("planned_test_ids", [])
+        if not isinstance(planned, list):
+            continue
         for test_id in planned:
+            if not isinstance(test_id, str):
+                continue
             test = tests_by_id.get(test_id)
             if test is None:
                 issues.append(f"criterion {criterion_id} references missing planned test {test_id}")
