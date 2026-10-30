@@ -29,7 +29,7 @@ The critical invariant: no path may be reported as preserved unless all its supp
 
 ### Evidence tiers must not be collapsed
 
-A 2026 survey of ML-based hardware-Trojan detection highlights unresolved dataset bias, adversarial robustness, explainability, evaluation inconsistency and FPGA deployment; it also notes that current benchmark suites have different strengths/limitations. A separate 2026 ETS paper questions the empirical basis of the field, observing that publicly documented, reproducible real-world Trojan incidents are extremely rare and that many often-cited examples are undocumented design features, firmware backdoors, supply-chain manipulations or unverified claims. These observations warrant three separately reported evidence tiers:
+A 2026 survey of ML-based hardware-Trojan detection highlights unresolved dataset bias, adversarial robustness, explainability, evaluation inconsistency and FPGA deployment; it also notes that current benchmark suites have different strengths/limitations. A separate 2026 ETS paper questions the empirical basis of the field, observing that publicly documented, reproducible real-world Trojan incidents are extremely rare and that many often-cited examples are undocumented design features, firmware backdoors, supply-chain manipulations or unverified claims. A separate concern is extreme class imbalance: the DATE industrial-scale paper describes labelled regions as typically far below 0.1% of all nodes/regions. These observations warrant three separately reported evidence tiers:
 - **labelled benchmark designs:** source-labelled RTL/netlist datasets such as Trust-Hub, with explicit caveats about their construction and split lineage;
 - **witness-validated synthetic sequential cases:** e.g. SeqCube-HT records reset-consistent activation, active/inactive replay and bounded audits, but are still generated instances rather than observed field incidents;
 - **industrial-scale structural stress graphs:** e.g. DATE 2026 function-preserving Trojan-like challenge patterns that test rarity, graph size and structural concealment, but do not establish full malicious payload execution.
@@ -116,7 +116,7 @@ cargo run --locked \
   --receipt /tmp/path-audit.json
 ```
 
-The streaming suite has 10 authored tests, including a synthetic 1,000,000-edge star-shaped structural graph with 1,000,001 node-to-partition assignments and a one-edge witness ledger. That fixture is a throughput/memory-path stress test only, not a representative SoC benchmark and not a Trojan instance. The test has not yet been reported as passing.
+The streaming suite has 10 authored tests, including a synthetic 1,000,000-edge star-shaped structural graph with 1,000,001 node-to-partition assignments, 999,001 explicit cross-partition bridges, and one witness edge crossing a partition boundary. That fixture is a high-fanout throughput/memory-path stress test only, not a representative SoC benchmark and not a Trojan instance. The focused CI job also records peak RSS for this test using `/usr/bin/time -v`; no result is claimed until the job completes.
 
 ## 5. Benchmark matrix and target gates
 
