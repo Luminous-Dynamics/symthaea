@@ -4,7 +4,6 @@ use lep_conformance::{
 };
 use serde_json::{Value, json};
 use std::env;
-use std::fs;
 use std::hint::black_box;
 use std::process::Command;
 use std::process::ExitCode;
