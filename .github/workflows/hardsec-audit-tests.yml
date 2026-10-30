@@ -1,0 +1,355 @@
+name: HARDSEC Audit Examples
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "examples/hardsec_trigger_budget.rs"
+      - "examples/hardsec_evidence_packet_audit.rs"
+      - "examples/hardsec_selective_eval.rs"
+      - "tests/fixtures/hardsec/*.json"
+      - "tools/hardsec-audit-harness/Cargo.toml"
+      - ".github/workflows/hardsec-audit-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-audit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test:
+    name: Focused HARDSEC Rust examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check HARDSEC example formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs examples/hardsec_selective_eval.rs
+
+      - name: Resolve isolated harness dependencies
+        run: cargo generate-lockfile --manifest-path tools/hardsec-audit-harness/Cargo.toml
+
+      - name: Test random-trigger sampling budget
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --example hardsec_trigger_budget
+
+      - name: Test claim-scoped evidence packet auditor
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+
+      - name: Test validation-frozen selective-risk evaluator
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-selective-eval --example hardsec_selective_eval
+
+      - name: Run selective-risk CLI fixture and validate receipt
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml \
+            --features hardsec-selective-eval --example hardsec_selective_eval -- \
+            --ledger tests/fixtures/hardsec/selective-score-ledger.json \
+            --receipt "$RUNNER_TEMP/selective-risk-receipt.json" \
+            --max-false-alert-rate 0 --max-false-clear-rate 0
+          python3 - "$RUNNER_TEMP/selective-risk-receipt.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              receipt = json.load(handle)
+
+          assert receipt["schema_version"] == "hardsec-selective-eval-receipt-v1"
+          assert receipt["result"] == "evaluated"
+          assert receipt["claim_scope"] == "validation_frozen_selective_risk_metrics_only"
+          assert receipt["decision_policy"]["clear_if_score_lte"] == 0.08
+          assert receipt["decision_policy"]["suspect_if_score_gte"] == 0.82
+          assert receipt["split_protocol"]["test_used_only_for_reporting"] is True
+          assert receipt["test_metrics"]["samples"] == 4
+          assert receipt["test_metrics"]["coverage"] == 0.5
+          assert receipt["test_metrics"]["abstention_rate"] == 0.5
+          assert receipt["test_metrics"]["false_alert_rate"] == 0.0
+          assert receipt["test_metrics"]["false_clear_rate"] == 0.0
+          assert receipt["generalization"]["held_out_group_count"] == 2
+          assert receipt["generalization"]["macro_group_coverage"] == 0.5
+          assert receipt["generalization"]["aggregate_constraints_met"] is True
+          family_risk = receipt["family_level_failure_bounds"]
+          assert family_risk["group_count"] == 2
+          assert family_risk["false_alert_failure_groups"] == 0
+          assert family_risk["false_clear_failure_groups"] == 0
+          assert family_risk["false_alert_group_failure_upper_bound"] > 0.8
+          assert family_risk["false_clear_group_failure_upper_bound"] > 0.8
+          assert family_risk["minimum_independent_groups_if_zero_failures"] == {
+              "one_percent": 368,
+              "half_percent": 736,
+              "zero_percent": None,
+          }
+          assert receipt["security_verdict"] is None
+          assert [item["group_count"] for item in receipt["split_summary"]] == [1, 1, 2]
+          print("Selective-risk CLI receipt: PASS (2 held-out groups, 50% coverage, 50% abstention)")
+          PY
+
+      - name: Fetch pinned SeqCube witness package and verify publisher checksums
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/seqcube-ht-e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz"
+          curl --fail --location --retry 3 \
+            "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/archive/e5acac37af6dbe1fa53b0be93199bb81a62c5320.tar.gz" \
+            --output "$archive"
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          package_root="$RUNNER_TEMP/seqcube-ht-witness-validation-artifact-e5acac37af6dbe1fa53b0be93199bb81a62c5320"
+          test -f "$package_root/manifest.json"
+          test -f "$package_root/netlists/seqctrl_infected.v"
+          archive_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
+          python3 - "$package_root" "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$archive_sha256" <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          archive_sha256 = sys.argv[3]
+          manifest = root / "checksums/SHA256SUMS"
+          entries = []
+          failures = []
+
+          for line_number, line in enumerate(manifest.read_text(encoding="ascii").splitlines(), 1):
+              if not line:
+                  continue
+              try:
+                  expected, relative_path = line.split("  ", 1)
+              except ValueError as error:
+                  raise SystemExit(f"invalid checksum manifest line {line_number}: {line!r}") from error
+              path = root / relative_path
+              raw = path.read_bytes()
+              raw_sha256 = hashlib.sha256(raw).hexdigest()
+              if raw_sha256 == expected:
+                  mode = "exact_bytes"
+              elif b"\r" not in raw and b"\n" in raw:
+                  crlf_sha256 = hashlib.sha256(raw.replace(b"\n", b"\r\n")).hexdigest()
+                  if crlf_sha256 == expected:
+                      mode = "lf_archive_matches_published_crlf_digest"
+                  else:
+                      failures.append({
+                          "path": relative_path,
+                          "expected": expected,
+                          "raw_sha256": raw_sha256,
+                          "crlf_sha256": crlf_sha256,
+                      })
+                      mode = "mismatch"
+              else:
+                  failures.append({
+                      "path": relative_path,
+                      "expected": expected,
+                      "raw_sha256": raw_sha256,
+                  })
+                  mode = "mismatch"
+              entries.append({
+                  "path": relative_path,
+                  "published_sha256": expected,
+                  "extracted_sha256": raw_sha256,
+                  "reconciliation": mode,
+              })
+
+          receipt = {
+              "schema_version": "seqcube-checksum-reconciliation-v1",
+              "upstream_commit": "e5acac37af6dbe1fa53b0be93199bb81a62c5320",
+              "archive_sha256": archive_sha256,
+              "manifest_path": "checksums/SHA256SUMS",
+              "manifest_entries": len(entries),
+              "exact_byte_matches": sum(item["reconciliation"] == "exact_bytes" for item in entries),
+              "line_ending_reconciled": sum(item["reconciliation"] == "lf_archive_matches_published_crlf_digest" for item in entries),
+              "mismatches": failures,
+              "entries": entries,
+              "rule": "Accept exact bytes or LF-only extracted bytes whose LF-to-CRLF representation matches the publisher digest; never rewrite source files.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "mismatches": len(failures),
+          }, indent=2))
+          if failures:
+              raise SystemExit("SeqCube publisher checksum mismatch beyond LF/CRLF representation")
+
+          canonical_root = root.parent / "seqcube-ht-canonical-crlf"
+          if canonical_root.exists():
+              shutil.rmtree(canonical_root)
+          shutil.copytree(root, canonical_root)
+          transformed = []
+          for item in entries:
+              target = canonical_root / item["path"]
+              raw = target.read_bytes()
+              if item["reconciliation"] == "lf_archive_matches_published_crlf_digest":
+                  if b"\r" in raw:
+                      raise SystemExit(f"unexpected existing CR byte in {item['path']}")
+                  raw = raw.replace(b"\n", b"\r\n")
+                  target.write_bytes(raw)
+                  transformed.append(item["path"])
+              canonical_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+              if canonical_sha256 != item["published_sha256"]:
+                  raise SystemExit(f"canonical CRLF copy still mismatches {item['path']}")
+              item["canonical_sha256"] = canonical_sha256
+          receipt["canonical_copy"] = {
+              "root_name": canonical_root.name,
+              "verified_manifest_entries": len(entries),
+              "transformed_files": transformed,
+              "transformed_file_count": len(transformed),
+              "source_archive_preserved": True,
+              "rule": "Only the copied files whose LF-to-CRLF digest matched the publisher checksum are converted; original extracted archive files remain untouched.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "canonical_manifest_entries_verified": receipt["canonical_copy"]["verified_manifest_entries"],
+              "canonical_files_transformed": receipt["canonical_copy"]["transformed_file_count"],
+              "mismatches": len(failures),
+          }, indent=2))
+          PY
+          echo "SEQCUBE_ARCHIVE_ROOT=$package_root" >> "$GITHUB_ENV"
+          echo "SEQCUBE_PACKAGE_ROOT=$RUNNER_TEMP/seqcube-ht-canonical-crlf" >> "$GITHUB_ENV"
+
+      - name: Set up Python for upstream SeqCube verifier
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Z3 and Icarus Verilog
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes iverilog
+          python -m venv "$RUNNER_TEMP/seqcube-venv"
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip install --requirement "$SEQCUBE_PACKAGE_ROOT/verify/requirements.txt"
+          {
+            python --version
+            "$RUNNER_TEMP/seqcube-venv/bin/python" -m pip freeze
+            iverilog -V
+            vvp -V
+          } > "$RUNNER_TEMP/seqcube-toolchain.txt" 2>&1
+
+      - name: Independently replay upstream SeqCube package verifier
+        run: |
+          set -euo pipefail
+          set +e
+          "$RUNNER_TEMP/seqcube-venv/bin/python" \
+            "$SEQCUBE_PACKAGE_ROOT/verify/verify_package.py" \
+            --package "$SEQCUBE_PACKAGE_ROOT" --require-iverilog \
+            > "$RUNNER_TEMP/seqcube-verifier.stdout" \
+            2> "$RUNNER_TEMP/seqcube-verifier.stderr"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/seqcube-verifier.stdout"
+          cat "$RUNNER_TEMP/seqcube-verifier.stderr" >&2
+          test "$status" -eq 0
+          test -f "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json"
+          mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
+          cp "$SEQCUBE_PACKAGE_ROOT/logs/verification_report.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stdout" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-verifier.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/seqcube-toolchain.txt" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Audit pinned SeqCube witness-validation packet and local bytes
+        run: |
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+            --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+            --evidence-root "$SEQCUBE_PACKAGE_ROOT" \
+            --receipt "$RUNNER_TEMP/seqcube-evidence-audit.json"
+          python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              receipt = json.load(handle)
+
+          expected = {
+              "trigger_activated",
+              "payload_effect_observed",
+              "trigger_not_observed_under_budget",
+              "payload_effect_not_observed_under_budget",
+              "bounded_reachability_not_found",
+          }
+          actual = {claim["claim_type"] for claim in receipt["claims"]}
+          assert receipt["result"] == "pass", receipt
+          assert receipt["evaluation_mode"] == "witness_validation", receipt
+          assert receipt["model_sha256"] is None, receipt
+          assert receipt["evidence_count"] == 5, receipt
+          assert actual == expected, (actual, expected)
+          assert all(claim["status"] == "supported" for claim in receipt["claims"]), receipt
+          assert receipt["byte_integrity"]["status"] == "verified", receipt
+          assert receipt["byte_integrity"]["verified_file_count"] == 9, receipt
+          assert receipt["security_verdict"] is None, receipt
+          print("SeqCube packet receipt: PASS (5 bounded/observed claims, 9 source bytes verified, detector-free)")
+          PY
+          cp "$RUNNER_TEMP/seqcube-evidence-audit.json" "$RUNNER_TEMP/hardsec-seqcube/"
+
+      - name: Reject a deliberately altered SeqCube trace (negative control)
+        run: |
+          set -euo pipefail
+          tampered_root="$RUNNER_TEMP/seqcube-tampered"
+          cp -a "$SEQCUBE_PACKAGE_ROOT" "$tampered_root"
+          printf '\n# intentional tamper negative control\n' >> "$tampered_root/replay/active.csv"
+
+          set +e
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+            --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+            --evidence-root "$tampered_root" \
+            --receipt "$RUNNER_TEMP/tampered-evidence-audit.json" \
+            > "$RUNNER_TEMP/tampered-auditor.stdout" \
+            2> "$RUNNER_TEMP/tampered-auditor.stderr"
+          auditor_status=$?
+          set -e
+          test "$auditor_status" -ne 0
+          grep -F "SHA-256 mismatch" "$RUNNER_TEMP/tampered-auditor.stderr"
+
+          set +e
+          "$RUNNER_TEMP/seqcube-venv/bin/python" \
+            "$tampered_root/verify/verify_package.py" \
+            --package "$tampered_root" --require-iverilog \
+            > "$RUNNER_TEMP/tampered-upstream.stdout" \
+            2> "$RUNNER_TEMP/tampered-upstream.stderr"
+          upstream_status=$?
+          set -e
+          test "$upstream_status" -ne 0
+          grep -F "hash mismatch" "$RUNNER_TEMP/tampered-upstream.stderr"
+
+          cp "$RUNNER_TEMP/tampered-auditor.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
+          cp "$RUNNER_TEMP/tampered-upstream.stderr" "$RUNNER_TEMP/hardsec-seqcube/"
+          printf 'auditor_exit=%s\nupstream_exit=%s\n' "$auditor_status" "$upstream_status" \
+            > "$RUNNER_TEMP/hardsec-seqcube/negative-control-status.txt"
+
+      - name: Upload SeqCube witness packet and replay receipts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-seqcubewitness-validation-receipt
+          path: "${{ runner.temp }}/hardsec-seqcube/"
+
+      - name: Record resolved harness dependency lock
+        if: always()
+        run: sha256sum tools/hardsec-audit-harness/Cargo.lock || true
+
+      - name: Upload exact harness lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-audit-harness-lock
+          path: tools/hardsec-audit-harness/Cargo.lock
+          if-no-files-found: ignore

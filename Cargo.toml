@@ -609,6 +609,8 @@ wait-timeout = "0.2"
 
 [features]
 default = ["default-mind"]
+hardsec-evidence-audit = ["dep:sha2"] # HARDSEC-007: hash input evidence packets and bind receipt digests
+hardsec-selective-eval = ["dep:sha2"] # HARDSEC-009: hash prediction ledgers and bind selective-risk receipts
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
 swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
@@ -2543,3 +2545,17 @@ name = "recurrent_mask_recovery"
 # observed. Must be declared here -- autoexamples = false.
 [[example]]
 name = "action_semantics_probe"
+
+# HARDSEC-007: quantify random-stimulus miss probability for rare triggers.
+[[example]]
+name = "hardsec_trigger_budget"
+
+# HARDSEC-007: enforce claim ceilings and evidence-packet consistency.
+[[example]]
+name = "hardsec_evidence_packet_audit"
+required-features = ["hardsec-evidence-audit"]
+
+# HARDSEC-009: select a validation-frozen clear/suspect/abstain operating point.
+[[example]]
+name = "hardsec_selective_eval"
+required-features = ["hardsec-selective-eval"]
