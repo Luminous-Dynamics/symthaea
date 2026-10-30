@@ -633,7 +633,9 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                 for pin in resource_pins {
                     resources_with_evidence.insert(pin.resource_id.clone());
                 }
-                if *dependency_coverage == DependencyCoverage::Incomplete {
+                if *dependency_coverage == DependencyCoverage::Incomplete
+                    && freshness == EvidenceFreshness::Fresh
+                {
                     incomplete_coverage_evidence.insert(evidence_id.clone());
                 }
 
@@ -1137,6 +1139,39 @@ mod tests {
         assert!(build.stale_resources.is_empty());
         assert_eq!(report.counts.evidence_invalidated_by_unknown_dependency_change, 1);
         assert_eq!(report.counts.unrelated_resource_changes, 0);
+    }
+
+    #[test]
+    fn incomplete_coverage_directly_pinned_change_preserves_both_reasons() {
+        let mut value = parsed_example();
+        value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
+        value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:CARGO_HOME"]);
+
+        let entries = value["entries"].as_array_mut().unwrap();
+        entries.remove(4); // Remove README-only change; retain the source change.
+        entries.truncate(5);
+        entries[4]["sequence"] = Value::from(5);
+        let before = format!("sha256:{}", "a".repeat(64));
+        let after = format!("sha256:{}", "e".repeat(64));
+        entries[4]["event_digest"] = Value::String(
+            resource_change_digest(
+                "state-shift-selective-invalidation-001",
+                5,
+                "source-edit-001",
+                ChangeKind::SourceChange,
+                "repo:src/lib.rs",
+                &before,
+                &after,
+            )
+            .unwrap(),
+        );
+
+        let report = audit_value(&value);
+        assert!(report.valid, "{:?}", report.errors);
+        let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
+        assert_eq!(build.freshness, EvidenceFreshness::StaleDirect);
+        assert!(build.invalidated_by_unknown_dependency_change);
+        assert!(build.stale_resources.iter().any(|id| id == "repo:src/lib.rs"));
     }
 
     #[test]
