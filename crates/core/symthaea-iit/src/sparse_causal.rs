@@ -122,6 +122,8 @@ pub enum SparseCausalError {
     InvalidReportValue { index: usize, value: f64 },
     #[error("cannot convert {units} sparse units to dense; maximum is {maximum}")]
     DenseConversionLimit { units: usize, maximum: usize },
+    #[error("partition cut-matrix size overflows for {candidate_count} candidate units")]
+    PartitionCutMatrixSizeOverflow { candidate_count: usize },
     #[error("dense model target {target} is not a function of its declared parent scope at full state {state}")]
     DenseModelNotLocal { target: usize, state: usize },
     #[error(transparent)]
@@ -347,10 +349,7 @@ impl SparseBinaryCausalModel {
         let candidate_count = candidate.len();
         let expected_cut_entries = candidate_count
             .checked_mul(candidate_count)
-            .ok_or(SparseCausalError::ParentTableSizeOverflow {
-                target: candidate.first().copied().unwrap_or(0),
-                parents: candidate_count.saturating_mul(2),
-            })?;
+            .ok_or(SparseCausalError::PartitionCutMatrixSizeOverflow { candidate_count })?;
         if partition.cut_matrix().len() != expected_cut_entries {
             return Err(PartitionApplyError::CutMatrixShapeMismatch {
                 expected: expected_cut_entries,
@@ -880,6 +879,28 @@ mod tests {
                     partition.is_total_cut(),
                     partition.parts(),
                     partition.directions()
+                );
+            }
+            let current_state = [true, false, true, false, true];
+            let dense_cause = dense_cut
+                .forward_cause_likelihood_iit4(
+                    &candidate,
+                    &candidate,
+                    &current_state,
+                    &candidate,
+                )
+                .unwrap();
+            let sparse_cause = sparse_cut
+                .forward_cause_likelihood_iit4(&candidate, &current_state, 1 << 16)
+                .unwrap()
+                .forward_likelihood;
+            for (index, (dense_value, sparse_value)) in
+                dense_cause.iter().zip(&sparse_cause).enumerate()
+            {
+                assert!(
+                    (dense_value - sparse_value).abs() <= 1e-12,
+                    "post-cut Eq4 mismatch: total={}, index={index}, dense={dense_value:.17}, sparse={sparse_value:.17}",
+                    partition.is_total_cut()
                 );
             }
         }
