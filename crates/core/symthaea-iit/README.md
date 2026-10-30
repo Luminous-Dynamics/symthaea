@@ -238,7 +238,8 @@ that separates:
 For the current enumerator and no TotalCut, the combinatorial fixtures specify:
 - 3 units: 54 assignments, 22 unique cuts, 32 duplicates;
 - 4 units: 306 assignments, 150 unique cuts, 156 duplicates;
-- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates;\n- 6 units: 12,348 assignments, 7,896 unique cuts, 4,452 duplicates.
+- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates;
+- 6 units: 12,348 assignments, 7,896 unique cuts, 4,452 duplicates.
 
 These counts are implementation regression anchors, not performance measurements.
 They make future optimizations measurable: reduce wall time/memory or allocation cost
@@ -293,7 +294,8 @@ partition expansion, not a measured runtime:
 | 2 | 9 | 72 | 36 | 2.00× |
 | 3 | 54 | 1,215 | 486 | 2.50× |
 | 4 | 306 | 14,976 | 4,896 | 3.06× |
-| 5 | 1,863 | 168,750 | 46,575 | 3.62× |\n| 6 | 12,348 | 1,778,112 | 444,528 | 4.00× |
+| 5 | 1,863 | 168,750 | 46,575 | 3.62× |
+| 6 | 12,348 | 1,854,252 | 444,528 | 4.17× |
 
 The older path also performed linear membership scans for both endpoints within
 each block iteration; the new path uses the precomputed block index plus incoming/
