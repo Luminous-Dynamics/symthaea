@@ -471,6 +471,55 @@ fn noiseless_information_gain_with_prior_weights(weighted_predictions: &[(f64, f
         .sum::<f64>()
 }
 
+/// Select an eligible experiment using prior-weighted, candidate-noise EIG per cost.
+///
+/// Prior weights are supplied by the caller and normalized by the EIG kernel. The
+/// eligibility callback is evaluated before cost, noise or prediction callbacks.
+/// Invalid priors, measurements or costs cause the candidate to be skipped; if no
+/// eligible candidate retains positive information gain, the function abstains.
+pub fn select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility<
+    'a,
+    H,
+    E,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        let Some(information_gain) = expected_information_gain_nats_with_prior_weights(
+            experiment,
+            hypotheses,
+            prior_weights,
+            noise,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost when each
 /// candidate has its own observation-noise standard deviation and prevalidated eligibility.
 ///
@@ -534,6 +583,75 @@ pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility
 /// The caller must ensure all scenarios share the same hypothesis meaning and prior,
 /// and that all candidate predictions represent the same measurand/unit. Measurement
 /// uncertainty is supplied independently by the metrology process.
+/// Select an eligible experiment by the worst-case prior-weighted EIG per cost
+/// across a finite, frozen set of model-discrepancy scenarios.
+pub fn select_experiment_by_worst_case_information_gain_per_cost_with_prior_weights<
+    'a,
+    H,
+    E,
+    S,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        if !noise.is_finite() || noise <= 0.0 {
+            continue;
+        }
+
+        let mut worst_case_information_gain = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let Some(information_gain) = expected_information_gain_nats_with_prior_weights(
+                experiment,
+                hypotheses,
+                prior_weights,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+            ) else {
+                complete = false;
+                break;
+            };
+            if !information_gain.is_finite() || information_gain <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_information_gain = worst_case_information_gain.min(information_gain);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E, S>(
     candidates: &'a [E],
     hypotheses: &[H],
@@ -1028,6 +1146,64 @@ mod tests {
         .unwrap();
         let expected = -(0.5_f64 * 0.5_f64.ln() + 0.5_f64 * 0.5_f64.ln());
         assert!((gain - expected).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn prior_weighted_selector_is_invariant_to_duplicate_hypotheses_with_split_mass() {
+        let candidates = ["candidate"];
+        let two_hypotheses = [0_usize, 1];
+        let two = select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility(
+            &candidates,
+            &two_hypotheses,
+            &[0.5, 0.5],
+            |_| true,
+            |_| 0.25,
+            |hypothesis, _| Some(*hypothesis as f64),
+            |_| 1.0,
+        )
+        .unwrap();
+
+        let three_hypotheses = [0_usize, 1, 2];
+        let duplicated = select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility(
+            &candidates,
+            &three_hypotheses,
+            &[0.25, 0.25, 0.5],
+            |_| true,
+            |_| 0.25,
+            |hypothesis, _| Some(if *hypothesis == 2 { 1.0 } else { 0.0 }),
+            |_| 1.0,
+        )
+        .unwrap();
+        assert!((two.1 - duplicated.1).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn prior_weighted_robust_selector_keeps_hard_eligibility_and_scenario_floor() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["blocked", "fragile", "robust"];
+        let scenarios = ["nominal", "shift"];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost_with_prior_weights(
+            &candidates,
+            &hypotheses,
+            &[0.5, 0.5],
+            &scenarios,
+            |candidate| *candidate != "blocked",
+            |_| 0.1,
+            |hypothesis, candidate, scenario| match (*candidate, *scenario, *hypothesis) {
+                ("fragile", "nominal", 0) => Some(0.0),
+                ("fragile", "nominal", 1) => Some(5.0),
+                ("fragile", "shift", _) => Some(3.0),
+                ("robust", _, 0) => Some(0.0),
+                ("robust", _, 1) => Some(1.0),
+                _ => None,
+            },
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+        )
+        .expect("robust candidate has positive weighted information in all scenarios");
+        assert_eq!(*selected.0, "robust");
     }
 
     #[test]
