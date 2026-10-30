@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Ed25519 attestations for policy-pinned memory events.
+//! Ed25519 attestations for policy-pinned memory events and role-scoped access grants.
 //!
 //! Signatures authenticate which registered key signed exact canonical bytes;
 //! they do not establish that a signed statement is factually true. Production
@@ -1091,6 +1091,11 @@ fn parse_utc(value: &str, field: &str) -> Result<DateTime<Utc>, String> {
 mod tests {
     use super::*;
     use crate::memory_governance::{LedgerQuery, SourcePolicy};
+    use crate::memory_evidence::{
+        Bm25Config, EvidenceIndex, EvidenceLifecycle, EvidencePayload, EvidenceRecord,
+        EvidenceSource, RoleScopePolicy, EVIDENCE_SCHEMA_VERSION,
+    };
+    use std::path::Path;
 
     fn policy(version: u64, timestamp: &str) -> AuthorityPolicy {
         AuthorityPolicy {
@@ -1776,6 +1781,82 @@ mod tests {
             .verify_role_scope_policy_and_advance(&invalid, &mut version_store)
             .is_err());
         assert_eq!(version_store.version, Some(2));
+    }
+
+
+    #[test]
+    fn signed_role_policy_flows_into_authorized_evidence_retrieval() {
+        let (trust_store, policy_key, _, ingestion_key) = store();
+        let signed_policy = sign_role_policy(
+            role_policy(9, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+            &policy_key,
+            "2026-01-02T00:00:00Z",
+            &ingestion_key,
+        );
+        let verified = trust_store
+            .verify_role_scope_policy(&signed_policy, 8)
+            .unwrap();
+        let access_policy = RoleScopePolicy::from_verified(verified);
+
+        let text = "security key rotation overdue";
+        let source_bytes = serde_json::to_vec(&serde_json::json!({
+            "evidence": text
+        })).unwrap();
+        let record = EvidenceRecord {
+            schema_version: EVIDENCE_SCHEMA_VERSION.to_owned(),
+            evidence_id: "signed-security-evidence".into(),
+            hdc_id: 7001,
+            scope_id: "security".into(),
+            source: EvidenceSource {
+                trajectory_id: "trajectory-attested-role".into(),
+                step_id: Some("step-1".into()),
+                step_index: Some(1),
+                source_sha256: format!("{:x}", Sha256::digest(&source_bytes)),
+                source_pointer: "/evidence".into(),
+            },
+            payload: EvidencePayload::Text { value: text.into() },
+            content_sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+            lifecycle: EvidenceLifecycle::Active,
+            occurred_at_unix_ms: Some(1767312000000),
+            valid_from_unix_ms: None,
+            valid_until_unix_ms: None,
+            superseded_by: None,
+        };
+        let mut index = EvidenceIndex::new();
+        index.insert(record, &source_bytes).unwrap();
+        let now_ms = parse_utc("2026-01-03T00:00:00Z", "test time")
+            .unwrap()
+            .timestamp_millis() as u64;
+
+        let authorized = index
+            .search_bm25_for_role(
+                "key rotation",
+                "security-agent",
+                "security",
+                now_ms,
+                Path::new("."),
+                Bm25Config::default(),
+                &access_policy,
+            )
+            .unwrap();
+        assert_eq!(authorized.len(), 1);
+        assert_eq!(authorized[0].requesting_role, "security-agent");
+        assert_eq!(authorized[0].access_policy_version, 9);
+        assert_eq!(authorized[0].evidence.evidence_id, "signed-security-evidence");
+        assert_eq!(authorized[0].context.value, text);
+
+        assert!(index
+            .search_bm25_for_role(
+                "key rotation",
+                "security-agent",
+                "finance",
+                now_ms,
+                Path::new("."),
+                Bm25Config::default(),
+                &access_policy,
+            )
+            .unwrap_err()
+            .contains("not authorized"));
     }
 
 
