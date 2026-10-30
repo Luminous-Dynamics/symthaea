@@ -110,6 +110,8 @@ Do not assume an architecture wins. Compare against the original component branc
 
 ## 5. Workstream B — rare and sequential trigger activation
 
+A recent sequential-benchmark lead is **SeqCube-HT: state-cube-guided generation of sequential hardware Trojan benchmarks**, published 9 October 2026 (DOI: https://doi.org/10.1186/s42400-026-00676-2). Its stated problem definition requires trigger execution from a declared reset state and payload effects to reach an observation boundary. This is the right abstraction for sequential-trigger tests: test both state reachability and effect observability, not merely whether an internal trigger predicate toggled. Treat it as a benchmark-generation methodology candidate until the exact artifacts, scripts, license and ground-truth files are independently located and pinned; the paper's publication alone is not a verified local dataset.
+
 The new Rust utility examples/hardsec_trigger_budget.rs calculates the miss probability for a user-supplied hypothetical p and N, and the number of IID trials required to reach a target miss probability. It is a budgeting tool only.
 
 Build the activation experiment around distinct evidence classes:
@@ -189,6 +191,22 @@ An evidence packet should contain:
 - a stimulus/activation witness or formal counterexample where one exists; timeout/unknown must be explicit;
 - source/derived artifact and label-map receipts, augmentation-equivalence status, and exact tool provenance;
 - explicit alternatives and uncertainty: why the signal may be benign, which evidence is missing, and what an engineer should verify next.
+ 
+The executable contract is implemented in `examples/hardsec_evidence_packet_audit.rs`, registered behind Cargo feature `hardsec-evidence-audit`. It accepts a strict JSON packet with:
+- `subject`: design ID and exact evaluated-netlist SHA-256;
+- `detector`: method, model SHA-256, config SHA-256, score, threshold and decision;
+- `evidence[]`: unique ID, kind, artifact URI, evidence SHA-256, subject SHA-256, tool/version, scope and status; optional witness/assumption hashes, stimulus counts, proof scope and bound;
+- `claims[]`: claim type, status (`supported`, `contradicted`, `unknown`, `not_evaluated`), explicit scope and evidence IDs.
+
+Formal evidence has an additional typed result: `assertion_proved`, `bounded_no_counterexample`, `counterexample_found`, `cover_reached`, `equivalence_proved`, `timeout`, or `unknown`, with property ID and proof scope as appropriate. The validator enforces status/result consistency. In particular:
+- a bounded no-counterexample result can support only `bounded_reachability_not_found` with a positive cycle bound;
+- `trigger_unreachable_under_assumptions` requires an unbounded assertion proof and an assumptions digest;
+- `trigger_not_observed_under_budget` requires a passing trace with a nonzero stimulus count and zero activations, but never implies unreachability;
+- `trigger_activated` requires an activation count and a hashed witness;
+- `functional_equivalence` requires an explicit passing equivalence report;
+- generic `trojan_absent` and `design_is_secure` claims are rejected.
+
+The tool emits a deterministic, unsigned receipt outside the packet directory. It validates packet shape, claim ceilings and internal hash binding; it does **not** download or hash the referenced evidence bytes, verify tool execution, authenticate signatures, validate assumptions, or prove the evidence truthful. Its receipt says so explicitly. It is an independent consistency check, not a hardware security verdict.
 
 ### Explanation-quality evaluation
 
@@ -245,6 +263,11 @@ cargo test --example hardsec_trigger_budget
 cargo run --example hardsec_trigger_budget -- \
   --activation-probability 0.0001 --trials 1000 \
   --target-miss-probability 0.05
+
+cargo test --example hardsec_evidence_packet_audit --features hardsec-evidence-audit
+cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-audit -- \
+  --packet /path/to/evidence-packet.json \
+  --receipt /path/outside/packet/evidence-audit.json
 ```
 
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
@@ -254,6 +277,7 @@ The test suite checks known-answer miss probabilities, the minimum trial count, 
 Useful tool references:
 - SymbiYosys: https://symbiyosys.readthedocs.io/en/latest/ (bounded/unbounded safety, cover and liveness)
 - EQY equivalence tutorial: https://formal.org/tutorials/symbiyosys/equivalence-checking (gold/gate comparison, partition proofs and counterexamples)
+- SeqCube-HT (2026): https://doi.org/10.1186/s42400-026-00676-2 (state-cube-guided sequential Trojan benchmark methodology)
 
 ## 12. Scope boundary
 
