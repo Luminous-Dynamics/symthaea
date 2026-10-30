@@ -338,7 +338,9 @@
                   "type": [
                     "integer",
                     "string"
-                  ]
+                  ],
+                  "minimum": -9223372036854776000,
+                  "maximum": 9223372036854776000
                 },
                 "paired_group_id": {
                   "type": "string",
