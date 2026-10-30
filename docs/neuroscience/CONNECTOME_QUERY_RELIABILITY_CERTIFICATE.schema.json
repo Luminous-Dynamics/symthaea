@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json",
+  "title": "Query-scoped connectome reliability certificate",
+  "description": "Scoped evidence/uncertainty contract. A digest proves byte identity, not biological correctness. No aggregate confidence field is permitted in V1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "certificate_id",
+    "state",
+    "query",
+    "source_revisions",
+    "dependency_closure",
+    "applied_corrections",
+    "evidence_bindings",
+    "quality_gates",
+    "uncertainty_components",
+    "scope_exclusions",
+    "invalidation_policy_version",
+    "verifier"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "certificate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "CERTIFIED_WITHIN_DECLARED_SCOPE",
+        "CONDITIONAL",
+        "NOT_CERTIFIED",
+        "INVALIDATED_BY_REVISION"
+      ]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "specification_sha256",
+        "implementation_sha256",
+        "parameters_sha256",
+        "scope"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "specification_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "implementation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "parameters_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source_revisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_kind",
+          "source_id",
+          "revision_id",
+          "content_sha256"
+        ],
+        "properties": {
+          "source_kind": {
+            "enum": [
+              "volume",
+              "imaging",
+              "segmentation",
+              "annotation",
+              "mesh",
+              "skeleton",
+              "synapse_table",
+              "connectome_graph",
+              "other"
+            ]
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "dependency_closure": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object_kind",
+          "object_id",
+          "source_revision_sha256",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "object_kind": {
+            "enum": [
+              "volume_region",
+              "neuron",
+              "root",
+              "segment",
+              "synapse",
+              "edge",
+              "morphology_subgraph",
+              "coordinate_transform",
+              "query_derived_value",
+              "other"
+            ]
+          },
+          "object_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_revision_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "applied_corrections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "correction_id",
+          "order",
+          "correction_sha256",
+          "review_decision",
+          "application_state"
+        ],
+        "properties": {
+          "correction_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correction_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "review_decision": {
+            "enum": [
+              "accept",
+              "reject",
+              "abstain",
+              "not_reviewed"
+            ]
+          },
+          "application_state": {
+            "enum": [
+              "applied_to_reversible_branch",
+              "not_applied",
+              "stale_conflict",
+              "reverted"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_type",
+          "artifact_id",
+          "artifact_sha256",
+          "role"
+        ],
+        "properties": {
+          "evidence_type": {
+            "enum": [
+              "dataset_intake",
+              "candidate_generation_audit",
+              "candidate_pool_audit",
+              "multi_rater_audit",
+              "unseen_error_sensitivity",
+              "query_impact",
+              "correction_portfolio",
+              "spatial_null_model",
+              "morphology_features",
+              "neurite_extension_audit",
+              "prospective_trial",
+              "other"
+            ]
+          },
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gate_id",
+          "status",
+          "critical",
+          "scope_note"
+        ],
+        "properties": {
+          "gate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOT_ESTIMABLE",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "scope_note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uncertainty_components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component_type",
+          "status",
+          "assumptions"
+        ],
+        "properties": {
+          "component_type": {
+            "enum": [
+              "sampling_design",
+              "candidate_pool_residual",
+              "rater_reference",
+              "unseen_error_mse",
+              "morphology_model",
+              "extension_path",
+              "correction_interaction",
+              "query_measurement",
+              "null_model",
+              "other"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ESTIMATED",
+              "SENSITIVITY_ONLY",
+              "NOT_ESTIMABLE"
+            ]
+          },
+          "estimate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "interval_95": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "scope_note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "scope_exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "invalidation_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_id",
+        "tool_version",
+        "binary_sha256"
+      ],
+      "properties": {
+        "tool_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binary_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
