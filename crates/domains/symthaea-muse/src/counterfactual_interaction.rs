@@ -815,7 +815,7 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(ordinal, source_index)| {
-                let onset_micros = (*source_index as u64) * 100_000;
+                let onset_micros = (*source_index as u64) * 100;
                 crate::performed_event_map::PerformedEventLineage {
                     source_event_id: format!("score_event_index:{source_index}"),
                     descendant_ordinal: 0,
@@ -933,7 +933,7 @@ mod tests {
         let baseline = binding(&base_audio, "baseline", "midi-00", "map-00", &[0, 1, 2]);
         let remove_a = binding(&remove_a_audio, "remove-a", "midi-10", "map-10", &[1, 2]);
         let remove_b = binding(&remove_b_audio, "remove-b", "midi-01", "map-01", &[0, 2]);
-        let mut remove_ab = binding(&remove_ab_audio, "remove-ab", "midi-11", "map-11", &[2]);
+        let remove_ab = binding(&remove_ab_audio, "remove-ab", "midi-11", "map-11", &[2]);
         // The test-only constructor is deliberately used to exercise the
         // fail-closed consumer boundary with a substituted execution profile.
         let remove_ab = crate::counterfactual_influence::test_verified_renderer_audio_binding(
