@@ -9,9 +9,10 @@
 //! Integration-level system \u{03c6}s searches under IIT 4.0 (2023), including
 //! embedded proper subsystems with Eq. 3/Eq. 4 background handling. Composition-level
 //! big-Phi tie resolution, the complete cause-effect structure, and the IIT 4.0
-//! (2026) intrinsic-information cap remain unimplemented. A separate binary
-//! factor-graph module provides exact bounded min-fill sum-product elimination;
-//! it is not yet wired into the dense IIT scorer. No output is a consciousness
+//! (2026) intrinsic-information cap remain unimplemented. A separate sparse
+//! local-CPT model now uses the exact log-domain min-fill kernel for Eq. 4 cause
+//! likelihoods without allocating a global dense TPM. The full system scorer
+//! still uses the dense reference representation. No output is a consciousness
 //! determination.
 //!
 //! # Model contract
@@ -41,6 +42,12 @@ mod factor_graph;
 pub use factor_graph::{
     min_fill_log_sum_product, min_fill_sum_product, BinaryFactor, BinaryLogFactor,
     FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
+};
+
+mod sparse_causal;
+pub use sparse_causal::{
+    SparseBinaryCausalModel, SparseCausalError, SparseEq4Report, SparseMechanismCpt,
+    MAX_LOCAL_PARENTS, MAX_SPARSE_UNITS,
 };
 
 /// Maximum dense binary units accepted by this in-memory v0.1 representation.
