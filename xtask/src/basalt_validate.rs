@@ -2357,7 +2357,7 @@ mod tests {
     #[test]
     fn actual_specification_bytes_must_match_frozen_digest() {
         let mut specs = synthetic_specs();
-        specs.insert("rust-repair-0001".to_string(), b"tampered specification bytes".to_vec());
+        specs.insert(EXAMPLE_SPEC_DIGEST.to_string(), b"tampered specification bytes".to_vec());
         let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &specs);
         assert!(!report.valid);
         assert!(has_code(&report, "E_SPEC_BYTE_LENGTH_MISMATCH"));
