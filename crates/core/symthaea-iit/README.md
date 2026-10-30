@@ -3,23 +3,34 @@
 Rust-native foundation for a formalism-pinned Integrated Information Theory (IIT)
 research engine.
 
-## Current scope: v0.1 causal-model substrate
+## Current scope: bounded IIT 4.0 (2023) system search
 
-This crate currently provides a validated dense binary factored TPM, cause/effect
-repertoire primitives, forward cause-likelihood computation, a validated pointwise
-GID measure primitive, an explicit partition-cut TPM transform, a bounded IIT 4.x
-directed-system-partition enumerator,
-and typed formalism/quantity identities, and stable model, evaluation, and
-analysis-request digests. It does not yet compute IIT system
-integrated information (phi_s), mechanism-level phi, a complete cause-effect
-structure, structure-level Phi, or any consciousness result.
+This crate now provides a validated dense binary factored TPM; cause/effect and
+forward-cause repertoire primitives; pointwise generalized intrinsic difference
+(GID); maximum-entropy cut transforms; an exact-quotiented directed set-partition
+generator; cause/effect intrinsic specified-state selection with tie families;
+fixed-state system-partition scoring; and a bounded exhaustive IIT 4.0 (2023)
+Integration-level system search for phi_s. Model, evaluation, and analysis-request
+identities are versioned and SHA-256 bound.
 
-The first step is to agree on the input contract before comparing mathematical
-outputs. A correct engine cannot compare with PyPhi if the two sides silently
-disagree about state order, TPM layout, connectivity, evaluation state, time grain,
-or formalism. The partition generator is now implemented with an exact quotient
-over direction-label equivalence classes; the full system-phi pipeline remains
-future work.
+The system search is complete only for the declared binary factored TPM profile,
+the IIT 4.0 (2023) formalism, its default directed-set-partition family, and the
+explicit work budgets passed to the API. It applies the default PyPhi MIP ranking:
+minimum normalized phi, then maximum nonnegative phi, then lexicographic induced
+cut. It evaluates every tied cause/effect specified-state pair before applying the
+Integration-level maximum-phi rule.
+
+This remains a partial implementation, not a complete PyPhi port. It does not
+construct the full cause-effect structure, compute structure-level big Phi, or
+resolve nonzero specified-state ties that require Composition-level big-Phi
+escalation. The IIT 4.0 (2026) intrinsic-information cap is not implemented by
+the system-search API, even though the formalism identifier is represented in
+the type system. No result supports a claim about consciousness.
+
+A correct engine cannot compare with PyPhi if the two sides silently disagree
+about state order, TPM layout, connectivity, evaluation state, time grain,
+formalism, partition family, or tie policy. The implementation therefore exposes
+these assumptions and refuses to label incomplete searches exact.
 
 ### Data contract
 
@@ -42,33 +53,44 @@ future work.
 
 ## Published reference fixture
 
-`tests/published_iit4_2023_fig1a.rs` pins the three-unit logistic substrate from
-PyPhi's published IIT 4.0 (2023) Fig. 1A example. It checks all 24 state-by-unit
-TPM values, little-endian state indexing for the specified state `(0, 1, 1)`,
-and the directed connectivity matrix. The paper's reported `phi_s` values
-(approximately 0.04 for {A}, 0.17 for {A, B}, and 0.13 for {A, B, C}) are
-future output-parity anchors; this fixture does **not** compute or validate
-those values. The upstream reference is the PyPhi example source:
+The integration fixture pins the three-unit logistic substrate from PyPhi's
+published IIT 4.0 (2023) Fig. 1A example. It checks all 24 state-by-unit TPM
+values, little-endian state indexing for the specified state (0, 1, 1), and
+directed connectivity.
+
+A new end-to-end regression runs the bounded IIT 4.0 (2023) system search for
+subset {A, B} at the published state and checks the documented system phi_s
+(0.1719 ± 0.001), cause contribution (0.2446 ± 0.002), and effect contribution
+(0.1719 ± 0.001). These rounded tolerances qualify this named example only, not
+general PyPhi parity. The published phi_s anchors for {A} and {A, B, C} remain
+future end-to-end checks.
+
+The upstream example source is pinned at:
 https://github.com/wmayner/pyphi/blob/134a8f31b49db512322465ed3ba5da7194d362fd/pyphi/examples.py.
 
 ## Development gates
 
-1. Run the v0.1 model/repertoire unit tests and pin TPM/state/connectivity semantics
-   against a documented PyPhi fixture.
-2. Compare forward cause likelihoods, cause/effect repertoire distributions, GID point
-   measures, directed cut matrices, and post-cut TPM rows against the reference on identical model, state,
-   subsystem, and partition-profile inputs,
-   including deterministic, independent, and zero-likelihood negative controls.
-3. Add IIT 4.0 (2023) system phi_s with a versioned formalism profile, documented
-   MIP repertoire-difference measure, and exhaustive partition search for tiny systems.
-4. Keep IIT 4.0 (2026) as a distinct profile because its intrinsic-information
-   requirement changes the system quantity.
-5. Add certified lower/upper bounds only when mathematically valid for the named
-   quantity; do not label heuristic estimates as bounds.
-6. Add mechanism distinctions, relations, and structure-level Phi only after system
-   phi_s parity is independently established.
-7. Add property-based tests for state/unit relabeling, invalid TPMs, boundary
-   probabilities, deterministic replay, and cross-language digest parity.
+1. **Input and primitive parity:** compare forward cause likelihoods, cause/effect
+   repertoire distributions, full GID vectors, directed cut matrices, and every
+   post-cut TPM cell against pinned PyPhi on identical model, state, subsystem,
+   and partition-profile inputs. Include deterministic, independent, zero-likelihood,
+   disconnected, and external-unit negative controls.
+2. **System-result parity:** differentially compare the end-to-end IIT 4.0 (2023)
+   system search: intrinsic specified-state ties, Cartesian cause/effect state
+   pairs, all partition scores, MIP selection, normalization, runner-up/margin,
+   and final phi_s. Extend the Fig. 1A anchors from subset AB to A and ABC.
+3. **Composition parity:** implement distinctions, relations, and big Phi; only then
+   resolve nonzero state-pair ties that currently return an explicit unresolved
+   status. Do not invent a canonical winner when PyPhi escalates to Composition.
+4. **Formalism separation:** implement IIT 4.0 (2026)'s intrinsic-information
+   requirement as a separate path. It caps phi_s after MIP selection; it must not
+   silently alter the 2023 computation.
+5. **Certified scale-up:** add mathematically valid lower/upper bounds, branch-and-bound
+   certificates, and exact stopping conditions. Heuristics are not bounds, and a
+   budget-exhausted search must never return an exact scalar.
+6. Add property-based and metamorphic tests for unit/state relabeling, edge
+   intervention invariance, invalid TPMs, boundary probabilities, deterministic
+   replay, and cross-language digest parity.
 
 ## Benchmark policy
 
@@ -146,10 +168,14 @@ https://pyphi.readthedocs.io/en/latest/whats-new-in-2.0.html
 ## Claim ceiling
 
 A valid BinaryCausalModel proves only that the input satisfies this crate's shape
-and probability invariants. It does not establish IIT conformance, integration, or
-consciousness. The current crate is an input/data-contract milestone, not a PyPhi
-port and not yet an IIT engine.
-
+and probability invariants. The current branch now contains an exhaustive
+Integration-level IIT 4.0 (2023) system search for bounded binary factored models,
+but its output remains under differential qualification. It is not a complete
+PyPhi port: the Composition-level cause-effect structure and big-Phi tie escalation
+are absent, and the IIT 4.0 (2026) intrinsic-information requirement is a separate
+unimplemented path. The Fig. 1A subset-AB anchor is the first end-to-end numeric
+check; it must pass CI and be extended across independent fixtures before any
+general conformance claim.
 
 ## Reference material
 
