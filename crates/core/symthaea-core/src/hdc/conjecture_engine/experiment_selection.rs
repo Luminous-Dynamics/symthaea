@@ -938,7 +938,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
         return None;
     }
 
-    let utilities: Vec<Vec<f64>> = actions
+    let raw_utilities: Vec<Vec<f64>> = actions
         .iter()
         .map(|action| {
             active
@@ -947,9 +947,20 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
                 .collect()
         })
         .collect();
-    if utilities.iter().flatten().any(|value| !value.is_finite()) {
+    if raw_utilities.iter().flatten().any(|value| !value.is_finite()) {
         return None;
     }
+    // Scale utilities before expectation arithmetic so a finite but very large
+    // approved utility unit cannot overflow intermediate weighted sums.
+    let utility_scale = raw_utilities
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(1.0_f64, f64::max);
+    let utilities: Vec<Vec<f64>> = raw_utilities
+        .iter()
+        .map(|row| row.iter().map(|value| value / utility_scale).collect())
+        .collect();
 
     let mut baseline = f64::NEG_INFINITY;
     for action_utilities in &utilities {
@@ -996,8 +1007,12 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
             }
             expected_after += group_mass * best_action;
         }
-        let value = expected_after - baseline;
-        return value.is_finite().then_some(value.max(0.0));
+        let scaled_value = expected_after - baseline;
+        if !scaled_value.is_finite() || scaled_value < -1.0e-7 {
+            return None;
+        }
+        let value = scaled_value.max(0.0) * utility_scale;
+        return value.is_finite().then_some(value);
     }
 
     let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
@@ -1055,21 +1070,14 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
         }
     }
 
-    let evsi = expected_after - baseline;
-    if !evsi.is_finite() {
-        return None;
-    }
-    let utility_scale = utilities
-        .iter()
-        .flatten()
-        .map(|value| value.abs())
-        .fold(1.0_f64, f64::max);
+    let scaled_evsi = expected_after - baseline;
     // Finite quadrature can introduce tiny negative roundoff despite non-negative
     // theoretical EVSI; larger negative values indicate a numerical/model defect.
-    if evsi < -1.0e-7 * utility_scale {
+    if !scaled_evsi.is_finite() || scaled_evsi < -1.0e-7 {
         return None;
     }
-    Some(evsi.max(0.0))
+    let evsi = scaled_evsi.max(0.0) * utility_scale;
+    evsi.is_finite().then_some(evsi)
 }
 
 /// Select an experiment by worst-case expected value of sample information (EVSI).
