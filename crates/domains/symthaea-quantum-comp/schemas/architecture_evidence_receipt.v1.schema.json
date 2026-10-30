@@ -21,7 +21,7 @@
     "raw_output_sha256",
     "interval_analysis_sha256",
     "summary_sha256",
-    "executor_identity",
+    "executor_identity"
   ],
   "properties": {
     "schema_version": {
