@@ -65,6 +65,7 @@ jobs:
           python3 - "$package_root" "$RUNNER_TEMP/seqcube-checksum-reconciliation.json" "$archive_sha256" <<'PY'
           import hashlib
           import json
+          import shutil
           import sys
           from pathlib import Path
 
@@ -134,8 +135,44 @@ jobs:
           }, indent=2))
           if failures:
               raise SystemExit("SeqCube publisher checksum mismatch beyond LF/CRLF representation")
-          PY
-          echo "SEQCUBE_PACKAGE_ROOT=$package_root" >> "$GITHUB_ENV"
+
+          canonical_root = root.parent / "seqcube-ht-canonical-crlf"
+          if canonical_root.exists():
+              shutil.rmtree(canonical_root)
+          shutil.copytree(root, canonical_root)
+          transformed = []
+          for item in entries:
+              target = canonical_root / item["path"]
+              raw = target.read_bytes()
+              if item["reconciliation"] == "lf_archive_matches_published_crlf_digest":
+                  if b"\\r" in raw:
+                      raise SystemExit(f"unexpected existing CR byte in {item['path']}")
+                  raw = raw.replace(b"\\n", b"\\r\\n")
+                  target.write_bytes(raw)
+                  transformed.append(item["path"])
+              canonical_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+              if canonical_sha256 != item["published_sha256"]:
+                  raise SystemExit(f"canonical CRLF copy still mismatches {item['path']}")
+              item["canonical_sha256"] = canonical_sha256
+          receipt["canonical_copy"] = {
+              "root_name": canonical_root.name,
+              "verified_manifest_entries": len(entries),
+              "transformed_files": transformed,
+              "transformed_file_count": len(transformed),
+              "source_archive_preserved": True,
+              "rule": "Only the copied files whose LF-to-CRLF digest matched the publisher checksum are converted; original extracted archive files remain untouched.",
+          }
+          output.write_text(json.dumps(receipt, indent=2) + "\\n", encoding="utf-8")
+          print(json.dumps({
+              "manifest_entries": receipt["manifest_entries"],
+              "exact_byte_matches": receipt["exact_byte_matches"],
+              "line_ending_reconciled": receipt["line_ending_reconciled"],
+              "canonical_manifest_entries_verified": receipt["canonical_copy"]["verified_manifest_entries"],
+              "canonical_files_transformed": receipt["canonical_copy"]["transformed_file_count"],
+              "mismatches": len(failures),
+          }, indent=2))
+          echo "SEQCUBE_ARCHIVE_ROOT=$package_root" >> "$GITHUB_ENV"
+          echo "SEQCUBE_PACKAGE_ROOT=$canonical_root" >> "$GITHUB_ENV"
 
       - name: Set up Python for upstream SeqCube verifier
         uses: actions/setup-python@v5
