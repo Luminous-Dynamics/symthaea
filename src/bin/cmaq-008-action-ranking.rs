@@ -51,6 +51,7 @@ impl SplitMix64 {
 enum Law {
     Source,
     ActionEffectReversal,
+    InteractionSignReversal,
 }
 
 impl Law {
@@ -58,13 +59,21 @@ impl Law {
         match self {
             Self::Source => "source_holdout",
             Self::ActionEffectReversal => "action_effect_reversal",
+            Self::InteractionSignReversal => "interaction_sign_reversal",
         }
     }
 
     fn action_coefficient(self) -> f32 {
         match self {
-            Self::Source => 0.25,
+            Self::Source | Self::InteractionSignReversal => 0.25,
             Self::ActionEffectReversal => -0.25,
+        }
+    }
+
+    fn interaction_coefficient(self) -> f32 {
+        match self {
+            Self::Source | Self::ActionEffectReversal => 0.06,
+            Self::InteractionSignReversal => -0.12,
         }
     }
 }
@@ -123,7 +132,7 @@ fn transition(state: &[f32], action: &[f32], law: Law) -> Vec<f32> {
             let neighbour = state[(i + 1) % DIM];
             0.55 * state[i]
                 + law.action_coefficient() * action[i]
-                + 0.06 * neighbour * action[i]
+                + law.interaction_coefficient() * neighbour * action[i]
         })
         .collect()
 }
