@@ -11,6 +11,7 @@ const MAX_INITIAL_RESOURCES: usize = 100_000;
 const MAX_PINS_PER_EVIDENCE: usize = 4_096;
 const MAX_EVIDENCE_PARENTS: usize = 4_096;
 const MAX_TOTAL_EDGES: usize = 250_000;
+const MAX_TOTAL_PROVENANCE_LINKS: usize = 1_000_000;
 
 /// A structurally valid timeline can still contain stale evidence. The valid
 /// flag means the event/evidence history is consistent, not that every item
@@ -247,6 +248,16 @@ fn failure(code: &'static str, path: impl Into<String>, message: impl Into<Strin
         path: path.into(),
         message: message.into(),
     }
+}
+
+fn checked_provenance_links(current: usize, additional: usize) -> Result<usize, &'static str> {
+    let total = current
+        .checked_add(additional)
+        .ok_or("provenance link count overflow")?;
+    if total > MAX_TOTAL_PROVENANCE_LINKS {
+        return Err("expanded evidence provenance exceeds 1000000 links");
+    }
+    Ok(total)
 }
 
 fn valid_identifier(value: &str) -> bool {
@@ -684,6 +695,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
     // topological order. Incremental invalidation marks currentness efficiently;
     // this pass makes causal provenance independent of traversal order in DAGs
     // where several independently stale parents converge on one descendant.
+    let mut total_provenance_links = 0_usize;
     for evidence_id in &evidence_order {
         let parent_ids = evidence
             .get(evidence_id)
@@ -716,6 +728,11 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
             }
             state.assessment.stale_ancestor_evidence_ids.sort();
             state.assessment.invalidation_event_ids.sort();
+            let links = state.assessment.stale_ancestor_evidence_ids.len()
+                .checked_add(state.assessment.invalidation_event_ids.len())
+                .ok_or_else(|| failure("E_PROVENANCE_LINK_OVERFLOW", evidence_id, "evidence provenance link count overflow"))?;
+            total_provenance_links = checked_provenance_links(total_provenance_links, links)
+                .map_err(|message| failure("E_PROVENANCE_LINK_LIMIT", evidence_id, message))?;
         }
     }
 
@@ -1235,6 +1252,16 @@ mod tests {
         let report = audit_value(&value);
         assert!(!report.structurally_valid);
         assert!(has_code(&report, "E_TIMELINE_EMPTY"));
+    }
+
+    #[test]
+    fn expanded_provenance_budget_has_exact_boundary_and_overflow_guard() {
+        assert_eq!(
+            checked_provenance_links(MAX_TOTAL_PROVENANCE_LINKS - 1, 1),
+            Ok(MAX_TOTAL_PROVENANCE_LINKS)
+        );
+        assert!(checked_provenance_links(MAX_TOTAL_PROVENANCE_LINKS, 1).is_err());
+        assert!(checked_provenance_links(usize::MAX, 1).is_err());
     }
 
     #[test]
