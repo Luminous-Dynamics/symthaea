@@ -1290,6 +1290,80 @@ mod tests {
         MultiFidelityTabularBenchmark::new(manifest(model, budget), features(12), labels(12)).unwrap()
     }
 
+    fn curve_calibrator() -> LearningCurveCalibrator {
+        use super::super::learning_curve_promotion::{
+            CurveFidelityLevel, LearningCurveCalibrationConfig,
+            LearningCurveCalibrationSample,
+        };
+        let sample_set = |prefix: &str, count: usize, noise_scale: f64| {
+            (0..count)
+                .map(|index| {
+                    let initial = 10.0 + ((index * 7) % 19) as f64;
+                    let slope = 0.2 + ((index * 11) % 13) as f64 * 0.1;
+                    let middle = initial + slope * 10.0;
+                    let noise = (((index * 3) % 5) as f64 - 2.0) * noise_scale;
+                    let final_value = 14.0 + 2.0 * middle + 4.0 * slope + noise;
+                    LearningCurveCalibrationSample {
+                        architecture_id: format!("{prefix}-{index:03}"),
+                        curve_values: vec![initial, middle, final_value],
+                        final_value,
+                    }
+                })
+                .collect::<Vec<_>>()
+        };
+        LearningCurveCalibrator::fit(
+            LearningCurveCalibrationConfig {
+                benchmark_id: "multi-fidelity-synthetic".into(),
+                target_metric_id: "validation_accuracy".into(),
+                metric_direction: super::super::nasbench201_trajectory::ProxyDirection::Maximize,
+                source_artifact_sha256: "a".repeat(64),
+                model_fit_split_id: "development-fit".into(),
+                residual_calibration_split_id: "development-b".into(),
+                evaluation_split_id: "challenge-a".into(),
+                fidelity_levels: vec![
+                    CurveFidelityLevel { id: "epoch-5".into(), cumulative_cost_units: 5 },
+                    CurveFidelityLevel { id: "epoch-15".into(), cumulative_cost_units: 15 },
+                    CurveFidelityLevel { id: "full-200".into(), cumulative_cost_units: 200 },
+                ],
+                alpha: 0.1,
+                minimum_model_fit_samples: 20,
+                minimum_residual_calibration_samples: 20,
+            },
+            &sample_set("fit", 60, 0.0),
+            &sample_set("cal", 60, 0.3),
+        )
+        .unwrap()
+    }
+
+    fn late_bloomer_labels() -> Vec<FidelityTargetLabel> {
+        let curves = [
+            [0.0, 80.0, 206.0],
+            [79.0, 81.0, 176.8],
+            [60.0, 75.0, 170.0],
+            [50.0, 70.0, 160.0],
+            [40.0, 65.0, 150.0],
+            [30.0, 60.0, 140.0],
+            [29.0, 55.0, 130.0],
+            [28.0, 50.0, 120.0],
+            [27.0, 45.0, 110.0],
+            [26.0, 40.0, 100.0],
+            [25.0, 35.0, 90.0],
+            [24.0, 30.0, 80.0],
+        ];
+        curves
+            .iter()
+            .enumerate()
+            .flat_map(|(index, curve)| {
+                let id = format!("arch-{index:03}");
+                [
+                    FidelityTargetLabel { architecture_id: id.clone(), fidelity_index: 0, value: curve[0] },
+                    FidelityTargetLabel { architecture_id: id.clone(), fidelity_index: 1, value: curve[1] },
+                    FidelityTargetLabel { architecture_id: id, fidelity_index: 2, value: curve[2] },
+                ]
+            })
+            .collect()
+    }
+
     #[test]
     fn successive_halving_promotes_observed_best_candidates_and_reconciles_cost() {
         let mut benchmark_manifest = manifest(FidelityCostModel::ResumablePrefix, 500);
@@ -1342,6 +1416,62 @@ mod tests {
         .unwrap();
         assert!(budgeted
             .run_successive_halving(initial, &[8, 4, 2])
+            .is_err());
+    }
+
+    #[test]
+    fn calibrated_successive_halving_uses_lcb_and_guard_slots_with_shared_query_ledger() {
+        let calibrator = curve_calibrator();
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            manifest(FidelityCostModel::ResumablePrefix, 700),
+            features(12),
+            late_bloomer_labels(),
+        )
+        .unwrap();
+        let initial = (0..6).map(|index| format!("arch-{index:03}")).collect();
+        let run = benchmark
+            .run_calibrated_successive_halving(initial, &[6, 4, 2], 1, &calibrator)
+            .unwrap();
+        assert_eq!(run.base_run.receipt.unique_architectures_touched, 6);
+        assert_eq!(run.base_run.receipt.final_fidelity_queries, 2);
+        assert_eq!(run.base_run.receipt.total_cost_units, 450);
+        assert_eq!(run.promotion_stages.len(), 2);
+        assert_eq!(run.calibration_sha256, calibrator.calibration_sha256);
+        assert_eq!(run.policy_sha256.len(), 64);
+        assert!(run.promotion_stages[0].selection.selected.iter().any(|candidate| {
+            candidate.reason == super::super::learning_curve_promotion::PromotionReason::OptimisticGuard
+        }));
+        assert!(run.base_run.receipt.final_fidelity_architecture_ids.contains(&"arch-000".to_string()));
+        assert_eq!(
+            run.promotion_stages.iter().map(|stage| stage.selection.selected.len()).collect::<Vec<_>>(),
+            vec![4, 2]
+        );
+    }
+
+    #[test]
+    fn calibrated_successive_halving_rejects_wrong_split_or_insufficient_guard_budget() {
+        let calibrator = curve_calibrator();
+        let mut wrong_split = calibrator.clone();
+        wrong_split.config.evaluation_split_id = "development-b".into();
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            manifest(FidelityCostModel::ResumablePrefix, 700),
+            features(12),
+            late_bloomer_labels(),
+        )
+        .unwrap();
+        let initial = (0..6).map(|index| format!("arch-{index:03}")).collect::<Vec<_>>();
+        assert!(benchmark
+            .run_calibrated_successive_halving(initial.clone(), &[6, 4, 2], 1, &wrong_split)
+            .is_err());
+
+        let benchmark = MultiFidelityTabularBenchmark::new(
+            manifest(FidelityCostModel::ResumablePrefix, 700),
+            features(12),
+            late_bloomer_labels(),
+        )
+        .unwrap();
+        assert!(benchmark
+            .run_calibrated_successive_halving(initial, &[6, 4, 2], 5, &calibrator)
             .is_err());
     }
 
