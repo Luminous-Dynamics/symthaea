@@ -444,7 +444,7 @@ mod tests {
         let slices = parse_and_validate(&input).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert!(slice.qualification_floor_met);
-        assert!(slice.reason.contains("subject to held-out"));
+        assert!(slice.reason.contains("held-out split and preregistration must be independently verified"));
     }
 
     #[test]
