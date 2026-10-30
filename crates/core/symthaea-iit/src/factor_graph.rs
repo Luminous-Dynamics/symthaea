@@ -517,6 +517,90 @@ mod tests {
         assert_eq!(first.factor.values, vec![16.0, 16.0]);
     }
 
+    fn reference_min_fill_order(
+        factors: &[BinaryFactor],
+        eliminate: &[usize],
+    ) -> (Vec<usize>, usize) {
+        let mut adjacency = BTreeMap::<usize, BTreeSet<usize>>::new();
+        for variable in eliminate.iter().copied() {
+            adjacency.entry(variable).or_default();
+        }
+        for factor in factors {
+            for variable in factor.variables.iter().copied() {
+                adjacency.entry(variable).or_default();
+            }
+            for (left_index, left) in factor.variables.iter().copied().enumerate() {
+                for right in factor.variables.iter().copied().skip(left_index + 1) {
+                    adjacency.entry(left).or_default().insert(right);
+                    adjacency.entry(right).or_default().insert(left);
+                }
+            }
+        }
+
+        let mut active = eliminate.iter().copied().collect::<BTreeSet<_>>();
+        let mut order = Vec::with_capacity(active.len());
+        let mut width = 0usize;
+        while !active.is_empty() {
+            let (variable, degree) = active
+                .iter()
+                .copied()
+                .map(|variable| {
+                    let (fill, degree) = fill_score(variable, &adjacency);
+                    ((fill, degree, variable), degree)
+                })
+                .min_by_key(|(score, _)| *score)
+                .map(|((_, _, variable), degree)| (variable, degree))
+                .unwrap();
+            width = width.max(degree);
+            let neighbours = adjacency.get(&variable).cloned().unwrap_or_default();
+            for (left_index, left) in neighbours.iter().copied().enumerate() {
+                for right in neighbours.iter().copied().skip(left_index + 1) {
+                    adjacency.entry(left).or_default().insert(right);
+                    adjacency.entry(right).or_default().insert(left);
+                }
+            }
+            for neighbour in &neighbours {
+                if let Some(edges) = adjacency.get_mut(neighbour) {
+                    edges.remove(&variable);
+                }
+            }
+            adjacency.remove(&variable);
+            active.remove(&variable);
+            order.push(variable);
+        }
+        (order, width)
+    }
+
+    #[test]
+    fn lazy_min_fill_queue_matches_full_rescan_reference() {
+        for variable_count in 4..=10 {
+            for seed in 0..12 {
+                let mut factors = Vec::new();
+                for left in 0..variable_count {
+                    for right in left + 1..variable_count {
+                        let selector =
+                            (left * 31 + right * 17 + seed * 13 + variable_count * 7) % 11;
+                        if selector < 4 {
+                            factors.push(
+                                BinaryFactor::new(vec![left, right], vec![1.0; 4]).unwrap(),
+                            );
+                        }
+                    }
+                }
+                if factors.is_empty() {
+                    factors.push(BinaryFactor::scalar(1.0).unwrap());
+                }
+                let eliminate = (0..variable_count).collect::<Vec<_>>();
+                let reference = reference_min_fill_order(&factors, &eliminate);
+                let actual = min_fill_order(&factors, &eliminate).unwrap();
+                assert_eq!(
+                    actual, reference,
+                    "lazy min-fill diverged for n={variable_count}, seed={seed}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn min_fill_respects_memory_budget_before_large_allocation() {
         let factor = BinaryFactor::new(vec![0, 1, 2], vec![1.0; 8]).unwrap();
