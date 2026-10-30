@@ -385,14 +385,11 @@ mod tests {
         assert_eq!(decision.action, RetrievalValueAction::RetrieveMore);
         assert_eq!(decision.reason, RetrievalValueReason::PositiveConservativeNetValue);
         assert!(decision.verify_internal_consistency().is_ok());
-        assert_eq!(
-            decision.to_lifecycle_progress().unwrap(),
-            LifecycleRetrievalProgress {
-                complete: false,
-                can_continue: true,
-                remaining_calls: 2,
-            }
-        );
+        let progress = decision.to_lifecycle_progress().unwrap();
+        assert_eq!(progress.complete, false);
+        assert_eq!(progress.can_continue, true);
+        assert_eq!(progress.remaining_calls, 2);
+        assert_eq!(progress.value_decision_sha256.as_deref(), Some(decision.decision_sha256.as_str()));
     }
 
     #[test]
@@ -481,6 +478,19 @@ mod tests {
     }
 
     #[test]
+    fn does_not_retrieve_when_all_required_claims_are_already_covered() {
+        let mut value = estimate();
+        value.unresolved_required_claim_ids.clear();
+        value.unresolved_claims_sha256 =
+            RetrievalUtilityEstimate::unresolved_claims_digest(
+                &value.unresolved_required_claim_ids
+            ).unwrap();
+        let decision = evaluate_retrieval_value(value).unwrap();
+        assert_eq!(decision.action, RetrievalValueAction::Stop);
+        assert_eq!(decision.reason, RetrievalValueReason::NoUnresolvedRequiredClaims);
+    }
+
+    #[test]
     fn positive_voi_receipt_can_populate_lifecycle_retrieval_progress() {
         let decision = evaluate_retrieval_value(estimate()).unwrap();
         assert_eq!(decision.to_lifecycle_progress().unwrap().can_continue, true);
@@ -490,8 +500,9 @@ mod tests {
         low_value.lifecycle_risk_reduction_lcb_micro = 0;
         let stop = evaluate_retrieval_value(low_value).unwrap();
         let progress = stop.to_lifecycle_progress().unwrap();
-        assert!(progress.complete);
-        assert!(!progress.can_continue);
-        assert_eq!(progress.remaining_calls, 0);
+        assert!(!progress.complete, "the retrieval budget is still present");
+        assert!(!progress.can_continue, "the value gate stopped early");
+        assert_eq!(progress.remaining_calls, 2);
+        assert_eq!(progress.value_decision_sha256.as_deref(), Some(stop.decision_sha256.as_str()));
     }
 }
