@@ -557,3 +557,12 @@ NEURD's paper identifies a specific blind spot: some merge errors are co-linear 
 ### Spatial PSU frame integrity (SCI-CONNECTOMICS-013)
 
 The spatial-frame auditor reports voxel *tile* volumes for eligible/excluded lattice cells; these are not counts of foreground voxels in the external eligibility mask. The mask itself is only digest-bound and must be independently inspected. The candidate coverage tool now takes both the exact frame manifest and exact frame-audit report and checks their byte digests, full lattice digest, and eligible population digest. This is a provenance/geometry gate, not proof of biological completeness.
+
+## Executable advances: joint edits and mask-bound sampling frames (2026-10-30)
+
+Two additional assurance components now have executable implementations on the Connectomics Autopilot branch:
+
+- [Joint correction portfolio audit](CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md): exact candidate-subset optimum for up to 20 graph edits, pairwise interaction terms, four non-oracle ranking baselines, matched minute budgets, regret, and reverse-order sensitivity. Synthetic only; no biological gain claimed.
+- [Spatial eligibility-mask audit](CONNECTOME_SPATIAL_FRAME_AUDIT_PROTOCOL_V1.md): the frame report only emits PASS after streaming and hashing the exact mask artifact, validating bit order/length/padding, and checking that every eligible PSU contains mask foreground voxels while every excluded PSU contains none. This still does not certify that the mask's biological selection rule is correct or that the declared box is complete.
+
+The combined target is an auditable chain from a declared tissue sampling frame to candidate-generation recall and downstream query reliability. A numerical recall estimate is not promoted if the frame or mask integrity gate fails.
