@@ -1662,16 +1662,10 @@ fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, St
             } else {
                 factor1
             };
-            let objective_profile = match *method {
-                "independent_profile_exact" => &independent,
-                "robust_upper_bound_exact" => &robust_profile,
-                _ => world,
-            };
             let worst_case_mse = analytic_mse(&robust_profile, allocation, EVAL_N)?;
             let sources = allocation_sources(allocation);
             let gap = ((analytic_true - exact_mse) / exact_mse.max(EPS)).max(0.0);
             let inflation = weighted_q_variance_inflation(world, allocation);
-            let _ = objective_profile; // Documents which profile selected the allocation.
             use std::fmt::Write;
             let _ = writeln!(
                 output,
@@ -2141,6 +2135,13 @@ mod tests {
                 .filter(|line| line.starts_with("BENCHMARK_CONFIG\t"))
                 .count(),
             8
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("CORR_RESULT\t"))
+                .count(),
+            18
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
