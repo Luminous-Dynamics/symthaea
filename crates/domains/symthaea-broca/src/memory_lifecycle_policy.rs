@@ -583,7 +583,7 @@ impl LifecycleActionDecision {
     }
 }
 
-pub const LIFECYCLE_POLICY_VERSION: &str = "BROCA-LIFECYCLE-ACTION-V1";
+pub const LIFECYCLE_POLICY_VERSION: &str = "BROCA-LIFECYCLE-ACTION-V2";
 
 /// Select an action from the complete claim lifecycle ledger.
 ///
