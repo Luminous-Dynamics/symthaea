@@ -1,0 +1,388 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QARCH-015 preregistered paired quantum/classical claim record",
+  "description": "Syntax contract for block-level paired analysis. JSON Schema does not establish independence, provenance, correct pairing, p-value arithmetic or statistical assumptions; those require semantic validation and independently verifiable run receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_class",
+    "claim_scope",
+    "comparison_contract",
+    "preregistration",
+    "observations",
+    "analysis",
+    "claim_family"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "qarch-015-paired-advantage/1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "measured_backend",
+        "calibrated_simulation",
+        "analytic_estimate"
+      ]
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_fixture_only",
+        "finite_suite_descriptive",
+        "sampled_target_population_inference"
+      ]
+    },
+    "comparison_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_fingerprint",
+        "target_population_fingerprint",
+        "workload_family",
+        "quality_metric",
+        "quality_unit",
+        "quality_higher_is_better",
+        "resource_metric",
+        "resource_unit",
+        "resource_scope",
+        "verifier_id",
+        "verifier_version",
+        "classical_baseline_id"
+      ],
+      "properties": {
+        "contract_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_population_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workload_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_higher_is_better": {
+          "const": true
+        },
+        "resource_metric": {
+          "enum": [
+            "wall_clock",
+            "energy",
+            "cost",
+            "memory",
+            "other"
+          ]
+        },
+        "resource_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classical_baseline_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_unit_definition",
+        "within_block_reduction",
+        "minimum_relative_resource_gain",
+        "quality_non_inferiority_margin",
+        "resource_tie_tolerance_log_ratio",
+        "quality_tie_tolerance",
+        "family_wise_alpha",
+        "claim_family_id",
+        "sampling_plan"
+      ],
+      "properties": {
+        "independent_unit_definition": {
+          "type": "string",
+          "minLength": 20
+        },
+        "within_block_reduction": {
+          "type": "string",
+          "minLength": 10
+        },
+        "minimum_relative_resource_gain": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality_non_inferiority_margin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resource_tie_tolerance_log_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality_tie_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_wise_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "claim_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sampling_plan": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "independent_block_id",
+          "workload_fingerprint",
+          "contract_fingerprint",
+          "quantum_resource_per_accepted_answer",
+          "classical_resource_per_accepted_answer",
+          "quantum_quality",
+          "classical_quality"
+        ],
+        "properties": {
+          "independent_block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workload_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contract_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantum_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "classical_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "quantum_quality": {
+            "type": "number"
+          },
+          "classical_quality": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_blocks",
+        "median_quality_difference",
+        "median_log_classical_over_quantum_resource",
+        "quality_non_inferiority",
+        "resource_superiority",
+        "composite_claim_raw_p_value",
+        "claim_disposition"
+      ],
+      "properties": {
+        "independent_blocks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "median_quality_difference": {
+          "type": "number"
+        },
+        "median_log_classical_over_quantum_resource": {
+          "type": "number"
+        },
+        "median_classical_over_quantum_resource_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "quality_non_inferiority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wins",
+            "losses",
+            "ties",
+            "effective_n",
+            "p_value_one_sided"
+          ],
+          "properties": {
+            "wins": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "losses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "effective_n": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "p_value_one_sided": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "resource_superiority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wins",
+            "losses",
+            "ties",
+            "effective_n",
+            "p_value_one_sided"
+          ],
+          "properties": {
+            "wins": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "losses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "effective_n": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "p_value_one_sided": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "composite_claim_raw_p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "claim_disposition": {
+          "enum": [
+            "fixture_only",
+            "requires_holm_correction",
+            "holm_accepted",
+            "not_supported"
+          ]
+        }
+      }
+    },
+    "claim_family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "alpha",
+        "hypotheses"
+      ],
+      "properties": {
+        "method": {
+          "const": "Holm"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "hypotheses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "raw_p_value",
+              "adjusted_p_value",
+              "rank",
+              "reject_at_alpha"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "raw_p_value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "adjusted_p_value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reject_at_alpha": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
