@@ -638,13 +638,36 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
             issues.push(format!("resolution {} requires at least one evidence span", resolution.resolution_id));
         }
         let mut seen_resolution_spans = BTreeSet::new();
+        let mut has_non_active_source = false;
         for span_id in &resolution.evidence_span_ids {
             if !seen_resolution_spans.insert(span_id.as_str()) {
                 issues.push(format!("resolution {} repeats evidence span {}", resolution.resolution_id, span_id));
             }
-            if !spans.contains_key(span_id.as_str()) {
+            if let Some(span) = spans.get(span_id.as_str()) {
+                if let Some(source) = sources.get(span.source_id.as_str()) {
+                    has_non_active_source |= source.lifecycle != SourceLifecycleV1::Active;
+                    if resolution.decision.requires_current_source() {
+                        if source.lifecycle != SourceLifecycleV1::Active {
+                            issues.push(format!("resolution {} uses a non-active source as current support without a source-validity interval", resolution.resolution_id));
+                        }
+                        if let (Some(claim), Some(target), Some(published)) = (
+                            claims.get(resolution.claim_id.as_str()),
+                            claims.get(resolution.claim_id.as_str()).and_then(|item| item.scope.target_date.as_deref()),
+                            source.publication_date.as_deref(),
+                        ) {
+                            let _ = claim;
+                            if published > target {
+                                issues.push(format!("resolution {} uses a source published after the claim target date", resolution.resolution_id));
+                            }
+                        }
+                    }
+                }
+            } else {
                 issues.push(format!("resolution {} references unknown span {}", resolution.resolution_id, span_id));
             }
+        }
+        if resolution.decision == ReferenceDecisionV1::TemporallyStale && !has_non_active_source {
+            issues.push(format!("resolution {} declares temporal staleness without a superseded/deleted/retracted source", resolution.resolution_id));
         }
     }
 
