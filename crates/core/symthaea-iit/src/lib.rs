@@ -39,7 +39,8 @@ use thiserror::Error;
 
 mod factor_graph;
 pub use factor_graph::{
-    min_fill_sum_product, BinaryFactor, FactorEliminationReport, FactorGraphError,
+    min_fill_log_sum_product, min_fill_sum_product, BinaryFactor, BinaryLogFactor,
+    FactorEliminationReport, FactorGraphError, LogFactorEliminationReport,
 };
 
 /// Maximum dense binary units accepted by this in-memory v0.1 representation.
