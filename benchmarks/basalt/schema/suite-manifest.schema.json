@@ -172,7 +172,8 @@
     },
     "attempts_per_task": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 1,
+      "maximum": 10000
     },
     "attempt_seeds": {
       "type": "array",
@@ -180,14 +181,17 @@
       "items": {
         "anyOf": [
           {
-            "type": "integer"
+            "type": "integer",
+            "minimum": -9223372036854776000,
+            "maximum": 9223372036854776000
           },
           {
             "type": "string",
             "minLength": 1
           }
         ]
-      }
+      },
+      "maxItems": 10000
     }
   }
 }
