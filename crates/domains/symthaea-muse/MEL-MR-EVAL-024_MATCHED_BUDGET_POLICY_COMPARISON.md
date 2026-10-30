@@ -12,6 +12,12 @@ The scientific question is whether structural information (acoustic-support over
 
 Evaluate the **experimental-design policy** rather than just the downstream edit. Publish seed-level recall-versus-render-cost observations, compare with simple baselines, and retain a non-deployable oracle top-K ceiling.
 
+## Frame-domain contract
+
+The benchmark has two distinct frame domains. Source-isolated event arrays and the EVAL-020 `input_frame_count` remain in the source/input domain. `EventInteractionSupport` intervals and the planner's `total_frames` are in the rendered PCM/output domain. The support horizon must equal EVAL-020's `output_frame_count`, including FIR/effect tails; interval ends are exclusive. A support interval is never clipped to the source duration. A real-render adapter must additionally bind frame origin, resampling and latency compensation.
+
+This distinction is required for a 64-frame source whose fixed FIR output is 67 frames: support in frames 64–67 is valid rendered evidence, not an out-of-range source event.
+
 A policy's requested budget is not its measured cost. Temporal-only and routing-only selection can legitimately return fewer pairs than requested. The evaluator records both the requested budget and selected pair count, then computes cost from the actual selected probes.
 
 ## Policies
