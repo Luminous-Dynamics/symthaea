@@ -1584,15 +1584,15 @@ mod tests {
     fn test_rk45_does_not_overshoot_interval_when_dt_min_is_larger() {
         let osc = HarmonicOscillator::simple(1.0);
         let rk45 = Rk45Integrator {
-            tol: 1e-30,
-            dt_min: 1e-6,
+            tol: 1e-20,
+            dt_min: 1.0,
             dt_max: 1.0,
         };
 
         // The requested interval is shorter than dt_min and the requested
         // tolerance cannot be met. Fail closed at the requested interval;
         // never grow the trial to dt_min and step beyond the caller's time.
-        let _ = rk45.step(&osc, &[1.0, 0.0], 0.0, 1e-7);
+        let _ = rk45.step(&osc, &[1.0, 0.0], 0.0, 0.1);
     }
 
     #[test]
