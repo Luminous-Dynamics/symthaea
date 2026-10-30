@@ -23,10 +23,25 @@ elab "pitb_snapshot " label:str : tactic => withMainContext do
   let goal ← getMainGoal
   let goalType ← goal.getType
   let context ← Lean.MonadLCtx.getLCtx
+  let goalText ← ppExpr goalType
+  let mut structuredDeclarations : Array Json := #[]
   Lean.logInfo m!"PITB_STATE_BEGIN:{label.getString}"
-  Lean.logInfo m!"PITB_STATE_GOAL:{← ppExpr goalType}"
+  Lean.logInfo m!"PITB_STATE_GOAL:{goalText}"
   for declaration in context do
-    Lean.logInfo m!"PITB_STATE_DECL:{declaration.userName}:{← ppExpr declaration.type}"
+    let declarationType ← ppExpr declaration.type
+    Lean.logInfo m!"PITB_STATE_DECL:{declaration.userName}:{declarationType}"
+    structuredDeclarations := structuredDeclarations.push <| Json.mkObj [
+      ("index", toJson declaration.index),
+      ("user_name", toJson declaration.userName.toString),
+      ("type", toJson declarationType.pretty)
+    ]
+  let snapshot := Json.mkObj [
+    ("schema_version", toJson "pitb.lean-proof-state-snapshot.v0"),
+    ("label", toJson label.getString),
+    ("goal", toJson goalText.pretty),
+    ("declarations", Json.arr structuredDeclarations)
+  ]
+  Lean.logInfo m!"PITB_STATE_JSON:{snapshot.compress}"
   Lean.logInfo m!"PITB_STATE_END:{label.getString}"
 
 /-- Binder-name reformulation: the propositions are definitionally equal. -/
@@ -80,5 +95,20 @@ theorem premise_removed_variant_is_false :
   have h10 : 1 ≤ 0 := Nat.succ_le_succ_iff.mp h21
   have hEq : (1 : Nat) = 0 := Nat.le_antisymm h10 (Nat.zero_le 1)
   exact Nat.succ_ne_zero 0 hEq
+
+
+/--
+Removing an irrelevant local declaration must preserve the same target and
+leave the required order hypothesis available. This is the positive control
+for context invariance: unlike clearing a required premise, it must not force
+the original move to be abandoned.
+-/
+theorem same_goal_after_irrelevant_hypothesis_clear
+    (a b : Nat) (h : a ≤ b) (hIrrelevant : 17 = 17) :
+    Nat.succ a ≤ Nat.succ b := by
+  pitb_snapshot "irrelevant-base"
+  clear hIrrelevant
+  pitb_snapshot "irrelevant-variant"
+  exact Nat.succ_le_succ h
 
 end PITBCounterfactualPilot
