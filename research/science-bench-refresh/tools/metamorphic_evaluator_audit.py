@@ -38,7 +38,7 @@ RECEIPT_FIELDS = {
     "evaluator_source_revision", "evaluator_prompt_sha256", "rubric_sha256",
     "observations",
 }
-OBSERVATION_FIELDS = {"pair_id", "baseline", "variant"}
+OBSERVATION_FIELDS = {"pair_id", "baseline_input_sha256", "variant_input_sha256", "baseline", "variant"}
 OUTCOME_FIELDS = {
     "decision", "criterion_scores", "hard_veto_active",
     "selected_candidate_id", "selected_position", "unique_source_group_count",
@@ -192,8 +192,8 @@ def validate_plan(plan: Any) -> dict[str, Any]:
             not isinstance(expected_candidate, str) or not expected_candidate.strip()
         ):
             raise MetamorphicAuditError(f"pair {pair_id} expected_selected_candidate_id must be null or non-empty")
-        if rule == "variant_decision_equals_declared" and expected_decision is None:
-            raise MetamorphicAuditError(f"counterfactual pair {pair_id} requires expected_variant_decision")
+        if rule in {"variant_decision_equals_declared", "support_non_decreasing", "support_non_increasing"} and expected_decision is None:
+            raise MetamorphicAuditError(f"pair {pair_id} requires expected_variant_decision")
         if rule == "candidate_identity_invariant_position_changes" and expected_candidate is None:
             raise MetamorphicAuditError(f"order-equivariance pair {pair_id} requires expected_selected_candidate_id")
     commitment = value["plan_commitment_sha256"]
@@ -282,21 +282,37 @@ def _check_pair(pair: dict[str, Any], observation: dict[str, Any], tolerance: in
             failures.append("criterion score drift exceeded tolerance under a declared invariant intervention")
         if before["selected_candidate_id"] != after["selected_candidate_id"]:
             failures.append("selected candidate changed under a declared invariant intervention")
+        if before["selected_position"] != after["selected_position"]:
+            failures.append("selected candidate position changed under a declared invariant intervention")
+        if baseline["candidate_scores"] != variant["candidate_scores"]:
+            failures.append("pointwise candidate scores changed under a declared invariant intervention")
+        if before["pairwise_preferred_candidate_id"] != after["pairwise_preferred_candidate_id"]:
+            failures.append("pairwise preference changed under a declared invariant intervention")
         if before["unique_source_group_count"] != after["unique_source_group_count"]:
             failures.append("source-origin group count changed under a declared invariant intervention")
 
     elif rule == "support_non_decreasing":
         if _decision_support(after["decision"]) < _decision_support(before["decision"]):
             failures.append("support decreased after a positive evidence intervention")
+        if after["decision"] != pair["expected_variant_decision"]:
+            failures.append("positive evidence variant decision differs from declared expectation")
         for criterion in pair["affected_criterion_ids"]:
             if deltas[criterion] < -tolerance:
                 failures.append(f"affected criterion {criterion} score decreased after positive evidence")
+        for criterion in pair["unaffected_criterion_ids"]:
+            if abs_deltas[criterion] > tolerance:
+                failures.append(f"unaffected criterion {criterion} drifted during positive evidence intervention")
     elif rule == "support_non_increasing":
         if _decision_support(after["decision"]) > _decision_support(before["decision"]):
             failures.append("support increased after evidence withdrawal or weakening")
+        if after["decision"] != pair["expected_variant_decision"]:
+            failures.append("evidence withdrawal variant decision differs from declared expectation")
         for criterion in pair["affected_criterion_ids"]:
             if deltas[criterion] > tolerance:
                 failures.append(f"affected criterion {criterion} score increased after evidence withdrawal")
+        for criterion in pair["unaffected_criterion_ids"]:
+            if abs_deltas[criterion] > tolerance:
+                failures.append(f"unaffected criterion {criterion} drifted during evidence withdrawal")
     elif rule == "only_unaffected_scores_invariant":
         affected = set(pair["affected_criterion_ids"])
         unaffected = set(pair["unaffected_criterion_ids"])
@@ -394,7 +410,8 @@ def audit_receipt(plan_bytes: bytes, receipt_bytes: bytes) -> dict[str, Any]:
             raise MetamorphicAuditError(f"duplicate observation pair_id {pair_id}")
         by_id[pair_id] = row
 
-    planned_ids = {pair["pair_id"] for pair in plan["pairs"]}
+    planned_by_id = {pair["pair_id"]: pair for pair in plan["pairs"]}
+    planned_ids = set(planned_by_id)
     observed_ids = set(by_id)
     missing = sorted(planned_ids - observed_ids)
     extra = sorted(observed_ids - planned_ids)
@@ -405,6 +422,16 @@ def audit_receipt(plan_bytes: bytes, receipt_bytes: bytes) -> dict[str, Any]:
         if extra:
             details.append("unexpected pairs: " + ",".join(extra))
         raise MetamorphicAuditError("; ".join(details))
+
+    for pair_id, observation in by_id.items():
+        pair = planned_by_id[pair_id]
+        for field in ("baseline_input_sha256", "variant_input_sha256"):
+            digest = observation[field]
+            _digest(digest, f"observation {pair_id} {field}", plan["purpose"] == "example_only")
+            if digest != pair[field]:
+                raise MetamorphicAuditError(
+                    f"observation {pair_id} {field} differs from the committed plan input digest"
+                )
 
     results = [
         _check_pair(pair, by_id[pair["pair_id"]], plan["score_tolerance_millionths"], plan["criterion_ids"])
@@ -424,6 +451,7 @@ def audit_receipt(plan_bytes: bytes, receipt_bytes: bytes) -> dict[str, Any]:
         "plan_id": plan["plan_id"],
         "plan_sha256": plan_sha256,
         "receipt_sha256": sha256(receipt_bytes),
+        "observation_input_digests_match_plan": True,
         "valid": True,
         "all_relations_pass": all(result["passed"] for result in results),
         "planned_pair_count": len(plan["pairs"]),
@@ -441,7 +469,7 @@ def audit_receipt(plan_bytes: bytes, receipt_bytes: bytes) -> dict[str, Any]:
         "construct_validity_proven": False,
         "external_anchor_required": True,
         "scoring_eligible_declared": False,
-        "claim_boundary": "Checks declared metamorphic relations on a supplied fixed paired receipt only; no evaluator execution authenticity, causal effect identification, population generalization, construct validity, or scoring qualification is established.",
+        "claim_boundary": "Checks declared metamorphic relations and receipt input-digest echoes against a supplied fixed plan; no raw input-byte custody, evaluator execution authenticity, receipt authenticity, causal effect identification, population generalization, construct validity, or scoring qualification is established.",
     }
 
 
