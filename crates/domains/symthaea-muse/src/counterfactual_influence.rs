@@ -819,6 +819,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+fn is_lower_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn parse_score_event_index(value: &str) -> Option<usize> {
     let suffix = value.strip_prefix("score_event_index:")?;
     if suffix.is_empty()
