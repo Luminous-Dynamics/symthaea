@@ -7,7 +7,14 @@
     "specification_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "implementation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "parameters_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    "scope": "Synthetic graph only; path existence from neuron-17 to neuron-42 in region-sim-01."
+    "scope": "Synthetic graph only; path existence from neuron-17 to neuron-42 in region-sim-01.",
+    "dependency_roots": [
+      {
+        "object_kind": "edge",
+        "object_id": "edge-17-42",
+        "source_revision_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    ]
   },
   "source_revisions": [
     {
@@ -28,19 +35,33 @@
       "object_kind": "neuron",
       "object_id": "neuron-17",
       "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "depends_on": []
     },
     {
       "object_kind": "neuron",
       "object_id": "neuron-42",
       "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "depends_on": []
     },
     {
       "object_kind": "edge",
       "object_id": "edge-17-42",
       "source_revision_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "depends_on": [
+        {
+          "object_kind": "neuron",
+          "object_id": "neuron-17",
+          "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "object_kind": "neuron",
+          "object_id": "neuron-42",
+          "source_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
     }
   ],
   "applied_corrections": [],
