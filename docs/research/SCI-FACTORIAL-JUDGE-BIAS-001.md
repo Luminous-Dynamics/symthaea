@@ -82,6 +82,7 @@ The current analyzer reports:
 - mean selected rubric-score effect;
 - selected score-option display-position effect;
 - candidate-A choice-rate effect, excluding ties and abstentions from the decisive-choice denominator;
+- tie-rate and abstention-rate main effects, plus their pairwise interactions, with explicit counts in each factorial cell;
 - per-criterion score changes under criterion ordering;
 - completed/ineligible/planned counts at each factor level;
 - fully balanced repeats used for effects and incomplete repeats excluded from effects;
