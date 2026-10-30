@@ -353,9 +353,10 @@ pub fn choose_next(context: &SelectionContext<'_>) -> SelectionDecision {
             StopReason::NoSemanticProgress
         } else if budget_rejections > 0 {
             StopReason::BudgetExhausted
-        } else if context.obligations.iter().any(|o| {
-            o.state == ObligationState::UnresolvableWithoutExternalInput
-        }) {
+        } else if context.obligations.iter()
+            .filter(|o| o.state.unresolved())
+            .all(|o| o.state == ObligationState::UnresolvableWithoutExternalInput)
+        {
             StopReason::NeedsExternalEvidence
         } else {
             StopReason::NoApplicableOperation
@@ -442,6 +443,7 @@ pub enum ReceiptError {
     EmptyProducerIdentity,
     EmptyTargetSet,
     UnknownObligation(String),
+    DuplicateExistingObligation(String),
     EmptyVerifierIdentity,
     EmptyProfileIdentity,
     EmptyProofIdentity,
@@ -496,8 +498,17 @@ pub fn apply_operation_receipt(
     if verifier.obligation_ids != receipt.obligation_ids {
         return Err(ReceiptError::ObligationBindingMismatch);
     }
+    let mut existing_ids = BTreeSet::new();
+    for obligation in obligations.iter() {
+        if obligation.id.is_empty() {
+            return Err(ReceiptError::UnknownObligation(String::new()));
+        }
+        if !existing_ids.insert(obligation.id.as_str()) {
+            return Err(ReceiptError::DuplicateExistingObligation(obligation.id.clone()));
+        }
+    }
     for id in &receipt.obligation_ids {
-        if !obligations.iter().any(|o| o.id == *id) {
+        if !existing_ids.contains(id.as_str()) {
             return Err(ReceiptError::UnknownObligation(id.clone()));
         }
     }
@@ -742,7 +753,9 @@ mod tests {
         for status in [OperationStatus::Failed, OperationStatus::Cancelled] {
             let mut obligations = vec![o("claim", ObligationState::CandidateEvidenceAvailable, 8)];
             let receipt = OperationReceipt {
+                producer_id: "planner-v1".into(),
                 operation_id: "verify".into(),
+                progress_key: "state-1".into(),
                 obligation_ids: BTreeSet::from(["claim".into()]),
                 status,
                 verifier: Some(receipt_verifier(
@@ -856,6 +869,40 @@ mod tests {
             Err(ReceiptError::ProgressBindingMismatch)
         );
         assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+    }
+
+    #[test]
+    fn mixed_external_and_internal_obligations_do_not_claim_full_external_stop() {
+        let obligations = [
+            o("external", ObligationState::UnresolvableWithoutExternalInput, 8),
+            o("open", ObligationState::Open, 4),
+        ];
+        let decision = choose(&obligations, &[], &BTreeSet::new(), 10, 0);
+        assert_eq!(decision.selection, Selection::Stop(StopReason::NoApplicableOperation));
+    }
+
+    #[test]
+    fn duplicate_existing_obligation_ids_reject_receipt_transactionally() {
+        let mut obligations = vec![
+            o("claim", ObligationState::CandidateEvidenceAvailable, 5),
+            o("claim", ObligationState::Open, 3),
+        ];
+        let receipt = OperationReceipt {
+            producer_id: "planner-v1".into(),
+            operation_id: "verify".into(),
+            progress_key: "state-1".into(),
+            obligation_ids: BTreeSet::from(["claim".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(receipt_verifier(
+                "verify", &["claim"], ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            )),
+        };
+        assert_eq!(
+            apply_operation_receipt(&mut obligations, &receipt),
+            Err(ReceiptError::DuplicateExistingObligation("claim".into()))
+        );
+        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(obligations[1].state, ObligationState::Open);
     }
 
 }
