@@ -123,6 +123,10 @@ Build the activation experiment around distinct evidence classes:
 | SAT/SMT / bounded model checking | Reachability witness or bounded result under exact model, assumptions, solver and bound |
 | Timeout / unsupported model | Unknown; never a benign or unreachable verdict |
 
+A concrete open-source tool path is Yosys + SymbiYosys (SBY) for assertions and bounded/unbounded safety checks, cover-trace generation and liveness jobs, and EQY for gold-vs-gate equivalence. For activation, use an explicit SBY `cover` target and archive the generated witness VCD and job/configuration. For augmentation, use EQY to compare the source design against the transformed design with exact gold/gate scripts and matching rules. EQY's partition results and SBY's solver outcomes are part of the receipt; do not reduce them to a generic pass boolean.
+
+A cover witness establishes that the target was reached under the encoded model/assumptions and bound. A bounded cover that finds no witness is not a proof of unreachability. EQY can only establish equivalence for the precise models, scripts, matching and assumptions supplied; unknown or timed-out partitions remain unknown.
+
 Record exact netlist/model digest, initial-state assumptions, input constraints, random seed, number of vectors/cycles, clock semantics, solver and version, time limit, witness digest and final proof/timeout status. Distinguish:
 - trigger condition activated;
 - payload condition executed;
@@ -145,6 +149,8 @@ Every accepted augmentation must have a source/derived artifact lineage receipt 
 For Trojan-labelled gates, verify that the transformation maps each labelled source gate to the expected derived gates and does not label unrelated gates. For benign augmentation, verify no new positive label appears. Sequential elements, reset logic and state encoding require sequential-equivalence reasoning; do not apply combinational identities to stateful elements without an appropriate proof.
 
 Any failed/unknown equivalence, incomplete label mapping, missing label, parser error or provenance mismatch disqualifies the sample from supervised scoring. It may remain in a separately labelled diagnostic corpus, never be silently reclassified as benign.
+
+A practical open-source equivalence path is EQY on top of Yosys/SymbiYosys: compare the original (gold) RTL/netlist with the transformed (gate) artifact, preserve exact read/elaboration scripts, matching rules and tool versions, and retain per-partition proof outcomes and counterexample traces. This is appropriate for augmentation/function-preservation evidence when a trusted source reference is available. It does not make a golden-free detector golden-reference dependent; it is an independent data-quality oracle on the transformation pipeline.
 
 ## 7. Workstream D — benchmark protocol and model comparison
 
@@ -244,6 +250,10 @@ cargo run --example hardsec_trigger_budget -- \
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
 
 The test suite checks known-answer miss probabilities, the minimum trial count, stable small-probability arithmetic, edge cases p=0 and p=1, invalid inputs and unrepresentably large budgets. These tests are authored but have not been compiled or executed in this environment.
+
+Useful tool references:
+- SymbiYosys: https://symbiyosys.readthedocs.io/en/latest/ (bounded/unbounded safety, cover and liveness)
+- EQY equivalence tutorial: https://formal.org/tutorials/symbiyosys/equivalence-checking (gold/gate comparison, partition proofs and counterexamples)
 
 ## 12. Scope boundary
 
