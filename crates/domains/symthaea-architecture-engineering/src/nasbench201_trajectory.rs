@@ -28,6 +28,7 @@ pub enum ProxyDirection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrajectorySearchConfig {
     pub proxy_id: String,
+    pub target_metric_id: String,
     pub proxy_direction: ProxyDirection,
     pub seed: u64,
     pub max_walks: usize,
@@ -411,7 +412,7 @@ pub fn plan_promotions(
                 "must be non-empty",
             ));
         }
-        if !feature.topology_encoding.len().eq(&NB201_EDGES)
+        if feature.topology_encoding.len() != NB201_EDGES
             || feature.topology_encoding.iter().any(|operation| *operation >= NB201_OPERATIONS)
         {
             return Err(TrajectorySearchError::new(
@@ -599,8 +600,14 @@ fn validate_search_inputs(
             "at least one architecture is required",
         ));
     }
-    if config.proxy_id.trim().is_empty() {
-        return Err(TrajectorySearchError::new("proxy_id", "must be non-empty"));
+    if config.proxy_id.trim().is_empty() || config.target_metric_id.trim().is_empty() {
+        return Err(TrajectorySearchError::new("proxy_id", "proxy and target metric IDs must be non-empty"));
+    }
+    if config.proxy_id == config.target_metric_id {
+        return Err(TrajectorySearchError::new(
+            "proxy_id",
+            "the target metric cannot be reused as a proxy feature",
+        ));
     }
     if config.max_walks == 0 || config.max_unique_visits == 0 || config.max_moves_per_walk == 0 {
         return Err(TrajectorySearchError::new(
@@ -867,6 +874,7 @@ fn digest_archive(
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.nasbench201.trajectory-archive.v0.1");
     update_string(&mut hasher, &config.proxy_id);
+    update_string(&mut hasher, &config.target_metric_id);
     hasher.update([direction_byte(config.proxy_direction)]);
     hasher.update(config.seed.to_be_bytes());
     hasher.update((config.max_walks as u64).to_be_bytes());
@@ -1020,6 +1028,7 @@ mod tests {
     fn config(seed: u64) -> TrajectorySearchConfig {
         TrajectorySearchConfig {
             proxy_id: "landscape".into(),
+            target_metric_id: "validation_accuracy".into(),
             proxy_direction: ProxyDirection::Maximize,
             seed,
             max_walks: 4,
@@ -1149,6 +1158,14 @@ mod tests {
             topology_diversity_quota: 3,
         };
         assert!(plan_promotions(&features, &archive, &valid_mix).is_err());
+    }
+
+    #[test]
+    fn search_rejects_target_metric_smuggled_as_proxy() {
+        let features = binary_catalog();
+        let mut invalid = config(1);
+        invalid.target_metric_id = invalid.proxy_id.clone();
+        assert!(build_trajectory_archive(&features, &invalid).is_err());
     }
 
     #[test]
