@@ -17,7 +17,7 @@ pub const FACTORIAL_GROUND_TRUTH_VERSION: &str =
     "mel-mr-eval-020-factorial-ground-truth-v0.1";
 const REPORT_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-020-factorial-reference-v1\0";
 const MAX_EVENT_COUNT: usize = 8;
-const MAX_INPUT_FRAMES: usize = 65_536;
+const MAX_INPUT_FRAMES: usize = 8_192;
 const MAX_FIR_TAPS: usize = 256;
 const MAX_SAMPLE_ABS: f64 = 16.0;
 const MAX_OUTPUT_ABS: f64 = 1.0e9;
@@ -313,7 +313,7 @@ fn render_coalition(
         } => {
             let all_present = event_indices
                 .iter()
-                .all(|index| mask & (1u16 << index) != 0);
+                .all(|index| mask & (1u16 << *index) != 0);
             let mut output = mixed;
             if all_present {
                 let a = &events[event_indices[0]].samples;
@@ -348,7 +348,7 @@ fn spectral_magnitudes(
     let mut buffer: Vec<Complex<f64>> = samples[..window_frames]
         .iter()
         .zip(hann.iter())
-        .map(|(sample, window)| Complex::new(sample * window, 0.0))
+        .map(|(sample, window)| Complex::new(*sample * *window, 0.0))
         .collect();
     let mut planner = FftPlanner::<f64>::new();
     let fft = planner.plan_fft_forward(window_frames);
@@ -361,24 +361,23 @@ fn spectral_magnitudes(
 
 fn feature_dividends(
     coalition_features: &[Vec<f64>],
+    event_count: usize,
 ) -> Vec<Vec<f64>> {
-    let coalition_count = coalition_features.len();
-    let feature_count = coalition_features[0].len();
-    let mut dividends = vec![vec![0.0f64; feature_count]; coalition_count];
+    let mut dividends = coalition_features.to_vec();
 
-    // Möbius transform on the Boolean lattice:
-    // H(S) = F(S) - sum_{T proper subset S} H(T).
-    // Numeric masks are topologically ordered: every proper submask is smaller.
-    for mask in 1..coalition_count {
-        let mut value = coalition_features[mask].clone();
-        let mut submask = (mask - 1) & mask;
-        while submask > 0 {
-            for index in 0..feature_count {
-                value[index] -= dividends[submask][index];
+    // Fast Möbius transform on the Boolean lattice. This is O(N * 2^N * F)
+    // rather than enumerating every proper submask (O(3^N * F)).
+    for bit in 0..event_count {
+        let bit_mask = 1usize << bit;
+        for mask in 0..dividends.len() {
+            if mask & bit_mask == 0 {
+                continue;
             }
-            submask = (submask - 1) & mask;
+            let subset = mask ^ bit_mask;
+            for feature in 0..dividends[mask].len() {
+                dividends[mask][feature] -= dividends[subset][feature];
+            }
         }
-        dividends[mask] = value;
     }
     dividends
 }
@@ -440,8 +439,8 @@ pub fn build_factorial_ground_truth(
         .iter()
         .map(|coalition| coalition.spectral_magnitudes.clone())
         .collect();
-    let pcm_dividends = feature_dividends(&pcm_features);
-    let spectral_dividends = feature_dividends(&spectral_features);
+    let pcm_dividends = feature_dividends(&pcm_features, event_count);
+    let spectral_dividends = feature_dividends(&spectral_features, event_count);
 
     let mut dividends = Vec::with_capacity(coalition_count - 1);
     for mask in 1..coalition_count {
