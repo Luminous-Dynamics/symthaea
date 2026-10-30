@@ -22,7 +22,7 @@ For every candidate in the frozen proposal pool, record at least two adjudicator
 - Reviewer time is measured elapsed minutes for that review event. It is not model-estimated effort.
 - The outcome file binds to exact proposal bytes, exact ranking-report bytes, and an independently versioned adjudication protocol SHA-256.
 
-The executable validator checks full candidate-pool coverage, duplicate/orphan IDs, role separation, vote counts, finite positive time, confidence/action consistency, and exact byte digests. The JSON Schema is a companion contract; executable validation remains authoritative for cross-file checks.
+The executable validator checks full candidate-pool coverage, duplicate/orphan IDs, role separation, vote counts, finite positive time, confidence/action consistency, and exact byte digests. It reads the adjudication-protocol file itself and verifies its bytes against the recorded protocol SHA-256. The JSON Schema is a companion contract; executable validation remains authoritative for cross-file checks.
 
 ## Consensus and agreement semantics
 
@@ -65,6 +65,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome_multi_rater_audit -- \
   --proposals frozen-proposals.json \
   --ranking-report frozen-ranking-report.json \
+  --adjudication-protocol CONNECTOME_MULTI_RATER_PROTOCOL_V1.md \
   --outcomes blinded-multi-rater-outcomes.json \
   --output multi-rater-audit-report.json
 ```
