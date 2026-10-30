@@ -75,6 +75,33 @@ The first Linux prototype should not equate any single filesystem API with a com
 - **fanotify is a useful supplemental observer, not a sole completeness oracle.** Its documented limitations include not reporting accesses/modifications caused by `mmap`, `msync` or `munmap`; child additions/removals/changes do not themselves emit events on a marked directory; directory monitoring is not automatically recursive; dynamically adding marks to newly created subdirectories can race; and its event queue can overflow. Mount-level monitoring can remove some recursive-marking gaps, but it does not solve the mmap limitation. See [fanotify(7), Limitations and caveats](https://man7.org/linux/man-pages/man7/fanotify.7.html).
 - **A syscall/process observer and independent snapshot/replay lane are still required.** Qualify the exact mechanisms for descriptor provenance, `exec`/child lineage, metadata and directory enumeration, `mmap`, dynamic library loads, process exit, observer restart and event loss. Treat untested interfaces and special filesystems as unresolved. A second observer or replay is a cross-check, not a magical oracle; common-mode failures must be included in the challenge design.
 
+## Additional Linux candidate: BPF LSM event lane
+
+The Linux kernel exposes a more promising complementary event source than fanotify alone: eBPF programs can attach to LSM hooks for runtime instrumentation and auditing. The kernel API documents relevant file hooks including `security_file_open`, `security_file_permission`, `security_mmap_file`, and `security_file_receive`. In particular, file-permission hooks are used when actual read/write operations occur, while memory-mapped file access needs separate handling. See the [BPF LSM program guide](https://docs.kernel.org/bpf/prog_lsm.html) and [Linux kernel API documentation](https://docs.kernel.org/7.0/core-api/kernel-api.html).
+
+### Candidate hook coverage
+
+| Hook / observation | Candidate role | Remaining limitation |
+|---|---|---|
+| `file_open` | Capture opened object identity, access mode and executable loads | Open is not proof the bytes were consumed; pre-existing descriptors need separate handling |
+| `file_permission` | Capture actual read/write permission checks for file operations | Not a byte-level semantic dependency oracle; mapping access must be handled separately |
+| `mmap_file` | Capture file-backed mappings and conservatively depend on mapped object | Mapping may include unused ranges; false attribution is possible |
+| `file_receive` | Detect descriptors received through IPC | Does not by itself explain how an existing descriptor was created or passed outside this hook |
+| Process/exec tracepoints | Correlate child lineage, executable identity and lifecycle | Tracepoint formats and kernel context must be pinned; environment capture is still owned by the supervisor |
+| Directory enumeration + namespace syscalls | Record enumeration and create/rename/unlink operations | Must hash sorted directory membership and account for races, mount changes and unobserved namespace paths |
+
+This is a candidate design matrix, not a claim that one eBPF program already observes all these paths. Exact hook availability, attach success, kernel configuration, LSM ordering, BTF identity, privileges, verifier acceptance, perf/ring-buffer loss and process scope must be reported in the profile receipt.
+
+### Why compose BPF LSM with Landlock instead of choosing one
+
+Landlock narrows what the task can access; BPF LSM can provide an independent audit signal for selected security hooks. Neither should be promoted alone:
+
+- Landlock rules are checked for newly opened descriptors; already-open descriptors remain an explicit boundary. Special filesystem access through descriptor paths also has documented limitations. See the [Landlock userspace API](https://docs.kernel.org/userspace-api/landlock.html).
+- BPF-LSM instrumentation is privileged system-wide observability. The kernel documentation notes that BTF-based access depends on kernel structure layouts without a stability guarantee; CO-RE is best-effort rather than a permanent cross-kernel ABI. See [Landlock system-wide management: tracing and audit](https://docs.kernel.org/admin-guide/LSM/landlock.html).
+- fanotify remains a useful cross-check for selected filesystem events but cannot be the sole oracle because of its documented mmap, directory-recursion and queue-overflow limitations. See [fanotify(7)](https://man7.org/linux/man-pages/man7/fanotify.7.html).
+
+The profile must therefore pin the exact kernel build and BTF digest, BPF object digest, attach map, Landlock ABI and handled rights, mount topology, process supervisor, security policy and event-loss counters. If a hook is missing or a buffer drops events, the affected channel is unresolved or the receipt is invalid. Do not silently downgrade to a weaker observer while retaining the same profile identity.
+
 ### Candidate composition
 
 1. Materialize the initial workspace as an immutable, content-addressed read-only snapshot. Provide a separate writable output/artifact area whose final contents are committed to the run receipt.
