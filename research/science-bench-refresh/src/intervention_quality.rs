@@ -68,10 +68,11 @@ enum AdjudicatedRelationV1 {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AdjudicationPolicyV1 {
-    pub minimum_reviewers: u32,
+    pub reviewers_per_candidate: u32,
     /// A single verdict must receive at least this share of all panel votes.
     pub consensus_threshold_permille: u16,
     pub require_blind_to_generator_identity: bool,
+    pub require_blind_to_intended_relation: bool,
     pub require_blind_to_pipeline_disposition: bool,
     pub require_blind_to_evaluator_outcome: bool,
 }
@@ -149,6 +150,7 @@ pub struct HumanAdjudicationV1 {
     pub reviewer_id_sha256: String,
     pub verdict: ReviewerVerdictV1,
     pub blind_to_generator_identity: bool,
+    pub blind_to_intended_relation: bool,
     pub blind_to_pipeline_disposition: bool,
     pub blind_to_evaluator_outcome: bool,
     pub adjudication_artifact_sha256: String,
@@ -398,13 +400,14 @@ pub fn validate_intervention_quality_plan_fields(
         issues.push("v1 requires full_census; sampled/adaptive adjudication needs a separately preregistered design".to_owned());
     }
     let policy = &fields.adjudication_policy;
-    if !(3..=MAX_PANEL).contains(&policy.minimum_reviewers) {
-        issues.push(format!("minimum_reviewers must be in 3..={MAX_PANEL}"));
+    if !(3..=MAX_PANEL).contains(&policy.reviewers_per_candidate) {
+        issues.push(format!("reviewers_per_candidate must be in 3..={MAX_PANEL}"));
     }
     if !(501..=1_000).contains(&policy.consensus_threshold_permille) {
         issues.push("consensus_threshold_permille must be in 501..=1000".to_owned());
     }
     if !policy.require_blind_to_generator_identity
+        || !policy.require_blind_to_intended_relation
         || !policy.require_blind_to_pipeline_disposition
         || !policy.require_blind_to_evaluator_outcome
     {
@@ -679,7 +682,7 @@ pub fn analyze_intervention_quality(
         let candidate = candidates_by_id.get(adjudication.candidate_id.as_str())
             .ok_or_else(|| format!("unknown candidate adjudication {}", adjudication.candidate_id))?;
         let policy = &plan.adjudication_policy;
-        if adjudication.reviewers.len() != policy.minimum_reviewers as usize
+        if adjudication.reviewers.len() != policy.reviewers_per_candidate as usize
             || adjudication.reviewers.len() > MAX_PANEL as usize
         {
             return Err(format!("candidate {} must have exactly the preregistered reviewer count", candidate.candidate_id));
@@ -695,6 +698,7 @@ pub fn analyze_intervention_quality(
                 return Err(format!("candidate {} has invalid adjudication artifact digest", candidate.candidate_id));
             }
             if (policy.require_blind_to_generator_identity && !reviewer.blind_to_generator_identity)
+                || (policy.require_blind_to_intended_relation && !reviewer.blind_to_intended_relation)
                 || (policy.require_blind_to_pipeline_disposition && !reviewer.blind_to_pipeline_disposition)
                 || (policy.require_blind_to_evaluator_outcome && !reviewer.blind_to_evaluator_outcome)
             {
@@ -830,7 +834,7 @@ pub fn analyze_intervention_quality(
         reviewer_pairwise_comparison_count: reviewer_pairwise_comparisons,
         reviewer_fleiss_kappa: fleiss_kappa(
             &reviewer_vote_counts,
-            plan.adjudication_policy.minimum_reviewers,
+            plan.adjudication_policy.reviewers_per_candidate,
         ),
         unique_transformation_family_count: all_families.len() as u64,
         unique_failure_mode_count: all_failure_modes.len() as u64,
@@ -895,9 +899,10 @@ mod tests {
             semantic_verifier_policy_sha256: digest("semantic-policy"),
             candidate_sampling_policy: "full_census".to_owned(),
             adjudication_policy: AdjudicationPolicyV1 {
-                minimum_reviewers: 3,
+                reviewers_per_candidate: 3,
                 consensus_threshold_permille: 666,
                 require_blind_to_generator_identity: true,
+                require_blind_to_intended_relation: true,
                 require_blind_to_pipeline_disposition: true,
                 require_blind_to_evaluator_outcome: true,
             },
@@ -917,6 +922,7 @@ mod tests {
             reviewer_id_sha256: digest(&format!("reviewer-{candidate}-{index}")),
             verdict,
             blind_to_generator_identity: true,
+            blind_to_intended_relation: true,
             blind_to_pipeline_disposition: true,
             blind_to_evaluator_outcome: true,
             adjudication_artifact_sha256: digest(&format!("artifact-{candidate}-{index}")),
@@ -1072,6 +1078,15 @@ mod tests {
         let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
         value["adjudications"][0]["reviewers"][0]["blind_to_pipeline_disposition"] = serde_json::json!(false);
         assert!(analyze_intervention_quality(&plan, &serde_json::to_vec(&value).unwrap()).unwrap_err().contains("non-blinded"));
+    }
+
+    #[test]
+    fn rejects_reviewers_exposed_to_the_intended_relation() {
+        let (_, plan, receipt) = fixture();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["adjudications"][0]["reviewers"][0]["blind_to_intended_relation"] = serde_json::json!(false);
+        let altered = serde_json::to_vec(&value).unwrap();
+        assert!(analyze_intervention_quality(&plan, &altered).unwrap_err().contains("non-blinded"));
     }
 
     #[test]
