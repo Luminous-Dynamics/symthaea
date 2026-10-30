@@ -1,0 +1,118 @@
+{
+  "schema_version": "hardsec-evidence-packet-v1",
+  "packet_id": "seqcube-reference-ctrl-0001",
+  "dataset_id": "seqcube-ht-witness-validation-artifact-v1.0",
+  "evaluation_mode": "witness_validation",
+  "subject": {
+    "design_id": "seqctrl_infected",
+    "netlist_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de"
+  },
+  "evidence": [
+    {
+      "evidence_id": "seqcube-active-cover",
+      "kind": "cover_witness",
+      "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+      "evidence_sha256": "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/active.csv",
+      "status": "pass",
+      "tool": "SeqCube-HT reference verifier (publisher-reported)",
+      "tool_version": "1.0",
+      "scope": "reset-consistent 10-cycle active replay; trigger phases at cycles 2, 4 and 6",
+      "formal_result": "cover_reached",
+      "property_id": "three_phase_trigger_path",
+      "proof_scope": "bounded",
+      "bound_cycles": 10,
+      "stimuli_count": 10,
+      "activation_count": 3,
+      "witness_sha256": "d2f865eb22c41c32a941007d44efefd5ac010d00e6baa623e8afa2072e5a7c8a"
+    },
+    {
+      "evidence_id": "seqcube-active-payload",
+      "kind": "payload_effect_trace",
+      "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+      "evidence_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
+      "status": "pass",
+      "tool": "SeqCube-HT reference verifier (publisher-reported)",
+      "tool_version": "1.0",
+      "scope": "paired clean/infected primary output difference first observed at cycle 8",
+      "stimuli_count": 10,
+      "payload_effects_observed": 1,
+      "witness_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d"
+    },
+    {
+      "evidence_id": "seqcube-inactive-trace",
+      "kind": "stimulus_trace",
+      "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+      "evidence_sha256": "3d7cf845a7d530a2d4356aa264ec4b3fea13308f9dc2b3e4fe5295f50c4f9359",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/inactive.csv",
+      "status": "pass",
+      "tool": "SeqCube-HT reference verifier (publisher-reported)",
+      "tool_version": "1.0",
+      "scope": "10-cycle inactive control; ack changes at cycle 4",
+      "stimuli_count": 10,
+      "activation_count": 0
+    },
+    {
+      "evidence_id": "seqcube-inactive-payload",
+      "kind": "payload_effect_trace",
+      "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
+      "evidence_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
+      "status": "pass",
+      "tool": "SeqCube-HT reference verifier (publisher-reported)",
+      "tool_version": "1.0",
+      "scope": "paired clean/infected output difference not observed on inactive control",
+      "stimuli_count": 10,
+      "payload_effects_observed": 0
+    },
+    {
+      "evidence_id": "seqcube-inactive-bounded-audit",
+      "kind": "formal_proof",
+      "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33aa04b65ea9941de",
+      "evidence_sha256": "b93fddb6a38e1ef148e8a259bf26634d031c44dccbc168c50161c1e50846379f",
+      "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/audit/inactive.smt2",
+      "status": "pass",
+      "tool": "Z3 Boolean API (publisher-reported)",
+      "tool_version": "4.x",
+      "scope": "inactive trigger activation query bounded to the recorded reset/vector sequence",
+      "proof_scope": "bounded",
+      "formal_result": "bounded_no_counterexample",
+      "property_id": "inactive_trigger_activation",
+      "assumptions_sha256": "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9",
+      "bound_cycles": 10
+    }
+  ],
+  "claims": [
+    {
+      "claim_type": "trigger_activated",
+      "status": "supported",
+      "scope": "active reset-consistent trace reached all three phases",
+      "evidence_ids": ["seqcube-active-cover"]
+    },
+    {
+      "claim_type": "payload_effect_observed",
+      "status": "supported",
+      "scope": "active trace reached the primary output observation boundary at cycle 8",
+      "evidence_ids": ["seqcube-active-payload"]
+    },
+    {
+      "claim_type": "trigger_not_observed_under_budget",
+      "status": "supported",
+      "scope": "inactive 10-cycle control only",
+      "evidence_ids": ["seqcube-inactive-trace"]
+    },
+    {
+      "claim_type": "payload_effect_not_observed_under_budget",
+      "status": "supported",
+      "scope": "inactive 10-cycle control only",
+      "evidence_ids": ["seqcube-inactive-payload"]
+    },
+    {
+      "claim_type": "bounded_reachability_not_found",
+      "status": "supported",
+      "scope": "inactive query and its declared 10-cycle bound only",
+      "evidence_ids": ["seqcube-inactive-bounded-audit"]
+    }
+  ]
+}
