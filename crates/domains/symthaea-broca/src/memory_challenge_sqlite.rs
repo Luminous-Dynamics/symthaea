@@ -167,7 +167,7 @@ impl SqliteAmlMemoryBackend {
             std::fs::create_dir_all(parent)
                 .map_err(|error| format!("failed to create SQLite database directory: {error}"))?;
         }
-        let connection = Connection::open(database_path)
+        let mut connection = Connection::open(database_path)
             .map_err(|error| format!("failed to open AML SQLite database: {error}"))?;
         connection
             .busy_timeout(BUSY_TIMEOUT)
@@ -223,17 +223,68 @@ impl SqliteAmlMemoryBackend {
         let schema_version: i64 = connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .map_err(|error| format!("failed to read AML SQLite schema version: {error}"))?;
-        if schema_version == 0 || schema_version == 1 {
-            // Version 2 adds the lifecycle-event table, which was created above
-            // with IF NOT EXISTS. This upgrade is additive and preserves all
-            // previously persisted Add batches.
-            connection
-                .pragma_update(None, "user_version", SQLITE_SCHEMA_VERSION)
-                .map_err(|error| format!("failed to set AML SQLite schema version: {error}"))?;
-        } else if schema_version != SQLITE_SCHEMA_VERSION {
-            return Err(format!(
-                "unsupported AML SQLite schema version {schema_version}; expected {SQLITE_SCHEMA_VERSION}"
-            ));
+        match schema_version {
+            0 | 1 => {
+                // Fresh databases and v1 Add-only stores get the v3 lifecycle
+                // schema created above. Existing Add batches are untouched.
+                connection
+                    .pragma_update(None, "user_version", SQLITE_SCHEMA_VERSION)
+                    .map_err(|error| format!("failed to set AML SQLite schema version: {error}"))?;
+            }
+            2 => {
+                // v2 lifecycle rows predate the content-digest column. Migrate
+                // atomically: hash each exact stored body, then advance version.
+                let transaction = connection
+                    .transaction_with_behavior(TransactionBehavior::Immediate)
+                    .map_err(|error| format!("failed to begin SQLite v2->v3 migration: {error}"))?;
+                transaction
+                    .execute_batch(
+                        "ALTER TABLE aml_evidence_lifecycle_events
+                         ADD COLUMN event_sha256 TEXT NOT NULL DEFAULT '';"
+                    )
+                    .map_err(|error| format!("failed to add lifecycle event digest column: {error}"))?;
+                let rows: Vec<(String, Vec<u8>)> = {
+                    let mut statement = transaction
+                        .prepare("SELECT event_id, body_json FROM aml_evidence_lifecycle_events ORDER BY sequence ASC")
+                        .map_err(|error| format!("failed to read v2 lifecycle rows: {error}"))?;
+                    let mapped = statement
+                        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                        .map_err(|error| format!("failed to query v2 lifecycle rows: {error}"))?;
+                    let mut rows = Vec::new();
+                    for row in mapped {
+                        rows.push(row.map_err(|error| format!("failed to decode v2 lifecycle row: {error}"))?);
+                    }
+                    rows
+                };
+                for (event_id, body_json) in rows {
+                    let event: PersistedEvidenceLifecycleEvent = serde_json::from_slice(&body_json)
+                        .map_err(|error| format!("v2 lifecycle event {event_id:?} is invalid: {error}"))?;
+                    require_non_empty(&event.event_id, "lifecycle event_id")?;
+                    event.operation.validate()?;
+                    if event.event_id != event_id {
+                        return Err("v2 lifecycle row event_id does not match its payload".into());
+                    }
+                    let digest = sha256_hex(&body_json);
+                    transaction
+                        .execute(
+                            "UPDATE aml_evidence_lifecycle_events SET event_sha256 = ?1 WHERE event_id = ?2",
+                            params![digest, event_id],
+                        )
+                        .map_err(|error| format!("failed to backfill v2 lifecycle digest: {error}"))?;
+                }
+                transaction
+                    .execute_batch("PRAGMA user_version = 3;")
+                    .map_err(|error| format!("failed to advance SQLite schema to v3: {error}"))?;
+                transaction
+                    .commit()
+                    .map_err(|error| format!("failed to commit SQLite v2->v3 migration: {error}"))?;
+            }
+            version if version == SQLITE_SCHEMA_VERSION => {}
+            version => {
+                return Err(format!(
+                    "unsupported AML SQLite schema version {version}; expected {SQLITE_SCHEMA_VERSION}"
+                ));
+            }
         }
 
         let mut backend = Self {
