@@ -127,12 +127,12 @@ class NasBench201CurveImporterTests(unittest.TestCase):
 
     def test_rejects_missing_or_extra_architecture_curve_records(self):
         curves = curve_fixture()
-        del curves["nb201_data"][IDS[0]]
+        del curves["nb201_data"][IMPORTER.suitezero_id_to_naslib_curve_key(IDS[0])]
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             build(curves=curves)
 
         curves = curve_fixture()
-        curves["nb201_data"]["(1, 1, 1, 1, 1, 1)"] = {
+        curves["nb201_data"][IMPORTER.suitezero_id_to_naslib_curve_key("(1, 1, 1, 1, 1, 1)")] = {
             "cifar10-valid": {"eval_acc1es": [1.0] * 20}
         }
         with self.assertRaises(IMPORTER.ImportErrorDetail):
@@ -140,18 +140,18 @@ class NasBench201CurveImporterTests(unittest.TestCase):
 
     def test_rejects_missing_dataset_key_or_short_learning_curve(self):
         curves = curve_fixture()
-        del curves["nb201_data"][IDS[0]]["cifar10-valid"]
+        del curves["nb201_data"][IMPORTER.suitezero_id_to_naslib_curve_key(IDS[0])]["cifar10-valid"]
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             build(curves=curves)
 
         curves = curve_fixture()
-        curves["nb201_data"][IDS[0]]["cifar10-valid"]["eval_acc1es"] = [1.0] * 14
+        curves["nb201_data"][IMPORTER.suitezero_id_to_naslib_curve_key(IDS[0])]["cifar10-valid"]["eval_acc1es"] = [1.0] * 14
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             build(curves=curves)
 
     def test_rejects_nonfinite_learning_curve_values(self):
         curves = curve_fixture()
-        curves["nb201_data"][IDS[0]]["cifar10-valid"]["eval_acc1es"][4] = float("nan")
+        curves["nb201_data"][IMPORTER.suitezero_id_to_naslib_curve_key(IDS[0])]["cifar10-valid"]["eval_acc1es"][4] = float("nan")
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             build(curves=curves)
 
