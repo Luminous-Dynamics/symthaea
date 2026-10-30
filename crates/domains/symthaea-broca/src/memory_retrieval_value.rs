@@ -23,7 +23,10 @@
 //! the lifecycle action controller selects WARN_STALE / EXPLAIN_CONFLICT /
 //! ABSTAIN (or ANSWER if a verified proof already exists).
 
-use crate::memory_lifecycle_policy::LifecycleRetrievalProgress;
+use crate::memory_lifecycle_policy::{
+    ClaimLifecycleState, LifecycleActionDecision, LifecyclePolicyRequest,
+    LifecycleRetrievalProgress, VerifiedLifecycleProofToken, decide_lifecycle_action,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -264,6 +267,39 @@ pub fn evaluate_retrieval_value(
     };
     decision.verify_internal_consistency()?;
     Ok(decision)
+}
+
+/// Canonical adapter from a calibrated VOI result into lifecycle action policy.
+///
+/// It derives the unresolved claim set from the request ledger, binds the value
+/// estimate to the exact decision/principal/scope/time and EvidenceIndex state,
+/// replaces retrieval progress with the deterministic VOI result, and then
+/// invokes the lifecycle action controller. Production orchestrators should
+/// use this instead of copying a can_continue boolean manually.
+pub fn decide_lifecycle_action_with_voi(
+    mut request: LifecyclePolicyRequest,
+    verified_proof: Option<&VerifiedLifecycleProofToken>,
+    value_decision: &RetrievalValueDecision,
+    evidence_index_state_sha256: &str,
+) -> Result<LifecycleActionDecision, String> {
+    let unresolved_claim_ids: BTreeSet<String> = request
+        .required_claims
+        .iter()
+        .filter(|claim| claim.state != ClaimLifecycleState::SupportedCurrent)
+        .map(|claim| claim.conclusion_id.clone())
+        .collect();
+
+    value_decision.verify_request_binding(
+        &request.decision_id,
+        &request.principal_id,
+        &request.scope_id,
+        request.valid_at_unix_ms,
+        request.known_at_unix_ms,
+        evidence_index_state_sha256,
+        &unresolved_claim_ids,
+    )?;
+    request.retrieval = value_decision.to_lifecycle_progress()?;
+    decide_lifecycle_action(request, verified_proof)
 }
 
 fn calculate_decision(
