@@ -22,7 +22,7 @@ The bound covers the realized value exactly when s <= q. This benchmark separate
 
 ## Experimental design
 
-The dependency-free Rust executable evaluates **512 episodes × 48 decisions** for each of three scenarios and search widths 8, 32 and 128 (nine scenario/width cells). Each decision uses the same deterministic synthetic candidate-generating process for all calibration methods.
+The dependency-free Rust executable evaluates **512 episodes × 48 decisions** for each of three scenarios, search widths 8/32/128 and rollout horizons 1/3/8 (27 scenario × width × horizon cells). The prediction-error standard deviation scales with the square root of rollout horizon, so the protocol tests both candidate-selection amplification and accumulated rollout uncertainty. Each decision uses the same deterministic synthetic candidate-generating process for all calibration methods.
 
 Candidate complexity is coupled to latent action quality. More complex candidates have larger prediction-error variance. The planner selects the candidate with the highest predicted value, not the highest hidden true value. This creates a winner's-curse effect: the selected action's prediction error is biased upward relative to randomly sampled actions.
 
@@ -30,7 +30,7 @@ Candidate complexity is coupled to latent action quality. More complex candidate
 - **Abrupt shift:** residual scale and bias increase at the episode midpoint.
 - **Gradual shift:** residual scale and bias increase over the middle third.
 
-For each search width, a separate stationary development set of 512 × 16 decisions calibrates random-action and selected-action quantiles. Evaluation uses separate deterministic seeds. The qualification-like evaluation tape is intentionally public smoke data, not a sealed test set.
+For each width × horizon pair, a separate stationary development set of 512 × 16 decisions calibrates random-action and selected-action quantiles. Evaluation uses separate deterministic seeds. The qualification-like evaluation tape is intentionally public smoke data, not a sealed test set.
 
 ## Methods
 
@@ -47,6 +47,7 @@ The 90% one-sided finite-sample order statistic uses rank ceil((n+1) × 0.9), ca
 
 Each cell and method reports:
 - selected-action lower-bound coverage;
+- pre-shift and post-shift selected-action coverage (stationary scenarios report -1 for the inapplicable post-shift field);
 - random-action lower-bound coverage;
 - false-safe rate among accepted actions (LCB >= threshold but realized value < threshold);
 - fallback rate;
@@ -56,7 +57,7 @@ Each cell and method reports:
 - fraction of shifted episodes that recover nominal rolling coverage;
 - p90 recovery delay after shift.
 
-The random-action coverage number must never substitute for selected-action coverage. False-safe rate and tail utility matter in addition to nominal marginal coverage.
+The random-action coverage number must never substitute for selected-action coverage. The rollout-horizon axis tests whether longer prediction chains widen the selected-action residual distribution even at fixed search width. False-safe rate and tail utility matter in addition to nominal marginal coverage.
 
 ## Relation to current research
 
@@ -79,7 +80,7 @@ The random-action coverage number must never substitute for selected-action cove
     cargo test --locked
     cargo run --quiet --locked
 
-The JSON report is deterministic and includes all nine cells and six methods. A green workflow validates source, deterministic output and the declared synthetic measurement contract only.
+The JSON report is deterministic and includes all 27 cells (3 scenarios × 3 search widths × 3 rollout horizons) and six methods. A green workflow validates source, deterministic output and the declared synthetic measurement contract only.
 
 ## Next experiments
 
