@@ -1,4 +1,4 @@
-//! CMAQ-008 v0.2: decision-ranking probe using the real Symthaea CfC model.
+//! CMAQ-008 v0.3: decision-ranking probe using the real Symthaea CfC model.
 //!
 //! The model predicts next state through HierarchicalCfCWorldModel::predict.
 //! A task reward is evaluated on predicted and evaluator-owned true next states.
@@ -416,7 +416,7 @@ fn render(results: &[SeedResult]) -> String {
     let mut out = format!(
         concat!(
             "{{\n",
-            "  \"schema_version\": \"cmaq-008-action-ranking-v0.1\",\n",
+            "  \"schema_version\": \"cmaq-008-action-ranking-v0.2\",\n",
             "  \"model\": \"HierarchicalCfCWorldModel\",\n",
             "  \"dimensions\": {{\"hdc\": {}, \"hidden\": {}}},\n",
             "  \"training\": {{\"samples\": {}, \"epochs\": {}, \"seeds\": {}, \"learning_rate\": 0.001}},\n",
@@ -490,7 +490,7 @@ fn main() {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "CMAQ-008 real CfC action-ranking diagnostic: {} model seeds; {} train samples x {} epochs; {} evaluation states x two regimes.",
+            "CMAQ-008 real CfC action-ranking diagnostic: {} model seeds; {} train samples x {} epochs; {} evaluation states x three regimes.",
             MODEL_SEEDS.len(), TRAIN_SAMPLES, EPOCHS, EVAL_STATES
         );
         return;
