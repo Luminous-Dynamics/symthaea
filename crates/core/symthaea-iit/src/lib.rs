@@ -1841,8 +1841,14 @@ mod tests {
         let expected = 0.72 * (0.72_f64 / 0.25).log2();
         assert!((selected.cause.intrinsic_specification - expected).abs() < 1e-12);
         assert!((selected.effect.intrinsic_specification - expected).abs() < 1e-12);
-        assert_eq!(selected.cause.selection_margin, Some(0.72_f64 * (0.72_f64 / 0.25).log2()
-            - (0.18_f64 * (0.18_f64 / 0.25).log2())));
+        // The runner-up is state 10 (likelihood 0.02), not state 11
+        // (likelihood 0.18): both have negative GID, but 10 is less negative.
+        let runner_up_information = 0.02 * (0.02_f64 / 0.25).log2();
+        assert_eq!(selected.cause.runner_up_state, Some(vec![true, false]));
+        assert!((selected.cause.runner_up_intrinsic_specification.unwrap()
+            - runner_up_information).abs() < 1e-12);
+        assert!((selected.cause.selection_margin.unwrap()
+            - (expected - runner_up_information)).abs() < 1e-12);
         assert_eq!(selected.state_pairs(), vec![Iit4SystemState {
             cause_specified_state: vec![false, true],
             effect_specified_state: vec![false, true],
