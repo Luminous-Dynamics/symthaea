@@ -303,6 +303,132 @@
       "evidence_grade": "project-self-report-with-dataset-fingerprint-and-per-question-receipts",
       "comparison_notes": "This evaluates BM25 retrieval component only, not the daemon, full runtime, memory compression, answer generation, lifecycle governance or abstention. Strict recall-all is not answer accuracy. The page states that all 30 unanswerable questions were included in coverage but abstention quality was not measured.",
       "source": "https://www.agent-memory.dev/benchmarks"
+    },
+    {
+      "id": "halt-verification-aware-stopping-2026-findings-emnlp",
+      "system": "HALT",
+      "category": "peer-reviewed-primary-paper",
+      "benchmark": "Three multi-hop QA benchmarks and open-corpus pilots",
+      "benchmark_revision": "Findings of EMNLP 2026",
+      "metric": "verification-aware redundant retrieval reduction with exact-match preservation",
+      "value_percent": null,
+      "answer_model": "Search agent unchanged; both gold expected-hop claims and generated claims evaluated",
+      "judge": "Claim-evidence coverage verification and exact match",
+      "reported_date": "2026-10",
+      "sample_size": null,
+      "secondary_metrics": {
+        "benchmark_count": 3,
+        "open_corpus_pilots": true,
+        "gold_claims_savings_stronger_than_generated_claims": true
+      },
+      "evidence_grade": "primary-paper-peer-reviewed",
+      "comparison_notes": "HALT stops based on cumulative evidence coverage for every expected hop claim rather than generator confidence, fixed stop positions or lexical overlap. The paper reports redundant-search reduction while largely preserving exact match, but this ledger does not invent an unreported percentage. This is a direct conceptual baseline for Broca proof-coverage stopping.",
+      "source": "https://aclanthology.org/2026.findings-emnlp.343/"
+    },
+    {
+      "id": "active-rag-budget-aware-utility-2026-07",
+      "system": "Budget-aware Active RAG evaluation",
+      "category": "primary-research-preprint",
+      "benchmark": "Multi-hop QA / HotpotQA utility and budget evaluation",
+      "benchmark_revision": "2026-07-27; 2,000-example Qwen2.5-1.5B experiments",
+      "metric": "held-out evidence-usage budget transfer",
+      "value_percent": null,
+      "answer_model": "Qwen2.5-1.5B",
+      "judge": "Correctness delta with/without retrieval and budget-frontier evaluation",
+      "reported_date": "2026-07-27",
+      "sample_size": 2000,
+      "secondary_metrics": {
+        "nominal_evidence_usage_target_percent": 50,
+        "hotpotqa_splits_with_any_budget_overshoot_percent_min": 40,
+        "hotpotqa_splits_with_any_budget_overshoot_percent_max": 100,
+        "evaluation_dimensions": [
+          "ranking_quality",
+          "threshold_transfer",
+          "realized_usage",
+          "retrieval_harm",
+          "trigger_cost"
+        ]
+      },
+      "evidence_grade": "primary-research-preprint",
+      "comparison_notes": "The paper defines retrieval value as marginal correctness change from using retrieved evidence versus a no-retrieval answer. It emphasizes that nominal budgets are not realized budgets and that retrieval can help, be neutral or harm. The reported 40–100% is the range of splits where common triggers overshoot a nominal 50% target when any overshoot is counted, not an accuracy score.",
+      "source": "https://arxiv.org/abs/2607.24010"
+    },
+    {
+      "id": "confrag-confidence-guided-rag-emnlp-industry-2026",
+      "system": "CONFRAG / CONFQA",
+      "category": "peer-reviewed-industry-paper",
+      "benchmark": "Production RAG system and factuality benchmarks",
+      "benchmark_revision": "EMNLP 2026 Industry Track",
+      "metric": "external retrieval call reduction with matched answer quality",
+      "value_percent": null,
+      "answer_model": "Confidence-calibrated LLM; one epoch fine-tuning over 3K knowledge-graph facts",
+      "judge": "System's production RAG evaluation and factuality benchmarks",
+      "reported_date": "2026-10",
+      "sample_size": 3000,
+      "secondary_metrics": {
+        "external_retrieval_reduction_percent_min": 5,
+        "external_retrieval_reduction_percent_max": 39,
+        "p90_tail_latency_reduction_ms_up_to": 800,
+        "reported_hallucination_rate_percent_after_training_max": 5,
+        "reported_hallucination_rate_percent_before_training_min": 20,
+        "reported_hallucination_rate_percent_before_training_max": 40,
+        "answer_quality_vs_always_on_rag": "matched"
+      },
+      "evidence_grade": "peer-reviewed-industry-primary-paper",
+      "comparison_notes": "CONFRAG uses confidence-guided retrieval and parallel early stopping. It is a useful industry efficiency comparator, but confidence gating alone is not lifecycle validity or proof coverage. Its retrieval reduction and latency figures belong to its own real RAG system; do not assume direct transfer to Broca.",
+      "source": "https://aclanthology.org/2026.emnlp-industry.171/"
+    },
+    {
+      "id": "agentabstain-neurips-2026",
+      "system": "AgentAbstain benchmark / frontier LLMs",
+      "category": "peer-reviewed-benchmark",
+      "benchmark": "AgentAbstain",
+      "benchmark_revision": "NeurIPS 2026 Evaluations & Datasets Track; 263 paired tasks / 42 executable environments",
+      "metric": "paired act-vs-abstain accuracy",
+      "value_percent": 59.5,
+      "answer_model": "17 frontier LLMs; best observed model",
+      "judge": "Deterministic environment commit/withhold check plus response judge",
+      "reported_date": "2026",
+      "sample_size": 263,
+      "secondary_metrics": {
+        "abstention_scenarios": 8,
+        "executable_environments": 42,
+        "tools": 541,
+        "task_design": "near-identical paired cases with one small decisive difference",
+        "human_annotator_soundness_percent_min": 94,
+        "human_annotator_soundness_percent_max": 98
+      },
+      "evidence_grade": "peer-reviewed-benchmark-primary-source",
+      "comparison_notes": "AgentAbstain evaluates whether tool-using agents know when not to act, with pre-execution and runtime abstention triggers. Only successful abstention (tool withheld and user informed) is credited. This is a broader agent-action benchmark, not memory QA or LifeEM.",
+      "source": "https://agentabstain.github.io/"
+    },
+    {
+      "id": "evidence-sufficiency-benchmark-cmc-2026",
+      "system": "Evidence Sufficiency Benchmark",
+      "category": "peer-reviewed-benchmark",
+      "benchmark": "Evidence Sufficiency Benchmark (ESB)",
+      "benchmark_revision": "2026; five-level L1-L5 evidence quality gradient",
+      "metric": "over-answer rate under L5 conflicting evidence",
+      "value_percent": null,
+      "answer_model": "Seven LLMs from five model families; three prompting strategies",
+      "judge": "Automatic evidence-sufficiency evaluation with 200-sample human validation",
+      "reported_date": "2026-08-13",
+      "sample_size": 200,
+      "secondary_metrics": {
+        "evidence_levels": [
+          "L1 Full Support",
+          "L2 Partial Support",
+          "L3 Irrelevant Evidence",
+          "L4 Absent Evidence",
+          "L5 Conflicting Evidence"
+        ],
+        "l5_over_answer_rate_percent_min": 65,
+        "l5_over_answer_rate_percent_max": 91,
+        "human_validation_samples": 200
+      },
+      "evidence_grade": "peer-reviewed-benchmark-primary-source",
+      "comparison_notes": "This benchmark focuses on evidence sufficiency and answer-abstention calibration. The 65-91% range is over-answering under conflicting evidence for the evaluated models, not a single pooled accuracy score. Use it as a failure-mode comparator for Broca's conflict and abstention policy.",
+      "source": "https://doi.org/10.32604/cmc.2026.086343"
     }
   ],
   "broca_targets": {
