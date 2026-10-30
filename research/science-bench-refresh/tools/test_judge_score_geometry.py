@@ -116,10 +116,19 @@ class JudgeScoreGeometryTests(unittest.TestCase):
         self.assertEqual(judge_judge["pair_count"], 3)
         self.assertEqual(judge_judge["defined_pair_count"], 0)
         self.assertEqual(judge_judge["undefined_pair_count"], 3)
-        self.assertIsNone(judge_judge["mean_pairwise_correlation"])
+        self.assertIsNone(judge_judge["mean_pairwise_pearson"])
+        self.assertIsNone(judge_judge["mean_pairwise_spearman"])
         self.assertFalse(report["judge_leading_axis_identifiable"])
         self.assertIsNone(report["leading_axis_angle_degrees"])
         self.assertIsNone(report["judge_effective_rank"])
+
+    def test_spearman_is_reported_separately_from_pearson(self) -> None:
+        report = analyze_score_geometry(encode(make_input(aligned=True)))
+        pairwise = report["pairwise_agreement"]["judge_human"]
+        self.assertEqual(pairwise["pair_count"], 9)
+        self.assertEqual(pairwise["defined_pair_count"], 9)
+        self.assertEqual(pairwise["spearman_defined_pair_count"], 9)
+        self.assertAlmostEqual(pairwise["mean_pairwise_spearman"], 1.0, places=12)
 
     def test_item_cluster_bootstrap_is_deterministic(self) -> None:
         payload = encode(make_input(bootstrap_resamples=120))
