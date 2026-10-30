@@ -72,12 +72,12 @@ V1 requires `candidate_sampling_policy = full_census`. A sampled audit can produ
 
 ## 4. Blinded semantic adjudication
 
-Every candidate receives exactly the preregistered fixed number of distinct reviewers (3–7). Each reviewer supplies one of:
+Every candidate receives exactly the preregistered fixed number of distinct reviewers (3–7), recorded as `reviewers_per_candidate` rather than a minimum. Each reviewer is blind to the declared intended relation as well as generator identity, pipeline disposition and evaluator outcome. This matters because a panel that knows the generator's claim can unconsciously confirm it. Each reviewer supplies one of:
 - `meaning_preserving`;
 - `meaning_changing`;
 - `ambiguous`.
 
-Reviewers must be blind to generator identity, pipeline disposition and evaluator outcome. Each review carries a reviewer pseudonym digest and an adjudication-artifact digest.
+Reviewers must be blind to generator identity, the declared intended relation, pipeline disposition and evaluator outcome. Each review carries a reviewer pseudonym digest and an adjudication-artifact digest.
 
 A relation is adjudicated only when one verdict reaches the preregistered consensus threshold. A 666-permille threshold permits a two-of-three panel majority. A tie or insufficient consensus yields `ambiguous`.
 
