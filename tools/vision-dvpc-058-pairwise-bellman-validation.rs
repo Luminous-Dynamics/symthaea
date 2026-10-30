@@ -239,51 +239,6 @@ fn pi_h(world: &World, h: &[[f64; ACTIONS]; STATES], state: usize) -> f64 {
         .sum()
 }
 
-fn candidate_bellman_moment(
-    world: &World,
-    left: &QFunction,
-    right: &QFunction,
-) -> f64 {
-    let mut moment = 0.0;
-    for state in 0..STATES {
-        for action in 0..ACTIONS {
-            let h = left.value(state, action) - right.value(state, action);
-            moment += world.nu(state, action) * h
-                * bellman_residual_mean(world, left, state, action);
-        }
-    }
-    moment
-}
-
-fn candidate_penalty_quadratic(
-    world: &World,
-    left: &QFunction,
-    right: &QFunction,
-) -> f64 {
-    let mut penalty = 0.0;
-    for state in 0..STATES {
-        for action in 0..ACTIONS {
-            let h = left.value(state, action) - right.value(state, action);
-            let expected_next = (0..STATES)
-                .map(|next| {
-                    world.transition[state][action][next]
-                        * pi_h(
-                            world,
-                            &std::array::from_fn(|s| {
-                                std::array::from_fn(|a| {
-                                    left.value(s, a) - right.value(s, a)
-                                })
-                            }),
-                            next,
-                        )
-                })
-                .sum::<f64>();
-            penalty += world.nu(state, action) * h * (h - world.gamma * expected_next);
-        }
-    }
-    penalty
-}
-
 fn exact_offline_q_error(world: &World, q: &QFunction, truth: &QFunction) -> f64 {
     let mut error = 0.0;
     for state in 0..STATES {
@@ -474,11 +429,6 @@ fn fit_candidates(world: &World, training: &[Transition]) -> Vec<QFunction> {
     });
     candidates.push(QFunction { name: "large_perturbation", values });
     candidates
-}
-
-fn sample_target_q(world: &World, q: &QFunction, state: usize, action: usize) -> f64 {
-    let _ = world;
-    q.value(state, action)
 }
 
 fn empirical_td_losses(world: &World, candidates: &[QFunction], validation: &[Transition]) -> Vec<f64> {
