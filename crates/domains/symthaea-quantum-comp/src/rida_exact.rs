@@ -764,6 +764,33 @@ mod tests {
     }
 
     #[test]
+    fn finite_model_class_observations_can_select_both_signs_as_erm() {
+        let model_predictions = [-1.0_f64, 1.0, 3.0];
+        let empirical_erm = |observed: f64| {
+            model_predictions
+                .iter()
+                .enumerate()
+                .map(|(index, prediction)| {
+                    let residual = prediction - observed;
+                    (index, residual * residual)
+                })
+                .min_by(|left, right| left.1.total_cmp(&right.1))
+                .unwrap()
+                .0
+        };
+
+        assert_eq!(empirical_erm(-2.0), 0);
+        assert_eq!(empirical_erm(3.0), 2);
+
+        let offsetting =
+            evaluate_signed_interaction_oracle(-1.0, 1.0, 0.5).unwrap();
+        let reinforcing =
+            evaluate_signed_interaction_oracle(3.0, 1.0, 0.5).unwrap();
+        assert_eq!(offsetting.interaction, SignedErrorInteraction::Offsetting);
+        assert_eq!(reinforcing.interaction, SignedErrorInteraction::Reinforcing);
+    }
+
+    #[test]
     fn signed_interaction_oracle_rejects_non_finite_truth() {
         assert_eq!(
             evaluate_signed_interaction_oracle(1.0, 0.5, f64::NAN),
