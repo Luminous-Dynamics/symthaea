@@ -753,4 +753,15 @@ mod tests {
         assert!(evaluation.weighted_query_impact > 0.0);
         assert_eq!(evaluation.expected_weighted_query_impact, 0.0);
     }
+    #[test]
+    fn checked_in_query_impact_fixture_is_scored_and_flags_interacting_candidates() {
+        let input = parse_input(include_str!("../../../../docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json").as_bytes())
+            .expect("checked-in query-impact fixture parses");
+        let report = score(&input, "0".repeat(64)).expect("query-impact fixture scores");
+        assert_eq!(report.candidate_count, 3);
+        assert!(report.candidate_evaluations.iter().any(|item| item.candidate_id == "remove_second_leg"
+            && item.overlaps_with_candidates == vec!["remove_part_of_second_leg".to_string()]));
+        assert_eq!(report.status, "RANKED_FOR_HUMAN_REVIEW_ONLY");
+    }
+
 }
