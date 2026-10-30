@@ -1,0 +1,119 @@
+name: CMAQ-008 sequential support-drift revocation benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/cmaq-008/**"
+      - ".github/workflows/cmaq-008.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "research/cmaq-008/**"
+      - ".github/workflows/cmaq-008.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  support-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-008
+        run: cargo test --locked
+      - name: Generate report and check pre-registered invariants
+        working-directory: research/cmaq-008
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-008-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-008-report.json").read_text())
+          assert report["schema_version"] == "cmaq-008-sequential-support-drift-v0.2"
+          assert report["episode_count"] == 512
+          assert report["horizon"] == 128
+          assert report["cusum_threshold"] == 5.0
+          assert report["null_unsupported_rate"] == 0.01
+          assert report["shifted_unsupported_rate"] == 0.25
+          assert report["scenarios"] == ["stationary", "abrupt_support_shift", "gradual_support_shift", "delayed_abrupt_support_shift", "noisy_stationary_feedback"]
+          assert report["policies"] == ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "integrity_witnessed_cusum", "oracle_changepoint"]
+
+          rows = report["summary"]
+          assert len(rows) == 30
+          by_key = {(row["scenario"], row["policy"]): row for row in rows}
+          assert len(by_key) == len(rows)
+          for scenario in report["scenarios"]:
+              for policy in report["policies"]:
+                  row = by_key[(scenario, policy)]
+                  assert row["episode_count"] == 512
+                  for key in [
+                      "mean_utility", "mean_utility_delta_vs_fixed",
+                      "utility_delta_ci95_low", "utility_delta_ci95_high",
+                      "model_action_coverage", "unsupported_rate_per_model_action",
+                      "unsupported_actions_per_1000_decisions", "feedback_mismatch_rate", "feedback_records_per_decision", "revocation_episode_rate",
+                      "false_revocation_episode_rate", "shift_detection_coverage",
+                      "mean_regret_vs_oracle", "cvar95_regret_vs_oracle", "max_regret_vs_oracle",
+                  ]:
+                      assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+                  assert 0.0 <= row["model_action_coverage"] <= 1.0
+                  assert 0.0 <= row["unsupported_rate_per_model_action"] <= 1.0
+                  assert 0.0 <= row["shift_detection_coverage"] <= 1.0
+                  assert 0.0 <= row["revocation_episode_rate"] <= 1.0
+                  assert 0.0 <= row["false_revocation_episode_rate"] <= 1.0
+                  assert row["cvar95_regret_vs_oracle"] + 1e-8 >= row["mean_regret_vs_oracle"]
+                  assert row["max_regret_vs_oracle"] + 1e-8 >= row["cvar95_regret_vs_oracle"]
+
+          for scenario in report["scenarios"]:
+              assert by_key[(scenario, "direct_fallback")]["model_action_coverage"] == 0.0
+              assert by_key[(scenario, "direct_fallback")]["unsupported_actions_per_1000_decisions"] == 0.0
+              assert by_key[(scenario, "fixed_gate")]["model_action_coverage"] == 1.0
+              assert by_key[(scenario, "fixed_gate")]["revocation_episode_rate"] == 0.0
+          # Preserve the observed miss against the preregistered 5% false-revocation target.
+          # A green smoke workflow validates the measurement and reports the miss; it does not
+          # relabel a failed performance hypothesis as a pass.
+          assert 0.05 < by_key[("stationary", "cusum_revocable_gate")]["false_revocation_episode_rate"] <= 0.10
+          assert 0.05 < by_key[("stationary", "integrity_witnessed_cusum")]["false_revocation_episode_rate"] <= 0.10
+          assert by_key[("stationary", "first_unsupported_revoke")]["false_revocation_episode_rate"] > by_key[("stationary", "cusum_revocable_gate")]["false_revocation_episode_rate"]
+          assert by_key[("noisy_stationary_feedback", "cusum_revocable_gate")]["false_revocation_episode_rate"] > 0.50
+          assert by_key[("noisy_stationary_feedback", "integrity_witnessed_cusum")]["false_revocation_episode_rate"] <= 0.10
+          assert by_key[("noisy_stationary_feedback", "integrity_witnessed_cusum")]["false_revocation_episode_rate"] < by_key[("noisy_stationary_feedback", "cusum_revocable_gate")]["false_revocation_episode_rate"]
+          assert by_key[("noisy_stationary_feedback", "fixed_gate")]["feedback_mismatch_rate"] > 0.07
+          assert by_key[("noisy_stationary_feedback", "integrity_witnessed_cusum")]["feedback_records_per_decision"] > by_key[("noisy_stationary_feedback", "cusum_revocable_gate")]["feedback_records_per_decision"]
+          abrupt_cusum = by_key[("abrupt_support_shift", "cusum_revocable_gate")]
+          abrupt_fixed = by_key[("abrupt_support_shift", "fixed_gate")]
+          assert abrupt_cusum["shift_detection_coverage"] >= 0.90
+          # Keep the p90<=16 target visible as unmet on this fixed tape.
+          assert abrupt_cusum["p90_detection_delay_steps"] > 16.0
+          assert abrupt_cusum["mean_utility_delta_vs_fixed"] > 0.0
+          assert abrupt_cusum["utility_delta_ci95_low"] > 0.0
+          assert abrupt_fixed["unsupported_rate_per_model_action"] > by_key[("stationary", "fixed_gate")]["unsupported_rate_per_model_action"]
+          delayed_cusum = by_key[("delayed_abrupt_support_shift", "cusum_revocable_gate")]
+          assert delayed_cusum["p90_detection_delay_steps"] > abrupt_cusum["p90_detection_delay_steps"]
+          assert delayed_cusum["shift_detection_coverage"] >= 0.80
+          print("CMAQ-008 v0.2 schema and report contract validated; target misses for <=5% stationary false revocation and <=16-step p90 delay are deliberately preserved")
+          print(json.dumps({
+              scenario: {
+                  policy: {
+                      "mean_utility": by_key[(scenario, policy)]["mean_utility"],
+                      "delta_vs_fixed": by_key[(scenario, policy)]["mean_utility_delta_vs_fixed"],
+                      "delta_ci95": [by_key[(scenario, policy)]["utility_delta_ci95_low"], by_key[(scenario, policy)]["utility_delta_ci95_high"]],
+                      "coverage": by_key[(scenario, policy)]["model_action_coverage"],
+                      "unsupported_rate": by_key[(scenario, policy)]["unsupported_rate_per_model_action"],
+                      "false_revocation": by_key[(scenario, policy)]["false_revocation_episode_rate"],
+                      "detection": by_key[(scenario, policy)]["shift_detection_coverage"],
+                      "p90_delay": by_key[(scenario, policy)]["p90_detection_delay_steps"],
+                      "cvar95": by_key[(scenario, policy)]["cvar95_regret_vs_oracle"],
+                  }
+                  for scenario in report["scenarios"]
+                  for policy in report["policies"]
+                  if policy in ["direct_fallback", "fixed_gate", "first_unsupported_revoke", "cusum_revocable_gate", "integrity_witnessed_cusum", "oracle_changepoint"]
+              }
+          }, sort_keys=True))
+          PY
