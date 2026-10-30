@@ -1,0 +1,169 @@
+{
+  "schema_version": "broca-retrieval-value-fixtures-v1",
+  "policy_version": "BROCA-RETRIEVAL-VOI-V1",
+  "created_at": "2026-10-30",
+  "utility_unit": "micro-utility units defined by utility_schema_sha256",
+  "source_protocol": "Synthetic deterministic fixtures for conservative retrieval continuation: expected correctness gain LCB plus lifecycle risk-reduction LCB minus retrieval harm UCB and retrieval cost.",
+  "case_count": 10,
+  "cases": [
+    {
+      "id": "positive_gain",
+      "correctness_gain_lcb_micro": 900,
+      "lifecycle_risk_reduction_lcb_micro": 300,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 400,
+      "remaining_calls": 2,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C1",
+        "C2"
+      ],
+      "expected_net_value_micro": 700,
+      "expected_action": "retrieve_more",
+      "expected_reason": "positive_conservative_net_value"
+    },
+    {
+      "id": "equal_to_margin",
+      "correctness_gain_lcb_micro": 300,
+      "lifecycle_risk_reduction_lcb_micro": 200,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 300,
+      "remaining_calls": 2,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C1"
+      ],
+      "expected_net_value_micro": 100,
+      "expected_action": "stop",
+      "expected_reason": "net_value_below_minimum_margin"
+    },
+    {
+      "id": "retrieval_harm_dominates",
+      "correctness_gain_lcb_micro": 50,
+      "lifecycle_risk_reduction_lcb_micro": 20,
+      "retrieval_harm_ucb_micro": 500,
+      "retrieval_cost_micro": 100,
+      "remaining_calls": 2,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 0,
+      "unresolved_required_claim_ids": [
+        "C1"
+      ],
+      "expected_net_value_micro": -530,
+      "expected_action": "stop",
+      "expected_reason": "net_value_below_minimum_margin"
+    },
+    {
+      "id": "budget_exceeded",
+      "correctness_gain_lcb_micro": 2000,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 50,
+      "retrieval_cost_micro": 1200,
+      "remaining_calls": 2,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C1"
+      ],
+      "expected_net_value_micro": 1250,
+      "expected_action": "stop",
+      "expected_reason": "retrieval_cost_exceeds_remaining_budget"
+    },
+    {
+      "id": "calls_exhausted",
+      "correctness_gain_lcb_micro": 2000,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 50,
+      "retrieval_cost_micro": 100,
+      "remaining_calls": 0,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C1"
+      ],
+      "expected_net_value_micro": 2350,
+      "expected_action": "stop",
+      "expected_reason": "no_remaining_calls"
+    },
+    {
+      "id": "no_unresolved_claims",
+      "correctness_gain_lcb_micro": 900,
+      "lifecycle_risk_reduction_lcb_micro": 300,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 400,
+      "remaining_calls": 2,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [],
+      "expected_net_value_micro": 700,
+      "expected_action": "stop",
+      "expected_reason": "no_unresolved_required_claims"
+    },
+    {
+      "id": "lifecycle_risk_reduction",
+      "correctness_gain_lcb_micro": 0,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 50,
+      "retrieval_cost_micro": 100,
+      "remaining_calls": 1,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C7"
+      ],
+      "expected_net_value_micro": 350,
+      "expected_action": "retrieve_more",
+      "expected_reason": "positive_conservative_net_value"
+    },
+    {
+      "id": "exact_budget_boundary",
+      "correctness_gain_lcb_micro": 500,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 1000,
+      "remaining_calls": 1,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C8"
+      ],
+      "expected_net_value_micro": -100,
+      "expected_action": "stop",
+      "expected_reason": "net_value_below_minimum_margin"
+    },
+    {
+      "id": "threshold_too_high",
+      "correctness_gain_lcb_micro": 600,
+      "lifecycle_risk_reduction_lcb_micro": 200,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 400,
+      "remaining_calls": 1,
+      "remaining_budget_micro": 900,
+      "minimum_net_value_micro": 500,
+      "unresolved_required_claim_ids": [
+        "C9"
+      ],
+      "expected_net_value_micro": 300,
+      "expected_action": "stop",
+      "expected_reason": "net_value_below_minimum_margin"
+    },
+    {
+      "case_id": "exact_budget_positive_net",
+      "correctness_gain_lcb_micro": 2500,
+      "lifecycle_risk_reduction_lcb_micro": 500,
+      "retrieval_harm_ucb_micro": 100,
+      "retrieval_cost_micro": 1000,
+      "remaining_calls": 1,
+      "remaining_budget_micro": 1000,
+      "minimum_net_value_micro": 100,
+      "unresolved_required_claim_ids": [
+        "C10"
+      ],
+      "expected_net_value_micro": 1900,
+      "expected_action": "retrieve_more",
+      "expected_reason": "positive_conservative_net_value"
+    }
+  ]
+}

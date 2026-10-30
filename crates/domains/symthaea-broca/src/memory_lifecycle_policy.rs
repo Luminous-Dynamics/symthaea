@@ -322,6 +322,10 @@ pub struct LifecycleRetrievalProgress {
     pub complete: bool,
     pub can_continue: bool,
     pub remaining_calls: u32,
+    /// Optional deterministic receipt from the calibrated retrieval value gate.
+    /// When present, it is included in the final lifecycle action digest.
+    #[serde(default)]
+    pub value_decision_sha256: Option<String>,
 }
 
 impl LifecycleRetrievalProgress {
@@ -334,6 +338,9 @@ impl LifecycleRetrievalProgress {
         }
         if self.can_continue && self.remaining_calls == 0 {
             return Err("retrieval continuation requires a positive remaining-call budget".into());
+        }
+        if let Some(value_digest) = &self.value_decision_sha256 {
+            validate_sha256(value_digest, "retrieval value decision digest")?;
         }
         Ok(())
     }
@@ -740,6 +747,9 @@ mod tests {
     use crate::memory_proof_budget::{
         ProofEvidenceCandidate, ProofJustification, ProofObligation, solve_proof_budget,
     };
+    use crate::memory_retrieval_value::{
+        RetrievalUtilityEstimate, evaluate_retrieval_value,
+    };
 
     fn digest(value: &str) -> String {
         format!("{:x}", Sha256::digest(value.as_bytes()))
@@ -812,7 +822,8 @@ mod tests {
         LifecycleRetrievalProgress {
             complete,
             can_continue,
-            remaining_calls: if can_continue { 2 } else { 0 },
+            remaining_calls: if complete { 0 } else if can_continue { 2 } else { 1 },
+            value_decision_sha256: None,
         }
     }
 
@@ -871,6 +882,38 @@ mod tests {
             },
             retrieval,
             required_claims: claims,
+        }
+    }
+
+    fn retrieval_value_estimate(unresolved: BTreeSet<String>) -> RetrievalUtilityEstimate {
+        RetrievalUtilityEstimate {
+            estimate_id: "voi-estimate-1".into(),
+            decision_id: "decision-1".into(),
+            principal_id: "principal-1".into(),
+            scope_id: "scope-1".into(),
+            valid_at_unix_ms: 200,
+            known_at_unix_ms: 300,
+            evidence_index_state_sha256: digest("evidence index state"),
+            unresolved_claims_sha256: RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap(),
+            unresolved_required_claim_ids: unresolved,
+            calibration_method_sha256: digest("BROCA-GROUP-CONFORMAL-VOI-V1"),
+            calibration_joint_coverage_percent: 90,
+            estimator_id: "test-estimator".into(),
+            estimator_version: "v1".into(),
+            estimator_sha256: digest("estimator"),
+            calibration_split_sha256: digest("heldout split"),
+            feature_schema_sha256: digest("feature schema"),
+            utility_schema_sha256: digest("utility schema"),
+            correctness_gain_prediction_micro: 900,
+            correctness_gain_lcb_micro: 900,
+            lifecycle_risk_reduction_prediction_micro: 300,
+            lifecycle_risk_reduction_lcb_micro: 300,
+            retrieval_harm_prediction_micro: 100,
+            retrieval_harm_ucb_micro: 100,
+            retrieval_cost_micro: 400,
+            remaining_calls: 2,
+            remaining_budget_micro: 1000,
+            minimum_net_value_micro: 100,
         }
     }
 
@@ -1285,6 +1328,59 @@ mod tests {
             }
         }
         assert_eq!(evaluated, 60);
+    }
+
+    #[test]
+    fn lifecycle_action_receipt_commits_to_retrieval_value_decision() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let value_decision = evaluate_retrieval_value(
+            retrieval_value_estimate(unresolved),
+        ).unwrap();
+        let progress = value_decision.to_lifecycle_progress().unwrap();
+        assert!(progress.can_continue);
+        assert_eq!(
+            progress.value_decision_sha256.as_deref(),
+            Some(value_decision.decision_sha256.as_str())
+        );
+
+        let request = request(
+            ProofVerificationState::NoEligibleProof,
+            vec![missing_claim("C1")],
+            progress,
+        );
+        let decision = decide_with_test_token(request).unwrap();
+        assert_eq!(decision.action, LifecycleAction::RetrieveMore);
+        decision.verify_internal_consistency().unwrap();
+
+        let mut altered = decision.clone();
+        altered.retrieval.value_decision_sha256 = Some(digest("different VOI result"));
+        assert!(altered
+            .verify_internal_consistency()
+            .unwrap_err()
+            .contains("SHA-256 mismatch"));
+    }
+
+    #[test]
+    fn lifecycle_stops_early_when_value_gate_says_not_worthwhile() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let mut estimate = retrieval_value_estimate(unresolved);
+        estimate.correctness_gain_lcb_micro = 10;
+        estimate.lifecycle_risk_reduction_lcb_micro = 0;
+        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let progress = value_decision.to_lifecycle_progress().unwrap();
+
+        assert!(!progress.complete);
+        assert!(!progress.can_continue);
+        assert_eq!(progress.remaining_calls, 2);
+
+        let decision = decide_with_test_token(request(
+            ProofVerificationState::NoEligibleProof,
+            vec![missing_claim("C1")],
+            progress,
+        )).unwrap();
+        assert_eq!(decision.action, LifecycleAction::Abstain);
+        assert_eq!(decision.retrieval.remaining_calls, 2);
+        assert!(decision.retrieval.value_decision_sha256.is_some());
     }
 
     #[test]

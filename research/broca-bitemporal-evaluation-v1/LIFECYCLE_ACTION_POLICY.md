@@ -127,3 +127,15 @@ The production generation loop is not yet wired to call this controller. No Life
 The file [lifecycle-action-fixtures-v1.json](lifecycle-action-fixtures-v1.json) contains 60 deterministic cases: five non-verified proof outcomes × six claim lifecycle states × two retrieval states (exhausted / continuation available). Each row carries the expected action. The Rust test suite reads this checked-in file using compile-time inclusion and asserts the policy output for every case. A separate real-proof integration test covers ANSWER, which is intentionally excluded from the synthetic table because it must be authorized by an actual independently verified packet and opaque token.
 
 The fixture corpus is a policy-conformance suite, not a substitute for Vera-Life-Eval. It contains no natural-language answer generation, hidden evidence chronology or human annotation; it only makes the deterministic controller truth table reusable and versioned.
+
+## Budget-aware RETRIEVE_MORE decisions
+
+The lifecycle policy's retrieval-progress field can be populated by the separate [RETRIEVAL_VALUE_OF_INFORMATION.md](RETRIEVAL_VALUE_OF_INFORMATION.md) gate. It evaluates lower-bound correctness gain plus lifecycle-risk reduction against upper-bound retrieval harm, measured cost, remaining budget and a minimum net-value margin. Its SHA-256 decision receipt is carried into the lifecycle action digest. Early stopping preserves unused calls and is not reported as budget exhaustion.
+
+Use the versioned [retrieval-value-fixtures-v1.json](retrieval-value-fixtures-v1.json) corpus to validate the deterministic utility gate. The estimate itself must come from a held-out-calibrated upstream estimator; the gate does not train or authenticate that estimator.
+
+## Canonical VOI orchestration
+
+The supported orchestration entry point is `decide_lifecycle_action_with_voi`. It takes the lifecycle claim ledger, the optional opaque proof-verifier capability, a calibrated `RetrievalValueDecision`, and the typed `EvidenceIndexSnapshotReceipt` used by the matching retrieval run. It derives unresolved claims itself and rejects estimates for a different principal, scope, `valid_at`, `known_at`, evidence-index digest or unresolved-claim set. It then embeds the VOI decision SHA into the lifecycle action receipt before selecting the action.
+
+A `RETRIEVE_MORE` decision requires another snapshot-bound retrieval and a fresh value estimate after claim coverage is recomputed. A VOI `Stop` preserves unused call budget and leads to the applicable terminal action—typically `WARN_STALE`, `EXPLAIN_CONFLICT` or `ABSTAIN` when proof is missing. It never upgrades the claim ledger or independently authorizes `ANSWER`.
