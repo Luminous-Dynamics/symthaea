@@ -61,12 +61,12 @@ jobs:
                   for key in [
                       "mean_return", "paired_delta_vs_direct", "delta_ci95_low",
                       "delta_ci95_high", "cvar95_return", "success_rate",
-                      "mean_conditional_regret_per_step", "action_disagreement_rate",
+                      "mean_conditional_regret_per_step", "action_deviation_from_direct_rate",
                       "mean_model_queries_per_episode"
                   ]:
                       assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
                   assert 0.0 <= row["success_rate"] <= 1.0
-                  assert 0.0 <= row["action_disagreement_rate"] <= 1.0
+                  assert 0.0 <= row["action_deviation_from_direct_rate"] <= 1.0
                   assert row["delta_ci95_low"] <= row["paired_delta_vs_direct"] <= row["delta_ci95_high"]
                   assert row["mean_model_queries_per_episode"] <= 2 * report["horizon"]
 
