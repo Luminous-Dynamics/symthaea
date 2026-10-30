@@ -1687,6 +1687,11 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         seed ^ 0x0580_c011_2026_1030,
     )?);
     output.push_str(&entropy_stopping_benchmark_rows()?);
+    if replicates <= 2 {
+        output.push_str(&selection_regret_benchmark_rows_with_config(2, 12, 4, 24)?);
+    } else {
+        output.push_str(&selection_regret_benchmark_rows()?);
+    }
     Ok(output)
 }
 
@@ -2658,6 +2663,340 @@ fn entropy_stopping_benchmark_rows() -> Result<String, String> {
     Ok(output)
 }
 
+const REGRET_SAA_REPLICATES: usize = 8;
+const REGRET_SAA_EVALUATION_N: usize = 32;
+const REGRET_HOLDOUT_REPLICATES: usize = 1024;
+const REGRET_HOLDOUT_EVALUATION_N: usize = EVAL_N;
+
+#[derive(Clone, Copy, Debug)]
+struct SelectionRegretExactResult {
+    allocation: Allocation,
+    objective: f64,
+    combinations_checked: usize,
+}
+
+/// Worst profile expected simple regret under a fixed simulation bank.
+/// Every candidate allocation receives the same replicate seed bank (common
+/// random numbers), reducing Monte Carlo noise in pairwise allocation ranking.
+fn sample_average_worst_profile_regret(
+    allocation: &Allocation,
+    profiles: &[ProfileScenario],
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+    replicates: usize,
+    seed: u64,
+) -> Result<f64, String> {
+    if profiles.is_empty() || replicates == 0 || evaluation_n == 0 {
+        return Err("selection-regret SAA requires profiles, replicates, and evaluation events".into());
+    }
+    let mut worst = 0.0_f64;
+    for (profile_index, profile) in profiles.iter().enumerate() {
+        let metrics = multi_policy_monte_carlo(
+            &profile.world,
+            allocation,
+            portfolio,
+            evaluation_n,
+            replicates,
+            seed ^ (profile_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+        );
+        worst = worst.max(metrics.expected_simple_regret);
+    }
+    if worst.is_finite() {
+        Ok(worst)
+    } else {
+        Err("non-finite sample-average selection regret".into())
+    }
+}
+
+/// Exhaustive minimizer of the fixed finite common-random-number simulation
+/// bank objective. This is exact for the SAA objective, not for population
+/// expected regret; independent holdout evaluation is mandatory.
+fn exact_saa_selection_regret_allocation(
+    allocation_world: &World,
+    profiles: &[ProfileScenario],
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+    replicates: usize,
+    seed: u64,
+) -> Result<SelectionRegretExactResult, String> {
+    allocation_world.validate()?;
+    validate_portfolio(portfolio)?;
+    if profiles.is_empty() {
+        return Err("selection-regret oracle requires profiles".into());
+    }
+    let left = enumerate_context_options(allocation_world, 0, [true; SOURCES]);
+    let right = enumerate_context_options(allocation_world, 1, [true; SOURCES]);
+    let mut best_score = f64::INFINITY;
+    let mut best_allocation = Allocation::default();
+    let mut combinations_checked = 0usize;
+
+    for left_option in &left {
+        for right_option in &right {
+            if left_option.cost + right_option.cost > allocation_world.budget {
+                continue;
+            }
+            let mut allocation = Allocation::default();
+            allocation.counts[0] = left_option.counts;
+            allocation.counts[1] = right_option.counts;
+            if !allocation.feasible(allocation_world) {
+                return Err("SAA oracle constructed infeasible allocation".into());
+            }
+            combinations_checked += 1;
+            let score = sample_average_worst_profile_regret(
+                &allocation,
+                profiles,
+                portfolio,
+                evaluation_n,
+                replicates,
+                seed,
+            )?;
+            if score + EPS < best_score {
+                best_score = score;
+                best_allocation = allocation;
+            }
+        }
+    }
+    if !best_score.is_finite() {
+        return Err("SAA selection-regret oracle found no feasible plan".into());
+    }
+    Ok(SelectionRegretExactResult {
+        allocation: best_allocation,
+        objective: best_score,
+        combinations_checked,
+    })
+}
+
+fn greedy_saa_selection_regret_allocate(
+    world: &World,
+    profiles: &[ProfileScenario],
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+    replicates: usize,
+    seed: u64,
+) -> Result<Allocation, String> {
+    let mut allocation = Allocation::default();
+    loop {
+        let current = sample_average_worst_profile_regret(
+            &allocation,
+            profiles,
+            portfolio,
+            evaluation_n,
+            replicates,
+            seed,
+        )?;
+        let mut best: Option<(f64, Allocation)> = None;
+        for context in 0..CONTEXTS {
+            for action in 0..ACTIONS {
+                for source in 0..SOURCES {
+                    let mut candidate = allocation;
+                    candidate.counts[context][action][source] += 1;
+                    if !candidate.feasible(world) {
+                        continue;
+                    }
+                    let next = sample_average_worst_profile_regret(
+                        &candidate,
+                        profiles,
+                        portfolio,
+                        evaluation_n,
+                        replicates,
+                        seed,
+                    )?;
+                    let gain_per_cost =
+                        (current - next).max(0.0) / world.source_cost[source] as f64;
+                    if gain_per_cost > EPS
+                        && best.is_none_or(|(best_gain, _)| gain_per_cost > best_gain + EPS)
+                    {
+                        best = Some((gain_per_cost, candidate));
+                    }
+                }
+            }
+        }
+        match best {
+            Some((_, candidate)) => allocation = candidate,
+            None => break,
+        }
+    }
+    Ok(allocation)
+}
+
+fn selection_regret_benchmark_rows_with_config(
+    saa_replicates: usize,
+    saa_evaluation_n: usize,
+    holdout_replicates: usize,
+    holdout_evaluation_n: usize,
+) -> Result<String, String> {
+    if saa_replicates == 0 || saa_evaluation_n == 0 || holdout_replicates == 0 || holdout_evaluation_n == 0 {
+        return Err("selection-regret benchmark config must be positive".into());
+    }
+    let world = correlated_stress_worlds()[1];
+    let portfolio = policy_portfolio(&world);
+    let profiles = coherent_profile_scenarios(&world)?;
+    let saa_seed = 0x0600_5aa0_2026_1030;
+    let holdout_seed = 0x0600_001d_2026_1030_u64;
+
+    let balanced_world = world_with_target(&world, portfolio.targets[1]);
+    let balanced_single =
+        exact_dynamic_program(&balanced_world, [true; SOURCES])?.allocation;
+    let nominal_prior = exact_portfolio_allocation(
+        &world,
+        &portfolio,
+        PortfolioObjective::PriorWeighted,
+    )?;
+    let nominal_worst = exact_portfolio_allocation(
+        &world,
+        &portfolio,
+        PortfolioObjective::WorstPolicy,
+    )?;
+    let robust_mse = exact_robust_portfolio_allocation(
+        &world,
+        &profiles,
+        &portfolio,
+        RobustPortfolioObjective::WorstProfileWorstPolicy,
+    )?;
+    let greedy_regret = greedy_saa_selection_regret_allocate(
+        &world,
+        &profiles,
+        &portfolio,
+        saa_evaluation_n,
+        saa_replicates,
+        saa_seed,
+    )?;
+    let exact_regret = exact_saa_selection_regret_allocation(
+        &world,
+        &profiles,
+        &portfolio,
+        saa_evaluation_n,
+        saa_replicates,
+        saa_seed,
+    )?;
+
+    let plans = [
+        ("balanced_single_policy_exact", balanced_single),
+        ("nominal_prior_mse_exact", nominal_prior.allocation),
+        ("nominal_worst_mse_exact", nominal_worst.allocation),
+        ("coherent_robust_worst_mse_exact", robust_mse.allocation),
+        ("greedy_saa_selection_regret", greedy_regret),
+        ("exact_saa_selection_regret", exact_regret.allocation),
+    ];
+
+    let mut evaluated: Vec<(&'static str, Allocation, f64, Vec<MultiPolicyMetrics>)> =
+        Vec::with_capacity(plans.len());
+    for (method, allocation) in plans {
+        if !allocation.feasible(&world) {
+            return Err(format!("selection-regret plan is infeasible: {method}"));
+        }
+        let saa_regret = sample_average_worst_profile_regret(
+            &allocation,
+            &profiles,
+            &portfolio,
+            saa_evaluation_n,
+            saa_replicates,
+            saa_seed,
+        )?;
+        let mut holdout = Vec::with_capacity(profiles.len());
+        for (profile_index, profile) in profiles.iter().enumerate() {
+            holdout.push(multi_policy_monte_carlo(
+                &profile.world,
+                &allocation,
+                &portfolio,
+                holdout_evaluation_n,
+                holdout_replicates,
+                holdout_seed ^ (profile_index as u64).wrapping_mul(0x94d0_49bb_1331_11eb),
+            ));
+        }
+        evaluated.push((method, allocation, saa_regret, holdout));
+    }
+    let exact_holdout_worst = evaluated
+        .iter()
+        .find(|(method, _, _, _)| *method == "exact_saa_selection_regret")
+        .map(|(_, _, _, holdout)| {
+            holdout
+                .iter()
+                .map(|metrics| metrics.expected_simple_regret)
+                .fold(0.0_f64, f64::max)
+        })
+        .ok_or_else(|| "missing exact SAA plan holdout".to_string())?;
+
+    let mut output = String::new();
+    use std::fmt::Write;
+    let _ = writeln!(
+        output,
+        "REGRET_CONFIG\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
+        world.name,
+        profiles.len(),
+        saa_replicates,
+        saa_evaluation_n,
+        holdout_replicates,
+        holdout_evaluation_n,
+        exact_regret.combinations_checked,
+        saa_seed,
+        holdout_seed,
+    );
+
+    for (method, allocation, saa_regret, holdout) in evaluated {
+        let sources = allocation_sources(&allocation);
+        let saa_gap =
+            ((saa_regret - exact_regret.objective) / exact_regret.objective.max(EPS)).max(0.0);
+        let holdout_worst = holdout
+            .iter()
+            .map(|metrics| metrics.expected_simple_regret)
+            .fold(0.0_f64, f64::max);
+        for (profile_index, profile) in profiles.iter().enumerate() {
+            let metrics = holdout[profile_index];
+            let policy_mses =
+                portfolio_policy_mses(&profile.world, &allocation, &portfolio, EVAL_N)?;
+            let prior_mse = portfolio_objective(
+                &policy_mses,
+                &portfolio,
+                PortfolioObjective::PriorWeighted,
+            );
+            let worst_mse = portfolio_objective(
+                &policy_mses,
+                &portfolio,
+                PortfolioObjective::WorstPolicy,
+            );
+            let regret_gap_to_saa_holdout =
+                metrics.expected_simple_regret - exact_holdout_worst;
+            let _ = writeln!(
+                output,
+                "REGRET_RESULT\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{:.10}",
+                world.name,
+                profile.name,
+                method,
+                saa_replicates,
+                holdout_replicates,
+                world.budget,
+                allocation.cost(&world),
+                allocation.total_count(),
+                saa_regret,
+                saa_gap,
+                metrics.expected_simple_regret,
+                holdout_worst,
+                metrics.selection_accuracy,
+                prior_mse,
+                worst_mse,
+                policy_mses[0],
+                policy_mses[1],
+                policy_mses[2],
+                sources[0],
+                sources[1],
+                sources[2],
+                regret_gap_to_saa_holdout,
+            );
+        }
+    }
+    Ok(output)
+}
+
+fn selection_regret_benchmark_rows() -> Result<String, String> {
+    selection_regret_benchmark_rows_with_config(
+        REGRET_SAA_REPLICATES,
+        REGRET_SAA_EVALUATION_N,
+        REGRET_HOLDOUT_REPLICATES,
+        REGRET_HOLDOUT_EVALUATION_N,
+    )
+}
+
 fn main() {
     let smoke = env::args().any(|arg| arg == "--smoke");
     let replicates = if smoke {
@@ -3448,6 +3787,118 @@ mod tests {
     }
 
     #[test]
+    fn exact_selection_regret_saa_matches_independent_allocation_enumeration() {
+        let mut world = correlated_stress_worlds()[1];
+        world.context_annotation_cap = [1, 1];
+        world.budget = 2;
+        world.source_cost = [1; SOURCES];
+        world.validate().unwrap();
+        let portfolio = policy_portfolio(&world);
+        let profiles = [ProfileScenario {
+            name: "nominal_only",
+            world,
+        }];
+        let exact = exact_saa_selection_regret_allocation(
+            &world,
+            &profiles,
+            &portfolio,
+            12,
+            4,
+            0x0600_1111,
+        )
+        .unwrap();
+        let left = enumerate_context_options(&world, 0, [true; SOURCES]);
+        let right = enumerate_context_options(&world, 1, [true; SOURCES]);
+        let mut brute = f64::INFINITY;
+        let mut combinations = 0usize;
+        for left_option in &left {
+            for right_option in &right {
+                if left_option.cost + right_option.cost > world.budget {
+                    continue;
+                }
+                let mut allocation = Allocation::default();
+                allocation.counts[0] = left_option.counts;
+                allocation.counts[1] = right_option.counts;
+                let value = sample_average_worst_profile_regret(
+                    &allocation,
+                    &profiles,
+                    &portfolio,
+                    12,
+                    4,
+                    0x0600_1111,
+                )
+                .unwrap();
+                brute = brute.min(value);
+                combinations += 1;
+            }
+        }
+        assert_eq!(exact.combinations_checked, combinations);
+        assert!((exact.objective - brute).abs() < 1e-12);
+        assert!(exact.allocation.feasible(&world));
+    }
+
+    #[test]
+    fn selection_regret_saa_uses_reproducible_common_random_number_bank() {
+        let world = correlated_stress_worlds()[1];
+        let portfolio = policy_portfolio(&world);
+        let profiles = coherent_profile_scenarios(&world).unwrap();
+        let allocation = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap()
+        .allocation;
+        let first = sample_average_worst_profile_regret(
+            &allocation,
+            &profiles,
+            &portfolio,
+            24,
+            8,
+            0x0600_2222,
+        )
+        .unwrap();
+        let repeated = sample_average_worst_profile_regret(
+            &allocation,
+            &profiles,
+            &portfolio,
+            24,
+            8,
+            0x0600_2222,
+        )
+        .unwrap();
+        assert_eq!(first, repeated);
+        assert_ne!(0x0600_5aa0_2026_1030_u64, 0x0600_001d_2026_1030_u64);
+    }
+
+    #[test]
+    fn selection_regret_benchmark_separates_training_saa_from_holdout_results() {
+        let first = selection_regret_benchmark_rows_with_config(4, 16, 8, 32).unwrap();
+        let second = selection_regret_benchmark_rows_with_config(4, 16, 8, 32).unwrap();
+        assert_eq!(first, second);
+        let configs: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("REGRET_CONFIG\t"))
+            .collect();
+        let results: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("REGRET_RESULT\t"))
+            .collect();
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].split('\t').count(), 10);
+        assert_eq!(results.len(), 24);
+        for row in &results {
+            assert_eq!(row.split('\t').count(), 23);
+        }
+        let methods: Vec<_> = results
+            .iter()
+            .filter_map(|row| row.split('\t').nth(3))
+            .collect();
+        assert!(methods.contains(&"exact_saa_selection_regret"));
+        assert!(methods.contains(&"nominal_prior_mse_exact"));
+    }
+
+    #[test]
     fn entropy_stop_benchmark_outputs_deterministic_stepwise_risk_diagnostics() {
         let first = entropy_stopping_benchmark_rows().unwrap();
         let second = entropy_stopping_benchmark_rows().unwrap();
@@ -3597,6 +4048,20 @@ mod tests {
                 .filter(|line| line.starts_with("ENTROPY_STOP\t"))
                 .count(),
             3
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("REGRET_CONFIG\t"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("REGRET_RESULT\t"))
+                .count(),
+            24
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
