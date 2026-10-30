@@ -1163,6 +1163,70 @@ mod tests {
         assert!(decision.verify_internal_consistency().unwrap_err().contains("SHA-256 mismatch"));
     }
 
+    #[derive(serde::Deserialize)]
+    struct LifecycleActionFixtureFile {
+        schema_version: String,
+        policy_version: String,
+        case_count: usize,
+        cases: Vec<LifecycleActionFixtureCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct LifecycleActionFixtureCase {
+        case_id: String,
+        proof_status: ProofVerificationState,
+        claim_state: ClaimLifecycleState,
+        retrieval_complete: bool,
+        retrieval_can_continue: bool,
+        remaining_calls: u32,
+        expected_action: LifecycleAction,
+    }
+
+    #[test]
+    fn versioned_lifecycle_action_fixture_corpus_matches_controller() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/lifecycle-action-fixtures-v1.json"
+        );
+        let fixture: LifecycleActionFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-lifecycle-action-fixtures-v1");
+        assert_eq!(fixture.policy_version, LIFECYCLE_POLICY_VERSION);
+        assert_eq!(fixture.case_count, fixture.cases.len());
+        assert_eq!(fixture.case_count, 60);
+
+        for case in fixture.cases {
+            let claim = match case.claim_state {
+                ClaimLifecycleState::SupportedCurrent => supported_claim(&case.case_id),
+                ClaimLifecycleState::StaleOnly => stale_claim(&case.case_id),
+                ClaimLifecycleState::Conflicted => conflict_claim(&case.case_id),
+                ClaimLifecycleState::Missing => missing_claim(&case.case_id),
+                ClaimLifecycleState::Unauthorized => {
+                    rejected_claim(&case.case_id, ClaimLifecycleState::Unauthorized)
+                }
+                ClaimLifecycleState::ProvenanceInvalid => {
+                    rejected_claim(&case.case_id, ClaimLifecycleState::ProvenanceInvalid)
+                }
+            };
+            let retrieval = LifecycleRetrievalProgress {
+                complete: case.retrieval_complete,
+                can_continue: case.retrieval_can_continue,
+                remaining_calls: case.remaining_calls,
+            };
+            let decision = decide_with_test_token(request(
+                case.proof_status,
+                vec![claim],
+                retrieval,
+            )).unwrap();
+            assert_eq!(
+                decision.action,
+                case.expected_action,
+                "fixture case {} expected {:?}, got {:?}",
+                case.case_id,
+                case.expected_action,
+                decision.action
+            );
+        }
+    }
+
     #[test]
     fn exhaustive_lifecycle_action_truth_table_matches_policy_precedence() {
         let proof_states = [
