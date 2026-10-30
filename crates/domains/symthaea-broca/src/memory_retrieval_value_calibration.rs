@@ -43,6 +43,12 @@ pub struct RetrievalUtilityCalibrationObservation {
     /// Independent unit used for exchangeability and leakage-safe splitting.
     pub calibration_group_id: String,
     pub query_fingerprint_sha256: String,
+    /// Exact EvidenceIndex state used to form this paired outcome.
+    pub evidence_index_state_sha256: String,
+    /// The same frozen predictor must produce all calibration predictions.
+    pub estimator_sha256: String,
+    pub feature_schema_sha256: String,
+    pub utility_schema_sha256: String,
     pub predicted_correctness_gain_micro: i64,
     pub observed_correctness_gain_micro: i64,
     pub predicted_lifecycle_risk_reduction_micro: i64,
@@ -59,7 +65,16 @@ impl RetrievalUtilityCalibrationObservation {
         ] {
             require_non_empty(value, field)?;
         }
-        validate_sha256(&self.query_fingerprint_sha256, "query_fingerprint_sha256")
+        for (field, value) in [
+            ("query_fingerprint_sha256", self.query_fingerprint_sha256.as_str()),
+            ("evidence_index_state_sha256", self.evidence_index_state_sha256.as_str()),
+            ("estimator_sha256", self.estimator_sha256.as_str()),
+            ("feature_schema_sha256", self.feature_schema_sha256.as_str()),
+            ("utility_schema_sha256", self.utility_schema_sha256.as_str()),
+        ] {
+            validate_sha256(value, field)?;
+        }
+        Ok(())
     }
 }
 
@@ -69,6 +84,9 @@ pub struct CalibratedRetrievalUtilityBounds {
     pub calibration_method_version: String,
     pub calibration_method_sha256: String,
     pub calibration_split_sha256: String,
+    pub estimator_sha256: String,
+    pub feature_schema_sha256: String,
+    pub utility_schema_sha256: String,
     pub calibration_joint_coverage_percent: u8,
     pub independent_group_count: usize,
     pub observation_count: usize,
@@ -86,6 +104,15 @@ impl CalibratedRetrievalUtilityBounds {
         estimate: &mut RetrievalUtilityEstimate,
     ) -> Result<(), String> {
         self.verify_internal_consistency()?;
+        if estimate.estimator_sha256 != self.estimator_sha256 {
+            return Err("calibration estimator digest does not match runtime estimator".into());
+        }
+        if estimate.feature_schema_sha256 != self.feature_schema_sha256 {
+            return Err("calibration feature schema does not match runtime estimate".into());
+        }
+        if estimate.utility_schema_sha256 != self.utility_schema_sha256 {
+            return Err("calibration utility schema does not match runtime estimate".into());
+        }
         estimate.calibration_method_sha256 = self.calibration_method_sha256.clone();
         estimate.calibration_joint_coverage_percent = self.calibration_joint_coverage_percent;
         estimate.calibration_split_sha256 = self.calibration_split_sha256.clone();
@@ -110,6 +137,9 @@ impl CalibratedRetrievalUtilityBounds {
         }
         validate_sha256(&self.calibration_method_sha256, "calibration_method_sha256")?;
         validate_sha256(&self.calibration_split_sha256, "calibration_split_sha256")?;
+        validate_sha256(&self.estimator_sha256, "estimator_sha256")?;
+        validate_sha256(&self.feature_schema_sha256, "feature_schema_sha256")?;
+        validate_sha256(&self.utility_schema_sha256, "utility_schema_sha256")?;
         if self.calibration_joint_coverage_percent != JOINT_COVERAGE_PERCENT {
             return Err("calibration result does not carry the pinned 90% joint coverage target".into());
         }
@@ -174,6 +204,15 @@ pub fn calibrate_retrieval_utility_bounds(
         let harm_residual = i128::from(observation.observed_retrieval_harm_micro)
             - i128::from(observation.predicted_retrieval_harm_micro);
 
+        if let Some(first) = observations.first() {
+            if observation.estimator_sha256 != first.estimator_sha256
+                || observation.feature_schema_sha256 != first.feature_schema_sha256
+                || observation.utility_schema_sha256 != first.utility_schema_sha256
+            {
+                return Err("calibration observations mix estimator or utility schemas".into());
+            }
+        }
+
         grouped
             .entry(observation.calibration_group_id.clone())
             .and_modify(|residuals| {
@@ -223,6 +262,9 @@ pub fn calibrate_retrieval_utility_bounds(
         calibration_method_version: RETRIEVAL_UTILITY_CALIBRATION_VERSION.into(),
         calibration_method_sha256,
         calibration_split_sha256,
+        estimator_sha256: observations[0].estimator_sha256.clone(),
+        feature_schema_sha256: observations[0].feature_schema_sha256.clone(),
+        utility_schema_sha256: observations[0].utility_schema_sha256.clone(),
         calibration_joint_coverage_percent: JOINT_COVERAGE_PERCENT,
         independent_group_count: grouped.len(),
         observation_count: observations.len(),
@@ -306,6 +348,10 @@ mod tests {
             observation_id: format!("observation-{index}"),
             calibration_group_id: format!("document-group-{group}"),
             query_fingerprint_sha256: digest(&format!("query-{index}")),
+            evidence_index_state_sha256: digest(&format!("index-{group}")),
+            estimator_sha256: digest("frozen estimator"),
+            feature_schema_sha256: digest("frozen features"),
+            utility_schema_sha256: digest("frozen utility"),
             predicted_correctness_gain_micro: 100,
             observed_correctness_gain_micro: 100 + correctness_residual,
             predicted_lifecycle_risk_reduction_micro: 200,
@@ -446,6 +492,47 @@ mod tests {
     }
 
     #[test]
+    fn refuses_to_apply_bounds_from_a_different_estimator_or_utility_schema() {
+        let bounds = calibrate_retrieval_utility_bounds(&calibration_rows()).unwrap();
+        let mut estimate = RetrievalUtilityEstimate {
+            estimate_id: "estimate-1".into(),
+            decision_id: "decision-1".into(),
+            principal_id: "principal-1".into(),
+            scope_id: "scope-1".into(),
+            valid_at_unix_ms: 1,
+            known_at_unix_ms: 2,
+            evidence_index_state_sha256: digest("index"),
+            unresolved_claims_sha256: digest("claims"),
+            unresolved_required_claim_ids: BTreeSet::from(["C1".into()]),
+            calibration_method_sha256: digest("placeholder method"),
+            calibration_joint_coverage_percent: 90,
+            estimator_id: "estimator".into(),
+            estimator_version: "1".into(),
+            estimator_sha256: digest("different estimator"),
+            calibration_split_sha256: digest("placeholder split"),
+            feature_schema_sha256: digest("frozen features"),
+            utility_schema_sha256: digest("frozen utility"),
+            correctness_gain_prediction_micro: 100,
+            correctness_gain_lcb_micro: 5,
+            lifecycle_risk_reduction_prediction_micro: 200,
+            lifecycle_risk_reduction_lcb_micro: 5,
+            retrieval_harm_prediction_micro: 50,
+            retrieval_harm_ucb_micro: 5,
+            retrieval_cost_micro: 1,
+            remaining_calls: 1,
+            remaining_budget_micro: 10,
+            minimum_net_value_micro: 1,
+        };
+        estimate.unresolved_claims_sha256 =
+            RetrievalUtilityEstimate::unresolved_claims_digest(
+                &estimate.unresolved_required_claim_ids
+            ).unwrap();
+        assert!(bounds.apply_to_estimate(&mut estimate)
+            .unwrap_err()
+            .contains("different runtime estimator"));
+    }
+
+    #[test]
     fn refuses_to_label_a_different_joint_coverage_as_the_pinned_calibration() {
         let mut bounds = calibrate_retrieval_utility_bounds(&calibration_rows()).unwrap();
         bounds.calibration_joint_coverage_percent = 95;
@@ -473,10 +560,10 @@ mod tests {
             calibration_joint_coverage_percent: 90,
             estimator_id: "estimator".into(),
             estimator_version: "1".into(),
-            estimator_sha256: digest("estimator"),
+            estimator_sha256: digest("frozen estimator"),
             calibration_split_sha256: digest("placeholder split"),
-            feature_schema_sha256: digest("features"),
-            utility_schema_sha256: digest("utility"),
+            feature_schema_sha256: digest("frozen features"),
+            utility_schema_sha256: digest("frozen utility"),
             correctness_gain_prediction_micro: 100,
             correctness_gain_lcb_micro: 5,
             lifecycle_risk_reduction_prediction_micro: 200,
