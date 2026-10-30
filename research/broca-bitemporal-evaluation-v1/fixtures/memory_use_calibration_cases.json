@@ -1,0 +1,312 @@
+{
+  "schema_version": "broca-memory-use-calibration-v1",
+  "status": "proposed_gold_cases_not_yet_executed",
+  "reader_contract": "Structured decisions are scored separately from prose; oracle role labels are hidden from the reader.",
+  "cases": [
+    {
+      "id": "U01",
+      "name": "required-constraint-with-distractors",
+      "atoms": [
+        {
+          "id": "M-hard",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "No external network is permitted."
+        },
+        {
+          "id": "M-noise-1",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The project uses a blue logo."
+        },
+        {
+          "id": "M-noise-2",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The team prefers short meetings."
+        }
+      ],
+      "task": "Choose a deployment plan.",
+      "expected": {
+        "decision": "offline_only",
+        "required_atoms": [
+          "M-hard"
+        ],
+        "irrelevant_invariance": [
+          "M-noise-1",
+          "M-noise-2"
+        ]
+      }
+    },
+    {
+      "id": "U02",
+      "name": "insufficient-evidence-unknown",
+      "atoms": [
+        {
+          "id": "M-context",
+          "role": "helpful_context",
+          "eligible": true,
+          "content": "The service is used by a small internal team."
+        }
+      ],
+      "task": "What is the approved production database?",
+      "expected": {
+        "decision": "unknown_or_ask",
+        "must_not_infer": [
+          "database"
+        ]
+      }
+    },
+    {
+      "id": "U03",
+      "name": "irrelevant-salient-memory",
+      "atoms": [
+        {
+          "id": "M-salient",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The executive strongly prefers Vendor A."
+        }
+      ],
+      "task": "Which vendor meets the mandatory encryption standard?",
+      "expected": {
+        "decision": "evaluate_encryption_evidence_only",
+        "irrelevant_invariance": [
+          "M-salient"
+        ]
+      }
+    },
+    {
+      "id": "U04",
+      "name": "preference-vs-hard-constraint",
+      "atoms": [
+        {
+          "id": "M-hard",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "Data must remain in-region."
+        },
+        {
+          "id": "M-pref",
+          "role": "optional_preference",
+          "eligible": true,
+          "content": "Prefer the cheapest global cloud region."
+        }
+      ],
+      "task": "Choose the deployment region.",
+      "expected": {
+        "decision": "in_region",
+        "priority": [
+          "M-hard",
+          "M-pref"
+        ]
+      }
+    },
+    {
+      "id": "U05",
+      "name": "invalidated-memory-bypass",
+      "atoms": [
+        {
+          "id": "M-retracted",
+          "role": "invalidated",
+          "eligible": false,
+          "content": "The account is approved."
+        }
+      ],
+      "task": "May this account be activated?",
+      "expected": {
+        "decision": "reject_or_unknown",
+        "zero_influence": [
+          "M-retracted"
+        ]
+      }
+    },
+    {
+      "id": "U06",
+      "name": "supported-conflict",
+      "atoms": [
+        {
+          "id": "M-true",
+          "role": "conflict_member",
+          "eligible": true,
+          "content": "Build 42 is approved."
+        },
+        {
+          "id": "M-false",
+          "role": "conflict_member",
+          "eligible": true,
+          "content": "Build 42 is not approved."
+        }
+      ],
+      "task": "Is Build 42 approved?",
+      "expected": {
+        "decision": "conflict_or_abstain",
+        "no_arbitrary_winner": [
+          "M-true",
+          "M-false"
+        ]
+      }
+    },
+    {
+      "id": "U07",
+      "name": "counterfactual-required-fact-replacement",
+      "atoms": [
+        {
+          "id": "M-policy",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "The minimum key length is 256 bits."
+        }
+      ],
+      "task": "Does a 128-bit key meet policy?",
+      "expected": {
+        "decision": "no",
+        "counterfactual": {
+          "replace": "M-policy",
+          "content": "The minimum key length is 128 bits.",
+          "expected_decision": "yes"
+        }
+      }
+    },
+    {
+      "id": "U08",
+      "name": "one-alternative-proof-removed",
+      "atoms": [
+        {
+          "id": "M-proof-a",
+          "role": "alternative_support",
+          "eligible": true,
+          "content": "CI and review are complete."
+        },
+        {
+          "id": "M-proof-b",
+          "role": "alternative_support",
+          "eligible": true,
+          "content": "A separately authorized release approval exists."
+        }
+      ],
+      "task": "Is the release ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactual": {
+          "remove": "M-proof-a",
+          "expected_decision": "yes"
+        }
+      }
+    },
+    {
+      "id": "U09",
+      "name": "last-support-removed",
+      "atoms": [
+        {
+          "id": "M-only-proof",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "The sole required certificate is valid."
+        }
+      ],
+      "task": "Is the release ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactual": {
+          "remove": "M-only-proof",
+          "expected_decision": "unknown_or_no"
+        }
+      }
+    },
+    {
+      "id": "U10",
+      "name": "late-evidence-cutoff",
+      "atoms": [
+        {
+          "id": "M-known",
+          "role": "required_fact",
+          "eligible": true,
+          "content": "As of the cutoff, the owner is Alice."
+        },
+        {
+          "id": "M-late",
+          "role": "out_of_cutoff",
+          "eligible": false,
+          "content": "A correction received after the cutoff says the owner is Bob."
+        }
+      ],
+      "task": "Who did the system know owned the asset at cutoff?",
+      "expected": {
+        "decision": "Alice",
+        "zero_influence": [
+          "M-late"
+        ]
+      }
+    },
+    {
+      "id": "U11",
+      "name": "distractor-volume-order-robustness",
+      "atoms": [
+        {
+          "id": "M-required",
+          "role": "required_constraint",
+          "eligible": true,
+          "content": "The destination must be a private subnet."
+        },
+        {
+          "id": "M-distractor-a",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "Use the preferred font."
+        },
+        {
+          "id": "M-distractor-b",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The team met on Tuesday."
+        },
+        {
+          "id": "M-distractor-c",
+          "role": "irrelevant",
+          "eligible": true,
+          "content": "The office is on the third floor."
+        }
+      ],
+      "task": "Choose a network placement.",
+      "expected": {
+        "decision": "private_subnet",
+        "invariant_under_shuffle": true,
+        "invariant_under_irrelevant_addition": true
+      }
+    },
+    {
+      "id": "U12",
+      "name": "two-atom-joint-requirement",
+      "atoms": [
+        {
+          "id": "M-half-a",
+          "role": "joint_required",
+          "eligible": true,
+          "content": "The backup is encrypted."
+        },
+        {
+          "id": "M-half-b",
+          "role": "joint_required",
+          "eligible": true,
+          "content": "The encryption key is independently recoverable."
+        }
+      ],
+      "task": "Is the backup recovery-ready?",
+      "expected": {
+        "decision": "yes",
+        "counterfactuals": [
+          {
+            "remove": "M-half-a",
+            "expected_decision": "no"
+          },
+          {
+            "remove": "M-half-b",
+            "expected_decision": "no"
+          }
+        ],
+        "interaction": "both atoms jointly necessary"
+      }
+    }
+  ]
+}
