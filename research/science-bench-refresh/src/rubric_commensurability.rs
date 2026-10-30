@@ -376,8 +376,8 @@ fn validate_instrument(
                 u64::MAX
             }
         };
-        if criterion.weight_millionths > 1_000_000 {
-            issues.push(format!("{criterion_label} weight exceeds 1,000,000"));
+        if criterion.weight_millionths == 0 || criterion.weight_millionths > 1_000_000 {
+            issues.push(format!("{criterion_label} weight must be in 1..=1,000,000"));
         }
         issues.extend(validate_scale(criterion, allow_zero, &criterion_label));
         let mapping = &criterion.construct_mapping;
@@ -1006,7 +1006,7 @@ mod tests {
     #[test]
     fn rejects_nonmonotonic_or_incomplete_score_scales() {
         let mut fields = make_fields();
-        fields.left_instrument.criteria[0].scale_anchors[1].normalized_score_millionths = 900_000;
+        fields.left_instrument.criteria[0].scale_anchors[1].normalized_score_millionths = 0;
         assert!(validate_rubric_commensurability_plan_fields(&fields).is_err());
         let mut fields = make_fields();
         fields.right_instrument.criteria[0].scale_anchors.pop();
