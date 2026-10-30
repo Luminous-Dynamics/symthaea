@@ -412,8 +412,9 @@ pub fn audit_bytes(
         oracle.selected_case_ids.iter().map(String::as_str).collect();
     let catalog_scope_ids: BTreeSet<&str> =
         catalog.cases.iter().map(|case| case.case_id.as_str()).collect();
-    report.scope_is_full_catalog =
-        !catalog_scope_ids.is_empty() && selected_ids == catalog_scope_ids;
+    report.scope_is_full_catalog = !catalog_scope_ids.is_empty()
+        && selected_ids.len() == oracle.selected_case_ids.len()
+        && selected_ids == catalog_scope_ids;
     if selected_ids.is_empty() || selected_ids.len() != oracle.selected_case_ids.len() {
         push_error(
             &mut report,
