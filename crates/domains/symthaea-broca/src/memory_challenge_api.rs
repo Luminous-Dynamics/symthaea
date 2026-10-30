@@ -202,7 +202,6 @@ impl AmlSearchRequest {
 
 /// One ranked memory evidence item returned to the platform's Answer stage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct AmlSearchResult {
     pub id: String,
     pub content: String,
@@ -229,7 +228,6 @@ impl AmlSearchResult {
 /// AML Search response. Vector order is semantically significant and must
 /// already be relevance-ranked by the participant implementation.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct AmlSearchResponse {
     pub data: Vec<AmlSearchResult>,
 }
@@ -500,6 +498,22 @@ mod tests {
             data: vec![result("mem-1", "one", 0.9), result("mem-1", "duplicate", 0.8)],
         };
         assert!(duplicate.validate_for(&request).unwrap_err().contains("duplicate memory ID"));
+    }
+
+    #[test]
+    fn search_response_ignores_undeclared_fields_as_platform_does() {
+        let json = serde_json::json!({
+            "data": [{
+                "id": "mem-1",
+                "content": "retrieved evidence",
+                "score": 0.9,
+                "platform_ignored_field": "ignored"
+            }],
+            "platform_response_metadata": "ignored"
+        });
+        let response: AmlSearchResponse = serde_json::from_value(json).unwrap();
+        response.validate_for(&search_request(10)).unwrap();
+        assert_eq!(response.data[0].id, "mem-1");
     }
 
     #[test]
