@@ -47,6 +47,9 @@ pub struct CounterfactualEventSupportEvidence {
     pub version: String,
     pub source_event_index: usize,
     pub source_event_id: String,
+    /// Final projected note-off frame across every performed descendant of this
+    /// score event. This is a MIDI schedule boundary, not an acoustic tail end.
+    pub source_event_last_note_off_frame: u64,
     pub expected_score_event_count: usize,
     pub intervention: EventIntervention,
     pub influence_report_sha256: String,
@@ -370,14 +373,22 @@ fn build_event_support(
         input.baseline_renderer_evidence,
         input.counterfactual_renderer_evidence,
     )?;
-    let baseline_channels: BTreeSet<u8> = input
+    let source_lineage: Vec<_> = input
         .baseline_renderer_evidence
         .performed_event_lineage()
         .iter()
         .filter(|lineage| lineage.source_event_id == input.source_event_id)
+        .collect();
+    let baseline_channels: BTreeSet<u8> = source_lineage
+        .iter()
         .map(|lineage| lineage.midi_channel)
         .collect();
-    if baseline_channels.is_empty() {
+    let source_event_last_note_off_frame = source_lineage
+        .iter()
+        .map(|lineage| lineage.end_frame)
+        .max()
+        .ok_or(CounterfactualSupportAdapterError::InvalidEventIdentity)?;
+    if baseline_channels.is_empty() || source_event_last_note_off_frame > output_frame_count {
         return Err(CounterfactualSupportAdapterError::InvalidEventIdentity);
     }
 
@@ -395,6 +406,7 @@ fn build_event_support(
         version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
         source_event_index,
         source_event_id: input.source_event_id.to_owned(),
+        source_event_last_note_off_frame,
         expected_score_event_count: input.expected_score_event_count,
         intervention: base.intervention.clone(),
         influence_report_sha256: base.receipt_sha256.clone(),
@@ -496,6 +508,7 @@ fn assemble_from_verified_events(
                 != Some(event.evidence_sha256.as_str())
             || event.version != COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION
             || event.support.routing_complete
+            || event.source_event_last_note_off_frame > event.output_frame_count
             || event.support.acoustic_support != event.conservative_support_intervals
         {
             return Err(CounterfactualSupportAdapterError::DuplicateOrMissingEvent);
@@ -595,6 +608,7 @@ mod tests {
             version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
             source_event_index: index,
             source_event_id: format!("score_event_index:{index}"),
+            source_event_last_note_off_frame: 10 + index as u64,
             expected_score_event_count: 2,
             intervention: EventIntervention::Remove,
             influence_report_sha256: digest(&format!("influence-{index}")),
@@ -685,7 +699,7 @@ mod tests {
             onset_micros: (source_index as u64) * 1_000_000,
             end_micros: (source_index as u64 + 1) * 1_000_000,
             onset_frame: (source_index as u64) * 48_000,
-            end_frame: (source_index as u64 + 1) * 48_000,
+            end_frame: 10 + source_index as u64,
         }
     }
 
