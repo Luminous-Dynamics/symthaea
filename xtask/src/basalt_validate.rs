@@ -82,6 +82,7 @@ struct ManifestTask {
     quality_audit: QualityAudit,
     required_checks: Vec<RequiredCheck>,
     quality_rubric: QualityRubric,
+    requirements: Vec<TaskRequirement>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,6 +91,43 @@ struct RequiredCheck {
     check_id: String,
     kind: String,
     blocking: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TaskRequirement {
+    requirement_id: String,
+    source_span: RequirementSourceSpan,
+    origin: RequirementOrigin,
+    ambiguity: RequirementAmbiguity,
+    statement_digest: String,
+    expectation_digest: String,
+    #[serde(default)]
+    inference_rationale_digest: RequiredNullable<String>,
+    blocking_check_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RequirementSourceSpan {
+    source_digest: String,
+    start_byte: usize,
+    end_byte: usize,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum RequirementOrigin {
+    Explicit,
+    Inferred,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum RequirementAmbiguity {
+    None,
+    ResolvedBeforeRun,
+    MaterialUnresolved,
 }
 
 #[derive(Debug, Deserialize)]
@@ -773,8 +811,8 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
 
 
 fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], report: &mut ValidationReport) {
-    if manifest.schema_version != 2 {
-        error(report, "E_MANIFEST_VERSION", "manifest.schema_version", "only suite-manifest schema_version=2 is supported");
+    if manifest.schema_version != 3 {
+        error(report, "E_MANIFEST_VERSION", "manifest.schema_version", "only suite-manifest schema_version=3 is supported");
     }
     if manifest.program != "BASALT" {
         error(report, "E_MANIFEST_PROGRAM", "manifest.program", "manifest program must be BASALT");
@@ -861,6 +899,11 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
             &format!("{task_path}.quality_rubric"),
             &task.quality_rubric,
         );
+        validate_task_requirements(
+            report,
+            &task_path,
+            task,
+        );
     }
 
     if manifest.tasks.len() != run.task_records.len() {
@@ -885,6 +928,136 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
                 if !task_match {
                     error(report, "E_TASK_MANIFEST_MISMATCH", &task_path, "task specification or quality-audit disposition differs from the frozen manifest");
                 }
+            }
+        }
+    }
+}
+
+fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, task: &ManifestTask) {
+    let path = format!("{task_path}.requirements");
+    if task.requirements.is_empty() {
+        error(report, "E_REQUIREMENTS_EMPTY", &path, "every task must freeze at least one atomic requirement");
+    }
+
+    let required_check_ids: BTreeSet<&str> = task
+        .required_checks
+        .iter()
+        .map(|check| check.check_id.as_str())
+        .collect();
+    let mut requirement_ids = BTreeSet::new();
+    for (index, requirement) in task.requirements.iter().enumerate() {
+        let requirement_path = format!("{path}[{index}]");
+        if requirement.requirement_id.trim().is_empty()
+            || !requirement_ids.insert(requirement.requirement_id.as_str())
+        {
+            error(
+                report,
+                "E_REQUIREMENT_ID",
+                format!("{requirement_path}.requirement_id"),
+                "requirement IDs must be non-empty and unique within a task",
+            );
+        }
+        validate_digest(
+            report,
+            &format!("{requirement_path}.source_span.source_digest"),
+            &requirement.source_span.source_digest,
+        );
+        if requirement.source_span.source_digest != task.spec_digest {
+            error(
+                report,
+                "E_REQUIREMENT_SOURCE_MISMATCH",
+                format!("{requirement_path}.source_span.source_digest"),
+                "requirement source span must bind the task's frozen specification digest",
+            );
+        }
+        if requirement.source_span.start_byte >= requirement.source_span.end_byte {
+            error(
+                report,
+                "E_REQUIREMENT_SPAN_RANGE",
+                format!("{requirement_path}.source_span"),
+                "source span must be a non-empty half-open UTF-8 byte range [start_byte, end_byte)",
+            );
+        }
+        validate_digest(
+            report,
+            &format!("{requirement_path}.statement_digest"),
+            &requirement.statement_digest,
+        );
+        validate_digest(
+            report,
+            &format!("{requirement_path}.expectation_digest"),
+            &requirement.expectation_digest,
+        );
+        if !requirement.inference_rationale_digest.present {
+            error(
+                report,
+                "E_REQUIREMENT_RATIONALE_MISSING",
+                format!("{requirement_path}.inference_rationale_digest"),
+                "inference_rationale_digest is required as a property, even when null",
+            );
+        }
+        match requirement.origin {
+            RequirementOrigin::Explicit => {
+                if requirement.inference_rationale_digest.value.is_some() {
+                    error(
+                        report,
+                        "E_REQUIREMENT_EXPLICIT_RATIONALE",
+                        format!("{requirement_path}.inference_rationale_digest"),
+                        "explicit requirements must use a null inference_rationale_digest",
+                    );
+                }
+            }
+            RequirementOrigin::Inferred => {
+                match &requirement.inference_rationale_digest.value {
+                    Some(digest) => validate_digest(
+                        report,
+                        &format!("{requirement_path}.inference_rationale_digest"),
+                        digest,
+                    ),
+                    None => error(
+                        report,
+                        "E_REQUIREMENT_INFERENCE_RATIONALE",
+                        format!("{requirement_path}.inference_rationale_digest"),
+                        "inferred requirements require a content-addressed rationale",
+                    ),
+                }
+            }
+        }
+        if task.quality_audit.status == TaskAuditStatus::Accepted
+            && requirement.ambiguity == RequirementAmbiguity::MaterialUnresolved
+        {
+            error(
+                report,
+                "E_REQUIREMENT_AMBIGUOUS_ACCEPTED",
+                format!("{requirement_path}.ambiguity"),
+                "accepted tasks cannot contain materially unresolved requirements",
+            );
+        }
+        if requirement.blocking_check_ids.is_empty() {
+            error(
+                report,
+                "E_REQUIREMENT_CHECKS_EMPTY",
+                format!("{requirement_path}.blocking_check_ids"),
+                "every requirement must map to at least one frozen blocking verifier check",
+            );
+        }
+        let mut mapped_checks = BTreeSet::new();
+        for check_id in &requirement.blocking_check_ids {
+            if check_id.trim().is_empty() || !mapped_checks.insert(check_id.as_str()) {
+                error(
+                    report,
+                    "E_REQUIREMENT_CHECK_DUPLICATE",
+                    format!("{requirement_path}.blocking_check_ids"),
+                    "blocking check IDs must be non-empty and unique within a requirement",
+                );
+            }
+            if !required_check_ids.contains(check_id.as_str()) {
+                error(
+                    report,
+                    "E_REQUIREMENT_CHECK_UNDECLARED",
+                    format!("{requirement_path}.blocking_check_ids"),
+                    "requirement mapping references a check not declared as required and blocking in this task manifest",
+                );
             }
         }
     }
@@ -1800,6 +1973,72 @@ mod tests {
         });
         assert!(!report.valid);
         assert!(has_code(&report, "E_MANIFEST_VERSION"));
+    }
+
+    #[test]
+    fn task_requirement_must_map_to_declared_blocking_check() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["blocking_check_ids"][0] = Value::String("unreviewed-check".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_CHECK_UNDECLARED"));
+    }
+
+    #[test]
+    fn duplicate_task_requirement_ids_are_rejected() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            let first = manifest["tasks"][0]["requirements"][0]["requirement_id"].clone();
+            manifest["tasks"][0]["requirements"][1]["requirement_id"] = first;
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_ID"));
+    }
+
+    #[test]
+    fn task_requirement_source_must_bind_frozen_specification() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["source_span"]["source_digest"] =
+                Value::String(format!("sha256:{}", "f".repeat(64)));
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_SOURCE_MISMATCH"));
+    }
+
+    #[test]
+    fn task_requirement_requires_nonempty_source_span() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["source_span"]["end_byte"] = Value::from(0);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_SPAN_RANGE"));
+    }
+
+    #[test]
+    fn inferred_requirement_requires_rationale_digest() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["origin"] = Value::String("inferred".into());
+            manifest["tasks"][0]["requirements"][0]["inference_rationale_digest"] = Value::Null;
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_INFERENCE_RATIONALE"));
+    }
+
+    #[test]
+    fn accepted_task_rejects_materially_unresolved_requirement() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["ambiguity"] = Value::String("material_unresolved".into());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_AMBIGUOUS_ACCEPTED"));
+    }
+
+    #[test]
+    fn task_requirement_requires_at_least_one_check_mapping() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["blocking_check_ids"] = Value::Array(Vec::new());
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_CHECKS_EMPTY"));
     }
 
 
