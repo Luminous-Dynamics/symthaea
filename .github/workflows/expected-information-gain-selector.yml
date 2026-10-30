@@ -8,6 +8,9 @@ on:
       - "crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs"
       - "crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs"
       - "docs/research/EXPECTED_INFORMATION_GAIN_SELECTOR_V0_1.md"
+      - "docs/research/DECISION_AWARE_MANUFACTURING_EVSI_V0_1.md"
+      - "crates/core/symthaea-core/examples/fixtures/manufacturing-decision-policy-synthetic.csv"
+      - "research/manufacturing-acquisition-test-harness.rs"
       - ".github/workflows/expected-information-gain-selector.yml"
   workflow_dispatch:
 
@@ -32,7 +35,11 @@ jobs:
         run: |
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
           rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/integrated_discovery.rs
-      - name: Test information-gain selector
+      - name: Run selector source tests without workspace resolution
+        run: |
+          rustc --edition=2024 --test research/manufacturing-acquisition-test-harness.rs -o "$RUNNER_TEMP/eig-selector-tests"
+          "$RUNNER_TEMP/eig-selector-tests" --nocapture
+      - name: Test information-gain selector in the full crate
         run: cargo test -p symthaea-core hdc::conjecture_engine::experiment_selection --lib
       - name: Run paired law-discovery selector pilot
         run: cargo test -p symthaea-physics-bridge expected_information_gain_vs_variance_on_paired_seeds --lib -- --nocapture

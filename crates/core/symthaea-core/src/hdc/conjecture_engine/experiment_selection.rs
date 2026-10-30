@@ -188,7 +188,12 @@ fn log_sum_exp(values: &[f64]) -> f64 {
     if maximum == f64::NEG_INFINITY {
         return maximum;
     }
-    maximum + values.iter().map(|value| (*value - maximum).exp()).sum::<f64>().ln()
+    maximum
+        + values
+            .iter()
+            .map(|value| (*value - maximum).exp())
+            .sum::<f64>()
+            .ln()
 }
 
 /// Limit of the uniform-prior information gain as the observation noise tends to zero.
@@ -319,6 +324,507 @@ fn expected_information_gain_with_steps<H, E>(
     Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
 }
 
+/// Expected information gain in nats under explicit (possibly unnormalized) prior weights.
+///
+/// Unlike the uniform-prior API, this function does not count duplicated hypotheses as
+/// additional prior mass unless the caller assigns them additional weight. Zero-weight
+/// hypotheses are ignored. The remaining finite, non-negative weights are normalized
+/// internally and must leave at least two positive-mass hypotheses.
+///
+/// The prior is over the supplied hypothesis instances. Callers should aggregate
+/// observationally equivalent hypotheses into equivalence classes when their multiplicity
+/// is an artifact of candidate generation, and must not estimate prior weights from held-out
+/// outcomes. Measurement noise remains an independently supplied Gaussian standard deviation.
+pub fn expected_information_gain_nats_with_prior_weights<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    expected_information_gain_with_prior_weights_and_steps(
+        experiment,
+        hypotheses,
+        prior_weights,
+        observation_std_dev,
+        INFORMATION_GAIN_QUADRATURE_STEPS,
+        predict,
+    )
+}
+
+fn expected_information_gain_with_prior_weights_and_steps<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    quadrature_steps: usize,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if quadrature_steps == 0
+        || hypotheses.len() < 2
+        || hypotheses.len() != prior_weights.len()
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+        || prior_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+
+    let prior_total: f64 = prior_weights.iter().sum();
+    if !prior_total.is_finite() || prior_total <= 0.0 {
+        return None;
+    }
+    let normalized: Vec<f64> = prior_weights.iter().map(|weight| weight / prior_total).collect();
+    let mut weighted_predictions = Vec::new();
+    for (hypothesis, prior_probability) in hypotheses.iter().zip(normalized.iter().copied()) {
+        if prior_probability == 0.0 {
+            continue;
+        }
+        let prediction = predict(hypothesis, experiment)?;
+        if !prediction.is_finite() {
+            return None;
+        }
+        weighted_predictions.push((prediction, prior_probability));
+    }
+    if weighted_predictions.len() < 2 {
+        return None;
+    }
+
+    let prior_entropy = -weighted_predictions
+        .iter()
+        .map(|(_, probability)| probability * probability.ln())
+        .sum::<f64>();
+    if !prior_entropy.is_finite() || prior_entropy <= 0.0 {
+        return None;
+    }
+
+    // Scale means and noise by one finite magnitude before subtraction to avoid
+    // overflow for large, opposite-sign predictions while preserving ratios.
+    let mean_scale = weighted_predictions
+        .iter()
+        .map(|(prediction, _)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let scaled: Vec<(f64, f64)> = weighted_predictions
+        .iter()
+        .map(|(prediction, probability)| (prediction / mean_scale, *probability))
+        .collect();
+    let scaled_noise = observation_std_dev / mean_scale;
+    if scaled_noise == 0.0 {
+        return Some(noiseless_information_gain_with_prior_weights(
+            &weighted_predictions,
+        )
+        .clamp(0.0, prior_entropy));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
+    let mut quadrature = Vec::with_capacity(quadrature_steps);
+    for step_index in 0..quadrature_steps {
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        quadrature.push((z, (-0.5 * z * z).exp() * step_width));
+    }
+    let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    let mut log_terms = Vec::with_capacity(scaled.len());
+    let mut information_gain = 0.0;
+
+    for &(true_mean, true_probability) in &scaled {
+        for &(z, quadrature_weight) in &quadrature {
+            log_terms.clear();
+            for &(other_mean, other_probability) in &scaled {
+                let separation = (true_mean - other_mean) / scaled_noise;
+                let log_likelihood_ratio = if separation == 0.0 {
+                    0.0
+                } else if !separation.is_finite() || separation.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * separation * separation - z * separation
+                };
+                log_terms.push(other_probability.ln() + log_likelihood_ratio);
+            }
+            let log_mixture_ratio = log_sum_exp(&log_terms);
+            information_gain -= (quadrature_weight / weight_sum)
+                * true_probability
+                * log_mixture_ratio;
+        }
+    }
+
+    if !information_gain.is_finite() {
+        return None;
+    }
+    Some(information_gain.clamp(0.0, prior_entropy))
+}
+
+fn noiseless_information_gain_with_prior_weights(weighted_predictions: &[(f64, f64)]) -> f64 {
+    let mut groups: Vec<(f64, f64)> = Vec::new();
+    for &(prediction, probability) in weighted_predictions {
+        if let Some((_, total_probability)) = groups
+            .iter_mut()
+            .find(|(existing, _)| *existing == prediction)
+        {
+            *total_probability += probability;
+        } else {
+            groups.push((prediction, probability));
+        }
+    }
+    -groups
+        .iter()
+        .map(|(_, probability)| probability * probability.ln())
+        .sum::<f64>()
+}
+
+/// Select an eligible experiment using prior-weighted, candidate-noise EIG per cost.
+///
+/// Prior weights are supplied by the caller and normalized by the EIG kernel. The
+/// eligibility callback is evaluated before cost, noise or prediction callbacks.
+/// Invalid priors, measurements or costs cause the candidate to be skipped; if no
+/// eligible candidate retains positive information gain, the function abstains.
+pub fn select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility<
+    'a,
+    H,
+    E,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        let Some(information_gain) = expected_information_gain_nats_with_prior_weights(
+            experiment,
+            hypotheses,
+            prior_weights,
+            noise,
+            predict,
+        ) else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// Select the candidate maximizing expected information gain per unit cost when each
+/// candidate has its own observation-noise standard deviation and prevalidated eligibility.
+///
+/// This is useful when candidate experiments use different instruments, fixtures, test
+/// methods, or calibration states. The eligibility predicate is a hard gate: it is evaluated
+/// before cost, measurement-noise, or hypothesis-prediction closures. An ineligible experiment
+/// is never rescued by a high information score. The caller remains responsible for ensuring
+/// eligibility was computed from an independently validated route, safety, calibration, and
+/// resource policy; this function does not validate those records.
+///
+/// Costs must use one comparable unit (for example, validated labor-minutes or currency) and
+/// each per-candidate standard deviation must describe the measurement process for that
+/// experiment. Incomplete predictions, invalid noise, invalid cost, and zero information gain
+/// are skipped. Returns None when no positive-information eligible experiment remains.
+pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility<'a, H, E>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        // Hard constraints precede every information/cost calculation.
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        let Some(information_gain) =
+            expected_information_gain_nats(experiment, hypotheses, noise, predict)
+        else {
+            continue;
+        };
+        let score = information_gain / experiment_cost;
+        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// Select an eligible experiment by worst-case information gain across a finite
+/// set of model-discrepancy scenarios, normalized by acquisition cost.
+///
+/// This is a conservative finite-set robustness baseline: every candidate must retain
+/// strictly positive information gain under every declared scenario. The returned
+/// score is the minimum scenario EIG (nats) divided by cost. It does not guarantee
+/// robustness outside the supplied scenario set, and it is not the R-IDeA criterion.
+///
+/// Eligibility is evaluated before cost, noise, or prediction callbacks. A candidate
+/// with an incomplete or non-finite prediction in any scenario is skipped rather than
+/// being scored on only its favorable scenarios. Empty scenario sets, invalid noise,
+/// invalid costs, and zero worst-case information gain fail closed with None.
+///
+/// The caller must ensure all scenarios share the same hypothesis meaning and prior,
+/// and that all candidate predictions represent the same measurand/unit. Measurement
+/// uncertainty is supplied independently by the metrology process.
+/// Select an eligible experiment by the worst-case prior-weighted EIG per cost
+/// across a finite, frozen set of model-discrepancy scenarios.
+pub fn select_experiment_by_worst_case_information_gain_per_cost_with_prior_weights<
+    'a,
+    H,
+    E,
+    S,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        if !noise.is_finite() || noise <= 0.0 {
+            continue;
+        }
+
+        let mut worst_case_information_gain = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let Some(information_gain) = expected_information_gain_nats_with_prior_weights(
+                experiment,
+                hypotheses,
+                prior_weights,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+            ) else {
+                complete = false;
+                break;
+            };
+            if !information_gain.is_finite() || information_gain <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_information_gain = worst_case_information_gain.min(information_gain);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E, S>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        // Hard constraints precede all information and cost calculations.
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        if !noise.is_finite() || noise <= 0.0 {
+            continue;
+        }
+
+        let mut worst_case_information_gain = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let information_gain = expected_information_gain_nats(
+                experiment,
+                hypotheses,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+            );
+            let Some(information_gain) = information_gain else {
+                complete = false;
+                break;
+            };
+            if !information_gain.is_finite() || information_gain <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_information_gain = worst_case_information_gain.min(information_gain);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_information_gain / experiment_cost;
+        if score.is_finite() && score > 0.0 && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
+/// Select an eligible experiment using a finite-scenario, representative and
+/// de-amplifying acquisition proxy.
+///
+/// The base information term is the minimum prior-weighted EIG across every supplied
+/// model-discrepancy scenario. It is then multiplied by two independently supplied,
+/// unitless evidence scores:
+///
+/// - `representativeness` in [0, 1], measuring how well the candidate represents the
+///   frozen deployment/production population;
+/// - `amplification_risk` in [0, 1], estimating the chance/severity that this candidate
+///   amplifies predictive or inferential error under the declared misspecification audit.
+///
+/// The final score is:
+/// `min_s(EIG_s) * representativeness * (1 - amplification_risk) / cost`.
+///
+/// This is an inspectable engineering proxy inspired by the representative/informative/de-
+/// amplifying principle; it is NOT an implementation or reproduction of the published
+/// R-IDeA acquisition function and is NOT a safety certificate. The supplied scores must
+/// come from frozen, independent validation evidence. They must not be generated by the
+/// same candidate-ranking model or estimated from held-out outcomes. Unknown, non-finite
+/// or out-of-range scores cause the candidate to be skipped.
+///
+/// Eligibility is a hard filter and runs before representativeness, risk, cost, noise,
+/// or prediction callbacks. Every model scenario must provide complete predictions and
+/// strictly positive EIG; one unsupported scenario rejects the candidate. The caller must
+/// ensure a common measurand/unit and common hypothesis semantics across scenarios.
+///
+/// A missing/empty scenario set or no positive robust candidate returns None (abstention).
+pub fn select_experiment_by_representative_deamplifying_worst_case_eig_per_cost<
+    'a,
+    H,
+    E,
+    S,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    representativeness: impl Fn(&E) -> f64 + Copy,
+    amplification_risk: impl Fn(&E) -> f64 + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        // Hard safety/route/calibration/resource gate before reading any ranking features.
+        if !eligible(experiment) {
+            continue;
+        }
+
+        let representative = representativeness(experiment);
+        let amplification = amplification_risk(experiment);
+        if !representative.is_finite()
+            || !(0.0..=1.0).contains(&representative)
+            || !amplification.is_finite()
+            || !(0.0..=1.0).contains(&amplification)
+            || representative <= 0.0
+            || amplification >= 1.0
+        {
+            continue;
+        }
+
+        let experiment_cost = cost(experiment);
+        let noise = observation_std_dev(experiment);
+        if !experiment_cost.is_finite()
+            || experiment_cost <= 0.0
+            || !noise.is_finite()
+            || noise <= 0.0
+        {
+            continue;
+        }
+
+        let mut worst_case_information_gain = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let Some(information_gain) = expected_information_gain_nats_with_prior_weights(
+                experiment,
+                hypotheses,
+                prior_weights,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+            ) else {
+                complete = false;
+                break;
+            };
+            if !information_gain.is_finite() || information_gain <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_information_gain = worst_case_information_gain.min(information_gain);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score =
+            worst_case_information_gain * representative * (1.0 - amplification) / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -332,18 +838,335 @@ pub fn select_experiment_by_information_gain_per_cost<'a, H, E>(
     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
     cost: impl Fn(&E) -> f64 + Copy,
 ) -> Option<(&'a E, f64)> {
-    let mut best: Option<(&'a E, f64)> = None;
-    for experiment in candidates {
-        let experiment_cost = cost(experiment);
-        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+    select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+        candidates,
+        hypotheses,
+        |_| true,
+        |_| observation_std_dev,
+        predict,
+        cost,
+    )
+}
+
+
+/// Expected value of sample information (EVSI) for a finite engineering decision.
+///
+/// Utilities are supplied by the approved decision policy; larger values are better.
+/// EVSI is the expected improvement in the best posterior expected utility after one
+/// measurement, compared with the best action before measuring. It is therefore
+/// decision-aware: information about distinctions that cannot change the preferred
+/// action has zero (or near-zero) value, even when that information gain is large.
+///
+/// The prior may be unnormalized but must have finite non-negative entries and at
+/// least two positive-mass hypotheses. Zero-weight hypotheses are ignored. Every
+/// positive-mass hypothesis needs a finite prediction and finite utility for each
+/// action. Measurement noise is an independent Gaussian standard deviation in the
+/// same unit as the predictions. A deterministic midpoint quadrature integrates
+/// over standard-normal outcomes across ±8 standard deviations.
+///
+/// The result is in the utility unit declared by the caller's action×hypothesis
+/// matrix, not nats. Returns None for invalid priors, incomplete predictions,
+/// invalid noise, empty action sets, or non-finite utilities. This ranking primitive
+/// does not validate or authorize the utility policy.
+pub fn expected_value_of_sample_information<H, E, A>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+    utility: impl Fn(&A, &H) -> f64,
+) -> Option<f64> {
+    expected_value_of_sample_information_with_steps(
+        experiment,
+        hypotheses,
+        prior_weights,
+        actions,
+        observation_std_dev,
+        INFORMATION_GAIN_QUADRATURE_STEPS,
+        predict,
+        utility,
+    )
+}
+
+fn expected_value_of_sample_information_with_steps<H, E, A>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    observation_std_dev: f64,
+    quadrature_steps: usize,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+    utility: impl Fn(&A, &H) -> f64,
+) -> Option<f64> {
+    if quadrature_steps == 0
+        || hypotheses.len() < 2
+        || hypotheses.len() != prior_weights.len()
+        || actions.is_empty()
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+        || prior_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+
+    // Normalize after max-scaling so finite but very large prior weights cannot
+    // overflow their sum.
+    let max_weight = prior_weights.iter().copied().fold(0.0_f64, f64::max);
+    if max_weight <= 0.0 {
+        return None;
+    }
+    let scaled_weights: Vec<f64> = prior_weights.iter().map(|weight| *weight / max_weight).collect();
+    let weight_sum: f64 = scaled_weights.iter().sum();
+    if !weight_sum.is_finite() || weight_sum <= 0.0 {
+        return None;
+    }
+
+    let mut active: Vec<(usize, f64, f64)> = Vec::new();
+    for (index, weight) in scaled_weights.iter().copied().enumerate() {
+        if weight == 0.0 {
             continue;
         }
-        let Some(information_gain) =
-            expected_information_gain_nats(experiment, hypotheses, observation_std_dev, predict)
-        else {
+        let probability = weight / weight_sum;
+        let prediction = predict(&hypotheses[index], experiment)?;
+        if !prediction.is_finite() {
+            return None;
+        }
+        active.push((index, probability, prediction));
+    }
+    if active.len() < 2 {
+        return None;
+    }
+
+    let raw_utilities: Vec<Vec<f64>> = actions
+        .iter()
+        .map(|action| {
+            active
+                .iter()
+                .map(|(index, _, _)| utility(action, &hypotheses[*index]))
+                .collect()
+        })
+        .collect();
+    if raw_utilities.iter().flatten().any(|value| !value.is_finite()) {
+        return None;
+    }
+    // Scale utilities before expectation arithmetic so a finite but very large
+    // approved utility unit cannot overflow intermediate weighted sums.
+    let utility_scale = raw_utilities
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(1.0_f64, f64::max);
+    let utilities: Vec<Vec<f64>> = raw_utilities
+        .iter()
+        .map(|row| row.iter().map(|value| value / utility_scale).collect())
+        .collect();
+
+    let mut baseline = f64::NEG_INFINITY;
+    for action_utilities in &utilities {
+        let expected = active
+            .iter()
+            .zip(action_utilities.iter())
+            .map(|((_, probability, _), value)| *probability * *value)
+            .sum::<f64>();
+        if !expected.is_finite() {
+            return None;
+        }
+        baseline = baseline.max(expected);
+    }
+
+    // Scale means and noise together to prevent overflow in mean differences.
+    let scale = active
+        .iter()
+        .map(|(_, _, prediction)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let means: Vec<f64> = active.iter().map(|(_, _, mean)| *mean / scale).collect();
+    let noise = observation_std_dev / scale;
+
+    if noise == 0.0 {
+        // In the noiseless limit, equal predicted values remain indistinguishable.
+        let mut groups: Vec<(f64, Vec<usize>)> = Vec::new();
+        for (index, mean) in means.iter().copied().enumerate() {
+            if let Some((_, members)) = groups.iter_mut().find(|(value, _)| *value == mean) {
+                members.push(index);
+            } else {
+                groups.push((mean, vec![index]));
+            }
+        }
+        let mut expected_after = 0.0;
+        for (_, members) in groups {
+            let group_mass: f64 = members.iter().map(|i| active[*i].1).sum();
+            let mut best_action = f64::NEG_INFINITY;
+            for action_utilities in &utilities {
+                let expected = members
+                    .iter()
+                    .map(|i| active[*i].1 * action_utilities[*i])
+                    .sum::<f64>()
+                    / group_mass;
+                best_action = best_action.max(expected);
+            }
+            expected_after += group_mass * best_action;
+        }
+        let scaled_value = expected_after - baseline;
+        if !scaled_value.is_finite() || scaled_value < -1.0e-7 {
+            return None;
+        }
+        let value = scaled_value.max(0.0) * utility_scale;
+        return value.is_finite().then_some(value);
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
+    let quadrature: Vec<(f64, f64)> = (0..quadrature_steps)
+        .map(|step| {
+            let z = -INFORMATION_GAIN_Z_LIMIT + (step as f64 + 0.5) * step_width;
+            (z, (-0.5 * z * z).exp() * step_width)
+        })
+        .collect();
+    let quadrature_weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    if !quadrature_weight_sum.is_finite() || quadrature_weight_sum <= 0.0 {
+        return None;
+    }
+
+    let mut expected_after = 0.0;
+    let mut log_joint = Vec::with_capacity(active.len());
+    for (true_index, (_, true_probability, _)) in active.iter().enumerate() {
+        let scaled_true_mean = means[true_index];
+        for (z, raw_weight) in &quadrature {
+            log_joint.clear();
+            for (other_mean, (_, probability, _)) in means.iter().zip(active.iter()) {
+                let separation = (scaled_true_mean - *other_mean) / noise;
+                let standardized = separation + *z;
+                let log_likelihood = if !standardized.is_finite() || standardized.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * standardized * standardized
+                };
+                log_joint.push((*probability).ln() + log_likelihood);
+            }
+            let log_normalizer = log_sum_exp(&log_joint);
+            if !log_normalizer.is_finite() {
+                return None;
+            }
+            let posterior: Vec<f64> = log_joint
+                .iter()
+                .map(|log_value| (*log_value - log_normalizer).exp())
+                .collect();
+
+            let mut best_posterior_utility = f64::NEG_INFINITY;
+            for action_utilities in &utilities {
+                let value = posterior
+                    .iter()
+                    .zip(action_utilities.iter())
+                    .map(|(probability, utility)| *probability * *utility)
+                    .sum::<f64>();
+                if !value.is_finite() {
+                    return None;
+                }
+                best_posterior_utility = best_posterior_utility.max(value);
+            }
+            expected_after += *true_probability
+                * (*raw_weight / quadrature_weight_sum)
+                * best_posterior_utility;
+        }
+    }
+
+    let scaled_evsi = expected_after - baseline;
+    // Finite quadrature can introduce tiny negative roundoff despite non-negative
+    // theoretical EVSI; larger negative values indicate a numerical/model defect.
+    if !scaled_evsi.is_finite() || scaled_evsi < -1.0e-7 {
+        return None;
+    }
+    let evsi = scaled_evsi.max(0.0) * utility_scale;
+    evsi.is_finite().then_some(evsi)
+}
+
+/// Select an experiment by worst-case expected value of sample information (EVSI).
+///
+/// The robust score is:
+/// min_s EVSI(experiment | discrepancy scenario s)
+///   × representativeness × (1 - amplification_risk) / acquisition_cost.
+///
+/// Utility values are provided by an externally approved action×hypothesis policy.
+/// Eligibility is a hard gate and is checked before representativeness, risk, cost,
+/// noise, prediction or utility callbacks. The scenario set is finite and caller-owned;
+/// this does not establish robustness outside the frozen scenario family. Returns None
+/// when no admissible candidate has strictly positive worst-case decision value.
+pub fn select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost<
+    'a,
+    H,
+    E,
+    A,
+    S,
+>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    actions: &[A],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    representativeness: impl Fn(&E) -> f64 + Copy,
+    amplification_risk: impl Fn(&E) -> f64 + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    utility: impl Fn(&A, &H) -> f64 + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        if !eligible(experiment) {
             continue;
-        };
-        let score = information_gain / experiment_cost;
+        }
+        let representative = representativeness(experiment);
+        let amplification = amplification_risk(experiment);
+        if !representative.is_finite()
+            || !(0.0..=1.0).contains(&representative)
+            || !amplification.is_finite()
+            || !(0.0..=1.0).contains(&amplification)
+            || representative <= 0.0
+            || amplification >= 1.0
+        {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        let noise = observation_std_dev(experiment);
+        if !experiment_cost.is_finite()
+            || experiment_cost <= 0.0
+            || !noise.is_finite()
+            || noise <= 0.0
+        {
+            continue;
+        }
+
+        let mut worst_case_evsi = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let Some(value) = expected_value_of_sample_information(
+                experiment,
+                hypotheses,
+                prior_weights,
+                actions,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+                utility,
+            ) else {
+                complete = false;
+                break;
+            };
+            if !value.is_finite() || value <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_evsi = worst_case_evsi.min(value);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_evsi * representative * (1.0 - amplification) / experiment_cost;
         if score.is_finite()
             && score > 0.0
             && best.is_none_or(|(_, best_score)| score > best_score)
@@ -450,7 +1273,10 @@ mod tests {
         let hypotheses = [0_i32, 1, 2, 3];
         let score = expected_information_gain_nats(&(), &hypotheses, 1.0, |_, _| Some(42.0))
             .expect("valid noise and complete predictions");
-        assert!(score.abs() < 1.0e-12, "identical predictions should teach nothing: {score}");
+        assert!(
+            score.abs() < 1.0e-12,
+            "identical predictions should teach nothing: {score}"
+        );
     }
 
     #[test]
@@ -461,20 +1287,16 @@ mod tests {
         let balanced = [0.0, 0.0, 10.0, 10.0];
         assert!(variance(&outlier) > variance(&balanced));
         let hypotheses = [0_usize, 1, 2, 3];
-        let outlier_gain = expected_information_gain_nats(
-            &0_usize,
-            &hypotheses,
-            1.0,
-            |hypothesis, _| Some(outlier[*hypothesis]),
-        )
-        .expect("complete finite predictions");
-        let balanced_gain = expected_information_gain_nats(
-            &0_usize,
-            &hypotheses,
-            1.0,
-            |hypothesis, _| Some(balanced[*hypothesis]),
-        )
-        .expect("complete finite predictions");
+        let outlier_gain =
+            expected_information_gain_nats(&0_usize, &hypotheses, 1.0, |hypothesis, _| {
+                Some(outlier[*hypothesis])
+            })
+            .expect("complete finite predictions");
+        let balanced_gain =
+            expected_information_gain_nats(&0_usize, &hypotheses, 1.0, |hypothesis, _| {
+                Some(balanced[*hypothesis])
+            })
+            .expect("complete finite predictions");
         assert!(
             balanced_gain > outlier_gain + 0.05,
             "balanced split should reduce hypothesis uncertainty more: outlier={outlier_gain}, balanced={balanced_gain}"
@@ -500,38 +1322,274 @@ mod tests {
     fn information_gain_fails_closed_on_invalid_noise_or_incomplete_predictions() {
         let hypotheses = [0_i32, 1, 2];
         assert!(
-            expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64))
-                .is_none()
+            expected_information_gain_nats(&(), &hypotheses, 0.0, |h, _| Some(*h as f64)).is_none()
         );
         assert!(
             expected_information_gain_nats(&(), &hypotheses, f64::NAN, |h, _| Some(*h as f64))
                 .is_none()
         );
-        assert!(expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
-            (*h != 1).then_some(*h as f64)
-        })
-        .is_none());
+        assert!(
+            expected_information_gain_nats(&(), &hypotheses, 1.0, |h, _| {
+                (*h != 1).then_some(*h as f64)
+            })
+            .is_none()
+        );
         assert!(
             expected_information_gain_nats(&(), &[1_i32], 1.0, |h, _| Some(*h as f64)).is_none()
         );
+    }
+
+    #[derive(Clone, Copy)]
+    struct RobustCandidate {
+        id: &'static str,
+        representative: f64,
+        amplification_risk: f64,
+        eligible: bool,
+    }
+
+    #[test]
+    fn robust_representative_selector_deamplifies_unrepresentative_high_information_candidate() {
+        let candidates = [
+            RobustCandidate {
+                id: "high-eig-unrepresentative",
+                representative: 0.05,
+                amplification_risk: 0.90,
+                eligible: true,
+            },
+            RobustCandidate {
+                id: "representative-low-risk",
+                representative: 0.95,
+                amplification_risk: 0.05,
+                eligible: true,
+            },
+        ];
+        let hypotheses = [0_usize, 1];
+        let scenarios = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &RobustCandidate, _scenario: &u8| {
+            let signal = if candidate.id == "high-eig-unrepresentative" { 10.0 } else { 2.0 };
+            Some(*hypothesis as f64 * signal)
+        };
+        let (chosen, score) =
+            select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.5, 0.5],
+                &scenarios,
+                |candidate| candidate.eligible,
+                |candidate| candidate.representative,
+                |candidate| candidate.amplification_risk,
+                |_| 1.0,
+                predict,
+                |_| 1.0,
+            )
+            .expect("at least one robust representative candidate");
+        assert_eq!(chosen.id, "representative-low-risk");
+        assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
+    fn robust_representative_selector_requires_every_declared_discrepancy_scenario() {
+        let candidates = [
+            RobustCandidate {
+                id: "scenario-brittle",
+                representative: 1.0,
+                amplification_risk: 0.0,
+                eligible: true,
+            },
+            RobustCandidate {
+                id: "scenario-stable",
+                representative: 0.8,
+                amplification_risk: 0.1,
+                eligible: true,
+            },
+        ];
+        let hypotheses = [0_usize, 1];
+        let scenarios = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize, candidate: &RobustCandidate, scenario: &u8| {
+            match (candidate.id, *scenario, *hypothesis) {
+                ("scenario-brittle", 0, 0) => Some(0.0),
+                ("scenario-brittle", 0, 1) => Some(8.0),
+                ("scenario-brittle", 1, _) => Some(0.0),
+                ("scenario-stable", _, 0) => Some(0.0),
+                ("scenario-stable", _, 1) => Some(2.0),
+                _ => None,
+            }
+        };
+        let selected = select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+            &candidates,
+            &hypotheses,
+            &[0.5, 0.5],
+            &scenarios,
+            |candidate| candidate.eligible,
+            |candidate| candidate.representative,
+            |candidate| candidate.amplification_risk,
+            |_| 1.0,
+            predict,
+            |_| 1.0,
+        )
+        .expect("stable candidate retains positive EIG in both scenarios");
+        assert_eq!(selected.0.id, "scenario-stable");
+    }
+
+    #[test]
+    fn robust_representative_selector_skips_unknown_scores_and_abstains() {
+        let candidates = [
+            RobustCandidate {
+                id: "unknown-representativeness",
+                representative: f64::NAN,
+                amplification_risk: 0.0,
+                eligible: true,
+            },
+            RobustCandidate {
+                id: "unknown-amplification",
+                representative: 0.9,
+                amplification_risk: f64::NAN,
+                eligible: true,
+            },
+            RobustCandidate {
+                id: "out-of-range-risk",
+                representative: 0.9,
+                amplification_risk: 1.1,
+                eligible: true,
+            },
+        ];
+        let hypotheses = [0_usize, 1];
+        let scenarios = [0_u8];
+        let predict = |hypothesis: &usize, _: &RobustCandidate, _: &u8| {
+            Some(*hypothesis as f64)
+        };
+        assert!(
+            select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.5, 0.5],
+                &scenarios,
+                |candidate| candidate.eligible,
+                |candidate| candidate.representative,
+                |candidate| candidate.amplification_risk,
+                |_| 1.0,
+                predict,
+                |_| 1.0,
+            )
+            .is_none(),
+            "unknown or invalid robustness metadata must cause abstention"
+        );
+    }
+
+    #[test]
+    fn robust_representative_selector_applies_eligibility_before_other_callbacks() {
+        let candidates = [RobustCandidate {
+            id: "blocked",
+            representative: 1.0,
+            amplification_risk: 0.0,
+            eligible: false,
+        }];
+        let hypotheses = [0_usize, 1];
+        let scenarios = [0_u8];
+        let predict = |hypothesis: &usize, _: &RobustCandidate, _: &u8| {
+            Some(*hypothesis as f64)
+        };
+        assert!(
+            select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.5, 0.5],
+                &scenarios,
+                |candidate| candidate.eligible,
+                |_| panic!("ineligible candidate representativeness must not be queried"),
+                |_| panic!("ineligible candidate risk must not be queried"),
+                |_| panic!("ineligible candidate noise must not be queried"),
+                predict,
+                |_| panic!("ineligible candidate cost must not be queried"),
+            )
+            .is_none()
+        );
+    }
+
+    struct ManufacturingAdapterCandidate {
+        id: String,
+        representative: f64,
+        amplification_risk: f64,
+        noise: f64,
+        cost: f64,
+        cost_unit: String,
+        eligible: bool,
+    }
+
+    #[test]
+    fn consumes_symtropy_manufacturing_adapter_and_selects_representative_low_risk_candidate() {
+        const ADAPTER: &str =
+            include_str!("fixtures/manufacturing-robustness-adapter-synthetic.csv");
+        let mut lines = ADAPTER.lines();
+        assert_eq!(
+            lines.next(),
+            Some("candidate_id,representativeness_score,amplification_risk,observation_std_uncertainty,acquisition_cost,cost_unit,eligible,eligibility_state,eligibility_receipt_sha256")
+        );
+        let candidates: Vec<ManufacturingAdapterCandidate> = lines
+            .map(|line| {
+                let fields: Vec<&str> = line.split(',').collect();
+                assert_eq!(fields.len(), 9);
+                assert_eq!(fields[7], "ELIGIBLE");
+                assert_eq!(fields[8].len(), 64);
+                let candidate = ManufacturingAdapterCandidate {
+                    id: fields[0].to_string(),
+                    representative: fields[1].parse().unwrap(),
+                    amplification_risk: fields[2].parse().unwrap(),
+                    noise: fields[3].parse().unwrap(),
+                    cost: fields[4].parse().unwrap(),
+                    cost_unit: fields[5].to_string(),
+                    eligible: fields[6].parse().unwrap(),
+                };
+                assert!((0.0..=1.0).contains(&candidate.representative));
+                assert!((0.0..=1.0).contains(&candidate.amplification_risk));
+                assert!(candidate.noise.is_finite() && candidate.noise > 0.0);
+                assert!(candidate.cost.is_finite() && candidate.cost > 0.0);
+                candidate
+            })
+            .collect();
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates.iter().all(|candidate| candidate.cost_unit == "USD_2026"));
+
+        let hypotheses = [0_usize, 1];
+        let discrepancy_scenarios = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize,
+                       candidate: &ManufacturingAdapterCandidate,
+                       scenario: &u8| {
+            let signal = if candidate.id == "TX-CAND-OOD-002" { 10.0 } else { 2.0 };
+            Some(*hypothesis as f64 * signal * (1.0 + f64::from(*scenario) * 0.1))
+        };
+        let (chosen, score) =
+            select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.5, 0.5],
+                &discrepancy_scenarios,
+                |candidate| candidate.eligible,
+                |candidate| candidate.representative,
+                |candidate| candidate.amplification_risk,
+                |candidate| candidate.noise,
+                predict,
+                |candidate| candidate.cost,
+            )
+            .expect("the manufacturing adapter contains an eligible positive-information candidate");
+        assert_eq!(chosen.id, "TX-CAND-REP-001");
+        assert!(score.is_finite() && score > 0.0);
     }
 
     #[test]
     fn information_gain_selector_maximizes_information_per_cost_not_raw_information() {
         let hypotheses = [0_usize, 1, 2, 3];
         let candidates = [1_u8, 2, 3];
-        let predict = |hypothesis: &usize, experiment: &u8| {
-            match (*experiment, *hypothesis) {
-                (1, 0 | 1) => Some(0.0),
-                (1, 2 | 3) => Some(1.0),
-                (2, 0 | 1) => Some(0.0),
-                (2, 2 | 3) => Some(10.0),
-                (3, 0) => Some(-100.0),
-                (3, 1) => Some(-50.0),
-                (3, 2) => Some(50.0),
-                (3, 3) => Some(100.0),
-                _ => None,
-            }
+        let predict = |hypothesis: &usize, experiment: &u8| match (*experiment, *hypothesis) {
+            (1, 0 | 1) => Some(0.0),
+            (1, 2 | 3) => Some(1.0),
+            (2, 0 | 1) => Some(0.0),
+            (2, 2 | 3) => Some(10.0),
+            (3, 0) => Some(-100.0),
+            (3, 1) => Some(-50.0),
+            (3, 2) => Some(50.0),
+            (3, 3) => Some(100.0),
+            _ => None,
         };
         let low_cost_information =
             expected_information_gain_nats(&1, &hypotheses, 1.0, predict).unwrap();
@@ -553,6 +1611,587 @@ mod tests {
         )
         .expect("at least one valid candidate");
         assert_eq!(*chosen, 1);
+        assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
+    fn heteroscedastic_selector_prefers_a_cleaner_measurement_over_a_noisier_high_signal_one() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["high_signal_bad_meter", "low_signal_good_meter"];
+        let predict = |hypothesis: &usize, candidate: &&str| match (*candidate, *hypothesis) {
+            ("high_signal_bad_meter", 0) => Some(0.0),
+            ("high_signal_bad_meter", 1) => Some(10.0),
+            ("low_signal_good_meter", 0) => Some(0.0),
+            ("low_signal_good_meter", 1) => Some(1.0),
+            _ => None,
+        };
+        let noise = |candidate: &&str| match *candidate {
+            "high_signal_bad_meter" => 100.0,
+            "low_signal_good_meter" => 0.1,
+            _ => f64::NAN,
+        };
+        let (chosen, score) =
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| true,
+                noise,
+                predict,
+                |_| 1.0,
+            )
+            .expect("the calibrated candidate has positive information gain");
+        assert_eq!(*chosen, "low_signal_good_meter");
+        assert!(score.is_finite() && score > 0.0);
+
+        // Under a shared low-noise assumption, the much larger nominal signal is
+        // selected first. Candidate-specific metrology uncertainty reverses that rank.
+        let (common_noise_choice, _) = select_experiment_by_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            0.1,
+            predict,
+            |_| 1.0,
+        )
+        .expect("both candidates are informative under the common-noise assumption");
+        assert_eq!(*common_noise_choice, "high_signal_bad_meter");
+    }
+
+    #[test]
+    fn hard_eligibility_gate_runs_before_cost_noise_or_prediction() {
+        let candidates = ["blocked", "eligible"];
+        let hypotheses = [0_usize, 1];
+        let predict = |hypothesis: &usize, candidate: &&str| {
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidates must not be scored"
+            );
+            Some(*hypothesis as f64)
+        };
+        let cost = |candidate: &&str| {
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidate cost must not be queried"
+            );
+            1.0
+        };
+        let noise = |candidate: &&str| {
+            assert_ne!(
+                *candidate, "blocked",
+                "blocked candidate noise must not be queried"
+            );
+            1.0
+        };
+        let selected = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |candidate| *candidate == "eligible",
+            noise,
+            predict,
+            cost,
+        )
+        .expect("one eligible informative candidate");
+        assert_eq!(*selected.0, "eligible");
+
+        assert!(
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| false,
+                noise,
+                predict,
+                cost,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn heteroscedastic_selector_skips_invalid_noise_and_invalid_cost() {
+        let candidates = [0_usize, 1, 2];
+        let hypotheses = [0_usize, 1];
+        let selected = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| true,
+            |candidate| match candidate {
+                0 => f64::NAN,
+                1 => 1.0,
+                _ => 1.0,
+            },
+            |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
+            |candidate| if *candidate == 2 { f64::INFINITY } else { 1.0 },
+        )
+        .expect("candidate 1 is admissible and informative");
+        assert_eq!(*selected.0, 1);
+
+        assert!(
+            select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+                &candidates,
+                &hypotheses,
+                |_| true,
+                |_| f64::NAN,
+                |hypothesis, candidate| Some((*hypothesis * (*candidate + 1)) as f64),
+                |_| 1.0,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn weighted_eig_is_invariant_to_duplicate_hypotheses_with_split_prior_mass() {
+        let hypotheses = [0_usize, 1];
+        let two_hypothesis_gain = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[0.5, 0.5],
+            0.25,
+            |hypothesis, _| Some(*hypothesis as f64),
+        )
+        .unwrap();
+
+        let duplicated_hypotheses = [0_usize, 1, 2];
+        let duplicated_gain = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &duplicated_hypotheses,
+            &[0.25, 0.25, 0.5],
+            0.25,
+            |hypothesis, _| Some(if *hypothesis == 2 { 1.0 } else { 0.0 }),
+        )
+        .unwrap();
+        assert!((two_hypothesis_gain - duplicated_gain).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn weighted_eig_respects_prior_entropy_and_asymmetric_hypothesis_mass() {
+        let hypotheses = [0.0_f64, 2.0];
+        let uniform = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[1.0, 1.0],
+            0.05,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .unwrap();
+        let skewed = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[9.0, 1.0],
+            0.05,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .unwrap();
+        let binary_entropy = -(0.9_f64 * 0.9_f64.ln() + 0.1_f64 * 0.1_f64.ln());
+        assert!(uniform > skewed);
+        assert!(skewed <= binary_entropy + 1.0e-12);
+        assert!(skewed > 0.0);
+    }
+
+    #[test]
+    fn weighted_eig_fails_closed_on_invalid_or_degenerate_priors() {
+        let hypotheses = [0_usize, 1];
+        let predict = |hypothesis: &usize, _| Some(*hypothesis as f64);
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[1.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[f64::NAN, 1.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[-0.1, 1.1], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[1.0, 0.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[0.0, 0.0], 1.0, predict
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn weighted_eig_zero_noise_limit_is_entropy_of_distinct_prediction_mass() {
+        let hypotheses = [0_usize, 1, 2];
+        let gain = expected_information_gain_with_prior_weights_and_steps(
+            &(),
+            &hypotheses,
+            &[0.2, 0.3, 0.5],
+            1.0e-300,
+            INFORMATION_GAIN_QUADRATURE_STEPS,
+            |hypothesis, _| Some(if *hypothesis < 2 { 7.0 } else { 9.0 }),
+        )
+        .unwrap();
+        let expected = -(0.5_f64 * 0.5_f64.ln() + 0.5_f64 * 0.5_f64.ln());
+        assert!((gain - expected).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn prior_weighted_selector_is_invariant_to_duplicate_hypotheses_with_split_mass() {
+        let candidates = ["candidate"];
+        let two_hypotheses = [0_usize, 1];
+        let two = select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility(
+            &candidates,
+            &two_hypotheses,
+            &[0.5, 0.5],
+            |_| true,
+            |_| 0.25,
+            |hypothesis, _| Some(*hypothesis as f64),
+            |_| 1.0,
+        )
+        .unwrap();
+
+        let three_hypotheses = [0_usize, 1, 2];
+        let duplicated = select_experiment_by_information_gain_per_cost_with_prior_weights_and_noise_and_eligibility(
+            &candidates,
+            &three_hypotheses,
+            &[0.25, 0.25, 0.5],
+            |_| true,
+            |_| 0.25,
+            |hypothesis, _| Some(if *hypothesis == 2 { 1.0 } else { 0.0 }),
+            |_| 1.0,
+        )
+        .unwrap();
+        assert!((two.1 - duplicated.1).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn prior_weighted_robust_selector_keeps_hard_eligibility_and_scenario_floor() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["blocked", "fragile", "robust"];
+        let scenarios = ["nominal", "shift"];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost_with_prior_weights(
+            &candidates,
+            &hypotheses,
+            &[0.5, 0.5],
+            &scenarios,
+            |candidate| *candidate != "blocked",
+            |_| 0.1,
+            |hypothesis, candidate, scenario| match (*candidate, *scenario, *hypothesis) {
+                ("fragile", "nominal", 0) => Some(0.0),
+                ("fragile", "nominal", 1) => Some(5.0),
+                ("fragile", "shift", _) => Some(3.0),
+                ("robust", _, 0) => Some(0.0),
+                ("robust", _, 1) => Some(1.0),
+                _ => None,
+            },
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+        )
+        .expect("robust candidate has positive weighted information in all scenarios");
+        assert_eq!(*selected.0, "robust");
+    }
+
+    #[test]
+    fn robust_selector_rejects_nominally_informative_candidate_that_fails_under_shift() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["fragile", "robust"];
+        let scenarios = ["nominal", "boundary_shift"];
+        let predict = |hypothesis: &usize, candidate: &&str, scenario: &&str| match (
+            *candidate,
+            *scenario,
+            *hypothesis,
+        ) {
+            ("fragile", "nominal", 0) => Some(0.0),
+            ("fragile", "nominal", 1) => Some(5.0),
+            ("fragile", "boundary_shift", _) => Some(2.0),
+            ("robust", _, 0) => Some(0.0),
+            ("robust", _, 1) => Some(1.0),
+            _ => None,
+        };
+        let nominal = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| true,
+            |_| 0.1,
+            |hypothesis, candidate| predict(hypothesis, candidate, &"nominal"),
+            |_| 1.0,
+        )
+        .expect("nominal EIG has a positive-information candidate");
+        assert_eq!(*nominal.0, "fragile");
+
+        let robust = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |_| true,
+            |_| 0.1,
+            predict,
+            |_| 1.0,
+        )
+        .expect("robust candidate retains information in both scenarios");
+        assert_eq!(*robust.0, "robust");
+        assert!(robust.1.is_finite() && robust.1 > 0.0);
+    }
+
+    #[test]
+    fn robust_selector_fails_closed_on_empty_scenario_set_or_incomplete_scenario() {
+        let hypotheses = [0_usize, 1];
+        let candidates = [0_usize, 1];
+        assert!(
+            select_experiment_by_worst_case_information_gain_per_cost(
+                &candidates,
+                &hypotheses,
+                &[],
+                |_| true,
+                |_| 1.0,
+                |hypothesis, candidate, _scenario: &usize| {
+                    Some((*hypothesis * (*candidate + 1)) as f64)
+                },
+                |_| 1.0,
+            )
+            .is_none()
+        );
+
+        let scenarios = [0_usize, 1];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |_| true,
+            |_| 1.0,
+            |hypothesis, candidate, scenario| {
+                if *candidate == 0 && *scenario == 1 {
+                    None
+                } else {
+                    Some((*hypothesis * (*candidate + 1)) as f64)
+                }
+            },
+            |_| 1.0,
+        );
+        assert_eq!(selected.map(|(candidate, _)| *candidate), Some(1));
+    }
+
+    #[test]
+    fn robust_selector_applies_eligibility_before_cost_noise_or_scenario_predictions() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["blocked", "eligible"];
+        let scenarios = [0_usize, 1];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |candidate| *candidate == "eligible",
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+            |hypothesis, candidate, scenario| {
+                assert_ne!(*candidate, "blocked");
+                Some((*hypothesis + *scenario) as f64)
+            },
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+        )
+        .expect("eligible candidate is informative in each scenario");
+        assert_eq!(*selected.0, "eligible");
+    }
+
+
+    #[test]
+    fn evsi_ignores_nuisance_information_that_cannot_change_the_decision() {
+        let hypotheses = [0_usize, 1, 2, 3];
+        let priors = [0.25, 0.25, 0.25, 0.25];
+        let actions = ["ACCEPT_CLASS_A", "ACCEPT_CLASS_B"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("ACCEPT_CLASS_A", 0 | 1) => 10.0,
+            ("ACCEPT_CLASS_A", 2 | 3) => 0.0,
+            ("ACCEPT_CLASS_B", 0 | 1) => 0.0,
+            ("ACCEPT_CLASS_B", 2 | 3) => 10.0,
+            _ => f64::NAN,
+        };
+        // This test separates within-decision-class nuisance hypotheses, but does
+        // not reveal which action class is correct. It has information, not decision value.
+        let nuisance = expected_value_of_sample_information(
+            &"nuisance",
+            &hypotheses,
+            &priors,
+            &actions,
+            0.1,
+            |h, _| Some(if *h % 2 == 0 { 0.0 } else { 4.0 }),
+            utility,
+        )
+        .expect("finite nuisance measurement model");
+        let decision_relevant = expected_value_of_sample_information(
+            &"decision",
+            &hypotheses,
+            &priors,
+            &actions,
+            0.1,
+            |h, _| Some(if *h < 2 { 0.0 } else { 4.0 }),
+            utility,
+        )
+        .expect("finite decision-relevant measurement model");
+        assert!(nuisance < 1.0e-6, "nuisance EVSI should be zero, got {nuisance}");
+        assert!(decision_relevant > 4.9, "decision-relevant EVSI too small: {decision_relevant}");
+    }
+
+    #[test]
+    fn evsi_is_invariant_to_representation_duplication_when_prior_mass_is_split() {
+        let actions = ["CHOOSE_ZERO", "CHOOSE_ONE"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("CHOOSE_ZERO", 0) => 1.0,
+            ("CHOOSE_ZERO", 1) => 0.0,
+            ("CHOOSE_ONE", 0) => 0.0,
+            ("CHOOSE_ONE", 1) => 1.0,
+            _ => f64::NAN,
+        };
+        let base_h = [0_usize, 1];
+        let base = expected_value_of_sample_information(
+            &(), &base_h, &[0.5, 0.5], &actions, 0.2,
+            |h, _| Some(*h as f64 * 2.0), utility,
+        ).unwrap();
+
+        let duplicate_h = [0_usize, 0, 1];
+        let duplicate = expected_value_of_sample_information(
+            &(), &duplicate_h, &[0.25, 0.25, 0.5], &actions, 0.2,
+            |h, _| Some(*h as f64 * 2.0), |action, h| utility(action, h),
+        ).unwrap();
+        assert!((base - duplicate).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn robust_evsi_rejects_a_nominally_useful_measurement_that_fails_under_shift() {
+        let hypotheses = [0_usize, 1];
+        let priors = [0.5, 0.5];
+        let actions = ["A", "B"];
+        let utility = |action: &&str, hypothesis: &usize| match (*action, *hypothesis) {
+            ("A", 0) | ("B", 1) => 10.0,
+            _ => 0.0,
+        };
+        let candidates = ["fragile", "robust"];
+        let scenarios = ["nominal", "boundary_shift"];
+        let predict = |h: &usize, candidate: &&str, scenario: &&str| match (*candidate, *scenario, *h) {
+            ("fragile", "nominal", 0) => Some(0.0),
+            ("fragile", "nominal", 1) => Some(5.0),
+            ("fragile", "boundary_shift", _) => Some(2.0),
+            ("robust", _, 0) => Some(0.0),
+            ("robust", _, 1) => Some(2.0),
+            _ => None,
+        };
+        let nominal = expected_value_of_sample_information(
+            &"fragile", &hypotheses, &priors, &actions, 0.1,
+            |h, candidate| predict(h, candidate, &"nominal"), utility,
+        ).unwrap();
+        let robust = select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |_| true, |_| 1.0, |_| 0.0, |_| 0.1,
+            predict, utility, |_| 1.0,
+        ).expect("robust candidate has decision value in every scenario");
+        assert!(nominal > 4.9);
+        assert_eq!(*robust.0, "robust");
+        assert!(robust.1 > 4.9);
+    }
+
+    #[test]
+    fn evsi_eligibility_gate_precedes_every_candidate_specific_callback() {
+        let hypotheses = [0_usize, 1];
+        let priors = [0.5, 0.5];
+        let actions = ["A", "B"];
+        let scenarios = [0_usize];
+        let candidates = ["blocked", "allowed"];
+        let utility = |action: &&str, hypothesis: &usize| {
+            if *action == "A" { 1.0 - *hypothesis as f64 } else { *hypothesis as f64 }
+        };
+        let chosen = select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |c| *c == "allowed",
+            |c| { assert_ne!(*c, "blocked"); 1.0 },
+            |c| { assert_ne!(*c, "blocked"); 0.0 },
+            |c| { assert_ne!(*c, "blocked"); 0.1 },
+            |h, c, _| { assert_ne!(*c, "blocked"); Some(*h as f64) },
+            utility,
+            |c| { assert_ne!(*c, "blocked"); 1.0 },
+        ).expect("eligible informative candidate");
+        assert_eq!(*chosen.0, "allowed");
+        assert!(select_experiment_by_representative_deamplifying_worst_case_evsi_per_cost(
+            &candidates, &hypotheses, &priors, &actions, &scenarios,
+            |_| false, |_| 1.0, |_| 0.0, |_| 0.1,
+            |h, c, _| { assert_ne!(*c, "blocked"); Some(*h as f64) },
+            utility, |_| 1.0,
+        ).is_none());
+    }
+
+    #[test]
+    fn evsi_fails_closed_on_invalid_utility_prior_or_scenario() {
+        let hypotheses = [0_usize, 1];
+        let actions = ["A", "B"];
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.5, 0.5], &actions, 1.0,
+            |h, _| Some(*h as f64), |_, _| f64::NAN,
+        ).is_none());
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.0, 0.0], &actions, 1.0,
+            |h, _| Some(*h as f64), |_, _| 1.0,
+        ).is_none());
+        assert!(expected_value_of_sample_information(
+            &(), &hypotheses, &[0.5, 0.5], &[], 1.0,
+            |h, _| Some(*h as f64), |_, _| 1.0,
+        ).is_none());
+    }
+
+    #[test]
+    fn symtropy_decision_policy_fixture_drives_decision_aware_acquisition() {
+        const POLICY: &str = include_str!("../../../examples/fixtures/manufacturing-decision-policy-synthetic.csv");
+        let mut lines = POLICY.lines();
+        let header = lines.next().expect("decision policy header");
+        assert_eq!(
+            header,
+            "policy_id,policy_revision,decision_case_id,product_family,test_id,measurand,unit,outcome_class,release_prohibited,action_id,is_release_action,utility_value,utility_unit,policy_source_artifact_id,policy_source_sha256,approval_artifact_id,approval_sha256,effective_from_utc,effective_to_utc,safety_policy_revision"
+        );
+        let mut utility_rows: Vec<(String, String, f64)> = Vec::new();
+        for line in lines {
+            let fields: Vec<&str> = line.split(',').collect();
+            assert_eq!(fields.len(), 20);
+            let value: f64 = fields[11].parse().expect("finite utility cell");
+            assert!(value.is_finite());
+            assert_eq!(fields[12], "SYNTHETIC_POINTS");
+            utility_rows.push((fields[7].to_string(), fields[9].to_string(), value));
+        }
+        assert_eq!(utility_rows.len(), 12, "three actions × four outcomes");
+        let outcomes = ["PASS", "FAIL", "INDETERMINATE", "OOD"];
+        let actions = ["RELEASE", "REWORK", "ESCALATE"];
+        for outcome in outcomes {
+            for action in actions {
+                assert_eq!(
+                    utility_rows.iter().filter(|(o, a, _)| o == outcome && a == action).count(),
+                    1,
+                    "missing or duplicate policy cell: {action}/{outcome}"
+                );
+            }
+        }
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prior = [0.4, 0.2, 0.2, 0.2];
+        let score = expected_value_of_sample_information(
+            &"routine-electrical-test",
+            &hypotheses,
+            &prior,
+            &actions,
+            0.1,
+            |hypothesis, _| Some(match hypothesis {
+                0 => 0.0,   // PASS
+                1 => 2.0,   // FAIL
+                2 => 2.2,   // INDETERMINATE
+                _ => 2.4,   // OOD
+            }),
+            |action, hypothesis| {
+                let outcome = outcomes[*hypothesis];
+                utility_rows
+                    .iter()
+                    .find(|(candidate_outcome, candidate_action, _)| {
+                        candidate_outcome.as_str() == outcome && candidate_action.as_str() == *action
+                    })
+                    .map(|(_, _, utility)| *utility)
+                    .unwrap_or(f64::NAN)
+            },
+        )
+        .expect("valid Symtropy utility matrix yields an EVSI score");
         assert!(score.is_finite() && score > 0.0);
     }
 
@@ -611,13 +2250,9 @@ mod tests {
         }
 
         assert!(
-            expected_information_gain_with_steps(
-                &(),
-                &[0.0_f64, 1.0],
-                1.0,
-                0,
-                |prediction, _| Some(*prediction),
-            )
+            expected_information_gain_with_steps(&(), &[0.0_f64, 1.0], 1.0, 0, |prediction, _| {
+                Some(*prediction)
+            },)
             .is_none()
         );
     }
