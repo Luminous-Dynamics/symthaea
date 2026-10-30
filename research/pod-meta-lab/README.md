@@ -9,6 +9,7 @@ This lab is intentionally outside the root Cargo workspace and has zero third-pa
 ```bash
 cargo test --manifest-path research/pod-meta-lab/Cargo.toml
 cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
+cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 ```
 
 ## What is implemented
@@ -25,7 +26,8 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 - Anti-replay behavior: a later revocation/correction advances the state identity, so an earlier valid receipt cannot resurrect a superseded conclusion.
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
 - Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
-- 24 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, transactional multi-obligation freshness, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
+- A public deterministic POAR-v1 runner with 16 scheduler/receipt conformance fixtures; it is a smoke suite, not a model leaderboard or hidden-test evaluation.
+- 25 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, transactional multi-obligation freshness, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
 
 ## Deliberate limits
 
