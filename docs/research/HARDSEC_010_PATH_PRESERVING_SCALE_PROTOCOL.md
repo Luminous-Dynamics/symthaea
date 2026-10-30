@@ -82,7 +82,7 @@ cargo test --locked \
 
 Nine unit tests are authored for a preserved cross-partition path, lost witness edge with fail receipt, incorrect bridge classification, edge endpoint mutation, disconnected witness, non-contiguous path index, duplicate partition-edge ID, missing node partition assignment, and receipt overwrite. They are not yet reported as passing.
 
-## 3. Streaming edge-merge implementation
+## 4. Streaming edge-merge implementation
 
 The original path auditor, `examples/hardsec_partition_path_audit.rs`, is useful for small fixtures because it loads the graph edges directly. The scale path is `examples/hardsec_partition_path_stream.rs`: it requires the original and partitioned edge files to be strictly sorted by `edge_id` and performs a merge join with one current record from each stream.
 
