@@ -420,26 +420,25 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                 claim.claim_id
             ));
         }
-        if let (Some(from), Some(until)) = (&scope.valid_from, &scope.valid_until) {
-            if from > until {
-                issues.push(format!(
-                    "claim {} valid_from is after valid_until",
-                    claim.claim_id
-                ));
-            }
+        if let (Some(from), Some(until)) = (&scope.valid_from, &scope.valid_until)
+            && from > until
+        {
+            issues.push(format!(
+                "claim {} valid_from is after valid_until",
+                claim.claim_id
+            ));
         }
-        if let Some(target) = &scope.target_date {
-            if scope.valid_from.as_ref().is_some_and(|from| target < from)
+        if let Some(target) = &scope.target_date
+            && (scope.valid_from.as_ref().is_some_and(|from| target < from)
                 || scope
                     .valid_until
                     .as_ref()
-                    .is_some_and(|until| target > until)
-            {
-                issues.push(format!(
-                    "claim {} target_date is outside its declared validity interval",
-                    claim.claim_id
-                ));
-            }
+                    .is_some_and(|until| target > until))
+        {
+            issues.push(format!(
+                "claim {} target_date is outside its declared validity interval",
+                claim.claim_id
+            ));
         }
     }
 
@@ -568,7 +567,6 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
     let mut per_claim_independence_groups: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     let mut seen_claim_adjudicator_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
     let mut seen_claim_independence_pairs: BTreeSet<(&str, &str)> = BTreeSet::new();
-    let mut abstentions = 0_u64;
     for record in &fields.initial_adjudications {
         if record.record_id.trim().is_empty() || record.record_id.len() > 128 {
             issues
@@ -621,7 +619,6 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
             ));
         }
         if record.decision == ReferenceDecisionV1::Abstain {
-            abstentions += 1;
             if record
                 .abstention_reason
                 .as_deref()
@@ -873,13 +870,12 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
                     }
                     if let (Some(target), Some(published)) =
                         (target_date, source.publication_date.as_deref())
+                        && published > target
                     {
-                        if published > target {
-                            issues.push(format!(
-                                "adjudication {} uses a source published after the claim target date",
-                                record.record_id
-                            ));
-                        }
+                        issues.push(format!(
+                            "adjudication {} uses a source published after the claim target date",
+                            record.record_id
+                        ));
                     }
                 }
             }
@@ -981,13 +977,13 @@ pub fn verify_reference_assurance_package(
             claims_with_cited_spans.insert(record.claim_id.as_str());
         }
         for span_id in &record.evidence_span_ids {
-            if let Some(span) = spans.get(span_id.as_str()) {
-                if let Some(source) = sources.get(span.source_id.as_str()) {
-                    if let Some(group) = &source.ancestry_group_sha256 {
-                        referenced_ancestry_groups.insert(group.as_str());
-                    } else {
-                        referenced_unknown_ancestry_sources.insert(source.source_id.as_str());
-                    }
+            if let Some(span) = spans.get(span_id.as_str())
+                && let Some(source) = sources.get(span.source_id.as_str())
+            {
+                if let Some(group) = &source.ancestry_group_sha256 {
+                    referenced_ancestry_groups.insert(group.as_str());
+                } else {
+                    referenced_unknown_ancestry_sources.insert(source.source_id.as_str());
                 }
             }
         }
