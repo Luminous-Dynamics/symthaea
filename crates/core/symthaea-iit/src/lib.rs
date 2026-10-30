@@ -1463,10 +1463,10 @@ impl BinaryCausalModel {
 
         let purview_state_count = 1usize << purview.len();
         if purview.is_empty() {
-            return Ok(vec![1.0]);
+            return Ok(vec![vec![1.0]; mechanism.len()]);
         }
         if mechanism.is_empty() {
-            return Ok(vec![1.0; purview_state_count]);
+            return Ok(Vec::new());
         }
 
         let background: Vec<usize> = (0..self.n_units)
