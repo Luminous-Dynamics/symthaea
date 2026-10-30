@@ -2130,6 +2130,65 @@ mod tests {
     }
 
     #[test]
+    fn symtropy_decision_policy_fixture_drives_decision_aware_acquisition() {
+        const POLICY: &str = include_str!("../../../examples/fixtures/manufacturing-decision-policy-synthetic.csv");
+        let mut lines = POLICY.lines();
+        let header = lines.next().expect("decision policy header");
+        assert_eq!(
+            header,
+            "policy_id,policy_revision,decision_case_id,product_family,test_id,measurand,unit,outcome_class,release_prohibited,action_id,is_release_action,utility_value,utility_unit,policy_source_artifact_id,policy_source_sha256,approval_artifact_id,approval_sha256,effective_from_utc,effective_to_utc,safety_policy_revision"
+        );
+        let mut utility_rows: Vec<(String, String, f64)> = Vec::new();
+        for line in lines {
+            let fields: Vec<&str> = line.split(',').collect();
+            assert_eq!(fields.len(), 20);
+            let value: f64 = fields[11].parse().expect("finite utility cell");
+            assert!(value.is_finite());
+            assert_eq!(fields[12], "SYNTHETIC_POINTS");
+            utility_rows.push((fields[7].to_string(), fields[9].to_string(), value));
+        }
+        assert_eq!(utility_rows.len(), 12, "three actions × four outcomes");
+        let outcomes = ["PASS", "FAIL", "INDETERMINATE", "OOD"];
+        let actions = ["RELEASE", "REWORK", "ESCALATE"];
+        for outcome in outcomes {
+            for action in actions {
+                assert_eq!(
+                    utility_rows.iter().filter(|(o, a, _)| o == outcome && a == action).count(),
+                    1,
+                    "missing or duplicate policy cell: {action}/{outcome}"
+                );
+            }
+        }
+        let hypotheses = [0_usize, 1, 2, 3];
+        let prior = [0.4, 0.2, 0.2, 0.2];
+        let score = expected_value_of_sample_information(
+            &"routine-electrical-test",
+            &hypotheses,
+            &prior,
+            &actions,
+            0.1,
+            |hypothesis, _| Some(match hypothesis {
+                0 => 0.0,   // PASS
+                1 => 2.0,   // FAIL
+                2 => 2.2,   // INDETERMINATE
+                _ => 2.4,   // OOD
+            }),
+            |action, hypothesis| {
+                let outcome = outcomes[*hypothesis];
+                utility_rows
+                    .iter()
+                    .find(|(candidate_outcome, candidate_action, _)| {
+                        candidate_outcome == outcome && candidate_action == *action
+                    })
+                    .map(|(_, _, utility)| *utility)
+                    .unwrap_or(f64::NAN)
+            },
+        )
+        .expect("valid Symtropy utility matrix yields an EVSI score");
+        assert!(score.is_finite() && score > 0.0);
+    }
+
+    #[test]
     fn information_gain_selector_returns_none_when_every_candidate_is_uninformative() {
         let hypotheses = [0_i32, 1, 2];
         let candidates = [0.0_f64, 1.0, 2.0];
