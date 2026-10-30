@@ -25,7 +25,7 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 - Anti-replay behavior: a later revocation/correction advances the state identity, so an earlier valid receipt cannot resurrect a superseded conclusion.
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
 - Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
-- 23 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
+- 24 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, transactional multi-obligation freshness, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
 
 ## Deliberate limits
 
