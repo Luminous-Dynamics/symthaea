@@ -1,0 +1,270 @@
+{
+  "schema_version": "broca-industry-baseline-ledger-v1",
+  "created_at": "2026-10-30",
+  "purpose": "Evidence-graded registry of external agent-memory results. This is not a unified leaderboard. Scores remain scoped to their original benchmark revision, dataset split, answer model, judge, prompts, memory corpus, and budgets.",
+  "comparability_policy": {
+    "direct_comparison_requires": [
+      "same benchmark version and split",
+      "same source corpus and ingestion trajectory",
+      "same answer model and version",
+      "same judge model, rubric, and prompt",
+      "same memory/query prompt and tool-call limits",
+      "same context-token accounting and answer context budget",
+      "same number of evaluation items and scoring rules",
+      "paired per-question outputs and uncertainty estimates"
+    ],
+    "never_pool": [
+      "LoCoMo accuracy with LongMemEval accuracy",
+      "LongMemEval with LongMemEval-V2",
+      "answer accuracy with evidence recall",
+      "retrieval-only results with end-to-end answer results",
+      "vendor self-reports with independent matched-harness runs"
+    ],
+    "broca_status": "No Broca score is entered until the exact runner, commit, dataset digest, model, judge, budgets, and raw per-item outputs are recorded."
+  },
+  "results": [
+    {
+      "id": "qemem-locomo-claude-opus-45-2026-10-15",
+      "system": "QEMem",
+      "category": "research-paper",
+      "benchmark": "LoCoMo",
+      "benchmark_revision": "paper evaluation protocol",
+      "metric": "LLM-judge answer accuracy",
+      "value_percent": 91.43,
+      "answer_model": "Claude Opus 4.5",
+      "judge": "LLM judge; paper-specific",
+      "reported_date": "2026-10-15",
+      "sample_size": null,
+      "secondary_metrics": {
+        "complete_retrieval_source_coverage_percent": 92.8,
+        "delta_vs_strongest_reported_baseline_percentage_points": 7.6
+      },
+      "evidence_grade": "primary-paper",
+      "comparison_notes": "QEMem is the direct evidence-set sufficiency comparator. Its score is tied to its shared-memory-store protocol and should not be compared directly with vendor LoCoMo scores that use different reader/judge configurations.",
+      "source": "https://arxiv.org/abs/2610.22668"
+    },
+    {
+      "id": "zep-cloud-locomo-2026",
+      "system": "Zep Cloud",
+      "category": "commercial-vendor-self-report",
+      "benchmark": "LoCoMo",
+      "benchmark_revision": "vendor-published evaluation",
+      "metric": "answer accuracy",
+      "value_percent": 94.7,
+      "answer_model": "GPT-5.4",
+      "judge": "Vendor-published evaluation; details on vendor research page",
+      "reported_date": "2026-10",
+      "sample_size": 1540,
+      "secondary_metrics": {
+        "correct_items": 1459,
+        "retrieval_latency_ms": 155,
+        "context_tokens": 5760
+      },
+      "evidence_grade": "vendor-self-report",
+      "comparison_notes": "A strong commercial reference. Not directly comparable with QEMem or a future Broca result until the answer/judge prompts, corpus, context and scoring are matched.",
+      "source": "https://www.getzep.com/research/"
+    },
+    {
+      "id": "zep-cloud-longmemeval-2026",
+      "system": "Zep Cloud",
+      "category": "commercial-vendor-self-report",
+      "benchmark": "LongMemEval",
+      "benchmark_revision": "vendor-published 500-question evaluation",
+      "metric": "answer accuracy",
+      "value_percent": 90.2,
+      "answer_model": "GPT-5.4",
+      "judge": "Vendor-published evaluation; details on vendor research page",
+      "reported_date": "2026-10",
+      "sample_size": 500,
+      "secondary_metrics": {
+        "correct_items": 451,
+        "retrieval_latency_p50_ms": 104,
+        "retrieval_latency_p95_ms": 162,
+        "context_tokens_median": 4408
+      },
+      "evidence_grade": "vendor-self-report",
+      "comparison_notes": "Do not compare with LongMemEval-V2 Small/Medium results; those are a different benchmark revision.",
+      "source": "https://www.getzep.com/research/"
+    },
+    {
+      "id": "mem0-locomo-2026",
+      "system": "Mem0 Platform",
+      "category": "commercial-vendor-self-report",
+      "benchmark": "LoCoMo",
+      "benchmark_revision": "vendor-published evaluation",
+      "metric": "answer accuracy",
+      "value_percent": 92.5,
+      "answer_model": "GPT-5; identified by a third-party methodology audit of the vendor's run artifacts",
+      "judge": "GPT-5; identified by a third-party methodology audit",
+      "reported_date": "2026-05",
+      "sample_size": 1540,
+      "secondary_metrics": {
+        "correct_items": 1425
+      },
+      "evidence_grade": "vendor-result-third-party-methodology-audit",
+      "comparison_notes": "The result and settings are summarized in a third-party comparison. Treat the score as a vendor-reported result, not a matched Broca baseline.",
+      "source": "https://agentsystems.blog/agent-memory-benchmark"
+    },
+    {
+      "id": "mem0-longmemeval-2026",
+      "system": "Mem0 Platform",
+      "category": "commercial-vendor-self-report",
+      "benchmark": "LongMemEval",
+      "benchmark_revision": "vendor-published 500-question evaluation",
+      "metric": "answer accuracy",
+      "value_percent": 94.4,
+      "answer_model": "GPT-5; identified by a third-party methodology audit of the vendor's run artifacts",
+      "judge": "GPT-5; identified by a third-party methodology audit",
+      "reported_date": "2026-05",
+      "sample_size": 500,
+      "secondary_metrics": {
+        "correct_items": 472
+      },
+      "evidence_grade": "vendor-result-third-party-methodology-audit",
+      "comparison_notes": "Different configuration and revision from LongMemEval-V2. Do not compare with AgentRunbook-C LongMemEval-V2 rows.",
+      "source": "https://agentsystems.blog/agent-memory-benchmark"
+    },
+    {
+      "id": "agentrunbook-c-longmemeval-v2-small-medium",
+      "system": "AgentRunbook-C",
+      "category": "benchmark-maintainer-baseline",
+      "benchmark": "LongMemEval-V2",
+      "benchmark_revision": "Small and Medium",
+      "metric": "answer accuracy",
+      "value_percent": null,
+      "answer_model": "Benchmark-published reference configuration",
+      "judge": "Benchmark-published evaluation",
+      "reported_date": "2026",
+      "sample_size": 451,
+      "secondary_metrics": {
+        "small_accuracy_percent": 74.9,
+        "small_latency_seconds": 108.3,
+        "medium_accuracy_percent": 70.1,
+        "medium_latency_seconds": 139.9
+      },
+      "evidence_grade": "benchmark-maintainer-baseline",
+      "comparison_notes": "LongMemEval-V2 is a separate protocol with Small/Medium variants and latency-adjusted frontier scoring. Preserve those dimensions; do not compare its percentages directly with original LongMemEval 500-question or LoCoMo scores.",
+      "source": "https://xiaowu0162.github.io/longmemeval-v2/"
+    },
+    {
+      "id": "matched-gemini-flashlite-mem0-letta-graphiti-2026-10-18",
+      "system": "Mem0 / Letta / Graphiti",
+      "category": "third-party-small-matched-harness",
+      "benchmark": "LongMemEval",
+      "benchmark_revision": "42-question / 40-question / 11-completed-question pilot",
+      "metric": "answer accuracy",
+      "value_percent": null,
+      "answer_model": "Gemini Flash-Lite; same reader/judge family across evaluated systems",
+      "judge": "Gemini Flash-Lite with shared prompt",
+      "reported_date": "2026-10-18",
+      "sample_size": 42,
+      "secondary_metrics": {
+        "mem0_accuracy_percent": 64.3,
+        "mem0_correct_items": 27,
+        "letta_accuracy_percent": 70.0,
+        "letta_correct_items": 28,
+        "graphiti_accuracy_percent": 63.6,
+        "graphiti_correct_items": 7,
+        "graphiti_completed_items": 11
+      },
+      "evidence_grade": "third-party-small-incomplete",
+      "comparison_notes": "The same reader/judge and harness reduce some confounders, but the sample is small and Graphiti did not finish the full run. These are diagnostics, not a stable vendor ranking or SOTA threshold.",
+      "source": "https://agentsystems.blog/agent-memory-benchmark"
+    },
+    {
+      "id": "matched-adversarial-recall-419-turns-2026-09-23",
+      "system": "GoodMem / Letta / Mem0 / LangMem / Graphiti",
+      "category": "third-party-matched-harness",
+      "benchmark": "Agent Memory Bench",
+      "benchmark_revision": "2026-09-23 public run; 419 turns and 120 probes",
+      "metric": "recall under shared workload",
+      "value_percent": null,
+      "answer_model": "GPT-4o-mini at temperature 0",
+      "judge": "Shared benchmark harness",
+      "reported_date": "2026-09-23",
+      "sample_size": 120,
+      "secondary_metrics": {
+        "goodmem_vendor_config_recall_percent": 57.6,
+        "goodmem_default_recall_percent": 53.3,
+        "letta_recall_percent": 52.2,
+        "mem0_recall_percent": 50.0,
+        "langmem_recall_percent": 45.7,
+        "graphiti_recall_percent": 37.0,
+        "goodmem_adversarial_refusal_percent": 82.1,
+        "letta_adversarial_refusal_percent": 92.9,
+        "mem0_adversarial_refusal_percent": 92.9,
+        "langmem_adversarial_refusal_percent": 85.7,
+        "graphiti_adversarial_refusal_percent": 92.9
+      },
+      "evidence_grade": "third-party-matched-harness",
+      "comparison_notes": "This is a different workload and recall metric, not LongMemEval or LoCoMo answer accuracy. It is useful for adversarial restraint and retrieval diagnostics.",
+      "source": "https://github.com/hamza-dev-tech/agent-memory-bench"
+    },
+    {
+      "id": "memderive-derived-state-diagnostic-2026-10-18",
+      "system": "MemDerive evaluated memory systems",
+      "category": "research-benchmark",
+      "benchmark": "MemDerive",
+      "benchmark_revision": "10 symbolic scenarios",
+      "metric": "derived-state query performance",
+      "value_percent": null,
+      "answer_model": "Multiple evaluated systems / paper protocol",
+      "judge": "Symbolic Datalog oracle plus answer evaluation",
+      "reported_date": "2026-10-18",
+      "sample_size": 1503,
+      "secondary_metrics": {
+        "event_count": 4692,
+        "scenario_count": 10,
+        "best_reported_memory_system_range_min_percent": 30.41,
+        "best_reported_memory_system_range_max_percent": 48.30,
+        "bm25_percent": 58.28,
+        "oracle_supporting_events_percent": 96.01,
+        "explicit_change_refresh_rate_percent": 82.4,
+        "implicit_dependency_change_refresh_rate_percent": 41.1
+      },
+      "evidence_grade": "primary-paper",
+      "comparison_notes": "This measures evolving derived-state acquisition/maintenance, not generic conversational QA. It motivates the Broca D01-D47 diagnostic families.",
+      "source": "https://arxiv.org/abs/2610.25373"
+    },
+    {
+      "id": "scivaliditybench-decision-use-2026-10-26",
+      "system": "SciValidityBench / SciStateForge",
+      "category": "research-benchmark",
+      "benchmark": "SciValidityBench",
+      "benchmark_revision": "64 TaskSpecs",
+      "metric": "valid decision-making",
+      "value_percent": null,
+      "answer_model": "Four model families",
+      "judge": "Programmatic decision oracles",
+      "reported_date": "2026-10-26",
+      "sample_size": 64,
+      "secondary_metrics": {
+        "task_spec_count": 64,
+        "validity_modules": 5,
+        "scientific_domains": 6,
+        "improvement_over_generic_event_graph_min_percentage_points": 9.2,
+        "improvement_over_generic_event_graph_max_percentage_points": 18.8
+      },
+      "evidence_grade": "primary-paper",
+      "comparison_notes": "This evaluates whether remembered facts may legitimately govern a decision, not only whether they are factually correct or retrievable.",
+      "source": "https://arxiv.org/abs/2610.34767"
+    }
+  ],
+  "broca_targets": {
+    "replication_first": [
+      "Reproduce QEMem's LoCoMo protocol with the exact answer model, judge, shared memory store and context budget before making accuracy claims.",
+      "Register Zep and Mem0 vendor-reported results as contextual ceilings only until their exact configurations are reproduced.",
+      "Implement LongMemEval-V2 Small/Medium as a separate evaluation target with latency-frontier reporting.",
+      "Use MemDerive-style symbolic state/DAG diagnostics and SciValidityBench-style decision-use counterfactuals as first-class qualification dimensions."
+    ],
+    "promotion_gates": {
+      "synthetic_oracle_agreement_percent": 100,
+      "invalid_proof_certificates": 0,
+      "cross_scope_emissions": 0,
+      "revoked_after_known_at_emissions": 0,
+      "false_optimality_claims": 0,
+      "contradictory_supported_packets": 0
+    },
+    "claim_boundary": "These are prospective qualification targets. No Broca score or pass result is present in this ledger."
+  }
+}
