@@ -18,6 +18,10 @@ use sha2::{Digest, Sha256};
 use super::tabular_nas_firewall::{
     ArchitectureFeatures, MetricDirection, TabularBenchmarkManifest, TopKCapture,
 };
+use super::learning_curve_promotion::{
+    select_curve_promotions, CurvePromotionSelection, LearningCurveCalibrator,
+    LearningCurveCalibrationError, PromotionReason,
+};
 
 const RECEIPT_DOMAIN: &[u8] = b"symthaea.tabular-nas.multi-fidelity-query-trace.v0.1";
 const IMPORT_DOMAIN: &[u8] = b"symthaea.tabular-nas.multi-fidelity-import.v0.1";
@@ -173,6 +177,23 @@ pub struct MultiFidelityEvaluation {
     pub global_best_metric: f64,
     pub final_simple_regret: Option<f64>,
     pub final_normalized_regret_percent: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibratedPromotionStage {
+    pub fidelity_index: usize,
+    pub selection: CurvePromotionSelection,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalibratedMultiFidelityRun {
+    pub base_run: MultiFidelityTabularRun,
+    pub calibration_sha256: String,
+    pub initial_candidate_ids: Vec<String>,
+    pub rung_populations: Vec<usize>,
+    pub guard_slots_per_rung: usize,
+    pub promotion_stages: Vec<CalibratedPromotionStage>,
+    pub policy_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -670,6 +691,249 @@ impl MultiFidelityTabularBenchmark {
         Ok(run)
     }
 
+    /// Cost-accounted Successive Halving with a split-conformal learning-curve predictor.
+    ///
+    /// At each intermediate rung it promotes (k - guard_slots_per_rung) candidates by their
+    /// conservative final-performance bound, then fills guard slots from the strongest
+    /// optimistic bounds. This protects uncertain/late-learning candidates while preserving an
+    /// explicit exploitation budget. The predictor must have been fit and residual-calibrated
+    /// on architecture splits disjoint from this benchmark's evaluation split.
+    pub fn run_calibrated_successive_halving(
+        self,
+        initial_candidate_ids: Vec<String>,
+        rung_populations: &[usize],
+        guard_slots_per_rung: usize,
+        calibrator: &LearningCurveCalibrator,
+    ) -> Result<CalibratedMultiFidelityRun, MultiFidelityFirewallError> {
+        calibrator
+            .verify_integrity()
+            .map_err(|error| MultiFidelityFirewallError::new(
+                "calibrator",
+                format!("invalid learning-curve calibrator: {error}"),
+            ))?;
+        let expected_direction = match self.manifest.base.metric_direction {
+            MetricDirection::Maximize => super::nasbench201_trajectory::ProxyDirection::Maximize,
+            MetricDirection::Minimize => super::nasbench201_trajectory::ProxyDirection::Minimize,
+        };
+        if calibrator.config.benchmark_id != self.manifest.base.benchmark_id
+            || calibrator.config.target_metric_id != self.manifest.base.metric_id
+            || calibrator.config.metric_direction != expected_direction
+            || calibrator.config.source_artifact_sha256 != self.manifest.base.artifact_sha256
+            || calibrator.config.evaluation_split_id != self.manifest.base.split_id
+            || calibrator.config.residual_calibration_split_id
+                != self.manifest.base.proxy_calibration_split_id
+        {
+            return Err(MultiFidelityFirewallError::new(
+                "calibrator",
+                "benchmark, metric, direction, source artifact or evaluation/calibration split does not match target manifest",
+            ));
+        }
+        if calibrator.config.fidelity_levels.len() != self.manifest.fidelity_levels.len()
+            || calibrator
+                .config
+                .fidelity_levels
+                .iter()
+                .zip(&self.manifest.fidelity_levels)
+                .any(|(curve_level, query_level)| {
+                    curve_level.id != query_level.id
+                        || curve_level.cumulative_cost_units != query_level.cumulative_cost_units
+                })
+        {
+            return Err(MultiFidelityFirewallError::new(
+                "calibrator.fidelity_levels",
+                "curve calibration fidelity ladder does not match target-query ladder",
+            ));
+        }
+
+        let rung_count = self.manifest.fidelity_levels.len();
+        if rung_populations.len() != rung_count
+            || rung_populations.is_empty()
+            || rung_populations[0] != initial_candidate_ids.len()
+            || rung_populations.iter().any(|count| *count == 0)
+            || rung_populations.windows(2).any(|pair| pair[1] >= pair[0])
+        {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "must be a positive strictly decreasing population schedule matching every fidelity rung and initial pool",
+            ));
+        }
+        if guard_slots_per_rung > *rung_populations.iter().skip(1).min().unwrap_or(&0) {
+            return Err(MultiFidelityFirewallError::new(
+                "guard_slots_per_rung",
+                "guard slot count cannot exceed any next-rung promotion population",
+            ));
+        }
+        if *rung_populations.last().unwrap_or(&0) > self.manifest.base.max_unique_queries {
+            return Err(MultiFidelityFirewallError::new(
+                "rung_populations",
+                "final rung exceeds the declared final-fidelity query cap",
+            ));
+        }
+
+        let mut known_ids = HashSet::with_capacity(self.features.len());
+        for feature in &self.features {
+            known_ids.insert(feature.architecture_id.as_str());
+        }
+        let mut initial_ids = HashSet::with_capacity(initial_candidate_ids.len());
+        for (index, architecture_id) in initial_candidate_ids.iter().enumerate() {
+            if architecture_id.trim().is_empty()
+                || !known_ids.contains(architecture_id.as_str())
+                || !initial_ids.insert(architecture_id.as_str())
+            {
+                return Err(MultiFidelityFirewallError::new(
+                    format!("initial_candidate_ids[{index}]"),
+                    "candidate IDs must be known, non-empty and unique",
+                ));
+            }
+        }
+
+        // Preflight the complete target-training resource cost before the first oracle query.
+        let mut planned_cost = 0u64;
+        for (fidelity_index, population) in rung_populations.iter().copied().enumerate() {
+            let cumulative = self.manifest.fidelity_levels[fidelity_index].cumulative_cost_units;
+            let incremental_per_candidate = match (
+                self.manifest.fidelity_cost_model,
+                fidelity_index.checked_sub(1),
+            ) {
+                (_, None) => cumulative,
+                (FidelityCostModel::ResumablePrefix, Some(previous_index)) => {
+                    cumulative - self.manifest.fidelity_levels[previous_index].cumulative_cost_units
+                }
+                (FidelityCostModel::IndependentRuns, Some(_)) => cumulative,
+            };
+            let rung_cost = incremental_per_candidate
+                .checked_mul(population as u64)
+                .ok_or_else(|| MultiFidelityFirewallError::new(
+                    "rung_populations",
+                    "resource cost multiplication overflow",
+                ))?;
+            planned_cost = planned_cost.checked_add(rung_cost).ok_or_else(|| {
+                MultiFidelityFirewallError::new(
+                    "rung_populations",
+                    "total resource cost overflow",
+                )
+            })?;
+        }
+        if planned_cost > self.manifest.max_total_cost_units {
+            return Err(MultiFidelityFirewallError::new(
+                "max_total_cost_units",
+                format!(
+                    "calibrated schedule requires {planned_cost} {}, budget is {}",
+                    self.manifest.resource_unit, self.manifest.max_total_cost_units
+                ),
+            ));
+        }
+
+        let initial_candidate_ids_for_digest = initial_candidate_ids.clone();
+        let rung_populations_for_digest = rung_populations.to_vec();
+        let calibration_sha256 = calibrator.calibration_sha256.clone();
+        let mut promotion_stages = Vec::with_capacity(rung_count.saturating_sub(1));
+        let mut query_error: Option<FidelityQueryError> = None;
+        let mut policy_error: Option<String> = None;
+        let run = self.run_search(|_features, oracle| {
+            let mut current_candidates = initial_candidate_ids;
+            let mut observed_curves: HashMap<String, Vec<f64>> =
+                HashMap::with_capacity(current_candidates.len());
+            for fidelity_index in 0..rung_count {
+                let mut current_observations = Vec::with_capacity(current_candidates.len());
+                for architecture_id in &current_candidates {
+                    match oracle.query(architecture_id, fidelity_index) {
+                        Ok(observation) => {
+                            observed_curves
+                                .entry(architecture_id.clone())
+                                .or_default()
+                                .push(observation.value);
+                            current_observations.push(architecture_id.clone());
+                        }
+                        Err(error) => {
+                            query_error = Some(error);
+                            return;
+                        }
+                    }
+                }
+
+                if fidelity_index + 1 < rung_count {
+                    let mut predictions = Vec::with_capacity(current_observations.len());
+                    for architecture_id in &current_observations {
+                        let Some(curve) = observed_curves.get(architecture_id) else {
+                            policy_error = Some(format!(
+                                "missing observed curve for candidate {architecture_id:?}"
+                            ));
+                            return;
+                        };
+                        match calibrator.predict_final(architecture_id, curve) {
+                            Ok(prediction) => predictions.push(prediction),
+                            Err(error) => {
+                                policy_error = Some(error.to_string());
+                                return;
+                            }
+                        }
+                    }
+                    let selection = match select_curve_promotions(
+                        calibrator,
+                        &predictions,
+                        rung_populations[fidelity_index + 1],
+                        guard_slots_per_rung,
+                    ) {
+                        Ok(selection) => selection,
+                        Err(error) => {
+                            policy_error = Some(error.to_string());
+                            return;
+                        }
+                    };
+                    current_candidates = selection
+                        .selected
+                        .iter()
+                        .map(|candidate| candidate.architecture_id.clone())
+                        .collect();
+                    promotion_stages.push(CalibratedPromotionStage {
+                        fidelity_index,
+                        selection,
+                    });
+                }
+            }
+        });
+
+        if let Some(error) = query_error {
+            return Err(MultiFidelityFirewallError::new(
+                "calibrated_successive_halving_query",
+                error.to_string(),
+            ));
+        }
+        if let Some(error) = policy_error {
+            return Err(MultiFidelityFirewallError::new(
+                "calibrated_successive_halving_policy",
+                error,
+            ));
+        }
+        if run.receipt.total_cost_units != planned_cost {
+            return Err(MultiFidelityFirewallError::new(
+                "calibrated_successive_halving_receipt",
+                format!(
+                    "observed cost {} does not reconcile with preflight cost {planned_cost}",
+                    run.receipt.total_cost_units
+                ),
+            ));
+        }
+        let policy_sha256 = digest_calibrated_policy(
+            &calibration_sha256,
+            &run.receipt.query_trace_sha256,
+            &initial_candidate_ids_for_digest,
+            &rung_populations_for_digest,
+            guard_slots_per_rung,
+            &promotion_stages,
+        );
+        Ok(CalibratedMultiFidelityRun {
+            base_run: run,
+            calibration_sha256,
+            initial_candidate_ids: initial_candidate_ids_for_digest,
+            rung_populations: rung_populations_for_digest,
+            guard_slots_per_rung,
+            promotion_stages,
+            policy_sha256,
+        })
+    }
+
     fn make_receipt(&self, parts: OracleParts) -> MultiFidelityQueryReceipt {
         let query_trace_sha256 = digest_query_trace(&self.manifest, &self.canonical_import_sha256, &parts);
         MultiFidelityQueryReceipt {
@@ -845,6 +1109,35 @@ fn digest_canonical_import(
         h.update(value.to_bits().to_be_bytes());
     }
     hex_digest(h.finalize().as_slice())
+}
+
+fn digest_calibrated_policy(
+    calibration_sha256: &str,
+    query_trace_sha256: &str,
+    initial_candidate_ids: &[String],
+    rung_populations: &[usize],
+    guard_slots_per_rung: usize,
+    stages: &[CalibratedPromotionStage],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.tabular-nas.calibrated-successive-halving.v0.1");
+    update_string(&mut hasher, calibration_sha256);
+    update_string(&mut hasher, query_trace_sha256);
+    hasher.update((initial_candidate_ids.len() as u64).to_be_bytes());
+    for architecture_id in initial_candidate_ids {
+        update_string(&mut hasher, architecture_id);
+    }
+    hasher.update((rung_populations.len() as u64).to_be_bytes());
+    for population in rung_populations {
+        hasher.update((*population as u64).to_be_bytes());
+    }
+    hasher.update((guard_slots_per_rung as u64).to_be_bytes());
+    hasher.update((stages.len() as u64).to_be_bytes());
+    for stage in stages {
+        hasher.update((stage.fidelity_index as u64).to_be_bytes());
+        update_string(&mut hasher, &stage.selection.selection_sha256);
+    }
+    hex_digest(hasher.finalize().as_slice())
 }
 
 fn digest_observation(metric: &str, id: &str, index: usize, value: f64) -> String {
