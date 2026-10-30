@@ -371,13 +371,8 @@ impl LifecyclePolicyRequest {
                     "VerifiedOptimal is inconsistent with a non-supported required claim".into(),
                 );
             }
-        } else if self.required_claims.iter().all(|claim| {
-            claim.state == ClaimLifecycleState::SupportedCurrent
-        }) {
-            // All current-looking claims are not sufficient to answer until
-            // the exact packet has passed the independent verifier.
-            // The state remains valid; the resulting action will be ABSTAIN
-            // or RETRIEVE_MORE depending on the retrieval progress.
+        } else if self.proof_packet_sha256.is_some() {
+            return Err("unverified proof status must not carry proof_packet_sha256".into());
         }
         Ok(())
     }
