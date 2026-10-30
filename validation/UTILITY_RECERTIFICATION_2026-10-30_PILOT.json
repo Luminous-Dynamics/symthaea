@@ -1,0 +1,20 @@
+{
+  "schema":"symthaea-utility-recertification-v1",
+  "status":"EXPLORATORY_LOCAL_PILOT_NOT_A_SOTA_CLAIM",
+  "source_sha256":"51f9f03a9215094a819e4455b4468499f69201d72ace5724975bfbb98e6c9799",
+  "tests_sha256":"87d3d49d991060204c733c7b3f2d01eb519bb49e1e2c5a6e498469b3803c48df",
+  "local_validation":{"tests_passed":9,"tests_total":9,
+    "uniform_RC_comparisons":190,"max_abs_tail_difference":4.440892098500626e-16,
+    "all_subset_random_families":360,"max_violation":2.220446049250313e-16,
+    "full_exhaustive_LP_optimum_comparisons":56,
+    "uniform_and_capacity_K_recover_RC":true},
+  "cells":[
+    {"q":10,"mu":2.5,"rho":0,"B":10,"n":200,"RC":{"FDR":0.09994,"power":0.3325,"mean_rejections":5.995,"actionable":3.61,"true_actionable":3.12},"LP":{"FDR":0.07805,"power":0.3295,"mean_rejections":4.205,"actionable":3.785,"true_actionable":3.215},"actionable_gain":0.175,"actionable_CI95":[0.08775,0.26225],"true_actionable_gain":0.095,"true_actionable_CI95":[0.04192,0.14808],"mean_solver_ms":58.29,"p95_solver_ms":85.68,"mean_cuts":345.07},
+    {"q":50,"mu":2.5,"rho":0.5,"B":10,"n":200,"RC":{"FDR":0.06662,"power":0.6839,"mean_rejections":39.505,"actionable":8.605,"true_actionable":8.605},"LP":{"FDR":0,"power":0.2204,"mean_rejections":11.02,"actionable":8.695,"true_actionable":8.695},"actionable_gain":0.09,"actionable_CI95":[0.01117,0.16883],"true_actionable_gain":0.09,"true_actionable_CI95":[0.01117,0.16883],"mean_solver_ms":32.02,"p95_solver_ms":96.26,"mean_cuts":221.83},
+    {"q":50,"mu":2.5,"rho":0,"B":10,"n":200,"RC":{"FDR":0.06786,"power":0.69,"mean_rejections":38.65,"actionable":10,"true_actionable":9.98},"LP":{"FDR":0.00375,"power":0.2396,"mean_rejections":12.025,"actionable":10,"true_actionable":9.98},"actionable_gain":0,"actionable_CI95":[0,0],"true_actionable_gain":0,"true_actionable_CI95":[0,0],"mean_solver_ms":7.61,"p95_solver_ms":11.78,"mean_cuts":101.95},
+    {"q":90,"mu":2,"rho":0,"B":10,"n":200,"RC":{"FDR":0.02251,"power":0.6693,"mean_rejections":62.24,"actionable":10,"true_actionable":10},"LP":{"FDR":0.000417,"power":0.1333,"mean_rejections":12,"actionable":10,"true_actionable":10},"actionable_gain":0,"actionable_CI95":[0,0],"true_actionable_gain":0,"true_actionable_CI95":[0,0],"mean_solver_ms":7.25,"p95_solver_ms":10.38,"mean_cuts":100},
+    {"q":50,"mu":2.5,"rho":0.5,"B":20,"n":200,"RC":{"FDR":0.06935,"power":0.6548,"mean_rejections":38.01,"actionable":15.67,"true_actionable":15.67},"LP":{"FDR":0,"power":0.3568,"mean_rejections":17.84,"actionable":16.05,"true_actionable":16.05},"actionable_gain":0.38,"actionable_CI95":[0.1654,0.5946],"true_actionable_gain":0.38,"true_actionable_CI95":[0.1654,0.5946],"mean_solver_ms":27.90,"p95_solver_ms":70.47,"mean_cuts":211.84},
+    {"q":0,"mu":2.5,"rho":0,"B":10,"n":500,"RC":{"FDR":0.106,"power":0,"mean_rejections":1.71,"actionable":0.556,"true_actionable":0},"LP":{"FDR":0.106,"power":0,"mean_rejections":0.846,"actionable":0.646,"true_actionable":0},"actionable_gain":0.09,"actionable_CI95":[0.03274,0.14726],"true_actionable_gain":0,"true_actionable_CI95":[0,0],"mean_solver_ms":76.18,"p95_solver_ms":107.20,"mean_cuts":435.16}
+  ],
+  "limitations":["200 paired alternative repetitions and 500 all-null repetitions only","Gaussian equicorrelation only","capacity utility counts slots, not truth","all-null interval crosses alpha","different objective from RC-eBH; does not improve expected total rejections","offline fixed-family FDR only; no SupFDR claim"]
+}
