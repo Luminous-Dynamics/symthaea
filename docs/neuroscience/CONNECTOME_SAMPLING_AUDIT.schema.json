@@ -54,10 +54,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["candidate_id", "adjudication", "signed_query_error_reduction_if_applied"],
+        "required": ["candidate_id", "adjudication", "audit_panel_person_minutes", "signed_query_error_reduction_if_applied"],
         "properties": {
           "candidate_id": { "type": "string", "minLength": 1 },
           "adjudication": { "enum": ["correct", "incorrect", "indeterminate"] },
+          "audit_panel_person_minutes": { "type": "number", "exclusiveMinimum": 0 },
           "signed_query_error_reduction_if_applied": {
             "description": "Independent evaluator's signed normalized reduction in the preregistered query-error objective for the isolated proposed mutation; positive is beneficial, negative harmful; null for indeterminate adjudication.",
             "type": ["number", "null"]
