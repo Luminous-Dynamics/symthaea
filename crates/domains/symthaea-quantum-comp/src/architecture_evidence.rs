@@ -665,12 +665,21 @@ mod tests {
             ),
             ArchitectureEvidenceOrigin::DirectMeasurement,
         );
+        let mut right_observation = physical_observation(
+            "neuromorphic-candidate",
+            ComputeArchitectureFamily::NeuromorphicDigital,
+            (0.4, 0.5),
+        );
+        right_observation.quality = interval(0.97, 0.98);
+        let right_resources = right_observation.resources.as_mut().unwrap();
+        right_resources.energy_joules = interval(1.0, 1.5);
+        right_resources.monetary_cost_usd = interval(0.005, 0.009);
+        right_resources.peak_memory = MemoryInterval {
+            lower_bytes: 512,
+            upper_bytes: 768,
+        };
         let right = record(
-            physical_observation(
-                "neuromorphic-candidate",
-                ComputeArchitectureFamily::NeuromorphicDigital,
-                (0.4, 0.5),
-            ),
+            right_observation,
             ArchitectureEvidenceOrigin::DirectMeasurement,
         );
         assert_eq!(
