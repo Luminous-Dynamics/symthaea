@@ -378,6 +378,79 @@ mod tests {
         }
     }
 
+    #[derive(serde::Deserialize)]
+    struct RetrievalValueFixtureFile {
+        schema_version: String,
+        policy_version: String,
+        case_count: usize,
+        cases: Vec<RetrievalValueFixtureCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct RetrievalValueFixtureCase {
+        case_id: String,
+        correctness_gain_lcb_micro: u64,
+        lifecycle_risk_reduction_lcb_micro: u64,
+        retrieval_harm_ucb_micro: u64,
+        retrieval_cost_micro: u64,
+        remaining_calls: u32,
+        remaining_budget_micro: u64,
+        minimum_net_value_micro: u64,
+        unresolved_required_claim_ids: BTreeSet<String>,
+        expected_net_value_micro: i128,
+        expected_action: RetrievalValueAction,
+        expected_reason: RetrievalValueReason,
+    }
+
+    #[test]
+    fn versioned_retrieval_value_fixture_corpus_matches_gate() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/retrieval-value-fixtures-v1.json"
+        );
+        let fixture: RetrievalValueFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-retrieval-value-fixtures-v1");
+        assert_eq!(fixture.policy_version, RETRIEVAL_UTILITY_POLICY_VERSION);
+        assert_eq!(fixture.case_count, fixture.cases.len());
+        assert_eq!(fixture.case_count, 9);
+
+        for case in fixture.cases {
+            let mut value = estimate();
+            value.estimate_id = case.case_id.clone();
+            value.correctness_gain_lcb_micro = case.correctness_gain_lcb_micro;
+            value.lifecycle_risk_reduction_lcb_micro = case.lifecycle_risk_reduction_lcb_micro;
+            value.retrieval_harm_ucb_micro = case.retrieval_harm_ucb_micro;
+            value.retrieval_cost_micro = case.retrieval_cost_micro;
+            value.remaining_calls = case.remaining_calls;
+            value.remaining_budget_micro = case.remaining_budget_micro;
+            value.minimum_net_value_micro = case.minimum_net_value_micro;
+            value.unresolved_required_claim_ids = case.unresolved_required_claim_ids;
+            value.unresolved_claims_sha256 =
+                RetrievalUtilityEstimate::unresolved_claims_digest(
+                    &value.unresolved_required_claim_ids
+                ).unwrap();
+
+            let decision = evaluate_retrieval_value(value).unwrap();
+            assert_eq!(
+                decision.conservative_net_value_micro,
+                case.expected_net_value_micro,
+                "net value mismatch for fixture case {}",
+                case.case_id
+            );
+            assert_eq!(
+                decision.action,
+                case.expected_action,
+                "action mismatch for fixture case {}",
+                case.case_id
+            );
+            assert_eq!(
+                decision.reason,
+                case.expected_reason,
+                "reason mismatch for fixture case {}",
+                case.case_id
+            );
+        }
+    }
+
     #[test]
     fn retrieves_when_conservative_net_value_exceeds_margin_and_budgets() {
         let decision = evaluate_retrieval_value(estimate()).unwrap();
