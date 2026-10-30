@@ -2505,6 +2505,17 @@ fn selection_inference_benchmark_rows(replicates: usize, seed: u64) -> Result<St
             PortfolioObjective::WorstPolicy,
         )?
         .allocation;
+        let pointwise_critical = normal_quantile(0.975)?;
+        let bonferroni_critical =
+            normal_quantile(1.0 - 0.05 / (2.0 * PORTFOLIO_POLICIES as f64))?;
+        let true_values: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
+            target_value(&world_with_target(world, portfolio.targets[policy]))
+        });
+        let mut sorted_true = true_values;
+        sorted_true.sort_by(f64::total_cmp);
+        let unique_best = sorted_true[PORTFOLIO_POLICIES - 1]
+            - sorted_true[PORTFOLIO_POLICIES - 2]
+            > 1e-10;
         let summaries = selection_inference(
             world,
             &allocation,
@@ -3113,6 +3124,85 @@ mod tests {
     }
 
     #[test]
+    fn normal_quantile_matches_registered_reference_values() {
+        assert!((normal_quantile(0.975).unwrap() - 1.95996398454).abs() < 1e-8);
+        assert!((normal_quantile(1.0 - 0.05 / 6.0).unwrap() - 2.3939798).abs() < 1e-5);
+        assert!(normal_quantile(0.0).is_err());
+        assert!(normal_quantile(1.0).is_err());
+    }
+
+    #[test]
+    fn common_multiplier_max_t_is_deterministic_and_finite() {
+        let world = correlated_stress_worlds()[1];
+        let portfolio = policy_portfolio(&world);
+        let allocation = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap()
+        .allocation;
+        let q_model = annotation_reward_model(&world, &allocation, 0x0580_aa01);
+        let rows = policy_score_rows(&world, &q_model, &portfolio, 128, 0x0580_aa02);
+        let (means, standard_errors) = score_row_moments(&rows);
+        let first = multiplier_max_t_critical(&rows, &means, &standard_errors, 127, 0x0580_aa03, 0.05).unwrap();
+        let second = multiplier_max_t_critical(&rows, &means, &standard_errors, 127, 0x0580_aa03, 0.05).unwrap();
+        assert_eq!(first, second);
+        assert!(first.is_finite() && first > 0.0);
+    }
+
+    #[test]
+    fn winner_certification_requires_strict_separation_and_abstains_on_ties() {
+        let tied_means = [0.4, 0.4, 0.4];
+        let tied_errors = [0.02, 0.02, 0.02];
+        assert!(!winner_is_certified(&tied_means, &tied_errors, 1.96).0);
+
+        let separated_means = [0.2, 0.4, 0.8];
+        let tiny_errors = [0.001, 0.001, 0.001];
+        let (certified, winner) = winner_is_certified(&separated_means, &tiny_errors, 2.4);
+        assert!(certified);
+        assert_eq!(winner, 2);
+    }
+
+    #[test]
+    fn simultaneous_inference_abstains_on_exact_policy_ties() {
+        let world = correlated_stress_worlds()[0];
+        let portfolio = exact_tie_policy_portfolio(&world);
+        let allocation = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap()
+        .allocation;
+        let results = selection_inference(&world, &allocation, &portfolio, 128, 64, 63, 0x0580_t1e0)
+            .unwrap();
+        for method in results {
+            assert_eq!(method.certification_rate, 0.0);
+            assert_eq!(method.false_promotion_rate, 0.0);
+            assert!((method.simultaneous_coverage - method.marginal_coverage).abs() < 1e-12);
+            assert!((0.0..=1.0).contains(&method.simultaneous_coverage));
+            assert!(method.simultaneous_wilson_low <= method.simultaneous_coverage + 1e-12);
+            assert!(method.simultaneous_wilson_high >= method.simultaneous_coverage - 1e-12);
+        }
+    }
+
+    #[test]
+    fn output_includes_deterministic_selection_inference_rows() {
+        let first = selection_inference_benchmark_rows(2, 987).unwrap();
+        let second = selection_inference_benchmark_rows(2, 987).unwrap();
+        assert_eq!(first, second);
+        let rows: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("INFERENCE_RESULT\\t"))
+            .collect();
+        assert_eq!(rows.len(), 9);
+        for row in rows {
+            assert_eq!(row.split('\\t').count(), 21);
+        }
+    }
+
+    #[test]
     fn output_includes_deterministic_policy_portfolio_rows() {
         let first = policy_portfolio_benchmark_rows(2, 789).unwrap();
         let second = policy_portfolio_benchmark_rows(2, 789).unwrap();
@@ -3198,6 +3288,13 @@ mod tests {
             first
                 .lines()
                 .filter(|line| line.starts_with("PORTFOLIO_CONFIG\t"))
+                .count(),
+            9
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("INFERENCE_RESULT\t"))
                 .count(),
             9
         );
