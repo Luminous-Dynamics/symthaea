@@ -380,15 +380,97 @@ pub fn audit_retrieval_value_estimator(
 }
 
 impl RetrievalCalibrationAuditReport {
-    /// Recompute the report commitment after JSON transport or archival.
+    /// Recompute the report statistics and commitment after transport/archive.
     pub fn verify_internal_consistency(&self) -> Result<(), String> {
         validate_sha256(&self.report_sha256, "report_sha256")?;
+        for (field, value) in [
+            ("estimator_sha256", self.estimator_sha256.as_str()),
+            ("feature_schema_sha256", self.feature_schema_sha256.as_str()),
+            ("utility_schema_sha256", self.utility_schema_sha256.as_str()),
+            ("training_split_sha256", self.training_split_sha256.as_str()),
+            ("calibration_split_sha256", self.calibration_split_sha256.as_str()),
+            ("audit_split_sha256", self.audit_split_sha256.as_str()),
+        ] {
+            validate_sha256(value, field)?;
+        }
         if self.policy_version != RETRIEVAL_CALIBRATION_POLICY_VERSION {
             return Err("unsupported retrieval calibration report version".into());
         }
-        if self.sample_count == 0 || self.covered_count > self.sample_count {
-            return Err("calibration report sample counts are inconsistent".into());
+        if self.sample_count < 30
+            || self.covered_count > self.sample_count
+            || self.family_size == 0
+            || self.ece_bins.is_empty()
+            || self.ece_bins.len() > 100
+        {
+            return Err("calibration report sample/configuration values are inconsistent".into());
         }
+        let close = |left: f64, right: f64| (left - right).abs() <= 1e-12;
+        if !self.family_alpha.is_finite()
+            || self.family_alpha <= 0.0
+            || self.family_alpha >= 1.0
+            || !self.per_test_alpha.is_finite()
+            || self.per_test_alpha <= 0.0
+            || self.per_test_alpha >= 1.0
+            || !self.target_lower_bound_coverage.is_finite()
+            || self.target_lower_bound_coverage <= 0.0
+            || self.target_lower_bound_coverage >= 1.0
+        {
+            return Err("calibration report alpha/target values are invalid".into());
+        }
+        let expected_alpha = self.family_alpha / f64::from(self.family_size);
+        if !close(self.per_test_alpha, expected_alpha) {
+            return Err("calibration report Bonferroni alpha does not match family size".into());
+        }
+        let expected_observed_coverage =
+            self.covered_count as f64 / self.sample_count as f64;
+        if !close(self.observed_lower_bound_coverage, expected_observed_coverage) {
+            return Err("calibration report observed coverage does not match counts".into());
+        }
+        let expected_radius =
+            (-self.per_test_alpha.ln() / (2.0 * self.sample_count as f64)).sqrt();
+        if !close(self.hoeffding_radius, expected_radius) {
+            return Err("calibration report Hoeffding radius is inconsistent".into());
+        }
+        let expected_lcb = (expected_observed_coverage - expected_radius).max(0.0);
+        if !close(self.lower_confidence_bound_coverage, expected_lcb) {
+            return Err("calibration report lower confidence bound is inconsistent".into());
+        }
+        let expected_pass = (expected_lcb >= self.target_lower_bound_coverage)
+            && ((expected_lcb * 1_000_000.0).floor()
+                >= (self.target_lower_bound_coverage * 1_000_000.0).ceil());
+        if self.passed != expected_pass {
+            return Err("calibration report pass/fail status is inconsistent".into());
+        }
+
+        let mut bin_total = 0usize;
+        let mut recomputed_ece = 0.0f64;
+        for (expected_index, bin) in self.ece_bins.iter().enumerate() {
+            if bin.bin_index != expected_index
+                || !bin.mean_predicted_probability.is_finite()
+                || !(0.0..=1.0).contains(&bin.mean_predicted_probability)
+                || !bin.observed_positive_rate.is_finite()
+                || !(0.0..=1.0).contains(&bin.observed_positive_rate)
+            {
+                return Err("calibration report ECE bins are malformed".into());
+            }
+            bin_total += bin.count;
+            if bin.count > 0 {
+                recomputed_ece += (bin.count as f64 / self.sample_count as f64)
+                    * (bin.mean_predicted_probability - bin.observed_positive_rate).abs();
+            }
+        }
+        if bin_total != self.sample_count {
+            return Err("calibration report ECE bin counts do not sum to sample count".into());
+        }
+        if !self.brier_score.is_finite()
+            || !(0.0..=1.0).contains(&self.brier_score)
+            || !self.expected_calibration_error.is_finite()
+            || !(0.0..=1.0).contains(&self.expected_calibration_error)
+            || !close(self.expected_calibration_error, recomputed_ece)
+        {
+            return Err("calibration report Brier/ECE values are invalid".into());
+        }
+
         let expected = retrieval_calibration_report_digest(self)?;
         if expected != self.report_sha256 {
             return Err("retrieval calibration report SHA-256 mismatch".into());
