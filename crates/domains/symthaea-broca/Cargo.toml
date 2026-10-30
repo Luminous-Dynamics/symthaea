@@ -39,6 +39,7 @@ regex = "1.10"
 tempfile = "3.10"
 sled = "0.34"
 rusqlite.workspace = true
+axum = { workspace = true, optional = true }
 rnix = "0.11"
 rowan = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
@@ -72,13 +73,18 @@ rustyline = "14.0"
 bytemuck = "1.25.0"
 lru.workspace = true
 uuid = "1"
-tokio = { workspace = true, features = ["sync"] }
+tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread", "net"] }
 
 # WASM support — getrandom + uuid need explicit features on wasm32
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 uuid = { version = "1", features = ["rng-getrandom"] }
+
+[[bin]]
+name = "broca-aml-server"
+path = "src/bin/broca_aml_server.rs"
+required-features = ["aml-http-server"]
 
 [[bin]]
 name = "broca-lme-worker"
@@ -229,6 +235,9 @@ test-helpers = ["mamba-cpu"]
 therapeutic = []
 speech-data = ["dep:symthaea-stt"]
 code-sheaf-eval = ["dep:symthaea-geodesic", "dep:syn"]
+# Optional public AML Text/Coding participant HTTP service.
+# Serve behind public HTTPS ingress; this feature does not deploy or terminate TLS.
+aml-http-server = ["dep:axum"]
 highway-projection = []
 
 [[example]]
