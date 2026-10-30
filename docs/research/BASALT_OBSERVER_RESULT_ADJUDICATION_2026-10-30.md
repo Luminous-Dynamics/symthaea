@@ -21,7 +21,7 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
 - `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json` plus its schema: machine-readable comparison arms, metric definitions, safety/selectivity/efficiency gates and sample-size protocol.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
-- Twelve Rust tests cover a paired recall/selectivity success case, stale reuse, event-loss misreporting, false attribution of an unrelated resource, and cross-run receipt mismatch.
+- Seventeen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch and incomplete receipts.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
 The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 34-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
@@ -37,7 +37,7 @@ cargo run -p xtask -- basalt-observer-result-audit \
   --receipts path/to/observer-receipts.v1.json
 ```
 
-The command prints a machine-readable report. It exits non-zero unless every catalog case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
+The command prints a machine-readable report. It exits non-zero unless every **selected** case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report separately identifies `scope_is_full_catalog`; `adjudication_complete` means only that the declared scope is complete. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
 
 
 ## Executable counterfactual fixture runner
@@ -69,7 +69,7 @@ The parent harness runs the separate child worker twice per case, once against b
 
 The fixture command intentionally rejects every catalog case it does not implement. It does not create fake records for environment, procfs, toolchain, cache, network, observer overflow or other unimplemented channels. The run scope in the oracle and observer receipt ledgers must match exactly. A selected paired case requires its reciprocal partner in the same run; a full-corpus qualification still requires a later run covering all 34 cases and all required independent challenge strata.
 
-The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs and before/after output witnesses. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**, never complete for the entire profile.
+The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs and before/after output witnesses. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
 
 ## Do not collapse freshness, coverage and integrity into one status
 
