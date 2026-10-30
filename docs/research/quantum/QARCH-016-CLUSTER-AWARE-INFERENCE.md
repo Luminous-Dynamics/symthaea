@@ -4,7 +4,9 @@
 **Implementation:** crates/domains/symthaea-quantum-comp/src/clustered_advantage.rs  
 **Schema:** docs/research/quantum/schemas/QARCH-016-CLUSTERED-ADVANTAGE.schema.json  
 **Counterexample:** docs/research/quantum/benchmarks/QARCH-016-PSEUDOREPLICATION-FIXTURE.json  
-**Null stress:** docs/research/quantum/benchmarks/QARCH-016-CLUSTER-NULL-STRESS.json
+**Null stress:** docs/research/quantum/benchmarks/QARCH-016-CLUSTER-NULL-STRESS.json  
+**Power schema:** docs/research/quantum/schemas/QARCH-016-CLUSTER-POWER.schema.json  
+**Power sensitivity:** docs/research/quantum/benchmarks/QARCH-016-CLUSTER-POWER-SENSITIVITY.json
 
 ## Research question
 
@@ -91,6 +93,43 @@ The frozen experiment uses 10 families, 10 instances per family, 10,000 null rep
 In this declared model, the naive row-level test becomes substantially anti-conservative as ICC rises. The cluster-level procedure remains below 5%. With only 10 clusters, the exact one-sided sign test is discrete: it rejects at 0.05 only with at least 9 wins (attainable null rate 11/1024, about 1.07%). Its conservative rate is accompanied by reduced power. Do not interpret this one experiment as a universal guarantee for arbitrary dependence structures.
 
 A second exact enumeration varies the number of independent families from 5 to 30 while retaining 10 perfectly dependent instances per family. Under that perfect-dependence null, the naive test's exact false-positive rate is 18.75–37.70% across the displayed designs, whereas the cluster-level sign test stays at or below 4.94%. The machine-readable result file preserves the thresholds and exact enumeration counts.
+
+## Exact power planning: replace sample-size folklore
+
+The Rust API now exposes an exact cluster sign-test power planner. Its inputs are the probabilities that an *independent cluster's median effect* clears the predeclared quality margin and practical resource margin. These are family-level win probabilities, not instance-level win rates.
+
+For one component with \(n\) independent clusters and a family-level win probability \(p\), the exact power is:
+
+\[
+\operatorname{Power}(n,p)=P\{\operatorname{Binomial}(n,p)\ge k_\alpha(n)\}
+\]
+
+where \(k_\alpha(n)\) is the smallest number of cluster wins whose one-sided null sign-test p-value is no greater than the per-claim alpha.
+
+The joint quality-and-resource claim requires both tests to reject. Without assuming that quality and resource outcomes are independent, the planner uses the valid lower bound:
+
+\[
+P(\text{both reject})\ge
+\max(0,\operatorname{Power}_Q+\operatorname{Power}_R-1)
+\]
+
+The frozen sensitivity design uses alpha=0.05 per claim and a desired joint-power lower bound of 80%. It assumes equal family-level win probabilities for the two components:
+
+| Probability each independent family clears each margin | Independent families required |
+|---:|---:|
+| 55% | 866 |
+| 60% | 213 |
+| 65% | 93 |
+| 70% | 53 |
+| 75% | 33 |
+
+This is why a blanket recommendation of 30–50 independent families is misleading. Under this exact sign-test design, 30 families deliver only about 51% component power when each family clears the margin with probability 65%; even 50 families deliver about 62%. At 75%, 33 families suffice for the specified 80% lower bound on joint power.
+
+These probabilities describe the *true proportion of independent families that exceed the declared practical/quality margins*. They must be estimated from a pilot or justified by prior evidence, not chosen to make the sample size look affordable. Sensitivity tables for fixed counts 5, 10, 20, 30, 50 and 100 are preserved in the machine-readable fixture.
+
+The power planner scans the exact discrete rejection boundary and returns the first feasible cluster count. Exact sign-test power can be non-monotone across adjacent sample sizes because critical win thresholds jump discretely. For multiple confirmatory claims, the alpha supplied to the planner must reflect the preregistered family correction; a worst-case conservative design can use family_alpha / family_size before applying Holm.
+
+The result is an analytic design calculation under independent clusters and the sign-test model, not a guarantee for a particular benchmark suite. It does not account for uncertainty in the pilot estimate of family win probability, selection bias in family construction, or invalid cluster independence. Those require additional design and sensitivity work.
 
 ## Industry benchmark implications
 
