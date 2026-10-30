@@ -70,5 +70,21 @@ jobs:
           assert aware["mean_task_success"] > greedy["mean_task_success"]
           assert aware["mean_net_utility"] > greedy["mean_net_utility"]
           assert next(cell for cell in report["cells"] if cell["lane"] == "fragile_assets")["summaries"][2]["probe_counts"][4] == 512
+          print(json.dumps({
+              cell["lane"]: {
+                  row["policy"]: {
+                      "task_success": row["mean_task_success"],
+                      "decision_accuracy": row["mean_decision_accuracy"],
+                      "net_utility": row["mean_net_utility"],
+                      "disturbance": row["mean_disturbance"],
+                      "damage_rate": row["damage_rate"],
+                      "probe_cost": row["mean_probe_cost"],
+                      "information_gain_bits": row["mean_information_gain_bits"]
+                  }
+                  for row in cell["summaries"]
+                  if row["policy"] in ["visual_only", "information_greedy", "cost_only", "disturbance_aware", "risk_constrained", "oracle_fragility_aware"]
+              }
+              for cell in report["cells"]
+          }, sort_keys=True))
           print("CMAQ-014 validated: information accuracy, collateral disturbance, task success and hard risk budget remain distinct")
           PY
