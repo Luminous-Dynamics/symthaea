@@ -213,6 +213,14 @@ Splits must be grouped by source volume, spatial block, neuron/cell identity, an
 **Rare OOD groups require a separate uncertainty gate.** The ConnectomeBench2 paper's natural test split reports only 60 human and 54 zebrafish merge-error operations, compared with thousands of split-error examples in each species. Cross-species merge-error point estimates can therefore be unstable and clustered samples further reduce effective sample size. Report exact positive/negative counts, cluster-aware confidence intervals, and both natural-prevalence and balanced challenge metrics. If a rare subgroup cannot support a preregistered precision or calibration claim, mark it not estimable rather than infer reliability from pooled accuracy. If a curated hidden OOD set is added, freeze its selection protocol in advance and report it separately from the untouched natural test.
 
 
+### Executable V2 intake-lineage gate (new)
+
+The dataset sidecar contract is now audited before fitting: unique composite sample hashes are recomputed as MD5(`source_archive|source_archive_sample_hash`); the exact sample-type → `same_neuron` → task-label and task-routing derivations are rechecked; geometry-mask flags are checked against metadata image types and modality slots; and the upstream split-group keys are reconstructed per archive bank. The audit checks that the same operation/junction/synapse grouping key and the same 50 µm spatial cube do not occur in multiple partitions. Edit/adjacent-control rows group on `operation_id`, junction controls on `source_operation_id`, and synapse controls on (`pre_pt_root_id`, `post_pt_root_id`, `synapse_ctr_pt_nm`), following the pinned upstream postprocessor.
+
+Root/neuron identifiers appearing across partitions are emitted as a dependence-risk warning rather than an automatic failure: the declared spatial split can place different pieces of one biological neuron in different cubes, so the overlap requires a neuron-grouped sensitivity analysis and should not be described as proven leakage by itself. Rows with no usable spatial coordinate are counted and warned about, never assigned a guessed cube. The Rust auditor consumes metadata-only JSONL; a checked-in DuckDB SQL adapter exports only the three metadata Parquet sidecars. Its synthetic five-sample fixture covers all five sample types but contains no biological observations.
+
+This gate is a material improvement over a manifest-only validator, but it still does not independently resolve the Hugging Face `v2` branch to an immutable Hub commit, verify image-byte/Parquet row correspondence, or provide the hidden test lockbox. The exact V2 commit SHA and sidecar digests must be captured in the run manifest before model benchmarking. A clean audit is necessary, not sufficient, for a leakage-safe performance claim.
+
 ### Comparator matrix
 
 1. **Published ConnectomeBench2 ViT baseline**, reproducing the pinned `v2` dataset, modality, and split protocol where possible.
