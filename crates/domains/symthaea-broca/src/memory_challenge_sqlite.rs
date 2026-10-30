@@ -648,6 +648,62 @@ mod tests {
     }
 
     #[test]
+    fn database_uses_wal_and_full_synchronous_commit_mode() {
+        let root = tempdir().unwrap();
+        let backend = open_backend(root.path());
+        let journal_mode: String = backend.connection
+            .pragma_query_value(None, "journal_mode", |row| row.get(0))
+            .unwrap();
+        let synchronous: i64 = backend.connection
+            .pragma_query_value(None, "synchronous", |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal_mode.to_ascii_lowercase(), "wal");
+        assert_eq!(synchronous, 2, "SQLite FULL synchronous mode is numeric value 2");
+    }
+
+    #[test]
+    fn second_connection_replays_same_add_without_duplicate_batch() {
+        let root = tempdir().unwrap();
+        let mut first = open_backend(root.path());
+        let mut second = open_backend(root.path());
+        let request = add_request(
+            "request-shared",
+            "user-1",
+            "session-1",
+            &["same logical trajectory committed once"],
+        );
+        execute_aml_add(&mut first, request.clone()).unwrap();
+        execute_aml_add(&mut second, request.clone()).unwrap();
+        assert_eq!(first.persisted_batch_count().unwrap(), 1);
+        assert_eq!(second.persisted_batch_count().unwrap(), 1);
+        let hits = execute_aml_search(
+            &second,
+            AmlSearchRequest {
+                query: "same logical trajectory".into(),
+                options: None,
+                user_id: "user-1".into(),
+                top_k: 10,
+            },
+        ).unwrap();
+        assert_eq!(hits.data.len(), 1);
+    }
+
+    #[test]
+    fn lexical_invalid_message_does_not_partially_commit_add_batch() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        let request = add_request(
+            "request-invalid",
+            "user-1",
+            "session-1",
+            &["valid evidence message", "!!!"],
+        );
+        assert!(execute_aml_add(&mut backend, request).is_err());
+        assert_eq!(backend.persisted_batch_count().unwrap(), 0);
+        assert_eq!(backend.indexed_evidence_count(), 0);
+    }
+
+    #[test]
     fn user_id_is_the_only_scope_and_sessions_for_the_same_user_are_searchable() {
         let root = tempdir().unwrap();
         let mut backend = open_backend(root.path());
