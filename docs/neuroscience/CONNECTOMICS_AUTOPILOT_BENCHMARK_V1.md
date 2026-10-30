@@ -388,3 +388,21 @@ Stop or revise the approach if:
 The first credible success is narrow: on a public, leakage-resistant connectomics task, Symthaea's triage/orchestration reduces expert review effort or increases high-impact error yield against strong matched-budget baselines, while maintaining reconstruction quality, calibrated abstention where support exists, exact provenance, and zero unreviewed authoritative edits.
 
 That would establish a real role for Symthaea in connectomics. Whole-brain mapping, cross-modal structure/function analysis, and greater autonomy remain later research questions whose feasibility must be earned through measured results.
+
+
+## Multi-rater reliability and reviewer calibration (SCI-CONNECTOMICS-004)
+
+The first outcome evaluator retains one reviewer decision and one adjudication per candidate. That is a useful minimum but cannot quantify reviewer disagreement or uncertainty in the reference label. A separate multi-rater instrument now preserves the full panel:
+
+- [Multi-rater protocol V1](CONNECTOME_MULTI_RATER_PROTOCOL_V1.md)
+- [Outcome JSON Schema](CONNECTOME_MULTI_RATER_OUTCOMES.schema.json)
+- [Synthetic outcome fixture](examples/CONNECTOME_MULTI_RATER_OUTCOMES.example.json)
+- [Tracking issue #9186](https://github.com/Luminous-Dynamics/symthaea/issues/9186)
+
+The standalone `connectome-multi-rater-audit` binary binds the outcome file to the exact proposal bytes, exact frozen ranking-report bytes, and adjudication-protocol digest. It requires at least two adjudicators and two blinded reviewer records per candidate; reviewer and adjudicator IDs must be disjoint. It retains every vote and checks complete frozen candidate-pool coverage. The ranker does not read this schema or these outcomes.
+
+The evaluator emits separate nominal Krippendorff alpha, observed/expected disagreement, strict-majority coverage and vote fractions for reviewer decisions and adjudicator labels; candidate-level unresolved/tied outcomes; pooled and per-reviewer decision metrics; accept/reject confidence Brier score and 10-bin ECE on determinate candidates; and total panel-review minutes. Abstentions are explicit and confidence must be null for abstain. Confidence calibration excludes unresolved and indeterminate reference labels.
+
+**Interpretation limits:** strict majority is a summary, not biological truth. Agreement is not correctness. Pooled reviewer events share candidates and must not be treated as independent samples. Panel minutes are summed person-minutes, not elapsed queue wall time. The implemented agreement statistic uses pair-count-weighted nominal disagreement; it is not a latent-rater truth model. Dawid–Skene-style aggregation remains future work and requires independent anchor cases and a validated protocol before it can influence any decision.
+
+For collection, use at least three independent adjudicators per candidate where feasible (two is only the executable minimum), blind reviewers to policy/model identity and other votes, randomize candidate order, retain abstentions and unresolved cases, and account for the full-corpus adjudication cost separately. Causal queue-efficiency claims still require a prospective randomized or block-randomized policy trial. No biological multi-rater corpus has yet been evaluated, and no performance gain is claimed.
