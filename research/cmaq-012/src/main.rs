@@ -344,7 +344,7 @@ fn render_report(input: &str, slices: &BTreeMap<SliceKey, Vec<Episode>>) -> Stri
     format!(
         concat!("{{\n  \"schema_version\":\"{}\",\n  \"auditor_version\":\"{}\",\n",
         "  \"input_sha256\":\"{}\",\n  \"minimum_qualification_pairs\":{},\n",
-        "  \"bootstrap_replicates\":{},\n  \"claim_ceiling\":\"scoring_contract_only_not_environment_performance\",\n  \"slice_count\":{},\n  \"slices\":[\n    {}\n  ]\n}}\\n"),
+        "  \"bootstrap_replicates\":{},\n  \"claim_ceiling\":\"scoring_contract_only_not_environment_performance\",\n  \"slice_count\":{},\n  \"slices\":[\n    {}\n  ]\n}}\n"),
         SCHEMA, AUDITOR_VERSION, sha256_hex(input.as_bytes()), MIN_QUALIFICATION_PAIRS,
         BOOTSTRAP_REPLICATES, summaries.len(), summary_json
     )
