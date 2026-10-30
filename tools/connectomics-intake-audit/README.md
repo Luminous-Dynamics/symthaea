@@ -253,3 +253,16 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 **Scope and information-flow limits:** estimates apply only to the complete declared finite search frame, not arbitrary unsampled tissue or the whole connectome. Exhaustive search and proposal-to-error mappings need independent protocol enforcement. The candidate generator/ranker must never receive sampled locations, seed, error identities, outcomes, or impact weights. This audit is not interchangeable with #9187, which samples the unreviewed tail *inside* the candidate pool. Neither audit establishes causal policy efficiency; that requires prospective randomized/block-randomized queue assignment. No biological sample or performance gain is claimed.
+
+
+## Query-scoped reliability certificate verifier
+
+The `connectome-query-cert-audit` binary checks certificate cross-field semantics and provenance references. It rejects a certified state with any non-passing gate or non-estimated uncertainty, rejects conditional certificates that hide a failed critical gate, requires every dependency to reference a bound source revision digest, and requires explicit revision-change evidence for invalidated certificates.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-query-cert-audit -- \
+  --certificate docs/neuroscience/examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json
+```
+
+This verifies internal consistency only; it does not independently fetch artifacts or prove biological correctness. The checked-in example is synthetic and intentionally conditional.
