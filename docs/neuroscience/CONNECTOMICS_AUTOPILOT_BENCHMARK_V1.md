@@ -543,3 +543,6 @@ No stage receives production write credentials. Only an accepted, independently 
 - [Issue #9260](https://github.com/Luminous-Dynamics/symthaea/issues/9260)
 
 The `connectome-spatial-frame-audit` executable validates exact 3D lattice tiling inside a declared voxel bounding box, partitions every tile into eligible or explicitly excluded, and exports the eligible PSU population. #9204 now requires the exact spatial-frame report bytes and both the complete lattice and eligible-population digests before it will estimate candidate-generation recall. This proves tiling only within the declared box; source and eligibility-mask completeness remain external evidence gates.
+
+
+The downstream #9204 invocation supplies both the exact spatial-frame manifest and the exact PASS report. It recomputes the manifest byte digest and checks it against the report, then verifies that the audit's eligible PSU/stratum rows exactly equal the report export. The coverage report retains separate hashes for the manifest, report, complete lattice, and eligible population.
