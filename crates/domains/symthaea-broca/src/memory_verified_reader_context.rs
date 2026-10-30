@@ -522,6 +522,30 @@ mod tests {
     }
 
     #[test]
+    fn reader_context_detects_excerpt_mutation_after_packet_verification() {
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let mut context = build_verified_proof_reader_context(&req, &result).unwrap();
+        context.context_items[0].value.push_str(" tampered");
+        assert!(context
+            .verify_internal_consistency()
+            .unwrap_err()
+            .contains("source-span digest"));
+    }
+
+    #[test]
+    fn reader_context_recomputes_full_token_cost_after_serialization_boundary() {
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let mut context = build_verified_proof_reader_context(&req, &result).unwrap();
+        context.total_token_cost += 1;
+        assert!(context
+            .verify_internal_consistency()
+            .unwrap_err()
+            .contains("token cost mismatch"));
+    }
+
+    #[test]
     fn context_never_truncates_or_changes_packet_evidence_order() {
         let mut req = request();
         req.obligations[0].alternatives = vec![ProofJustification {
