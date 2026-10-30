@@ -7,6 +7,7 @@ on:
       - "Cargo.lock"
       - "examples/hardsec_trigger_budget.rs"
       - "examples/hardsec_evidence_packet_audit.rs"
+      - "examples/hardsec_selective_eval.rs"
       - "tests/fixtures/hardsec/*.json"
       - "tools/hardsec-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-audit-tests.yml"
@@ -39,7 +40,7 @@ jobs:
           components: rustfmt
 
       - name: Check HARDSEC example formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs examples/hardsec_selective_eval.rs
 
       - name: Resolve isolated harness dependencies
         run: cargo generate-lockfile --manifest-path tools/hardsec-audit-harness/Cargo.toml
@@ -49,6 +50,9 @@ jobs:
 
       - name: Test claim-scoped evidence packet auditor
         run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+
+      - name: Test validation-frozen selective-risk evaluator
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-selective-eval --example hardsec_selective_eval
 
       - name: Fetch pinned SeqCube witness package and verify publisher checksums
         run: |
