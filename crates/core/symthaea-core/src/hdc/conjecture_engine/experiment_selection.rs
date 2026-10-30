@@ -956,7 +956,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
         let expected = active
             .iter()
             .zip(action_utilities.iter())
-             .map(|((_, probability, _), value)| *probability * *value)
+            .map(|((_, probability, _), value)| *probability * *value)
             .sum::<f64>();
         if !expected.is_finite() {
             return None;
@@ -1020,7 +1020,7 @@ fn expected_value_of_sample_information_with_steps<H, E, A>(
             log_joint.clear();
             for (other_mean, (_, probability, _)) in means.iter().zip(active.iter()) {
                 let separation = (scaled_true_mean - *other_mean) / noise;
-                let standardized = separation + z;
+                let standardized = separation + *z;
                 let log_likelihood = if !standardized.is_finite() || standardized.abs() > 1.0e6 {
                     f64::NEG_INFINITY
                 } else {
