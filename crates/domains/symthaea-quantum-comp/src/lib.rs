@@ -187,9 +187,11 @@ pub use representative_experiment::{
 };
 
 pub use rida_exact::{
-    DeAmplificationThreshold, ProxyTrainingObjective, RidaExactError, RideaAcquisitionScore,
-    RiAcquisitionScore, derive_de_amplification_threshold, empirical_squared_mmd_rbf,
-    evaluate_proxy_training_objective, score_de_amplification, score_r_i, score_r_idea,
+    DeAmplificationThreshold, EvaluatorOnlySignedErrorDiagnostic, ProxyTrainingObjective,
+    RidaExactError, RideaAcquisitionScore, RiAcquisitionScore, SignedErrorInteraction,
+    derive_de_amplification_threshold, empirical_squared_mmd_rbf,
+    evaluate_proxy_training_objective, evaluate_signed_interaction_oracle,
+    score_de_amplification, score_r_i, score_r_idea,
 };
 
 pub use robust_experiment::{
