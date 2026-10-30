@@ -94,7 +94,7 @@ pub enum EvidenceFreshness {
     StaleTransitive,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ChangeKind {
     SourceChange,
@@ -170,6 +170,41 @@ struct ResourceVersion {
     digest: String,
     generation: u64,
 }
+
+#[derive(Serialize)]
+struct ResourceChangeCommitment<'a> {
+    run_id: &'a str,
+    sequence: u64,
+    event_id: &'a str,
+    change_kind: ChangeKind,
+    resource_id: &'a str,
+    before_digest: &'a str,
+    after_digest: &'a str,
+}
+
+fn resource_change_digest(
+    run_id: &str,
+    sequence: u64,
+    event_id: &str,
+    change_kind: ChangeKind,
+    resource_id: &str,
+    before_digest: &str,
+    after_digest: &str,
+) -> Result<String, String> {
+    let commitment = ResourceChangeCommitment {
+        run_id,
+        sequence,
+        event_id,
+        change_kind,
+        resource_id,
+        before_digest,
+        after_digest,
+    };
+    serde_json::to_vec(&commitment)
+        .map(|bytes| format!("sha256:{}", sha256_hex(&bytes)))
+        .map_err(|error| error.to_string())
+}
+
 
 #[derive(Debug)]
 struct EvidenceState {
@@ -359,8 +394,9 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
 
         match entry {
             TimelineEntry::ResourceChanged {
+                sequence,
                 event_id,
-                change_kind: _,
+                change_kind,
                 event_digest,
                 resource_id,
                 before_digest,
@@ -381,6 +417,23 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     if !valid_digest(digest) {
                         return Err(failure("E_EVENT_DIGEST", format!("{path}.{field}"), "digest must be lowercase sha256:<64 hex>"));
                     }
+                }
+                let expected_event_digest = resource_change_digest(
+                    &timeline.run_id,
+                    *sequence,
+                    event_id,
+                    *change_kind,
+                    resource_id,
+                    before_digest,
+                    after_digest,
+                )
+                .map_err(|error| failure("E_EVENT_COMMITMENT", &path, error))?;
+                if &expected_event_digest != event_digest {
+                    return Err(failure(
+                        "E_EVENT_DIGEST_MISMATCH",
+                        format!("{path}.event_digest"),
+                        "event_digest does not bind the canonical run/sequence/change payload",
+                    ));
                 }
                 if before_digest == after_digest {
                     return Err(failure("E_CHANGE_NOOP", &path, "resource-change event must change the pinned digest"));
@@ -769,10 +822,33 @@ mod tests {
     #[test]
     fn event_chain_rejects_wrong_before_digest() {
         let mut value = parsed_example();
-        value["entries"][5]["before_digest"] = Value::String(format!("sha256:{}", "9".repeat(64)));
+        let wrong_before = format!("sha256:{}", "9".repeat(64));
+        let after = format!("sha256:{}", "e".repeat(64));
+        value["entries"][5]["before_digest"] = Value::String(wrong_before.clone());
+        value["entries"][5]["event_digest"] = Value::String(
+            resource_change_digest(
+                "state-shift-selective-invalidation-001",
+                6,
+                "source-edit-001",
+                ChangeKind::SourceChange,
+                "repo:src/lib.rs",
+                &wrong_before,
+                &after,
+            )
+            .unwrap(),
+        );
         let report = audit_value(&value);
         assert!(!report.valid);
         assert!(has_code(&report, "E_CHANGE_BEFORE_MISMATCH"));
+    }
+
+    #[test]
+    fn event_digest_is_recomputed_from_the_full_change_payload() {
+        let mut value = parsed_example();
+        value["entries"][5]["after_digest"] = Value::String(format!("sha256:{}", "9".repeat(64)));
+        let report = audit_value(&value);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_EVENT_DIGEST_MISMATCH"));
     }
 
     #[test]
