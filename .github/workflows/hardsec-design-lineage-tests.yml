@@ -6,6 +6,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "examples/hardsec_design_lineage_audit.rs"
+      - "examples/hardsec_partition_path_audit.rs"
       - "tools/hardsec-design-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-design-lineage-tests.yml"
   workflow_dispatch:
@@ -37,13 +38,15 @@ jobs:
           components: rustfmt
 
       - name: Check audit formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_design_lineage_audit.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_design_lineage_audit.rs examples/hardsec_partition_path_audit.rs
 
       - name: Resolve isolated harness dependencies
         run: cargo generate-lockfile --manifest-path tools/hardsec-design-audit-harness/Cargo.toml
 
       - name: Test design-lineage and source-holdout audit
-        run: cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_design_lineage_audit
+        run: |
+          cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_design_lineage_audit
+          cargo test --locked --manifest-path tools/hardsec-design-audit-harness/Cargo.toml --features hardsec-design-audit --example hardsec_partition_path_audit
 
       - name: Record resolved dependency lock
         if: always()
