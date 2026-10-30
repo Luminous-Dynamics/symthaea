@@ -56,7 +56,7 @@ impl Scenario {
 enum Policy { DirectFallback, ClaimSum, ClaimMajority, EieGammaOnly, EieGammaBoundedBatch, RootDedupSum, RobustRootMajority, IntegrityGate, Oracle }
 
 impl Policy {
-    fn all() -> [Self; 7] {
+    fn all() -> [Self; 9] {
         [Self::DirectFallback, Self::ClaimSum, Self::ClaimMajority, Self::EieGammaOnly,
          Self::EieGammaBoundedBatch, Self::RootDedupSum, Self::RobustRootMajority,
          Self::IntegrityGate, Self::Oracle]
