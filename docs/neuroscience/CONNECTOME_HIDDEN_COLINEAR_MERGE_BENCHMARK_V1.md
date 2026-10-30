@@ -1,6 +1,6 @@
 # Hidden co-linear merge boundary detection benchmark V1
 
-**Status:** research protocol; no detector or biological result is implemented.
+**Status:** research protocol plus a synthetic 1D change-point baseline; no EM/mesh/skeleton biological result is implemented.
 **Tracking:** [SCI-CONNECTOMICS-014 / #9265](https://github.com/Luminous-Dynamics/symthaea/issues/9265).
 **Independent evaluation:** #9204 spatial PSU probability sample, gated by #9260.
 
@@ -82,3 +82,9 @@ These goals are not directly comparable to NEURD's high-confidence rule-subset a
 ## 8. Promotion boundary
 
 No hidden-boundary detector is promoted on synthetic localization alone. Biological recall uses the #9204 design-based PSU sample after the #9260 frame audit. Audit outcomes remain evaluator-only and must not tune detector thresholds on the lockbox.
+
+## 9. Executable synthetic V1 baseline
+
+An initial executable baseline now exists in `connectome-colinear-merge-audit`. It compares radius-only with a multifeature, piecewise-linear change-point detector over ordered centreline profiles. The evaluator-only truth file binds the exact detector-input SHA-256 and includes all positive and negative-control tracks. See [the executable protocol and schema](CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md), [profile fixture](examples/CONNECTOME_COLINEAR_PROFILE_INPUT.example.json), and [truth fixture](examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json).
+
+The synthetic fixture intentionally demonstrates a trade-off: radius-only misses the constant-radius / multifeature boundary; the fused feature baseline detects it, but the bouton pulse can produce a false proposal. This is a synthetic counterexample and test case, not a biological recall or precision result. The prototype does not inspect EM, meshes, or skeleton geometry.
