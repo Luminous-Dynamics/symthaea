@@ -653,6 +653,35 @@ impl PerformedEventMap {
         Ok(())
     }
 
+    /// Verify an exact single-source-event removal together with primary MIDI
+    /// pitch agreement for every retained source event.
+    pub fn verify_for_score_excluding_and_pitches(
+        &self,
+        expected_target_score_sha256: &str,
+        expected_performed_midi_sha256: &str,
+        expected_sample_rate_hz: u32,
+        expected_total_frames: u64,
+        expected_target_event_count: usize,
+        excluded_source_event_index: usize,
+        expected_midi_by_score_index: &[u8],
+    ) -> Result<(), PerformedEventMapError> {
+        if expected_midi_by_score_index.len() != expected_target_event_count {
+            return Err(PerformedEventMapError::InvalidExpectedEventCount);
+        }
+        self.verify_for_score_excluding(
+            expected_target_score_sha256,
+            expected_performed_midi_sha256,
+            expected_sample_rate_hz,
+            expected_total_frames,
+            expected_target_event_count,
+            excluded_source_event_index,
+        )?;
+        self.verify_primary_pitches_excluding(
+            expected_midi_by_score_index,
+            Some(excluded_source_event_index),
+        )
+    }
+
     /// Verify the complete receipt/context gate and exact primary MIDI pitches.
     ///
     /// This is the public convenience entry point for acceptance paths; it
@@ -673,14 +702,15 @@ impl PerformedEventMap {
             expected_total_frames,
             expected_target_event_count,
         )?;
-        self.verify_primary_pitches(expected_midi_by_score_index)
+        self.verify_primary_pitches_excluding(expected_midi_by_score_index, None)
     }
 
-    /// Check the primary MIDI note for each target-score event. This is
-    /// private so external callers cannot bypass receipt/context validation.
-    fn verify_primary_pitches(
+    /// Check primary MIDI notes by canonical source-event index, optionally
+    /// excluding exactly one event whose absence is separately verified.
+    fn verify_primary_pitches_excluding(
         &self,
         expected_midi_by_score_index: &[u8],
+        excluded_source_event_index: Option<usize>,
     ) -> Result<(), PerformedEventMapError> {
         let mut primary = BTreeMap::new();
         for event in &self.events {
@@ -693,12 +723,20 @@ impl PerformedEventMap {
                 }
             }
         }
-        if primary.len() != expected_midi_by_score_index.len() {
+        let expected_primary_count = expected_midi_by_score_index.len()
+            - usize::from(excluded_source_event_index.is_some());
+        if primary.len() != expected_primary_count {
             return Err(PerformedEventMapError::MissingSourceEvent);
         }
         for (index, expected_pitch) in expected_midi_by_score_index.iter().enumerate() {
             if *expected_pitch > 127 {
                 return Err(PerformedEventMapError::InvalidMidiNote);
+            }
+            if Some(index) == excluded_source_event_index {
+                if primary.contains_key(score_event_id(index).as_str()) {
+                    return Err(PerformedEventMapError::ExcludedSourceEventPresent);
+                }
+                continue;
             }
             if primary.get(score_event_id(index).as_str()) != Some(expected_pitch) {
                 return Err(PerformedEventMapError::ContextMismatch("primary performed MIDI pitch"));
