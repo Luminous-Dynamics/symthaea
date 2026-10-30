@@ -366,6 +366,7 @@ pub fn audit_bytes(
 
     report.run_id = Some(oracle.run_id.clone());
     report.counts.challenge_cases = catalog.cases.len();
+    report.counts.selected_cases = oracle.selected_case_ids.len();
     report.counts.oracle_records = oracle.records.len();
     report.counts.observer_receipts = receipts.records.len();
 
@@ -403,6 +404,43 @@ pub fn audit_bytes(
         }
     }
 
+    let selected_ids: BTreeSet<&str> =
+        oracle.selected_case_ids.iter().map(String::as_str).collect();
+    if selected_ids.is_empty() || selected_ids.len() != oracle.selected_case_ids.len() {
+        push_error(
+            &mut report,
+            None,
+            "E_ORACLE_SCOPE_INVALID",
+            "oracle.selected_case_ids",
+            "oracle scope must contain at least one unique case ID",
+        );
+    }
+    for selected_id in &selected_ids {
+        if !catalog_ids.contains(selected_id) {
+            push_error(
+                &mut report,
+                Some(selected_id),
+                "E_ORACLE_SCOPE_UNKNOWN",
+                "oracle.selected_case_ids",
+                "selected case ID is absent from the challenge catalog",
+            );
+        }
+    }
+
+    let receipt_scope: BTreeSet<&str> =
+        receipts.selected_case_ids.iter().map(String::as_str).collect();
+    if receipt_scope.len() != receipts.selected_case_ids.len()
+        || receipt_scope != selected_ids
+    {
+        push_error(
+            &mut report,
+            None,
+            "E_RECEIPT_SCOPE_MISMATCH",
+            "observer_receipts.selected_case_ids",
+            "observer receipt scope must contain exactly the same unique case IDs as the oracle scope",
+        );
+    }
+
     let mut oracle_by_id = BTreeMap::<&str, &OracleRecord>::new();
     for record in &oracle.records {
         if oracle_by_id.insert(&record.case_id, record).is_some() {
@@ -411,7 +449,7 @@ pub fn audit_bytes(
                 Some(&record.case_id),
                 "E_ORACLE_CASE_DUPLICATE",
                 "oracle.records",
-                "oracle must contain exactly one record per challenge case",
+                "oracle must contain exactly one record per selected challenge case",
             );
         }
         if !catalog_ids.contains(record.case_id.as_str()) {
@@ -421,6 +459,14 @@ pub fn audit_bytes(
                 "E_ORACLE_CASE_UNKNOWN",
                 "oracle.records",
                 "oracle contains a case ID that is absent from the catalog",
+            );
+        } else if !selected_ids.contains(record.case_id.as_str()) {
+            push_error(
+                &mut report,
+                Some(&record.case_id),
+                "E_ORACLE_CASE_OUT_OF_SCOPE",
+                "oracle.records",
+                "oracle record is not named in selected_case_ids",
             );
         }
     }
@@ -433,7 +479,7 @@ pub fn audit_bytes(
                 Some(&record.case_id),
                 "E_RECEIPT_CASE_DUPLICATE",
                 "observer_receipts.records",
-                "observer receipts must contain exactly one record per challenge case",
+                "observer receipts must contain exactly one record per selected challenge case",
             );
         }
         if !catalog_ids.contains(record.case_id.as_str()) {
@@ -444,13 +490,26 @@ pub fn audit_bytes(
                 "observer_receipts.records",
                 "observer receipts contain a case ID that is absent from the catalog",
             );
+        } else if !selected_ids.contains(record.case_id.as_str()) {
+            push_error(
+                &mut report,
+                Some(&record.case_id),
+                "E_RECEIPT_CASE_OUT_OF_SCOPE",
+                "observer_receipts.records",
+                "observer receipt is not named in selected_case_ids",
+            );
         }
     }
 
-    let mut complete = oracle_by_id.len() == catalog.cases.len()
-        && receipts_by_id.len() == catalog.cases.len();
+    let mut complete = !selected_ids.is_empty()
+        && oracle_by_id.len() == selected_ids.len()
+        && receipts_by_id.len() == selected_ids.len();
 
-    for case in &catalog.cases {
+    for case in catalog
+        .cases
+        .iter()
+        .filter(|case| selected_ids.contains(case.case_id.as_str()))
+    {
         let before_errors = report.errors.len();
         let oracle_record = oracle_by_id.get(case.case_id.as_str()).copied();
         let receipt_record = receipts_by_id.get(case.case_id.as_str()).copied();
@@ -524,6 +583,7 @@ pub fn audit_bytes(
 
     validate_pairs(
         &catalog.cases,
+        &selected_ids,
         &oracle_by_id,
         &receipts_by_id,
         &mut report,
@@ -550,9 +610,9 @@ pub fn audit_bytes(
     }
 
     report.adjudication_complete = complete
-        && report.counts.adjudicated_cases == catalog.cases.len();
+        && report.counts.adjudicated_cases == selected_ids.len();
     report.adjudication_passed = report.adjudication_complete
-        && report.counts.passed_cases == catalog.cases.len()
+        && report.counts.passed_cases == selected_ids.len()
         && report.errors.is_empty();
 
     // These are policy constants, not values inferred from a green run.
@@ -1110,6 +1170,7 @@ fn adjudicate_case(
 
 fn validate_pairs(
     cases: &[ChallengeCase],
+    selected_ids: &BTreeSet<&str>,
     oracle_by_id: &BTreeMap<&str, &OracleRecord>,
     receipts_by_id: &BTreeMap<&str, &ObserverReceipt>,
     report: &mut ResultAuditReport,
@@ -1119,8 +1180,18 @@ fn validate_pairs(
         .map(|case| (case.case_id.as_str(), case))
         .collect::<BTreeMap<_, _>>();
 
-    for case in cases {
+    for case in cases.iter().filter(|case| selected_ids.contains(case.case_id.as_str())) {
         for paired_id in &case.paired_case_ids {
+            if !selected_ids.contains(paired_id.as_str()) {
+                push_error(
+                    report,
+                    Some(&case.case_id),
+                    "E_PAIR_SCOPE_INCOMPLETE",
+                    "oracle.selected_case_ids",
+                    "a selected challenge case requires its reciprocal pair in the same adjudication scope",
+                );
+                continue;
+            }
             // Reciprocal links are adjudicated once in stable lexical order.
             if case.case_id.as_str() > paired_id.as_str() {
                 continue;
