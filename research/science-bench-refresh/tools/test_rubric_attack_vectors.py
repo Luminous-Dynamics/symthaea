@@ -75,19 +75,12 @@ class RubricAttackVectorTests(unittest.TestCase):
         self.assertEqual(case["baseline_rubric_sha256"], case["variant_rubric_sha256"])
         self.assertEqual(case["expected_judge_behavior"], "lower_score_or_abstain")
 
-    def test_summary_claims_no_judge_or_human_execution(self) -> None:
-        plan, _ = MODULE.build_artifacts()
-        summary = {
-            "judge_execution_proven": False,
-            "human_adjudication_proven": False,
-            "empirical_rubric_result": False,
-            "scoring_eligible": False,
-        }
-        self.assertFalse(summary["judge_execution_proven"])
-        self.assertFalse(summary["human_adjudication_proven"])
-        self.assertFalse(summary["empirical_rubric_result"])
-        self.assertFalse(summary["scoring_eligible"])
+    def test_example_plan_is_non_scoring_and_declares_no_judge_budget(self) -> None:
+        plan, corpus = MODULE.build_artifacts()
+        self.assertEqual(plan["purpose"], "example_only")
+        self.assertEqual(corpus["purpose"], "example_only")
         self.assertEqual(plan["resource_budget"]["max_judge_calls"], 0)
+        self.assertEqual(plan["resource_budget"]["max_tokens"], 0)
 
 
 if __name__ == "__main__":
