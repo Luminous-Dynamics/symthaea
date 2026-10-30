@@ -67,6 +67,7 @@ fn get_path_optional<'a>(root: &'a Value, path: &str) -> Result<Option<&'a Value
     Ok(Some(current))
 }
 
+#[cfg(test)]
 fn remove_path(root: &mut Value, path: &str) -> Result<(), String> {
     fn remove_at(current: &mut Value, segments: &[&str], full_path: &str) -> Result<(), String> {
         if segments.len() == 1 {
@@ -393,7 +394,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{audit_case, audit_fixture, default_fixture_paths, equal_except_path, path_changed, remove_path};
+    use serde_json::{json, Value};
 
     fn valid_case() -> Value {
         json!({
@@ -435,6 +437,22 @@ mod tests {
                 }
             ]
         })
+    }
+
+    #[test]
+    fn checked_in_fixture_corpus_passes_integrity_audit() {
+        let paths = default_fixture_paths().unwrap();
+        assert_eq!(paths.len(), 4);
+
+        let mut cases = 0usize;
+        let mut variants = 0usize;
+        for path in paths {
+            let report = audit_fixture(&path).unwrap();
+            cases += report["case_count"].as_u64().unwrap() as usize;
+            variants += report["variant_count"].as_u64().unwrap() as usize;
+        }
+        assert_eq!(cases, 22);
+        assert_eq!(variants, 110);
     }
 
     #[test]
