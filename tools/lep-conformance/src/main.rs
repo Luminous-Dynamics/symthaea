@@ -1,7 +1,4 @@
-use lep_conformance::{
-    MAX_STATEMENT_BYTES, ValidationReport, parse_json_unique_keys, verify_statement,
-};
-use serde_json::Value;
+use lep_conformance::{MAX_STATEMENT_BYTES, ValidationReport, verify_statement_bytes};
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -48,30 +45,19 @@ fn main() -> ExitCode {
         emit(&report);
         return ExitCode::from(2);
     }
-    if bytes.len() > MAX_STATEMENT_BYTES {
-        let report = ValidationReport::invalid_json(format!(
-            "Statement exceeds maximum size of {MAX_STATEMENT_BYTES} bytes."
-        ));
-        emit(&report);
-        return ExitCode::from(2);
-    }
-
-    let statement: Value = match parse_json_unique_keys(&bytes) {
-        Ok(value) => value,
-        Err(error) => {
-            let report = ValidationReport::invalid_json(format!(
-                "Invalid JSON statement (including duplicate-key rejection): {error}"
-            ));
-            emit(&report);
-            return ExitCode::from(2);
-        }
-    };
-
-    let report = verify_statement(&statement);
+    let report = verify_statement_bytes(&bytes);
+    let parse_failed = report.violations.iter().any(|violation| {
+        matches!(
+            violation.code.as_str(),
+            "INVALID_JSON" | "DUPLICATE_JSON_KEY" | "STATEMENT_TOO_LARGE"
+        )
+    });
     let conforms = report.conforms;
     emit(&report);
     if conforms {
         ExitCode::SUCCESS
+    } else if parse_failed {
+        ExitCode::from(2)
     } else {
         ExitCode::from(1)
     }

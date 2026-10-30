@@ -152,6 +152,20 @@ pub fn parse_json_unique_keys(input: &[u8]) -> Result<Value, String> {
     Ok(value)
 }
 
+/// Safely validate serialized LEP Statement bytes.
+///
+/// This is the recommended public entry point because it owns the entire
+/// trust-sensitive input boundary: bounded parsing, duplicate-key rejection,
+/// schema validation, then semantic consistency validation. Callers should
+/// not parse untrusted bytes into `serde_json::Value` first, because a
+/// last-key-wins parser may already have erased duplicate-key ambiguity.
+pub fn verify_statement_bytes(input: &[u8]) -> ValidationReport {
+    match parse_json_unique_keys(input) {
+        Ok(statement) => verify_statement(&statement),
+        Err(error) => ValidationReport::invalid_json(error),
+    }
+}
+
 const LEP_SCHEMA_JSON: &str =
     include_str!("../../../docs/research/schemas/luminous-evidence-predicate-v0.1.schema.json");
 
@@ -1564,6 +1578,14 @@ mod tests {
             };
 
             let report = verify_statement(&statement);
+            let predicate = statement
+                .get("predicate")
+                .expect("generated mutation must retain predicate");
+            let schema_report = validate_schema_only(predicate);
+            assert!(
+                schema_report.conforms || !report.conforms,
+                "mutation seed {seed} (operator {mutation}) was rejected by schema but accepted by the full verifier"
+            );
             assert!(
                 !report.conforms,
                 "mutation seed {seed} (operator {mutation}) was falsely accepted"
@@ -1599,6 +1621,147 @@ mod tests {
             error.contains("recursion limit"),
             "unexpected nesting error: {error}"
         );
+    }
+
+    fn append_reversed_object_members(value: &Value, output: &mut String) {
+        match value {
+            Value::Object(object) => {
+                output.push('{');
+                for (index, (key, child)) in object.iter().rev().enumerate() {
+                    if index > 0 {
+                        output.push(',');
+                    }
+                    output.push_str(
+                        &serde_json::to_string(key).expect("object keys serialize as JSON strings"),
+                    );
+                    output.push(':');
+                    append_reversed_object_members(child, output);
+                }
+                output.push('}');
+            }
+            Value::Array(array) => {
+                output.push('[');
+                for (index, child) in array.iter().enumerate() {
+                    if index > 0 {
+                        output.push(',');
+                    }
+                    append_reversed_object_members(child, output);
+                }
+                output.push(']');
+            }
+            scalar => output.push_str(
+                &serde_json::to_string(scalar).expect("JSON scalar serialization must succeed"),
+            ),
+        }
+    }
+
+    fn sorted_violation_codes(report: &ValidationReport) -> Vec<String> {
+        let mut codes = report
+            .violations
+            .iter()
+            .map(|violation| violation.code.clone())
+            .collect::<Vec<_>>();
+        codes.sort();
+        codes
+    }
+
+    #[test]
+    fn byte_entrypoint_rejects_nested_duplicate_keys_before_validation() {
+        let input = br#"{"outer":{"duplicate":1,"duplicate":2}}"#;
+        let report = verify_statement_bytes(input);
+        assert!(!report.conforms);
+        assert_eq!(report.violations.len(), 1);
+        assert_eq!(report.violations[0].code, "DUPLICATE_JSON_KEY");
+    }
+
+    #[test]
+    fn byte_entrypoint_matches_the_strict_parse_then_verify_pipeline() {
+        let statement = minimal_statement();
+        let bytes = serde_json::to_vec(&statement).expect("statement must serialize");
+        let parsed = parse_json_unique_keys(&bytes).expect("strict parse must succeed");
+        assert_eq!(
+            verify_statement_bytes(&bytes),
+            verify_statement(&parsed),
+            "safe byte entry point must be exactly the strict parse plus semantic pipeline"
+        );
+    }
+
+    #[test]
+    fn whitespace_and_object_member_order_are_semantics_preserving() {
+        let mut invalid = minimal_statement();
+        invalid["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+            json!("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+
+        for statement in [minimal_statement(), invalid] {
+            let compact = serde_json::to_string(&statement).expect("statement must serialize");
+            let pretty =
+                serde_json::to_string_pretty(&statement).expect("statement must pretty serialize");
+            let mut reversed = String::new();
+            append_reversed_object_members(&statement, &mut reversed);
+
+            let baseline_bytes = compact.as_bytes();
+            let baseline = verify_statement_bytes(baseline_bytes);
+            let baseline_codes = sorted_violation_codes(&baseline);
+
+            for seed in 0..128 {
+                let body = match seed % 3 {
+                    0 => compact.as_str(),
+                    1 => pretty.as_str(),
+                    _ => reversed.as_str(),
+                };
+                let prefix = " ".repeat(seed % 7);
+                let suffix = format!("{}{}", "\n".repeat(seed % 3 + 1), "\t".repeat(seed % 5));
+                let transformed = format!("{prefix}{body}{suffix}");
+                let report = verify_statement_bytes(transformed.as_bytes());
+
+                assert_eq!(
+                    report.conforms, baseline.conforms,
+                    "format-only transformation {seed} changed the conformance verdict"
+                );
+                assert_eq!(
+                    sorted_violation_codes(&report),
+                    baseline_codes,
+                    "format-only transformation {seed} changed the violation-code set"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn target_identity_mismatch_is_detected_component_by_component() {
+        type TargetIdentityMutation = (&'static str, fn(&mut Value));
+        let cases: [TargetIdentityMutation; 4] = [
+            ("repository", |statement| {
+                statement["predicate"]["verification"]["checkedTarget"]["source"]["repository"] =
+                    json!("https://example.invalid/other-repository");
+            }),
+            ("revision", |statement| {
+                statement["predicate"]["verification"]["checkedTarget"]["source"]["revision"] =
+                    json!("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+            }),
+            ("configuration", |statement| {
+                statement["predicate"]["verification"]["checkedTarget"]["configurationDigest"]["sha256"] =
+                    json!("a".repeat(64));
+            }),
+            ("inputs", |statement| {
+                statement["predicate"]["verification"]["checkedTarget"]["inputs"] = json!([{
+                    "name": "different-input",
+                    "kind": "dataset_manifest",
+                    "digest": { "sha256": "a".repeat(64) }
+                }]);
+            }),
+        ];
+
+        for (component, mutate) in cases {
+            let mut statement = minimal_statement();
+            mutate(&mut statement);
+            let report = verify_statement(&statement);
+            assert!(
+                !report.conforms && has_code(&report, "LEP_TARGET_MISMATCH"),
+                "target {component} mismatch was not rejected: {:?}",
+                report.violations
+            );
+        }
     }
 
     #[test]
