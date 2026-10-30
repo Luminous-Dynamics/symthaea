@@ -316,7 +316,7 @@ The input contains no labels; the evaluator truth is parsed only after proposal 
 
 ## Query-scoped certificate dependency DAG
 
-The `connectome-query-cert-audit` verifier now requires `query.dependency_roots` and explicit `depends_on` edges for every dependency record. It rejects unresolved references, duplicate identities/edges, reachable cycles, and dependency records outside every declared root's transitive closure. See `docs/neuroscience/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE_V1.md`. Passing this check validates the declared graph, not the scientific completeness of the query's root manifest.
+The `connectome-query-cert-audit` verifier now requires `query.dependency_roots` and explicit `depends_on` edges for every dependency record. It rejects unresolved references, duplicate identities/edges, reachable cycles, and dependency records outside every declared root's transitive closure. Its audit report emits root/node/edge counts and a canonical dependency-graph SHA-256 that remains stable under JSON node/edge reordering. See `docs/neuroscience/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE_V1.md`. Passing this check validates the declared graph, not the scientific completeness of the query's root manifest.
 
 
 ## Acquisition–proofreading co-design
