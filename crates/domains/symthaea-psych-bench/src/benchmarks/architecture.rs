@@ -194,12 +194,10 @@ struct TaskSpace {
 
 impl TaskSpace {
     fn new(dim: usize, seed: u64) -> Self {
-        let values = std::array::from_fn(|i| {
-            ContinuousHV::random(dim, mix_seed(seed, 0x1000 + i as u64))
-        });
-        let worlds = std::array::from_fn(|i| {
-            ContinuousHV::random(dim, mix_seed(seed, 0x2000 + i as u64))
-        });
+        let values =
+            std::array::from_fn(|i| ContinuousHV::random(dim, mix_seed(seed, 0x1000 + i as u64)));
+        let worlds =
+            std::array::from_fn(|i| ContinuousHV::random(dim, mix_seed(seed, 0x2000 + i as u64)));
         Self {
             values,
             worlds,
@@ -211,10 +209,7 @@ impl TaskSpace {
     fn encode(&self, world: usize, p: Pair) -> ContinuousHV {
         let shape = self.values[p.i].bind(&self.shape_role);
         let texture = self.values[p.j].bind(&self.texture_role);
-        shape
-            .bind(&texture)
-            .bind(&self.worlds[world])
-            .normalize()
+        shape.bind(&texture).bind(&self.worlds[world]).normalize()
     }
 }
 
@@ -392,8 +387,7 @@ impl Agent {
                 let representation = ContinuousHV::from_values(output).normalize();
                 memory.predict(&representation)
             }
-            Self::LiquidFrozen { liquid, memory }
-            | Self::LiquidHebbian { liquid, memory, .. } => {
+            Self::LiquidFrozen { liquid, memory } | Self::LiquidHebbian { liquid, memory, .. } => {
                 let mut shadow = liquid.clone();
                 shadow.evolve_closed_form(0.05, input);
                 memory.predict(shadow.state())
@@ -521,8 +515,8 @@ fn run_seed(config: &SymArch001Config, seed: u64) -> Vec<(String, SeedMetrics)> 
                     reversed.observe(&x, target);
                     if outcomes.len() >= REVERSAL_WINDOW && adaptation_latency > reversal_trials {
                         let tail = &outcomes[outcomes.len() - REVERSAL_WINDOW..];
-                        let rolling = tail.iter().filter(|&&v| v).count() as f64
-                            / REVERSAL_WINDOW as f64;
+                        let rolling =
+                            tail.iter().filter(|&&v| v).count() as f64 / REVERSAL_WINDOW as f64;
                         if rolling >= 0.75 {
                             adaptation_latency = outcomes.len();
                         }
@@ -581,10 +575,7 @@ pub fn run_sym_arch_001(
             compositional: mean_ci95(rows.iter().map(|r| r.heldout_compositional_accuracy)),
             forgetting: mean_ci95(rows.iter().map(|r| r.mean_forgetting)),
             reversal_final: mean_ci95(rows.iter().map(|r| r.reversal_final_accuracy)),
-            reversal_latency: mean_ci95(
-                rows.iter()
-                    .map(|r| r.reversal_adaptation_latency as f64),
-            ),
+            reversal_latency: mean_ci95(rows.iter().map(|r| r.reversal_adaptation_latency as f64)),
             agent,
             per_seed: rows,
         })
@@ -648,10 +639,7 @@ fn classify(agents: &[AgentSummary], config: &SymArch001Config) -> DecisionEvide
     let forgetting_delta = best_forgetting - candidate.forgetting.mean;
 
     let targets = [retention_delta, composition_delta, reversal_delta];
-    let wins = targets
-        .iter()
-        .filter(|&&d| d >= config.win_margin)
-        .count();
+    let wins = targets.iter().filter(|&&d| d >= config.win_margin).count();
     let regressions = targets
         .iter()
         .filter(|&&d| d < -config.regression_tolerance)
@@ -701,11 +689,7 @@ where
             ci95_high: m,
         };
     }
-    let variance = values
-        .iter()
-        .map(|v| (v - m).powi(2))
-        .sum::<f64>()
-        / (values.len() - 1) as f64;
+    let variance = values.iter().map(|v| (v - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     let half = 1.96 * variance.sqrt() / (values.len() as f64).sqrt();
     MeanCi95 {
         mean: m,
@@ -771,7 +755,11 @@ mod tests {
                 agent.reversal_final.mean,
                 agent.reversal_latency.mean,
             ] {
-                assert!(value.is_finite(), "{} emitted non-finite metric", agent.agent);
+                assert!(
+                    value.is_finite(),
+                    "{} emitted non-finite metric",
+                    agent.agent
+                );
             }
         }
         assert!(matches!(
