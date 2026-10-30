@@ -292,6 +292,78 @@ impl EvidenceRecord {
     }
 }
 
+/// Explicit trusted configuration mapping agent roles to readable evidence scopes.
+///
+/// This policy is intentionally separate from evidence authenticity and source
+/// authority. Construct it from an authenticated configuration or a verified
+/// governance policy; this type does not itself cryptographically authenticate
+/// the policy bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleScopePolicy {
+    policy_version: u64,
+    readable_scopes: BTreeMap<String, BTreeSet<String>>,
+}
+
+impl RoleScopePolicy {
+    pub fn new(
+        policy_version: u64,
+        readable_scopes: BTreeMap<String, BTreeSet<String>>,
+    ) -> Result<Self, String> {
+        if policy_version == 0 {
+            return Err("role-scope policy version must be positive".into());
+        }
+        if readable_scopes.is_empty() {
+            return Err("role-scope policy must contain at least one role".into());
+        }
+        for (role_id, scopes) in &readable_scopes {
+            if role_id.trim().is_empty() {
+                return Err("role ID must be non-empty".into());
+            }
+            if scopes.is_empty() || scopes.iter().any(|scope| scope.trim().is_empty()) {
+                return Err(format!("role {role_id:?} must have non-empty readable scopes"));
+            }
+        }
+        Ok(Self {
+            policy_version,
+            readable_scopes,
+        })
+    }
+
+    pub fn policy_version(&self) -> u64 {
+        self.policy_version
+    }
+
+    fn require_read_scope(&self, role_id: &str, scope_id: &str) -> Result<(), String> {
+        if role_id.trim().is_empty() {
+            return Err("requesting role ID must be non-empty".into());
+        }
+        if scope_id.trim().is_empty() {
+            return Err("requested scope ID must be non-empty".into());
+        }
+        let scopes = self
+            .readable_scopes
+            .get(role_id)
+            .ok_or_else(|| format!("role {role_id:?} has no memory read grants"))?;
+        if !scopes.contains(scope_id) {
+            return Err(format!(
+                "role {role_id:?} is not authorized to read scope {scope_id:?}"
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A context item returned after role authorization and evidence validation.
+/// The full record preserves source identity and content provenance for audit;
+/// only the context field should be placed in the language-model prompt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorizedEvidenceContext {
+    pub requesting_role: String,
+    pub access_policy_version: u64,
+    pub evidence: EvidenceRecord,
+    pub context: MemoryContextItem,
+}
+
 /// Process-local map from HDC candidate IDs to evidence payloads.
 ///
 /// Production persistence must commit lifecycle/tombstone state atomically with
@@ -412,46 +484,6 @@ impl EvidenceIndex {
         record.lifecycle = EvidenceLifecycle::Deleted;
         record.superseded_by = None;
         Ok(())
-    }
-
-    /// Revoke an evidence item by its stable external evidence ID.
-    /// Numeric mapping remains as a tombstone so stale candidates cannot resurrect it.
-    pub fn revoke_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
-        let hdc_id = self
-            .evidence_ids
-            .get(evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown evidence_id".to_string())?;
-        self.revoke(hdc_id)
-    }
-
-    /// Mark evidence deleted while retaining a non-resolvable tombstone.
-    pub fn delete_evidence(&mut self, evidence_id: &str) -> Result<(), String> {
-        let hdc_id = self
-            .evidence_ids
-            .get(evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown evidence_id".to_string())?;
-        self.mark_deleted(hdc_id)
-    }
-
-    /// Supersede evidence by stable IDs, enforcing the existing same-scope rule.
-    pub fn supersede_evidence(
-        &mut self,
-        old_evidence_id: &str,
-        new_evidence_id: &str,
-    ) -> Result<(), String> {
-        let old_hdc_id = self
-            .evidence_ids
-            .get(old_evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown old evidence_id".to_string())?;
-        let new_hdc_id = self
-            .evidence_ids
-            .get(new_evidence_id)
-            .copied()
-            .ok_or_else(|| "unknown replacement evidence_id".to_string())?;
-        self.supersede(old_hdc_id, new_hdc_id)
     }
 
     /// Revoke an evidence item by its stable external evidence ID.
@@ -690,6 +722,78 @@ impl EvidenceIndex {
             output.push(record.context_item(payload_root)?);
         }
         Ok(output)
+    }
+
+    /// Resolve candidate IDs only when the requesting role has an explicit
+    /// grant for the requested scope. Returned records retain provenance.
+    pub fn resolve_for_role(
+        &self,
+        hdc_hits: &[u64],
+        requesting_role: &str,
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        max_items: usize,
+        policy: &RoleScopePolicy,
+    ) -> Result<Vec<AuthorizedEvidenceContext>, String> {
+        policy.require_read_scope(requesting_role, scope_id)?;
+        if max_items == 0 {
+            return Ok(Vec::new());
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut output = Vec::new();
+        for hdc_id in hdc_hits {
+            if output.len() >= max_items {
+                break;
+            }
+            if !seen.insert(*hdc_id) {
+                continue;
+            }
+            let Some(record) = self.records.get(hdc_id) else {
+                // A stale vector hit with no payload mapping never becomes
+                // evidence through a caller-supplied fallback.
+                continue;
+            };
+            if !record.is_eligible_for(scope_id, now_ms) {
+                continue;
+            }
+            let context = record.context_item(payload_root)?;
+            output.push(AuthorizedEvidenceContext {
+                requesting_role: requesting_role.to_owned(),
+                access_policy_version: policy.policy_version(),
+                evidence: record.clone(),
+                context,
+            });
+        }
+        Ok(output)
+    }
+
+    /// Role-authorized BM25 retrieval plus evidence resolution. This is the
+    /// preferred multi-agent entry point because the same trusted role policy
+    /// gates both candidate search and context materialization.
+    pub fn search_bm25_for_role(
+        &self,
+        query: &str,
+        requesting_role: &str,
+        scope_id: &str,
+        now_ms: u64,
+        payload_root: &Path,
+        config: Bm25Config,
+        policy: &RoleScopePolicy,
+    ) -> Result<Vec<AuthorizedEvidenceContext>, String> {
+        policy.require_read_scope(requesting_role, scope_id)?;
+        let hits = self.search_bm25(query, scope_id, now_ms, payload_root, config)?;
+        let hdc_ids: Vec<u64> = hits.iter().map(|hit| hit.hdc_id).collect();
+        self.resolve_for_role(
+            &hdc_ids,
+            requesting_role,
+            scope_id,
+            now_ms,
+            payload_root,
+            config.max_items,
+            policy,
+        )
     }
 }
 
@@ -933,29 +1037,6 @@ mod tests {
 
 
     #[test]
-    fn evidence_id_lifecycle_transitions_are_query_visible_and_stable() {
-        let mut index = EvidenceIndex::new();
-        let old = text_record(101, "old-evidence", "web", "billing panel moved");
-        let new = text_record(102, "new-evidence", "web", "billing panel now here");
-        index.insert(old, &source_bytes_for_text("billing panel moved")).unwrap();
-        index.insert(new, &source_bytes_for_text("billing panel now here")).unwrap();
-
-        index.supersede_evidence("old-evidence", "new-evidence").unwrap();
-        let hits = index
-            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
-            .unwrap();
-        assert!(hits.iter().all(|hit| hit.evidence_id != "old-evidence"));
-
-        index.revoke_evidence("new-evidence").unwrap();
-        assert!(index
-            .search_bm25("billing panel", "web", 150, Path::new("."), Bm25Config::default())
-            .unwrap()
-            .is_empty());
-        index.delete_evidence("new-evidence").unwrap();
-        assert!(index.revoke_evidence("new-evidence").is_err());
-    }
-
-    #[test]
     fn batch_ingestion_is_atomic_when_the_final_source_pointer_is_invalid() {
         let mut index = EvidenceIndex::new();
         let source_value = serde_json::json!({
@@ -980,6 +1061,134 @@ mod tests {
         assert!(index.lexical_document_lengths.is_empty());
         assert!(index.insert(valid, &source_bytes).is_ok());
     }
+    #[test]
+    fn role_scoped_search_requires_explicit_scope_grant_and_preserves_provenance() {
+        let mut index = EvidenceIndex::new();
+        insert_text(&mut index, 1, "security key rotation overdue", "security");
+        insert_text(&mut index, 2, "billing invoice workflow", "finance");
+
+        let policy = RoleScopePolicy::new(
+            7,
+            BTreeMap::from([
+                ("security-agent".to_string(), BTreeSet::from(["security".to_string()])),
+                ("finance-agent".to_string(), BTreeSet::from(["finance".to_string()])),
+            ]),
+        )
+        .unwrap();
+
+        let security = index
+            .search_bm25_for_role(
+                "key rotation",
+                "security-agent",
+                "security",
+                150,
+                Path::new("."),
+                Bm25Config::default(),
+                &policy,
+            )
+            .unwrap();
+        assert_eq!(security.len(), 1);
+        assert_eq!(security[0].evidence.evidence_id, "evidence-1");
+        assert_eq!(security[0].evidence.scope_id, "security");
+        assert_eq!(security[0].evidence.source.trajectory_id, "trajectory-001");
+        assert_eq!(security[0].requesting_role, "security-agent");
+        assert_eq!(security[0].access_policy_version, 7);
+        assert_eq!(security[0].context.value, "security key rotation overdue");
+
+        assert!(index
+            .search_bm25_for_role(
+                "invoice",
+                "security-agent",
+                "finance",
+                150,
+                Path::new("."),
+                Bm25Config::default(),
+                &policy,
+            )
+            .unwrap_err()
+            .contains("not authorized"));
+        assert!(index
+            .search_bm25_for_role(
+                "invoice",
+                "unknown-agent",
+                "finance",
+                150,
+                Path::new("."),
+                Bm25Config::default(),
+                &policy,
+            )
+            .unwrap_err()
+            .contains("no memory read grants"));
+    }
+
+    #[test]
+    fn role_scope_policy_rejects_ambiguous_empty_grants() {
+        assert!(RoleScopePolicy::new(0, BTreeMap::from([
+            ("agent".to_string(), BTreeSet::from(["web".to_string()]))
+        ])).is_err());
+        assert!(RoleScopePolicy::new(1, BTreeMap::new()).is_err());
+        assert!(RoleScopePolicy::new(1, BTreeMap::from([
+            ("agent".to_string(), BTreeSet::new())
+        ])).is_err());
+    }
+
+    #[test]
+    fn role_scoped_resolution_still_enforces_lifecycle_and_validity() {
+        let mut index = EvidenceIndex::new();
+        let mut record = text_record(1, "evidence-a", "security", "key rotation overdue");
+        record.valid_until_unix_ms = Some(200);
+        index.insert(record, &source_bytes_for_text("key rotation overdue")).unwrap();
+
+        let policy = RoleScopePolicy::new(
+            3,
+            BTreeMap::from([(
+                "security-agent".to_string(),
+                BTreeSet::from(["security".to_string()]),
+            )]),
+        )
+        .unwrap();
+
+        let before_expiry = index
+            .resolve_for_role(
+                &[1],
+                "security-agent",
+                "security",
+                199,
+                Path::new("."),
+                5,
+                &policy,
+            )
+            .unwrap();
+        assert_eq!(before_expiry.len(), 1);
+
+        let at_expiry = index
+            .resolve_for_role(
+                &[1],
+                "security-agent",
+                "security",
+                200,
+                Path::new("."),
+                5,
+                &policy,
+            )
+            .unwrap();
+        assert!(at_expiry.is_empty());
+
+        index.revoke_evidence("evidence-a").unwrap();
+        let revoked = index
+            .resolve_for_role(
+                &[1],
+                "security-agent",
+                "security",
+                150,
+                Path::new("."),
+                5,
+                &policy,
+            )
+            .unwrap();
+        assert!(revoked.is_empty());
+    }
+
     #[test]
     fn serializes_context_items_to_official_type_value_shape() {
         let item = MemoryContextItem {
