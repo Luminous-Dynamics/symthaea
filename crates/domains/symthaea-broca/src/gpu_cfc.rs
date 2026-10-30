@@ -188,7 +188,14 @@ impl GpuCfcLayer {
         self.states.mean(0) // [D] — mean across neurons
     }
 
-    /// Backward pass: compute gradients for all neurons in the layer.
+    /// Compute a local, single-step learning signal for all neurons in this layer.
+    ///
+    /// This reads the current `states` only. It stores no temporal activation
+    /// history and cannot propagate a token-position loss to earlier recurrent
+    /// states. Its recomputed transition uses `sigma = 1 - exp(-dt / tau)` and
+    /// omits the gated `sigma_base` contribution used by `evolve_closed_form`;
+    /// this is therefore a simplified local surrogate, not the exact derivative
+    /// of the full gated CfC transition.
     ///
     /// Returns (dw, du, dtau_scalar, d_input) as tensors.
     /// - dw: [N, D] — gradient w.r.t. weight_hv
