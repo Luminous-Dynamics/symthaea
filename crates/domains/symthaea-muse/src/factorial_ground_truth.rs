@@ -261,7 +261,7 @@ fn validate_inputs(
 
 fn included_indices(mask: u16, event_count: usize) -> Vec<usize> {
     (0..event_count)
-        .filter(|index| mask & (1u16 << index) != 0)
+        .filter(|index| mask & (1u16 << *index) != 0)
         .collect()
 }
 
@@ -287,7 +287,7 @@ fn render_coalition(
             let mut convolved = vec![0.0f64; output_len];
             for (sample_index, sample) in mixed.iter().enumerate() {
                 for (tap_index, tap) in impulse_response.iter().enumerate() {
-                    convolved[sample_index + tap_index] += sample * tap;
+                    convolved[sample_index + tap_index] += *sample * *tap;
                 }
             }
             convolved
@@ -299,13 +299,13 @@ fn render_coalition(
             .into_iter()
             .map(|sample| {
                 sample
-                    + quadratic_coefficient * sample * sample
-                    + cubic_coefficient * sample * sample * sample
+                    + *quadratic_coefficient * sample * sample
+                    + *cubic_coefficient * sample * sample * sample
             })
             .collect(),
         SyntheticEffect::HardClip { threshold } => mixed
             .into_iter()
-            .map(|sample| sample.clamp(-threshold, *threshold))
+            .map(|sample| sample.clamp(-*threshold, *threshold))
             .collect(),
         SyntheticEffect::ThreeWayProduct {
             event_indices,
@@ -320,7 +320,7 @@ fn render_coalition(
                 let b = &events[event_indices[1]].samples;
                 let c = &events[event_indices[2]].samples;
                 for index in 0..input_frames {
-                    output[index] += coefficient * a[index] * b[index] * c[index];
+                    output[index] += *coefficient * a[index] * b[index] * c[index];
                 }
             }
             output
@@ -361,7 +361,6 @@ fn spectral_magnitudes(
 
 fn feature_dividends(
     coalition_features: &[Vec<f64>],
-    event_count: usize,
 ) -> Vec<Vec<f64>> {
     let coalition_count = coalition_features.len();
     let feature_count = coalition_features[0].len();
@@ -381,7 +380,6 @@ fn feature_dividends(
         }
         dividends[mask] = value;
     }
-    let _ = event_count;
     dividends
 }
 
@@ -442,8 +440,8 @@ pub fn build_factorial_ground_truth(
         .iter()
         .map(|coalition| coalition.spectral_magnitudes.clone())
         .collect();
-    let pcm_dividends = feature_dividends(&pcm_features, event_count);
-    let spectral_dividends = feature_dividends(&spectral_features, event_count);
+    let pcm_dividends = feature_dividends(&pcm_features);
+    let spectral_dividends = feature_dividends(&spectral_features);
 
     let mut dividends = Vec::with_capacity(coalition_count - 1);
     for mask in 1..coalition_count {
