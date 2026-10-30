@@ -336,10 +336,11 @@ fn validate_context(
         return Err(RidaAblationError::InvalidRegimeLabels);
     }
     let regime_count = context.regime_labels.len();
-    if context.target_regime_probabilities.len() != regime_count
-        || context.profiles.len() != problem.experiments().len()
-    {
+    if context.target_regime_probabilities.len() != regime_count {
         return Err(RidaAblationError::RegimeDimensionMismatch);
+    }
+    if context.profiles.len() != problem.experiments().len() {
+        return Err(RidaAblationError::CandidateProfileSetMismatch);
     }
     validate_distribution(&context.target_regime_probabilities)?;
 
@@ -391,11 +392,11 @@ fn validate_distribution(values: &[f64]) -> Result<(), RidaAblationError> {
     Ok(())
 }
 
-fn has_duplicates(values: &[&str]) -> bool {
+fn has_duplicates<T: AsRef<str>>(values: &[T]) -> bool {
     values.iter().enumerate().any(|(index, value)| {
         values[..index]
             .iter()
-            .any(|previous| previous == value)
+            .any(|previous| previous.as_ref() == value.as_ref())
     })
 }
 
