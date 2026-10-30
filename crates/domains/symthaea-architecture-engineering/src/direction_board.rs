@@ -1092,7 +1092,6 @@ mod tests {
             .unwrap()
             .is_none());
 
-        let stats = board.new_direction_stats();
         assert!(board
             .record_new_direction_proposal(NewDirectionProposal {
                 proposal_id: "new-3".to_owned(),
