@@ -41,6 +41,12 @@ This appears to provide a more useful in-corpus test bed for host-design, Trojan
 
 **Qualification caveat:** only the indexed catalogue description has been inspected so far. The exact archive/file inventory, license/redistribution terms, archive SHA-256, associated article DOI, executable code, author split files and per-fold predictions have not yet been retrieved or independently verified. Do not call the corpus audited or reproduce its results until those artifacts are pinned. Dataset-specific intake and reproduction is tracked in [HARDSEC-006 / issue #9100](https://github.com/Luminous-Dynamics/symthaea/issues/9100).
 
+### Insertion-source shift is a separate holdout axis
+
+Xu et al.'s SeqCube-HT paper (published 9 October 2026, DOI 10.1186/s42400-026-00676-2) uses fixed graph probes on four shared ISCAS'89 hosts and excludes instance/source names and insertion-method identifiers from model inputs. For SeqCube-generated instances, graph F1 / localization recall are 69.2% / 55.7% on an instance-random split, but 47.8% / 31.4% when SeqCube is the held-out insertion source and models train on Random, TRIT-TS and CG sources. Covariate matching raises SeqCube to 77.2% / 66.1%, yet it remains 9.0 F1 points and 12.3 localization-recall points below the closest reference source on that fixed four-circuit corpus. Fixed-threshold ISCAS-to-Extended-IP transfer is 56.8% F1 / 40.7% localization recall. The authors caution that fixed-corpus seed intervals are not uncertainty over unseen circuit populations and that these results do not establish physical realism or intrinsic stealth.
+
+These findings motivate benchmark-source holdout as a separate axis from host-family, Trojan-family, toolchain and library holdouts: a model can omit the explicit source ID and still learn source-specific structural artifacts. Reference: https://doi.org/10.1186/s42400-026-00676-2.
+
 ## 3. Paradigm shift: the independent unit is design lineage
 
 A benchmark can contain tens of thousands of gates but only a handful of independent host designs. Sibling Trojan variants can share most of their benign logic. Randomly assigning gates to train and test can evaluate recognition of a known host circuit rather than detection on a new design.
@@ -93,20 +99,28 @@ Exact digest equality establishes byte identity. Canonicalized graph similarity 
 | Leave-one-netlist-out (LOCO) | New netlist; sibling host may be known | Transfer within represented hosts |
 | Leave-one-base-family-out (LOFO) | Entire host family unseen | Family transfer within represented corpus |
 | Leave-one-Trojan-family-out | New attack insertion mechanism | Trojan-family transfer, not arbitrary zero-day coverage |
+| Leave-one-benchmark-source-out | New insertion/generation cohort, including paired controls | Transfer across represented sources, not zero-day coverage |
 | Leave-toolchain/library-out | Synthesis or library domain shift | Only when independent groups exist |
-| Combined host × Trojan holdout | New host and attack family | Hardest in-corpus transfer test |
+| Combined source × host / Trojan holdout | New source plus new host or attack family | Hardest in-corpus transfer test |
 
 No sibling variant or derived gate can cross a family holdout. Report every family and its support count. When there are only five host families, results are descriptive; thousands of gates do not turn five designs into thousands of independent trials.
 
+For source holdouts, distinguish the source cohort from the insertion method: benchmark_source_id groups the full cohort, including its paired clean control; insertion_method_id records the technique/version that made the positive variant. The cohort ID is metadata used to assign folds, not a model feature. The source-held-out split keeps every paired positive and clean control in the same held-out cohort.
+
+A source-held-out protocol may intentionally reuse an identical benign host netlist across source cohorts. The auditor counts and lists those benign byte-identical controls instead of silently rejecting or ignoring them. Identical Trojan-positive artifacts across partitions and any identical-content label disagreement remain hard failures. Report a separate host-disjoint result where possible, because reused clean controls make this a source-shift test, not a host-generalization test.
+
 ## 7. Evaluation metrics and aggregation
 
-Report both:
-- gate-weighted metrics for comparability with prior literature; and
-- host-family macro metrics (one family, one vote), per-netlist outcomes and worst-family performance.
+Report:
+- gate-weighted metrics for comparability with prior literature;
+- host-family macro metrics (one family, one vote), per-netlist outcomes and worst-family performance; and
+- benchmark-source macro metrics, per-source outcomes and worst-source performance, with independent source-group support displayed.
 
 At minimum include precision, recall, F1, average precision / PR-AUC, ROC-AUC where meaningful, confusion matrix, operating-point false-positive burden, and calibration/selective risk where confidence scores exist. State prevalence and weighting assumptions, group counts and all family supports.
 
 Separate Trojan detection from localization, type attribution and weakness identification. A detector must not receive host-family identifiers, filenames or labels that encode the answer unless those are part of an explicitly defined deployment threat model and are separately ablated.
+
+Likewise, benchmark source IDs and insertion-method IDs are split/provenance metadata, not detector inputs unless the deployment threat model explicitly makes them available. Audit the feature list and use a source-ID leakage negative control. Compare instance-random, source-held-out and covariate-matched source-held-out results under the same training budget and frozen threshold; source-held-out performance alone is not zero-day generalization.
 
 ## 8. NIST-aligned security coverage is a separate axis
 
@@ -226,6 +240,8 @@ References:
 - [ ] Negative-control and oracle-adequacy fixtures pass independently.
 - [ ] Baseline results reproduced with exact code/data/model lineage or marked irreproducible.
 - [ ] If matched clean/Trojan pairs exist, benign-transform controls and paired delta-graph comparisons are evaluated; otherwise this arm is marked unsupported.
+- [ ] Source-held-out evaluation is reported where source groups exist, with source IDs excluded from model inputs.
+- [ ] Identical benign paired-control reuse is enumerated; identical Trojan-positive reuse and content-label conflicts fail closed.
 - [ ] No unqualified zero-day or industrial-transfer claim.
 
 ## 15. Initial Rust audit implementation
@@ -253,16 +269,16 @@ cargo run --example hardsec_design_lineage_audit --features hardsec-design-audit
 
 **Important source-path contract:** in this manifest, `source_path` and `source_sha256` identify the exact artifact consumed by the detector (for a gate-level graph detector, normally the synthesized netlist file), not a shared clean RTL ancestor used to derive multiple variants. A single evaluated netlist may be referenced by many gate/sample rows, but its complete sample group must remain in one split. Upstream RTL, parent commit and synthesis inputs belong in the separate design-lineage inventory and retain their own hashes; they must not be substituted for the evaluated-artifact digest. This distinction prevents the exact-duplicate guard from mistaking legitimate shared ancestry for reused classifier input.
 
-The first schema is intentionally narrow and strict (14 tab-separated fields, exact order): `dataset_id, source_artifact_id, source_path, source_sha256, sample_id, design_id, base_design_family_id, netlist_id, trojan_family_id, synthesis_config_id, cell_library_id, split_protocol, split, label`.
+The schema is strict (15 tab-separated fields, exact order): `dataset_id, source_artifact_id, source_path, source_sha256, sample_id, design_id, base_design_family_id, netlist_id, trojan_family_id, synthesis_config_id, cell_library_id, benchmark_source_id, split_protocol, split, label`. The new `benchmark_source_id` is required for `leave_benchmark_source_out`; it identifies the full source cohort, including paired clean controls. It is grouping metadata, not a detector feature.
 
-The auditor supports `random_gate` (diagnostic only), `loco_netlist`, `lofo_base_family`, `leave_trojan_family_out`, `leave_toolchain_out`, and `leave_library_out`. It verifies exact source bytes against SHA-256, rejects unsafe paths/symlinks and duplicate sample IDs, enforces the selected group holdout, and rejects exact source-file hash reuse across splits for non-random protocols. For random gate splits, exact-content and declared-lineage overlaps are reported rather than rejected because that split is diagnostic only.
+The auditor supports `random_gate` (diagnostic only), `loco_netlist`, `lofo_base_family`, `leave_trojan_family_out`, `leave_toolchain_out`, `leave_library_out`, and `leave_benchmark_source_out`. It verifies exact evaluated-artifact bytes against SHA-256, rejects unsafe paths/symlinks and duplicate sample IDs, and enforces the selected group holdout. For `leave_benchmark_source_out`, source cohort IDs must be present and cannot cross splits. Identical benign evaluated artifacts may be reused as paired controls across source cohorts, but every reused digest, sample ID and source cohort is enumerated in the receipt. Identical Trojan-positive artifacts across partitions and any identical-content label disagreement are rejected. For other non-random protocols, exact cross-split artifact reuse is rejected. For random-gate splits, exact-content and declared-lineage overlaps are reported rather than rejected.
 
 The JSON receipt is deterministic and unsigned. Its claim scope is source-file integrity plus the declared group-split check only. The lineage group identifiers are caller-supplied; the tool does not independently infer design ancestry. It does not parse Verilog, perform canonical graph comparison, detect non-identical near-duplicate logic, prove that the metadata is truthful, or evaluate a Trojan detector.
 
-Thirteen unit tests are authored for valid manifests, base-family/netlist/Trojan-family leakage, exact source-hash reuse, source tampering, path traversal, symlink rejection, duplicate sample IDs, missing toolchain identity, receipt overwrite/path safety, and the diagnostic random-gate mode. **They have not been compiled or run in this environment.**
+Nineteen unit tests are authored for valid manifests; base-family/netlist/Trojan-family and benchmark-source leakage; required source metadata; exact Trojan-positive artifact reuse; benign paired-control reuse/reporting; content-label disagreement; source tampering; path traversal; symlink rejection; duplicate sample IDs; missing toolchain identity; receipt overwrite/path safety; and diagnostic random-gate overlap. They have not yet been compiled or run on this branch.
 
 ## 16. Scope boundary
 
 This work evaluates benchmark integrity and generalization of design-level hardware-Trojan detection. It does not modify hardware, create Trojan payloads or certify a design. It is not merged with RISC-V runtime telemetry metrics in HARDSEC-001/004 or secure generation in HARDSEC-002.
 
-The generic manifest auditor is implemented, but a dataset-specific importer, canonical structural-overlap screening and independent verification of lineage metadata require the pinned Trust-Hub release and its actual executable reproducibility artifacts.
+The generic manifest auditor now supports source-held-out split integrity, but dataset-specific importers, canonical structural-overlap screening and independent verification of lineage metadata still require pinned source releases and their actual reproducibility artifacts. The source-holdout protocol is tracked in [HARDSEC-009 / issue #9244](https://github.com/Luminous-Dynamics/symthaea/issues/9244).
