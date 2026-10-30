@@ -642,7 +642,7 @@ mod tests {
         if sample_type == "synapse_control" {
             routes.insert("false_split_correction".to_string());
         }
-        let source_archive_sample_hash = format!("{operation:012x}");
+        let source_archive_sample_hash = format!("{sample_hash:0>12}");
         let sample_id = md5_sample_hash(archive, &source_archive_sample_hash);
         let row = Row {
             combined_sample_hash: sample_id,
