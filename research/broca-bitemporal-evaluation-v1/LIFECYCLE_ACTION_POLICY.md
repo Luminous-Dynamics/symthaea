@@ -127,3 +127,9 @@ The production generation loop is not yet wired to call this controller. No Life
 The file [lifecycle-action-fixtures-v1.json](lifecycle-action-fixtures-v1.json) contains 60 deterministic cases: five non-verified proof outcomes × six claim lifecycle states × two retrieval states (exhausted / continuation available). Each row carries the expected action. The Rust test suite reads this checked-in file using compile-time inclusion and asserts the policy output for every case. A separate real-proof integration test covers ANSWER, which is intentionally excluded from the synthetic table because it must be authorized by an actual independently verified packet and opaque token.
 
 The fixture corpus is a policy-conformance suite, not a substitute for Vera-Life-Eval. It contains no natural-language answer generation, hidden evidence chronology or human annotation; it only makes the deterministic controller truth table reusable and versioned.
+
+## Budget-aware RETRIEVE_MORE decisions
+
+The lifecycle policy's retrieval-progress field can be populated by the separate [RETRIEVAL_VALUE_OF_INFORMATION.md](RETRIEVAL_VALUE_OF_INFORMATION.md) gate. It evaluates lower-bound correctness gain plus lifecycle-risk reduction against upper-bound retrieval harm, measured cost, remaining budget and a minimum net-value margin. Its SHA-256 decision receipt is carried into the lifecycle action digest. Early stopping preserves unused calls and is not reported as budget exhaustion.
+
+Use the versioned [retrieval-value-fixtures-v1.json](retrieval-value-fixtures-v1.json) corpus to validate the deterministic utility gate. The estimate itself must come from a held-out-calibrated upstream estimator; the gate does not train or authenticate that estimator.
