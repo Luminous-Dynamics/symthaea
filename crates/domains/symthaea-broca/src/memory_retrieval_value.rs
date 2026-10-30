@@ -35,6 +35,7 @@ use std::collections::BTreeSet;
 
 /// Versioned assumptions defining one micro-utility unit and cost conversion.
 pub const RETRIEVAL_UTILITY_POLICY_VERSION: &str = "BROCA-RETRIEVAL-VOI-V1";
+pub const RETRIEVAL_UTILITY_CALIBRATION_VERSION: &str = "BROCA-GROUP-CONFORMAL-VOI-V1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +51,10 @@ pub struct RetrievalUtilityEstimate {
     /// Digest of the exact unresolved-claim state used by the estimator.
     pub unresolved_claims_sha256: String,
     pub unresolved_required_claim_ids: BTreeSet<String>,
+    /// Digest of the calibration algorithm and group-conformal procedure.
+    pub calibration_method_sha256: String,
+    /// Familywise one-sided coverage target for the three calibrated bounds.
+    pub calibration_joint_coverage_percent: u8,
     /// Identity and digest of the held-out-calibrated estimator.
     pub estimator_id: String,
     pub estimator_version: String,
@@ -59,12 +64,13 @@ pub struct RetrievalUtilityEstimate {
     /// Defines the utility unit and all cost conversion coefficients.
     pub utility_schema_sha256: String,
     /// Conservative lower confidence bound on marginal correctness gain.
-    pub correctness_gain_lcb_micro: u64,
+    pub correctness_gain_lcb_micro: i64,
     /// Conservative lower bound on avoided lifecycle decision loss
-    /// (e.g. stale-only or unresolved-conflict failure).
-    pub lifecycle_risk_reduction_lcb_micro: u64,
-    /// Upper confidence bound on retrieval-induced answer harm/distraction.
-    pub retrieval_harm_ucb_micro: u64,
+    /// (e.g. stale-only or unresolved-conflict failure); may be negative.
+    pub lifecycle_risk_reduction_lcb_micro: i64,
+    /// Upper confidence bound on retrieval-induced answer harm/distraction;
+    /// signed because retrieval can reduce harm on some workloads.
+    pub retrieval_harm_ucb_micro: i64,
     /// Measured/inferred cost after converting tokens, latency and serving cost
     /// into the same utility unit under utility_schema_sha256.
     pub retrieval_cost_micro: u64,
@@ -91,6 +97,7 @@ impl RetrievalUtilityEstimate {
         for (field, value) in [
             ("evidence_index_state_sha256", self.evidence_index_state_sha256.as_str()),
             ("unresolved_claims_sha256", self.unresolved_claims_sha256.as_str()),
+            ("calibration_method_sha256", self.calibration_method_sha256.as_str()),
             ("estimator_sha256", self.estimator_sha256.as_str()),
             ("calibration_split_sha256", self.calibration_split_sha256.as_str()),
             ("feature_schema_sha256", self.feature_schema_sha256.as_str()),
@@ -105,6 +112,9 @@ impl RetrievalUtilityEstimate {
             Self::unresolved_claims_digest(&self.unresolved_required_claim_ids)?;
         if expected_claims_digest != self.unresolved_claims_sha256 {
             return Err("unresolved-claim set digest mismatch".into());
+        }
+        if self.calibration_joint_coverage_percent != 90 {
+            return Err("retrieval value calibration must use the pinned 90% joint-coverage target".into());
         }
         Ok(())
     }
@@ -454,6 +464,8 @@ mod tests {
             evidence_index_state_sha256: digest("evidence index state"),
             unresolved_claims_sha256: RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap(),
             unresolved_required_claim_ids: unresolved,
+            calibration_method_sha256: digest("BROCA-GROUP-CONFORMAL-VOI-V1"),
+            calibration_joint_coverage_percent: 90,
             estimator_id: "utility-estimator".into(),
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator"),
@@ -481,9 +493,9 @@ mod tests {
     #[derive(serde::Deserialize)]
     struct RetrievalValueFixtureCase {
         case_id: String,
-        correctness_gain_lcb_micro: u64,
-        lifecycle_risk_reduction_lcb_micro: u64,
-        retrieval_harm_ucb_micro: u64,
+        correctness_gain_lcb_micro: i64,
+        lifecycle_risk_reduction_lcb_micro: i64,
+        retrieval_harm_ucb_micro: i64,
         retrieval_cost_micro: u64,
         remaining_calls: u32,
         remaining_budget_micro: u64,
