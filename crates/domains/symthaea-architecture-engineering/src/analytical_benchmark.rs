@@ -394,12 +394,18 @@ pub fn run_analytical_trial(
     let random_best = best_by_objective(&random_pool, function)?;
     let promotion_objective = function.objective(&promotion_best.coordinates)?;
     let random_objective = function.objective(&random_best.coordinates)?;
-    let f0_nominal_95_coverage = f0_scores.iter().zip(&f0_expected).zip(&f0_errors)
-        .filter(|((observed, expected), se)| (observed - expected).abs() <= 1.96 * **se)
-        .count() as f64 / f0_scores.len() as f64;
-    let f0_mean_absolute_standardized_residual = f0_scores.iter().zip(&f0_expected).zip(&f0_errors)
-        .map(|((observed, expected), se)| (observed - expected).abs() / se.max(f64::MIN_POSITIVE))
-        .sum::<f64>() / f0_scores.len() as f64;
+    let mut covered_f0 = 0usize;
+    let mut standardized_residual_sum = 0.0;
+    for index in 0..f0_scores.len() {
+        let residual = (f0_scores[index] - f0_expected[index]).abs();
+        if residual <= 1.96 * f0_errors[index] {
+            covered_f0 += 1;
+        }
+        standardized_residual_sum += residual / f0_errors[index].max(f64::MIN_POSITIVE);
+    }
+    let f0_nominal_95_coverage = covered_f0 as f64 / f0_scores.len() as f64;
+    let f0_mean_absolute_standardized_residual =
+        standardized_residual_sum / f0_scores.len() as f64;
     let oracle_score = |candidate: &AnalyticalCandidate| -> Result<f64, String> {
         Ok(-function.objective(&candidate.coordinates)?)
     };
