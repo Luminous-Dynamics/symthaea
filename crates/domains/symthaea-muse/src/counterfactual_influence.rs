@@ -36,6 +36,7 @@ const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RECORDED_EFFECTS_GROUPS: u8 = 128;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceAnalysisConfig {
@@ -158,6 +159,39 @@ pub struct VerifiedRendererAudioBinding {
     /// bound child argv. None means the historical/unknown topology did not
     /// explicitly record the setting; downstream routing adapters must abstain.
     fluid_synth_effects_groups: Option<u8>,
+}
+
+/// Test-only constructor for a verified FluidSynth token carrying an
+/// explicitly recorded effects-group count. Production must obtain this value
+/// only through the receipt-replaying verifier above.
+#[cfg(test)]
+pub(crate) fn test_verified_renderer_audio_binding_with_effects_groups(
+    audio: &AudioView<'_>,
+    receipt_sha256: String,
+    renderer_identity_sha256: String,
+    renderer_config_sha256: String,
+    source_score_sha256: String,
+    input_artifact_sha256: String,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
+    performed_event_lineage: Vec<PerformedEventLineage>,
+    effects_groups: u8,
+) -> VerifiedRendererAudioBinding {
+    let mut binding = test_verified_renderer_audio_binding(
+        audio,
+        receipt_sha256,
+        renderer_identity_sha256,
+        renderer_config_sha256,
+        source_score_sha256,
+        input_artifact_sha256,
+        performed_event_map_sha256,
+        performed_event_map_artifact_sha256,
+        expected_primary_pitches_sha256,
+        performed_event_lineage,
+    );
+    binding.fluid_synth_effects_groups = Some(effects_groups);
+    binding
 }
 
 /// Test-only constructor for exercising downstream coalition validators.
@@ -311,7 +345,7 @@ fn receipt_fluidsynth_effects_groups(
         if pair[0] == "-o" {
             if let Some(value) = pair[1].strip_prefix("synth.effects-groups=") {
                 let groups = value.parse::<u8>().ok()?;
-                if !(1..=crate::fluid_render::MAX_EFFECTS_GROUPS).contains(&groups) {
+                if !(1..=MAX_RECORDED_EFFECTS_GROUPS).contains(&groups) {
                     return None;
                 }
                 matches.push(groups);
@@ -1590,6 +1624,8 @@ mod tests {
                 format!("/tmp/{render_id}.wav"),
                 "-r".into(),
                 "48000".into(),
+                "-o".into(),
+                "synth.effects-groups=1".into(),
                 "-ni".into(),
                 "/fixture/soundfont.sf2".into(),
                 format!("/tmp/{render_id}.mid"),
