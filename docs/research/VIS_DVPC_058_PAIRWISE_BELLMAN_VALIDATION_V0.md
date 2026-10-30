@@ -25,18 +25,18 @@ Two scenarios are registered: a reasonably coercive stochastic world and a shift
 For candidate Q_i and comparator Q_j, define h_ij = Q_i - Q_j and the held-out one-step Bellman residual:
 
 \[
-\\delta_i(X,R,S')=Q_i(X)-R-\\gamma(\\pi Q_i)(S').
+\delta_i(X,R,S')=Q_i(X)-R-\gamma(\pi Q_i)(S').
 \]
 
 The unweighted empirical pairwise moment and penalized score follow the paper's Equation (5):
 
 \[
-\\widehat M_{ij}^{unw}
-=\\frac1n\\sum_{t=1}^n h_{ij}(X_t)\\delta_i(X_t,R_t,S'_t)
--\\frac14\\max\\left\\{0,
-\\frac1n\\sum_{t=1}^n h_{ij}(X_t)
-\\left[h_{ij}(X_t)-\\gamma(\\pi h_{ij})(S'_t)\\right]
-\\right\\}.
+\widehat M_{ij}^{unw}
+=\frac1n\sum_{t=1}^n h_{ij}(X_t)\delta_i(X_t,R_t,S'_t)
+-\frac14\max\left\{0,
+\frac1n\sum_{t=1}^n h_{ij}(X_t)
+\left[h_{ij}(X_t)-\gamma(\pi h_{ij})(S'_t)\right]
+\right\}.
 \]
 
 Select the smallest index minimizing `max_j M_ij`. Deterministic smallest-index tie-breaking is part of the protocol. The unpenalized pairwise selector is retained as a misspecification negative comparator.
