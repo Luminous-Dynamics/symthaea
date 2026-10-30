@@ -2000,6 +2000,17 @@ fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<Strin
     for (scenario_index, world) in correlated_stress_worlds().iter().enumerate() {
         let portfolio = policy_portfolio(world);
         validate_portfolio(&portfolio)?;
+        for policy in 0..PORTFOLIO_POLICIES {
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "PORTFOLIO_CONFIG\\t{}\\t{}\\t{}\\t{:.8}",
+                world.name,
+                policy,
+                portfolio.names[policy],
+                portfolio.prior_weights[policy],
+            );
+        }
         let balanced_world = world_with_target(world, portfolio.targets[1]);
         let balanced_plan = exact_dynamic_program(&balanced_world, [true; SOURCES])?.allocation;
         let prior_exact =
@@ -2493,6 +2504,148 @@ mod tests {
         let mut invalid_variance = correlated_stress_worlds()[0];
         invalid_variance.shared_factor_variance[1] = f64::INFINITY;
         assert!(invalid_variance.validate().is_err());
+    }
+
+    #[test]
+    fn exact_portfolio_prior_and_worst_oracles_match_independent_exhaustive_enumeration() {
+        let world = correlated_stress_worlds()[1];
+        let portfolio = policy_portfolio(&world);
+        let left = enumerate_context_options(&world, 0, [true; SOURCES]);
+        let right = enumerate_context_options(&world, 1, [true; SOURCES]);
+
+        let prior_exact = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::PriorWeighted,
+        )
+        .unwrap();
+        let worst_exact = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap();
+
+        let mut brute_prior = f64::INFINITY;
+        let mut brute_worst = f64::INFINITY;
+        let mut combinations = 0usize;
+        for left_option in &left {
+            for right_option in &right {
+                if left_option.cost + right_option.cost > world.budget {
+                    continue;
+                }
+                let mut allocation = Allocation::default();
+                allocation.counts[0] = left_option.counts;
+                allocation.counts[1] = right_option.counts;
+                let mses = portfolio_policy_mses(&world, &allocation, &portfolio, EVAL_N).unwrap();
+                brute_prior = brute_prior.min(portfolio_objective(
+                    &mses,
+                    &portfolio,
+                    PortfolioObjective::PriorWeighted,
+                ));
+                brute_worst = brute_worst.min(portfolio_objective(
+                    &mses,
+                    &portfolio,
+                    PortfolioObjective::WorstPolicy,
+                ));
+                combinations += 1;
+            }
+        }
+        assert_eq!(prior_exact.combinations_checked, combinations);
+        assert_eq!(worst_exact.combinations_checked, combinations);
+        assert!((prior_exact.objective - brute_prior).abs() < 1e-12);
+        assert!((worst_exact.objective - brute_worst).abs() < 1e-12);
+    }
+
+    #[test]
+    fn portfolio_minimax_and_prior_plans_are_no_worse_than_single_policy_baseline() {
+        for world in correlated_stress_worlds() {
+            let portfolio = policy_portfolio(&world);
+            let balanced_world = world_with_target(&world, portfolio.targets[1]);
+            let single = exact_dynamic_program(&balanced_world, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            let prior = exact_portfolio_allocation(
+                &world,
+                &portfolio,
+                PortfolioObjective::PriorWeighted,
+            )
+            .unwrap()
+            .allocation;
+            let worst = exact_portfolio_allocation(
+                &world,
+                &portfolio,
+                PortfolioObjective::WorstPolicy,
+            )
+            .unwrap()
+            .allocation;
+            let single_mses = portfolio_policy_mses(&world, &single, &portfolio, EVAL_N).unwrap();
+            let prior_mses = portfolio_policy_mses(&world, &prior, &portfolio, EVAL_N).unwrap();
+            let worst_mses = portfolio_policy_mses(&world, &worst, &portfolio, EVAL_N).unwrap();
+            assert!(
+                portfolio_objective(&prior_mses, &portfolio, PortfolioObjective::PriorWeighted)
+                    <= portfolio_objective(&single_mses, &portfolio, PortfolioObjective::PriorWeighted) + 1e-12
+            );
+            assert!(
+                portfolio_objective(&worst_mses, &portfolio, PortfolioObjective::WorstPolicy)
+                    <= portfolio_objective(&single_mses, &portfolio, PortfolioObjective::WorstPolicy) + 1e-12
+            );
+            assert!(prior.feasible(&world) && worst.feasible(&world));
+        }
+    }
+
+    #[test]
+    fn common_sample_multi_policy_covariance_is_psd_and_selection_metrics_are_bounded() {
+        let world = correlated_stress_worlds()[2];
+        let portfolio = policy_portfolio(&world);
+        let allocation = exact_portfolio_allocation(
+            &world,
+            &portfolio,
+            PortfolioObjective::WorstPolicy,
+        )
+        .unwrap()
+        .allocation;
+        let metrics = multi_policy_monte_carlo(&world, &allocation, &portfolio, 64, 1024, 0x0570_001);
+        assert!((0.0..=1.0).contains(&metrics.selection_accuracy));
+        assert!(metrics.expected_simple_regret >= 0.0);
+        for policy in 0..PORTFOLIO_POLICIES {
+            assert!(metrics.mse[policy] >= 0.0);
+            assert!(metrics.variance[policy] >= 0.0);
+            assert!((metrics.mse[policy] - metrics.bias[policy].powi(2) - metrics.variance[policy]).abs() < 1e-10);
+        }
+        for vector in [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, -1.0, 0.5],
+            [-0.25, 0.75, 2.0],
+        ] {
+            let quadratic = (0..PORTFOLIO_POLICIES)
+                .flat_map(|i| (0..PORTFOLIO_POLICIES).map(move |j| (i, j)))
+                .map(|(i, j)| vector[i] * metrics.covariance[i][j] * vector[j])
+                .sum::<f64>();
+            assert!(quadratic >= -1e-10, "portfolio covariance quadratic={quadratic}");
+        }
+    }
+
+    #[test]
+    fn output_includes_deterministic_policy_portfolio_rows() {
+        let first = policy_portfolio_benchmark_rows(2, 789).unwrap();
+        let second = policy_portfolio_benchmark_rows(2, 789).unwrap();
+        assert_eq!(first, second);
+        let results: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("PORTFOLIO_RESULT\\\\t"))
+            .collect();
+        let configs: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("PORTFOLIO_CONFIG\\\\t"))
+            .collect();
+        assert_eq!(results.len(), 12);
+        assert_eq!(configs.len(), 9);
+        for row in results {
+            assert_eq!(row.split('\\\\t').count(), 31);
+        }
     }
 
     #[test]
