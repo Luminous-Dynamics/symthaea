@@ -123,6 +123,34 @@ pub enum CausalDirection {
     Effect,
 }
 
+/// Both cause and effect specified-state tie families for one candidate system.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Iit4SystemIntrinsicSpecification {
+    pub cause: Iit4IntrinsicSpecificationResult,
+    pub effect: Iit4IntrinsicSpecificationResult,
+}
+
+impl Iit4SystemIntrinsicSpecification {
+    /// Cartesian product of every tied cause/effect state, preserving stable order.
+    ///
+    /// IIT 4.0's SIA tie cascade must score each pair; choosing one state
+    /// independently from either direction can change the selected MIP.
+    pub fn state_pairs(&self) -> Vec<Iit4SystemState> {
+        let mut pairs = Vec::with_capacity(
+            self.cause.specified_states.len() * self.effect.specified_states.len(),
+        );
+        for cause_state in &self.cause.specified_states {
+            for effect_state in &self.effect.specified_states {
+                pairs.push(Iit4SystemState {
+                    cause_specified_state: cause_state.clone(),
+                    effect_specified_state: effect_state.clone(),
+                });
+            }
+        }
+        pairs
+    }
+}
+
 /// Result of maximizing one direction's IIT 4.0 system intrinsic specification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Iit4IntrinsicSpecificationResult {
@@ -1086,6 +1114,28 @@ impl BinaryCausalModel {
         Self::new(self.n_units, tpm, connectivity).map_err(PartitionApplyError::from)
     }
 
+    /// Compute both cause and effect intrinsic specified-state tie families.
+    pub fn system_intrinsic_specification_iit4(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        decimal_precision: u32,
+    ) -> Result<Iit4SystemIntrinsicSpecification, SystemPhiError> {
+        let cause = self.intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            CausalDirection::Cause,
+            decimal_precision,
+        )?;
+        let effect = self.intrinsic_specification_iit4(
+            candidate_system,
+            current_state,
+            CausalDirection::Effect,
+            decimal_precision,
+        )?;
+        Ok(Iit4SystemIntrinsicSpecification { cause, effect })
+    }
+
     /// Select the system's intrinsically specified past/future state in one direction.
     ///
     /// This implements PyPhi IIT 4.0's composite intrinsic-specification path:
@@ -1765,6 +1815,63 @@ mod tests {
             vec![true, false, false, true],
         ).unwrap();
         assert_ne!(model.model_sha256(), changed_connectivity.model_sha256());
+    }
+
+    #[test]
+    fn system_intrinsic_specification_selects_cause_and_effect_states() {
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2,
+                0.1, 0.8,
+                0.9, 0.2,
+                0.9, 0.8,
+            ],
+            vec![false, true, true, false],
+        ).unwrap();
+        let selected = model.system_intrinsic_specification_iit4(
+            &[0, 1],
+            &[true, false],
+            6,
+        ).unwrap();
+
+        assert_eq!(selected.cause.specified_states, vec![vec![false, true]]);
+        assert_eq!(selected.effect.specified_states, vec![vec![false, true]]);
+        let expected = 0.72 * (0.72_f64 / 0.25).log2();
+        assert!((selected.cause.intrinsic_specification - expected).abs() < 1e-12);
+        assert!((selected.effect.intrinsic_specification - expected).abs() < 1e-12);
+        assert_eq!(selected.cause.selection_margin, Some(0.72_f64 * (0.72_f64 / 0.25).log2()
+            - (0.18_f64 * (0.18_f64 / 0.25).log2())));
+        assert_eq!(selected.state_pairs(), vec![Iit4SystemState {
+            cause_specified_state: vec![false, true],
+            effect_specified_state: vec![false, true],
+        }]);
+    }
+
+    #[test]
+    fn intrinsic_specification_preserves_all_tied_states() {
+        let model = BinaryCausalModel::new(1, vec![0.5, 0.5], vec![false]).unwrap();
+        let selected = model.system_intrinsic_specification_iit4(&[0], &[false], 6).unwrap();
+        assert_eq!(selected.cause.specified_states, vec![vec![false], vec![true]]);
+        assert_eq!(selected.effect.specified_states, vec![vec![false], vec![true]]);
+        assert_eq!(selected.cause.intrinsic_specification, 0.0);
+        assert_eq!(selected.effect.intrinsic_specification, 0.0);
+        assert_eq!(selected.cause.selection_margin, Some(0.0));
+        assert_eq!(selected.effect.selection_margin, Some(0.0));
+        assert_eq!(selected.state_pairs().len(), 4);
+    }
+
+    #[test]
+    fn intrinsic_specification_rejects_noncanonical_candidates_and_precision() {
+        let model = two_unit_model();
+        assert!(matches!(
+            model.intrinsic_specification_iit4(&[1, 0], &[false, false], CausalDirection::Cause, 6),
+            Err(SystemPhiError::CandidateSystemNotCanonical)
+        ));
+        assert!(matches!(
+            model.intrinsic_specification_iit4(&[0, 1], &[false, false], CausalDirection::Cause, 16),
+            Err(SystemPhiError::InvalidNumericalPrecision { precision: 16 })
+        ));
     }
 
     #[test]
