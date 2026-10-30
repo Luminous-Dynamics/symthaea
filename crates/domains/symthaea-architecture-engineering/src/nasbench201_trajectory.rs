@@ -54,11 +54,13 @@ pub struct TrajectoryEvent {
     pub proxy_score: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SearchTrajectoryArchive {
+    pub config: TrajectorySearchConfig,
     pub proxy_id: String,
     pub proxy_direction: ProxyDirection,
     pub seed: u64,
+    pub feature_catalog_sha256: String,
     pub visited_architecture_ids: Vec<String>,
     pub start_architecture_ids: Vec<String>,
     pub first_improvement_architecture_ids: Vec<String>,
@@ -296,11 +298,23 @@ pub fn build_trajectory_archive(
         }
     }
 
-    let archive_sha256 = digest_archive(config, &visited_order, &events);
+    let feature_catalog_sha256 = digest_feature_catalog(features, &config.proxy_id);
+    let archive_sha256 = digest_archive(
+        config,
+        &feature_catalog_sha256,
+        &visited_order,
+        &start_ids,
+        &first_improvement_ids,
+        &local_optima_ids,
+        &escape_ids,
+        &events,
+    );
     Ok(SearchTrajectoryArchive {
+        config: config.clone(),
         proxy_id: config.proxy_id.clone(),
         proxy_direction: config.proxy_direction,
         seed: config.seed,
+        feature_catalog_sha256,
         visited_architecture_ids: visited_order,
         start_architecture_ids: deduplicate_in_order(start_ids),
         first_improvement_architecture_ids: deduplicate_in_order(first_improvement_ids),
@@ -349,6 +363,38 @@ pub fn plan_promotions(
         return Err(TrajectorySearchError::new(
             "archive.proxy_id",
             "must be non-empty",
+        ));
+    }
+    if archive.proxy_id != archive.config.proxy_id
+        || archive.proxy_direction != archive.config.proxy_direction
+        || archive.seed != archive.config.seed
+    {
+        return Err(TrajectorySearchError::new(
+            "archive",
+            "duplicated archive metadata does not match the frozen search configuration",
+        ));
+    }
+    let supplied_catalog_sha256 = digest_feature_catalog(features, &archive.proxy_id);
+    if supplied_catalog_sha256 != archive.feature_catalog_sha256 {
+        return Err(TrajectorySearchError::new(
+            "archive.feature_catalog_sha256",
+            "promotion features do not match the catalog used to generate the trajectory",
+        ));
+    }
+    let expected_archive_sha256 = digest_archive(
+        &archive.config,
+        &archive.feature_catalog_sha256,
+        &archive.visited_architecture_ids,
+        &archive.start_architecture_ids,
+        &archive.first_improvement_architecture_ids,
+        &archive.local_optimum_architecture_ids,
+        &archive.escape_architecture_ids,
+        &archive.events,
+    );
+    if expected_archive_sha256 != archive.archive_sha256 {
+        return Err(TrajectorySearchError::new(
+            "archive.archive_sha256",
+            "trajectory archive content does not match its digest",
         ));
     }
 
@@ -784,9 +830,34 @@ fn min_hamming_distance(
         .unwrap_or(NB201_EDGES)
 }
 
+fn digest_feature_catalog(
+    features: &[ArchitectureFeatures],
+    proxy_id: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea.nasbench201.proxy-feature-catalog.v0.1");
+    update_string(&mut hasher, proxy_id);
+    let mut ordered: Vec<&ArchitectureFeatures> = features.iter().collect();
+    ordered.sort_by(|left, right| left.architecture_id.cmp(&right.architecture_id));
+    hasher.update((ordered.len() as u64).to_be_bytes());
+    for feature in ordered {
+        update_string(&mut hasher, &feature.architecture_id);
+        hasher.update((feature.topology_encoding.len() as u64).to_be_bytes());
+        hasher.update(&feature.topology_encoding);
+        let score = feature.proxy_scores.get(proxy_id).copied().unwrap_or(f64::NAN);
+        hasher.update(score.to_bits().to_be_bytes());
+    }
+    hex_digest(hasher.finalize().as_slice())
+}
+
 fn digest_archive(
     config: &TrajectorySearchConfig,
+    feature_catalog_sha256: &str,
     visited: &[String],
+    starts: &[String],
+    first_improvements: &[String],
+    local_optima: &[String],
+    escapes: &[String],
     events: &[TrajectoryEvent],
 ) -> String {
     let mut hasher = Sha256::new();
@@ -798,9 +869,16 @@ fn digest_archive(
     hasher.update((config.max_unique_visits as u64).to_be_bytes());
     hasher.update((config.max_moves_per_walk as u64).to_be_bytes());
     hasher.update((config.max_escapes_per_walk as u64).to_be_bytes());
+    update_string(&mut hasher, feature_catalog_sha256);
     hasher.update((visited.len() as u64).to_be_bytes());
     for architecture_id in visited {
         update_string(&mut hasher, architecture_id);
+    }
+    for values in [starts, first_improvements, local_optima, escapes] {
+        hasher.update((values.len() as u64).to_be_bytes());
+        for architecture_id in values {
+            update_string(&mut hasher, architecture_id);
+        }
     }
     hasher.update((events.len() as u64).to_be_bytes());
     for event in events {
