@@ -101,12 +101,24 @@ observed state, candidate-system order, algorithm version, factor-entry budget,
 likelihood vector, and elimination telemetry. This is an integrity receipt,
 not a proof of the model's scientific validity.
 
-This is an independently usable Eq. 4 primitive, **not yet the complete
-Integration-level phi_s search path**. The main system search still uses the
-dense model and dense full-system score/partition machinery. The sparse API
-does not make the complete IIT calculation scalable by itself; it is a
-controlled way to scale the proper-subsystem cause contraction when the
-dependency graph has low induced width.
+The sparse engine now includes Eq. 3 effect repertoires with observed-state
+external-input clamping, Eq. 4 cause-likelihood contraction under the original
+whole-system background posterior, and maximum-entropy directed cuts applied
+directly to local CPTs. A partitioned Eq. 4 call computes its posterior from
+the original uncut model and uses the cut local CPTs only for target-specific
+cause factors; it never recomputes the background posterior from the cut model.
+The sparse partition scorer combines Eq. 3, Eq. 4, cause/effect GID, positive-part
+clamping and the dense scorer's cut-edge normalization.
+
+Dense-vs-sparse parity covers local transitions, Eq. 3 repertoires, uncut Eq. 4,
+maximum-entropy-cut TPM cells, partitioned Eq. 4 and complete per-partition
+cause/effect scores for an embedded five-unit substrate.
+
+This remains a **per-partition scoring substrate, not yet a complete sparse
+Integration-level phi_s search**. The exhaustive full system search and its
+intrinsic specified-state tie selection still run through the dense reference
+model. A large sparse per-partition benchmark must not be represented as full
+system-analysis throughput.
 
 Validation includes dense-to-sparse transition equality, an independent
 full-joint Eq. 4 posterior oracle on small embedded systems, and sparse ring
@@ -121,6 +133,12 @@ multiplications, median and minimum elapsed time, and an output checksum.
 These measurements are for the Eq. 4 cause-likelihood primitive only; they
 must not be represented as full phi_s throughput or compared with end-to-end
 PyPhi system-analysis timings.
+
+A separate fixed-partition score sweep uses the same 64–2,048-unit ring
+substrates and a four-unit embedded candidate. It records cause/effect signed
+scores, normalized partition score, severed-edge count, partitioned Eq. 4
+receipt, and latency. This is one fixed-state per-partition evaluation, not the
+exhaustive intrinsic-state / all-partitions search needed for phi_s.
 
 ## Published reference fixture
 
