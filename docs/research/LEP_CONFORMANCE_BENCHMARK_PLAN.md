@@ -68,6 +68,22 @@ done
 
 Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This harness currently establishes a measurement method only; its first run must still pass compile and validity checks.
 
+## Deterministic adversarial suite now authored
+
+The Rust conformance library now includes a deterministic 1,000-record mutation
+test generated from the checked-in positive fixture. It repeats ten single-fault
+operators 100 times each: mutable source revision, stale checked target,
+malformed digest, queued-but-passed execution, missing completed run ID, empty
+executed-check set, duplicate check ID, failed check hidden by an inconclusive
+outcome, missing target, and an unknown core field. Each case asserts both
+rejection and its expected diagnostic code.
+
+This is a checked-in test definition, **not a 1,000-case execution result**.
+The first successful Rust test run must confirm that the implementation rejects
+all 1,000 cases on the exact commit. The suite is deterministic and is intended
+as a minimum adversarial regression layer; later suites should add parser
+differential tests, compound attacks, fuzzing, and resource-exhaustion bounds.
+
 ## Baseline to collect next
 
 The implementation now caches the compiled schema per process so repeated validation need not parse and compile the schema for every record. This is a design optimization, **not a measured speedup**. First collect the table above on the current implementation; use that result to set a realistic absolute latency/throughput budget and to determine whether further optimization is justified.
