@@ -4360,8 +4360,8 @@ mod tests {
     }
 
     #[test]
-    fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_six_units() {
-        for units in 2..=6 {
+    fn optimized_enumerator_matches_complete_reference_matrix_set_for_two_through_seven_units() {
+        for units in 2..=7 {
             let candidate: Vec<usize> = (0..units).collect();
             let budget = match units {
                 2 => 3,
@@ -4369,6 +4369,7 @@ mod tests {
                 4 => 150,
                 5 => 1_061,
                 6 => 7_896,
+                7 => 61_888,
                 _ => unreachable!(),
             };
             let expected = reference_directed_cut_matrices(units);
