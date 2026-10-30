@@ -71,6 +71,7 @@ pub mod significance;
 pub mod paired_advantage;
 pub mod clustered_advantage;
 pub mod adaptive_evaluation;
+pub mod architecture_portfolio;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -160,9 +161,18 @@ pub use schema::{
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
 pub use adaptive_evaluation::{
     ADAPTIVE_EVALUATION_SCHEMA, AdaptiveEvaluationAuthorization,
+    ARCHITECTURE_PORTFOLIO_SCHEMA,
     AdaptiveEvaluationError, AdaptiveEvaluationPlan, AdaptiveEvaluationRecord,
     AdaptiveEvaluationRequest, EvaluationDisposition, EvaluationLane,
     authorize_adaptive_evaluation,
+};
+pub use architecture_portfolio::{
+    compare_architecture_pareto, validate_architecture_observation,
+    ArchitectureBenchmarkObservation, ArchitectureComparisonError,
+    ArchitectureEvidenceClass, ArchitectureMeasurementBoundary,
+    ArchitectureParetoRelation, ArchitectureResourceEnvelope,
+    ArchitectureWorkloadKind, ComputeArchitectureFamily, MemoryInterval,
+    MetricInterval,
 };
 pub use paired_advantage::{
     ExactSignTest, HolmAdjustedPValue, PairedAdvantageConfig, PairedAdvantageError,

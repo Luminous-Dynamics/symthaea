@@ -38,6 +38,10 @@ pub const INTEGRATION_DECLARATION_SCHEMA: &str =
 pub const ADAPTIVE_EVALUATION_SCHEMA: &str =
     "symthaea.quantum_comp.adaptive_evaluation.v1";
 
+/// Schema label for the cross-paradigm architecture portfolio v1 envelope.
+pub const ARCHITECTURE_PORTFOLIO_SCHEMA: &str =
+    "symthaea.quantum_comp.architecture_portfolio.v1";
+
 /// Returns all known alpha.10 schema labels.
 pub fn known_schema_labels() -> &'static [&'static str] {
     &[

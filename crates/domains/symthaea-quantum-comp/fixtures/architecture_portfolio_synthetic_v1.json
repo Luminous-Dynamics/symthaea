@@ -1,0 +1,104 @@
+{
+  "schema_version": "symthaea.quantum_comp.architecture_portfolio.v1",
+  "purpose": "synthetic_comparator_logic_fixture_only",
+  "claim_ceiling": "No hardware measurement or architecture advantage is represented.",
+  "comparisons": [
+    {
+      "id": "illustrative-neuromorphic-dominates-cpu",
+      "left": {
+        "record_id": "synthetic-neuromorphic",
+        "architecture_id": "synthetic-digital-neuromorphic",
+        "architecture_family": "neuromorphic_digital",
+        "workload_kind": "hdc_algebra",
+        "workload_fingerprint": "fixture-workload-a",
+        "comparison_contract_fingerprint": "fixture-contract-a",
+        "evidence_class": "physical_prototype",
+        "measurement_boundary": "application_end_to_end",
+        "quality": {"lower": 0.96, "upper": 0.97},
+        "resources": {
+          "wall_time_seconds": {"lower": 0.8, "upper": 0.9},
+          "energy_joules": {"lower": 3.0, "upper": 4.0},
+          "monetary_cost_usd": {"lower": 0.03, "upper": 0.04},
+          "peak_memory": {"lower_bytes": 4000, "upper_bytes": 5000}
+        }
+      },
+      "right": {
+        "record_id": "synthetic-cpu",
+        "architecture_id": "synthetic-cpu",
+        "architecture_family": "classical_cpu",
+        "workload_kind": "hdc_algebra",
+        "workload_fingerprint": "fixture-workload-a",
+        "comparison_contract_fingerprint": "fixture-contract-a",
+        "evidence_class": "physical_prototype",
+        "measurement_boundary": "application_end_to_end",
+        "quality": {"lower": 0.94, "upper": 0.95},
+        "resources": {
+          "wall_time_seconds": {"lower": 1.8, "upper": 2.0},
+          "energy_joules": {"lower": 9.0, "upper": 10.0},
+          "monetary_cost_usd": {"lower": 0.08, "upper": 0.09},
+          "peak_memory": {"lower_bytes": 8000, "upper_bytes": 9000}
+        }
+      },
+      "expected_relation": "left_dominates"
+    },
+    {
+      "id": "illustrative-quality-resource-tradeoff",
+      "left": {
+        "record_id": "synthetic-photonic",
+        "architecture_id": "synthetic-photonic-linear",
+        "architecture_family": "photonic_linear",
+        "workload_kind": "dense_tensor_inference",
+        "workload_fingerprint": "fixture-workload-b",
+        "comparison_contract_fingerprint": "fixture-contract-b",
+        "evidence_class": "simulation",
+        "measurement_boundary": "runtime_end_to_end",
+        "quality": {"lower": 0.99, "upper": 1.0},
+        "resources": {
+          "wall_time_seconds": {"lower": 2.0, "upper": 2.2},
+          "energy_joules": {"lower": 8.0, "upper": 9.0},
+          "monetary_cost_usd": {"lower": 0.10, "upper": 0.11},
+          "peak_memory": {"lower_bytes": 16000, "upper_bytes": 17000}
+        }
+      },
+      "right": {
+        "record_id": "synthetic-analog",
+        "architecture_id": "synthetic-analog-cim",
+        "architecture_family": "analog_compute_in_memory",
+        "workload_kind": "dense_tensor_inference",
+        "workload_fingerprint": "fixture-workload-b",
+        "comparison_contract_fingerprint": "fixture-contract-b",
+        "evidence_class": "simulation",
+        "measurement_boundary": "runtime_end_to_end",
+        "quality": {"lower": 0.90, "upper": 0.92},
+        "resources": {
+          "wall_time_seconds": {"lower": 0.3, "upper": 0.4},
+          "energy_joules": {"lower": 1.0, "upper": 1.5},
+          "monetary_cost_usd": {"lower": 0.01, "upper": 0.02},
+          "peak_memory": {"lower_bytes": 1000, "upper_bytes": 2000}
+        }
+      },
+      "expected_relation": "tradeoff"
+    },
+    {
+      "id": "algorithm-only-not-system-comparable",
+      "observation": {
+        "record_id": "synthetic-algorithm-reference",
+        "architecture_id": "reference-hdc-algorithm",
+        "architecture_family": "classical_cpu",
+        "workload_kind": "hdc_algebra",
+        "workload_fingerprint": "fixture-workload-c",
+        "comparison_contract_fingerprint": "fixture-contract-c",
+        "evidence_class": "algorithmic_reference",
+        "measurement_boundary": "algorithm_only",
+        "quality": {"lower": 0.95, "upper": 0.96},
+        "resources": null
+      },
+      "expected_relation": "not_eligible_for_system_pareto"
+    }
+  ],
+  "limitations": [
+    "All values are fabricated test values.",
+    "Interval bounds are assumed to have been produced by a separately qualified analysis; this fixture does not calculate statistical uncertainty.",
+    "No device, simulator, or production architecture is measured here."
+  ]
+}
