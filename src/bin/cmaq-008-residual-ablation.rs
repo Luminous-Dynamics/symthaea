@@ -617,6 +617,52 @@ struct Aggregate {
     mse_delta_vs_persistence_ci95_high: f64,
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+struct DecisionAggregate {
+    model_mean_utility: f64,
+    arx_mean_utility: f64,
+    direct_mean_utility: f64,
+    oracle_mean_utility: f64,
+    model_mean_regret: f64,
+    arx_mean_regret: f64,
+    model_oracle_action_agreement: f64,
+    arx_oracle_action_agreement: f64,
+    model_delta_vs_arx: f64,
+    model_delta_vs_arx_ci95_low: f64,
+    model_delta_vs_arx_ci95_high: f64,
+    model_delta_vs_direct: f64,
+    model_delta_vs_direct_ci95_low: f64,
+    model_delta_vs_direct_ci95_high: f64,
+}
+
+fn aggregate_decisions(results: &[SeedResult], law_index: usize) -> DecisionAggregate {
+    let rows = results.iter().map(|row| row.decisions[law_index]).collect::<Vec<_>>();
+    let model_delta_vs_arx = rows.iter()
+        .map(|row| row.model_utility - row.arx_utility)
+        .collect::<Vec<_>>();
+    let model_delta_vs_direct = rows.iter()
+        .map(|row| row.model_utility - row.direct_utility)
+        .collect::<Vec<_>>();
+    let (arx_delta, arx_low, arx_high) = mean_ci95(&model_delta_vs_arx);
+    let (direct_delta, direct_low, direct_high) = mean_ci95(&model_delta_vs_direct);
+    DecisionAggregate {
+        model_mean_utility: mean(&rows.iter().map(|row| row.model_utility).collect::<Vec<_>>()),
+        arx_mean_utility: mean(&rows.iter().map(|row| row.arx_utility).collect::<Vec<_>>()),
+        direct_mean_utility: mean(&rows.iter().map(|row| row.direct_utility).collect::<Vec<_>>()),
+        oracle_mean_utility: mean(&rows.iter().map(|row| row.oracle_utility).collect::<Vec<_>>()),
+        model_mean_regret: mean(&rows.iter().map(|row| row.model_regret).collect::<Vec<_>>()),
+        arx_mean_regret: mean(&rows.iter().map(|row| row.arx_regret).collect::<Vec<_>>()),
+        model_oracle_action_agreement: mean(&rows.iter().map(|row| row.model_oracle_action_agreement).collect::<Vec<_>>()),
+        arx_oracle_action_agreement: mean(&rows.iter().map(|row| row.arx_oracle_action_agreement).collect::<Vec<_>>()),
+        model_delta_vs_arx: arx_delta,
+        model_delta_vs_arx_ci95_low: arx_low,
+        model_delta_vs_arx_ci95_high: arx_high,
+        model_delta_vs_direct: direct_delta,
+        model_delta_vs_direct_ci95_low: direct_low,
+        model_delta_vs_direct_ci95_high: direct_high,
+    }
+}
+
 fn aggregate(results: &[SeedResult], law_index: usize) -> Aggregate {
     let rows = results.iter().map(|row| row.regimes[law_index]).collect::<Vec<_>>();
     let mses = rows.iter().map(|row| row.mse).collect::<Vec<_>>();
@@ -764,6 +810,8 @@ fn render(report: &RunReport) -> String {
                 "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8},",
                 "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8},",
                 "\"paired_mse_delta_vs_linear_arx\":{:.8},\"paired_linear_ci95_low\":{:.8},\"paired_linear_ci95_high\":{:.8}}},",
+                "\"decision_quality_source\":{{\"model_mean_utility\":{:.8},\"arx_mean_utility\":{:.8},\"direct_mean_utility\":{:.8},\"oracle_mean_utility\":{:.8},\"model_mean_regret\":{:.8},\"arx_mean_regret\":{:.8},\"model_oracle_action_agreement\":{:.8},\"arx_oracle_action_agreement\":{:.8},\"model_delta_vs_arx\":{:.8},\"model_delta_vs_arx_ci95_low\":{:.8},\"model_delta_vs_arx_ci95_high\":{:.8},\"model_delta_vs_direct\":{:.8},\"model_delta_vs_direct_ci95_low\":{:.8},\"model_delta_vs_direct_ci95_high\":{:.8}}},",
+                "\"decision_quality_action_effect_reversal\":{{\"model_mean_utility\":{:.8},\"arx_mean_utility\":{:.8},\"direct_mean_utility\":{:.8},\"oracle_mean_utility\":{:.8},\"model_mean_regret\":{:.8},\"arx_mean_regret\":{:.8},\"model_oracle_action_agreement\":{:.8},\"arx_oracle_action_agreement\":{:.8},\"model_delta_vs_arx\":{:.8},\"model_delta_vs_arx_ci95_low\":{:.8},\"model_delta_vs_arx_ci95_high\":{:.8},\"model_delta_vs_direct\":{:.8},\"model_delta_vs_direct_ci95_low\":{:.8},\"model_delta_vs_direct_ci95_high\":{:.8}}},",
                 "\"per_seed\":["
             ),
             mode.objective.name(),
@@ -777,7 +825,21 @@ fn render(report: &RunReport) -> String {
             reversal.mse_to_persistence_ratio, reversal.mse_delta_vs_persistence,
             reversal.mse_delta_vs_persistence_ci95_low, reversal.mse_delta_vs_persistence_ci95_high,
             reversal_pair.0, reversal_pair.1, reversal_pair.2,
-            reversal_linear_pair.0, reversal_linear_pair.1, reversal_linear_pair.2
+            reversal_linear_pair.0, reversal_linear_pair.1, reversal_linear_pair.2,
+            {
+                let d = aggregate_decisions(&mode.seeds, 0);
+                d.model_mean_utility, d.arx_mean_utility, d.direct_mean_utility, d.oracle_mean_utility,
+                d.model_mean_regret, d.arx_mean_regret, d.model_oracle_action_agreement, d.arx_oracle_action_agreement,
+                d.model_delta_vs_arx, d.model_delta_vs_arx_ci95_low, d.model_delta_vs_arx_ci95_high,
+                d.model_delta_vs_direct, d.model_delta_vs_direct_ci95_low, d.model_delta_vs_direct_ci95_high
+            },
+            {
+                let d = aggregate_decisions(&mode.seeds, 1);
+                d.model_mean_utility, d.arx_mean_utility, d.direct_mean_utility, d.oracle_mean_utility,
+                d.model_mean_regret, d.arx_mean_regret, d.model_oracle_action_agreement, d.arx_oracle_action_agreement,
+                d.model_delta_vs_arx, d.model_delta_vs_arx_ci95_low, d.model_delta_vs_arx_ci95_high,
+                d.model_delta_vs_direct, d.model_delta_vs_direct_ci95_low, d.model_delta_vs_direct_ci95_high
+            }
         ));
         for (seed_index, row) in mode.seeds.iter().enumerate() {
             out.push_str(&format!(
