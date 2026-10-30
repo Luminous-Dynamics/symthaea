@@ -745,6 +745,7 @@ fn sparse_hex_digest(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enumerate_iit4_system_partitions;
 
     fn dense_ring_model(n_units: usize) -> BinaryCausalModel {
         let mut connectivity = vec![false; n_units * n_units];
