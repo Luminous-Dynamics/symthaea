@@ -1312,6 +1312,90 @@ mod tests {
     }
 
     #[test]
+    fn exact_group_failure_bound_matches_zero_event_closed_form() {
+        let alpha = 0.025;
+        let upper = clopper_pearson_upper(0, 5, alpha).unwrap().unwrap();
+        let expected = 1.0 - alpha.powf(1.0 / 5.0);
+        assert!((upper - expected).abs() < 1e-12);
+        assert!((upper - 0.5218).abs() < 0.0001);
+    }
+
+    #[test]
+    fn exact_group_failure_bound_is_one_when_every_group_fails() {
+        assert_eq!(clopper_pearson_upper(5, 5, 0.025).unwrap(), Some(1.0));
+    }
+
+    #[test]
+    fn exact_group_failure_bound_increases_with_observed_failures() {
+        let zero = clopper_pearson_upper(0, 12, 0.025).unwrap().unwrap();
+        let one = clopper_pearson_upper(1, 12, 0.025).unwrap().unwrap();
+        let three = clopper_pearson_upper(3, 12, 0.025).unwrap().unwrap();
+        assert!(zero < one && one < three);
+    }
+
+    #[test]
+    fn minimum_independent_group_counts_are_reported_for_zero_failure_targets() {
+        assert_eq!(minimum_zero_failure_groups(0.01, 0.025).unwrap(), Some(368));
+        assert_eq!(minimum_zero_failure_groups(0.005, 0.025).unwrap(), Some(736));
+        assert_eq!(minimum_zero_failure_groups(0.0, 0.025).unwrap(), None);
+    }
+
+    #[test]
+    fn binomial_cdf_matches_small_known_values() {
+        assert!((binomial_cdf(0, 5, 0.5) - 1.0 / 32.0).abs() < 1e-12);
+        assert!((binomial_cdf(1, 5, 0.5) - 6.0 / 32.0).abs() < 1e-12);
+        assert!((binomial_cdf(2, 5, 0.5) - 16.0 / 32.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn group_failure_bounds_are_distinct_from_sample_level_error_rates() {
+        let ledger = parse_ledger(&serde_json::to_vec(&valid_ledger_json()).unwrap()).unwrap();
+        let validation = ledger
+            .predictions
+            .iter()
+            .filter(|row| row.split == "validation")
+            .cloned()
+            .collect::<Vec<_>>();
+        let test = ledger
+            .predictions
+            .iter()
+            .filter(|row| row.split == "test")
+            .cloned()
+            .collect::<Vec<_>>();
+        let point = select_operating_point(&validation, 0.0, 0.0).unwrap();
+        let receipt = build_receipt(
+            &ledger,
+            "c".repeat(64).as_str(),
+            point,
+            &validation,
+            &test,
+            0.0,
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(receipt["test_metrics"]["false_alert_rate"], 0.0);
+        assert_eq!(receipt["test_metrics"]["false_clear_rate"], 0.0);
+        assert_eq!(receipt["family_level_failure_bounds"]["group_count"], 1);
+        assert_eq!(receipt["family_level_failure_bounds"]["false_alert_failure_groups"], 0);
+        assert_eq!(receipt["family_level_failure_bounds"]["false_clear_failure_groups"], 0);
+        assert!(receipt["family_level_failure_bounds"]["false_alert_group_failure_upper_bound"]
+            .as_f64()
+            .unwrap()
+            > 0.0);
+        assert!(receipt["family_level_failure_bounds"]["scope"]
+            .as_str()
+            .unwrap()
+            .contains("independent_held_out_group"));
+    }
+
+    #[test]
+    fn group_bounds_reject_invalid_alpha_and_event_counts() {
+        assert!(clopper_pearson_upper(0, 5, 0.0).is_err());
+        assert!(clopper_pearson_upper(6, 5, 0.025).is_err());
+        assert_eq!(clopper_pearson_upper(0, 0, 0.025).unwrap(), None);
+    }
+
+    #[test]
     fn parse_args_rejects_rates_outside_zero_one() {
         assert!(parse_rate("alpha", "-0.1").is_err());
         assert!(parse_rate("alpha", "1.1").is_err());
