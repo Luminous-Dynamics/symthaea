@@ -64,16 +64,24 @@ impl fmt::Display for RidaExactError {
             Self::EmptySamples => "empirical samples and design history must be non-empty",
             Self::FeatureDimensionMismatch => "sample feature dimensions must be equal and positive",
             Self::NonFiniteSample => "empirical sample coordinates must be finite",
-            Self::InvalidBandwidth => "RBF bandwidth must be finite and positive with representable variance",
+            Self::InvalidBandwidth => {
+                "RBF bandwidth must be finite and positive with representable variance"
+            }
             Self::ZeroBaselineMmd => "baseline MMD^2 is zero; the R-I robust ratio is undefined",
-            Self::InvalidExpectedInformationGain => "expected information gain must be finite and non-negative",
-            Self::InvalidRepresentativenessWeight => "representativeness weight lambda must be finite and non-negative",
+            Self::InvalidExpectedInformationGain => {
+                "expected information gain must be finite and non-negative"
+            }
+            Self::InvalidRepresentativenessWeight => {
+                "representativeness weight lambda must be finite and non-negative"
+            }
             Self::InvalidDerivedScore => "a derived MMD or acquisition score is invalid",
             Self::ProxyDimensionMismatch => "proxy inputs must be non-empty and have equal lengths",
             Self::NonFiniteProxyValue => "predictor, proxy, and observed values must be finite",
             Self::InvalidThreshold => "de-amplification threshold must be finite and non-negative",
             Self::InvalidSmoothingScale => "sigmoid smoothing scale kappa must be finite and positive",
-            Self::InvalidThresholdParameters => "threshold parameters require tau0 >= 0, B_infinity >= 0, c >= 2, and tau2 >= 0",
+            Self::InvalidThresholdParameters => {
+                "threshold parameters require tau0 >= 0, B_infinity >= 0, c >= 2, and tau2 >= 0"
+            }
             Self::ThresholdOverflow => "the derived de-amplification threshold overflowed",
         };
         f.write_str(message)
