@@ -39,6 +39,8 @@ jobs:
         run: >-
           rustfmt --check --edition 2024
           research/science-bench-refresh/src/main.rs
+          research/science-bench-refresh/src/lib.rs
+          research/science-bench-refresh/src/judge_factorial.rs
           research/science-bench-refresh/src/evidence_behavior_contracts.rs
           research/science-bench-refresh/src/reference_assurance.rs
 
