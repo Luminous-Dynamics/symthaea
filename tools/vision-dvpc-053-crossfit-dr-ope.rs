@@ -733,7 +733,8 @@ mod tests {
     #[test]
     fn crossfit_runs_with_two_disjoint_training_folds() {
         let rows = sample_dataset(64, Logger { p1: [0.5, 0.5] }, [0.5, 0.5], SOURCE_REWARD, 19).unwrap();
-        let result = estimate(&rows, TARGET_POLICIES[0], Logger { p1: [0.5, 0.5] }, Estimator::DrCrossfit2, [[0.5; 2]; 2]).unwrap();
+        let policy = TARGET_POLICIES[0];
+        let result = estimate(&rows, policy, Logger { p1: [0.5, 0.5] }, Estimator::DrCrossfit2, [[0.5; 2]; 2]).unwrap();
         assert!(result.value.is_finite());
         assert!(result.standard_error.is_finite());
         assert!(result.interval_valid);
