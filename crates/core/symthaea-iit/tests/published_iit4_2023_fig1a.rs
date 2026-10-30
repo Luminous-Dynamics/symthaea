@@ -15,7 +15,10 @@
 //! single-node {A} candidate is a valid nonzero system because the published
 //! TPM contains an A -> A self-loop and its TotalCut is evaluated.
 
-use symthaea_iit::{BinaryCausalModel, Iit4SystemPhiSearchConfig, Iit4SystemPhiStatus};
+use symthaea_iit::{
+    enumerate_iit4_system_partitions, BinaryCausalModel, Iit4SystemPhiSearchConfig,
+    Iit4SystemPhiStatus,
+};
 
 const FIG1A_TPM: [f64; 24] = [
     0.11920292202211757, 0.7685247834990178, 0.16798161486607552, // 000
@@ -121,6 +124,34 @@ fn published_fig1a_connectivity_matches_the_weight_matrix() {
                 "connectivity mismatch at {source} -> {target}"
             );
         }
+    }
+}
+
+#[test]
+fn published_fig1a_singleton_cut_reuses_uncut_eq4_background_posterior() {
+    let model = fig1a_model();
+    let state = [false, true, true];
+    let uncut = model
+        .forward_cause_likelihood_iit4(&[0], &[0], &state, &[0])
+        .unwrap();
+    let total_cut = enumerate_iit4_system_partitions(&[0], 3, false, 1)
+        .unwrap()
+        .into_iter()
+        .find(|partition| partition.is_total_cut())
+        .expect("a one-unit system must include TotalCut");
+
+    let partitioned = model
+        .partitioned_forward_cause_likelihood_iit4(&total_cut, &state)
+        .unwrap();
+    let expected = (uncut[0] + uncut[1]) * 0.5;
+
+    assert_eq!(uncut.len(), 2);
+    assert_eq!(partitioned.len(), 2);
+    for (index, actual) in partitioned.iter().copied().enumerate() {
+        assert!(
+            (actual - expected).abs() <= 1e-14,
+            "cut cause likelihood at state {index}: actual={actual:.16}, expected={expected:.16}"
+        );
     }
 }
 
