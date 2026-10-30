@@ -156,7 +156,9 @@
         "outcome",
         "evidence_digest",
         "resource_pins",
-        "evidence_dependencies"
+        "evidence_dependencies",
+        "dependency_coverage",
+        "unresolved_inputs"
       ],
       "properties": {
         "entry_type": {
@@ -210,8 +212,31 @@
           "items": {
             "$ref": "#/$defs/identifier"
           }
+        },
+        "dependency_coverage": {
+          "$ref": "#/$defs/dependencyCoverage"
+        },
+        "unresolved_inputs": {
+          "type": "array",
+          "maxItems": 4096,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/unresolvedInput"
+          },
+          "description": "Required empty when dependency_coverage=complete; required non-empty and explicitly identified when dependency_coverage=incomplete."
         }
       }
+    },
+    "dependencyCoverage": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "incomplete"
+      ],
+      "description": "Complete means the producer asserts the dependency observation is exhaustive for the evidence. Incomplete is a conservative declaration that untracked inputs remain."
+    },
+    "unresolvedInput": {
+      "$ref": "#/$defs/identifier"
     }
   }
 }
