@@ -55,6 +55,15 @@ struct QueryBinding {
     implementation_sha256: String,
     parameters_sha256: String,
     scope: String,
+    dependency_roots: Vec<DependencyRef>,
+}
+
+#[derive(Debug, Clone, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[serde(deny_unknown_fields)]
+struct DependencyRef {
+    object_kind: String,
+    object_id: String,
+    source_revision_sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +82,7 @@ struct Dependency {
     object_id: String,
     source_revision_sha256: String,
     evidence_sha256: String,
+    depends_on: Vec<DependencyRef>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,6 +184,122 @@ fn push_if_invalid(errors: &mut Vec<String>, condition: bool, message: impl Into
     }
 }
 
+type DependencyKey = (String, String, String);
+
+fn dependency_key(reference: &DependencyRef) -> DependencyKey {
+    (
+        reference.object_kind.clone(),
+        reference.object_id.clone(),
+        reference.source_revision_sha256.clone(),
+    )
+}
+
+fn validate_dependency_graph(certificate: &Certificate) -> Vec<String> {
+    let mut errors = Vec::new();
+    let allowed_kinds = [
+        "volume_region", "neuron", "root", "segment", "synapse", "edge",
+        "morphology_subgraph", "coordinate_transform", "query_derived_value", "other",
+    ];
+    if certificate.query.dependency_roots.is_empty() {
+        errors.push("query.dependency_roots must not be empty".into());
+    }
+
+    let mut nodes = BTreeMap::<DependencyKey, &Dependency>::new();
+    for dependency in &certificate.dependency_closure {
+        let key = (
+            dependency.object_kind.clone(),
+            dependency.object_id.clone(),
+            dependency.source_revision_sha256.clone(),
+        );
+        if nodes.insert(key, dependency).is_some() {
+            errors.push("dependency graph contains duplicate node identities".into());
+        }
+    }
+
+    let validate_reference = |reference: &DependencyRef, role: &str, errors: &mut Vec<String>| {
+        if !allowed_kinds.contains(&reference.object_kind.as_str())
+            || !nonempty(&reference.object_id)
+            || !valid_sha256(&reference.source_revision_sha256)
+        {
+            errors.push(format!("{role} contains an invalid dependency identity"));
+        }
+        if !nodes.contains_key(&dependency_key(reference)) {
+            errors.push(format!(
+                "{role} references unresolved dependency {}:{}",
+                reference.object_kind, reference.object_id
+            ));
+        }
+    };
+
+    let mut roots = BTreeSet::new();
+    for root in &certificate.query.dependency_roots {
+        validate_reference(root, "query dependency root", &mut errors);
+        if !roots.insert(dependency_key(root)) {
+            errors.push("query dependency_roots contains a duplicate root".into());
+        }
+    }
+
+    for dependency in &certificate.dependency_closure {
+        let mut children = BTreeSet::new();
+        for child in &dependency.depends_on {
+            validate_reference(child, "dependency edge", &mut errors);
+            if !children.insert(dependency_key(child)) {
+                errors.push(format!(
+                    "dependency {} has a duplicate depends_on reference",
+                    dependency.object_id
+                ));
+            }
+        }
+    }
+
+    // Three-colour iterative DFS from all declared query roots. This proves
+    // that the supplied manifest is a DAG and that every declared node is
+    // reachable from at least one root; it cannot prove the root manifest
+    // itself is scientifically complete.
+    let mut colors = BTreeMap::<DependencyKey, u8>::new();
+    let mut reachable = BTreeSet::<DependencyKey>::new();
+    for root in &certificate.query.dependency_roots {
+        let root_key = dependency_key(root);
+        if !nodes.contains_key(&root_key) {
+            continue;
+        }
+        let mut stack = vec![(root_key, false)];
+        while let Some((key, exiting)) = stack.pop() {
+            if exiting {
+                colors.insert(key.clone(), 2);
+                reachable.insert(key);
+                continue;
+            }
+            match colors.get(&key).copied().unwrap_or(0) {
+                1 => {
+                    errors.push("dependency closure contains a cycle reachable from a query root".into());
+                    continue;
+                }
+                2 => continue,
+                _ => {}
+            }
+            colors.insert(key.clone(), 1);
+            stack.push((key.clone(), true));
+            if let Some(node) = nodes.get(&key) {
+                for child in node.depends_on.iter().rev() {
+                    let child_key = dependency_key(child);
+                    if nodes.contains_key(&child_key) {
+                        match colors.get(&child_key).copied().unwrap_or(0) {
+                            1 => errors.push("dependency closure contains a cycle reachable from a query root".into()),
+                            2 => {}
+                            _ => stack.push((child_key, false)),
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if reachable.len() != nodes.len() {
+        errors.push("dependency_closure contains nodes unreachable from every declared query root".into());
+    }
+    errors
+}
+
 fn validate(certificate: &Certificate) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -194,6 +320,7 @@ fn validate(certificate: &Certificate) -> Vec<String> {
     );
     push_if_invalid(&mut errors, !nonempty(&certificate.query.query_id), "query.query_id must be non-empty");
     push_if_invalid(&mut errors, !nonempty(&certificate.query.scope), "query.scope must be non-empty");
+    errors.extend(validate_dependency_graph(certificate));
     for (name, digest) in [
         ("query.specification_sha256", certificate.query.specification_sha256.as_str()),
         ("query.implementation_sha256", certificate.query.implementation_sha256.as_str()),
