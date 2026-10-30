@@ -61,6 +61,12 @@ struct SpatialFrameReport {
     schema_version: u32,
     canonical_frame_sha256: String,
     population_frame_sha256: String,
+    eligibility_mask_sha256: String,
+    eligibility_selection_rule_sha256: String,
+    frame_protocol_sha256: String,
+    frame_generator_tool_id: String,
+    frame_generator_tool_version: String,
+    frame_generator_binary_sha256: String,
     population_frame: Vec<PopulationPsu>,
     status: String,
 }
@@ -251,6 +257,12 @@ fn validate_spatial_frame_binding(
     if !is_lower_hex(spatial_report_hash, 64)
         || !is_lower_hex(&spatial_report.canonical_frame_sha256, 64)
         || !is_lower_hex(&spatial_report.population_frame_sha256, 64)
+        || !is_lower_hex(&spatial_report.eligibility_mask_sha256, 64)
+        || !is_lower_hex(&spatial_report.eligibility_selection_rule_sha256, 64)
+        || !is_lower_hex(&spatial_report.frame_protocol_sha256, 64)
+        || !is_lower_hex(&spatial_report.frame_generator_binary_sha256, 64)
+        || !nonempty(&spatial_report.frame_generator_tool_id)
+        || !nonempty(&spatial_report.frame_generator_tool_version)
     {
         return Err("spatial frame report and canonical frame digests must be lowercase SHA-256".into());
     }
@@ -1093,6 +1105,12 @@ mod tests {
             schema_version: 1,
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
+            eligibility_mask_sha256: "3".repeat(64),
+            eligibility_selection_rule_sha256: "4".repeat(64),
+            frame_protocol_sha256: "5".repeat(64),
+            frame_generator_tool_id: "test-frame-auditor".into(),
+            frame_generator_tool_version: "1.0.0".into(),
+            frame_generator_binary_sha256: "6".repeat(64),
             population_frame: audit.population_frame.clone(),
             status: "PASS".into(),
         };
@@ -1110,6 +1128,12 @@ mod tests {
             schema_version: 1,
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
+            eligibility_mask_sha256: "3".repeat(64),
+            eligibility_selection_rule_sha256: "4".repeat(64),
+            frame_protocol_sha256: "5".repeat(64),
+            frame_generator_tool_id: "test-frame-auditor".into(),
+            frame_generator_tool_version: "1.0.0".into(),
+            frame_generator_binary_sha256: "6".repeat(64),
             population_frame: audit.population_frame.clone(),
             status: "PASS".into(),
         };
@@ -1126,6 +1150,12 @@ mod tests {
             schema_version: 1,
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
+            eligibility_mask_sha256: "3".repeat(64),
+            eligibility_selection_rule_sha256: "4".repeat(64),
+            frame_protocol_sha256: "5".repeat(64),
+            frame_generator_tool_id: "test-frame-auditor".into(),
+            frame_generator_tool_version: "1.0.0".into(),
+            frame_generator_binary_sha256: "6".repeat(64),
             population_frame,
             status: "PASS".into(),
         };
@@ -1143,6 +1173,12 @@ mod tests {
             schema_version: 1,
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
+            eligibility_mask_sha256: "3".repeat(64),
+            eligibility_selection_rule_sha256: "4".repeat(64),
+            frame_protocol_sha256: "5".repeat(64),
+            frame_generator_tool_id: "test-frame-auditor".into(),
+            frame_generator_tool_version: "1.0.0".into(),
+            frame_generator_binary_sha256: "6".repeat(64),
             population_frame: audit.population_frame.clone(),
             status: "FAIL".into(),
         };
