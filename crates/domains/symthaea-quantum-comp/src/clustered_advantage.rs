@@ -125,6 +125,10 @@ pub enum ClusteredAdvantageError {
     InvalidConfig,
     /// The synthetic null-stress configuration is invalid.
     InvalidStressConfig,
+    /// The exact cluster-level power-plan configuration is invalid.
+    InvalidPowerPlanConfig,
+    /// A power-planning case identifier is empty or duplicated.
+    InvalidPowerCaseId,
     /// Fewer independent clusters were supplied than preregistered.
     InsufficientIndependentClusters,
 }
@@ -142,6 +146,8 @@ impl std::fmt::Display for ClusteredAdvantageError {
             Self::InvalidQuality => "quality values and paired differences must be finite",
             Self::InvalidConfig => "invalid margin, tolerance or minimum-cluster configuration",
             Self::InvalidStressConfig => "invalid cluster-null stress configuration",
+            Self::InvalidPowerPlanConfig => "invalid exact cluster sign-test power-plan configuration",
+            Self::InvalidPowerCaseId => "power-plan case IDs must be nonempty and unique",
             Self::InsufficientIndependentClusters => "fewer independent clusters than preregistered",
         };
         f.write_str(message)
@@ -391,6 +397,192 @@ fn leave_one_cluster_out_range(values: &[f64]) -> (f64, f64) {
     }
     medians.sort_by(f64::total_cmp);
     (medians[0], medians[medians.len() - 1])
+}
+
+/// One predeclared cluster-level alternative for exact power planning.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterSignPowerCase {
+    /// Stable scenario identifier.
+    pub case_id: String,
+    /// Probability an independent cluster clears the quality non-inferiority margin.
+    pub quality_cluster_win_probability: f64,
+    /// Probability an independent cluster clears the practical resource margin.
+    pub resource_cluster_win_probability: f64,
+}
+
+/// Exact power-planning configuration for the joint quality/resource claim.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterSignPowerPlanConfig {
+    /// Raw per-claim one-sided significance level before any across-claim Holm correction.
+    pub alpha: f64,
+    /// Desired lower bound on joint power for both component tests to reject.
+    pub desired_joint_power: f64,
+    /// Smallest number of independent clusters considered.
+    pub minimum_independent_clusters: usize,
+    /// Largest number of independent clusters searched.
+    pub maximum_independent_clusters: usize,
+    /// Preregistered family-level alternatives.
+    pub cases: Vec<ClusterSignPowerCase>,
+}
+
+/// Exact power and sample-size requirement for one family-level alternative.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterSignPowerPlanPoint {
+    /// Stable scenario identifier.
+    pub case_id: String,
+    /// Assumed probability a cluster clears the quality margin.
+    pub quality_cluster_win_probability: f64,
+    /// Assumed probability a cluster clears the practical resource margin.
+    pub resource_cluster_win_probability: f64,
+    /// Minimum independent clusters found, or None when the configured search is insufficient.
+    pub required_independent_clusters: Option<usize>,
+    /// Critical quality-cluster wins at the selected sample size.
+    pub quality_critical_wins: Option<usize>,
+    /// Critical resource-cluster wins at the selected sample size.
+    pub resource_critical_wins: Option<usize>,
+    /// Exact quality component power at the selected sample size.
+    pub quality_component_power: Option<f64>,
+    /// Exact resource component power at the selected sample size.
+    pub resource_component_power: Option<f64>,
+    /// Dependence-free lower bound on joint power from the union bound.
+    pub joint_power_lower_bound: Option<f64>,
+}
+
+/// Plan independent-cluster count using exact sign-test power.
+///
+/// The joint lower bound is
+/// max(0, power_quality + power_resource - 1), so no independence between the
+/// quality and resource test statistics is assumed. This plans one claim; if
+/// Holm correction spans multiple confirmatory claims, use the preregistered
+/// per-claim alpha appropriate to that family (a worst-case design can use
+/// family_alpha / family_size).
+pub fn plan_cluster_sign_test_power(
+    config: &ClusterSignPowerPlanConfig,
+) -> Result<Vec<ClusterSignPowerPlanPoint>, ClusteredAdvantageError> {
+    if !config.alpha.is_finite()
+        || !(0.0..1.0).contains(&config.alpha)
+        || !config.desired_joint_power.is_finite()
+        || !(0.0..1.0).contains(&config.desired_joint_power)
+        || config.minimum_independent_clusters < 2
+        || config.maximum_independent_clusters < config.minimum_independent_clusters
+        || config.maximum_independent_clusters > 10_000
+        || config.cases.is_empty()
+    {
+        return Err(ClusteredAdvantageError::InvalidPowerPlanConfig);
+    }
+
+    let mut case_ids = HashSet::with_capacity(config.cases.len());
+    let mut results = Vec::with_capacity(config.cases.len());
+    for case in &config.cases {
+        if case.case_id.trim().is_empty() || !case_ids.insert(case.case_id.as_str()) {
+            return Err(ClusteredAdvantageError::InvalidPowerCaseId);
+        }
+        if !case.quality_cluster_win_probability.is_finite()
+            || !(0.0..=1.0).contains(&case.quality_cluster_win_probability)
+            || !case.resource_cluster_win_probability.is_finite()
+            || !(0.0..=1.0).contains(&case.resource_cluster_win_probability)
+        {
+            return Err(ClusteredAdvantageError::InvalidPowerPlanConfig);
+        }
+
+        let mut selected = None;
+        for clusters in config.minimum_independent_clusters
+            ..=config.maximum_independent_clusters
+        {
+            let quality_critical = critical_cluster_wins(clusters, config.alpha);
+            let resource_critical = critical_cluster_wins(clusters, config.alpha);
+            let (Some(quality_critical), Some(resource_critical)) =
+                (quality_critical, resource_critical)
+            else {
+                continue;
+            };
+            let quality_power = binomial_upper_tail_probability(
+                clusters,
+                quality_critical,
+                case.quality_cluster_win_probability,
+            );
+            let resource_power = binomial_upper_tail_probability(
+                clusters,
+                resource_critical,
+                case.resource_cluster_win_probability,
+            );
+            let joint_lower = (quality_power + resource_power - 1.0).max(0.0);
+            if joint_lower >= config.desired_joint_power {
+                selected = Some((
+                    clusters,
+                    quality_critical,
+                    resource_critical,
+                    quality_power,
+                    resource_power,
+                    joint_lower,
+                ));
+                break;
+            }
+        }
+
+        results.push(match selected {
+            Some((clusters, q_critical, r_critical, q_power, r_power, joint_lower)) => {
+                ClusterSignPowerPlanPoint {
+                    case_id: case.case_id.clone(),
+                    quality_cluster_win_probability: case.quality_cluster_win_probability,
+                    resource_cluster_win_probability: case.resource_cluster_win_probability,
+                    required_independent_clusters: Some(clusters),
+                    quality_critical_wins: Some(q_critical),
+                    resource_critical_wins: Some(r_critical),
+                    quality_component_power: Some(q_power),
+                    resource_component_power: Some(r_power),
+                    joint_power_lower_bound: Some(joint_lower),
+                }
+            }
+            None => ClusterSignPowerPlanPoint {
+                case_id: case.case_id.clone(),
+                quality_cluster_win_probability: case.quality_cluster_win_probability,
+                resource_cluster_win_probability: case.resource_cluster_win_probability,
+                required_independent_clusters: None,
+                quality_critical_wins: None,
+                resource_critical_wins: None,
+                quality_component_power: None,
+                resource_component_power: None,
+                joint_power_lower_bound: None,
+            },
+        });
+    }
+    Ok(results)
+}
+
+fn critical_cluster_wins(clusters: usize, alpha: f64) -> Option<usize> {
+    (1..=clusters)
+        .find(|&wins| exact_one_sided_sign_test_p_value(wins, clusters) <= alpha)
+}
+
+fn binomial_upper_tail_probability(n: usize, minimum_wins: usize, p: f64) -> f64 {
+    if minimum_wins == 0 {
+        return 1.0;
+    }
+    if minimum_wins > n || p == 0.0 {
+        return 0.0;
+    }
+    if p == 1.0 {
+        return 1.0;
+    }
+
+    let mode = (((n + 1) as f64) * p).floor() as usize;
+    let mode = mode.min(n);
+    let mut weights = vec![0.0_f64; n + 1];
+    weights[mode] = 1.0;
+
+    for wins in (1..=mode).rev() {
+        let ratio = (wins as f64 / (n - wins + 1) as f64) * ((1.0 - p) / p);
+        weights[wins - 1] = weights[wins] * ratio;
+    }
+    for wins in mode..n {
+        let ratio = ((n - wins) as f64 / (wins + 1) as f64) * (p / (1.0 - p));
+        weights[wins + 1] = weights[wins] * ratio;
+    }
+
+    let total = weights.iter().sum::<f64>();
+    let tail = weights[minimum_wins..].iter().sum::<f64>();
+    (tail / total).clamp(0.0, 1.0)
 }
 
 /// Configuration for a reproducible cluster-dependence null stress experiment.
