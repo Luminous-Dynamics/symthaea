@@ -531,13 +531,35 @@ mod tests {
             request,
             None,
             &value_decision,
-            &digest("evidence index state"),
+            &EvidenceIndexSnapshotReceipt {
+                known_at_unix_ms: 300,
+                index_state_sha256: digest("evidence index state"),
+            },
         ).unwrap();
         assert_eq!(action.action, LifecycleAction::Abstain);
         assert!(!action.retrieval.complete);
         assert!(!action.retrieval.can_continue);
         assert_eq!(action.retrieval.remaining_calls, 2);
         assert!(action.retrieval.value_decision_sha256.is_some());
+    }
+
+    #[test]
+    fn canonical_voi_adapter_rejects_snapshot_known_at_mismatch() {
+        let unresolved = BTreeSet::from(["C1".to_string()]);
+        let estimate = estimate_for_claims(unresolved.clone());
+        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let request = lifecycle_request_for_missing_claims(&unresolved);
+
+        let error = decide_lifecycle_action_with_voi(
+            request,
+            None,
+            &value_decision,
+            &EvidenceIndexSnapshotReceipt {
+                known_at_unix_ms: 301,
+                index_state_sha256: digest("evidence index state"),
+            },
+        ).unwrap_err();
+        assert!(error.contains("snapshot known_at"));
     }
 
     #[test]
