@@ -186,9 +186,11 @@ impl BitemporalJustificationRuntime {
 
         let mut candidate_known_at = self.derived_known_at.clone();
         candidate_known_at.insert(fact_id, recorded_at);
-        self.justifications = candidate_graph;
-        self.derived_known_at = candidate_known_at;
-        self.verify_consistency()?;
+        let mut candidate_runtime = self.clone();
+        candidate_runtime.justifications = candidate_graph;
+        candidate_runtime.derived_known_at = candidate_known_at;
+        candidate_runtime.verify_consistency()?;
+        *self = candidate_runtime;
         Ok(())
     }
 
