@@ -22,7 +22,7 @@ The new Rust module currently provides:
 - PublicTaskPacket: exact solver-visible request; no oracle, secret seed, split, answer key, hidden shortcut labels or rubric fields.
 - SealedOracleCommitment: commitment to verifier-held answer material with a random nonce of at least 256 bits.
 - RecipeRefinementReceipt: binds prior and revised recipe versions and requires independent construct-validity adjudication.
-- VerifierReceipt: binds task packet, solver artifact, environment, verifier profile, evidence bundle, stage scores and measured resource use.
+- VerifierReceipt: binds task packet, solver artifact, environment, verifier profile, evidence bundle, stage scores and measured resource use; signs/verifies a domain-separated canonical payload using Ed25519 and a versioned trusted-key registry.
 
 Seven unit tests are authored for canonical/versioned digests, public packet non-disclosure at the schema boundary, concept/recipe binding, oracle opening tampering, construct-preserving refinement, receipt/task binding, resource limits and stage evidence integrity. These tests have not been run yet.
 
@@ -30,7 +30,7 @@ Seven unit tests are authored for canonical/versioned digests, public packet non
 
 Private Rust fields, omitted serde fields and SHA-256 hashes do not provide security against a solver in the same process or against someone who can inspect memory. The SealedOracleCommitment type is a protocol/data structure only. The actual oracle payload, nonce, split assignment and grading logic must remain in a different process or service with separate access control and audit logs.
 
-Similarly, VerifierReceipt.validate_shape checks syntax, bindings and budget consistency; it does not verify an Ed25519 signature. A separate verifier client must validate the signature over a canonical receipt payload against a trusted key registry, check key revocation/rotation, and bind signer identity to an approved verifier deployment. A digest or signature-shaped string is not proof of authentic verification.
+VerifierReceipt.validate_shape checks syntax, bindings and budget consistency. VerifierReceipt.verify_signature_at additionally performs Ed25519 verification over a domain-separated canonical payload, using a supplied trusted-key registry with not-before, not-after and revocation timestamps. This is cryptographic verification only if the registry itself is delivered through a trusted channel and signer identity is bound operationally to an approved verifier deployment. The module does not provision keys, operate a remote verifier, protect key custody, or guarantee process isolation. A valid signature proves control of the corresponding private key, not that the signer is scientifically independent or honest.
 
 The service must never expose oracle-bearing Rust values, seeds, stack traces, private exceptions, grader metrics or split identifiers to the solver. It must not include hidden labels in task IDs, filenames, log ordering or timing.
 
@@ -123,7 +123,7 @@ AR-5D is not a reproduction of these systems. It is the integrity and adaptive-e
 
 ## Next implementation increments
 
-1. Implement an out-of-process verifier protocol and canonical signed payload format with actual Ed25519 verification and key rotation.
+1. Implement an out-of-process verifier protocol and remote attestation of the verifier deployment; the current module performs local Ed25519 receipt verification only.
 2. Add a sealed split registry, access audit and burn-on-exposure state transitions.
 3. Add recipe generation for finite-state systems and causal synthetic tasks with exhaustive oracles.
 4. Add shortcut baseline harnesses and construct-validity adjudication workflow.
@@ -132,4 +132,4 @@ AR-5D is not a reproduction of these systems. It is the integrity and adaptive-e
 
 ## Claim ceiling
 
-v0.1 only defines contracts and shape validators. It does not implement process isolation, secure key management, signature verification, benchmark generation, or adaptive qualification. Even a passing future synthetic campaign would qualify the benchmark mechanism on specified families; it would not establish real scientific or architecture discovery without independent transfer and replication.
+v0.1 defines contracts, commitment-opening checks and local Ed25519 receipt verification against a caller-supplied key registry. It does not implement process isolation, remote verifier deployment, key custody/registry distribution, sealed split management, benchmark generation, or adaptive qualification. Even a passing future synthetic campaign would qualify the benchmark mechanism on specified families; it would not establish real scientific or architecture discovery without independent transfer and replication.
