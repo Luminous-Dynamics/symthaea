@@ -365,5 +365,6 @@
         }
       ]
     }
-  ]
+  ],
+  "cell_seed_schedule": "For zero-based cell index i in the listed cells: seed_i=(master_seed+i*65537) mod 2^32."
 }
