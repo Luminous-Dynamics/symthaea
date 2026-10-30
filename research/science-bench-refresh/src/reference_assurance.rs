@@ -746,6 +746,15 @@ mod tests {
         .expect("test package parses")
     }
 
+    fn reseal(value: &mut Value) {
+        let mut fields = value.clone();
+        fields.as_object_mut().unwrap().remove("package_commitment_sha256");
+        let bytes = serde_json::to_vec(&fields).unwrap();
+        let commitment = compute_reference_package_commitment(&bytes).unwrap();
+        value["package_commitment_sha256"] = json!(commitment);
+    }
+
+
     #[test]
     fn example_package_is_structurally_valid_but_never_scoring_eligible() {
         let report = verify_reference_assurance_package(FIXTURE.as_bytes()).unwrap();
@@ -905,6 +914,7 @@ mod tests {
         let mut value = fixture_value();
         value["sources"][1]["ancestry_group_sha256"] =
             value["sources"][0]["ancestry_group_sha256"].clone();
+        reseal(&mut value);
         let report = verify_value(&value);
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.referenced_source_ancestry_groups, 1);
