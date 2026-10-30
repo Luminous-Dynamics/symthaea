@@ -23,6 +23,12 @@
     "observed_transition_count",
     "transition_recall",
     "missed_transition_ids",
+    "reference_phase_edge_count",
+    "observed_phase_edge_count",
+    "phase_edge_recall",
+    "reference_phase_edges",
+    "observed_phase_edges",
+    "missed_phase_edges",
     "unreachable_transition_ids_excluded_from_denominator",
     "unreachable_event_ids_excluded_from_denominator",
     "coverage_interpretation",
@@ -133,6 +139,77 @@
       "minItems": 1,
       "items": {
         "type": "string"
+      }
+    },
+    "reference_phase_edge_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_phase_edge_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "phase_edge_recall": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reference_phase_edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_transition_id",
+          "to_transition_id"
+        ],
+        "properties": {
+          "from_transition_id": {
+            "type": "string"
+          },
+          "to_transition_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "observed_phase_edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_transition_id",
+          "to_transition_id"
+        ],
+        "properties": {
+          "from_transition_id": {
+            "type": "string"
+          },
+          "to_transition_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "missed_phase_edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_transition_id",
+          "to_transition_id"
+        ],
+        "properties": {
+          "from_transition_id": {
+            "type": "string"
+          },
+          "to_transition_id": {
+            "type": "string"
+          }
+        }
       }
     }
   }
