@@ -121,6 +121,9 @@ impl ProofEvidenceCandidate {
         if self.source_span_end <= self.source_span_start {
             return Err("source_span_end must be greater than source_span_start".into());
         }
+        if self.source_span_end - self.source_span_start != self.source_span_text.len() as u64 {
+            return Err("source span byte offsets do not match resolved UTF-8 excerpt length".into());
+        }
         if self.token_cost == 0 {
             return Err("token_cost must be greater than zero".into());
         }
@@ -1473,6 +1476,78 @@ mod tests {
         let mut changed = req;
         changed.tokenizer_sha256 = digest('9');
         assert!(verify_proof_packet(&changed, &result).is_err());
+    }
+
+    #[test]
+    fn packet_fixed_and_per_proof_overheads_change_minimum_choice() {
+        let mut req = request(
+            vec![
+                candidate("A-short-source", "family-A", 1),
+                candidate("B-long-source", "family-B", 2),
+            ],
+            vec![obligation(
+                "claim-1",
+                vec![
+                    justification("proof-A", &["A-short-source"]),
+                    justification("proof-B", &["B-long-source"]),
+                ],
+            )],
+            10,
+        );
+        req.fixed_packet_overhead_tokens = 3;
+        req.obligations[0].selection_overhead_tokens = 0;
+        // With no per-proof differentiation, the 1-token source is selected.
+        let cheap = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(cheap.selected_proofs[0].justification_id, "proof-A");
+        assert_eq!(cheap.total_token_cost, 4);
+
+        // The short-source proof requires a larger proof envelope.
+        req.obligations[0].selection_overhead_tokens = 0;
+        req.obligations[0].alternatives[0].evidence_dependencies = vec!["A-short-source".into()];
+        // Use one overhead per obligation: both alternatives share this envelope.
+        assert_eq!(solve_proof_budget(req.clone()).unwrap().total_token_cost, 4);
+        // A packet-wide proof overhead applies regardless of the branch, while
+        // the evidence portion remains exact and auditable.
+        req.fixed_packet_overhead_tokens = 5;
+        let framed = solve_proof_budget(req).unwrap();
+        assert_eq!(framed.status, ProofBudgetStatus::Supported);
+        assert_eq!(framed.total_token_cost, 6);
+    }
+
+    #[test]
+    fn independent_verifier_rejects_dependency_edge_tampering() {
+        let req = request(
+            vec![candidate("A", "family-A", 1), candidate("B", "family-B", 1)],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        let mut result = solve_proof_budget(req.clone()).unwrap();
+        result.selected_proofs[0].evidence_dependencies = vec!["B".into()];
+        assert!(verify_proof_packet(&req, &result).unwrap_err().contains("exact conjunctive dependency edges"));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_source_locator_tampering() {
+        let req = request(
+            vec![candidate("A", "family-A", 1)],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        let mut result = solve_proof_budget(req.clone()).unwrap();
+        result.evidence[0].source_pointer = "/messages/999/content".into();
+        assert!(verify_proof_packet(&req, &result).unwrap_err().contains("source digests"));
+    }
+
+    #[test]
+    fn source_span_offsets_must_match_the_resolved_excerpt_byte_length() {
+        let mut item = candidate("A", "family-A", 1);
+        item.source_span_end = 11;
+        let req = request(
+            vec![item],
+            vec![obligation("claim-1", vec![justification("p1", &["A"])])],
+            5,
+        );
+        assert!(solve_proof_budget(req).unwrap_err().contains("byte offsets"));
     }
 
     #[test]
