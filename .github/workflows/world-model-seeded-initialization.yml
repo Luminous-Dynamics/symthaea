@@ -248,6 +248,12 @@ jobs:
                   assert 0.0 <= row[key] <= 1.0
               assert row["model_regret"] >= -1e-9
               assert row["direct_regret"] >= -1e-9
+              assert row["oracle_reward"] >= row["model_reward"] - 1e-8
+              assert row["oracle_reward"] >= row["direct_reward"] - 1e-8
+              assert abs(row["model_lift_vs_direct"] - (row["model_reward"] - row["direct_reward"])) < 1e-8
+              assert abs(row["model_regret"] - (row["oracle_reward"] - row["model_reward"])) < 1e-8
+              assert abs(row["direct_regret"] - (row["oracle_reward"] - row["direct_reward"])) < 1e-8
+              assert row["model_beats_direct_rate"] + row["model_harm_rate"] <= 1.0 + 1e-8
 
           for seed in report["per_seed"]:
               assert len(seed["seed"]) == 16
