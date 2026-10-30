@@ -557,6 +557,38 @@ fn validate_score_cohort<'a>(
 /// Let N be the population size, n the sample size and x the observed successes. This returns
 /// the largest K for which P[X <= x | X ~ Hypergeometric(N, K, n)] is at least 1-confidence.
 /// The inversion is discrete and therefore conservative.
+/// Best-case (zero observed false-pruned sentinels) one-sided finite-population upper
+/// bound used only to design a fixed audit schedule before outcomes are observed.
+///
+/// A zero sample returns the trivial bound N. The result is an optimistic schedule-design
+/// quantity, not the post-audit bound; actual observed misses must be passed through
+/// audit_pruning and can force the controller to disable pruning.
+pub fn zero_miss_upper_bound_false_pruned_count(
+    population_size: usize,
+    sample_size: usize,
+    confidence_level: f64,
+) -> Result<usize, PruningAuditError> {
+    if population_size == 0 || sample_size > population_size {
+        return Err(PruningAuditError::new(
+            "sample_size",
+            "requires population_size > 0 and sample_size <= population_size",
+        ));
+    }
+    if sample_size == 0 {
+        if !confidence_level.is_finite()
+            || confidence_level <= 0.0
+            || confidence_level >= 1.0
+        {
+            return Err(PruningAuditError::new(
+                "confidence_level",
+                "must be finite and in (0, 1)",
+            ));
+        }
+        return Ok(population_size);
+    }
+    finite_population_upper_bound(population_size, sample_size, 0, confidence_level)
+}
+
 fn finite_population_upper_bound(
     population_size: usize,
     sample_size: usize,
