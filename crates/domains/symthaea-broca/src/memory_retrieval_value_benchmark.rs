@@ -25,6 +25,9 @@ const MIN_BOOTSTRAP_GROUPS: usize = 20;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RetrievalUtilityPointPrediction {
+    pub estimator_sha256: String,
+    pub feature_schema_sha256: String,
+    pub utility_schema_sha256: String,
     pub correctness_gain_micro: i64,
     pub lifecycle_risk_reduction_micro: i64,
     pub retrieval_harm_micro: i64,
@@ -35,8 +38,16 @@ pub struct RetrievalUtilityPointPrediction {
 #[serde(deny_unknown_fields)]
 pub struct PairedRetrievalOutcome {
     pub observation_id: String,
+    pub experiment_id: String,
     pub calibration_group_id: String,
     pub query_fingerprint_sha256: String,
+    /// Exact EvidenceIndex state used to produce this paired outcome.
+    pub evidence_index_state_sha256: String,
+    /// All rows in one comparison must share these pinned artifacts.
+    pub utility_schema_sha256: String,
+    pub reader_sha256: String,
+    pub evaluator_sha256: String,
+    pub evaluation_split_sha256: String,
     /// All component scores use the frozen utility schema, higher is better.
     pub no_retrieval_correctness_micro: i64,
     pub retrieval_correctness_micro: i64,
@@ -57,8 +68,19 @@ pub struct PairedRetrievalOutcome {
 impl PairedRetrievalOutcome {
     pub fn validate(&self) -> Result<(), String> {
         require_non_empty(&self.observation_id, "observation_id")?;
+        require_non_empty(&self.experiment_id, "experiment_id")?;
         require_non_empty(&self.calibration_group_id, "calibration_group_id")?;
-        validate_sha256(&self.query_fingerprint_sha256, "query_fingerprint_sha256")
+        for (field, value) in [
+            ("query_fingerprint_sha256", self.query_fingerprint_sha256.as_str()),
+            ("evidence_index_state_sha256", self.evidence_index_state_sha256.as_str()),
+            ("utility_schema_sha256", self.utility_schema_sha256.as_str()),
+            ("reader_sha256", self.reader_sha256.as_str()),
+            ("evaluator_sha256", self.evaluator_sha256.as_str()),
+            ("evaluation_split_sha256", self.evaluation_split_sha256.as_str()),
+        ] {
+            validate_sha256(value, field)?;
+        }
+        Ok(())
     }
 
     pub fn correctness_gain_micro(&self) -> Result<i64, String> {
@@ -100,6 +122,10 @@ impl PairedRetrievalOutcome {
             observation_id: self.observation_id.clone(),
             calibration_group_id: self.calibration_group_id.clone(),
             query_fingerprint_sha256: self.query_fingerprint_sha256.clone(),
+            evidence_index_state_sha256: self.evidence_index_state_sha256.clone(),
+            estimator_sha256: prediction.estimator_sha256.clone(),
+            feature_schema_sha256: prediction.feature_schema_sha256.clone(),
+            utility_schema_sha256: self.utility_schema_sha256.clone(),
             predicted_correctness_gain_micro: prediction.correctness_gain_micro,
             observed_correctness_gain_micro: self.correctness_gain_micro()?,
             predicted_lifecycle_risk_reduction_micro: prediction.lifecycle_risk_reduction_micro,
@@ -170,6 +196,14 @@ pub fn summarize_paired_retrieval_outcomes(
     let mut observation_ids = BTreeSet::new();
     let mut query_fingerprints = BTreeSet::new();
     let mut groups = BTreeMap::<String, GroupAggregate>::new();
+    let first = &outcomes[0];
+    let experiment_binding = (
+        first.experiment_id.as_str(),
+        first.utility_schema_sha256.as_str(),
+        first.reader_sha256.as_str(),
+        first.evaluator_sha256.as_str(),
+        first.evaluation_split_sha256.as_str(),
+    );
 
     let mut correctness = Vec::with_capacity(outcomes.len());
     let mut lifecycle = Vec::with_capacity(outcomes.len());
@@ -185,6 +219,16 @@ pub fn summarize_paired_retrieval_outcomes(
 
     for outcome in outcomes {
         outcome.validate()?;
+        let current_binding = (
+            outcome.experiment_id.as_str(),
+            outcome.utility_schema_sha256.as_str(),
+            outcome.reader_sha256.as_str(),
+            outcome.evaluator_sha256.as_str(),
+            outcome.evaluation_split_sha256.as_str(),
+        );
+        if current_binding != experiment_binding {
+            return Err("paired outcomes mix experiment, utility, reader, evaluator or split bindings".into());
+        }
         if !observation_ids.insert(outcome.observation_id.as_str()) {
             return Err(format!("duplicate paired observation ID {:?}", outcome.observation_id));
         }
@@ -356,8 +400,14 @@ mod tests {
     fn outcome(index: usize, group: usize, delta: i64) -> PairedRetrievalOutcome {
         PairedRetrievalOutcome {
             observation_id: format!("outcome-{index}"),
+            experiment_id: "experiment-v1".into(),
             calibration_group_id: format!("group-{group}"),
             query_fingerprint_sha256: digest(&format!("query-{index}")),
+            evidence_index_state_sha256: digest(&format!("index-{index}")),
+            utility_schema_sha256: digest("utility-schema"),
+            reader_sha256: digest("reader"),
+            evaluator_sha256: digest("evaluator"),
+            evaluation_split_sha256: digest("sealed-split"),
             no_retrieval_correctness_micro: 500,
             retrieval_correctness_micro: 500 + delta,
             no_retrieval_lifecycle_loss_micro: 100,
@@ -381,6 +431,9 @@ mod tests {
 
         let observation = result.to_calibration_observation(
             &RetrievalUtilityPointPrediction {
+                estimator_sha256: digest("frozen estimator"),
+                feature_schema_sha256: digest("frozen features"),
+                utility_schema_sha256: digest("utility-schema"),
                 correctness_gain_micro: 90,
                 lifecycle_risk_reduction_micro: 0,
                 retrieval_harm_micro: 0,
