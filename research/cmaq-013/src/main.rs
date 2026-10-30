@@ -307,30 +307,34 @@ fn run_episode(scenario: Scenario, policy: Policy, pack: &ModelPack) -> Outcome 
     let mut root_done = false;
 
     for step in 0..HORIZON {
-        if state == 4 { break; }
         let remaining = HORIZON - step;
-        let (action, predicted_value, oracle_best_value) =
-            choose_action(scenario, policy, pack, state, remaining, &mut queries);
-        let (true_next, reward) = transition_reward(scenario, state, action);
-        let mut true_action_queries = 0;
-        let true_selected_value = value(
-            scenario, &pack.truth, state, action, remaining, &mut true_action_queries,
-        );
-        if !root_done {
-            root_action_regret = (oracle_best_value - true_selected_value).max(0.0);
-            if matches!(policy, Policy::LearnedModelPlanner | Policy::ShamModelPlanner) {
-                optimism_gap = predicted_value - true_selected_value;
-            }
-            root_done = true;
-        }
-        let direct = immediate_action(scenario, state);
-        if action != direct { action_changes += 1; }
-        decisions += 1;
-        total_return += discount * reward;
-        discount *= DISCOUNT;
-        state = true_next;
 
-        // Roll out the oracle policy on its own paired state trajectory.
+        // Candidate policy and oracle advance on separate, paired trajectories.
+        // Do not break when the candidate terminates: the oracle may continue.
+        if state != 4 {
+            let (action, predicted_value, oracle_best_value) =
+                choose_action(scenario, policy, pack, state, remaining, &mut queries);
+            let (true_next, reward) = transition_reward(scenario, state, action);
+            let mut true_action_queries = 0;
+            let true_selected_value = value(
+                scenario, &pack.truth, state, action, remaining, &mut true_action_queries,
+            );
+            if !root_done {
+                root_action_regret = (oracle_best_value - true_selected_value).max(0.0);
+                if matches!(policy, Policy::LearnedModelPlanner | Policy::ShamModelPlanner) {
+                    optimism_gap = predicted_value - true_selected_value;
+                }
+                root_done = true;
+            }
+            let direct = immediate_action(scenario, state);
+            if action != direct { action_changes += 1; }
+            decisions += 1;
+            total_return += discount * reward;
+            discount *= DISCOUNT;
+            state = true_next;
+        }
+
+        // Oracle retains its own state and receives the full remaining horizon.
         if oracle_state != 4 {
             let mut oracle_queries = 0;
             let (oracle_action, _, _) = best_action(
@@ -365,7 +369,6 @@ fn percentile(values: &mut [f64], fraction: f64) -> f64 {
 fn summarize(
     scenario: Scenario,
     policy: Policy,
-    error_rate: f64,
     outcomes: &[Outcome],
     direct: &[Outcome],
     oracle: &[Outcome],
@@ -388,13 +391,12 @@ fn summarize(
     tail.sort_by(|a, b| b.total_cmp(a));
     let tail_count = ((tail.len() as f64 * 0.05).ceil() as usize).max(1);
     let cvar95 = tail.iter().take(tail_count).sum::<f64>() / tail_count as f64;
-    let mut max_regret = oracle_regrets.clone();
-    let maximum = max_regret.iter().copied().fold(0.0, f64::max);
+    let maximum = oracle_regrets.iter().copied().fold(0.0, f64::max);
 
     Summary {
         scenario: scenario.name(),
         policy: policy.name(),
-        model_error_rate: error_rate,
+        model_error_rate: measured_model_error,
         mean_return,
         return_delta_vs_direct: mean_return - direct_mean,
         paired_ci95_low: delta - 1.96 * standard_error,
@@ -428,7 +430,7 @@ fn run_benchmark() -> Vec<Summary> {
                 let outcomes = packs.iter().map(|pack| run_episode(scenario, policy, pack))
                     .collect::<Vec<_>>();
                 rows.push(summarize(
-                    scenario, policy, error_rate, &outcomes, &direct, &oracle, measured_error,
+                    scenario, policy, &outcomes, &direct, &oracle, measured_error,
                 ));
             }
         }
