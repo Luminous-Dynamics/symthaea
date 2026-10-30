@@ -408,6 +408,67 @@ mod tests {
         rows
     }
 
+    fn next_uniform(state: &mut u32) -> f64 {
+        *state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        *state as f64 / 4_294_967_296.0
+    }
+
+    fn simulate_null_cell(
+        cluster_sizes: &[usize],
+        icc: f64,
+        seed: u32,
+        replicates: usize,
+    ) -> (usize, usize) {
+        let copy_probability = icc.sqrt();
+        let mut state = seed;
+        let mut naive_false_positives = 0usize;
+        let mut family_false_positives = 0usize;
+        let instance_count = cluster_sizes.iter().sum::<usize>();
+
+        for _ in 0..replicates {
+            let mut instance_wins = 0usize;
+            let mut family_wins = 0usize;
+
+            for &cluster_size in cluster_sizes {
+                let common = if next_uniform(&mut state) < 0.5 { 1 } else { -1 };
+                let mut family_instance_wins = 0usize;
+                for _ in 0..cluster_size {
+                    let sign = if next_uniform(&mut state) < copy_probability {
+                        common
+                    } else if next_uniform(&mut state) < 0.5 {
+                        1
+                    } else {
+                        -1
+                    };
+                    if sign > 0 {
+                        instance_wins += 1;
+                        family_instance_wins += 1;
+                    }
+                }
+                if family_instance_wins * 2 > cluster_size {
+                    family_wins += 1;
+                }
+            }
+
+            if crate::paired_advantage::exact_one_sided_sign_test_p_value(
+                instance_wins,
+                instance_count,
+            ) <= 0.05
+            {
+                naive_false_positives += 1;
+            }
+            if crate::paired_advantage::exact_one_sided_sign_test_p_value(
+                family_wins,
+                cluster_sizes.len(),
+            ) <= 0.05
+            {
+                family_false_positives += 1;
+            }
+        }
+
+        (naive_false_positives, family_false_positives)
+    }
+
     fn compact_fixture() -> Vec<ClusteredBenchmarkObservation> {
         let sizes = [3usize, 2, 4, 1, 5, 2, 3, 1];
         let resource_winner_families = [true, true, true, true, true, true, true, false];
@@ -418,6 +479,42 @@ mod tests {
             }
         }
         rows
+    }
+
+    #[test]
+    fn frozen_cluster_null_simulation_reproduces_all_twelve_cells() {
+        const MASTER_SEED: u32 = 1_369_948_382;
+        const REPLICATES: usize = 10_000;
+        let iccs = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0];
+        let designs: [&[usize]; 2] = [
+            &[3, 3, 3, 3, 3, 3, 3, 3],
+            &[21, 1, 1, 1, 1, 1, 1, 1],
+        ];
+        let expected = [
+            (313, 384),
+            (457, 332),
+            (605, 321),
+            (997, 344),
+            (1_246, 367),
+            (1_392, 360),
+            (420, 311),
+            (1_695, 353),
+            (3_184, 349),
+            (4_628, 378),
+            (5_010, 387),
+            (5_008, 353),
+        ];
+
+        let mut cell_index = 0u32;
+        for design in designs {
+            for icc in iccs {
+                let seed = MASTER_SEED.wrapping_add(cell_index.wrapping_mul(65_537));
+                let observed = simulate_null_cell(design, icc, seed, REPLICATES);
+                assert_eq!(observed, expected[cell_index as usize]);
+                cell_index += 1;
+            }
+        }
+        assert_eq!(cell_index, 12);
     }
 
     #[test]
