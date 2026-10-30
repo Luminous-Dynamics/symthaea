@@ -730,7 +730,7 @@ mod tests {
             graph.support_status_at("C", "2026-02-01").unwrap(),
             AsOfSupportStatus::Supported { .. }
         ));
-        assert!(graph.current_fact_at("C", "2026-02-29").unwrap().is_some());
+        assert!(graph.current_fact_at("C", "2026-02-28").unwrap().is_some());
         assert!(matches!(
             graph.support_status_at("C", "2026-03-01").unwrap(),
             AsOfSupportStatus::OutsideValidity
