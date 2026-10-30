@@ -242,7 +242,7 @@ impl SqliteAmlMemoryBackend {
         usize::try_from(count).map_err(|_| "negative or oversized SQLite batch count".into())
     }
 
-remove incorrect indexed evidence count    /// Explicit logical retention purge. Invoke no later than 30 days after an
+    /// Explicit logical retention purge. Invoke no later than 30 days after an
     /// evaluation run completes. SQLite transaction commit is durable under
     /// synchronous=FULL; the process-local index is rebuilt before returning.
     pub fn purge_stored_before(&mut self, cutoff_unix_ms: u64) -> Result<usize, String> {
@@ -284,7 +284,7 @@ remove incorrect indexed evidence count    /// Explicit logical retention purge.
         Ok(removed)
     }
 
-remove incorrect index count helper    fn read_persisted_rows(&self) -> Result<Vec<PersistedRow>, String> {
+    fn read_persisted_rows(&self) -> Result<Vec<PersistedRow>, String> {
         let mut statement = self.connection
             .prepare(
                 "SELECT request_id, payload_sha256, stored_at_unix_ms, body_json
