@@ -492,7 +492,7 @@ fn select_candidate_pairs(
         });
     }
 
-    let available = buckets.iter().map(Vec::len).sum();
+    let available = buckets.iter().map(Vec::len).sum::<usize>();
     let mut selected = Vec::with_capacity(budget.min(available));
     let mut cursors = [0usize; 3];
     while selected.len() < budget {
