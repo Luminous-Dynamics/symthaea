@@ -248,6 +248,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --proposals proposals.json \
   --ranking-report frozen-ranking.json \
   --sampling-protocol docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md \
+  --spatial-frame-report spatial-frame-report.json \
   --audit independent-volume-search-audit.json \
   --output candidate-coverage-report.json
 ```
