@@ -133,10 +133,94 @@ pub struct ProxyAcquisitionEvaluation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProxyAcquisitionRun {
     pub candidates: Vec<ProxyCandidate>,
+    pub declared_proxy_directions: BTreeMap<String, ProxyDirection>,
     /// Contains only successfully acquired proxy observations.
     pub observations: Vec<ProxyObservation>,
     pub receipt: ProxyAcquisitionReceipt,
     pub evaluation: ProxyAcquisitionEvaluation,
+}
+
+impl ProxyAcquisitionRun {
+    /// Materialize a rectangular architecture × proxy table from successfully queried evidence.
+    /// Missing candidates/proxy pairs fail closed; this method never fills an unqueried value
+    /// with a sentinel or copies hidden values from the evaluator's source table.
+    pub fn to_complete_feature_table(
+        &self,
+    ) -> Result<Vec<ArchitectureFeatures>, ProxyAcquisitionError> {
+        if self.declared_proxy_directions.is_empty() {
+            return Err(ProxyAcquisitionError::new(
+                "declared_proxy_directions",
+                "at least one proxy is required",
+            ));
+        }
+        let mut by_architecture: HashMap<String, (BTreeMap<String, f64>, BTreeMap<String, f64>)> =
+            HashMap::with_capacity(self.candidates.len());
+        for candidate in &self.candidates {
+            by_architecture.insert(
+                candidate.architecture_id.clone(),
+                (BTreeMap::new(), BTreeMap::new()),
+            );
+        }
+        for observation in &self.observations {
+            let Some((scores, runtimes)) = by_architecture.get_mut(&observation.architecture_id) else {
+                return Err(ProxyAcquisitionError::new(
+                    "observations",
+                    "observation references an architecture outside the public candidate catalog",
+                ));
+            };
+            if !self.declared_proxy_directions.contains_key(&observation.proxy_id) {
+                return Err(ProxyAcquisitionError::new(
+                    "observations",
+                    "observation references an undeclared proxy",
+                ));
+            }
+            if scores.insert(observation.proxy_id.clone(), observation.score).is_some()
+                || runtimes
+                    .insert(observation.proxy_id.clone(), observation.measured_seconds)
+                    .is_some()
+            {
+                return Err(ProxyAcquisitionError::new(
+                    "observations",
+                    "duplicate architecture/proxy observation",
+                ));
+            }
+        }
+
+        let mut output = Vec::with_capacity(self.candidates.len());
+        for candidate in &self.candidates {
+            let Some((scores, runtimes)) = by_architecture.remove(&candidate.architecture_id) else {
+                return Err(ProxyAcquisitionError::new(
+                    "candidates",
+                    "candidate row unexpectedly missing",
+                ));
+            };
+            let expected: BTreeSet<&str> = self
+                .declared_proxy_directions
+                .keys()
+                .map(String::as_str)
+                .collect();
+            let actual_scores: BTreeSet<&str> =
+                scores.keys().map(String::as_str).collect();
+            let actual_runtimes: BTreeSet<&str> =
+                runtimes.keys().map(String::as_str).collect();
+            if actual_scores != expected || actual_runtimes != expected {
+                return Err(ProxyAcquisitionError::new(
+                    "observations",
+                    format!(
+                        "candidate {:?} does not have every declared proxy observation",
+                        candidate.architecture_id
+                    ),
+                ));
+            }
+            output.push(ArchitectureFeatures {
+                architecture_id: candidate.architecture_id.clone(),
+                proxy_scores: scores,
+                proxy_times_seconds: runtimes,
+                topology_encoding: candidate.topology_encoding.clone(),
+            });
+        }
+        Ok(output)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -459,6 +543,7 @@ impl ProxyAcquisitionBenchmark {
         let evaluation = evaluate_receipt(&receipt);
         ProxyAcquisitionRun {
             candidates: self.candidates,
+            declared_proxy_directions: self.manifest.proxy_directions.clone(),
             observations: parts.observations,
             receipt,
             evaluation,
@@ -854,6 +939,31 @@ mod tests {
         assert!(run.observations.is_empty());
         assert!(run.receipt.attempts.iter().all(|attempt| attempt.observation_sha256.is_none()));
         assert_eq!(run.receipt.total_proxy_seconds, 0.0);
+    }
+
+    #[test]
+    fn fully_acquired_rectangular_evidence_materializes_for_consensus() {
+        let benchmark = benchmark(12, 10.0);
+        let run = benchmark.run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                oracle.query(&candidate.architecture_id, "proxy_a").unwrap();
+                oracle.query(&candidate.architecture_id, "proxy_b").unwrap();
+            }
+        });
+        let rows = run.to_complete_feature_table().unwrap();
+        assert_eq!(rows.len(), 6);
+        assert!(rows.iter().all(|row| row.proxy_scores.len() == 2));
+        assert_eq!(rows[5].proxy_scores["proxy_a"], 5.0);
+        assert_eq!(rows[5].proxy_times_seconds["proxy_b"], 0.12);
+    }
+
+    #[test]
+    fn partial_acquisition_cannot_be_materialized_as_complete_evidence() {
+        let benchmark = benchmark(12, 10.0);
+        let run = benchmark.run_policy(|candidates, oracle| {
+            oracle.query(&candidates[0].architecture_id, "proxy_a").unwrap();
+        });
+        assert!(run.to_complete_feature_table().is_err());
     }
 
     #[test]
