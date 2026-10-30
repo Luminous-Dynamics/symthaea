@@ -129,6 +129,8 @@ The first code increment provides:
 
 Fifteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
 
+A one-off independent mathematical check used a Python log-domain mirror of the inversion and compared its upper-bound decisions with SciPy's hypergeometric CDF: 8,900 cases passed (all configurations for N <= 35 at 95% confidence plus 500 randomized cases up to N = 100,000 at 90%, 95% and 99%). This is independent formula-level validation only; it is not execution of the Rust implementation, is not part of CI, and should be converted into pinned reference fixtures/tests before qualification.
+
 Independent mathematical validation remains separate from Rust execution: the hypergeometric inversion should also be checked against an independent high-precision/reference implementation over randomized larger populations, especially near confidence-bound transitions.
 
 ## 7. Qualification experiment
