@@ -897,7 +897,7 @@ mod tests {
     fn checked_in_metadata_lineage_fixture_passes_the_audit() {
         let rows = parse_rows(include_str!("../../../../docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl").as_bytes())
             .expect("synthetic JSONL fixture parses");
-        let report = audit_rows(&rows, "0".repeat(64), CUBE_EDGE_NM);
+        let report = audit_rows(&rows, "0".repeat(64), CUBE_EDGE_NM, "1".repeat(40));
         assert_eq!(report.status, "PASS", "{:?}", report.errors);
         assert_eq!(report.row_count, 5);
         assert_eq!(report.sample_type_counts.len(), 5);
