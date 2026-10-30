@@ -1327,6 +1327,39 @@ mod tests {
     }
 
     #[test]
+    fn reports_ties_and_abstentions_separately_from_decisive_choice_rates() {
+        let (_, plan, receipt) = make_plan();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["decision"] = serde_json::json!("tie");
+        value["observations"][1]["decision"] = serde_json::json!("abstain");
+        let altered = serde_json::to_vec(&value).unwrap();
+        let report = analyze_judge_factorial(&plan, &altered).unwrap();
+
+        let candidate_order = report.fields.main_effects.iter()
+            .find(|effect| effect.factor == JudgeNuisanceFactorV1::CandidateOrder).unwrap();
+        assert_eq!(candidate_order.complete_low_count, 32);
+        assert_eq!(candidate_order.complete_high_count, 32);
+        assert_eq!(candidate_order.decisive_low_count, 30);
+        assert_eq!(candidate_order.decisive_high_count, 32);
+        assert_eq!(candidate_order.tie_low_count, 1);
+        assert_eq!(candidate_order.tie_high_count, 0);
+        assert_eq!(candidate_order.abstention_low_count, 1);
+        assert_eq!(candidate_order.abstention_high_count, 0);
+        assert_eq!(candidate_order.tie_rate_delta_millionths, Some(-31_250.0));
+        assert_eq!(candidate_order.abstention_rate_delta_millionths, Some(-31_250.0));
+
+        let interaction = report.fields.pairwise_interactions.iter()
+            .find(|effect| effect.factor_a == JudgeNuisanceFactorV1::CandidateOrder
+                && effect.factor_b == JudgeNuisanceFactorV1::ProvenanceCue).unwrap();
+        assert_eq!(interaction.complete_00_count, 16);
+        assert_eq!(interaction.decisive_00_count, 14);
+        assert_eq!(interaction.tie_00_count, 1);
+        assert_eq!(interaction.abstention_00_count, 1);
+        assert_eq!(interaction.tie_rate_interaction_millionths, Some(62_500.0));
+        assert_eq!(interaction.abstention_rate_interaction_millionths, Some(62_500.0));
+    }
+
+    #[test]
     fn analysis_is_deterministic_for_exact_input_bytes() {
         let (_, plan, receipt) = make_plan();
         let first = serde_json::to_vec(&analyze_judge_factorial(&plan, &receipt).unwrap()).unwrap();
