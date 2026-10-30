@@ -267,6 +267,47 @@ def make_task(
     }
 
 
+def first_difference(expected: Any, observed: Any, path: str = "$") -> str | None:
+    """Return a bounded structural diagnostic without dumping task contents."""
+    if isinstance(expected, dict) and isinstance(observed, dict):
+        expected_keys = set(expected)
+        observed_keys = set(observed)
+        missing = sorted(expected_keys - observed_keys)
+        extra = sorted(observed_keys - expected_keys)
+        if missing:
+            return f"{path}: missing key {missing[0]!r}"
+        if extra:
+            return f"{path}: unexpected key {extra[0]!r}"
+        for key in sorted(expected_keys):
+            difference = first_difference(expected[key], observed[key], f"{path}.{key}")
+            if difference is not None:
+                return difference
+        return None
+    if isinstance(expected, list) and isinstance(observed, list):
+        if len(expected) != len(observed):
+            return f"{path}: array length {len(expected)} != {len(observed)}"
+        for index, (left, right) in enumerate(zip(expected, observed)):
+            difference = first_difference(left, right, f"{path}[{index}]")
+            if difference is not None:
+                return difference
+        return None
+    if type(expected) is not type(observed):
+        # JSON booleans are Python ints' subclass; exact type checks are
+        # intentional so true/false cannot silently compare equal to 1/0.
+        return f"{path}: type {type(expected).__name__} != {type(observed).__name__}"
+    if isinstance(expected, float):
+        if expected.hex() != observed.hex():
+            return f"{path}: float {expected.hex()} != {observed.hex()}"
+        return None
+    if expected != observed:
+        if isinstance(expected, str) and isinstance(observed, str):
+            left = hashlib.sha256(expected.encode("utf-8")).hexdigest()[:12]
+            right = hashlib.sha256(observed.encode("utf-8")).hexdigest()[:12]
+            return f"{path}: string length/hash {len(expected)}/{left} != {len(observed)}/{right}"
+        return f"{path}: values differ ({type(expected).__name__})"
+    return None
+
+
 def independently_generate(
     manifest: dict[str, Any], seed: bytes, config: dict[str, Any]
 ) -> dict[str, Any]:
@@ -337,8 +378,11 @@ def main(argv: list[str]) -> int:
         raise ValueError("generator config schema mismatch")
 
     expected = independently_generate(manifest, seed, config)
-    if expected != observed:
-        raise ValueError("independent semantic replay differs from Rust task-set output")
+    difference = first_difference(expected, observed)
+    if difference is not None:
+        raise ValueError(
+            "independent semantic replay differs from Rust task-set output: " + difference
+        )
 
     ids = [task["task_id"] for task in observed["tasks"]]
     families = Counter(task["family_id"] for task in observed["tasks"])
