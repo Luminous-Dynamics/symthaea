@@ -51,6 +51,48 @@ At minimum, evaluate where the environment adapter permits:
 
 Do not treat paper-reported MRS.Q scores as a reproduced baseline. A row is “reproduced” only when the exact configuration is run in this harness and the artifact is retained.
 
+## Predictive advantage: mandatory matched ablation
+
+CMAQ-011 is not merely a world-model leaderboard. Its primary scientific question is whether prediction changes task success relative to a strong direct policy when the proposal policy, task, data, action budget and compute are controlled.
+
+The specialized robotics survey *Do World Models Make Better Robots?* (arXiv:2609.29669, 30 August 2026) catalogues 160 web-verified benchmarks and reports only 11 explicit direct-VLA/world-model comparisons and four prediction-to-action bridges. This is a survey-specific audit, not a universal census. It motivates making the prediction contribution itself the primary estimand.
+
+For each capability and task, create paired runs from the same initial states and seed manifest with these arms:
+
+| Arm | Policy / predictive access | Purpose |
+|---|---|---|
+| D0 direct | Frozen direct policy; no future predictions | Strong no-world-model baseline |
+| D1 compute-matched direct | Same direct policy family with the same inference compute/latency budget allocated to policy-side refinement or ensembling | Controls for extra test-time compute |
+| W1 learned WM | Same frozen proposal policy; action ranking may use learned predicted futures | Candidate world-model system |
+| W2 shuffled-future control | Same W1 pipeline, but future predictions are permuted across candidate action sequences within matched state/task strata | Tests whether correctly action-conditioned prediction mediates the gain |
+| W3 oracle dynamics | Same proposer and planner with ground-truth environment transitions or exact simulator queries | Upper bound on available planning value; not deployable |
+
+Freeze the proposal policy and candidate sequence set across D0/D1/W1/W2/W3. The direct arms must not receive hidden candidate-specific future information. The shuffled-future control must preserve marginal prediction quality while breaking action-to-future correspondence; document exactly how strata and permutations are formed. The oracle arm must use the same candidate count and rollout horizon.
+
+For paired episode i and capability c:
+
+`AoP(c) = mean_i[U_W1(i,c) - U_D1(i,c)]`
+
+where AoP is **Advantage of Prediction** and D1 is the compute-matched direct policy. Also report the more deployment-realistic gain over D0, but do not use it alone to claim prediction added value. Use paired bootstrap intervals and per-task distributions.
+
+Mandatory mediation checks:
+
+- `W1 - W2`: whether action-conditioned predicted futures improve decisions beyond matching marginal prediction statistics;
+- `W1 - D1`: whether the world model beats the compute-matched direct policy;
+- `W3 - W1`: remaining gap to perfect dynamics under the chosen proposer/planner;
+- `D1 - D0`: benefit from extra inference-time compute without prediction.
+
+If W1 beats D0 but not D1, the gain may be extra compute, not prediction. If W1 and W2 are indistinguishable, the system may not be using action-conditioned predictions. If W3 is weak, the bottleneck is likely proposal/planning rather than predictive fidelity.
+
+Report four advantage-aware quantities:
+
+1. **Closed-loop prediction advantage:** AoP per capability, with paired confidence interval.
+2. **Counterfactual competence:** success/regret on episodes requiring inference about unobserved or hypothetical dynamics, with occlusion, hidden-state and memory slices.
+3. **Prediction-to-action retention:** gap between open-loop prediction scores and closed-loop success on the same task/data split.
+4. **Capability coverage:** fraction of preregistered capabilities with a valid D1-versus-W1 head-to-head; missing or incompatible arms count as not covered, not zero performance.
+
+Also publish inference FLOPs, p50/p95 latency, memory, candidate count, model queries, simulator queries and energy only when measured. Use a cost-performance Pareto frontier rather than a single scalar. Capabilities must remain separate: manipulation, navigation, contact reasoning, occlusion inference and delayed-effect reasoning should not be averaged into one headline number without their constituent results.
+
 ## Four evaluation levels
 
 ### L1. Predictive fidelity (diagnostic)
