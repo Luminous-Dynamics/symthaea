@@ -625,18 +625,134 @@ pub fn solve_proof_budget(
     })
 }
 
-/// Independently recompute and compare the exact proof-selection result.
+/// Independently verify packet sufficiency without invoking the optimizer.
 ///
-/// This catches a changed request, packet, selected justification, source
-/// digest, token cost, rejection list, or claimed search cost. It is not an
-/// authenticity/signature verifier for upstream policy/source adapters.
+/// This checks that every requested conclusion has exactly one selected
+/// admissible alternative, that all conjunctive dependencies are present,
+/// that independent-family thresholds are met, and that the exact source set,
+/// token cost and packet digest match. It does not prove minimum cost.
+pub fn verify_proof_packet(
+    request: &ProofBudgetRequest,
+    result: &ProofBudgetResult,
+) -> Result<(), String> {
+    request.validate()?;
+    let request = canonicalize_request(request.clone());
+    if result.status != ProofBudgetStatus::Supported {
+        return Err("only a Supported result can be verified as a proof packet".into());
+    }
+    let request_sha256 = sha256_json(&request, "canonical proof budget request")?;
+    if result.request_sha256 != request_sha256 {
+        return Err("proof packet request digest mismatch".into());
+    }
+    if result.selected_proofs.len() != request.obligations.len() {
+        return Err("proof packet does not select exactly one proof per obligation".into());
+    }
+
+    let candidate_by_id: BTreeMap<_, _> = request.candidates
+        .iter()
+        .map(|candidate| (candidate.evidence_id.as_str(), candidate))
+        .collect();
+    let mut selected_evidence_ids = BTreeSet::new();
+    let mut seen_conclusions = BTreeSet::new();
+
+    for selected in &result.selected_proofs {
+        if !seen_conclusions.insert(selected.conclusion_id.as_str()) {
+            return Err(format!("duplicate selected proof for {:?}", selected.conclusion_id));
+        }
+        let obligation = request.obligations
+            .iter()
+            .find(|obligation| obligation.conclusion_id == selected.conclusion_id)
+            .ok_or_else(|| format!("unknown selected conclusion {:?}", selected.conclusion_id))?;
+        let justification = obligation.alternatives
+            .iter()
+            .find(|alternative| alternative.justification_id == selected.justification_id)
+            .ok_or_else(|| format!("unknown selected justification {:?}", selected.justification_id))?;
+
+        let mut independent_families = BTreeSet::new();
+        for evidence_id in &justification.evidence_dependencies {
+            let candidate = candidate_by_id
+                .get(evidence_id.as_str())
+                .ok_or_else(|| format!("selected proof references missing evidence {evidence_id:?}"))?;
+            let reasons = candidate.rejection_reasons(&request);
+            if !reasons.is_empty() {
+                return Err(format!(
+                    "selected evidence {evidence_id:?} is ineligible: {reasons:?}"
+                ));
+            }
+            independent_families.insert(candidate.source_family_id.as_str());
+            selected_evidence_ids.insert(evidence_id.clone());
+        }
+        if independent_families.len() < obligation.minimum_independent_families as usize {
+            return Err(format!(
+                "selected proof {:?} does not meet the independent-family threshold",
+                selected.justification_id
+            ));
+        }
+    }
+
+    if seen_conclusions.len() != request.obligations.len() {
+        return Err("proof packet omits one or more required conclusions".into());
+    }
+
+    let mut expected_evidence = Vec::new();
+    let mut total_token_cost = 0u64;
+    for evidence_id in &selected_evidence_ids {
+        let candidate = candidate_by_id[evidence_id.as_str()];
+        total_token_cost = total_token_cost
+            .checked_add(candidate.token_cost as u64)
+            .ok_or_else(|| "proof packet token cost overflow".to_string())?;
+        expected_evidence.push(ProofPacketEvidenceRef {
+            evidence_id: candidate.evidence_id.clone(),
+            source_family_id: candidate.source_family_id.clone(),
+            payload_sha256: candidate.payload_sha256.clone(),
+            source_span_sha256: candidate.source_span_sha256.clone(),
+            authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
+            retrieval_rank: candidate.retrieval_rank,
+            token_cost: candidate.token_cost,
+        });
+    }
+
+    if result.evidence != expected_evidence {
+        return Err("proof packet evidence set or source digests do not match selected proofs".into());
+    }
+    if result.total_token_cost != total_token_cost {
+        return Err("proof packet token cost does not match its unique evidence set".into());
+    }
+    if total_token_cost > request.token_budget {
+        return Err("proof packet exceeds the requested token budget".into());
+    }
+
+    let payload = ProofPacketPayload {
+        decision_id: &request.decision_id,
+        principal_id: &request.principal_id,
+        scope_id: &request.scope_id,
+        valid_at_unix_ms: request.valid_at_unix_ms,
+        known_at_unix_ms: request.known_at_unix_ms,
+        policy_id: &request.policy_id,
+        policy_sha256: &request.policy_sha256,
+        selected_proofs: &result.selected_proofs,
+        evidence: &result.evidence,
+        total_token_cost,
+    };
+    let expected_packet_sha256 = sha256_json(&payload, "proof packet")?;
+    if result.packet_sha256.as_deref() != Some(expected_packet_sha256.as_str()) {
+        return Err("proof packet digest mismatch".into());
+    }
+    Ok(())
+}
+
+/// Verify both packet sufficiency and exact minimum-cost optimality.
+///
+/// Sufficiency is checked by the separate verifier above; optimality is then
+/// checked by exhaustive recomputation under the same bounded exact solver.
 pub fn verify_proof_budget_result(
     request: &ProofBudgetRequest,
     result: &ProofBudgetResult,
 ) -> Result<(), String> {
+    verify_proof_packet(request, result)?;
     let recomputed = solve_proof_budget(request.clone())?;
     if &recomputed != result {
-        return Err("proof-budget result differs from independently recomputed optimum".into());
+        return Err("proof-budget result is valid but differs from the independently recomputed optimum".into());
     }
     Ok(())
 }
