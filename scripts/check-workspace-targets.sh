@@ -24,6 +24,9 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
 # Excluded members — must mirror [workspace].exclude in Cargo.toml.
 EXCLUDES=(
+  # Manifestless paths matched by the root crates/core/* member glob.
+  "crates/core/symthaea"
+  "crates/core/symthaea-observation-attestation"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
   "crates/domains/symthaea-spore/fuzz"
