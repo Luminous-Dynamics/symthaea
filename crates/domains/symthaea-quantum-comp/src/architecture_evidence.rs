@@ -554,6 +554,47 @@ mod tests {
     }
 
     #[test]
+    fn missing_public_source_reference_is_rejected() {
+        let observation = physical_observation(
+            "cpu-baseline",
+            ComputeArchitectureFamily::ClassicalCpu,
+            (0.9, 1.0),
+        );
+        let mut evidence = physical_receipt(&observation);
+        evidence.source_reference = "   ".to_owned();
+        assert_eq!(
+            validate_architecture_evidence_receipt(&observation, &evidence),
+            Err(ArchitectureEvidenceError::EmptyField)
+        );
+    }
+
+    #[test]
+    fn published_interval_without_method_is_not_comparable() {
+        let observation = physical_observation(
+            "published-neuromorphic",
+            ComputeArchitectureFamily::NeuromorphicDigital,
+            (0.4, 0.5),
+        );
+        let mut published = receipt(
+            &observation,
+            ArchitectureEvidenceOrigin::PublishedResult,
+        );
+        published.runner_artifact_sha256 = None;
+        published.toolchain_identity = None;
+        published.interval_method_id = None;
+        published.aggregation_method_id = None;
+        let record = ArchitectureEvidenceRecord {
+            observation,
+            receipt: published,
+        };
+        assert_eq!(validate_architecture_evidence_record(&record), Ok(()));
+        assert_eq!(
+            validate_architecture_evidence_record_for_comparison(&record),
+            Err(ArchitectureEvidenceError::UnspecifiedIntervalMethod)
+        );
+    }
+
+    #[test]
     fn run_count_fields_must_be_reported_as_a_pair() {
         let observation = physical_observation(
             "published-neuromorphic",
