@@ -38,7 +38,7 @@ The v1 engineering fixture uses one block, 32 conditions per repeat and two repe
 
 The block freezes candidate IDs, criterion IDs, score-option IDs and their canonical numeric values. Conditions change the presentation order/cue/format, not the underlying semantic identity.
 
-The plan declares each condition's factors and binds its rendered-input digest. The receipt must echo that exact digest. Each selected criterion option must map to the same score value as its frozen option ID.
+The plan declares each condition's factors and binds its rendered-input digest. The receipt must echo that exact digest and the exact execution ordinal from the committed schedule. A receipt that omits or changes the planned ordinal is rejected. This records schedule agreement; it does not prove the runner actually executed in that order. Each selected criterion option must map to the same score value as its frozen option ID.
 
 The transformation itself still needs independent semantic-validity review. A digest proves byte binding, not semantic equivalence. For provenance cues, only use domains in which system identity is a nuisance rather than a legitimate criterion. If source identity materially belongs in the decision, do not treat anonymization as a meaning-preserving transformation.
 
@@ -47,6 +47,7 @@ The transformation itself still needs independent semantic-validity review. A di
 Files:
 - `schema/judge-factorial-plan.schema.json`
 - `schema/judge-factorial-receipt.schema.json`
+- `schema/judge-factorial-report.schema.json`
 - `src/judge_factorial.rs`
 - `tools/judge_factorial_fixture.py`
 
@@ -64,7 +65,7 @@ The verifier requires exactly 32 cells per repeat, with no duplicated or missing
 
 The receipt contains exactly one record for every planned condition. A completed observation requires a judge receipt digest, decision, candidate scores and a score/option record for every criterion. Timed-out, blocked, invalid-receipt and not-started observations must have null outcomes and an empty criterion-score list. They are not silently omitted or scored as zero.
 
-Hashes bind declared bytes; they do not prove that the raw rendered prompts were retained, that a random number generator produced the schedule, or that a judge actually executed. The plan/receipt must be externally anchored before outcomes are observed for any future qualification.
+Hashes bind declared bytes; they do not prove that the raw rendered prompts were retained, that a random number generator produced the schedule, or that a judge actually executed. The receipt's execution ordinal only proves consistency with the committed schedule. The plan/receipt must be externally anchored before outcomes are observed for any future qualification.
 
 ## 4. Analysis
 
@@ -91,7 +92,7 @@ I_{ab} = overline{Y}_{11} - overline{Y}_{10}
         - overline{Y}_{01} + overline{Y}_{00}
 ]
 
-There are ten pairwise factor interactions in a five-factor study. The report includes all four cell denominators and counts excluded observations across those cells. Main effects, criterion-order effects and interactions use only fully completed 32-cell block/repeat units. A repeat with even one timed-out/blocked/invalid/not-started condition is excluded as a whole from effect estimation; all its planned cells remain in the full denominator. The report separately counts ineligible observations and otherwise completed observations excluded because their repeat was incomplete.
+There are ten pairwise factor interactions in a five-factor study. The report includes all four cell denominators, decisive-choice denominators within each interaction cell, and counts excluded observations across those cells. Main effects, criterion-order effects and interactions use only fully completed 32-cell block/repeat units. A repeat with even one timed-out/blocked/invalid/not-started condition is excluded as a whole from effect estimation; all its planned cells remain in the full denominator. The report separately counts ineligible observations and otherwise completed observations excluded because their repeat was incomplete.
 
 This v1 analysis is deliberately descriptive. It does not calculate p-values, confidence intervals, randomization-inference tests, cluster-robust standard errors or multiplicity corrections. Missing outcomes remain explicit; effects computed from incomplete cells are not qualification evidence. A future inferential layer must respect task/judge clustering and the preregistered assignment mechanism.
 
