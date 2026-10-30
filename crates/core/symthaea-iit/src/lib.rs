@@ -1433,13 +1433,13 @@ impl BinaryCausalModel {
     /// purview. This dense exhaustive path is the reference implementation for
     /// correctness; a factor-graph variable-elimination kernel can replace its
     /// posterior contraction without changing the public contract.
-    pub fn forward_cause_likelihood_iit4(
+    fn forward_cause_likelihood_iit4_factors(
         &self,
         candidate_system: &[usize],
         mechanism: &[usize],
         current_state: &[bool],
         purview: &[usize],
-    ) -> Result<Vec<f64>, RepertoireError> {
+    ) -> Result<Vec<Vec<f64>>, RepertoireError> {
         self.check_state(current_state)?;
         self.validate_subset(candidate_system, "candidate_system")?;
         self.validate_subset(mechanism, "mechanism")?;
@@ -1572,14 +1572,134 @@ impl BinaryCausalModel {
             }
         }
 
-        let mut forward = vec![1.0; purview_state_count];
-        for factor in &per_mechanism_unit {
+        if per_mechanism_unit
+            .iter()
+            .flatten()
+            .any(|value| !value.is_finite())
+        {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+        Ok(per_mechanism_unit)
+    }
+
+    /// Compute the unnormalized IIT 4.0 Eq. 4 forward-cause likelihood.
+    ///
+    /// Each mechanism-unit cause factor is marginalized independently over
+    /// background units and the factors are multiplied pointwise. The returned
+    /// likelihood vector is not normalized over past purview states.
+    pub fn forward_cause_likelihood_iit4(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<f64>, RepertoireError> {
+        let factors = self.forward_cause_likelihood_iit4_factors(
+            candidate_system,
+            mechanism,
+            current_state,
+            purview,
+        )?;
+        let state_count = 1usize << purview.len();
+        let mut forward = vec![1.0; state_count];
+        for factor in factors {
             for (joint, factor_value) in forward.iter_mut().zip(factor) {
                 *joint *= factor_value;
             }
         }
         if forward.iter().any(|value| !value.is_finite()) {
             return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+        Ok(forward)
+    }
+
+    /// Compute the partitioned IIT 4.0 forward-cause likelihood without
+    /// recomputing the original system's Eq. 4 background posterior.
+    ///
+    /// PyPhi's cut-system construction shares the *uncut* cause marginals with
+    /// the original system. The cut connectivity then removes severed inputs
+    /// from each target's factor, which is equivalent to uniformly marginalizing
+    /// those candidate-system past-state axes before multiplying the factors.
+    /// Recomputing the whole-substrate background posterior from an already-cut
+    /// TPM is not equivalent and changes the published Fig. 1A singleton result.
+    pub fn partitioned_forward_cause_likelihood_iit4(
+        &self,
+        partition: &DirectedSystemPartition,
+        current_state: &[bool],
+    ) -> Result<Vec<f64>, SystemPhiError> {
+        self.check_state(current_state)?;
+        let candidate = partition.candidate_system();
+        self.validate_subset(candidate, "candidate_system")?;
+        let candidate_count = candidate.len();
+        let expected_cut_len = candidate_count * candidate_count;
+        if partition.cut_matrix().len() != expected_cut_len {
+            return Err(PartitionApplyError::CutMatrixShapeMismatch {
+                expected: expected_cut_len,
+                actual: partition.cut_matrix().len(),
+            }.into());
+        }
+
+        // These factors carry the original Eq. 4 posterior over external
+        // background states. Do not derive them from the globally cut TPM.
+        let factors = self.forward_cause_likelihood_iit4_factors(
+            candidate,
+            candidate,
+            current_state,
+            candidate,
+        )?;
+        let state_count = 1usize << candidate_count;
+        let mut forward = vec![1.0; state_count];
+
+        for (target_slot, target) in candidate.iter().copied().enumerate() {
+            // PyPhi's cut System retains only incoming edges not severed by the
+            // partition. Its Node then marginalizes every other candidate axis
+            // from this target's already-computed cause factor.
+            let retained_sources = (0..candidate_count)
+                .filter(|source_slot| {
+                    let source = candidate[*source_slot];
+                    self.connectivity[source * self.n_units + target]
+                        && !partition.cut_matrix()[*source_slot * candidate_count + target_slot]
+                })
+                .collect::<Vec<_>>();
+            let retained_count = retained_sources.len();
+            let projected_state_count = 1usize << retained_count;
+            let marginalized_count = 1usize << (candidate_count - retained_count);
+            let mut projected = vec![0.0; projected_state_count];
+
+            for (past_state, factor_value) in factors[target_slot].iter().copied().enumerate() {
+                let projected_index = retained_sources
+                    .iter()
+                    .enumerate()
+                    .fold(0usize, |index, (slot, source_slot)| {
+                        if ((past_state >> source_slot) & 1) != 0 {
+                            index | (1usize << slot)
+                        } else {
+                            index
+                        }
+                    });
+                projected[projected_index] += factor_value;
+            }
+            for value in &mut projected {
+                *value /= marginalized_count as f64;
+            }
+
+            for past_state in 0..state_count {
+                let projected_index = retained_sources
+                    .iter()
+                    .enumerate()
+                    .fold(0usize, |index, (slot, source_slot)| {
+                        if ((past_state >> source_slot) & 1) != 0 {
+                            index | (1usize << slot)
+                        } else {
+                            index
+                        }
+                    });
+                forward[past_state] *= projected[projected_index];
+            }
+        }
+
+        if forward.iter().any(|value| !value.is_finite()) {
+            return Err(SystemPhiError::NonFinitePartitionScore);
         }
         Ok(forward)
     }
@@ -1937,7 +2057,7 @@ impl BinaryCausalModel {
 
         let cut_model = self.apply_partition(partition)?;
         let cause_partitioned =
-            cut_model.forward_cause_likelihood_iit4(candidate, candidate, current_state, candidate)?;
+            self.partitioned_forward_cause_likelihood_iit4(partition, current_state)?;
         let effect_partitioned =
             cut_model.effect_repertoire_iit4(candidate, candidate, current_state, candidate)?;
 
