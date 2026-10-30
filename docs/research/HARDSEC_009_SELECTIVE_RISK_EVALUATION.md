@@ -138,6 +138,20 @@ https://opentitan.org/book/doc/contributing/dv/methodology/index.html
 NIST IR 8615 (published September 2026) emphasizes lifecycle evidence, provenance/traceability, interoperable assurance and scalable verification/validation. The score ledger and evidence packet can contribute portable records, but neither is a certification scheme:
 https://csrc.nist.gov/News/2026/next-generation-secure-hardware-into-standards
 
+## Finite-sample family-level uncertainty
+
+The receipt also reports a conservative, distinct **family-level failure** measure. For each held-out group, it records whether that group contains at least one false alert and whether it contains at least one false clear. It then calculates a one-sided exact Clopper-Pearson upper confidence bound for each group-failure proportion.
+
+The two risks share a family-wise 5% error budget using Bonferroni allocation (`alpha = 0.025` per risk). For zero observed failure groups, the bound is:
+
+`1 - alpha^(1 / number_of_independent_groups)`.
+
+The receipt includes minimum independent group counts needed to bound the group-failure probability below 1% and 0.5%, assuming zero group failures. At 95% family-wise confidence with this two-risk Bonferroni split, those sample-size targets are 368 and 736 independent groups respectively. With five groups and zero failures, the upper bound for each risk is still about 52.2%.
+
+**Interpretation boundary:** this is the probability that a new independent group contains *any* false decision of the named type. It is not a per-gate FPR/FNR bound. It depends on the experiment genuinely sampling independent/exchangeable host/source groups from the intended deployment population. The score ledger cannot establish that assumption. A few sibling netlists from the same base circuit are not automatically independent groups. The evaluator reports the assumption rather than certifying it.
+
+The exact bound is intentionally conservative. It exposes when a benchmark has too few independent families to substantiate very low population-risk claims, even if the observed sample-level error rate is zero.
+
 ## Reproduction
 
 ```bash
@@ -166,12 +180,14 @@ Implemented:
 - deterministic validation-only threshold selection;
 - frozen clear/suspect/abstain evaluation;
 - aggregate and per-group error/coverage metrics;
+- one-sided exact family-level group-failure bounds with Bonferroni control for false-alert and false-clear risks;
+- minimum independent-group counts for zero-failure targets;
 - Brier, log loss and 10-bin ECE diagnostics;
 - immutable, unsigned receipt creation with raw ledger digest.
 
 Not implemented by this evaluator:
 - model fitting or probability calibration;
-- bootstrap confidence intervals;
+- paired group-bootstrap intervals for baseline-improvement claims (the current family-failure bound is not a performance-difference interval);
 - cost accounting for the formal/simulation/human escalation cascade;
 - evidence that model scores predict real-world Trojan prevalence;
 - proof of Trojan presence or absence.
