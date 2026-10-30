@@ -1,6 +1,6 @@
 # Bounded Manufacturing Intervention Proposals v0.1
 
-**Status:** research interface only. Symthaea does not authorize or execute physical manufacturing actions.
+**Status:** research interface only. Tracks [Symthaea issue #9200](https://github.com/Luminous-Dynamics/symthaea/issues/9200). Symthaea does not authorize or execute physical manufacturing actions.
 
 ## Role separation
 
