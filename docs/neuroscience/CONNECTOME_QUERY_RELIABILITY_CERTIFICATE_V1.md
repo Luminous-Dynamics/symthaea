@@ -87,3 +87,26 @@ No certificate implementation or biological certification is claimed by this doc
 - [Synthetic fixture](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json)
 
 The example is synthetic and intentionally `CONDITIONAL`: a critical coverage gate is not estimable. It is not a biological certificate. V1 forbids a single aggregate-confidence field; uncertainty components remain separate unless a validated joint model exists.
+
+
+## Semantic verifier
+
+The Rust binary `connectome-query-cert-audit` validates the cross-field invariants that JSON Schema alone does not express:
+
+- every dependency references a source revision digest bound by the certificate;
+- all digests are lowercase SHA-256 strings and identities are unique;
+- correction order is contiguous and an applied correction requires an `accept` decision;
+- a `CERTIFIED_WITHIN_DECLARED_SCOPE` state requires every quality gate to pass and every uncertainty component to be estimated;
+- a `CONDITIONAL` certificate cannot conceal a failed critical gate;
+- `INVALIDATED_BY_REVISION` requires an explicit event with different previous/current revision digests;
+- non-estimable components cannot carry point estimates or intervals.
+
+Run:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-query-cert-audit -- \
+  --certificate docs/neuroscience/examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json
+```
+
+This is an internal consistency verifier only. It does not fetch source artifacts, independently verify external digest claims, establish the completeness of a dependency closure, or prove biological truth. A successful run means only that the supplied certificate is internally consistent under V1 rules. The example is expected to pass as `CONDITIONAL`, not as a biological certification.
