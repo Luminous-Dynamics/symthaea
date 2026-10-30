@@ -496,7 +496,9 @@
         "content_digest",
         "untracked_classification"
       ],
-      "paired_case_ids": [],
+      "paired_case_ids": [
+        "unused-neighbor-change"
+      ],
       "description": "Inject a deliberately untracked but in-root file read that changes a matched task outcome.",
       "safety_property": "This is a mandatory positive control against manifest-only dependency capture."
     },
@@ -520,15 +522,17 @@
       "family": "positive_control",
       "channel": "filesystem",
       "mutation_kind": "irrelevant_mutation",
-      "ground_truth_resource_id": "fixture:src/unused-neighbor.rs",
+      "ground_truth_resource_id": "fixture:unlisted-secret.txt",
       "expected_disposition": "preserve_unrelated",
       "required_receipt_facts": [
         "mutation_identity",
         "non_dependency_witness"
       ],
-      "paired_case_ids": [],
-      "description": "Change an adjacent source file that is neither read nor semantically used by this check.",
-      "safety_property": "This is a precision control; directory enumeration would change the classification if the check enumerates that directory."
+      "paired_case_ids": [
+        "hidden-untracked-read"
+      ],
+      "description": "Matched negative control for hidden-untracked-read: mutate the same ignored/untracked file in a continuation where the check never reads or enumerates it, and independently establish unchanged output.",
+      "safety_property": "The observer must distinguish an actually consumed hidden input from the same resource when it is not consumed; this measures over-invalidation without weakening recall."
     },
     {
       "case_id": "unresolved-channel-not-hidden",
