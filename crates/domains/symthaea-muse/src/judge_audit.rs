@@ -27,13 +27,14 @@ pub enum JudgeRole {
     Secondary,
 }
 
-/// Binary rubric decision. Abstentions must be represented as missing/invalid
-/// attempts in the collection layer, never coerced into a pass or fail here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Rubric decision. Secondary judges may abstain; official binary-scoring
+/// attempts must not abstain and are rejected if they do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JudgeVerdict {
     Pass,
     Fail,
+    Abstain,
 }
 
 impl JudgeVerdict {
@@ -116,6 +117,7 @@ pub enum JudgeAuditViolationKind {
     DuplicateHumanReference,
     LineageMismatch,
     IncompleteOfficialTriple,
+    OfficialAbstention,
     IncompleteSecondaryCoverage,
     RepeatedSecondaryAttempt,
 }
@@ -146,6 +148,7 @@ impl JudgeAuditViolationKind {
             Self::DuplicateHumanReference => "duplicate_human_reference",
             Self::LineageMismatch => "lineage_mismatch",
             Self::IncompleteOfficialTriple => "incomplete_official_triple",
+            Self::OfficialAbstention => "official_abstention",
             Self::IncompleteSecondaryCoverage => "incomplete_secondary_coverage",
             Self::RepeatedSecondaryAttempt => "repeated_secondary_attempt",
         }
@@ -170,6 +173,7 @@ pub struct JudgeConfusionSummary {
     pub incorrect: u64,
     pub false_pass: u64,
     pub false_fail: u64,
+    pub abstained: u64,
 }
 
 /// Pairwise error association between the three retries of one official judge.
@@ -365,6 +369,7 @@ fn audit_digest(audit: &JudgeEvaluationAudit) -> String {
         hasher.update(summary.incorrect.to_le_bytes());
         hasher.update(summary.false_pass.to_le_bytes());
         hasher.update(summary.false_fail.to_le_bytes());
+        hasher.update(summary.abstained.to_le_bytes());
     }
     let retry = &audit.official_retry_error_association;
     hasher.update(retry.pair_count.to_le_bytes());
@@ -574,7 +579,12 @@ pub fn audit_judge_evaluation(manifest: &JudgeEvaluationManifest) -> JudgeEvalua
         };
         let max_attempt = if spec.role == JudgeRole::Official { OFFICIAL_ATTEMPTS } else { 1 };
         if attempt.attempt_index == 0 || attempt.attempt_index > max_attempt {
-            push_violation(&mut violations, JudgeAuditViolationKind::InvalidAttemptIndex, Some(&attempt.sample_id), Some(&attempt.rubric_id), Some(&attempt.judge_spec_sha256));
+            let kind = if spec.role == JudgeRole::Secondary && attempt.attempt_index > 1 {
+                JudgeAuditViolationKind::RepeatedSecondaryAttempt
+            } else {
+                JudgeAuditViolationKind::InvalidAttemptIndex
+            };
+            push_violation(&mut violations, kind, Some(&attempt.sample_id), Some(&attempt.rubric_id), Some(&attempt.judge_spec_sha256));
             continue;
         }
         let unique = (
@@ -644,6 +654,7 @@ pub fn audit_judge_evaluation(manifest: &JudgeEvaluationManifest) -> JudgeEvalua
             incorrect: 0,
             false_pass: 0,
             false_fail: 0,
+            abstained: 0,
         };
         for ((sample_id, rubric_id, digest), attempts) in &groups {
             if digest != spec_digest {
@@ -653,6 +664,10 @@ pub fn audit_judge_evaluation(manifest: &JudgeEvaluationManifest) -> JudgeEvalua
                 continue;
             };
             for attempt in attempts {
+                if attempt.verdict == JudgeVerdict::Abstain {
+                    summary.abstained += 1;
+                    continue;
+                }
                 summary.compared_attempts += 1;
                 if attempt.verdict == reference.verdict {
                     summary.correct += 1;
@@ -661,6 +676,7 @@ pub fn audit_judge_evaluation(manifest: &JudgeEvaluationManifest) -> JudgeEvalua
                     match attempt.verdict {
                         JudgeVerdict::Pass => summary.false_pass += 1,
                         JudgeVerdict::Fail => summary.false_fail += 1,
+                        JudgeVerdict::Abstain => unreachable!("abstention handled above"),
                     }
                 }
             }
@@ -673,6 +689,16 @@ pub fn audit_judge_evaluation(manifest: &JudgeEvaluationManifest) -> JudgeEvalua
                     push_violation(
                         &mut violations,
                         JudgeAuditViolationKind::IncompleteOfficialTriple,
+                        Some(sample_id),
+                        Some(rubric_id),
+                        Some(spec_digest),
+                    );
+                    continue;
+                }
+                if ordered.iter().any(|attempt| attempt.verdict == JudgeVerdict::Abstain) {
+                    push_violation(
+                        &mut violations,
+                        JudgeAuditViolationKind::OfficialAbstention,
                         Some(sample_id),
                         Some(rubric_id),
                         Some(spec_digest),
@@ -911,6 +937,43 @@ mod tests {
         input.human_references.reverse();
         let second = audit_judge_evaluation(&input);
         assert_eq!(first, second);
+    }
+
+
+    #[test]
+    fn secondary_abstention_is_counted_but_not_scored_as_failure() {
+        let mut input = manifest();
+        input.attempts[3].verdict = JudgeVerdict::Abstain;
+        let audit = audit_judge_evaluation(&input);
+        assert!(audit.is_qualified(), "{:?}", audit.violations);
+        let secondary_hash = judge_spec_digest(&input.judge_specs[1]);
+        let secondary = audit.per_judge_attempt_metrics.iter()
+            .find(|summary| summary.judge_spec_sha256 == secondary_hash)
+            .unwrap();
+        assert_eq!(secondary.abstained, 1);
+        assert_eq!(secondary.compared_attempts, 0);
+        assert_eq!(secondary.incorrect, 0);
+    }
+
+    #[test]
+    fn official_abstention_is_rejected_and_not_coerced_to_fail() {
+        let mut input = manifest();
+        input.attempts[0].verdict = JudgeVerdict::Abstain;
+        let audit = audit_judge_evaluation(&input);
+        assert!(audit.violations.iter().any(|v| v.kind == JudgeAuditViolationKind::OfficialAbstention));
+        assert!(!audit.is_qualified());
+    }
+
+    #[test]
+    fn secondary_retry_is_not_mistaken_for_an_independent_judge() {
+        let mut input = manifest();
+        let mut retry = input.attempts[3].clone();
+        retry.attempt_index = 2;
+        retry.answer_order_sha256 = digest(14);
+        retry.raw_response_sha256 = digest(24);
+        input.attempts.push(retry);
+        let audit = audit_judge_evaluation(&input);
+        assert!(audit.violations.iter().any(|v| v.kind == JudgeAuditViolationKind::RepeatedSecondaryAttempt));
     }
 
     #[test]
