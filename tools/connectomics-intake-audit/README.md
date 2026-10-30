@@ -138,7 +138,7 @@ probability_weighted_query_sensitivity_per_review_minute =
     estimated_error_probability * weighted_query_sensitivity / review_minutes
 ```
 
-Supported query metrics in schema v1 are directed edge weight, weighted in-degree, weighted out-degree, and directed path existence. Supported candidate mutations are adding/removing positive edge weight. Duplicate graph edges must be aggregated by the producer. The query bundle's weights and scales are scientific-policy choices and must be frozen before evaluation. Candidate error probabilities must come from an independently calibrated model/policy; this tool does not train or calibrate them.
+Supported query metrics in schema v1 are directed edge weight, weighted in-degree, weighted out-degree, directed path existence, weighted feed-forward-loop counts, and weighted directed three-cycle counts. Motif counts sum products of the three directed edge weights; directed cycles are divided by three to remove rotation duplicates. Motif queries are limited to frozen subgraphs containing at most 4,096 directed edges. Supported candidate mutations are adding/removing positive edge weight. Duplicate graph edges must be aggregated by the producer. The query bundle's weights and scales are scientific-policy choices and must be frozen before evaluation. Candidate error probabilities must come from an independently calibrated model/policy; this tool does not train or calibrate them.
 
 Run the checked-in synthetic example:
 
