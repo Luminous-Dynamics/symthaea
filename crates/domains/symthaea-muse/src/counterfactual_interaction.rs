@@ -660,8 +660,8 @@ mod tests {
 
     fn config() -> PairwiseInteractionConfig {
         PairwiseInteractionConfig {
-            window_size_frames: 16,
-            hop_size_frames: 8,
+            window_size_frames: 32,
+            hop_size_frames: 16,
             ratio_epsilon: 1.0e-12,
         }
     }
@@ -674,34 +674,76 @@ mod tests {
         }
     }
 
-    #[test]
-    fn second_order_pcm_difference_is_zero_for_an_additive_fixture() {
-        let baseline = vec![0.5f32; 32];
-        let remove_a = vec![0.0f32; 32];
-        let remove_b = vec![0.0f32; 32];
-        let remove_ab = vec![-0.5f32; 32];
-        let input = [
-            audio(&baseline),
-            audio(&remove_a),
-            audio(&remove_b),
-            audio(&remove_ab),
-        ];
-        let residual = baseline[0] as f64 - remove_a[0] as f64
-            - remove_b[0] as f64 + remove_ab[0] as f64;
-        assert_eq!(residual, 0.0);
-        assert!(validate_config(&config()).is_ok());
-        assert_eq!(validate_audio(&input[0]).unwrap(), 32);
+    fn window_metrics(
+        baseline: &[f32],
+        remove_a: &[f32],
+        remove_b: &[f32],
+        remove_ab: &[f32],
+    ) -> WindowMetrics {
+        let b = audio(baseline);
+        let a = audio(remove_a);
+        let c = audio(remove_b);
+        let d = audio(remove_ab);
+        let hann = hann_window(baseline.len());
+        let fft = FftPlanner::<f32>::new().plan_fft_forward(baseline.len());
+        channel_window_metrics(
+            &b,
+            &a,
+            &c,
+            &d,
+            FrameInterval {
+                start_frame: 0,
+                end_frame: baseline.len(),
+            },
+            0,
+            &hann,
+            fft.as_ref(),
+        )
     }
 
     #[test]
-    fn second_order_pcm_difference_detects_non_additive_fixture() {
+    fn pcm_interaction_is_zero_for_a_linear_additive_fixture() {
+        // A+B = 0.5+0.3. Removing A leaves B; removing B leaves A.
+        let baseline = vec![0.8f32; 32];
+        let remove_a = vec![0.3f32; 32];
+        let remove_b = vec![0.5f32; 32];
+        let remove_ab = vec![0.0f32; 32];
+        let metrics = window_metrics(&baseline, &remove_a, &remove_b, &remove_ab);
+        assert!(metrics.pcm_rms < 1.0e-7);
+        assert!(metrics.pcm_peak < 1.0e-7);
+    }
+
+    #[test]
+    fn pcm_interaction_detects_a_non_additive_fixture() {
         let baseline = vec![0.8f32; 32];
         let remove_a = vec![0.3f32; 32];
         let remove_b = vec![0.4f32; 32];
         let remove_ab = vec![0.0f32; 32];
-        let residual = baseline[0] as f64 - remove_a[0] as f64
-            - remove_b[0] as f64 + remove_ab[0] as f64;
-        assert!((residual - 0.1).abs() < 1.0e-6);
+        let metrics = window_metrics(&baseline, &remove_a, &remove_b, &remove_ab);
+        assert!((metrics.pcm_rms - 0.1).abs() < 1.0e-6);
+        assert!((metrics.pcm_peak - 0.1).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn spectral_magnitude_interaction_can_exist_without_pcm_nonadditivity() {
+        // Two equal-frequency sinusoids in quadrature add linearly in PCM.
+        // Their magnitude spectra do not add linearly, so this must not be
+        // mislabeled as a nonlinear renderer interaction.
+        let size = 32usize;
+        let signal_a: Vec<f32> = (0..size)
+            .map(|index| (std::f32::consts::TAU * 2.0 * index as f32 / size as f32).sin())
+            .collect();
+        let signal_b: Vec<f32> = (0..size)
+            .map(|index| (std::f32::consts::TAU * 2.0 * index as f32 / size as f32).cos())
+            .collect();
+        let baseline: Vec<f32> = signal_a.iter().zip(&signal_b).map(|(a, b)| a + b).collect();
+        let remove_a = signal_b.clone();
+        let remove_b = signal_a.clone();
+        let remove_ab = vec![0.0f32; size];
+
+        let metrics = window_metrics(&baseline, &remove_a, &remove_b, &remove_ab);
+        assert!(metrics.pcm_rms < 1.0e-7);
+        assert!(metrics.spectral_rms > 1.0e-3);
     }
 
     #[test]
@@ -733,9 +775,28 @@ mod tests {
 
     #[test]
     fn windows_cover_final_tail_without_overrun() {
-        let windows = windows_for(35, &config()).unwrap();
+        let windows = windows_for(67, &config()).unwrap();
         assert_eq!(windows.first().unwrap().start_frame, 0);
-        assert_eq!(windows.last().unwrap().end_frame, 35);
-        assert!(windows.iter().all(|window| window.end_frame <= 35));
+        assert_eq!(windows.last().unwrap().end_frame, 67);
+        assert!(windows.iter().all(|window| window.end_frame <= 67));
+    }
+
+    #[test]
+    fn invalid_event_pair_and_analysis_configuration_are_rejected() {
+        assert_eq!(
+            parse_source_index("score_event_index:01"),
+            None
+        );
+        assert_eq!(parse_source_index("score_event_index:2"), Some(2));
+        assert_eq!(
+            validate_config(&PairwiseInteractionConfig {
+                ratio_epsilon: 0.0,
+                ..config()
+            })
+            .unwrap_err(),
+            PairwiseInteractionError::InvalidConfig(
+                "ratio_epsilon must be finite and positive"
+            )
+        );
     }
 }
