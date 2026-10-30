@@ -540,7 +540,8 @@ fn calibration(predictions: &[Prediction]) -> Result<(Calibration, Vec<Value>), 
         bins.push(json!({
             "bin_index": index,
             "lower_inclusive": index as f64 / CALIBRATION_BINS as f64,
-            "upper_exclusive": (index + 1) as f64 / CALIBRATION_BINS as f64,
+            "upper_bound": (index + 1) as f64 / CALIBRATION_BINS as f64,
+            "upper_bound_inclusive": index == CALIBRATION_BINS - 1,
             "count": count,
             "mean_score": mean_score,
             "empirical_trojan_rate": empirical_rate,
@@ -885,7 +886,7 @@ mod tests {
         let result = rates(calculate_counts(&validation, point));
         assert_eq!(result.false_alert_rate, Some(0.0));
         assert_eq!(result.false_clear_rate, Some(0.0));
-        assert_eq!(result.coverage, 5.0 / 6.0);
+        assert_eq!(result.coverage, 0.5);
     }
 
     #[test]
@@ -1039,14 +1040,14 @@ mod tests {
         let validation = balanced_validation();
         let point = select_operating_point(&validation, 0.0, 0.0).unwrap();
         let test = vec![
-            row("t-1", "host-test", "test", 0, 0.85),
-            row("t-2", "host-test", "test", 1, 0.95),
+            row("t-1", "host-test", "test", 0, 0.99),
+            row("t-2", "host-test", "test", 1, 0.99),
         ];
         let metrics = rates(calculate_counts(&test, point));
         assert_eq!(metrics.false_alert_rate, Some(1.0));
         assert_eq!(metrics.false_clear_rate, Some(0.0));
         // The evaluator reports the test failure; it does not retune the point.
-        assert!(point.alert_min_score < 0.95);
+        assert_eq!(point.alert_min_score, 0.95);
     }
 
     #[test]
