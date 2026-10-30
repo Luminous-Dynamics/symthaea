@@ -93,8 +93,8 @@ fn main() -> anyhow::Result<()> {
         Commands::BasaltStateAudit { input } => {
             let report = basalt_state::audit_file(&input)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
-            if !report.valid {
-                anyhow::bail!("BASALT evidence-state audit failed");
+            if !report.structurally_valid {
+                anyhow::bail!("BASALT evidence-state timeline is structurally invalid");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
