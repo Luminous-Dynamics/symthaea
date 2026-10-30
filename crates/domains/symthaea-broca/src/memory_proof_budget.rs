@@ -1597,6 +1597,71 @@ mod tests {
     }
 
     #[test]
+    fn exact_solver_matches_cartesian_product_oracle_over_64_small_graphs() {
+        for seed in 0u32..64 {
+            let mut req = request(
+                vec![
+                    candidate("A", "family-A", 1),
+                    candidate("B", "family-B", 1),
+                    candidate("C", "family-C", 1),
+                    candidate("D", "family-D", 1),
+                ],
+                vec![
+                    obligation(
+                        "claim-a",
+                        vec![
+                            justification("a-AB", &["A", "B"]),
+                            justification("a-C", &["C"]),
+                        ],
+                    ),
+                    obligation(
+                        "claim-b",
+                        vec![
+                            justification("b-BD", &["B", "D"]),
+                            justification("b-CA", &["C", "A"]),
+                        ],
+                    ),
+                ],
+                100,
+            );
+            req.fixed_packet_overhead_tokens = (seed % 4) as u64;
+            req.obligations[0].selection_overhead_tokens = seed % 3;
+            req.obligations[1].selection_overhead_tokens = (seed.wrapping_mul(3) % 5) as u32;
+            for (index, item) in req.candidates.iter_mut().enumerate() {
+                item.token_cost = ((seed + (index as u32 * 3)) % 7) + 1;
+            }
+
+            // Independent Cartesian-product oracle enumerates all four proof
+            // combinations, deduplicates shared evidence, and adds renderer
+            // header/proof-envelope costs.
+            let mut oracle_minimum = u64::MAX;
+            for first in &req.obligations[0].alternatives {
+                for second in &req.obligations[1].alternatives {
+                    let mut evidence_ids = BTreeSet::new();
+                    evidence_ids.extend(first.evidence_dependencies.iter().cloned());
+                    evidence_ids.extend(second.evidence_dependencies.iter().cloned());
+                    let mut cost = req.fixed_packet_overhead_tokens
+                        + req.obligations[0].selection_overhead_tokens as u64
+                        + req.obligations[1].selection_overhead_tokens as u64;
+                    for evidence_id in evidence_ids {
+                        let item = req.candidates.iter()
+                            .find(|item| item.evidence_id == evidence_id)
+                            .expect("test oracle references only defined evidence");
+                        cost += item.token_cost as u64;
+                    }
+                    oracle_minimum = oracle_minimum.min(cost);
+                }
+            }
+
+            let result = solve_proof_budget(req.clone()).unwrap();
+            assert_eq!(result.status, ProofBudgetStatus::Supported, "seed={seed}");
+            assert_eq!(result.total_token_cost, oracle_minimum, "seed={seed}");
+            verify_proof_budget_result(&req, &result)
+                .unwrap_or_else(|error| panic!("seed={seed}: {error}"));
+        }
+    }
+
+    #[test]
     fn invalid_source_digest_is_rejected_before_search() {
         let mut item = candidate("A", "family-A", 1);
         item.payload_sha256 = "bad".into();
