@@ -298,6 +298,10 @@ pub fn build_trajectory_archive(
         }
     }
 
+    let start_ids = deduplicate_in_order(start_ids);
+    let first_improvement_ids = deduplicate_in_order(first_improvement_ids);
+    let local_optima_ids = deduplicate_in_order(local_optima_ids);
+    let escape_ids = deduplicate_in_order(escape_ids);
     let feature_catalog_sha256 = digest_feature_catalog(features, &config.proxy_id);
     let archive_sha256 = digest_archive(
         config,
@@ -316,10 +320,10 @@ pub fn build_trajectory_archive(
         seed: config.seed,
         feature_catalog_sha256,
         visited_architecture_ids: visited_order,
-        start_architecture_ids: deduplicate_in_order(start_ids),
-        first_improvement_architecture_ids: deduplicate_in_order(first_improvement_ids),
-        local_optimum_architecture_ids: deduplicate_in_order(local_optima_ids),
-        escape_architecture_ids: deduplicate_in_order(escape_ids),
+        start_architecture_ids: start_ids,
+        first_improvement_architecture_ids: first_improvement_ids,
+        local_optimum_architecture_ids: local_optima_ids,
+        escape_architecture_ids: escape_ids,
         events,
         archive_sha256,
     })
