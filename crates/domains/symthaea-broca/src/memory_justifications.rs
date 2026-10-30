@@ -78,6 +78,27 @@ impl SupportStatus {
     }
 }
 
+/// Query-time support state under valid-time semantics.
+///
+/// `OutsideValidity` is distinct from `Unsupported`: a conclusion may have
+/// structurally valid proofs but not apply at the requested date. Neither state
+/// means that the proposition is false.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum AsOfSupportStatus {
+    Supported {
+        active_justification_ids: BTreeSet<String>,
+    },
+    Unsupported,
+    OutsideValidity,
+}
+
+impl AsOfSupportStatus {
+    pub fn is_supported(&self) -> bool {
+        matches!(self, Self::Supported { .. })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DerivedConclusionRecord {
     pub conclusion: DerivedConclusionInput,
@@ -314,6 +335,103 @@ impl JustificationGraph {
     /// through `fact` for audit and must not be treated as false assertions.
     pub fn current_fact(&self, fact_id: &str) -> Option<&DerivedConclusionRecord> {
         self.facts.get(fact_id).filter(|record| record.status.is_supported())
+    }
+
+    /// Recompute query-time support for every conclusion using valid-time intervals.
+    ///
+    /// Intervals are half-open: valid_from <= as_of < valid_to. A conclusion outside
+    /// its own interval is OutsideValidity; a conclusion whose interval applies but
+    /// whose justifications are all ineligible is Unsupported. Derived dependencies
+    /// must themselves be Supported at the same as-of date.
+    ///
+    /// Source-event IDs in this research model are timeless until retracted. This
+    /// method therefore does not claim bitemporal source-event semantics; source
+    /// valid-time and transaction-time metadata require a richer source-event record.
+    pub fn support_statuses_at(
+        &self,
+        as_of: &str,
+    ) -> Result<BTreeMap<String, AsOfSupportStatus>, String> {
+        let as_of_date = NaiveDate::parse_from_str(as_of, "%Y-%m-%d")
+            .map_err(|error| format!("as_of must be YYYY-MM-DD: {error}"))?;
+        self.verify_consistency()?;
+
+        let mut statuses = BTreeMap::<String, AsOfSupportStatus>::new();
+        for fact_id in &self.fact_order {
+            let record = self
+                .facts
+                .get(fact_id)
+                .ok_or_else(|| format!("fact order references missing fact {fact_id:?}"))?;
+            let start = NaiveDate::parse_from_str(&record.conclusion.valid_from, "%Y-%m-%d")
+                .map_err(|error| format!("fact {fact_id:?} has invalid valid_from: {error}"))?;
+            let end = record
+                .conclusion
+                .valid_to
+                .as_deref()
+                .map(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d"))
+                .transpose()
+                .map_err(|error| format!("fact {fact_id:?} has invalid valid_to: {error}"))?;
+
+            if as_of_date < start || end.is_some_and(|end_date| as_of_date >= end_date) {
+                statuses.insert(fact_id.clone(), AsOfSupportStatus::OutsideValidity);
+                continue;
+            }
+
+            let active: BTreeSet<String> = record
+                .conclusion
+                .justifications
+                .iter()
+                .filter(|justification| {
+                    justification.dependencies.iter().all(|dependency| match dependency {
+                        SupportRef::SourceEvent(source_id) => {
+                            self.source_events.contains(source_id)
+                                && !self.retracted_source_events.contains(source_id)
+                        }
+                        SupportRef::DerivedFact(parent_id) => statuses
+                            .get(parent_id)
+                            .is_some_and(AsOfSupportStatus::is_supported),
+                    })
+                })
+                .map(|justification| justification.justification_id.clone())
+                .collect();
+
+            let status = if active.is_empty() {
+                AsOfSupportStatus::Unsupported
+            } else {
+                AsOfSupportStatus::Supported {
+                    active_justification_ids: active,
+                }
+            };
+            statuses.insert(fact_id.clone(), status);
+        }
+        Ok(statuses)
+    }
+
+    /// Return one conclusion's query-time support state.
+    pub fn support_status_at(
+        &self,
+        fact_id: &str,
+        as_of: &str,
+    ) -> Result<AsOfSupportStatus, String> {
+        let statuses = self.support_statuses_at(as_of)?;
+        statuses
+            .get(fact_id)
+            .cloned()
+            .ok_or_else(|| format!("unknown derived fact {fact_id:?}"))
+    }
+
+    /// Return a conclusion only when it is supported and within its valid-time
+    /// interval at the requested date.
+    pub fn current_fact_at(
+        &self,
+        fact_id: &str,
+        as_of: &str,
+    ) -> Result<Option<&DerivedConclusionRecord>, String> {
+        let status = self.support_status_at(fact_id, as_of)?;
+        if status.is_supported() {
+            Ok(self.facts.get(fact_id))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn source_is_retracted(&self, event_id: &str) -> bool {
@@ -590,6 +708,123 @@ mod tests {
             );
             graph.verify_consistency().unwrap();
         }
+    }
+
+    #[test]
+    fn as_of_validity_uses_half_open_interval_boundaries() {
+        let mut graph = JustificationGraph::default();
+        graph.register_source_event("A").unwrap();
+        let mut time_bounded = conclusion(
+            "C",
+            [justification("from-A", [source("A")])],
+        );
+        time_bounded.valid_from = "2026-02-01".into();
+        time_bounded.valid_to = Some("2026-03-01".into());
+        graph.derive(time_bounded).unwrap();
+
+        assert!(matches!(
+            graph.support_status_at("C", "2026-01-31").unwrap(),
+            AsOfSupportStatus::OutsideValidity
+        ));
+        assert!(matches!(
+            graph.support_status_at("C", "2026-02-01").unwrap(),
+            AsOfSupportStatus::Supported { .. }
+        ));
+        assert!(graph.current_fact_at("C", "2026-02-29").unwrap().is_some());
+        assert!(matches!(
+            graph.support_status_at("C", "2026-03-01").unwrap(),
+            AsOfSupportStatus::OutsideValidity
+        ));
+        assert!(graph.current_fact_at("C", "2026-03-01").unwrap().is_none());
+    }
+
+    #[test]
+    fn expired_parent_makes_descendant_unsupported_at_query_time() {
+        let mut graph = JustificationGraph::default();
+        graph.register_source_event("A").unwrap();
+        let mut parent = conclusion(
+            "parent",
+            [justification("from-A", [source("A")])],
+        );
+        parent.valid_to = Some("2026-03-01".into());
+        graph.derive(parent).unwrap();
+        graph
+            .derive(conclusion(
+                "child",
+                [justification("from-parent", [derived("parent")])],
+            ))
+            .unwrap();
+
+        assert!(graph.current_fact_at("child", "2026-02-28").unwrap().is_some());
+        assert!(matches!(
+            graph.support_status_at("parent", "2026-03-01").unwrap(),
+            AsOfSupportStatus::OutsideValidity
+        ));
+        assert!(matches!(
+            graph.support_status_at("child", "2026-03-01").unwrap(),
+            AsOfSupportStatus::Unsupported
+        ));
+        assert!(graph.current_fact_at("child", "2026-03-01").unwrap().is_none());
+        // A time-bounded query does not mutate the timeless audit status.
+        assert!(graph.current_fact("child").is_some());
+    }
+
+    #[test]
+    fn alternative_proof_preserves_query_time_support_when_other_proof_expires() {
+        let mut graph = JustificationGraph::default();
+        graph.register_source_event("A").unwrap();
+        graph.register_source_event("B").unwrap();
+        let mut first_proof = conclusion(
+            "proof-A",
+            [justification("from-A", [source("A")])],
+        );
+        first_proof.valid_to = Some("2026-03-01".into());
+        graph.derive(first_proof).unwrap();
+        graph
+            .derive(conclusion(
+                "proof-B",
+                [justification("from-B", [source("B")])],
+            ))
+            .unwrap();
+        graph
+            .derive(conclusion(
+                "C",
+                [
+                    justification("via-A", [derived("proof-A")]),
+                    justification("via-B", [derived("proof-B")]),
+                ],
+            ))
+            .unwrap();
+
+        assert_eq!(
+            graph.support_status_at("C", "2026-02-28").unwrap(),
+            AsOfSupportStatus::Supported {
+                active_justification_ids: BTreeSet::from([
+                    "via-A".to_owned(),
+                    "via-B".to_owned()
+                ])
+            }
+        );
+        assert_eq!(
+            graph.support_status_at("C", "2026-03-01").unwrap(),
+            AsOfSupportStatus::Supported {
+                active_justification_ids: BTreeSet::from(["via-B".to_owned()])
+            }
+        );
+    }
+
+    #[test]
+    fn as_of_query_rejects_invalid_date_and_unknown_fact() {
+        let mut graph = JustificationGraph::default();
+        graph.register_source_event("A").unwrap();
+        graph
+            .derive(conclusion(
+                "C",
+                [justification("from-A", [source("A")])],
+            ))
+            .unwrap();
+        assert!(graph.support_status_at("C", "not-a-date").is_err());
+        assert!(graph.support_status_at("MISSING", "2026-02-01").is_err());
     }
 
     #[test]
