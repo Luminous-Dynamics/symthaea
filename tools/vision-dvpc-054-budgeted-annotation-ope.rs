@@ -1767,7 +1767,7 @@ mod tests {
             8
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
-            assert_eq!(line.split('\t').count(), 18);
+            assert_eq!(line.split('\t').count(), 20);
         }
     }
 
