@@ -49,8 +49,9 @@ Create versioned, human-readable episodes with a symbolic oracle and gold deriva
 | D13: alternative justifications | A conclusion has support sets `(A AND B) OR D`; retract A, then D | Keep the conclusion current while D remains eligible; transition to unknown/unsupported only after all sufficient supports are gone |
 | D14: absence vs closed-world negation | No record establishes P; compare open-world evaluation with an explicitly scoped completeness witness | Absence alone remains unknown; derive not-P only under a versioned closed-world rule with a valid completeness proof |
 | D15: valid-time boundary and proof expiry | Query before, on, and after a derived fact's half-open valid interval; let one alternative proof expire | Distinguish OutsideValidity from Unsupported; retain the conclusion if another complete proof remains valid, otherwise mark it unsupported |
+| D16: bitemporal late correction | A correction has a historical valid_from but is recorded after the first query's known_at cutoff | For the same valid_at, an earlier known_at must show the then-known state; a later known_at may show the correction, without rewriting the earlier as-known answer |
 
-These extensions require a versioned support schema and oracle; they are not claims about what the current graph implementation already supports. The original seed suite remains a diagnostic fixture, not a statistically representative dataset. Do not tune the implementation to it and report it as held-out quality. Extend with programmatically generated, seeded trajectories and hidden test seeds after the executor and oracle are stable.
+PR #9049 now authors a research-only as-of support API and tests for the D15 valid-time behavior; the Rust tests remain unexecuted, and this does not yet implement source-event transaction time. D13-D14 and D16 still require a versioned support / bitemporal schema and independent oracle. D16 is tracked separately in [issue #9075](https://github.com/Luminous-Dynamics/symthaea/issues/9075). None of these additions establish production semantics or benchmark performance. The original seed suite remains a diagnostic fixture, not a statistically representative dataset. Do not tune the implementation to it and report it as held-out quality. Extend with programmatically generated, seeded trajectories and hidden test seeds after the executor and oracle are stable.
 
 ## 4. Gold format and oracle
 
@@ -93,7 +94,8 @@ Use paired episodes and retain per-case outputs. Do not pool incompatible benchm
 - **Unsupported-current-state rate (proposed extension):** conclusions still marked current after all sufficient justifications are withdrawn.
 - **Absence-to-negation error rate (proposed extension):** cases in which missing evidence is incorrectly converted to false without an explicit scoped completeness witness and closed-world rule.
 - **Evidence acquisition recall:** fraction of gold supporting leaves retrieved; include precision and evidence-set size.
-- **Temporal leakage rate:** number of as-known queries influenced by events received after the cutoff.
+- **Temporal leakage rate:** number of as-known queries influenced by events received after the cutoff; report valid-time leakage and transaction-time leakage separately once bitemporal source events are available.
+- **Bitemporal exact match (proposed D16):** state correctness at the paired coordinates (valid_at, known_at), including the ability to distinguish retrospective corrections from what the system actually knew at an earlier transaction time.
 - **Conflict safety and abstention:** arbitrary-winner rate, correct conflict rate, correct unknown rate, and useful-answer coverage.
 - **Replay/rebuild parity:** state and digest differences after duplicate replay, process restart, index reconstruction, policy migration and full replay.
 - **Final task success:** exact and rubric-scored answer accuracy with source-backed citations.
