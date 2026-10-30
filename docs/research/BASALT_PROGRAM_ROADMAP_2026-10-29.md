@@ -148,6 +148,7 @@ Use external suites as complementing reference points rather than combine incomp
 - [Terminal-Bench](https://www.tbench.ai/): terminal and tool-use tasks.
 - [AgentSuite/COBA](https://proceedings.mlr.press/v306/suh26a.html): benchmark validity methods.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196): clean-to-shifted execution evaluation.
+- [TestJack](https://arxiv.org/abs/2610.10619): requirement-grounded evaluator evolution and executable witness tests for apparently passing patches.
 - [OpenAI SWE-bench Pro audit (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/): task, ground-truth and grading quality audit.
 - [Epoch AI Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review): reviewer findings about scoring defects.
 - [HypeCodeNet / The Natural Geometry of Code](https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html): motivation for evaluating hyperbolic structural representations.
@@ -211,6 +212,7 @@ Public leaderboard percentages are properties of a full evaluation configuration
 - [Terminal-Bench 4.0](https://www.tbench.ai/?version=4.0) lists Opus 5.5 + Claude Code at **64.8% ± 3.1%**, Sonnet 5.5 + Claude Code at 61.8% ± 2.9%, and GPT-6 Astra + Codex at 58.2% ± 2.8%. These are benchmark/harness-specific results, not a universal software-engineering score.
 - [Artificial Analysis Coding Agent Index v2.0](https://artificialanalysis.ai/methodology/coding-agents-benchmarking) equal-weights FrontierCode v1.1 (100 repository-engineering tasks), Terminal-Bench 4.0 (66 terminal tasks), and SWE-Atlas-QnA-AA (124 repository-Q&A tasks). It runs three attempts per task, reports pooled cost/token/time, and audits trajectories for solution retrieval and test/verifier tampering. FrontierCode uses non-compensatory blockers followed by a bounded quality score when blockers pass.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196), published 23 October 2026, evaluates 120 scenarios across 12 change families and nine intervention positions. All 17 evaluated systems had lower shifted than clean success; GPT-6 Astra is reported at 67.35% clean versus 24.79% shifted, with 20.34% paired success. Tool/session changes and stale-evidence scenarios had zero paired success across that evaluated cohort.
+- [TestJack](https://arxiv.org/abs/2610.10619), published 7 October 2026, audited 4,487 trials previously marked as passing across five coding-agent benchmarks and reported 1,545 requirement-violating trials (34.4%). Its reported overall resolution rate fell from 50.6% to 33.2% after evaluator evolution. A lightweight randomized-audit / witness-sharing variant recovered 72.4% of the refutations at 15.4% of the cost on three studied benchmarks. These are paper-specific results, not a universal prevalence estimate or a BASALT result.
 - [SWE-bench Multilingual](https://www.swebench.com/multilingual) supplies a cross-language reference of 300 tasks from 42 repositories across nine languages.
 
 These are not matched head-to-head comparisons. BASALT should reproduce selected public setups where permitted, match budgets and execution identities, publish per-task results and uncertainty, and measure the differentiated capabilities separately.
@@ -222,6 +224,8 @@ Proposed stretch targets—not achievements or universal standards:
 - **Metamorphic robustness:** no more than 5 percentage points of degradation under validated semantics-preserving transformations.
 - **Integrity:** zero false accepts across at least 300 genuinely independent adversarial negative controls as an initial gate.
 - **Patch quality:** separate blinded, calibrated non-blocking quality rubric; no quality score can compensate for a failed blocker.
+- **Oracle validity:** every accepted task has a frozen requirement-to-verifier coverage map; every accepted dynamic witness is requirement-grounded, reference-compatible, independently reviewed, and replayed against every system arm for that task.
+- **Oracle false rejection:** zero accepted witness tests may reject the pinned reference or independently reviewed valid alternative implementations in the qualified control set.
 
 Targets require pre-run power/precision analysis and independent cohort qualification. Zero false accepts in 300 controls is an initial hurdle, not proof of zero risk. The SWE-Shift retention target is a BASALT stretch goal, not a directly comparable external result.
 
@@ -239,6 +243,7 @@ These are goals, not achieved metrics or universal industry standards:
 8. **Performance:** no SOTA claim without matched, held-out, independently audited runs.
 9. **Shift robustness:** the runner attests that shifts were applied and that post-shift evidence was refreshed or correctly rejected.
 10. **Complexity budget:** additional subsystems must justify their compute, latency and maintenance cost through ablations.
+11. **Oracle validity:** every accepted witness test is tied to a frozen requirement, passes on the reference, is reviewed for incidental-reference overfit, and is replayed across all paired system arms.
 
 ## Execution order that does not depend on queued runs
 
@@ -247,7 +252,10 @@ These are goals, not achieved metrics or universal industry standards:
 3. Run the retrieval/geodesic representation pilot independently.
 4. Add a discrete task-state graph fixture with known optimal path costs and adversarial transitions.
 5. Connect trusted runner receipts to the shifted analyzer; keep scoring ineligible until the evidence boundary is qualified.
-6. Expand language adapters and cognitive modules based on measured benefit.
+6. Implement requirement-grounded evaluator evolution and shared witness replay under #9115.
+7. Expand language adapters and cognitive modules based on measured benefit.
+
+Related oracle qualification work: [BASALT-ORACLE-001 #9115](https://github.com/Luminous-Dynamics/symthaea/issues/9115).
 
 ## Risks and explicit non-claims
 
@@ -267,4 +275,5 @@ These are goals, not achieved metrics or universal industry standards:
 - HypeCodeNet, ICLR 2026: https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html
 - AgentSuite/COBA, ICML 2026: https://proceedings.mlr.press/v306/suh26a.html
 - SWE-Shift (October 2026): https://arxiv.org/abs/2610.32196
+- TestJack (October 2026): https://arxiv.org/abs/2610.10619
 - Counterexample Guided Inductive Synthesis Modulo Theories: https://www.repository.cam.ac.uk/items/e0f2aa2a-af2b-4b9b-9429-6ff0a99a3559
