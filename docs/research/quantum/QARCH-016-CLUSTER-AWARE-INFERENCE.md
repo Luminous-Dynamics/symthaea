@@ -77,18 +77,18 @@ The cluster-level analysis does not support the claim. This is a constructed nul
 
 The stress harness is included in the Rust module. It compares an instance-level sign test that incorrectly assumes independent rows with the implemented family-median sign test.
 
-For each independent family, a latent favourable-outcome probability is drawn as \(0.5\pm0.5\sqrt{\rho}\), with each sign selected equally. Conditional instance signs are Bernoulli draws from that probability. This yields marginal win probability 0.5 and within-family Bernoulli ICC \(\rho\). Independent continuous magnitudes are added so the cluster median does not have deterministic ties.
+For each independent family, a latent favourable-outcome probability is drawn as \(0.5\pm0.5\sqrt{\rho}\), with each sign selected equally. Conditional instance signs are Bernoulli draws from that probability. This yields marginal win probability 0.5 and within-family Bernoulli ICC \(\rho\). Independent continuous magnitudes are drawn immediately after each instance sign. The cluster effect is the median of these signed magnitudes; for even cluster sizes, the median is the arithmetic mean of the two central signed values. The frozen result fixture uses this exact reduction and random-draw order.
 
 The frozen experiment uses 10 families, 10 instances per family, 10,000 null replicates for each ICC in \(\{0,0.05,0.15,0.30,0.60,1\}\), one-sided alpha=0.05, Mulberry32 seed 0x00516016, and Wilson 95% Monte Carlo intervals.
 
 | ICC | Naive instance-level type-I rate | Cluster-median type-I rate |
 |---:|---:|---:|
 | 0.00 | 4.73% | 1.19% |
-| 0.05 | 7.90% | 0.98% |
-| 0.15 | 13.53% | 1.11% |
-| 0.30 | 19.28% | 1.21% |
-| 0.60 | 25.44% | 1.21% |
-| 1.00 | 38.21% | 1.12% |
+| 0.05 | 8.49% | 1.20% |
+| 0.15 | 13.73% | 1.10% |
+| 0.30 | 19.13% | 1.03% |
+| 0.60 | 25.42% | 1.05% |
+| 1.00 | 37.14% | 1.03% |
 
 In this declared model, the naive row-level test becomes substantially anti-conservative as ICC rises. The cluster-level procedure remains below 5%. With only 10 clusters, the exact one-sided sign test is discrete: it rejects at 0.05 only with at least 9 wins (attainable null rate 11/1024, about 1.07%). Its conservative rate is accompanied by reduced power. Do not interpret this one experiment as a universal guarantee for arbitrary dependence structures.
 
