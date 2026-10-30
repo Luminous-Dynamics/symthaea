@@ -1737,6 +1737,40 @@ mod tests {
     }
 
     #[test]
+    fn legacy_single_session_requests_and_packets_keep_canonical_json_shape() {
+        let mut candidate_without_session = candidate("legacy", "family-legacy", 2);
+        candidate_without_session.source_session_id = None;
+        let req = request(
+            vec![candidate_without_session],
+            vec![obligation(
+                "legacy-claim",
+                vec![justification("legacy-proof", &["legacy"])],
+            )],
+            64,
+        );
+
+        let request_json = serde_json::to_value(&req).unwrap();
+        assert!(
+            request_json["candidates"][0].get("source_session_id").is_none(),
+            "absent session metadata must not change legacy canonical request JSON"
+        );
+        assert!(
+            request_json["obligations"][0]
+                .get("minimum_distinct_sessions")
+                .is_none(),
+            "zero session threshold must not change legacy canonical request JSON"
+        );
+
+        let result = solve_proof_budget(req).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        let packet_json = serde_json::to_value(&result).unwrap();
+        assert!(
+            packet_json["evidence"][0].get("source_session_id").is_none(),
+            "absent session metadata must not change legacy packet JSON"
+        );
+    }
+
+    #[test]
     fn out_of_scope_candidate_is_not_eligible() {
         let mut item = candidate("A", "family-A", 1);
         item.scope_id = "scope-2".into();
