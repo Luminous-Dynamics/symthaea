@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --quiet --locked -- fixtures/qualification.tsv > /tmp/cmaq-012-report.json
+          cargo run --quiet --locked -- fixtures/smoke.tsv > /tmp/cmaq-012-report.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -45,9 +45,11 @@ jobs:
           slice_ = report["slices"][0]
           assert slice_["task_id"] == "halfcheetah-v4"
           assert slice_["capability"] == "hidden-dynamics"
-          assert slice_["split"] == "qualification"
+          assert slice_["split"] == "development"
           assert slice_["n_pairs"] == 20
-          assert slice_["eligible"] is True
+          assert "not qualification eligible" in slice_["qualification_floor_reason"]
+          assert report["claim_ceiling"] == "scoring_contract_only_not_environment_performance"
+          assert slice_["qualification_floor_met"] is False
           assert slice_["arms"]["D0"]["timeout"] == 1
           assert slice_["arms"]["D0"]["complete"] == 19
           assert slice_["contrasts"]["aop_w1_minus_d1"]["return"]["mean"] > 0.0
