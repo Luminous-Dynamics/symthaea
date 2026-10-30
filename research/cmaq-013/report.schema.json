@@ -17,7 +17,8 @@
     "search_widths",
     "scenarios",
     "methods",
-    "cells"
+    "cells",
+    "rollout_horizons"
   ],
   "properties": {
     "schema_version": {
@@ -79,8 +80,8 @@
     },
     "cells": {
       "type": "array",
-      "minItems": 9,
-      "maxItems": 9,
+      "minItems": 27,
+      "maxItems": 27,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -93,7 +94,8 @@
           "random_calibration_quantile",
           "selected_calibration_quantile",
           "oracle_selected_quantile",
-          "methods"
+          "methods",
+          "rollout_horizon"
         ],
         "properties": {
           "scenario": {
@@ -146,7 +148,9 @@
                 "mean_interval_width",
                 "feedback_updates_per_episode",
                 "recovery_episode_rate",
-                "p90_recovery_delay"
+                "p90_recovery_delay",
+                "pre_shift_selected_coverage",
+                "post_shift_selected_coverage"
               ],
               "properties": {
                 "method": {
@@ -190,12 +194,36 @@
                 "p90_recovery_delay": {
                   "type": "number",
                   "minimum": -1
+                },
+                "pre_shift_selected_coverage": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                "post_shift_selected_coverage": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
                 }
               }
             }
+          },
+          "rollout_horizon": {
+            "enum": [
+              1,
+              3,
+              8
+            ]
           }
         }
       }
+    },
+    "rollout_horizons": {
+      "const": [
+        1,
+        3,
+        8
+      ]
     }
   }
 }
