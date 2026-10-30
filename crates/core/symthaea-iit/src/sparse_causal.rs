@@ -116,6 +116,10 @@ pub enum SparseCausalError {
     CandidateUnitOutOfRange { unit: usize, unit_count: usize },
     #[error("candidate system contains duplicate unit {unit}")]
     DuplicateCandidateUnit { unit: usize },
+    #[error("{subset} contains duplicate unit {unit}")]
+    DuplicateSubsetUnit { subset: &'static str, unit: usize },
+    #[error("{subset} unit {unit} is not part of the candidate system")]
+    SubsetOutsideCandidateSystem { subset: &'static str, unit: usize },
     #[error("candidate-system posterior is undefined for the observed whole-system state")]
     UndefinedBackgroundPosterior,
     #[error("sparse Eq4 report entry {index} is not finite and nonnegative: {value}")]
@@ -494,6 +498,138 @@ impl SparseBinaryCausalModel {
             probability *= if next_on { p_on } else { 1.0 - p_on };
         }
         Ok(probability)
+    }
+
+    /// Exact sparse IIT 4.0 Eq. 3 effect repertoire.
+    ///
+    /// External parent inputs are clamped to their observed values in
+    /// current_state. Candidate-system units outside the mechanism are averaged
+    /// uniformly, and target purview units are factorized under the same
+    /// conditional-independence semantics as the dense TPM implementation.
+    /// The first listed candidate/purview unit is the least-significant state bit.
+    pub fn effect_repertoire_iit4(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+        max_repertoire_entries: usize,
+    ) -> Result<Vec<f64>, SparseCausalError> {
+        self.check_state(current_state)?;
+        let mut candidate_slot = vec![None; self.n_units];
+        for (slot, unit) in candidate_system.iter().copied().enumerate() {
+            if unit >= self.n_units {
+                return Err(SparseCausalError::CandidateUnitOutOfRange {
+                    unit,
+                    unit_count: self.n_units,
+                });
+            }
+            if candidate_slot[unit].is_some() {
+                return Err(SparseCausalError::DuplicateCandidateUnit { unit });
+            }
+            candidate_slot[unit] = Some(slot);
+        }
+
+        let mut mechanism_slots = Vec::with_capacity(mechanism.len());
+        let mut seen_mechanism = vec![false; self.n_units];
+        for unit in mechanism.iter().copied() {
+            if unit >= self.n_units || candidate_slot[unit].is_none() {
+                return Err(SparseCausalError::SubsetOutsideCandidateSystem {
+                    subset: "mechanism",
+                    unit,
+                });
+            }
+            if seen_mechanism[unit] {
+                return Err(SparseCausalError::DuplicateSubsetUnit {
+                    subset: "mechanism",
+                    unit,
+                });
+            }
+            seen_mechanism[unit] = true;
+            mechanism_slots.push(candidate_slot[unit].unwrap());
+        }
+        let mut seen_purview = vec![false; self.n_units];
+        for unit in purview.iter().copied() {
+            if unit >= self.n_units || candidate_slot[unit].is_none() {
+                return Err(SparseCausalError::SubsetOutsideCandidateSystem {
+                    subset: "purview",
+                    unit,
+                });
+            }
+            if seen_purview[unit] {
+                return Err(SparseCausalError::DuplicateSubsetUnit {
+                    subset: "purview",
+                    unit,
+                });
+            }
+            seen_purview[unit] = true;
+        }
+
+        let candidate_state_count = 1usize
+            .checked_shl(candidate_system.len() as u32)
+            .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                target: candidate_system.first().copied().unwrap_or(0),
+                parents: candidate_system.len(),
+            })?;
+        let purview_state_count = 1usize
+            .checked_shl(purview.len() as u32)
+            .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                target: purview.first().copied().unwrap_or(0),
+                parents: purview.len(),
+            })?;
+        if candidate_state_count > max_repertoire_entries {
+            return Err(FactorGraphError::IntermediateTooLarge {
+                entries: candidate_state_count,
+                limit: max_repertoire_entries,
+            }.into());
+        }
+        if purview_state_count > max_repertoire_entries {
+            return Err(FactorGraphError::IntermediateTooLarge {
+                entries: purview_state_count,
+                limit: max_repertoire_entries,
+            }.into());
+        }
+        if purview.is_empty() {
+            return Ok(vec![1.0]);
+        }
+
+        let unconstrained_count = 1usize
+            .checked_shl((candidate_system.len() - mechanism.len()) as u32)
+            .ok_or(SparseCausalError::ParentTableSizeOverflow {
+                target: candidate_system.first().copied().unwrap_or(0),
+                parents: candidate_system.len() - mechanism.len(),
+            })?;
+        let mut per_purview_unit = vec![0.0; purview.len()];
+        for candidate_state_index in 0..candidate_state_count {
+            let mechanism_matches = mechanism_slots
+                .iter()
+                .zip(mechanism)
+                .all(|(slot, unit)| {
+                    (((candidate_state_index >> *slot) & 1) != 0) == current_state[*unit]
+                });
+            if !mechanism_matches {
+                continue;
+            }
+            let mut past_state = current_state.to_vec();
+            for (slot, unit) in candidate_system.iter().copied().enumerate() {
+                past_state[unit] = ((candidate_state_index >> slot) & 1) != 0;
+            }
+            for (purview_slot, target) in purview.iter().copied().enumerate() {
+                per_purview_unit[purview_slot] += self.probability_next_one(&past_state, target)?;
+            }
+        }
+        for probability in &mut per_purview_unit {
+            *probability /= unconstrained_count as f64;
+        }
+
+        let mut repertoire = vec![1.0; purview_state_count];
+        for (future_state, probability) in repertoire.iter_mut().enumerate() {
+            for (slot, p_on) in per_purview_unit.iter().copied().enumerate() {
+                let target_on = ((future_state >> slot) & 1) != 0;
+                *probability *= if target_on { p_on } else { 1.0 - p_on };
+            }
+        }
+        Ok(repertoire)
     }
 
     /// Exact sparse Eq. 4 cause-likelihood contraction.
@@ -924,6 +1060,32 @@ mod tests {
                 assert!(
                     (expected - actual).abs() <= expected.abs().max(1.0) * 1e-12,
                     "candidate={candidate:?}, index={index}: dense={expected:.17}, sparse={actual:.17}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_effect_repertoire_matches_dense_eq3_for_embedded_subsystems() {
+        let dense = dense_ring_model(5);
+        let sparse = SparseBinaryCausalModel::from_dense(&dense).unwrap();
+        let state = [true, false, true, false, true];
+        for (candidate, mechanism, purview) in [
+            (&[0, 1][..], &[0, 1][..], &[0, 1][..]),
+            (&[0, 2, 4][..], &[0][..], &[2, 4][..]),
+            (&[0, 1, 2, 3, 4][..], &[1, 3][..], &[0, 2, 4][..]),
+        ] {
+            let expected = dense.effect_repertoire_iit4(
+                candidate, mechanism, &state, purview,
+            ).unwrap();
+            let actual = sparse.effect_repertoire_iit4(
+                candidate, mechanism, &state, purview, 1 << 16,
+            ).unwrap();
+            assert_eq!(expected.len(), actual.len());
+            for (index, (expected, actual)) in expected.iter().zip(&actual).enumerate() {
+                assert!(
+                    (expected - actual).abs() <= 1e-12,
+                    "candidate={candidate:?}, mechanism={mechanism:?}, purview={purview:?}, index={index}"
                 );
             }
         }
