@@ -17,6 +17,7 @@ const ONLINE_STEP_SIZE: f64 = 0.035;
 const GAUSSIAN_Z90: f64 = 1.644_853_626_951_472_2;
 const NOMINAL_RESIDUAL_SCALE: f64 = 0.11;
 const SEARCH_WIDTHS: [usize; 3] = [8, 32, 128];
+const ROLLOUT_HORIZONS: [usize; 3] = [1, 3, 8];
 const BASE_SEED: u64 = 0xC0A0_0013_2026_1030;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,12 +106,12 @@ struct ActionSample {
     nonconformity: f64,
 }
 
-fn draw_action(rng: &mut SplitMix64, drift: f64) -> ActionSample {
+fn draw_action(rng: &mut SplitMix64, drift: f64, horizon: usize) -> ActionSample {
     // Candidate complexity is coupled to latent action quality; harder actions
     // have larger model error. Search selects on predicted value, not true value.
     let quality = rng.unit();
     let actual = 0.15 + 0.65 * quality;
-    let sigma = (0.02 + 0.18 * quality) * drift;
+    let sigma = (0.02 + 0.18 * quality) * drift * (horizon as f64).sqrt();
     let bias = (drift - 1.0) * 0.035;
     let predicted = actual + sigma * normal(rng) + bias;
     ActionSample { predicted, actual, nonconformity: predicted - actual }
@@ -125,32 +126,33 @@ struct Observation {
 
 type EpisodeTape = Vec<Vec<Observation>>;
 
-fn collect_calibration(width: usize, seed: u64) -> (Vec<f64>, Vec<f64>) {
-    let mut rng = SplitMix64::new(seed ^ (width as u64).wrapping_mul(0xD134_2543_DE82_EF95));
+fn collect_calibration(width: usize, horizon: usize, seed: u64) -> (Vec<f64>, Vec<f64>) {
+    let mut rng = SplitMix64::new(seed ^ (width as u64).wrapping_mul(0xD134_2543_DE82_EF95) ^ (horizon as u64).rotate_left(23));
     let mut random_scores = Vec::with_capacity(CALIBRATION_EPISODES * CALIBRATION_STEPS);
     let mut selected_scores = Vec::with_capacity(CALIBRATION_EPISODES * CALIBRATION_STEPS);
     for _episode in 0..CALIBRATION_EPISODES {
         for _step in 0..CALIBRATION_STEPS {
             let mut best: Option<ActionSample> = None;
             for _ in 0..width {
-                let candidate = draw_action(&mut rng, 1.0);
+                let candidate = draw_action(&mut rng, 1.0, horizon);
                 if best.map(|current| candidate.predicted > current.predicted).unwrap_or(true) {
                     best = Some(candidate);
                 }
             }
             selected_scores.push(best.unwrap().nonconformity);
-            random_scores.push(draw_action(&mut rng, 1.0).nonconformity);
+            random_scores.push(draw_action(&mut rng, 1.0, horizon).nonconformity);
         }
     }
     (random_scores, selected_scores)
 }
 
-fn generate_evaluation(scenario: Scenario, width: usize) -> EpisodeTape {
+fn generate_evaluation(scenario: Scenario, width: usize, horizon: usize) -> EpisodeTape {
     let mut episodes = Vec::with_capacity(EPISODES);
     for episode in 0..EPISODES {
         let seed = BASE_SEED
             ^ ((scenario as u64) << 48)
             ^ (width as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            ^ (horizon as u64).rotate_left(29)
             ^ (episode as u64).wrapping_mul(0xD134_2543_DE82_EF95);
         let mut rng = SplitMix64::new(seed);
         let mut tape = Vec::with_capacity(DECISIONS_PER_EPISODE);
@@ -158,7 +160,7 @@ fn generate_evaluation(scenario: Scenario, width: usize) -> EpisodeTape {
             let drift = scenario.drift_multiplier(step);
             let mut best: Option<ActionSample> = None;
             for _ in 0..width {
-                let candidate = draw_action(&mut rng, drift);
+                let candidate = draw_action(&mut rng, drift, horizon);
                 if best.map(|current| candidate.predicted > current.predicted).unwrap_or(true) {
                     best = Some(candidate);
                 }
@@ -314,6 +316,7 @@ fn evaluate_method(
 struct CellReport {
     scenario: &'static str,
     search_width: usize,
+    rollout_horizon: usize,
     episode_count: usize,
     decisions_per_episode: usize,
     calibration_samples: usize,
@@ -326,25 +329,27 @@ struct CellReport {
 fn run_benchmark() -> Vec<CellReport> {
     let mut cells = Vec::new();
     for width in SEARCH_WIDTHS {
-        let (random_calibration, selected_calibration) = collect_calibration(width, BASE_SEED ^ 0xCA11_BA7E);
-        let random_q = conformal_quantile(&random_calibration, TARGET_COVERAGE);
-        let selected_q = conformal_quantile(&selected_calibration, TARGET_COVERAGE);
-        for scenario in Scenario::all() {
-            let episodes = generate_evaluation(scenario, width);
-            let oracle_scores: Vec<f64> = episodes.iter().flat_map(|tape| tape.iter().map(|obs| obs.selected.nonconformity)).collect();
-            let oracle_q = conformal_quantile(&oracle_scores, TARGET_COVERAGE);
-            let methods = Method::all().iter().map(|method| {
-                evaluate_method(*method, scenario, &episodes, random_q, selected_q, oracle_q)
-            }).collect();
-            cells.push(CellReport {
-                scenario: scenario.name(), search_width: width, episode_count: EPISODES,
-                decisions_per_episode: DECISIONS_PER_EPISODE,
-                calibration_samples: random_calibration.len(),
-                random_calibration_quantile: random_q,
-                selected_calibration_quantile: selected_q,
-                oracle_selected_quantile: oracle_q,
-                methods,
-            });
+        for horizon in ROLLOUT_HORIZONS {
+            let (random_calibration, selected_calibration) = collect_calibration(width, horizon, BASE_SEED ^ 0xCA11_BA7E);
+            let random_q = conformal_quantile(&random_calibration, TARGET_COVERAGE);
+            let selected_q = conformal_quantile(&selected_calibration, TARGET_COVERAGE);
+            for scenario in Scenario::all() {
+                let episodes = generate_evaluation(scenario, width, horizon);
+                let oracle_scores: Vec<f64> = episodes.iter().flat_map(|tape| tape.iter().map(|obs| obs.selected.nonconformity)).collect();
+                let oracle_q = conformal_quantile(&oracle_scores, TARGET_COVERAGE);
+                let methods = Method::all().iter().map(|method| {
+                    evaluate_method(*method, scenario, &episodes, random_q, selected_q, oracle_q)
+                }).collect();
+                cells.push(CellReport {
+                    scenario: scenario.name(), search_width: width, rollout_horizon: horizon,
+                    episode_count: EPISODES, decisions_per_episode: DECISIONS_PER_EPISODE,
+                    calibration_samples: random_calibration.len(),
+                    random_calibration_quantile: random_q,
+                    selected_calibration_quantile: selected_q,
+                    oracle_selected_quantile: oracle_q,
+                    methods,
+                });
+            }
         }
     }
     cells
