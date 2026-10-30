@@ -20,8 +20,9 @@ use std::fmt::Write;
 
 const BRANCHES: usize = 2;
 const GRID_STEPS: usize = 10;
-const PILOT_N: usize = 128;
+const PILOT_N: usize = 64;
 const EVALUATION_N: usize = 256;
+const ADAPTIVE_BATCH_N: usize = EVALUATION_N - PILOT_N;
 const FULL_REPLICATES: usize = 2048;
 const SMOKE_REPLICATES: usize = 48;
 const MC_TEST_REPLICATES: usize = 4096;
@@ -299,32 +300,60 @@ fn uniform_prefix_design(world: World) -> PrefixDesign {
 /// The paper's two-batch mixture correction. Pilot units are fully annotated
 /// with probability p; the adaptive batch probability is clipped so the pooled
 /// design matches the target when it lies inside the attainable mixture range.
-fn adaptive_probability(target: f64, upper: f64, kappa: f64, pilot_p: f64, floor: f64) -> f64 {
-    ((target - kappa * pilot_p) / (1.0 - kappa)).clamp(floor, upper)
+fn pilot_design(pilot_probability: f64) -> Result<PrefixDesign, String> {
+    let design = PrefixDesign {
+        lambda1: pilot_probability,
+        lambda12: [pilot_probability; BRANCHES],
+    };
+    design.validate()?;
+    Ok(design)
 }
 
-fn pooled_two_batch_design(target: PrefixDesign, kappa: f64, pilot_p: f64, floor: f64) -> Result<PrefixDesign, String> {
-    if !kappa.is_finite() || kappa <= 0.0 || kappa >= 1.0
-        || !pilot_p.is_finite() || pilot_p <= 0.0 || pilot_p > 1.0
-        || !floor.is_finite() || floor <= 0.0 || floor >= 1.0
+/// Expected annotation cost left for the adaptive batch after charging the
+/// pilot batch. The budget is expressed per trajectory in the combined sample.
+fn adaptive_batch_budget(
+    total_budget: f64,
+    pilot_fraction: f64,
+    pilot_probability: f64,
+) -> Result<f64, String> {
+    if !total_budget.is_finite()
+        || total_budget <= 0.0
+        || total_budget > 2.0
+        || !pilot_fraction.is_finite()
+        || pilot_fraction <= 0.0
+        || pilot_fraction >= 1.0
+        || !pilot_probability.is_finite()
+        || pilot_probability <= 0.0
+        || pilot_probability > 1.0
     {
-        return Err("invalid pilot mixture parameters".into());
+        return Err("invalid two-batch budget parameters".into());
     }
-    target.validate()?;
-    let adaptive_lambda1 = adaptive_probability(target.lambda1, 1.0, kappa, pilot_p, floor);
-    let adaptive_lambda12 = [
-        adaptive_probability(target.lambda12[0], adaptive_lambda1, kappa, pilot_p, floor),
-        adaptive_probability(target.lambda12[1], adaptive_lambda1, kappa, pilot_p, floor),
-    ];
-    let pooled = PrefixDesign {
-        lambda1: kappa * pilot_p + (1.0 - kappa) * adaptive_lambda1,
-        lambda12: [
-            kappa * pilot_p + (1.0 - kappa) * adaptive_lambda12[0],
-            kappa * pilot_p + (1.0 - kappa) * adaptive_lambda12[1],
-        ],
-    };
-    pooled.validate()?;
-    Ok(pooled)
+    let pilot_cost = 2.0 * pilot_probability;
+    let remaining = (total_budget - pilot_fraction * pilot_cost) / (1.0 - pilot_fraction);
+    if !remaining.is_finite() || remaining <= 0.0 || remaining > 2.0 {
+        return Err("pilot consumes the entire annotation budget or leaves an invalid remainder".into());
+    }
+    Ok(remaining)
+}
+
+/// Variance per combined-sample trajectory for a stratified two-batch design.
+/// Batch means are weighted by their sample fractions; each batch uses its own
+/// known prefix probabilities in its score. The pilot batch is not collapsed
+/// into a fictitious pooled propensity.
+fn two_batch_variance_objective(
+    profile: VarianceProfile,
+    pilot_probability: f64,
+    adaptive: PrefixDesign,
+    branch_probability: [f64; BRANCHES],
+    pilot_fraction: f64,
+) -> Result<f64, String> {
+    let pilot = pilot_design(pilot_probability)?;
+    adaptive.validate()?;
+    if !pilot_fraction.is_finite() || pilot_fraction <= 0.0 || pilot_fraction >= 1.0 {
+        return Err("pilot fraction must lie in (0,1)".into());
+    }
+    Ok(pilot_fraction * objective(profile, pilot, branch_probability)
+        + (1.0 - pilot_fraction) * objective(profile, adaptive, branch_probability))
 }
 
 #[derive(Clone, Copy, Debug)]
