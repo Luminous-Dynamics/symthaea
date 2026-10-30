@@ -147,6 +147,22 @@ The initial module implements:
 
 Fifteen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports and empty queries. They have not been compiled or executed.
 
+## 7. Trajectory-preserving promotion (R-MF-NAS-inspired)
+
+A proxy-ranked top-k shortlist can discard strong architectures encountered earlier in a local-search trajectory. R-MF-NAS (Phan & Luong, ACM TELO, published 29 June 2026) documents this failure: high-performing candidates can appear early or midway through proxy-guided local search, while the terminal proxy elite may be weak. Its R-MF-NAS selector therefore adds first-improvement neighbors and 2-opt escape candidates to the successive-halving pool instead of selecting only the highest terminal proxy scores. In its reported 500-run results, the worst proxy variant on NB201-CIFAR100 improves from a mean ± SD of 69.96 ± 3.45 for MF-NAS to 71.46 ± 1.05 for R-MF-NAS; for NBASR-TIMIT the cross-proxy SD falls from 19.01 to 0.42. These are published results, not Symthaea measurements. [ACM paper](https://doi.org/10.1145/3774940).
+
+The new Rust primitive is `nasbench201_trajectory.rs` and its tracking issue is [#9191](https://github.com/Luminous-Dynamics/symthaea/issues/9191). It implements a reproducible, bounded, target-free approximation of this candidate-retention idea over NAS-Bench-201's six-operation topology:
+- seeded first-improvement 1-opt local search driven by one declared proxy;
+- local-optimum recording and bounded random 2-opt escapes;
+- preservation of starts, first-improvement candidates, local optima, escape candidates and all visited IDs;
+- feature-catalog digest over architecture IDs, six-op topology and selected proxy values;
+- archive digest over the frozen config, catalog digest, all candidate lists and ordered event trace;
+- final promotion planner with explicit proxy-elite, trajectory and topology-diversity quotas; remaining slots are labelled fallback, never silently counted as trajectory discoveries.
+
+The archive's target-metric ID is explicit and must differ from the proxy ID. The planner verifies that it receives the same feature catalog and archive content that generated the trajectory, rejects unknown candidates and rejects quota overcommit. It uses no target labels. The resulting IDs can be passed into the multi-fidelity query oracle to receive actual fidelity observations and final-confirmation credit.
+
+This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. It is an independently testable archive/promotion primitive inspired by the published finding. Nine Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, distinct quota accounting, digest binding and invalid inputs. They have not been compiled or executed.
+
 ## 8. External benchmark and data limitations
 
 The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201 or CoRA-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
@@ -157,12 +173,12 @@ The observed NASLib API structure is:
 - the curve is indexed by epoch (NASLib's query API returns the first 50 elements for `full_lc=True, epoch=50`);
 - the importer uses one-based milestones (default 5, 15, 200) and maps them to zero-based curve indices (4, 14, 199).
 
-The CIFAR-10 pickle is documented upstream as `nb201_cifar10_full_training.pickle`, Google Drive ID `1sh8pEhdrgZ97-VFBVL94rI36gedExVgJ`; NASLib's Colab artifact log reports 117 MB. The importer requires a caller-supplied expected raw SHA-256 and checks it **before** unpickling. Pickle deserialization can execute code: only use the official artifact after verifying the expected digest from a trusted, independent source. The importer validates exact architecture-set equality against SuiteZero, validates complete curves, checks the final curve point against SuiteZero `val_accuracy` within a declared tolerance, and emits the multi-fidelity canonical schema. It records the raw curve digest and SuiteZero canonical-import digest in a composite source provenance digest.
+The SuiteZero importer uses six-integer tuple-string architecture IDs, while the NASLib learning-curve pickle uses graph-string keys. The curve importer now reproduces the official NASLib `convert_op_indices_to_str` mapping exactly (edge order `(1,2),(1,3),(1,4),(2,3),(2,4),(3,4)`; op IDs 0..4 map to `skip_connect, none, nor_conv_3x3, nor_conv_1x1, avg_pool_3x3`). A pinned unit test checks the conversion against a concrete NASLib example. Directly comparing the two key formats would have rejected valid data; this mismatch is fixed in the importer. The CIFAR-10 pickle is documented upstream as `nb201_cifar10_full_training.pickle`, Google Drive ID `1sh8pEhdrgZ97-VFBVL94rI36gedExVgJ`; NASLib's Colab artifact log reports 117 MB. The importer requires a caller-supplied expected raw SHA-256 and checks it **before** unpickling. Pickle deserialization can execute code: only use the official artifact after verifying the expected digest from a trusted, independent source. The importer validates exact architecture-set equality against SuiteZero, validates complete curves, checks the final curve point against SuiteZero `val_accuracy` within a declared tolerance, and emits the multi-fidelity canonical schema. It records the raw curve digest and SuiteZero canonical-import digest in a composite source provenance digest.
 
 Eight standard-library Python tests are authored in `scripts/research/test_import_naslib_nb201_learning_curves.py` for epoch mapping, endpoint agreement, missing/extra architectures, missing/short curves, non-finite values, schedule/budget guards and pre-unpickle SHA verification. They have not been executed. The real 117 MB artifact has not been downloaded or hash-pinned, so importer validation remains synthetic until that step is completed. The 4.7 GB checkpoint or 226 GB trained-weight archive is not a prerequisite for this initial curve table.
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
-## 9. Claim ceiling
+## 10. Claim ceiling
 
 This module makes multi-fidelity resource use auditable. It does not implement ZAPS, CoRA, Hyperband, BOHB, DEHB or an optimizer. Passing its synthetic tests would qualify only the evaluator contract, not NAS search quality, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
