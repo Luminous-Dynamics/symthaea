@@ -41,6 +41,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const SQLITE_SCHEMA_VERSION: i64 = 2;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
+fn require_non_empty(value: &str, field: &str) -> Result<(), String> {
+    if value.trim().is_empty() || value.trim() != value {
+        return Err(format!("{field} must be non-empty and trimmed"));
+    }
+    Ok(())
+}
+
 /// Canonical row payload for one Add transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
