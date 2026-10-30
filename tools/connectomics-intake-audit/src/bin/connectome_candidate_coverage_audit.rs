@@ -369,10 +369,15 @@ fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> 
     {
         return Err("spatial frame per-PSU mask totals disagree with report totals".into());
     }
-    for psu in &report.population_frame {
-        if tile_ids.get(&psu.psu_id).copied().unwrap_or(0) == 0 {
-            return Err(format!("eligible population PSU {} has no foreground voxel in the verified mask", psu.psu_id));
-        }
+    let mask_eligible_ids = tile_ids.iter()
+        .filter(|(_, foreground)| **foreground > 0)
+        .map(|(psu_id, _)| psu_id.clone())
+        .collect::<BTreeSet<_>>();
+    let population_ids = report.population_frame.iter()
+        .map(|psu| psu.psu_id.clone())
+        .collect::<BTreeSet<_>>();
+    if population_ids.len() != report.population_frame.len() || population_ids != mask_eligible_ids {
+        return Err("verified mask eligible PSU IDs do not exactly equal the exported population frame".into());
     }
     Ok(())
 }
@@ -1281,6 +1286,45 @@ mod tests {
             population_frame: audit.population_frame.clone(),
             status: status.into(),
         }
+    }
+
+    #[test]
+    fn geometry_only_spatial_frame_report_cannot_feed_coverage() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.eligibility_mask_verified = false;
+        assert!(validate_spatial_frame_binding(
+            &audit,
+            &report,
+            &audit.source_spatial_frame_input_sha256,
+            &audit.source_spatial_frame_report_sha256,
+        ).unwrap_err().contains("did not verify eligibility-mask"));
+    }
+
+    #[test]
+    fn mask_digest_must_equal_verified_artifact_digest() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.eligibility_mask_actual_sha256 = "9".repeat(64);
+        assert!(validate_spatial_frame_binding(
+            &audit,
+            &report,
+            &audit.source_spatial_frame_input_sha256,
+            &audit.source_spatial_frame_report_sha256,
+        ).unwrap_err().contains("does not match the verified bytes"));
+    }
+
+    #[test]
+    fn mask_tile_totals_must_reconcile_with_grid_and_population() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.mask_tile_counts[0].eligible_voxel_count = "0".into();
+        assert!(validate_spatial_frame_binding(
+            &audit,
+            &report,
+            &audit.source_spatial_frame_input_sha256,
+            &audit.source_spatial_frame_report_sha256,
+        ).unwrap_err().contains("per-PSU mask totals"));
     }
 
     #[test]
