@@ -568,4 +568,4 @@ Two additional assurance components now have executable implementations on the C
 The combined target is an auditable chain from a declared tissue sampling frame to candidate-generation recall and downstream query reliability. A numerical recall estimate is not promoted if the frame or mask integrity gate fails.
 
 
-- [Hidden co-linear merge executable baseline](CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md): separate evaluator-only truth, radius-only versus multifeature change-point proposals, and negative controls for taper, bouton pulses, imaging artifacts, and compartment transitions. Synthetic only; not a biological detector.
+- [Hidden co-linear merge executable baseline](CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md): separate evaluator-only truth, a no-proposal control, radius-only versus multifeature change-point proposals, and negative controls for taper, bouton pulses, imaging artifacts, and compartment transitions. The synthetic fixture intentionally shows recall improving from 1/2 to 2/2 while false proposals rise from 1 to 7. Synthetic only; not a biological detector.
