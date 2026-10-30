@@ -104,6 +104,7 @@
       "additionalProperties": false,
       "required": [
         "condition_id",
+        "execution_ordinal",
         "input_sha256",
         "status",
         "judge_receipt_sha256",
@@ -168,6 +169,11 @@
           "items": {
             "$ref": "#/$defs/criterion_score"
           }
+        },
+        "execution_ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
         }
       },
       "allOf": [
