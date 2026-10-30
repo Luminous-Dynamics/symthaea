@@ -940,4 +940,88 @@ mod tests {
     }
 
 
+    #[test]
+    fn generated_derivation_witnesses_match_independent_fixed_point_oracle() {
+        for seed in 1_u64..=12 {
+            let mut graph = DerivationGraph::default();
+            for event_index in 0..8 {
+                graph.register_source_event(format!("E{event_index}")).unwrap();
+            }
+            let mut state = seed;
+            let mut deps_by_fact: BTreeMap<String, BTreeSet<DependencyRef>> = BTreeMap::new();
+
+            for fact_index in 0..40 {
+                state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let event_index = ((state >> 32) % 8) as usize;
+                let mut dependencies =
+                    make_dependencies([DependencyRef::SourceEvent(format!("E{event_index}"))]);
+                for parent_index in 0..fact_index {
+                    state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                    if state % 19 == 0 {
+                        dependencies.insert(DependencyRef::DerivedFact(format!("D{parent_index:02}")));
+                    }
+                }
+                let id = format!("D{fact_index:02}");
+                graph.derive(fact(&id, dependencies.iter().cloned())).unwrap();
+                deps_by_fact.insert(id, dependencies);
+            }
+
+            let root = "D39";
+            let mut expected_facts = BTreeSet::from([root.to_string()]);
+            let mut expected_sources = BTreeSet::new();
+            loop {
+                let before_facts = expected_facts.len();
+                let current: Vec<String> = expected_facts.iter().cloned().collect();
+                for id in current {
+                    for dependency in deps_by_fact.get(&id).unwrap() {
+                        match dependency {
+                            DependencyRef::SourceEvent(event_id) => {
+                                expected_sources.insert(event_id.clone());
+                            }
+                            DependencyRef::DerivedFact(parent_id) => {
+                                expected_facts.insert(parent_id.clone());
+                            }
+                        }
+                    }
+                }
+                if expected_facts.len() == before_facts {
+                    break;
+                }
+            }
+
+            let witness = graph.supporting_witness(root).unwrap();
+            let actual_facts: BTreeSet<String> = witness
+                .nodes_dependency_first
+                .iter()
+                .map(|node| node.fact.fact_id.clone())
+                .collect();
+            assert_eq!(actual_facts, expected_facts, "fact closure, seed {seed}");
+            assert_eq!(witness.source_event_ids, expected_sources, "source closure, seed {seed}");
+
+            let positions: BTreeMap<String, usize> = witness
+                .nodes_dependency_first
+                .iter()
+                .enumerate()
+                .map(|(index, node)| (node.fact.fact_id.clone(), index))
+                .collect();
+            for node in &witness.nodes_dependency_first {
+                for dependency in &node.fact.dependencies {
+                    if let DependencyRef::DerivedFact(parent_id) = dependency {
+                        assert!(
+                            positions[parent_id] < positions[&node.fact.fact_id],
+                            "dependency order, seed {seed}, edge {parent_id} -> {}",
+                            node.fact.fact_id
+                        );
+                    }
+                }
+            }
+            assert_eq!(
+                graph.supporting_witness(root).unwrap().witness_sha256,
+                witness.witness_sha256,
+                "deterministic digest, seed {seed}"
+            );
+        }
+    }
+
+
 }
