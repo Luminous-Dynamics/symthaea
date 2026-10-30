@@ -570,11 +570,28 @@ fn run(args: Args) -> Result<(), String> {
         "schema_version": "hardsec-evidence-audit-receipt-v1",
         "result": "pass",
         "claim_scope": CLAIM_SCOPE,
+        "packet_id": summary.packet_id,
         "packet_sha256": summary.packet_sha256,
         "design_id": summary.design_id,
         "netlist_sha256": summary.netlist_sha256,
         "model_sha256": summary.model_sha256,
         "evidence_count": summary.evidence_count,
+        "evidence": summary.evidence.iter().map(|item| json!({
+            "evidence_id": item.id,
+            "kind": item.kind,
+            "status": item.status,
+            "subject_sha256": item.subject_sha256,
+            "evidence_sha256": item.evidence_sha256,
+            "tool": item.tool,
+            "tool_version": item.tool_version,
+            "scope": item.scope,
+            "proof_scope": item.proof_scope,
+            "assumptions_sha256": item.assumptions_sha256,
+            "witness_sha256": item.witness_sha256,
+            "stimuli_count": item.stimuli_count,
+            "activation_count": item.activation_count,
+            "bound_cycles": item.bound_cycles
+        })).collect::<Vec<_>>(),
         "claims": claims,
         "signature": null,
         "security_verdict": null,
@@ -696,7 +713,6 @@ mod tests {
     struct Fixture {
         base: PathBuf,
         packet: PathBuf,
-        receipt_dir: PathBuf,
         receipt: PathBuf,
     }
 
@@ -717,7 +733,6 @@ mod tests {
             Self {
                 base,
                 packet,
-                receipt_dir,
                 receipt,
             }
         }
