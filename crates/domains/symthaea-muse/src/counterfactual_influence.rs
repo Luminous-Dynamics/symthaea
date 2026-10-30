@@ -104,7 +104,10 @@ pub struct RepeatabilityCalibration {
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
     pub source_score_sha256: String,
+    /// SHA-256 of the exact serialized baseline map artifact.
     pub performed_event_map_sha256: String,
+    /// Parser-reconstructed receipt digest from the baseline MIDI bytes.
+    pub performed_event_map_receipt_sha256: String,
     pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
@@ -147,7 +150,7 @@ pub struct VerifiedRendererAudioBinding {
     source_score_sha256: String,
     input_artifact_sha256: String,
     performed_event_map_sha256: String,
-    performed_event_map_artifact_sha256: Option<String>,
+    performed_event_map_artifact_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
 }
 
@@ -180,6 +183,10 @@ impl VerifiedRendererAudioBinding {
         &self.performed_event_map_sha256
     }
 
+    pub fn performed_event_map_artifact_sha256(&self) -> &str {
+        &self.performed_event_map_artifact_sha256
+    }
+
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
         &self.performed_event_lineage
     }
@@ -202,7 +209,9 @@ fn decoded_pcm_f32_le_sha256(audio: &AudioView<'_>) -> String {
 pub fn verify_renderer_audio_binding(
     receipt: &RendererExecutionReceipt,
     inputs: RendererReceiptInputs<'_>,
-    performed_event_map_bytes: Option<&[u8]>,
+    performed_event_map_bytes: &[u8],
+    expected_score_event_count: usize,
+    excluded_source_event_index: Option<usize>,
     audio: &AudioView<'_>,
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
     let frames = validate_audio(audio)?;
@@ -222,20 +231,40 @@ pub fn verify_renderer_audio_binding(
     )
     .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
 
+    match excluded_source_event_index {
+        None => parsed_map.verify_for_score(
+            &receipt.score_sha256,
+            &parsed_map.performed_midi_sha256,
+            audio.sample_rate_hz,
+            frames as u64,
+            expected_score_event_count,
+        ),
+        Some(excluded_index) => parsed_map.verify_for_score_excluding(
+            &receipt.score_sha256,
+            &parsed_map.performed_midi_sha256,
+            audio.sample_rate_hz,
+            frames as u64,
+            expected_score_event_count,
+            excluded_index,
+        ),
+    }
+    .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
+
+    let supplied_map: PerformedEventMap = serde_json::from_slice(performed_event_map_bytes)
+        .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
+    if supplied_map != parsed_map {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
     if let Some(receipt_map_sha256) = receipt.performed_event_map_sha256.as_deref()
         && receipt_map_sha256 != parsed_map.receipt_sha256
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
-    if let Some(map_bytes) = performed_event_map_bytes {
-        let supplied_map: PerformedEventMap = serde_json::from_slice(map_bytes)
-            .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
-        if supplied_map != parsed_map
-            || receipt.performed_event_map_sha256.as_deref()
-                != Some(parsed_map.receipt_sha256.as_str())
-        {
-            return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
-        }
+    if excluded_source_event_index.is_none()
+        && receipt.performed_event_map_sha256.as_deref()
+            != Some(parsed_map.receipt_sha256.as_str())
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
 
     receipt
@@ -268,7 +297,7 @@ pub fn verify_renderer_audio_binding(
         source_score_sha256: receipt.score_sha256.clone(),
         input_artifact_sha256,
         performed_event_map_sha256: parsed_map.receipt_sha256,
-        performed_event_map_artifact_sha256: performed_event_map_bytes.map(sha256_hex),
+        performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         performed_event_lineage: parsed_map.events,
     })
 }
@@ -292,7 +321,11 @@ pub struct CounterfactualInfluenceReport {
     pub source_event_id: String,
     pub intervention: EventIntervention,
     pub source_score_sha256: String,
+    /// Hash of the exact serialized baseline map artifact.
     pub performed_event_map_sha256: String,
+    pub performed_event_map_receipt_sha256: String,
+    pub counterfactual_event_map_sha256: String,
+    pub counterfactual_event_map_receipt_sha256: String,
     pub baseline_schedule_sha256: String,
     pub counterfactual_schedule_sha256: String,
     pub renderer_identity_sha256: String,
@@ -323,6 +356,8 @@ pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub intervention: EventIntervention,
     pub source_score_bytes: &'view [u8],
     pub performed_event_map_bytes: &'view [u8],
+    pub counterfactual_performed_event_map_bytes: &'view [u8],
+    pub expected_score_event_count: usize,
     pub baseline_schedule_bytes: &'view [u8],
     pub counterfactual_schedule_bytes: &'view [u8],
     pub baseline_renderer_evidence: &'view VerifiedRendererAudioBinding,
@@ -423,6 +458,17 @@ impl std::error::Error for CounterfactualInfluenceError {}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+fn parse_score_event_index(value: &str) -> Option<usize> {
+    let suffix = value.strip_prefix("score_event_index:")?;
+    if suffix.is_empty()
+        || (suffix.len() > 1 && suffix.starts_with('0'))
+        || !suffix.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    suffix.parse().ok()
 }
 
 fn audio_sha256(audio: &AudioView<'_>) -> String {
@@ -724,9 +770,8 @@ pub fn calibrate_repeatability(
     let baseline_schedule_sha256 = sha256_hex(baseline_schedule_bytes);
     if anchor_renderer_evidence.source_score_sha256 != score_sha256
         || anchor_renderer_evidence.input_artifact_sha256 != baseline_schedule_sha256
-        || anchor_renderer_evidence.performed_event_map_artifact_sha256.as_deref()
-            != Some(event_map_sha256.as_str())
-        || anchor_renderer_evidence.performed_event_map_sha256 != event_map_sha256
+        || anchor_renderer_evidence.performed_event_map_artifact_sha256
+            != event_map_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
@@ -741,9 +786,9 @@ pub fn calibrate_repeatability(
         }
         if evidence.source_score_sha256 != score_sha256
             || evidence.input_artifact_sha256 != baseline_schedule_sha256
-            || evidence.performed_event_map_artifact_sha256.as_deref()
-                != Some(event_map_sha256.as_str())
-            || evidence.performed_event_map_sha256 != event_map_sha256
+            || evidence.performed_event_map_artifact_sha256 != event_map_sha256
+            || evidence.performed_event_map_sha256
+                != anchor_renderer_evidence.performed_event_map_sha256
         {
             return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
         }
@@ -794,7 +839,10 @@ pub fn calibrate_repeatability(
         total_frames,
         analysis: analysis.clone(),
         source_score_sha256: sha256_hex(source_score_bytes),
-        performed_event_map_sha256: sha256_hex(performed_event_map_bytes),
+        performed_event_map_sha256: event_map_sha256,
+        performed_event_map_receipt_sha256: anchor_renderer_evidence
+            .performed_event_map_sha256
+            .clone(),
         baseline_schedule_sha256: sha256_hex(baseline_schedule_bytes),
         renderer_identity_sha256: anchor_renderer_evidence.renderer_identity_sha256.clone(),
         renderer_config_sha256: anchor_renderer_evidence.renderer_config_sha256.clone(),
@@ -861,15 +909,18 @@ fn validate_input(
     calibration: &RepeatabilityCalibration,
 ) -> Result<usize, CounterfactualInfluenceError> {
     validate_intervention(&input.intervention)?;
-    if input.source_event_id.trim().is_empty()
-        || input.source_event_id.len() > MAX_EVENT_ID_BYTES
-        || input.source_event_id.chars().any(char::is_control)
+    let excluded_index = parse_score_event_index(input.source_event_id)
+        .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
+    if input.expected_score_event_count == 0
+        || input.expected_score_event_count > 100_000
+        || excluded_index >= input.expected_score_event_count
     {
         return Err(CounterfactualInfluenceError::InvalidEventId);
     }
     for (name, bytes) in [
         ("source_score", input.source_score_bytes),
         ("performed_event_map", input.performed_event_map_bytes),
+        ("counterfactual_performed_event_map", input.counterfactual_performed_event_map_bytes),
         ("baseline_schedule", input.baseline_schedule_bytes),
         ("counterfactual_schedule", input.counterfactual_schedule_bytes),
         ("baseline_renderer_receipt", input.baseline_renderer_evidence.receipt_sha256.as_bytes()),
@@ -915,38 +966,71 @@ fn validate_input(
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.counterfactual_schedule_bytes)
-        || input.baseline_renderer_evidence.performed_event_map_artifact_sha256.as_deref()
-            != Some(sha256_hex(input.performed_event_map_bytes).as_str())
-        || input.baseline_renderer_evidence.performed_event_map_sha256
-            != calibration.performed_event_map_sha256
+        || input.baseline_renderer_evidence.performed_event_map_artifact_sha256
+            != sha256_hex(input.performed_event_map_bytes)
+        || input.counterfactual_renderer_evidence.performed_event_map_artifact_sha256
+            != sha256_hex(input.counterfactual_performed_event_map_bytes)
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
-    let baseline_target_present = input
+
+    let baseline_ids: std::collections::BTreeSet<usize> = input
         .baseline_renderer_evidence
         .performed_event_lineage
         .iter()
-        .any(|row| row.source_event_id == input.source_event_id);
-    let counterfactual_target_absent = input
+        .filter_map(|row| parse_score_event_index(&row.source_event_id))
+        .collect();
+    let counterfactual_ids: std::collections::BTreeSet<usize> = input
         .counterfactual_renderer_evidence
         .performed_event_lineage
         .iter()
-        .all(|row| row.source_event_id != input.source_event_id);
-    if !baseline_target_present || !counterfactual_target_absent {
+        .filter_map(|row| parse_score_event_index(&row.source_event_id))
+        .collect();
+    let expected_baseline_ids: std::collections::BTreeSet<usize> =
+        (0..input.expected_score_event_count).collect();
+    let expected_counterfactual_ids: std::collections::BTreeSet<usize> =
+        (0..input.expected_score_event_count)
+            .filter(|index| *index != excluded_index)
+            .collect();
+    if baseline_ids != expected_baseline_ids
+        || counterfactual_ids != expected_counterfactual_ids
+    {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    }
+    if input.baseline_renderer_evidence.performed_event_map_sha256
+        != calibration.performed_event_map_receipt_sha256
+    {
+        return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
+    }
+
+    let baseline_target_rows: Vec<&PerformedEventLineage> = input
+        .baseline_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .filter(|row| row.source_event_id == input.source_event_id)
+        .collect();
+    let counterfactual_target_present = input
+        .counterfactual_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .any(|row| row.source_event_id == input.source_event_id);
+    if baseline_target_rows.is_empty() || counterfactual_target_present {
         return Err(CounterfactualInfluenceError::InvalidIntervention);
     }
 
+    // A true Remove operation must preserve every non-target descendant exactly.
+    // MIDI ordinal is omitted because removing a prior note shifts later per-track ordinals.
     let baseline_protected: Vec<&PerformedEventLineage> = input
         .baseline_renderer_evidence
         .performed_event_lineage
         .iter()
         .filter(|row| row.source_event_id != input.source_event_id)
         .collect();
-    let candidate_protected =
+    let counterfactual_protected =
         &input.counterfactual_renderer_evidence.performed_event_lineage;
-    if baseline_protected.len() != candidate_protected.len()
+    if baseline_protected.len() != counterfactual_protected.len()
         || baseline_protected.iter().any(|baseline| {
-            !candidate_protected.iter().any(|candidate| {
+            !counterfactual_protected.iter().any(|candidate| {
                 candidate.source_event_id == baseline.source_event_id
                     && candidate.descendant_ordinal == baseline.descendant_ordinal
                     && candidate.midi_track_index == baseline.midi_track_index
@@ -977,6 +1061,7 @@ fn validate_input(
     }
     Ok(frames)
 }
+
 
 fn seal_report(
     mut report: CounterfactualInfluenceReport,
@@ -1064,6 +1149,16 @@ pub fn measure_counterfactual_influence(
         intervention: input.intervention.clone(),
         source_score_sha256: sha256_hex(input.source_score_bytes),
         performed_event_map_sha256: sha256_hex(input.performed_event_map_bytes),
+        performed_event_map_receipt_sha256: calibration
+            .performed_event_map_receipt_sha256
+            .clone(),
+        counterfactual_event_map_sha256: sha256_hex(
+            input.counterfactual_performed_event_map_bytes,
+        ),
+        counterfactual_event_map_receipt_sha256: input
+            .counterfactual_renderer_evidence
+            .performed_event_map_sha256
+            .clone(),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
         renderer_identity_sha256: input.baseline_renderer_evidence.renderer_identity_sha256.clone(),
