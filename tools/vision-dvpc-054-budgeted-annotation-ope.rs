@@ -1687,7 +1687,11 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         seed ^ 0x0580_c011_2026_1030,
     )?);
     output.push_str(&entropy_stopping_benchmark_rows()?);
-    output.push_str(&selection_regret_benchmark_rows()?);
+    if replicates <= 2 {
+        output.push_str(&selection_regret_benchmark_rows_with_config(2, 12, 4, 24)?);
+    } else {
+        output.push_str(&selection_regret_benchmark_rows()?);
+    }
     Ok(output)
 }
 
@@ -2955,7 +2959,7 @@ fn selection_regret_benchmark_rows_with_config(
                 metrics.expected_simple_regret - exact_holdout_worst;
             let _ = writeln!(
                 output,
-                "REGRET_RESULT\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{:.10}",
+                "REGRET_RESULT\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.8}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{}\\t{}\\t{}\\t{:.10}",
                 world.name,
                 profile.name,
                 method,
@@ -2973,6 +2977,7 @@ fn selection_regret_benchmark_rows_with_config(
                 worst_mse,
                 policy_mses[0],
                 policy_mses[1],
+                policy_mses[2],
                 sources[0],
                 sources[1],
                 sources[2],
@@ -3883,7 +3888,7 @@ mod tests {
         assert_eq!(configs[0].split('\t').count(), 10);
         assert_eq!(results.len(), 24);
         for row in &results {
-            assert_eq!(row.split('\t').count(), 22);
+            assert_eq!(row.split('\t').count(), 23);
         }
         let methods: Vec<_> = results
             .iter()
