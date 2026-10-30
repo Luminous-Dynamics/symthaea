@@ -7,6 +7,7 @@ on:
       - "Cargo.lock"
       - "examples/hardsec_trigger_budget.rs"
       - "examples/hardsec_evidence_packet_audit.rs"
+      - "tests/fixtures/hardsec/*.json"
       - "tools/hardsec-audit-harness/Cargo.toml"
       - ".github/workflows/hardsec-audit-tests.yml"
   workflow_dispatch:
@@ -48,6 +49,43 @@ jobs:
 
       - name: Test claim-scoped evidence packet auditor
         run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+
+      - name: Audit pinned SeqCube witness-validation packet
+        run: |
+          cargo run --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit -- \
+            --packet tests/fixtures/hardsec/seqcube-witness-validation-packet.json \
+            --receipt "$RUNNER_TEMP/seqcube-evidence-audit.json"
+          python3 - "$RUNNER_TEMP/seqcube-evidence-audit.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              receipt = json.load(handle)
+
+          expected = {
+              "trigger_activated",
+              "payload_effect_observed",
+              "trigger_not_observed_under_budget",
+              "payload_effect_not_observed_under_budget",
+              "bounded_reachability_not_found",
+          }
+          actual = {claim["claim_type"] for claim in receipt["claims"]}
+          assert receipt["result"] == "pass", receipt
+          assert receipt["evaluation_mode"] == "witness_validation", receipt
+          assert receipt["model_sha256"] is None, receipt
+          assert receipt["evidence_count"] == 5, receipt
+          assert actual == expected, (actual, expected)
+          assert all(claim["status"] == "supported" for claim in receipt["claims"]), receipt
+          assert receipt["security_verdict"] is None, receipt
+          print("SeqCube packet receipt: PASS (5 bounded/observed claims, detector-free)")
+          PY
+
+      - name: Upload SeqCube witness packet audit receipt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-seqcubewitness-validation-receipt
+          path: "$RUNNER_TEMP/seqcube-evidence-audit.json"
 
       - name: Record resolved harness dependency lock
         if: always()
