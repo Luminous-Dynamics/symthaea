@@ -51,7 +51,10 @@ Source tests cover:
 4. One composition lineage represented by different audio renders across splits is rejected.
 5. Duplicate IDs and malformed required digests are reported.
 6. Row ordering does not affect either commitment.
-7. A tampered audit count fails replay verification.
+7. Empty manifests and blank benchmark/revision metadata fail closed.
+8. Same-role and cross-role audio asset reuse across splits is rejected.
+9. Whitespace-only sample IDs and malformed optional score digests are rejected.
+10. A tampered audit count fails replay verification.
 
 Additional campaign controls should include alternate encodings, stems, remasters, time-stretched copies, transposed MIDI exports, and source/target role swaps. Exact SHA-256 alone will not detect perceptually or structurally equivalent content with different bytes.
 
@@ -85,4 +88,4 @@ A lineage audit is necessary but not sufficient to establish external validity o
 
 ## Validation boundary
 
-The Rust module and seven tests are authored. The current execution environment does not have `cargo`, `rustc`, `rustfmt`, or the benchmark datasets, so compilation, execution, and dataset qualification remain unverified. Do not treat the PR as passing CI or as a measured benchmark improvement.
+The Rust module and ten tests are authored. The current execution environment does not have `cargo`, `rustc`, `rustfmt`, or the benchmark datasets, so compilation, execution, and dataset qualification remain unverified. Do not treat the PR as passing CI or as a measured benchmark improvement.
