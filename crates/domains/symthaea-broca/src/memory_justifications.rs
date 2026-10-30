@@ -51,6 +51,8 @@ pub struct DerivedConclusionInput {
     pub justifications: Vec<JustificationInput>,
 }
 
+/// Stored support state after explicit source retractions, independent of a query date.
+/// Use `support_status_at` / `current_fact_at` when valid-time intervals matter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum SupportStatus {
@@ -333,6 +335,8 @@ impl JustificationGraph {
 
     /// Return only supported conclusions. Unsupported records remain inspectable
     /// through `fact` for audit and must not be treated as false assertions.
+    /// Return a conclusion with structurally active support, ignoring its valid-time
+    /// interval. Prefer `current_fact_at` for a date-scoped answer.
     pub fn current_fact(&self, fact_id: &str) -> Option<&DerivedConclusionRecord> {
         self.facts.get(fact_id).filter(|record| record.status.is_supported())
     }
