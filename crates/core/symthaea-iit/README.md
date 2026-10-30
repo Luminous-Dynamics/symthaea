@@ -243,6 +243,25 @@ The same bucketed, log-domain kernel is used by the system-level Eq. 4 cause
 path; end-to-end system-search timing must still be measured separately.
 
 
+### Proper-system Eq. 4 background sweep
+
+A second benchmark exercises the public production path
+`forward_cause_likelihood_iit4` with a fixed four-unit candidate system embedded
+in sparse ring substrates of 8, 12, and 16 units. It records total substrate
+state count, candidate-system state count, external-background size, median and
+minimum latency, and a deterministic result checksum.
+
+Run:
+
+    cargo run --release --locked -p symthaea-iit --example eq4_sparse_background_sweep
+
+This isolates the cost of Eq. 4 cause-side inversion as the background grows while
+the candidate system remains fixed. It does not measure the full system partition
+sweep, and it is not a PyPhi performance comparison. The dense implementation is
+still used as an exact differential oracle on small models; larger performance
+claims require the same input TPM, formalism, candidate, state, and result status
+on a pinned PyPhi artifact.
+
 ### Factor-graph benchmark targets
 
 - **Exactness:** zero unexplained dense-vs-factor-graph mismatches on exhaustive
