@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-event-pool-recall-receipt-v1.schema.json",
+  "title": "HARDSEC Event-Pool Recall Receipt v1",
+  "description": "Exact unique-event and transition recall against a complete reachable graph of a declared finite FSM. Not a real circuit coverage or security verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result",
+    "claim_scope",
+    "fixture_id",
+    "spec_sha256",
+    "reference_state_count",
+    "trace_count",
+    "reference_event_count",
+    "observed_event_count",
+    "event_pool_recall",
+    "reference_event_ids",
+    "observed_event_ids",
+    "missed_event_ids",
+    "reference_transition_count",
+    "observed_transition_count",
+    "transition_recall",
+    "missed_transition_ids",
+    "unreachable_transition_ids_excluded_from_denominator",
+    "unreachable_event_ids_excluded_from_denominator",
+    "coverage_interpretation",
+    "security_verdict",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-event-pool-recall-receipt-v1"
+    },
+    "result": {
+      "const": "pass"
+    },
+    "claim_scope": {
+      "const": "complete_reachable_event_enumeration_for_declared_finite_fsm_only"
+    },
+    "fixture_id": {
+      "type": "string"
+    },
+    "spec_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reference_state_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "trace_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reference_event_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_pool_recall": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reference_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "observed_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "missed_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "reference_transition_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_transition_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "transition_recall": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "missed_transition_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "unreachable_transition_ids_excluded_from_denominator": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "unreachable_event_ids_excluded_from_denominator": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "coverage_interpretation": {
+      "type": "string"
+    },
+    "security_verdict": {
+      "type": "null"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
