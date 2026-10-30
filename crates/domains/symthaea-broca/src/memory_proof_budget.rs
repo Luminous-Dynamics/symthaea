@@ -50,6 +50,10 @@ fn sha256_json<T: Serialize>(value: &T, field: &str) -> Result<String, String> {
     Ok(format!("{:x}", Sha256::digest(bytes)))
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
 /// One immutable, source-anchored evidence candidate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +61,8 @@ pub struct ProofEvidenceCandidate {
     pub evidence_id: String,
     pub source_revision_id: String,
     pub source_pointer: String,
+    /// UTF-8 excerpt resolved from the source pointer and byte offsets.
+    pub source_span_text: String,
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
@@ -92,6 +98,7 @@ impl ProofEvidenceCandidate {
             ("evidence_id", self.evidence_id.as_str()),
             ("source_revision_id", self.source_revision_id.as_str()),
             ("source_pointer", self.source_pointer.as_str()),
+            ("source_span_text", self.source_span_text.as_str()),
             ("source_family_id", self.source_family_id.as_str()),
             ("scope_id", self.scope_id.as_str()),
             ("authorized_principal_id", self.authorized_principal_id.as_str()),
@@ -161,7 +168,10 @@ impl ProofEvidenceCandidate {
         {
             reasons.insert(ProofCandidateRejection::Unauthorized);
         }
-        if self.source_span_sha256 != self.resolved_span_sha256 {
+        let resolved_digest = sha256_hex(self.source_span_text.as_bytes());
+        if self.source_span_sha256 != self.resolved_span_sha256
+            || self.source_span_sha256 != resolved_digest
+        {
             reasons.insert(ProofCandidateRejection::SourceSpanMismatch);
         }
         reasons
@@ -185,6 +195,8 @@ pub struct ProofObligation {
     pub alternatives: Vec<ProofJustification>,
     /// Count distinct source families within the selected proof, not revisions.
     pub minimum_independent_families: u32,
+    /// Token cost of the selected conclusion's rendered proof/dependency envelope.
+    pub selection_overhead_tokens: u32,
 }
 
 /// Query contract for exact minimum-cost proof selection.
@@ -198,6 +210,8 @@ pub struct ProofBudgetRequest {
     pub known_at_unix_ms: u64,
     pub policy_id: String,
     pub policy_sha256: String,
+    /// Fixed packet header/framing tokens emitted by the pinned renderer.
+    pub fixed_packet_overhead_tokens: u64,
     pub token_budget: u64,
     pub max_search_nodes: u64,
     /// Tokenizer identity/version/digest used to calculate token_cost.
@@ -362,6 +376,7 @@ pub struct ProofPacketEvidenceRef {
     pub evidence_id: String,
     pub source_revision_id: String,
     pub source_pointer: String,
+    pub source_span_text: String,
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
@@ -686,6 +701,7 @@ pub fn solve_proof_budget(
                 evidence_id: candidate.evidence_id.clone(),
                 source_revision_id: candidate.source_revision_id.clone(),
                 source_pointer: candidate.source_pointer.clone(),
+                source_span_text: candidate.source_span_text.clone(),
                 source_span_start: candidate.source_span_start,
                 source_span_end: candidate.source_span_end,
                 source_family_id: candidate.source_family_id.clone(),
@@ -830,6 +846,7 @@ pub fn verify_proof_packet(
             evidence_id: candidate.evidence_id.clone(),
             source_revision_id: candidate.source_revision_id.clone(),
             source_pointer: candidate.source_pointer.clone(),
+            source_span_text: candidate.source_span_text.clone(),
             source_span_start: candidate.source_span_start,
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
@@ -904,13 +921,14 @@ mod tests {
             evidence_id: id.into(),
             source_revision_id: format!("revision-{id}"),
             source_pointer: format!("/messages/{id}/content"),
+            source_span_text: "0123456789".into(),
             source_span_start: 0,
             source_span_end: 10,
             source_family_id: family.into(),
             scope_id: "scope-1".into(),
             payload_sha256: digest('a'),
-            source_span_sha256: digest('b'),
-            resolved_span_sha256: digest('b'),
+            source_span_sha256: sha256_hex(b"0123456789"),
+            resolved_span_sha256: sha256_hex(b"0123456789"),
             conflicts_with: BTreeSet::new(),
             recorded_at_unix_ms: 100,
             retracted_at_unix_ms: None,
@@ -936,6 +954,7 @@ mod tests {
             conclusion_id: id.into(),
             alternatives,
             minimum_independent_families: 1,
+            selection_overhead_tokens: 0,
         }
     }
 
@@ -956,6 +975,7 @@ mod tests {
             tokenizer_version: "2026-10-30".into(),
             tokenizer_sha256: digest('e'),
             packet_renderer_sha256: digest('f'),
+            fixed_packet_overhead_tokens: 0,
             token_budget: budget,
             max_search_nodes: 10_000,
             candidates,
@@ -1279,6 +1299,7 @@ mod tests {
             evidence_id: candidate.evidence_id.clone(),
             source_revision_id: candidate.source_revision_id.clone(),
             source_pointer: candidate.source_pointer.clone(),
+            source_span_text: candidate.source_span_text.clone(),
             source_span_start: candidate.source_span_start,
             source_span_end: candidate.source_span_end,
             source_family_id: candidate.source_family_id.clone(),
