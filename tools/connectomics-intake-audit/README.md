@@ -220,6 +220,8 @@ The new `connectome-candidate-coverage-audit` binary addresses a distinct blind 
 
 This evaluator binds the exact proposal bytes, ranking-report bytes, sampling protocol, and seed commitment. It draws a deterministic stratified simple random sample without replacement of primary sampling units (PSUs) from a complete declared search frame. Every selected PSU must attest to exhaustive expert search, including selected units with zero errors. Each independently verified error is mapped to zero or more IDs from the frozen proposal pool; an empty mapping is a candidate-generation miss.
 
+The complete `error_families` vocabulary must be unique and preregistered in the audit input; every sampled error must belong to it. Declared families with no sampled observations remain visible with zero estimated count and undefined recall when the denominator is zero.
+
 The report estimates:
 - finite-frame total, covered, and uncovered error counts using stratified Horvitz–Thompson totals;
 - candidate-generation recall as a ratio of covered to total estimated errors;
