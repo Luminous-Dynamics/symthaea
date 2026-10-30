@@ -153,8 +153,13 @@ The candidate-coverage verifier rejects a spatial-frame report unless it declare
 - the mask encoding is one of the two protocol-defined LSB-first x-fastest representations;
 - artifact byte count equals `ceil(declared_voxel_count / 8)` for packed bytes or twice that for ASCII hex;
 - mask foreground count/fraction agrees with the declared voxel count;
-- grid dimensions multiply to `total_grid_cells`, and mask tile rows cover that exact count;
+- the reported `grid_dimensions` are recomputed from positive `extent_voxels` and `tile_shape_voxels`, and multiply to `total_grid_cells`;
+- every PSU ID is canonical `x:y:z`, in bounds, unique, and its reported clipped tile volume is recomputed from its coordinate and the extent/tile shape;
+- the exact tile rows cover that complete lattice (cell count plus unique in-bounds coordinates), not merely an equal number of rows;
 - per-tile geometric volumes sum to the declared voxel count, and per-tile foreground counts sum to the global mask count;
 - positive-mask PSU IDs exactly equal the exported eligible population, with the same cardinality and no duplicates.
 
 A geometry-only status, missing mask fields, digest mismatch, count mismatch, duplicated PSU, or different population set blocks coverage estimation. This binds the coverage estimator to a mask-verified frame report. It still does not independently validate the scientific correctness of the mask-selection rule or prove that the declared volume bounding box is complete.
+
+
+The verifier performs the geometric recomputation directly: for tile coordinate `g`, axis start is `g[axis] * tile_shape[axis]`, and clipped axis extent is `min(tile_shape[axis], extent[axis] - start`. The product of those three clipped extents must equal that tile's reported geometric volume. Non-canonical coordinate strings, out-of-range coordinates, zero extents/tile sizes, incorrect grid dimensions, and incorrect clipped volumes are rejected. This check is separate from mask foreground counts; geometric tile volume and eligible-mask foreground volume must not be conflated.
