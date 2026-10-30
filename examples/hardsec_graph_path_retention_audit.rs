@@ -78,6 +78,17 @@ struct ReferencePath {
 }
 
 #[derive(Debug, Clone)]
+struct PathStepSummary {
+    step_index: usize,
+    edge_id: String,
+    src: String,
+    dst: String,
+    disposition: &'static str,
+    represented_partition: Option<String>,
+    exclusion_reason: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 struct PathSummary {
     path_id: String,
     source_node: String,
@@ -87,6 +98,7 @@ struct PathSummary {
     excluded_edge_count: usize,
     partition_crossings: usize,
     status: &'static str,
+    steps: Vec<PathStepSummary>,
 }
 
 #[derive(Debug, Clone)]
@@ -540,6 +552,26 @@ fn audit_readers<S: BufRead, R: BufRead, X: BufRead, P: BufRead>(
         };
         total_reference_path_edges += path.steps.len();
         retained_reference_path_edges += retained;
+        let step_summaries = path
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(index, step)| {
+                let (disposition, exclusion_reason) = match &step.exclusion_reason {
+                    Some(reason) => ("excluded", Some(reason.clone())),
+                    None => ("retained", None),
+                };
+                PathStepSummary {
+                    step_index: index + 1,
+                    edge_id: step.edge_id.clone(),
+                    src: step.src.clone(),
+                    dst: step.dst.clone(),
+                    disposition,
+                    represented_partition: step.represented_partition.clone(),
+                    exclusion_reason,
+                }
+            })
+            .collect::<Vec<_>>();
         path_summaries.push(PathSummary {
             path_id: path.path_id,
             source_node: first.src.clone(),
@@ -549,6 +581,7 @@ fn audit_readers<S: BufRead, R: BufRead, X: BufRead, P: BufRead>(
             excluded_edge_count: excluded,
             partition_crossings: crossings,
             status,
+            steps: step_summaries,
         });
     }
 
@@ -673,9 +706,13 @@ fn audit_files(args: &Args) -> Result<serde_json::Value, String> {
         "result": "pass",
         "claim_scope": CLAIM_SCOPE,
         "inputs": {
+            "source_edges_path": args.source_edges.display().to_string(),
             "source_edges_sha256": source_hash,
+            "represented_edges_path": args.represented_edges.display().to_string(),
             "represented_edges_sha256": represented_hash,
+            "exclusions_path": args.exclusions.display().to_string(),
             "exclusions_sha256": exclusion_hash,
+            "reference_paths_path": args.reference_paths.display().to_string(),
             "reference_paths_sha256": paths_hash
         },
         "edge_accounting": {
@@ -699,7 +736,16 @@ fn audit_files(args: &Args) -> Result<serde_json::Value, String> {
                 "retained_edge_count": path.retained_edge_count,
                 "excluded_edge_count": path.excluded_edge_count,
                 "partition_crossings": path.partition_crossings,
-                "status": path.status
+                "status": path.status,
+                "steps": path.steps.iter().map(|step| json!({
+                    "step_index": step.step_index,
+                    "edge_id": step.edge_id,
+                    "src": step.src,
+                    "dst": step.dst,
+                    "disposition": step.disposition,
+                    "represented_partition": step.represented_partition,
+                    "exclusion_reason": step.exclusion_reason
+                })).collect::<Vec<_>>()
             })).collect::<Vec<_>>()
         },
         "limitations": [
@@ -897,6 +943,11 @@ mod tests {
         assert_eq!(summary.cut_path_count, 1);
         assert_eq!(summary.paths[0].status, "cut_and_reported");
         assert_eq!(summary.paths[0].excluded_edge_count, 1);
+        assert_eq!(summary.paths[0].steps[1].disposition, "excluded");
+        assert_eq!(
+            summary.paths[0].steps[1].exclusion_reason.as_deref(),
+            Some("memory budget partition cut")
+        );
     }
 
     #[test]
