@@ -23,6 +23,7 @@ The machine-readable registry is \`industry-baseline-ledger-v1.json\`.
 | AgentMemory BM25 | LongMemEval-S | 84.7% strict recall-all@5 (398/470) | Project component report with per-question receipts | Retrieval only; no answer model, no abstention score; multi-session strict recall 71.1% |
 | HALT | Three multi-hop QA benchmarks | Redundant search reduced; exact match largely preserved | Peer-reviewed Findings paper | Stops on expected claim-evidence coverage; no percentage pooled here |
 | Active RAG utility evaluation | Multi-hop QA / HotpotQA | Nominal 50% retrieval budget overshot in 40–100% of splits for common triggers | Primary research preprint | Measures marginal correctness change, threshold transfer, realized budget, retrieval harm and all-in cost |
+| Cost-aware additional-retrieval router | QASPER | 78.70% evidence Hit@10; 24.5% routed to hybrid retrieval | 27 Oct 2026 preprint | 188 questions / 60 held-out articles; paired bootstrap does not establish reliable utility advantage; answer-level review provisional |
 | CONFRAG | Production RAG | 5–39% fewer retrieval calls; up to 800 ms P90 reduction | Peer-reviewed EMNLP Industry paper | Matched answer quality to always-on RAG in its reported system; confidence-based gate, not lifecycle proof |
 | AgentAbstain | 263 paired agent tasks | 59.5% best paired accuracy across 17 models | Peer-reviewed NeurIPS benchmark | 42 environments, 8 abstention scenarios; broader agent action benchmark, not memory QA |
 | Evidence Sufficiency Benchmark | Five-level L1–L5 evidence quality | 65–91% over-answer rate at L5 conflict | Peer-reviewed benchmark | Seven LLMs / five families; 200-sample human validation; evidence abstention, not lifecycle replay |
@@ -108,6 +109,8 @@ Do not collapse these into one number. A retriever can have high recall and stil
 
 Recent work makes clear that deciding whether to retrieve more is its own benchmark problem. HALT uses expected claim–evidence coverage as a stopping condition and reports lower redundant search while largely preserving exact match. Active RAG utility work goes further: it measures marginal correctness change with versus without retrieval, and requires realized budget usage, threshold transfer, retrieval harm and total trigger/retrieval cost. CONFRAG provides an industry operating point with 5–39% fewer external retrievals and up to 800 ms P90 latency reduction while matching its own always-on RAG quality.
 
+A further caution is provided by Zhao's 27 October 2026 cost-aware retrieval study: its policy sent 46/188 QASPER questions (24.5%) to hybrid retrieval and obtained 78.70% evidence Hit@10 versus 76.92% for always-keep, but paper-cluster paired-bootstrap intervals did not establish a reliable utility advantage. Answer-level correctness/faithfulness assessment was provisional, model-assisted and not independently human validated. Broca must therefore evaluate downstream action/answer utility, not merely evidence Hit@k or fewer calls.
+
 AgentAbstain and the Evidence Sufficiency Benchmark expose the complementary stop/abstain failure: task completion does not imply that acting was justified. AgentAbstain's 263 paired tasks across 42 environments report 59.5% best paired accuracy; the Evidence Sufficiency Benchmark reports 65–91% over-answering under conflicting evidence for the evaluated models.
 
 ### What Broca should measure
@@ -137,6 +140,7 @@ The comparison must hold generator, reader prompt, memory corpus, proof checker,
 - Vera-Life, *Lifecycle Faithfulness for Grounded Retrieval-Augmented Generation* (GroundLM 2026, 29 October 2026): https://aclanthology.org/2026.groundlm-1.18/
 - HALT, *Verification-Aware Stopping for Retrieval-Augmented Search Agents*, Findings of EMNLP 2026: https://aclanthology.org/2026.findings-emnlp.343/
 - Active RAG, *When Should Active RAG Retrieve? A Budget-Aware Evaluation of Utility, Calibration, and Cost* (27 July 2026): https://arxiv.org/abs/2607.24010
+- Zhao, *When Is Additional Retrieval Worthwhile? A Cost-Aware Study of Evidence Gain and Answer Reliability in RAG* (27 October 2026): https://arxiv.org/abs/2610.37358
 - CONFRAG, *Confidence-Guided Retrieval-Augmented Generation*, EMNLP 2026 Industry Track: https://aclanthology.org/2026.emnlp-industry.171/
 - AgentAbstain, NeurIPS 2026 Evaluations & Datasets Track: https://agentabstain.github.io/
 - Evidence Sufficiency Benchmark, *Do LLMs Know When Evidence is Insufficient?* (13 August 2026): https://doi.org/10.32604/cmc.2026.086343
