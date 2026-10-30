@@ -800,10 +800,7 @@ fn context_bias_sums(world: &World, allocation: &Allocation) -> [f64; CONTEXTS] 
 /// Allocation-dependent part of the exact OPE variance objective:
 /// J = J1 - J2 + J3. The factual reward variance and between-context variance
 /// are invariant to the annotation allocation and are dropped from the optimizer.
-fn allocation_dependent_objective(
-    world: &World,
-    allocation: &Allocation,
-) -> Result<f64, String> {
+fn allocation_dependent_objective(world: &World, allocation: &Allocation) -> Result<f64, String> {
     if !allocation.feasible(world) {
         return Err("MM objective requires a feasible allocation".into());
     }
@@ -912,9 +909,8 @@ fn local_mix_option(
     counts[cheapest] = total_annotations as u8;
 
     for _ in 0..swap_limit {
-        let current_score = mm_cell_surrogate(
-            world, context, action, &counts, current_beta, lambda,
-        );
+        let current_score =
+            mm_cell_surrogate(world, context, action, &counts, current_beta, lambda);
         let mut best_gain = EPS;
         let mut best_counts = None;
         for source_from in 0..SOURCES {
@@ -928,9 +924,8 @@ fn local_mix_option(
                 let mut candidate = counts;
                 candidate[source_from] -= 1;
                 candidate[source_to] += 1;
-                let candidate_score = mm_cell_surrogate(
-                    world, context, action, &candidate, current_beta, lambda,
-                );
+                let candidate_score =
+                    mm_cell_surrogate(world, context, action, &candidate, current_beta, lambda);
                 let gain = current_score - candidate_score;
                 if gain > best_gain + EPS {
                     best_gain = gain;
@@ -944,9 +939,7 @@ fn local_mix_option(
         }
     }
 
-    let score = mm_cell_surrogate(
-        world, context, action, &counts, current_beta, lambda,
-    );
+    let score = mm_cell_surrogate(world, context, action, &counts, current_beta, lambda);
     let mut remaining_swap_gain = 0.0_f64;
     for source_from in 0..SOURCES {
         if counts[source_from] == 0 {
@@ -959,17 +952,20 @@ fn local_mix_option(
             let mut candidate = counts;
             candidate[source_from] -= 1;
             candidate[source_to] += 1;
-            let candidate_score = mm_cell_surrogate(
-                world, context, action, &candidate, current_beta, lambda,
-            );
-            remaining_swap_gain =
-                remaining_swap_gain.max((score - candidate_score).max(0.0));
+            let candidate_score =
+                mm_cell_surrogate(world, context, action, &candidate, current_beta, lambda);
+            remaining_swap_gain = remaining_swap_gain.max((score - candidate_score).max(0.0));
         }
     }
     let cost = (0..SOURCES)
         .map(|k| counts[k] as u32 * world.source_cost[k])
         .sum();
-    LocalMixOption { counts, cost, score, remaining_swap_gain }
+    LocalMixOption {
+        counts,
+        cost,
+        score,
+        remaining_swap_gain,
+    }
 }
 
 /// For fixed lambda, perform per-cell pairwise source search and then an exact
@@ -992,8 +988,7 @@ fn mm_candidate_for_lambda(
             .iter()
             .map(|count| *count as usize)
             .sum::<usize>();
-        let mut tables: [Vec<LocalMixOption>; ACTIONS] =
-            std::array::from_fn(|_| Vec::new());
+        let mut tables: [Vec<LocalMixOption>; ACTIONS] = std::array::from_fn(|_| Vec::new());
         for a in 0..ACTIONS {
             let factual_cell_count = world.factual_count[x][a] as usize;
             let max_for_cell = factual_context_count
@@ -1001,14 +996,19 @@ fn mm_candidate_for_lambda(
                 .min(cap);
             for m in 0..=max_for_cell {
                 tables[a].push(local_mix_option(
-                    world, x, a, m, current_beta[x], lambda, swap_limit,
+                    world,
+                    x,
+                    a,
+                    m,
+                    current_beta[x],
+                    lambda,
+                    swap_limit,
                 ));
             }
         }
 
         let mut dp = vec![vec![f64::INFINITY; cap + 1]; ACTIONS + 1];
-        let mut parent: Vec<Vec<Option<(usize, usize)>>> =
-            vec![vec![None; cap + 1]; ACTIONS + 1];
+        let mut parent: Vec<Vec<Option<(usize, usize)>>> = vec![vec![None; cap + 1]; ACTIONS + 1];
         dp[0][0] = 0.0;
         for a in 0..ACTIONS {
             for used in 0..=cap {
@@ -1037,8 +1037,8 @@ fn mm_candidate_for_lambda(
         }
         let mut cursor = best_used;
         for a in (0..ACTIONS).rev() {
-            let (previous, m) = parent[a + 1][cursor]
-                .ok_or_else(|| "missing MM DP backpointer".to_string())?;
+            let (previous, m) =
+                parent[a + 1][cursor].ok_or_else(|| "missing MM DP backpointer".to_string())?;
             let option = tables[a][m];
             allocation.counts[x][a] = option.counts;
             remaining_swap_gain += option.remaining_swap_gain;
@@ -1048,7 +1048,10 @@ fn mm_candidate_for_lambda(
     if !allocation.feasible(world) {
         return Err("MM candidate violates global budget or context cap".into());
     }
-    Ok(MmCandidate { allocation, remaining_swap_gain })
+    Ok(MmCandidate {
+        allocation,
+        remaining_swap_gain,
+    })
 }
 
 /// Algorithm 1: linearize the squared context bias, search lambda with doubling
@@ -1107,8 +1110,7 @@ fn mm_allocate(
                 break;
             }
             let lambda_mid = (lambda_low + lambda_high) / 2.0;
-            let candidate =
-                mm_candidate_for_lambda(world, &current_beta, lambda_mid, swap_limit)?;
+            let candidate = mm_candidate_for_lambda(world, &current_beta, lambda_mid, swap_limit)?;
             if candidate.allocation.cost(world) > world.budget {
                 lambda_low = lambda_mid;
             } else {
@@ -1118,8 +1120,7 @@ fn mm_allocate(
         }
 
         for candidate in candidates {
-            let surrogate =
-                mm_surrogate_value(world, &candidate.allocation, &current_beta)?;
+            let surrogate = mm_surrogate_value(world, &candidate.allocation, &current_beta)?;
             if surrogate + EPS < best_surrogate {
                 best_allocation = candidate.allocation;
                 best_surrogate = surrogate;
@@ -1131,8 +1132,7 @@ fn mm_allocate(
         }
 
         let old_objective = *objective_trace.last().expect("initial objective");
-        let new_objective =
-            allocation_dependent_objective(world, &best_allocation)?;
+        let new_objective = allocation_dependent_objective(world, &best_allocation)?;
         if new_objective > old_objective + 1e-10 {
             return Err(format!(
                 "MM monotonicity violated: old={old_objective}, new={new_objective}"
@@ -1147,7 +1147,12 @@ fn mm_allocate(
         }
     }
 
-    Ok(MmRun { allocation: current, iterations, objective_trace, remaining_swap_gain: last_residual })
+    Ok(MmRun {
+        allocation: current,
+        iterations,
+        objective_trace,
+        remaining_swap_gain: last_residual,
+    })
 }
 
 type Plan = (&'static str, Allocation, usize, f64);
@@ -1172,8 +1177,18 @@ fn build_plans(world: &World) -> Result<Vec<Plan>, String> {
         ("pairwise_exchange", exchange, 0, 0.0),
         ("exact_dp_oracle", exact, 0, 0.0),
         ("plugin_profile_exact", plugin_profile, 0, 0.0),
-        ("mm_from_zero", mm_zero.allocation, mm_zero.iterations, mm_zero.remaining_swap_gain),
-        ("mm_from_greedy", mm_greedy.allocation, mm_greedy.iterations, mm_greedy.remaining_swap_gain),
+        (
+            "mm_from_zero",
+            mm_zero.allocation,
+            mm_zero.iterations,
+            mm_zero.remaining_swap_gain,
+        ),
+        (
+            "mm_from_greedy",
+            mm_greedy.allocation,
+            mm_greedy.iterations,
+            mm_greedy.remaining_swap_gain,
+        ),
     ])
 }
 
@@ -1668,16 +1683,15 @@ mod tests {
     fn mm_majorizer_is_tangent_and_dominates_original_objective() {
         let world = World::mixed_bias_cancellation();
         let current = greedy_allocate(&world, GreedyRule::MaxGain).unwrap();
-        let candidate = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
+        let candidate = exact_dynamic_program(&world, [true; SOURCES])
+            .unwrap()
+            .allocation;
         let beta_current = context_bias_sums(&world, &current);
         let beta_candidate = context_bias_sums(&world, &candidate);
         let majorizer = full_mm_majorizer(&world, &candidate, &beta_current).unwrap();
         let objective = allocation_dependent_objective(&world, &candidate).unwrap();
         let expected_gap = (0..CONTEXTS)
-            .map(|x| {
-                world.context_probability[x]
-                    * (beta_candidate[x] - beta_current[x]).powi(2)
-            })
+            .map(|x| world.context_probability[x] * (beta_candidate[x] - beta_current[x]).powi(2))
             .sum::<f64>();
         assert!((majorizer - objective - expected_gap).abs() < 1e-10);
         let at_current = full_mm_majorizer(&world, &current, &beta_current).unwrap();
@@ -1692,19 +1706,23 @@ mod tests {
             World::mixed_bias_cancellation(),
             World::heterogeneous_source_quality(),
         ] {
-            let exact = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
+            let exact = exact_dynamic_program(&world, [true; SOURCES])
+                .unwrap()
+                .allocation;
             let exact_objective = allocation_dependent_objective(&world, &exact).unwrap();
             for initial in [
                 Allocation::default(),
                 greedy_allocate(&world, GreedyRule::MaxGain).unwrap(),
             ] {
-                let initial_objective =
-                    allocation_dependent_objective(&world, &initial).unwrap();
+                let initial_objective = allocation_dependent_objective(&world, &initial).unwrap();
                 let result = mm_allocate(&world, initial, 24, 128).unwrap();
                 assert!(result.allocation.feasible(&world));
                 assert!(result.objective_trace.len() >= 1);
                 assert!(
-                    result.objective_trace.windows(2).all(|pair| pair[1] <= pair[0] + 1e-10),
+                    result
+                        .objective_trace
+                        .windows(2)
+                        .all(|pair| pair[1] <= pair[0] + 1e-10),
                     "MM objective trace is not monotone: {:?}",
                     result.objective_trace
                 );
