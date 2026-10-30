@@ -863,6 +863,20 @@ mod tests {
     }
 
     #[test]
+    fn fidelity_name_must_match_the_measured_fidelity_index() {
+        let mut ledger = RunWidePruningRiskLedger::new(config(2, 0.5)).unwrap();
+        let sample = make_sample(&["a", "b"], 8);
+        assert!(ledger.record_event(
+            "rung-0",
+            "epoch-15",
+            &selected(0.8),
+            &sample,
+            &audited(&sample, &[0.1, 0.2]),
+        ).is_err());
+        assert!(!ledger.pruning_enabled());
+    }
+
+    #[test]
     fn frontier_digest_is_independent_of_selected_input_order() {
         let left = vec![
             AuditScore { candidate_id: "a".into(), fidelity_index: 2, score: 0.4 },
