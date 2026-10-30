@@ -1109,6 +1109,29 @@ mod tests {
     }
 
     #[test]
+    fn configuration_digest_mismatch_is_rejected() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["verification"]["checkedTarget"]["configurationDigest"]["sha256"] =
+            json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let report = verify_statement(&statement);
+        assert!(!report.conforms);
+        assert!(has_code(&report, "LEP_TARGET_MISMATCH"));
+    }
+
+    #[test]
+    fn input_artifact_mismatch_is_rejected() {
+        let mut statement = minimal_statement();
+        statement["predicate"]["target"]["inputs"] = json!([{
+            "name": "sample-dataset",
+            "kind": "dataset_manifest",
+            "digest": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+        }]);
+        let report = verify_statement(&statement);
+        assert!(!report.conforms);
+        assert!(has_code(&report, "LEP_TARGET_MISMATCH"));
+    }
+
+    #[test]
     fn incomplete_hash_is_rejected() {
         let mut statement = minimal_statement();
         statement["predicate"]["target"]["configurationDigest"]["sha256"] = json!("deadbeef");
