@@ -166,6 +166,8 @@ def build_canonical_import(
     if evaluation_split_id == proxy_calibration_split_id:
         raise ImportErrorDetail("strict no-oracle import requires distinct calibration and evaluation split IDs")
     calibration_digest = _sha256_digest(proxy_calibration_sha256, "proxy_calibration_sha256")
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", source_commit or ""):
+        raise ImportErrorDetail("source_commit must be a 40-character hexadecimal Git commit SHA")
     if not isinstance(max_unique_queries, int) or isinstance(max_unique_queries, bool) or max_unique_queries < 1:
         raise ImportErrorDetail("max_unique_queries must be a positive integer")
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
@@ -360,8 +362,8 @@ def main(argv: list[str] | None = None) -> int:
                 handle.write(encoded)
                 handle.flush()
                 os.fsync(handle.fileno())
-            if output_path.exists() and args.force:
-                output_path.unlink()
+            # os.replace is atomic on the same filesystem and safely replaces an existing
+            # destination when --force was explicitly requested.
             os.replace(temp_name, output_path)
         except Exception:
             try:
