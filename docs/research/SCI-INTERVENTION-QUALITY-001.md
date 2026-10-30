@@ -88,6 +88,8 @@ The report does not turn ambiguous labels into valid transformations. Accepted, 
 
 The same valid/invalid/ambiguous breakdown is retained for rejected and abstained candidates. This makes false rejection, justified rejection and unresolved abstention separately auditable.
 
+Important v1 boundary: `semantic_change` means the panel supports that some material semantic change occurred; it does not yet prove that the *specific intended proposition, direction, scope or target failure mechanism* changed as planned. V2 should add a blinded target-delta adjudication with explicit target proposition, expected direction and scope, plus an independent reference. Do not treat generic semantic change as proof of targeted counterfactual validity.
+
 The fixed panel size enables both raw pairwise agreement and Fleiss' κ. The chance-adjusted statistic is descriptive, not evidence of independence or correctness. A panel can agree and still be wrong.
 
 Blinding flags and unique reviewer digests are checked as declarations. The analyzer cannot prove real reviewer independence, conflicts of interest, blinding in practice, panel competence or authenticity of source artifacts.
