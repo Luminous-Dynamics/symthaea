@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "format_version": 1,
   "suite_id": "basalt-evidence-retention-frontier-v1",
   "catalog_path": "benchmarks/basalt/coverage/observer-challenges.v1.json",
