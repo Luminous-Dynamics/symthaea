@@ -539,20 +539,22 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                     let mut mean_min_propensity = 0.0;
 
                     for replicate in 0..replicates {
+                        let pilot_seed = mixed_seed(scenario, replicate, 1);
                         let pilot = sample_dataset(
                             pilot_n,
                             Logger { p1: [0.5, 0.5] },
                             [0.5, 0.5],
                             SOURCE_REWARD,
-                            mixed_seed(scenario, replicate, 1),
+                            pilot_seed,
                         )?;
                         let fitted = perturb_model(fit_reward_model(&pilot)?, scenario.predictor_bias());
+                        let calibration_seed = mixed_seed(scenario, replicate, 2);
                         let calibration = sample_dataset(
                             CALIBRATION_N,
                             Logger { p1: [0.5, 0.5] },
                             [0.5, 0.5],
                             SOURCE_REWARD,
-                            mixed_seed(scenario, replicate, 2),
+                            calibration_seed,
                         )?;
                         let heldout_w = calibration_shrinkage_weight(fitted, &calibration)?;
                         let leaky_w = calibration_shrinkage_weight(fitted, &pilot)?;
@@ -569,16 +571,17 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                         } else {
                             logger_from_model(q_model, ACTION_FLOOR)?
                         };
+                        let evaluation_seed = mixed_seed(
+                            scenario,
+                            replicate,
+                            100 + sample_size as u64 + logger_kind.as_u64_index(),
+                        );
                         let rows = sample_dataset(
                             sample_size,
                             logger,
                             context_probabilities,
                             eval_rewards,
-                            mixed_seed(
-                                scenario,
-                                replicate,
-                                100 + sample_size as u64 + logger_kind.as_u64_index(),
-                            ),
+                            evaluation_seed,
                         )?;
                         let truth = target_value(policy, context_probabilities, eval_rewards);
                         let realized_logger_reward = logger_reward(logger, context_probabilities, eval_rewards);
@@ -591,13 +594,16 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                             aggregates[index].add(result, truth);
                             let error = result.value - truth;
                             output.push_str(&format!(
-                                "REPLICATE\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\tidentified_full_support\\n",
+                                "REPLICATE\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\tidentified_full_support\\n",
                                 scenario.name(),
                                 sample_size,
                                 logger_kind.name(),
                                 policy.id,
                                 estimator.name(),
                                 replicate,
+                                pilot_seed,
+                                calibration_seed,
+                                evaluation_seed,
                                 result.value,
                                 truth,
                                 error,
@@ -714,7 +720,7 @@ mod tests {
             assert!(line.contains("identified_full_support"));
         }
         for line in a.lines().filter(|line| line.starts_with("REPLICATE\t")) {
-            assert_eq!(line.split('\t').count(), 15);
+            assert_eq!(line.split('\t').count(), 18);
             assert!(line.contains("identified_full_support"));
         }
         assert_eq!(a.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
