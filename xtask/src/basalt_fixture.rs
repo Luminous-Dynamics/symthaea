@@ -518,7 +518,6 @@ fn run_worker(
     input: &Path,
 ) -> anyhow::Result<(WorkerOutput, u32)> {
     let mut child = Command::new(binary_path)
-        .arg("basalt-observer-fixture-worker")
         .arg("--mode")
         .arg(mode)
         .arg("--input")
