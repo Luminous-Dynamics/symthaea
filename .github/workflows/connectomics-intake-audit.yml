@@ -10,6 +10,9 @@ on:
       - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
       - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
       - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_CANDIDATE_COVERAGE_AUDIT.example.json"
       - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
@@ -31,6 +34,9 @@ on:
       - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
       - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
       - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_CANDIDATE_COVERAGE_AUDIT.example.json"
       - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT_PROTOCOL_V1.md"
       - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
@@ -59,5 +65,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, and multi-rater audits
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, reviewer outcome, multi-rater, candidate-pool sampling, and candidate-generation coverage audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
