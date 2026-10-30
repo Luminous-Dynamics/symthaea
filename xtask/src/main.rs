@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod basalt_state;
+mod basalt_observer;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -19,6 +20,12 @@ enum Commands {
     /// Audit currentness and re-verification obligations for a BASALT evidence timeline.
     BasaltStateAudit {
         /// Path to the event-sourced resource/evidence timeline JSON.
+        #[arg(long)]
+        input: PathBuf,
+    },
+    /// Audit the structure and cross-references of a BASALT observer challenge catalog.
+    BasaltObserverCatalogAudit {
+        /// Path to the observer-challenge catalog JSON.
         #[arg(long)]
         input: PathBuf,
     },
@@ -95,6 +102,13 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&report)?);
             if !report.structurally_valid {
                 anyhow::bail!("BASALT evidence-state timeline is structurally invalid");
+            }
+        }
+        Commands::BasaltObserverCatalogAudit { input } => {
+            let report = basalt_observer::audit_file(&input)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if !report.structurally_valid {
+                anyhow::bail!("BASALT observer challenge catalog is structurally invalid");
             }
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
