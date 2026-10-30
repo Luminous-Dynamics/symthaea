@@ -66,10 +66,7 @@ impl World {
                     [-0.01, -0.14, 0.14],
                 ],
             ],
-            source_excess_variance: [
-                [[0.01, 0.08, 0.08]; ACTIONS],
-                [[0.01, 0.08, 0.08]; ACTIONS],
-            ],
+            source_excess_variance: [[[0.01, 0.08, 0.08]; ACTIONS], [[0.01, 0.08, 0.08]; ACTIONS]],
             source_cost: [3, 1, 2],
             context_annotation_cap: [ACTION_CAP_PER_CONTEXT; CONTEXTS],
             budget: BUDGET_TOKENS,
@@ -92,10 +89,8 @@ impl World {
                 [0.10, -0.14, 0.16],
             ],
         ];
-        world.source_excess_variance = [
-            [[0.01, 0.10, 0.06]; ACTIONS],
-            [[0.10, 0.01, 0.06]; ACTIONS],
-        ];
+        world.source_excess_variance =
+            [[[0.01, 0.10, 0.06]; ACTIONS], [[0.10, 0.01, 0.06]; ACTIONS]];
         world
     }
 
@@ -215,9 +210,8 @@ impl Allocation {
 
     fn feasible(&self, world: &World) -> bool {
         self.cost(world) <= world.budget
-            && (0..CONTEXTS).all(|x| {
-                self.context_count(x) <= world.context_annotation_cap[x] as u32
-            })
+            && (0..CONTEXTS)
+                .all(|x| self.context_count(x) <= world.context_annotation_cap[x] as u32)
     }
 }
 
@@ -289,9 +283,7 @@ fn target_value(world: &World) -> f64 {
     let mut value = 0.0;
     for x in 0..CONTEXTS {
         for a in 0..ACTIONS {
-            value += world.context_probability[x]
-                * world.target[x][a]
-                * world.reward_mean[x][a];
+            value += world.context_probability[x] * world.target[x][a] * world.reward_mean[x][a];
         }
     }
     value
@@ -333,10 +325,7 @@ fn cell_bias_and_variance(
                     * (reward_variance(reward_mean) + world.source_excess_variance[x][a][k])
             })
             .sum::<f64>();
-    (
-        weighted_bias / total,
-        variance_numerator / (total * total),
-    )
+    (weighted_bias / total, variance_numerator / (total * total))
 }
 
 /// Exact per-event variance of the annotation-augmented DM+IS/DR score.
@@ -346,11 +335,7 @@ fn cell_bias_and_variance(
 /// residual always uses the observed Bernoulli reward and exact behavior
 /// propensity. This expression integrates over both q_hat fitting noise and
 /// the logged evaluation observation.
-fn context_conditional_variance(
-    world: &World,
-    allocation: &Allocation,
-    x: usize,
-) -> f64 {
+fn context_conditional_variance(world: &World, allocation: &Allocation, x: usize) -> f64 {
     let mut terms = 0.0;
     let mut target_weighted_bias = 0.0;
     for a in 0..ACTIONS {
@@ -427,8 +412,8 @@ fn enumerate_context_options(
         if position == ACTIONS * SOURCES {
             let mut partial = Allocation::default();
             partial.counts[context] = *counts;
-            let risk_component =
-                world.context_probability[context] * context_conditional_variance(world, &partial, context);
+            let risk_component = world.context_probability[context]
+                * context_conditional_variance(world, &partial, context);
             output.push(ContextOption {
                 counts: *counts,
                 cost: used_cost,
@@ -454,8 +439,8 @@ fn enumerate_context_options(
             return;
         }
 
-        let max_by_budget = ((world.budget - used_cost) / world.source_cost[source])
-            .min(u8::MAX as u32) as u8;
+        let max_by_budget =
+            ((world.budget - used_cost) / world.source_cost[source]).min(u8::MAX as u32) as u8;
         let max_count = remaining.min(max_by_budget);
         for count in 0..=max_count {
             counts[action][source] = count;
@@ -504,8 +489,7 @@ fn exact_dynamic_program(
     let option_count = options.iter().map(Vec::len).sum::<usize>();
     let budget = world.budget as usize;
     let mut dp = vec![vec![f64::INFINITY; budget + 1]; CONTEXTS + 1];
-    let mut parent: Vec<Vec<Option<(usize, usize)>>> =
-        vec![vec![None; budget + 1]; CONTEXTS + 1];
+    let mut parent: Vec<Vec<Option<(usize, usize)>>> = vec![vec![None; budget + 1]; CONTEXTS + 1];
     let mut transitions = 0usize;
     dp[0][0] = 0.0;
 
@@ -542,8 +526,8 @@ fn exact_dynamic_program(
     let mut allocation = Allocation::default();
     let mut cursor = best_spent;
     for x in (0..CONTEXTS).rev() {
-        let (previous_spent, option_index) = parent[x + 1][cursor]
-            .ok_or_else(|| "missing exact-DP backpointer".to_string())?;
+        let (previous_spent, option_index) =
+            parent[x + 1][cursor].ok_or_else(|| "missing exact-DP backpointer".to_string())?;
         allocation.counts[x] = options[x][option_index].counts;
         cursor = previous_spent;
     }
@@ -634,7 +618,9 @@ fn pairwise_exchange(world: &World, mut allocation: Allocation) -> Result<Alloca
                                 }
                                 let score = analytic_mse(world, &candidate, EVAL_N)?;
                                 let gain = current - score;
-                                if gain > EPS && best.is_none_or(|(best_gain, _)| gain > best_gain + EPS) {
+                                if gain > EPS
+                                    && best.is_none_or(|(best_gain, _)| gain > best_gain + EPS)
+                                {
                                     best = Some((gain, candidate));
                                 }
                             }
@@ -711,7 +697,11 @@ fn one_ope_estimate(
     let mut rng = Rng::new(seed);
     let mut estimate = 0.0;
     for _ in 0..evaluation_n {
-        let context = if rng.uniform() < world.context_probability[0] { 0 } else { 1 };
+        let context = if rng.uniform() < world.context_probability[0] {
+            0
+        } else {
+            1
+        };
         let action = sample_action(&world.behavior[context], &mut rng);
         let pi = world.target[context][action];
         let mu = world.behavior[context][action];
@@ -771,7 +761,11 @@ fn monte_carlo_evaluate(
     let bias = errors.iter().sum::<f64>() / n;
     let mse = errors.iter().map(|error| error * error).sum::<f64>() / n;
     let variance = (mse - bias * bias).max(0.0);
-    MonteCarloMetrics { bias, variance, mse }
+    MonteCarloMetrics {
+        bias,
+        variance,
+        mse,
+    }
 }
 
 fn allocation_sources(allocation: &Allocation) -> [u32; SOURCES] {
@@ -820,8 +814,7 @@ fn local_phi(
     let alpha3 = eta * alpha1;
     let annotation_variance = reward_variance + annotation_excess_variance;
     let numerator = alpha1 * annotation_n * annotation_n * annotation_bias_squared
-        + alpha3
-            * (factual_count * reward_variance + annotation_n * annotation_variance);
+        + alpha3 * (factual_count * reward_variance + annotation_n * annotation_variance);
     numerator / (factual_count + annotation_n).powi(2)
 }
 
@@ -834,8 +827,7 @@ fn first_annotation_threshold(
 ) -> bool {
     annotation_bias_squared
         <= eta
-            * ((factual_count + 1.0) * reward_variance / factual_count
-                - annotation_excess_variance)
+            * ((factual_count + 1.0) * reward_variance / factual_count - annotation_excess_variance)
             + EPS
 }
 
@@ -849,11 +841,36 @@ struct LocalRegime {
 
 fn local_regimes() -> [LocalRegime; 5] {
     [
-        LocalRegime { name: "I_no_annotation", excess_variance: 0.20, bias_squared: 0.04, capacity: 100 },
-        LocalRegime { name: "II_finite_batch", excess_variance: 0.00, bias_squared: 0.03, capacity: 100 },
-        LocalRegime { name: "III_more_is_better", excess_variance: 0.00, bias_squared: 0.0025, capacity: 100 },
-        LocalRegime { name: "IVa_lumpy_batch", excess_variance: 0.40, bias_squared: 0.01, capacity: 100 },
-        LocalRegime { name: "IVb_no_annotation", excess_variance: 0.40, bias_squared: 0.03, capacity: 100 },
+        LocalRegime {
+            name: "I_no_annotation",
+            excess_variance: 0.20,
+            bias_squared: 0.04,
+            capacity: 100,
+        },
+        LocalRegime {
+            name: "II_finite_batch",
+            excess_variance: 0.00,
+            bias_squared: 0.03,
+            capacity: 100,
+        },
+        LocalRegime {
+            name: "III_more_is_better",
+            excess_variance: 0.00,
+            bias_squared: 0.0025,
+            capacity: 100,
+        },
+        LocalRegime {
+            name: "IVa_lumpy_batch",
+            excess_variance: 0.40,
+            bias_squared: 0.01,
+            capacity: 100,
+        },
+        LocalRegime {
+            name: "IVb_no_annotation",
+            excess_variance: 0.40,
+            bias_squared: 0.03,
+            capacity: 100,
+        },
     ]
 }
 
@@ -864,13 +881,53 @@ fn local_regime_rows() -> String {
     let eta = 0.5;
     let mut output = String::new();
     for regime in local_regimes() {
-        let phi0 = local_phi(0, factual_count, reward_variance_value, regime.bias_squared, regime.excess_variance, alpha1, eta);
-        let phi1 = local_phi(1, factual_count, reward_variance_value, regime.bias_squared, regime.excess_variance, alpha1, eta);
-        let phi_cap = local_phi(regime.capacity, factual_count, reward_variance_value, regime.bias_squared, regime.excess_variance, alpha1, eta);
+        let phi0 = local_phi(
+            0,
+            factual_count,
+            reward_variance_value,
+            regime.bias_squared,
+            regime.excess_variance,
+            alpha1,
+            eta,
+        );
+        let phi1 = local_phi(
+            1,
+            factual_count,
+            reward_variance_value,
+            regime.bias_squared,
+            regime.excess_variance,
+            alpha1,
+            eta,
+        );
+        let phi_cap = local_phi(
+            regime.capacity,
+            factual_count,
+            reward_variance_value,
+            regime.bias_squared,
+            regime.excess_variance,
+            alpha1,
+            eta,
+        );
         let best_n = (0..=regime.capacity)
             .min_by(|left, right| {
-                local_phi(*left, factual_count, reward_variance_value, regime.bias_squared, regime.excess_variance, alpha1, eta)
-                    .total_cmp(&local_phi(*right, factual_count, reward_variance_value, regime.bias_squared, regime.excess_variance, alpha1, eta))
+                local_phi(
+                    *left,
+                    factual_count,
+                    reward_variance_value,
+                    regime.bias_squared,
+                    regime.excess_variance,
+                    alpha1,
+                    eta,
+                )
+                .total_cmp(&local_phi(
+                    *right,
+                    factual_count,
+                    reward_variance_value,
+                    regime.bias_squared,
+                    regime.excess_variance,
+                    alpha1,
+                    eta,
+                ))
             })
             .unwrap_or(0);
         let first_helpful = first_annotation_threshold(
@@ -884,13 +941,7 @@ fn local_regime_rows() -> String {
         let _ = writeln!(
             output,
             "LOCAL_REGIME\t{}\t{:.6}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}",
-            regime.name,
-            phi0,
-            phi1,
-            phi_cap,
-            regime.bias_squared,
-            best_n,
-            first_helpful,
+            regime.name, phi0, phi1, phi_cap, regime.bias_squared, best_n, first_helpful,
         );
     }
     output
@@ -910,8 +961,13 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
     output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-054\tversion\t0\n");
     output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
     output.push_str(&format!("BENCHMARK_CONFIG\tevaluation_n\t{EVAL_N}\n"));
-    output.push_str(&format!("BENCHMARK_CONFIG\taction_cap_per_context\t{}\n", ACTION_CAP_PER_CONTEXT));
-    output.push_str(&format!("BENCHMARK_CONFIG\tbudget_tokens\t{BUDGET_TOKENS}\n"));
+    output.push_str(&format!(
+        "BENCHMARK_CONFIG\taction_cap_per_context\t{}\n",
+        ACTION_CAP_PER_CONTEXT
+    ));
+    output.push_str(&format!(
+        "BENCHMARK_CONFIG\tbudget_tokens\t{BUDGET_TOKENS}\n"
+    ));
     output.push_str("BENCHMARK_CONFIG\testimator\tDM+IS / annotated DR; annotations augment q only; factual residual preserved\n");
     output.push_str("BENCHMARK_CONFIG\toptimizer\texact per-context allocation enumeration + global budget DP; greedy comparators\n");
     output.push_str("BENCHMARK_CONFIG\tprofile_pilot\tindependent estimated source profiles; plugin allocation evaluated under hidden true profiles\n");
@@ -983,12 +1039,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let _ = writeln!(
             output,
             "NEGATIVE_CONTROL\t{}\tannotation_as_factual_residual\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\tIDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT",
-            world.name,
-            EVAL_N,
-            replicates,
-            wrong.bias,
-            wrong.mse,
-            proper_mse,
+            world.name, EVAL_N, replicates, wrong.bias, wrong.mse, proper_mse,
         );
     }
 
@@ -998,7 +1049,11 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
 
 fn main() {
     let smoke = env::args().any(|arg| arg == "--smoke");
-    let replicates = if smoke { SMOKE_REPLICATES } else { FULL_REPLICATES };
+    let replicates = if smoke {
+        SMOKE_REPLICATES
+    } else {
+        FULL_REPLICATES
+    };
     match benchmark(replicates, 0x0540_2026_1030) {
         Ok(output) => print!("{output}"),
         Err(error) => {
@@ -1027,7 +1082,10 @@ mod tests {
             }
         }
         let exact_component = (0..CONTEXTS)
-            .map(|x| world.context_probability[x] * context_conditional_variance(&world, &exact.allocation, x))
+            .map(|x| {
+                world.context_probability[x]
+                    * context_conditional_variance(&world, &exact.allocation, x)
+            })
             .sum::<f64>();
         assert!((exact_component - brute_best).abs() < 1e-10);
         assert!(exact.allocation.feasible(&world));
@@ -1037,10 +1095,18 @@ mod tests {
 
     #[test]
     fn exact_optimum_is_never_worse_than_no_annotation_plan() {
-        for world in [World::mixed_bias_cancellation(), World::heterogeneous_source_quality()] {
+        for world in [
+            World::mixed_bias_cancellation(),
+            World::heterogeneous_source_quality(),
+        ] {
             let none = Allocation::default();
-            let exact = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
-            assert!(analytic_mse(&world, &exact, EVAL_N).unwrap() <= analytic_mse(&world, &none, EVAL_N).unwrap() + EPS);
+            let exact = exact_dynamic_program(&world, [true; SOURCES])
+                .unwrap()
+                .allocation;
+            assert!(
+                analytic_mse(&world, &exact, EVAL_N).unwrap()
+                    <= analytic_mse(&world, &none, EVAL_N).unwrap() + EPS
+            );
         }
     }
 
@@ -1062,7 +1128,10 @@ mod tests {
         let (mixed_bias, _) = cell_bias_and_variance(&world, &mixed, 0, 0);
         assert!((mixed_bias).abs() < EPS);
         assert!(single_bias.abs() > 0.1);
-        assert!(analytic_mse(&world, &mixed, EVAL_N).unwrap() < analytic_mse(&world, &single, EVAL_N).unwrap());
+        assert!(
+            analytic_mse(&world, &mixed, EVAL_N).unwrap()
+                < analytic_mse(&world, &single, EVAL_N).unwrap()
+        );
     }
 
     #[test]
@@ -1089,14 +1158,55 @@ mod tests {
         let values: Vec<(f64, f64, f64, usize)> = regimes
             .iter()
             .map(|regime| {
-                let p0 = local_phi(0, nf, sigma2, regime.bias_squared, regime.excess_variance, 1.0, eta);
-                let p1 = local_phi(1, nf, sigma2, regime.bias_squared, regime.excess_variance, 1.0, eta);
-                let pc = local_phi(regime.capacity, nf, sigma2, regime.bias_squared, regime.excess_variance, 1.0, eta);
+                let p0 = local_phi(
+                    0,
+                    nf,
+                    sigma2,
+                    regime.bias_squared,
+                    regime.excess_variance,
+                    1.0,
+                    eta,
+                );
+                let p1 = local_phi(
+                    1,
+                    nf,
+                    sigma2,
+                    regime.bias_squared,
+                    regime.excess_variance,
+                    1.0,
+                    eta,
+                );
+                let pc = local_phi(
+                    regime.capacity,
+                    nf,
+                    sigma2,
+                    regime.bias_squared,
+                    regime.excess_variance,
+                    1.0,
+                    eta,
+                );
                 let best = (0..=regime.capacity)
                     .min_by(|a, b| {
-                        local_phi(*a, nf, sigma2, regime.bias_squared, regime.excess_variance, 1.0, eta)
-                            .total_cmp(&local_phi(*b, nf, sigma2, regime.bias_squared, regime.excess_variance, 1.0, eta))
-                    }).unwrap();
+                        local_phi(
+                            *a,
+                            nf,
+                            sigma2,
+                            regime.bias_squared,
+                            regime.excess_variance,
+                            1.0,
+                            eta,
+                        )
+                        .total_cmp(&local_phi(
+                            *b,
+                            nf,
+                            sigma2,
+                            regime.bias_squared,
+                            regime.excess_variance,
+                            1.0,
+                            eta,
+                        ))
+                    })
+                    .unwrap();
                 (p0, p1, pc, best)
             })
             .collect();
@@ -1123,11 +1233,24 @@ mod tests {
     #[test]
     fn analytic_mse_matches_independent_monte_carlo() {
         let world = World::mixed_bias_cancellation();
-        let allocation = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
+        let allocation = exact_dynamic_program(&world, [true; SOURCES])
+            .unwrap()
+            .allocation;
         let analytic = analytic_mse(&world, &allocation, 64).unwrap();
-        let mc = monte_carlo_evaluate(&world, &allocation, 64, MC_TEST_REPLICATES, 0x0540_abc0, None);
+        let mc = monte_carlo_evaluate(
+            &world,
+            &allocation,
+            64,
+            MC_TEST_REPLICATES,
+            0x0540_abc0,
+            None,
+        );
         let relative_error = (mc.mse - analytic).abs() / analytic.max(1e-12);
-        assert!(relative_error < 0.15, "analytic={analytic}, MC={}, relative={relative_error}", mc.mse);
+        assert!(
+            relative_error < 0.15,
+            "analytic={analytic}, MC={}, relative={relative_error}",
+            mc.mse
+        );
         assert!(mc.bias.abs() < 0.03, "proper DM+IS bias={}", mc.bias);
     }
 
@@ -1158,10 +1281,34 @@ mod tests {
         let first = benchmark(2, 123).unwrap();
         let second = benchmark(2, 123).unwrap();
         assert_eq!(first, second);
-        assert_eq!(first.lines().filter(|line| line.starts_with("RESULT\t")).count(), 14);
-        assert_eq!(first.lines().filter(|line| line.starts_with("NEGATIVE_CONTROL\t")).count(), 2);
-        assert_eq!(first.lines().filter(|line| line.starts_with("LOCAL_REGIME\t")).count(), 5);
-        assert_eq!(first.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("RESULT\t"))
+                .count(),
+            14
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("NEGATIVE_CONTROL\t"))
+                .count(),
+            2
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("LOCAL_REGIME\t"))
+                .count(),
+            5
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("BENCHMARK_CONFIG\t"))
+                .count(),
+            8
+        );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 17);
         }
