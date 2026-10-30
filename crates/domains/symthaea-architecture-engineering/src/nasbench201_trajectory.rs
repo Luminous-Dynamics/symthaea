@@ -491,6 +491,57 @@ pub fn trajectory_candidate_pool(
             "candidate IDs must be non-empty and unique",
         ));
     }
+    let count_source = |predicate: fn(PromotionSource) -> bool| {
+        plan.candidates
+            .iter()
+            .filter(|candidate| predicate(candidate.source))
+            .count()
+    };
+    let proxy_elite_count =
+        count_source(|source| source == PromotionSource::ProxyElite);
+    let trajectory_count = count_source(|source| {
+        matches!(
+            source,
+            PromotionSource::FirstImprovement
+                | PromotionSource::Escape
+                | PromotionSource::LocalOptimum
+        )
+    });
+    let diversity_count =
+        count_source(|source| source == PromotionSource::TopologyDiversity);
+    let fallback_count = count_source(|source| {
+        matches!(
+            source,
+            PromotionSource::TrajectoryFallback | PromotionSource::RankedFallback
+        )
+    });
+    if proxy_elite_count != plan.proxy_elite_count
+        || trajectory_count != plan.trajectory_count
+        || diversity_count != plan.diversity_count
+        || fallback_count != plan.fallback_count
+    {
+        return Err(TrajectorySearchError::new(
+            "promotion_plan",
+            "declared source counts do not match candidate source assignments",
+        ));
+    }
+    let reconstructed_mix = PromotionMix {
+        promotion_count: plan.candidates.len(),
+        proxy_elite_quota: plan.proxy_elite_count,
+        trajectory_quota: plan.trajectory_count,
+        topology_diversity_quota: plan.diversity_count,
+    };
+    if digest_plan_from_archive(
+        &plan.archive_sha256,
+        &reconstructed_mix,
+        &plan.candidates,
+    ) != plan.plan_sha256
+    {
+        return Err(TrajectorySearchError::new(
+            "promotion_plan.plan_sha256",
+            "promotion plan content digest mismatch",
+        ));
+    }
     let source_evidence_sha256 = plan.plan_sha256.clone();
     let pool_sha256 = digest_initial_pool(
         InitialPoolStrategy::TrajectoryPortfolio,
@@ -1236,9 +1287,17 @@ fn digest_plan(
     mix: &PromotionMix,
     candidates: &[PromotionCandidate],
 ) -> String {
+    digest_plan_from_archive(&archive.archive_sha256, mix, candidates)
+}
+
+fn digest_plan_from_archive(
+    archive_sha256: &str,
+    mix: &PromotionMix,
+    candidates: &[PromotionCandidate],
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.nasbench201.trajectory-promotion-plan.v0.1");
-    update_string(&mut hasher, &archive.archive_sha256);
+    update_string(&mut hasher, archive_sha256);
     hasher.update((mix.promotion_count as u64).to_be_bytes());
     hasher.update((mix.proxy_elite_quota as u64).to_be_bytes());
     hasher.update((mix.trajectory_quota as u64).to_be_bytes());
@@ -1396,6 +1455,21 @@ mod tests {
             ProxyDirection::Maximize,
             3,
         ).is_err());
+    }
+
+    #[test]
+    fn tampered_trajectory_promotion_plan_is_rejected_by_pool_adapter() {
+        let features = binary_catalog();
+        let archive = build_trajectory_archive(&features, &config(47)).unwrap();
+        let mix = PromotionMix {
+            promotion_count: 8,
+            proxy_elite_quota: 2,
+            trajectory_quota: 3,
+            topology_diversity_quota: 3,
+        };
+        let mut plan = plan_promotions(&features, &archive, &mix).unwrap();
+        plan.candidates[0].architecture_id = "changed-after-planning".into();
+        assert!(trajectory_candidate_pool(&plan).is_err());
     }
 
     #[test]
