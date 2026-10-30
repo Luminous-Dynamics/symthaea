@@ -137,14 +137,14 @@ fn published_fig1a_a_unit_phi_s_matches_pinned_iit4_2023_anchor() {
 
     assert_eq!(result.formalism.id(), "IIT_4_0_2023");
     assert!(result.complete);
-    assert_eq!(result.partition_summary.total_cut_included, true);
+    assert!(result.partition_summary.total_cut_included);
     assert_eq!(result.partition_summary.unique_non_total_cuts, 0);
     assert_eq!(result.partition_score_evaluations, 1);
 
     let phi_s = result.phi_s.expect("qualified A system must expose phi_s");
     assert!(
         (phi_s - 0.0396).abs() <= 0.001,
-        "Fig. 1A {A} phi_s mismatch: computed={phi_s:.8}, expected=0.0396 ± 0.001"
+        "Fig. 1A {{A}} phi_s mismatch: computed={phi_s:.8}, expected=0.0396 ± 0.001"
     );
 }
 
@@ -167,7 +167,7 @@ fn published_fig1a_ab_proper_subsystem_phi_s_matches_pinned_iit4_2023_anchor() {
     let phi_s = result.phi_s.expect("unique {A,B} state pair must expose phi_s");
     assert!(
         (phi_s - 0.1719).abs() <= 0.001,
-        "Fig. 1A {A,B} phi_s mismatch: computed={phi_s:.8}, expected=0.1719 ± 0.001"
+        "Fig. 1A {{A,B}} phi_s mismatch: computed={phi_s:.8}, expected=0.1719 ± 0.001"
     );
 }
 
