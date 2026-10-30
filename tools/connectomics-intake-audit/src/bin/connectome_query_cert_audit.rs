@@ -696,11 +696,12 @@ mod tests {
     fn invalidated_certificate_records_a_changed_revision() {
         let mut certificate = fixture();
         certificate.state = "INVALIDATED_BY_REVISION".into();
+        let previous = certificate.source_revisions[0].content_sha256.clone();
         certificate.invalidation = Some(Invalidation {
             event_sha256: "6".repeat(64),
             changed_object_kind: "source_revision".into(),
             changed_object_id: "synthetic-volume".into(),
-            previous_revision_sha256: certificate.source_revisions[0].content_sha256.clone(),
+            previous_revision_sha256: previous,
             current_revision_sha256: "8".repeat(64),
             reason: "synthetic source revision changed".into(),
         });
