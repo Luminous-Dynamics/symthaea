@@ -1228,24 +1228,24 @@ mod tests {
         track.extend_from_slice(bytes);
     }
 
-    fn push_lineage_marker(track: &mut Vec<u8>, source_index: usize) {
-        let payload = PerformedEventMap::encode_midi_lineage_marker_payload(
+    fn push_lineage_marker(track: &mut Vec<u8>, delta: u8, source_index: usize) {
+        let payload = crate::performed_event_map::encode_midi_lineage_marker_payload(
             source_index,
             0,
         );
-        push_delta_event(track, 0, &[0xff, 0x7f, 0x10]);
+        push_delta_event(track, delta, &[0xff, 0x7f, 0x10]);
         track.extend_from_slice(&payload);
     }
 
     /// Two-note, format-0 MIDI. Event 0 occupies ticks 0..1; event 1 occupies
-    /// ticks 1..2. At 48 kHz/default 500,000 us per beat/480 TPB, they occupy
-    /// disjoint 24-frame scheduled intervals.
+    /// ticks 1..2. At 48 kHz/default 500,000 us per beat/480 TPB, each tick
+    /// occupies 50 PCM frames.
     fn baseline_midi() -> Vec<u8> {
         let mut track = Vec::new();
-        push_lineage_marker(&mut track, 0);
+        push_lineage_marker(&mut track, 0, 0);
         push_delta_event(&mut track, 0, &[0x90, 60, 90]);
         push_delta_event(&mut track, 1, &[0x80, 60, 0]);
-        push_lineage_marker(&mut track, 1);
+        push_lineage_marker(&mut track, 0, 1);
         push_delta_event(&mut track, 0, &[0x90, 64, 90]);
         push_delta_event(&mut track, 1, &[0x80, 64, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
@@ -1266,7 +1266,7 @@ mod tests {
     /// canonical Score identity even though its MIDI note-on ordinal changes.
     fn without_event_zero_midi() -> Vec<u8> {
         let mut track = Vec::new();
-        push_lineage_marker(&mut track, 1);
+        push_lineage_marker(&mut track, 1, 1);
         push_delta_event(&mut track, 0, &[0x90, 64, 90]);
         push_delta_event(&mut track, 1, &[0x80, 64, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
@@ -1419,7 +1419,7 @@ mod tests {
 
     #[test]
     fn renderer_receipt_replays_midi_map_process_and_exact_pcm() {
-        let samples = vec![0.0f32; 64];
+        let samples = vec![0.0f32; 128];
         let render = build_render("render-0", &baseline_midi(), &samples);
         let verified = verify_bound_render(&render, &samples, None);
         assert_eq!(verified.audio_sha256(), audio_sha256(&audio(&samples)));
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn repeatability_calibration_requires_three_noop_renders_and_replays() {
-        let samples = vec![0.0f32; 64];
+        let samples = vec![0.0f32; 128];
         let midi = baseline_midi();
         let anchor = build_render("anchor", &midi, &samples);
         let anchor_evidence = verify_bound_render(&anchor, &samples, None);
@@ -1525,15 +1525,15 @@ mod tests {
 
     #[test]
     fn removing_one_note_preserves_all_other_symbolic_events_and_measures_pcm_effect() {
-        let mut baseline_samples = vec![0.0f32; 64];
-        for sample in &mut baseline_samples[0..24] {
+        let mut baseline_samples = vec![0.0f32; 128];
+        for sample in &mut baseline_samples[0..50] {
             *sample = 0.25;
         }
-        for sample in &mut baseline_samples[24..48] {
+        for sample in &mut baseline_samples[50..100] {
             *sample = 0.15;
         }
         let mut counterfactual_samples = baseline_samples.clone();
-        counterfactual_samples[0..24].fill(0.0);
+        counterfactual_samples[0..50].fill(0.0);
 
         let baseline_midi = baseline_midi();
         let counterfactual_midi = without_event_zero_midi();
@@ -1617,7 +1617,7 @@ mod tests {
 
     #[test]
     fn calibration_and_intervention_reject_renderer_or_schedule_substitution() {
-        let samples = vec![0.0f32; 64];
+        let samples = vec![0.0f32; 128];
         let baseline = build_render("baseline", &baseline_midi(), &samples);
         let baseline_evidence = verify_bound_render(&baseline, &samples, None);
         let noops = [
@@ -1655,7 +1655,7 @@ mod tests {
         let mut altered_config_evidence =
             verify_bound_render(&baseline, &samples, None);
         altered_config_evidence.renderer_config_sha256 = sha256_hex(b"substituted-config");
-        let counterfactual_samples = vec![0.0f32; 64];
+        let counterfactual_samples = vec![0.0f32; 128];
         let counterfactual = build_render(
             "counterfactual",
             &without_event_zero_midi(),
