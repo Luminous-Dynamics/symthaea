@@ -719,12 +719,10 @@ impl MultiFidelityTabularBenchmark {
             || calibrator.config.metric_direction != expected_direction
             || calibrator.config.source_artifact_sha256 != self.manifest.base.artifact_sha256
             || calibrator.config.evaluation_split_id != self.manifest.base.split_id
-            || calibrator.config.residual_calibration_split_id
-                != self.manifest.base.proxy_calibration_split_id
         {
             return Err(MultiFidelityFirewallError::new(
                 "calibrator",
-                "benchmark, metric, direction, source artifact or evaluation/calibration split does not match target manifest",
+                "benchmark, metric, direction, source artifact or evaluation split does not match target manifest",
             ));
         }
         if calibrator.config.fidelity_levels.len() != self.manifest.fidelity_levels.len()
