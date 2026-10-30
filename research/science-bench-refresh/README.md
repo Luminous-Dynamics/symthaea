@@ -15,6 +15,9 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - tools/judge_robustness_test_vectors.py: synthetic CLI positive controls and hostile mutations; not empirical judge evidence.
 - docs/research/SCI-REFERENCE-ASSURANCE-001.md: protocol for evidence-backed reference labels, independent adjudication, uncertainty preservation, source ancestry and external custody.
 - docs/research/SCI-RUBRIC-EXPLOITABILITY-001.md: protocol for rubric validity, meaning-preserving/meaning-changing interventions, score gaming, adaptive Goodhart tests and human-alignment comparisons; no empirical result is claimed.
+- schema/rubric-robustness-plan.schema.json: strict plan contract for meaning-preserving, surface-cue, meaning-changing and evidence-withdrawal interventions.
+- tools/rubric_attack_vectors.py: deterministic synthetic paired rubric/candidate corpus generator; no judge execution or scoring.
+- tools/test_rubric_attack_vectors.py: test-only checks for case coverage, digest binding and intervention semantics.
 - src/reference_assurance.rs: strict typed reference-package commitment/verification, cross-record validation, disagreement accounting and explicit claim-boundary report.
 - schema/reference-assurance-package.schema.json and fixtures/reference-assurance-package.example.json: strict v1 package schema and non-scoring example with intentionally preserved rater disagreement.
 - tools/test_reference_assurance.py: independent standard-library Python commitment/structure oracle and adversarial unit tests; test-only, not a production validator.
@@ -28,6 +31,17 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Generate rubric exploitability synthetic controls
+
+The test-only generator emits a precommitted, non-scoring plan and a paired artifact corpus containing rubric paraphrase/order changes, verbosity and keyword attacks, confidence/citation/formatting theater, criterion removal/priority changes, and evidence withdrawal.
+
+```sh
+python3 research/science-bench-refresh/tools/rubric_attack_vectors.py /tmp/rubric-attacks
+python3 -m unittest research.science-bench-refresh.tools.test_rubric_attack_vectors
+```
+
+The corpus does not call a judge or establish human preferences. Its expected relations are synthetic protocol controls; real scoring requires a blinded reference panel and frozen judge/rubric execution.
 
 ## Validate an evaluator-side reference package
 
