@@ -213,12 +213,24 @@ expose their high width and stop at the explicit memory budget. This can make
 proper-subsystem analysis practical in large substrates when the candidate
 system and its boundary have low effective treewidth.
 
-**Important current boundary:** the factor-graph kernel is a separately tested
-primitive and topology benchmark. It is not yet wired into the IIT system scorer.
-The dense cause-inversion path remains the oracle. Integration requires exact
-differential parity for Eq. 4 background posteriors, per-node cause factors,
-partitioned cause likelihoods, and final Fig. 1A/noisy-OR system scores on
-small systems before the sparse path can become the default.
+**Current integration boundary:** the log-domain min-fill path is now used
+for system-level Eq. 4 cause factors when mechanism and purview both equal the
+candidate system. It contracts the uncut observation factors over candidate-past
+and external-background variables, then attaches a second candidate-past copy
+for each target factor. This avoids materializing the joint background posterior
+table. Multiplication is log addition and marginalization is log-sum-exp; exact
+zero likelihoods remain negative infinity until the final probability factors
+are emitted.
+
+The dense exhaustive implementation is retained as a differential oracle and
+remains the fallback for general mechanism/purview subsets. Regression tests
+compare every Eq. 4 per-node factor across embedded subsystems, noncanonical
+candidate ordering, and extreme joint-likelihood underflow. A separate test
+compares the complete partitioned cause-likelihood vector against an independent
+dense-factor projection for every directed cut of an embedded three-unit system.
+The published Fig. 1A system anchors remain end-to-end regression gates. This
+does not establish general PyPhi parity yet; broader generated-model differential
+coverage and release-profile performance comparisons are still required.
 
 Run the topology sweep:
 
@@ -227,7 +239,9 @@ Run the topology sweep:
 It emits CSV rows for chains (32–256 variables), rings (32–128), and grids
 (4×4, 6×6, 8×8), including induced width, peak entries, multiplication count,
 median/minimum latency, and a deterministic-output check. These are standalone
-kernel measurements, not end-to-end IIT or PyPhi comparisons.
+factor-kernel measurements, not end-to-end IIT or PyPhi comparisons. The same
+log-domain kernel is used by the system-level Eq. 4 cause path; end-to-end system
+search timing must still be measured separately.
 
 ### Factor-graph benchmark targets
 
@@ -253,9 +267,12 @@ Integration-level IIT 4.0 (2023) system search for bounded binary factored model
 but its output remains under differential qualification. It is not a complete
 PyPhi port: the Composition-level cause-effect structure and big-Phi tie escalation
 are absent, and the IIT 4.0 (2026) intrinsic-information requirement is a separate
-unimplemented path. The Fig. 1A subset-AB anchor is the first end-to-end numeric
-check; it must pass CI and be extended across independent fixtures before any
-general conformance claim.
+unimplemented path. The Fig. 1A {A}, {A,B}, and {A,B,C} anchors and noisy-OR Eq. 3/Eq. 4
+repertoire fixtures are executable end-to-end/reference checks. The min-fill
+Eq. 4 path is additionally differentially compared with the dense oracle and
+independent partition projection on small systems. These named fixtures do not
+establish general PyPhi conformance; broader generated models and an independently
+pinned PyPhi output corpus remain required.
 
 ## Reference material
 
