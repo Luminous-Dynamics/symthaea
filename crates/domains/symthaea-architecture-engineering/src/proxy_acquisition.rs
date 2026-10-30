@@ -132,6 +132,7 @@ pub struct ProxyAcquisitionEvaluation {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProxyAcquisitionRun {
+    pub manifest: ProxyAcquisitionManifest,
     pub candidates: Vec<ProxyCandidate>,
     pub declared_proxy_directions: BTreeMap<String, ProxyDirection>,
     /// Contains only successfully acquired proxy observations.
@@ -147,6 +148,92 @@ impl ProxyAcquisitionRun {
     pub fn to_complete_feature_table(
         &self,
     ) -> Result<Vec<ArchitectureFeatures>, ProxyAcquisitionError> {
+        if self.declared_proxy_directions != self.manifest.proxy_directions {
+            return Err(ProxyAcquisitionError::new(
+                "declared_proxy_directions",
+                "run proxy schema differs from the frozen manifest",
+            ));
+        }
+        if self.receipt.benchmark_id != self.manifest.benchmark_id
+            || self.receipt.target_metric_id != self.manifest.target_metric_id
+            || self.receipt.artifact_sha256 != self.manifest.artifact_sha256
+            || self.receipt.evaluation_split_id != self.manifest.evaluation_split_id
+            || self.receipt.proxy_calibration_split_id != self.manifest.proxy_calibration_split_id
+            || self.receipt.proxy_calibration_sha256 != self.manifest.proxy_calibration_sha256
+            || self.receipt.max_unique_proxy_queries != self.manifest.max_unique_proxy_queries
+            || self.receipt.max_total_proxy_seconds.to_bits()
+                != self.manifest.max_total_proxy_seconds.to_bits()
+        {
+            return Err(ProxyAcquisitionError::new(
+                "receipt",
+                "receipt metadata does not match the frozen acquisition manifest",
+            ));
+        }
+        let recomputed_receipt_sha256 = digest_receipt(
+            &self.manifest,
+            &self.receipt.source_proxy_catalog_sha256,
+            &self.receipt.attempts,
+            self.receipt.total_proxy_seconds,
+        );
+        if recomputed_receipt_sha256 != self.receipt.receipt_sha256 {
+            return Err(ProxyAcquisitionError::new(
+                "receipt.receipt_sha256",
+                "receipt content digest mismatch",
+            ));
+        }
+        let successful_attempts: Vec<&ProxyQueryAttempt> = self.receipt.attempts
+            .iter()
+            .filter(|attempt| attempt.status == ProxyQueryAttemptStatus::Revealed)
+            .collect();
+        if successful_attempts.len() != self.observations.len()
+            || self.receipt.unique_proxy_queries != self.observations.len()
+        {
+            return Err(ProxyAcquisitionError::new(
+                "observations",
+                "successful attempts, observations and receipt query count differ",
+            ));
+        }
+        let mut observed_architectures = BTreeSet::new();
+        let mut summed_seconds = 0.0;
+        for (index, observation) in self.observations.iter().enumerate() {
+            let Some(attempt) = successful_attempts.get(index) else {
+                return Err(ProxyAcquisitionError::new(
+                    "observations",
+                    "missing successful attempt for observation",
+                ));
+            };
+            let expected_digest = digest_observation(
+                &observation.architecture_id,
+                &observation.proxy_id,
+                observation.score,
+                observation.measured_seconds,
+            );
+            if observation.unique_query_index != index
+                || attempt.unique_query_index != Some(index)
+                || attempt.architecture_id != observation.architecture_id
+                || attempt.proxy_id != observation.proxy_id
+                || attempt.measured_seconds.to_bits() != observation.measured_seconds.to_bits()
+                || attempt.observation_sha256.as_deref() != Some(expected_digest.as_str())
+                || observation.observation_sha256 != expected_digest
+                || self.manifest.proxy_directions.get(&observation.proxy_id)
+                    != Some(&observation.direction)
+            {
+                return Err(ProxyAcquisitionError::new(
+                    format!("observations[{index}]"),
+                    "observation does not match its successful query receipt",
+                ));
+            }
+            observed_architectures.insert(observation.architecture_id.as_str());
+            summed_seconds += observation.measured_seconds;
+        }
+        if observed_architectures.len() != self.receipt.unique_architectures_observed
+            || summed_seconds.to_bits() != self.receipt.total_proxy_seconds.to_bits()
+        {
+            return Err(ProxyAcquisitionError::new(
+                "receipt",
+                "unique architecture count or measured proxy seconds do not reconcile",
+            ));
+        }
         if self.declared_proxy_directions.is_empty() {
             return Err(ProxyAcquisitionError::new(
                 "declared_proxy_directions",
@@ -542,6 +629,7 @@ impl ProxyAcquisitionBenchmark {
         let receipt = self.build_receipt(&parts);
         let evaluation = evaluate_receipt(&receipt);
         ProxyAcquisitionRun {
+            manifest: self.manifest.clone(),
             candidates: self.candidates,
             declared_proxy_directions: self.manifest.proxy_directions.clone(),
             observations: parts.observations,
@@ -955,6 +1043,29 @@ mod tests {
         assert!(rows.iter().all(|row| row.proxy_scores.len() == 2));
         assert_eq!(rows[5].proxy_scores["proxy_a"], 5.0);
         assert_eq!(rows[5].proxy_times_seconds["proxy_b"], 0.12);
+    }
+
+    #[test]
+    fn tampered_observation_or_receipt_is_rejected_before_materialization() {
+        let benchmark = benchmark(12, 10.0);
+        let mut run = benchmark.run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                oracle.query(&candidate.architecture_id, "proxy_a").unwrap();
+                oracle.query(&candidate.architecture_id, "proxy_b").unwrap();
+            }
+        });
+        run.observations[0].score += 1.0;
+        assert!(run.to_complete_feature_table().is_err());
+
+        let benchmark = benchmark(12, 10.0);
+        let mut run = benchmark.run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                oracle.query(&candidate.architecture_id, "proxy_a").unwrap();
+                oracle.query(&candidate.architecture_id, "proxy_b").unwrap();
+            }
+        });
+        run.receipt.total_proxy_seconds += 1.0;
+        assert!(run.to_complete_feature_table().is_err());
     }
 
     #[test]
