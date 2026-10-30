@@ -437,9 +437,9 @@ fn exact_mcnemar_statistics(wins: u64, losses: u64) -> (f64, f64, bool) {
     (p_value, log10_p, floored)
 }
 
-fn outcome_lookup<'a>(
-    outcome: &'a EvidenceOutcomeReportV1,
-) -> BTreeMap<PairConditionKey, &'a crate::evidence_outcomes::EvidenceOutcomeRecordV1> {
+fn outcome_lookup(
+    outcome: &EvidenceOutcomeReportV1,
+) -> BTreeMap<PairConditionKey, &crate::evidence_outcomes::EvidenceOutcomeRecordV1> {
     outcome
         .records
         .iter()
