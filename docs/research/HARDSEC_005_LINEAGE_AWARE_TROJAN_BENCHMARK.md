@@ -128,15 +128,58 @@ Every control has an explicit expected failure/success, an independent verifier 
 
 First reproduce the paper's fixed 36-feature RF / XGBoost / logistic-regression conditions and three test boundaries as closely as the actual public reproducibility artifact permits. Record exact deviations and hashes. Do not assume five host families support strong population inference.
 
+A second direct comparator is Mukherjee and Mahanta's September 2026 paper, “A unified graph neural network pipeline for hardware Trojan detection” (DOI 10.1016/j.vlsi.2026.102775). It reports a four-feature, two-layer GCN over 55 synthesized designs from the AES-T100–T2800 family and PIC16F84-T200, with 87.27% accuracy and 0.9563 ROC-AUC, plus saliency-guided localization evaluated with node-level IoU. This is a useful graph-level baseline and localization comparator. It is **not directly comparable** to the Trust-Hub RF F1/AP figures above: dataset composition, synthesis construction, aggregation, labels and split protocol differ. The accessible article summary does not establish a strict host-family-held-out split. Reproduce it only after pinning its exact source designs, synthesis scripts, data split and code; label it unreproduced until then.
+
 Then compare:
 - handcrafted gate/netlist features with RF, XGBoost and logistic regression;
-- graph models / message-passing GNNs, only after leakage-resistant splits are frozen;
+- the published compact two-layer GCN and saliency/localization pipeline;
+- larger message-passing or graph-transformer models only after leakage-resistant splits are frozen;
 - design-family-invariant representations;
 - Symthaea HDC representations as an additional candidate, not a presumed winner.
 
-Use identical splits, features where possible, matched tuning budgets, and family-level metrics. A new model earns credit only by improving leakage-resistant transfer—not by restoring pooled-split performance.
+Use identical splits, features where possible, matched tuning budgets, and family-level metrics. A new model earns credit only by improving leakage-resistant transfer—not by restoring pooled-split performance or winning on a different test partition.
 
-## 11. Proposed success gates
+## 11. Counterfactual paired-design experiment: benign change versus Trojan change
+
+**New falsifiable hypothesis:** where a benchmark provides a clean host design and matched Trojan-inserted variants, a representation of the *difference* between a host and candidate variant may separate Trojan-associated logic changes from host identity better than absolute netlist features alone.
+
+This is a benchmark-only paired experiment. It deliberately uses the clean host as a reference, so it is separate from golden-model-free detection and must not be presented as a deployment assumption.
+
+### Build paired controls
+
+For each eligible host family:
+
+1. Freeze a clean host RTL/netlist, Trojan-inserted variant(s), synthesis tool/version, constraints, defines, cell library and command. Pair only variants with defensible common ancestry and reproducible comparable synthesis.
+2. Generate benign functionally equivalent variants of the clean host using predeclared transformations (e.g. identifier renaming, equivalent logic-optimization recipes, synthesis seeds, or supported buffering transformations). Verify functional equivalence with an independent equivalence checker where available. A transformation is not benign merely because it was intended to be.
+3. Generate or obtain matched Trojan variants under the same synthesis conditions. Preserve exact insertion transform and affected-cone annotations if supplied by the dataset.
+4. Align graphs using stable source/net/cell lineage where available. If only heuristic graph matching is possible, report mapping precision/recall on fixtures and propagate uncertain mappings; do not claim exact gate ancestry.
+5. If source data has no defensible clean/Trojan pairing or stable mapping, mark this arm unsupported rather than inventing pairs.
+
+### Compare three representations
+
+- **Absolute graph:** classify a design from its netlist graph alone (reference-free comparator).
+- **Paired delta graph:** encode matched host/variant changes—added/removed/re-wired nodes/edges, cell-type changes and affected fan-in/fan-out cones—while retaining host identity as a controlled covariate/ablation.
+- **Delta plus context:** represent changed subgraphs with bounded surrounding context to test whether localization needs neighboring benign circuitry.
+
+The model must not infer a Trojan merely because a large transformation occurred. Benign-equivalent variants are hard negatives. Keep any source-provided Trojan annotations sealed from model input.
+
+### Evaluate detection and localization separately
+
+- Pairwise discrimination: rank a Trojan variant above the benign host and above benign-equivalent variants under the same host.
+- Family transfer: hold out the complete host family and, separately, the Trojan insertion family.
+- Benign-transformation false-positive rate: fraction of verified benign transformations flagged at the frozen operating point.
+- Trojan sensitivity at a matched benign-transformation alert budget.
+- Localization IoU / precision / recall on mapped affected cones, with mapping-confidence strata.
+- Functional equivalence pass rate and synthesis-flow consistency, reported separately from detection quality.
+- Resource cost of alignment and inference; report absolute and delta pipelines end-to-end.
+
+A useful paired contrast is the detector-score change for a Trojan-inserted variant versus the score change caused by a benign, equivalence-checked transformation of the same host. The benign control estimates how much score movement comes from design-flow variation alone. Freeze the pairing, matching and scoring policy before testing.
+
+### Failure conditions
+
+The paired experiment is invalid where clean and Trojan designs were synthesized with incompatible toolchains/constraints without controlled normalization, where host ancestry is uncertain, or where graph-matching quality is unmeasured. If a Trojan is functionally or structurally subtle and does not produce a reliably alignable delta, the model may not be capable of detecting it; report that failure rather than changing the pairing after observing scores.
+
+## 12. Proposed success gates
 
 These are research gates, not published standards:
 
@@ -149,7 +192,7 @@ These are research gates, not published standards:
 
 Set numeric effect sizes and minimum independent family counts only after inventory and precision/power analysis, before examining confirmatory model results.
 
-## 12. Industry and standards alignment
+## 13. Industry and standards alignment
 
 NIST IR 8615 (September 2026) calls for interoperable, evidence-based trust models, provenance and traceability across the semiconductor lifecycle, supply-chain assurance, scalable verification/validation and collaboration. This work operationalizes a narrow but important part of that direction: traceable design lineage and honest transfer claims.
 
@@ -162,7 +205,7 @@ References:
 - OpenTitan security documentation: https://opentitan.org/book/doc/security/
 - NIST CSWP 45: https://doi.org/10.6028/NIST.CSWP.45
 
-## 13. Acceptance criteria
+## 14. Acceptance criteria
 
 - [ ] Source inventory and licensing notes frozen.
 - [ ] Design-lineage schema defined and validated on fixtures.
@@ -172,9 +215,10 @@ References:
 - [ ] Gate-weighted and family-macro report formats generated with support counts.
 - [ ] Negative-control and oracle-adequacy fixtures pass independently.
 - [ ] Baseline results reproduced with exact code/data/model lineage or marked irreproducible.
+- [ ] If matched clean/Trojan pairs exist, benign-transform controls and paired delta-graph comparisons are evaluated; otherwise this arm is marked unsupported.
 - [ ] No unqualified zero-day or industrial-transfer claim.
 
-## 14. Initial Rust audit implementation
+## 15. Initial Rust audit implementation
 
 The branch now includes an opt-in generic manifest auditor:
 
@@ -205,7 +249,7 @@ The JSON receipt is deterministic and unsigned. Its claim scope is source-file i
 
 Thirteen unit tests are authored for valid manifests, base-family/netlist/Trojan-family leakage, exact source-hash reuse, source tampering, path traversal, symlink rejection, duplicate sample IDs, missing toolchain identity, receipt overwrite/path safety, and the diagnostic random-gate mode. **They have not been compiled or run in this environment.**
 
-## 15. Scope boundary
+## 16. Scope boundary
 
 This work evaluates benchmark integrity and generalization of design-level hardware-Trojan detection. It does not modify hardware, create Trojan payloads or certify a design. It is not merged with RISC-V runtime telemetry metrics in HARDSEC-001/004 or secure generation in HARDSEC-002.
 
