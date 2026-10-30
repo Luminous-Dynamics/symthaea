@@ -7,7 +7,7 @@
     "repository": "Luminous-Dynamics/symthaea",
     "base_revision": "0123456789abcdef0123456789abcdef01234567",
     "candidate_revision": "89abcdef0123456789abcdef0123456789abcdef",
-    "manifest_digest": "sha256:41c5d6313c95bbc7cf8e17b8e4febd60f1887c8a835e30c21097a0da82123aae",
+    "manifest_digest": "sha256:1cc7eb326f42b0a8afa6f448e6a5440cc2b56813a17b372a0a19ee6cacae0297",
     "orchestrator_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
     "verifier_bundle_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
   },
