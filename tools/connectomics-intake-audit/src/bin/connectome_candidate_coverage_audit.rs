@@ -66,13 +66,32 @@ struct SpatialFrameReport {
     canonical_frame_sha256: String,
     population_frame_sha256: String,
     eligibility_mask_sha256: String,
+    eligibility_mask_encoding: String,
+    eligibility_mask_verified: bool,
+    eligibility_mask_actual_sha256: String,
+    eligibility_mask_artifact_byte_count: String,
+    eligibility_foreground_voxel_count: String,
+    eligibility_foreground_voxel_fraction: f64,
+    mask_tile_counts: Vec<MaskTileCount>,
     eligibility_selection_rule_sha256: String,
     frame_protocol_sha256: String,
     frame_generator_tool_id: String,
     frame_generator_tool_version: String,
     frame_generator_binary_sha256: String,
+    grid_dimensions: [u64; 3],
+    total_grid_cells: u64,
+    eligible_grid_cells: u64,
+    excluded_grid_cells: u64,
+    declared_voxel_count: String,
     population_frame: Vec<PopulationPsu>,
     status: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MaskTileCount {
+    psu_id: String,
+    tile_voxel_count: String,
+    eligible_voxel_count: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -252,6 +271,112 @@ fn frame_sha256(frame: &[PopulationPsu]) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn report_count(value: &str, field: &str) -> Result<u128, String> {
+    value.parse::<u128>()
+        .map_err(|_| format!("spatial frame report {field} must be a base-10 u128 string"))
+}
+
+fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> {
+    if !report.eligibility_mask_verified {
+        return Err("spatial frame report did not verify eligibility-mask artifact bytes".into());
+    }
+    if !matches!(
+        report.eligibility_mask_encoding.as_str(),
+        "packed_bitset_lsb0_x_fastest_v1" | "hex_bitset_lsb0_x_fastest_v1"
+    ) {
+        return Err("spatial frame report uses an unsupported eligibility-mask encoding".into());
+    }
+    if !is_lower_hex(&report.eligibility_mask_sha256, 64)
+        || report.eligibility_mask_actual_sha256 != report.eligibility_mask_sha256
+    {
+        return Err("spatial frame report mask digest is missing or does not match the verified bytes".into());
+    }
+
+    let artifact_bytes = report_count(&report.eligibility_mask_artifact_byte_count, "eligibility_mask_artifact_byte_count")?;
+    let declared_voxels = report_count(&report.declared_voxel_count, "declared_voxel_count")?;
+    let foreground_voxels = report_count(&report.eligibility_foreground_voxel_count, "eligibility_foreground_voxel_count")?;
+    if declared_voxels == 0 || foreground_voxels == 0 || foreground_voxels > declared_voxels {
+        return Err("spatial frame report declared/foreground voxel counts are invalid".into());
+    }
+    let packed_bytes = declared_voxels.checked_add(7)
+        .ok_or_else(|| "spatial frame declared voxel count overflows while deriving mask length".to_string())? / 8;
+    let expected_artifact_bytes = if report.eligibility_mask_encoding == "hex_bitset_lsb0_x_fastest_v1" {
+        packed_bytes.checked_mul(2)
+            .ok_or_else(|| "spatial frame expected hex mask byte count overflows".to_string())?
+    } else {
+        packed_bytes
+    };
+    if artifact_bytes != expected_artifact_bytes {
+        return Err("spatial frame report mask artifact byte count does not match declared extent and encoding".into());
+    }
+    if !report.eligibility_foreground_voxel_fraction.is_finite()
+        || report.eligibility_foreground_voxel_fraction <= 0.0
+        || report.eligibility_foreground_voxel_fraction > 1.0
+    {
+        return Err("spatial frame report foreground voxel fraction is invalid".into());
+    }
+    let expected_fraction = foreground_voxels as f64 / declared_voxels as f64;
+    if (report.eligibility_foreground_voxel_fraction - expected_fraction).abs() > 1.0e-12 {
+        return Err("spatial frame report foreground fraction disagrees with voxel counts".into());
+    }
+
+    let grid_cells = report.grid_dimensions.iter().try_fold(1_u128, |product, dimension| {
+        if *dimension == 0 {
+            return Err("spatial frame grid dimensions must be positive".to_string());
+        }
+        product.checked_mul(u128::from(*dimension))
+            .ok_or_else(|| "spatial frame grid dimension product overflows u128".to_string())
+    })?;
+    if grid_cells != u128::from(report.total_grid_cells)
+        || report.eligible_grid_cells.checked_add(report.excluded_grid_cells) != Some(report.total_grid_cells)
+        || report.mask_tile_counts.len() as u128 != grid_cells
+        || report.population_frame.len() != report.eligible_grid_cells as usize
+    {
+        return Err("spatial frame report grid, disposition, mask-tile, and population counts disagree".into());
+    }
+
+    let mut tile_ids = BTreeMap::<String, u128>::new();
+    let mut tile_voxels = 0_u128;
+    let mut mask_foreground = 0_u128;
+    let mut eligible_tiles = 0_u64;
+    let mut excluded_tiles = 0_u64;
+    for tile in &report.mask_tile_counts {
+        if !nonempty(&tile.psu_id) {
+            return Err("spatial frame mask tile contains an empty PSU ID".into());
+        }
+        let tile_volume = report_count(&tile.tile_voxel_count, "mask tile volume")?;
+        let eligible_volume = report_count(&tile.eligible_voxel_count, "mask tile foreground count")?;
+        if tile_volume == 0 || eligible_volume > tile_volume {
+            return Err(format!("spatial frame mask tile {} has invalid voxel counts", tile.psu_id));
+        }
+        if tile_ids.insert(tile.psu_id.clone(), eligible_volume).is_some() {
+            return Err(format!("spatial frame mask tile ID {} is duplicated", tile.psu_id));
+        }
+        tile_voxels = tile_voxels.checked_add(tile_volume)
+            .ok_or_else(|| "spatial frame tile voxel total overflows u128".to_string())?;
+        mask_foreground = mask_foreground.checked_add(eligible_volume)
+            .ok_or_else(|| "spatial frame tile foreground total overflows u128".to_string())?;
+        if eligible_volume > 0 {
+            eligible_tiles = eligible_tiles.checked_add(1)
+                .ok_or_else(|| "eligible tile count overflows u64".to_string())?;
+        } else {
+            excluded_tiles = excluded_tiles.checked_add(1)
+                .ok_or_else(|| "excluded tile count overflows u64".to_string())?;
+        }
+    }
+    if tile_voxels != declared_voxels || mask_foreground != foreground_voxels
+        || eligible_tiles != report.eligible_grid_cells || excluded_tiles != report.excluded_grid_cells
+    {
+        return Err("spatial frame per-PSU mask totals disagree with report totals".into());
+    }
+    for psu in &report.population_frame {
+        if tile_ids.get(&psu.psu_id).copied().unwrap_or(0) == 0 {
+            return Err(format!("eligible population PSU {} has no foreground voxel in the verified mask", psu.psu_id));
+        }
+    }
+    Ok(())
+}
+
 fn validate_spatial_frame_binding(
     audit: &AuditInput,
     spatial_report: &SpatialFrameReport,
@@ -261,6 +386,7 @@ fn validate_spatial_frame_binding(
     if spatial_report.schema_version != 1 || spatial_report.status != "PASS" {
         return Err("spatial frame report must be schema v1 with status PASS".into());
     }
+    validate_mask_attestation(spatial_report)?;
     if !is_lower_hex(spatial_report_hash, 64)
         || !is_lower_hex(&spatial_report.input_sha256, 64)
         || !is_lower_hex(&spatial_report.canonical_frame_sha256, 64)
