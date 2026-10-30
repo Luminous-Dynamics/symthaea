@@ -61,15 +61,6 @@ pub enum CandidateOrderV1 {
     CandidateBFirst,
 }
 
-impl CandidateOrderV1 {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::CandidateAFirst => "candidate_a_first",
-            Self::CandidateBFirst => "candidate_b_first",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SemanticDecisionV1 {
@@ -115,17 +106,9 @@ impl RawJudgeDecisionV1 {
         }
     }
 
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Left => "left",
-            Self::Right => "right",
-            Self::Tie => "tie",
-            Self::Abstain => "abstain",
-        }
-    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JudgeAuditConditionV1 {
     Baseline,
@@ -1475,7 +1458,8 @@ mod tests {
         let plan = committed_plan_bytes();
         let mut fields = report_fields(&plan);
         let case = &mut fields.cases[0];
-        case.observations[1].repeat_index = case.observations[0].repeat_index;
+        let first_repeat_index = case.observations[0].repeat_index;
+        case.observations[1].repeat_index = first_repeat_index;
         assert!(
             compute_judge_robustness_report_commitment(
                 &plan,
