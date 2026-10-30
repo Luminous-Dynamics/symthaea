@@ -1,0 +1,38 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [{ "name": "synthetic-test-report.json", "digest": { "sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4" } }],
+  "predicateType": "https://luminousdynamics.io/attestations/evidence/v0.1",
+  "predicate": {
+    "schemaVersion": "0.1.0",
+    "claim": {
+      "id": "NEG-003",
+      "kind": "test_result",
+      "statement": "A verification bound to a different source revision must not verify the declared target.",
+      "scope": ["exact-target-binding"]
+    },
+    "target": {
+      "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "754589fa14a63070cf75d8f9ec90078e673d626c" },
+      "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+      "inputs": []
+    },
+    "execution": {
+      "status": "completed",
+      "result": "passed",
+      "runId": "synthetic-stale-target-example"
+    },
+    "verification": {
+      "outcome": "passed",
+      "verifier": { "id": "example-only-verifier", "version": "0.1.0" },
+      "checkedTarget": {
+        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" },
+        "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+        "inputs": []
+      },
+      "checks": [
+        { "id": "example-only-check", "outcome": "passed", "details": "Synthetic intentionally inconsistent fixture; no real verification occurred." }
+      ]
+    },
+    "evidence": [],
+    "limitations": ["Synthetic negative fixture; schema validation alone is expected to accept this shape, but a semantic verifier must reject the stale source revision."]
+  }
+}

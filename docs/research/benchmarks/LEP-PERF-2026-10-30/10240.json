@@ -1,0 +1,27 @@
+{
+  "actual_input_bytes": 10240,
+  "environment": {
+    "architecture": "x86_64",
+    "os": "linux",
+    "rustc_version": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "iterations": 100,
+  "measurements": {
+    "strict_parse_plus_schema": {
+      "mean_ns": 6887,
+      "p50_ns": 6870,
+      "p95_ns": 7010,
+      "throughput_records_per_second_at_p50": 145560.40756914119
+    },
+    "strict_parse_plus_schema_and_semantics": {
+      "mean_ns": 7848,
+      "p50_ns": 7822,
+      "p95_ns": 8012,
+      "throughput_records_per_second_at_p50": 127844.54103809767
+    }
+  },
+  "requested_target_bytes": 10240,
+  "scope": "Synthetic local parsing + validation only; excludes signature verification, artifact I/O, and domain execution.",
+  "suite": "LEP-PERF-0.1",
+  "warmup_iterations_per_path": 20
+}

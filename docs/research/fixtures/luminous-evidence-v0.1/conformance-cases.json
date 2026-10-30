@@ -1,0 +1,124 @@
+{
+  "suite": "LEP-CONFORMANCE-0.1",
+  "status": "prototype-with-schema-semantic-and-strict-parse-checker-source",
+  "cases": [
+    {
+      "id": "LEP-SCHEMA-001",
+      "file": "valid-passed.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "accept",
+      "purpose": "Demonstrate a structurally valid in-toto statement with an LEP predicate.",
+      "implementationStatus": "test-added-not-run-locally"
+    },
+    {
+      "id": "LEP-SCHEMA-002",
+      "file": "invalid-queued-but-passed.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "EXECUTION_STATUS_RESULT_CONFLICT",
+      "purpose": "Queued execution cannot be passed.",
+      "implementationStatus": "test-added-not-run-locally"
+    },
+    {
+      "id": "LEP-SCHEMA-003",
+      "file": "invalid-missing-target.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "MISSING_TARGET",
+      "purpose": "Evidence claims must identify their source, configuration, and inputs.",
+      "implementationStatus": "test-added-not-run-locally"
+    },
+    {
+      "id": "LEP-SEMANTIC-001",
+      "file": "semantic-stale-target.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "rust-checker-source-added-test-not-run-locally",
+      "purpose": "Structural validation cannot compare target and checkedTarget; exact-target binding is a separate mandatory check."
+    },
+    {
+      "id": "LEP-SEMANTIC-002",
+      "file": "valid-passed.json",
+      "schemaExpected": "accept",
+      "semanticExpected": "accept",
+      "expectedFailure": null,
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A passing verification must name the exact target and have completed passing execution plus at least one recorded all-passing check."
+    },
+    {
+      "id": "LEP-SEMANTIC-003",
+      "file": "invalid-queued-but-passed.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "EXECUTION_STATUS_RESULT_CONFLICT",
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A queued execution cannot be reported as passed."
+    },
+    {
+      "id": "LEP-SEMANTIC-004",
+      "file": "invalid-missing-target.json",
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "MISSING_TARGET",
+      "implementationStatus": "test-added-not-run-locally",
+      "purpose": "A claim without a source/configuration/input target must fail closed."
+    },
+    {
+      "id": "LEP-PARSE-001",
+      "file": "invalid-duplicate-key.json",
+      "schemaExpected": "not_reached",
+      "semanticExpected": "reject",
+      "expectedFailure": "DUPLICATE_JSON_KEY",
+      "implementationStatus": "strict-parser-and-fixture-test-added-not-run-locally",
+      "purpose": "Duplicate keys in JSON objects are rejected during parsing before a parser's last-key-wins behavior can alter the attested meaning."
+    },
+    {
+      "id": "LEP-SEMANTIC-005",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/verification/checkedTarget/configurationDigest/sha256",
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "A schema-valid verifier result must not validate a different configuration digest."
+    },
+    {
+      "id": "LEP-SEMANTIC-006",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/target/inputs",
+        "value": [
+          {
+            "name": "sample-dataset",
+            "kind": "dataset_manifest",
+            "digest": {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ]
+      },
+      "schemaExpected": "accept",
+      "semanticExpected": "reject",
+      "expectedFailure": "LEP_TARGET_MISMATCH",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "A schema-valid verifier result must not validate a different input-artifact set."
+    },
+    {
+      "id": "LEP-SCHEMA-004",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/unrecognizedCoreField",
+        "value": true
+      },
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "PREDICATE_SCHEMA_VALIDATION_FAILED",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "LEP v0.1 rejects unknown fields in closed core objects; extension values belong in the explicit namespaced extensions object."
+    }
+  ]
+}

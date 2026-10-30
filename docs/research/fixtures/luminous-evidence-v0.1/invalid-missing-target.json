@@ -1,0 +1,13 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [{ "name": "negative-fixture.json", "digest": { "sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4" } }],
+  "predicateType": "https://luminousdynamics.io/attestations/evidence/v0.1",
+  "predicate": {
+    "schemaVersion": "0.1.0",
+    "claim": { "id": "NEG-002", "kind": "implementation", "statement": "A record without target identity must be rejected.", "scope": ["required-target"] },
+    "execution": { "status": "not_run", "result": "not_run", "runId": null },
+    "verification": { "outcome": "not_run", "verifier": null, "checkedTarget": null, "checks": [] },
+    "evidence": [],
+    "limitations": ["Negative fixture: target deliberately omitted."]
+  }
+}

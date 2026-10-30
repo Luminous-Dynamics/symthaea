@@ -1,0 +1,18 @@
+[package]
+name = "lep-conformance"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Offline schema and semantic conformance checks for the Luminous Evidence Profile"
+publish = false
+
+# This standalone workspace intentionally avoids the monorepo's known
+# glob-matched member with no Cargo.toml. It does not exclude or weaken that
+# existing root-workspace gate.
+[workspace]
+resolver = "2"
+
+[dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+jsonschema = { version = "=0.59.0", default-features = false }

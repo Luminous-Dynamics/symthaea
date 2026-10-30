@@ -1,0 +1,50 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    { "name": "symthaea-test-report.json", "digest": { "sha256": "a4d9f7a8e44c1d3c6f4a9f83a25c8e20f3a6d1c9b2e4f7a8d5c0e1f3a6b9d2e4" } }
+  ],
+  "predicateType": "https://luminousdynamics.io/attestations/evidence/v0.1",
+  "predicate": {
+    "schemaVersion": "0.1.0",
+    "claim": {
+      "id": "SY-EVIDENCE-EXAMPLE-001",
+      "kind": "test_result",
+      "statement": "Illustrative completed test result showing how a passing report is represented; no production benchmark is implied.",
+      "scope": ["schema-conformance", "fixture-validation"]
+    },
+    "target": {
+      "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "754589fa14a63070cf75d8f9ec90078e673d626c" },
+      "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+      "inputs": [
+        { "name": "evidence-fixture-set-v0.1", "kind": "dataset_manifest", "digest": { "sha256": "c6e9b0d5f4a321789abcdef0123456789abcdef0123456789abcdef012345678" } }
+      ]
+    },
+    "execution": {
+      "status": "completed",
+      "result": "passed",
+      "runId": "example-only-run-id",
+      "startedAt": "2026-10-29T16:00:00Z",
+      "finishedAt": "2026-10-29T16:00:01Z",
+      "runner": { "id": "example-only-runner", "version": "4.26.0" }
+    },
+    "verification": {
+      "outcome": "passed",
+      "verifier": { "id": "evidence-predicate-schema-check", "version": "0.1.0" },
+      "checkedTarget": {
+        "source": { "repository": "https://github.com/Luminous-Dynamics/symthaea", "revision": "754589fa14a63070cf75d8f9ec90078e673d626c" },
+        "configurationDigest": { "sha256": "b5d8a9c4e3f2106789abcdef0123456789abcdef0123456789abcdef01234567" },
+        "inputs": [
+          { "name": "evidence-fixture-set-v0.1", "kind": "dataset_manifest", "digest": { "sha256": "c6e9b0d5f4a321789abcdef0123456789abcdef0123456789abcdef012345678" } }
+        ]
+      },
+      "checks": [
+        { "id": "predicate-schema", "outcome": "passed", "details": "Predicate matched the versioned structural schema." },
+        { "id": "record-shape", "outcome": "passed", "details": "The example uses the required record fields; semantic target binding must be checked by a separate verifier." }
+      ]
+    },
+    "evidence": [
+      { "name": "schema-validation-report", "kind": "test_report", "digest": { "sha256": "d7fae1c6b5d432109abcdef0123456789abcdef0123456789abcdef012345678" }, "mediaType": "application/json" }
+    ],
+    "limitations": ["Synthetic illustrative fixture only; digest values are placeholders, and this is not evidence that a production Symthaea benchmark ran."]
+  }
+}
