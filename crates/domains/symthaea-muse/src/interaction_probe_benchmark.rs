@@ -71,13 +71,15 @@ pub struct InteractionProbeBenchmarkReport {
     pub selected_pair_recall: Option<f64>,
     pub unselected_ground_truth_pair_count: usize,
 
-    /// Higher-order PCM terms are deliberately not credited to pairwise recall.
+    /// Pairwise finite differences with all other events held present, matching EVAL-018.
+    pub conditional_pair_total_pcm_l2_norm: f64,
+    /// Unconditional global order-2 Harsanyi structure, reported separately.
+    pub global_order_two_harsanyi_interaction_count: usize,
+    pub global_order_two_harsanyi_total_pcm_l2_norm: f64,
     pub nonzero_higher_order_interaction_count: usize,
-    /// Aggregate L2 norm across all order-2 / order-3+ dividend vectors.
-    pub pairwise_total_pcm_l2_norm: f64,
     pub higher_order_total_pcm_l2_norm: f64,
-    /// None when the pairwise norm is zero; avoids infinity/NaN in receipts.
-    pub higher_order_to_pairwise_l2_ratio: Option<f64>,
+    /// None when the global order-2 norm is zero; avoids infinity/NaN in receipts.
+    pub higher_order_to_global_order_two_l2_ratio: Option<f64>,
 
     pub planned_render_count: u128,
     pub exhaustive_pairwise_render_count: u128,
@@ -141,6 +143,46 @@ fn collect_pairs(
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
     if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) }
+}
+
+fn contextual_pair_interaction_l2_norm(
+    report: &FactorialGroundTruthReport,
+    left: usize,
+    right: usize,
+) -> Result<f64, InteractionProbeBenchmarkError> {
+    let all_mask = (1u16 << report.event_count) - 1;
+    let mask_without_left = all_mask & !(1u16 << left);
+    let mask_without_right = all_mask & !(1u16 << right);
+    let mask_without_both = all_mask & !(1u16 << left) & !(1u16 << right);
+
+    let coalition_pcm = |mask: u16| {
+        report.coalitions
+            .iter()
+            .find(|coalition| coalition.coalition_mask == mask)
+            .map(|coalition| coalition.pcm_samples.as_slice())
+            .ok_or(InteractionProbeBenchmarkError::ReplayMismatch)
+    };
+    let full = coalition_pcm(all_mask)?;
+    let without_left = coalition_pcm(mask_without_left)?;
+    let without_right = coalition_pcm(mask_without_right)?;
+    let without_both = coalition_pcm(mask_without_both)?;
+    if full.len() != without_left.len()
+        || full.len() != without_right.len()
+        || full.len() != without_both.len()
+    {
+        return Err(InteractionProbeBenchmarkError::ReplayMismatch);
+    }
+
+    let squared_norm = full.iter()
+        .zip(without_left)
+        .zip(without_right)
+        .zip(without_both)
+        .map(|(((full, without_left), without_right), without_both)| {
+            let residual = full - without_left - without_right + without_both;
+            residual * residual
+        })
+        .sum::<f64>();
+    Ok(squared_norm.sqrt())
 }
 
 fn report_digest_valid(
@@ -239,20 +281,31 @@ pub fn evaluate_interaction_probe_plan(
         return Err(InteractionProbeBenchmarkError::PlanAccountingMismatch);
     }
 
+    // EVAL-018 probes the pair finite difference with all other source events
+    // retained. This is a contextual effect and can include higher-order terms.
+    // Do not confuse it with the unconditional order-2 Harsanyi dividend below.
     let mut ground_truth_pairs = BTreeSet::new();
-    let mut pairwise_l2_squared = 0.0f64;
+    let mut conditional_pair_l2_squared = 0.0f64;
+    for left in 0..events.len() {
+        for right in (left + 1)..events.len() {
+            let interaction_norm =
+                contextual_pair_interaction_l2_norm(factorial_report, left, right)?;
+            conditional_pair_l2_squared += interaction_norm * interaction_norm;
+            if interaction_norm > benchmark_config.minimum_pair_pcm_l2_norm {
+                ground_truth_pairs.insert((left, right));
+            }
+        }
+    }
+
+    let mut global_order_two_harsanyi_interaction_count = 0usize;
+    let mut global_order_two_l2_squared = 0.0f64;
     let mut higher_order_l2_squared = 0.0f64;
     let mut nonzero_higher_order_interaction_count = 0usize;
-
     for dividend in &factorial_report.dividends {
         if dividend.order == 2 {
-            pairwise_l2_squared += dividend.pcm_l2_norm * dividend.pcm_l2_norm;
+            global_order_two_l2_squared += dividend.pcm_l2_norm * dividend.pcm_l2_norm;
             if dividend.pcm_l2_norm > benchmark_config.minimum_pair_pcm_l2_norm {
-                if dividend.event_indices.len() != 2 {
-                    return Err(InteractionProbeBenchmarkError::ReplayMismatch);
-                }
-                let pair = pair_key(dividend.event_indices[0], dividend.event_indices[1]);
-                ground_truth_pairs.insert(pair);
+                global_order_two_harsanyi_interaction_count += 1;
             }
         } else if dividend.order >= 3 {
             higher_order_l2_squared += dividend.pcm_l2_norm * dividend.pcm_l2_norm;
@@ -292,13 +345,15 @@ pub fn evaluate_interaction_probe_plan(
         return Err(InteractionProbeBenchmarkError::PlanAccountingMismatch);
     }
 
-    let pairwise_total_pcm_l2_norm = pairwise_l2_squared.sqrt();
+    let conditional_pair_total_pcm_l2_norm = conditional_pair_l2_squared.sqrt();
+    let global_order_two_harsanyi_total_pcm_l2_norm = global_order_two_l2_squared.sqrt();
     let higher_order_total_pcm_l2_norm = higher_order_l2_squared.sqrt();
-    let higher_order_to_pairwise_l2_ratio = if pairwise_total_pcm_l2_norm > 0.0 {
-        Some(higher_order_total_pcm_l2_norm / pairwise_total_pcm_l2_norm)
-    } else {
-        None
-    };
+    let higher_order_to_global_order_two_l2_ratio =
+        if global_order_two_harsanyi_total_pcm_l2_norm > 0.0 {
+            Some(higher_order_total_pcm_l2_norm / global_order_two_harsanyi_total_pcm_l2_norm)
+        } else {
+            None
+        };
 
     let mut report = InteractionProbeBenchmarkReport {
         version: INTERACTION_PROBE_BENCHMARK_VERSION.to_owned(),
@@ -321,10 +376,12 @@ pub fn evaluate_interaction_probe_plan(
         selected_true_positive_count,
         selected_pair_recall: ratio(selected_true_positive_count, ground_truth_pairs.len()),
         unselected_ground_truth_pair_count,
+        conditional_pair_total_pcm_l2_norm,
+        global_order_two_harsanyi_interaction_count,
+        global_order_two_harsanyi_total_pcm_l2_norm,
         nonzero_higher_order_interaction_count,
-        pairwise_total_pcm_l2_norm,
         higher_order_total_pcm_l2_norm,
-        higher_order_to_pairwise_l2_ratio,
+        higher_order_to_global_order_two_l2_ratio,
         planned_render_count,
         exhaustive_pairwise_render_count,
         render_cost_fraction_of_exhaustive:
@@ -576,12 +633,15 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.ground_truth_interacting_pair_count, 0);
+        assert_eq!(result.ground_truth_interacting_pair_count, 3);
         assert_eq!(result.candidate_pair_count, 3);
-        assert_eq!(result.candidate_false_positive_count, 3);
-        assert_eq!(result.candidate_recall, None);
+        assert_eq!(result.candidate_true_positive_count, 3);
+        assert_eq!(result.candidate_false_positive_count, 0);
+        assert_eq!(result.candidate_recall, Some(1.0));
         assert_eq!(result.nonzero_higher_order_interaction_count, 1);
         assert!(result.higher_order_total_pcm_l2_norm > 0.0);
-        assert_eq!(result.higher_order_to_pairwise_l2_ratio, None);
+        assert_eq!(result.global_order_two_harsanyi_interaction_count, 0);
+        assert_eq!(result.higher_order_to_global_order_two_l2_ratio, None);
     }
 
     #[test]
