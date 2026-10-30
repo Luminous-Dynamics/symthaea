@@ -726,6 +726,17 @@ fn validate_envelopes(
             "run ID and harness identity must be non-empty bounded identifiers",
         );
     }
+    for record in &oracle.records {
+        if record.execution_witness.worker_binary_digest != oracle.harness.binary_digest {
+            push_error(
+                report,
+                Some(&record.case_id),
+                "E_WORKER_BINARY_MISMATCH",
+                "oracle.records.execution_witness.worker_binary_digest",
+                "child worker binary digest must match the pinned harness executable digest",
+            );
+        }
+    }
     if oracle.profile_id != catalog.profile_id
         || receipts.observer_profile_id != catalog.profile_id
     {
@@ -1848,6 +1859,21 @@ mod tests {
         assert!(!report.adjudication_passed);
         assert!(report.errors.iter().any(|error| {
             error.code == "E_COUNTERFACTUAL_NON_INFLUENCE_NOT_ESTABLISHED"
+        }));
+    }
+
+    #[test]
+    fn rejects_execution_witness_from_a_different_worker_binary() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["execution_witness"]["worker_binary_digest"] =
+            json!(format!("sha256:{}", "f".repeat(64)));
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_WORKER_BINARY_MISMATCH"
         }));
     }
 
