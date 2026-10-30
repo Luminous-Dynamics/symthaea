@@ -831,7 +831,7 @@ mod tests {
     }
 
     fn evidence(kind: &str, status: &str) -> Value {
-        json!({
+        let mut item = json!({
             "evidence_id": format!("{kind}-1"),
             "kind": kind,
             "subject_sha256": NETLIST,
@@ -841,7 +841,34 @@ mod tests {
             "tool": "fixture-tool",
             "tool_version": "1.0",
             "scope": "fixture scope"
-        })
+        });
+        match kind {
+            "formal_proof" => {
+                item["property_id"] = json!("trigger_reachable_property");
+                item["formal_result"] = json!(match status {
+                    "pass" => "bounded_no_counterexample",
+                    "fail" => "counterexample_found",
+                    _ => "unknown",
+                });
+            }
+            "equivalence_report" => {
+                item["property_id"] = json!("gold_gate_equivalence");
+                item["formal_result"] = json!(match status {
+                    "pass" => "equivalence_proved",
+                    "fail" => "counterexample_found",
+                    _ => "unknown",
+                });
+            }
+            "cover_witness" => {
+                item["property_id"] = json!("trigger_cover");
+                item["formal_result"] = json!("cover_reached");
+                item["witness_sha256"] = json!(WITNESS);
+                item["stimuli_count"] = json!(1000);
+                item["activation_count"] = json!(1);
+            }
+            _ => {}
+        }
+        item
     }
 
     fn set_claim(packet: &mut Value, claim_type: &str, status: &str, ids: Vec<&str>) {
@@ -916,6 +943,7 @@ mod tests {
         let mut packet = base_packet();
         let mut formal = evidence("formal_proof", "pass");
         formal["proof_scope"] = json!("unbounded");
+        formal["formal_result"] = json!("assertion_proved");
         formal["assumptions_sha256"] = json!(ASSUMPTIONS);
         add_evidence(&mut packet, formal);
         set_claim(
@@ -932,6 +960,7 @@ mod tests {
         let mut packet = base_packet();
         let mut formal = evidence("formal_proof", "pass");
         formal["proof_scope"] = json!("unbounded");
+        formal["formal_result"] = json!("assertion_proved");
         add_evidence(&mut packet, formal);
         set_claim(
             &mut packet,
