@@ -739,15 +739,12 @@ mod tests {
 
         let (success_delta, success_ci_low, success_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
-            |pair| {
-                (if pair.eig_false_singleton { 1.0 } else { 0.0 })
-                    - (if pair.eig_detected { 1.0 } else { 0.0 })
-            },
+            |pair| (if pair.1 { 1.0 } else { 0.0 }) - (if pair.0 { 1.0 } else { 0.0 }),
             0x4549_475f_5355_4343,
         );
         let (round_delta, round_ci_low, round_ci_high) = paired_bootstrap_mean_ci(
             &paired_outcomes,
-            |pair| pair.audit_false_singleton as f64 - pair.audit_detected as f64,
+            |pair| pair.3 as f64 - pair.2 as f64,
             0x4549_475f_524f_554e,
         );
         println!(
