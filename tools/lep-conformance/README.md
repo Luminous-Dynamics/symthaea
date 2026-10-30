@@ -26,7 +26,7 @@ Repeat on controlled hardware and record the actual input size and exact commit;
 
 ## Validation performed
 
-The CLI first parses JSON with duplicate object keys rejected at every nesting level, then validates the predicate against the bundled JSON Schema Draft 2020-12 schema, with format assertions enabled and unknown formats rejected, then performs semantic validation. The schema uses only in-document references; no remote schema retrieval is required.
+The CLI performs a bounded streaming read (16 MiB maximum), then parses JSON with duplicate object keys rejected at every nesting level and serde_json's default recursion limit, then validates the predicate against the bundled JSON Schema Draft 2020-12 schema, with format assertions enabled and unknown formats rejected, then performs semantic validation. The schema uses only in-document references; no remote schema retrieval is required.
 
 Semantic checks include:
 
@@ -48,5 +48,7 @@ A passing report establishes only that the bundled schema and implemented consis
 Fixture digests are synthetic placeholders. The fixtures are conformance fixtures, not evidence of production runs. The duplicate-key fixture is intentionally rejected by the strict parser before it reaches schema validation.
 
 A one-off local cross-check of the current schema and four structural fixtures was run with Python `jsonschema` 4.26.0, `Draft202012Validator.check_schema`, and `FormatChecker`: the valid and stale-target predicates were accepted; queued-but-passed and missing-target predicates were rejected. A strict Python `object_pairs_hook` also rejected the committed duplicate-key fixture. These are independent schema/fixture checks only; they do not run the Rust implementation or its tests.
+
+The parser rejects oversized statements before deserialization; excessive JSON nesting is rejected by serde_json's recursion limit. These are parser resource-safety controls, not a complete CPU/memory sandbox.
 
 The source is a prototype. Rust compilation and tests have not been run in the current authoring environment, which has no rustc/cargo/Nix toolchain. A standalone Cargo.lock is checked in and its transitive dependency closure was extracted from a public lockfile using matching direct dependency versions and `jsonschema` default features disabled; it was not generated or validated by Cargo here. The new CI workflow uses `--locked` for test and lint steps so a lockfile mismatch fails instead of silently rewriting dependency resolution.
