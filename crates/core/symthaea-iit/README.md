@@ -14,10 +14,12 @@ analysis-request digests. It does not yet compute IIT system
 integrated information (phi_s), mechanism-level phi, a complete cause-effect
 structure, structure-level Phi, or any consciousness result.
 
-The intentional first step is to agree on the input contract before implementing
-the combinatorial algorithms. A mathematically correct engine cannot compare with
-PyPhi if the two sides silently disagree about state order, TPM layout, connectivity,
-evaluation state, time grain, or formalism.
+The first step is to agree on the input contract before comparing mathematical
+outputs. A correct engine cannot compare with PyPhi if the two sides silently
+disagree about state order, TPM layout, connectivity, evaluation state, time grain,
+or formalism. The partition generator is now implemented with an exact quotient
+over direction-label equivalence classes; the full system-phi pipeline remains
+future work.
 
 ### Data contract
 
@@ -195,19 +197,40 @@ Reference formula: https://github.com/wmayner/pyphi/blob/main/pyphi/measures/dis
 
 ## Directed system-partition enumeration
 
-`enumerate_iit4_system_partitions` now enumerates each non-trivial set partition,
-assigns Cause, Effect, or Bidirectional to each block, builds the directed severance
-matrix, and deduplicates candidates by that matrix. It preserves self-loops for
-ordinary directed partitions; the optional `TotalCut` severs all entries, including
-self-loops. A one-unit system always includes `TotalCut`. The caller supplies a
-maximum count of block-direction assignments to visit; if the budget is exceeded,
-the function returns an error rather than a partial candidate list.
+`enumerate_iit4_system_partitions` enumerates each non-trivial set partition and
+emits one canonical direction assignment for every distinct severance matrix. It
+does not materialize all (3^k) Cause/Effect/Bidirectional labelings and then hash
+away duplicates.
 
-This is a candidate generator only. The next stage is to compare its cut matrices
-with a pinned PyPhi configuration and then implement the corresponding cause/effect
-repertoire comparison and minimum-information-partition selection. Different
-partition schemes must not be represented as a speed-only option when they alter
-the calculated quantity.
+The exact quotient follows directly from the cut rule. For blocks (i,j), the
+cross-block edge (i \to j) is uncut **only** when block (i) is Cause and block
+(j) is Effect. Thus every cut matrix is uniquely represented by either:
+
+- the all-Bidirectional labeling, which cuts every cross-block edge; or
+- a nonempty Cause-block subset (C), a disjoint nonempty Effect-block subset
+  (E), and Bidirectional labels for all remaining blocks. The only uncut
+  cross-block edges are the complete directed biclique (C \to E).
+
+For (k) blocks this yields exactly
+(1 + (3^k - 2^{k+1} + 1) = 3^k - 2^{k+1} + 2) representatives. This matches the
+matrix-equivalence relation used by PyPhi's `EdgeCut` equality (candidate node
+indices plus severance matrix); redundant direction metadata is not part of the
+identity of a cut. Since a cut matrix also recovers its set partition—two units
+belong to the same block exactly when neither direction between them is cut—there
+are no cross-partition matrix collisions. The implementation can therefore omit
+the runtime deduplication hash set entirely.
+
+Ordinary directed partitions preserve within-block self-loops; the optional
+`TotalCut` severs every entry, including self-loops. A one-unit system always
+includes `TotalCut`. The caller's work budget applies to canonical representatives
+actually materialized, while the report records the raw equivalent labelings and
+how many were pruned. Budget exhaustion returns an error rather than a partial list.
+
+This remains a candidate generator only. It does not yet apply repertoires to each
+cut, score a minimum-information partition, or compute system \(\phi_s\). The
+next gate is full-matrix parity and post-cut TPM parity with pinned PyPhi inputs,
+then the formalism-specific minimum search. Different partition schemes must not
+be represented as a speed-only option when they alter the calculated quantity.
 
 
 ## Partition application
@@ -229,29 +252,35 @@ system remains to be tested differentially.
 
 The convenience enumerator returns the partition list. The companion
 `enumerate_iit4_system_partitions_with_stats` returns a `PartitionEnumerationReport`
-that separates:
-- block-direction assignments actually evaluated;
-- unique non-total cut matrices retained;
-- duplicate matrices suppressed;
-- whether the special TotalCut was included.
+that separates the raw equivalent labelings, canonical representatives actually
+evaluated, redundant labelings pruned before matrix construction, and unique
+non-total cut matrices emitted. It also reports whether the special TotalCut was
+included. Under this exact quotient, canonical representatives and unique
+non-total cut matrices must agree exactly.
 
-For the current enumerator and no TotalCut, the combinatorial fixtures specify:
-- 3 units: 54 assignments, 22 unique cuts, 32 duplicates;
-- 4 units: 306 assignments, 150 unique cuts, 156 duplicates;
-- 5 units: 1,863 assignments, 1,061 unique cuts, 802 duplicates;
-- 6 units: 12,348 assignments, 7,896 unique cuts, 4,452 duplicates.
+For no TotalCut, the combinatorial regression fixtures specify:
 
-These counts are implementation regression anchors, not performance measurements.
-They make future optimizations measurable: reduce wall time/memory or allocation cost
-while preserving the exact cut-matrix set and reporting candidate work transparently.
+| Units | Raw direction labelings | Canonical representatives evaluated | Redundant labelings pruned | Unique cuts |
+|---:|---:|---:|---:|---:|
+| 2 | 9 | 3 | 6 | 3 |
+| 3 | 54 | 22 | 32 | 22 |
+| 4 | 306 | 150 | 156 | 150 |
+| 5 | 1,863 | 1,061 | 802 | 1,061 |
+| 6 | 12,348 | 7,896 | 4,452 | 7,896 |
+
+These are exact work-count identities and regression anchors, not runtime
+measurements. The independent brute-force reference still generates the original
+3^k labeling family, constructs its matrices, and compares the complete result
+set against the canonical generator through six units.
 
 
 ## Reproducible partition microbenchmark
 
 A standard-library-only Rust example records median/minimum elapsed nanoseconds
-alongside exact search counters for the two- through six-unit
-partition fixtures. Every warm-up and timed iteration must reproduce the frozen
-assignment and unique-cut counts; otherwise it exits nonzero.
+alongside raw direction-label count, canonical representatives evaluated,
+redundant labelings pruned, and unique cuts for the two- through six-unit
+fixtures. Every warm-up and timed iteration must reproduce all frozen work counts;
+otherwise it exits nonzero.
 
 Run:
 
@@ -264,40 +293,37 @@ until the same directed cut-matrix set and workload are generated by both engine
 Do not report a speedup until those semantic parity checks pass.
 
 
-## Exact-preserving cut-matrix optimization
+## Exact-preserving cut-matrix quotient
 
-The enumerator now builds one local block-index array per set partition and
-represents each block direction with two Boolean flags (cuts outgoing, cuts
-incoming). A source -> target edge is severed exactly when the units belong to
-different blocks and the source block cuts outgoing edges or the target block
-cuts incoming edges. This avoids repeated linear membership scans inside the
-source/target matrix loops.
+The first optimization precomputes one local block-index array per set partition.
+The stronger optimization uses the closed-form equivalence above to emit only
+canonical Cause/Effect block subsets. It avoids materializing redundant direction
+vectors, allocating a candidate matrix for each redundant labeling, and maintaining
+a global hash set of cut matrices. Every emitted candidate still has its explicit
+parts, direction vector, and severance matrix.
 
-The test suite contains a deliberately simpler brute-force reference generator
-that uses the original block-membership definition, then compares the complete set
-of matrices—not merely the count—against the optimized enumerator for 2–6 units.
-The existing assignment/unique-cut counts remain fixed. This is an exact-semantic
-optimization candidate; runtime improvement must still be measured in the Rust
-release microbenchmark before claiming a speedup.
+The test suite retains a deliberately simple brute-force reference generator that
+uses the original block-membership definition and all three directions per block.
+It compares the complete matrix set—not merely counts—against the canonical
+enumerator for 2–6 units. This is exact-set equality, not a heuristic or approximate
+search. The six-unit fixture reduces the equivalent direction space from 12,348
+raw labelings to 7,896 canonical representatives, pruning 4,452 redundant
+labelings before matrix construction.
 
+The analytical matrix-loop comparison below contrasts the previous implementation
+(one n² matrix pass per block per raw labeling) with the canonical implementation
+(one n² pass per distinct output cut). These are operation counts, not elapsed time
+or a claim of end-to-end speedup:
 
-For context before timing is available, the combinatorics imply the following
-matrix-loop work counts for the previous implementation (one full n² pass per
-block and assignment) versus the current implementation (one full n² pass per
-block-direction assignment). These are analytical operation counts, not elapsed
-time or a claim of end-to-end speedup. The six-unit workload now also acts as an
-exhaustive exact-matrix parity case; its loop counts are derived from the same
-partition expansion, not a measured runtime:
-
-| Units | Assignments | Previous block-by-matrix iterations | Current matrix-cell checks | Ratio |
+| Units | Raw labelings | Previous block-by-matrix iterations | Canonical matrix-cell checks | Ratio |
 |---:|---:|---:|---:|---:|
-| 2 | 9 | 72 | 36 | 2.00× |
-| 3 | 54 | 1,215 | 486 | 2.50× |
-| 4 | 306 | 14,976 | 4,896 | 3.06× |
-| 5 | 1,863 | 168,750 | 46,575 | 3.62× |
-| 6 | 12,348 | 1,854,252 | 444,528 | 4.17× |
+| 2 | 9 | 72 | 12 | 6.00× |
+| 3 | 54 | 1,215 | 198 | 6.14× |
+| 4 | 306 | 14,976 | 2,400 | 6.24× |
+| 5 | 1,863 | 168,750 | 26,525 | 6.36× |
+| 6 | 12,348 | 1,854,252 | 284,256 | 6.52× |
 
-The older path also performed linear membership scans for both endpoints within
-each block iteration; the new path uses the precomputed block index plus incoming/
-outgoing flags. Actual performance must be established by the release microbenchmark
-on a pinned build and machine, including allocation and deduplication costs.
+These figures count matrix-cell loop work only. They exclude set-partition recursion,
+direction-subset generation, allocation, and output storage. Release benchmarks must
+measure actual wall time and memory on a pinned build and machine before making any
+performance claim.
