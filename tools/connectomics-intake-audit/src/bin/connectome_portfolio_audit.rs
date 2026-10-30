@@ -742,6 +742,30 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_fixture_proves_three_edit_synergy_against_the_exact_pool_oracle() {
+        let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json");
+        let input: Input = serde_json::from_slice(bytes).expect("portfolio fixture should parse");
+        let report = run(&input, bytes).expect("portfolio fixture should evaluate");
+        assert_eq!(report.subset_count_evaluated, 60);
+        let budget_three = report.budget_results.iter()
+            .find(|result| (result.review_budget_minutes - 3.0).abs() < 1.0e-12)
+            .expect("three-minute budget should be present");
+        assert_eq!(
+            budget_three.exact_optimum.selected_candidate_ids,
+            vec![
+                "a-add-1-to-2".to_string(),
+                "b-add-2-to-3".to_string(),
+                "c-add-3-to-4".to_string()
+            ]
+        );
+        let probability_ranker = budget_three.ranked_policies.iter()
+            .find(|result| result.policy == "probability_per_minute")
+            .expect("probability baseline should be present");
+        assert_ne!(probability_ranker.selected_candidate_ids, budget_three.exact_optimum.selected_candidate_ids);
+        assert!(probability_ranker.regret_to_exact_optimum.unwrap() > 0.0);
+    }
+
+    #[test]
     fn exact_optimum_finds_two_edit_synergy_that_single_edit_ranking_misses() {
         let candidates = vec![
             candidate("add-first-leg", 0.8, 1.0, EdgeChange::AddWeight { source: 1, target: 2, weight: 1.0 }),
