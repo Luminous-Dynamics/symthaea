@@ -94,8 +94,6 @@ jobs:
           assert rows[0]["scoap_score_milli"] == "12000"
           assert rows[0]["rarity_percentile_bps"] == "8333"
           assert all("label" not in row for row in rows)
-          unknown = [row for row in rows if row["node_id"] == "1" and row["design_id"] == "design-c"]
-          assert not unknown
           design_c_node_1 = next(row for row in rows if row["design_id"] == "design-c" and row["node_id"] == "1")
           assert design_c_node_1["scoap_score_milli"] == "unknown"
 
