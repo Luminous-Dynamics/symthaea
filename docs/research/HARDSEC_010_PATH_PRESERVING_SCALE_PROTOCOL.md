@@ -27,6 +27,15 @@ Proposed architecture, to be tested rather than assumed to win:
 
 The critical invariant: no path may be reported as preserved unless all its supplied edges exist in the partitioned graph and every cross-partition edge is represented by an explicit bridge.
 
+### Evidence tiers must not be collapsed
+
+A 2026 survey of ML-based hardware-Trojan detection highlights unresolved dataset bias, adversarial robustness, explainability, evaluation inconsistency and FPGA deployment; it also notes that current benchmark suites have different strengths/limitations. A separate 2026 ETS paper questions the empirical basis of the field, observing that publicly documented, reproducible real-world Trojan incidents are extremely rare and that many often-cited examples are undocumented design features, firmware backdoors, supply-chain manipulations or unverified claims. These observations warrant three separately reported evidence tiers:
+- **labelled benchmark designs:** source-labelled RTL/netlist datasets such as Trust-Hub, with explicit caveats about their construction and split lineage;
+- **witness-validated synthetic sequential cases:** e.g. SeqCube-HT records reset-consistent activation, active/inactive replay and bounded audits, but are still generated instances rather than observed field incidents;
+- **industrial-scale structural stress graphs:** e.g. DATE 2026 function-preserving Trojan-like challenge patterns that test rarity, graph size and structural concealment, but do not establish full malicious payload execution.
+
+Never pool these tiers into one accuracy figure or imply that a pass on a synthetic structural challenge is evidence of a real-world incident detector. Sources: survey DOI https://doi.org/10.1016/j.vlsi.2026.102889; ETS 2026 “Hardware Trojans Horses: Two Decades Later, What We Really Know”, DOI https://doi.org/10.1109/ETS69887.2026.11591602; SeqCube-HT https://doi.org/10.1186/s42400-026-00676-2; DATE 2026 https://doi.org/10.23919/DATE69613.2026.11539640.
+
 ## 3. Initial Rust implementation
 
 Adds `examples/hardsec_partition_path_audit.rs`, registered behind Cargo feature `hardsec-design-audit`. It is source-independent and can be run on safe fixtures without a proprietary SoC.
@@ -73,7 +82,43 @@ cargo test --locked \
 
 Nine unit tests are authored for a preserved cross-partition path, lost witness edge with fail receipt, incorrect bridge classification, edge endpoint mutation, disconnected witness, non-contiguous path index, duplicate partition-edge ID, missing node partition assignment, and receipt overwrite. They are not yet reported as passing.
 
-## 4. Benchmark matrix and target gates
+## 3. Streaming edge-merge implementation
+
+The original path auditor, `examples/hardsec_partition_path_audit.rs`, is useful for small fixtures because it loads the graph edges directly. The scale path is `examples/hardsec_partition_path_stream.rs`: it requires the original and partitioned edge files to be strictly sorted by `edge_id` and performs a merge join with one current record from each stream.
+
+The streaming implementation:
+- hashes each of the four inputs before processing and re-hashes them after the merge pass to reject persistent changes during the audit;
+- holds the node-to-partition map and witness-path ledger in memory;
+- scans the original and partitioned edge sets without materializing either full edge set;
+- validates every retained edge against its original ID and endpoints;
+- classifies cross-partition edges as explicit `bridge` records;
+- counts all edge rows and reports supplied witness-edge retention;
+- emits a deterministic receipt with the exact four input hashes.
+
+Its stated working-memory contract is `O(V + W + maximum_input_record_size)`: V is the node partition map and W is the supplied witness ledger. It is not constant-memory and is not yet fully out-of-core because those two structures remain resident. The before/after digest check catches persistent file mutation, but the tool does not claim protection against an adversarial concurrent filesystem replacement/ABA race. An input that is not strictly sorted fails closed rather than being silently sorted in memory.
+
+Run the streaming version:
+
+```bash
+cargo test --locked \
+  --manifest-path tools/hardsec-design-audit-harness/Cargo.toml \
+  --features hardsec-design-audit \
+  --example hardsec_partition_path_stream
+
+cargo run --locked \
+  --manifest-path tools/hardsec-design-audit-harness/Cargo.toml \
+  --features hardsec-design-audit \
+  --example hardsec_partition_path_stream -- \
+  --original-edges /data/original-edges.sorted.tsv \
+  --partitioned-edges /data/partitioned-edges.sorted.tsv \
+  --node-partitions /data/node-partitions.tsv \
+  --witness-paths /data/witness-paths.tsv \
+  --receipt /tmp/path-audit.json
+```
+
+The streaming suite has 10 authored tests, including a synthetic 1,000,000-edge star-shaped structural graph with 1,000,001 node-to-partition assignments and a one-edge witness ledger. That fixture is a throughput/memory-path stress test only, not a representative SoC benchmark and not a Trojan instance. The test has not yet been reported as passing.
+
+## 5. Benchmark matrix and target gates
 
 Scale ladder, where authorized design inputs exist:
 
@@ -100,7 +145,7 @@ Proposed project gates (not achieved results or industry standards):
 - publish p50/p95 and worst-stratum scaling across at least five graph sizes and three independent design families before claiming broad scalability;
 - do not claim physical or industrial transfer from function-preserving synthetic patterns alone.
 
-## 5. Next work
+## 6. Next work
 
 1. Pass the focused formatter and regression tests for both the lineage auditor and this path auditor.
 2. Add a deterministic streaming edge-list ingest/index benchmark with input/output hashes and bounded-memory measurements.
@@ -108,6 +153,6 @@ Proposed project gates (not achieved results or industry standards):
 4. Obtain rights-qualified DATE challenge inputs and exact generation/parser code before reproducing paper timings or detector metrics.
 5. Add witness-path retention to an adaptive-refinement prototype, then compare with the same local GNN/KGE baselines and the same split groups.
 
-## 6. Industry comparison and claim ceiling
+## 7. Industry comparison and claim ceiling
 
 The competitive deliverable is not just a larger graph model. It is a reproducible graph-ingest, partition, path-ledger and evidence pipeline whose memory/latency costs are measured and whose dropped dependencies are visible. That supports industry-style design review and verification work; it does not replace formal verification, silicon validation, or a platform-specific security assessment.
