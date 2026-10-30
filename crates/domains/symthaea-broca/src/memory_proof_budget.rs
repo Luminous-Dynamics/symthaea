@@ -1407,6 +1407,7 @@ mod tests {
             tokenizer_sha256: &canonical.tokenizer_sha256,
             packet_renderer_sha256: &canonical.packet_renderer_sha256,
             fixed_packet_overhead_tokens: canonical.fixed_packet_overhead_tokens,
+            token_budget: canonical.token_budget,
             selected_proofs: &non_minimal.selected_proofs,
             evidence: &non_minimal.evidence,
             total_token_cost: non_minimal.total_token_cost,
