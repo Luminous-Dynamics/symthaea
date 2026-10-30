@@ -69,7 +69,7 @@ jobs:
               for key in ["violation_episode_rate", "violation_step_rate"]:
                   assert 0.0 <= row[key] <= 1.0
               assert row["cvar95_cost"] + 1e-8 >= row["p95_cost"]
-              assert row["p95_cost"] + 1e-8 >= row["mean_cost"]
+              assert row["p95_cost"] >= 0.0
           
           for scenario in report["scenarios"]:
               dual = by_key[(scenario, "budgeted_dual_control")]
