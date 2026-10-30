@@ -1614,6 +1614,10 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         replicates,
         seed ^ 0x0560_c011_2026_1030,
     )?);
+    output.push_str(&policy_portfolio_benchmark_rows(
+        replicates,
+        seed ^ 0x0570_ba7c_2026_1030,
+    )?);
     Ok(output)
 }
 
@@ -1701,6 +1705,346 @@ fn correlation_benchmark_rows(replicates: usize, seed: u64) -> Result<String, St
                 sources[2],
                 worst_case_mse,
                 iterations,
+            );
+        }
+    }
+    Ok(output)
+}
+
+const PORTFOLIO_POLICIES: usize = 3;
+
+#[derive(Clone, Copy)]
+struct PolicyPortfolio {
+    names: [&'static str; PORTFOLIO_POLICIES],
+    targets: [[[f64; ACTIONS]; CONTEXTS]; PORTFOLIO_POLICIES],
+    prior_weights: [f64; PORTFOLIO_POLICIES],
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PortfolioObjective {
+    PriorWeighted,
+    WorstPolicy,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PortfolioExactResult {
+    allocation: Allocation,
+    objective: f64,
+    combinations_checked: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MultiPolicyMetrics {
+    bias: [f64; PORTFOLIO_POLICIES],
+    variance: [f64; PORTFOLIO_POLICIES],
+    mse: [f64; PORTFOLIO_POLICIES],
+    covariance: [[f64; PORTFOLIO_POLICIES]; PORTFOLIO_POLICIES],
+    selection_accuracy: f64,
+    expected_simple_regret: f64,
+}
+
+fn policy_portfolio(world: &World) -> PolicyPortfolio {
+    let balanced = world.target;
+    let conservative = [[0.78, 0.17, 0.05], [0.55, 0.30, 0.15]];
+    let aggressive = [[0.10, 0.20, 0.70], [0.05, 0.15, 0.80]];
+    PolicyPortfolio {
+        names: ["conservative", "balanced", "aggressive"],
+        targets: [conservative, balanced, aggressive],
+        prior_weights: [0.25, 0.50, 0.25],
+    }
+}
+
+fn world_with_target(
+    world: &World,
+    target: [[f64; ACTIONS]; CONTEXTS],
+) -> World {
+    let mut updated = *world;
+    updated.target = target;
+    updated
+}
+
+fn portfolio_policy_mses(
+    world: &World,
+    allocation: &Allocation,
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+) -> Result<[f64; PORTFOLIO_POLICIES], String> {
+    std::array::try_from_fn(|policy| {
+        let target_world = world_with_target(world, portfolio.targets[policy]);
+        analytic_mse(&target_world, allocation, evaluation_n)
+    })
+}
+
+fn portfolio_objective(
+    mse: &[f64; PORTFOLIO_POLICIES],
+    portfolio: &PolicyPortfolio,
+    objective: PortfolioObjective,
+) -> f64 {
+    match objective {
+        PortfolioObjective::PriorWeighted => (0..PORTFOLIO_POLICIES)
+            .map(|policy| portfolio.prior_weights[policy] * mse[policy])
+            .sum(),
+        PortfolioObjective::WorstPolicy => mse.iter().copied().fold(0.0, f64::max),
+    }
+}
+
+/// Exact finite-fixture portfolio oracle. It enumerates each context's feasible
+/// source-count options and exhaustively combines them under the shared budget.
+/// This is intentionally a small-instance certificate, not a scalable solver.
+fn exact_portfolio_allocation(
+    world: &World,
+    portfolio: &PolicyPortfolio,
+    objective: PortfolioObjective,
+) -> Result<PortfolioExactResult, String> {
+    world.validate()?;
+    let left = enumerate_context_options(world, 0, [true; SOURCES]);
+    let right = enumerate_context_options(world, 1, [true; SOURCES]);
+    let mut best_score = f64::INFINITY;
+    let mut best_allocation = Allocation::default();
+    let mut combinations_checked = 0usize;
+
+    for left_option in &left {
+        for right_option in &right {
+            if left_option.cost + right_option.cost > world.budget {
+                continue;
+            }
+            combinations_checked += 1;
+            let mut allocation = Allocation::default();
+            allocation.counts[0] = left_option.counts;
+            allocation.counts[1] = right_option.counts;
+            if !allocation.feasible(world) {
+                return Err("portfolio oracle constructed an infeasible allocation".into());
+            }
+            let mses = portfolio_policy_mses(world, &allocation, portfolio, EVAL_N)?;
+            let score = portfolio_objective(&mses, portfolio, objective);
+            if score + EPS < best_score {
+                best_score = score;
+                best_allocation = allocation;
+            }
+        }
+    }
+    if !best_score.is_finite() {
+        return Err("portfolio exact oracle found no feasible allocation".into());
+    }
+    Ok(PortfolioExactResult {
+        allocation: best_allocation,
+        objective: best_score,
+        combinations_checked,
+    })
+}
+
+fn greedy_portfolio_allocate(
+    world: &World,
+    portfolio: &PolicyPortfolio,
+    objective: PortfolioObjective,
+) -> Result<Allocation, String> {
+    let mut allocation = Allocation::default();
+    loop {
+        let current_mses =
+            portfolio_policy_mses(world, &allocation, portfolio, EVAL_N)?;
+        let current_score = portfolio_objective(&current_mses, portfolio, objective);
+        let mut best: Option<(f64, Allocation)> = None;
+        for x in 0..CONTEXTS {
+            for a in 0..ACTIONS {
+                for k in 0..SOURCES {
+                    let mut candidate = allocation;
+                    candidate.counts[x][a][k] += 1;
+                    if !candidate.feasible(world) {
+                        continue;
+                    }
+                    let candidate_mses =
+                        portfolio_policy_mses(world, &candidate, portfolio, EVAL_N)?;
+                    let candidate_score =
+                        portfolio_objective(&candidate_mses, portfolio, objective);
+                    let gain = current_score - candidate_score;
+                    if gain <= EPS {
+                        continue;
+                    }
+                    let score = gain / world.source_cost[k] as f64;
+                    if best.is_none_or(|(best_score, _)| score > best_score + EPS) {
+                        best = Some((score, candidate));
+                    }
+                }
+            }
+        }
+        match best {
+            Some((_, candidate)) => allocation = candidate,
+            None => break,
+        }
+    }
+    Ok(allocation)
+}
+
+/// Evaluates all portfolio policies on exactly the same contexts, logged actions,
+/// factual rewards, and shared q-hat realization. The returned covariance matrix
+/// therefore includes the dependence that matters for simultaneous screening and
+/// best-policy selection, rather than treating K OPE estimates as independent.
+fn multi_policy_monte_carlo(
+    world: &World,
+    allocation: &Allocation,
+    portfolio: &PolicyPortfolio,
+    evaluation_n: usize,
+    replicates: usize,
+    seed: u64,
+) -> MultiPolicyMetrics {
+    let true_values: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
+        target_value(&world_with_target(world, portfolio.targets[policy]))
+    });
+    let best_true = (0..PORTFOLIO_POLICIES)
+        .max_by(|left, right| true_values[*left].total_cmp(&true_values[*right]))
+        .unwrap_or(0);
+
+    let mut errors = Vec::with_capacity(replicates);
+    let mut selected_correct = 0usize;
+    let mut total_regret = 0.0;
+    for replicate in 0..replicates {
+        let q = annotation_reward_model(world, allocation, mix_seed(seed, replicate, 71));
+        let mut rng = Rng::new(mix_seed(seed, replicate, 89));
+        let mut estimates = [0.0; PORTFOLIO_POLICIES];
+        for _ in 0..evaluation_n {
+            let context = if rng.uniform() < world.context_probability[0] {
+                0
+            } else {
+                1
+            };
+            let action = sample_action(&world.behavior[context], &mut rng);
+            let reward = if rng.uniform() < world.reward_mean[context][action] {
+                1.0
+            } else {
+                0.0
+            };
+            let mu = world.behavior[context][action];
+            for policy in 0..PORTFOLIO_POLICIES {
+                let target = portfolio.targets[policy];
+                let dm = (0..ACTIONS)
+                    .map(|a| target[context][a] * q[context][a])
+                    .sum::<f64>();
+                let pi = target[context][action];
+                estimates[policy] += dm + pi / mu * (reward - q[context][action]);
+            }
+        }
+        for estimate in &mut estimates {
+            *estimate /= evaluation_n as f64;
+        }
+        let errors_for_replicate =
+            std::array::from_fn(|policy| estimates[policy] - true_values[policy]);
+        let selected = (0..PORTFOLIO_POLICIES)
+            .max_by(|left, right| estimates[*left].total_cmp(&estimates[*right]))
+            .unwrap_or(0);
+        if selected == best_true {
+            selected_correct += 1;
+        }
+        total_regret += (true_values[best_true] - true_values[selected]).max(0.0);
+        errors.push(errors_for_replicate);
+    }
+
+    let n = replicates as f64;
+    let bias: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
+        errors.iter().map(|row| row[policy]).sum::<f64>() / n
+    });
+    let mse: [f64; PORTFOLIO_POLICIES] = std::array::from_fn(|policy| {
+        errors.iter().map(|row| row[policy].powi(2)).sum::<f64>() / n
+    });
+    let variance: [f64; PORTFOLIO_POLICIES] =
+        std::array::from_fn(|policy| (mse[policy] - bias[policy] * bias[policy]).max(0.0));
+    let covariance = std::array::from_fn(|left| {
+        std::array::from_fn(|right| {
+            let product = errors
+                .iter()
+                .map(|row| row[left] * row[right])
+                .sum::<f64>()
+                / n;
+            product - bias[left] * bias[right]
+        })
+    });
+
+    MultiPolicyMetrics {
+        bias,
+        variance,
+        mse,
+        covariance,
+        selection_accuracy: selected_correct as f64 / n,
+        expected_simple_regret: total_regret / n,
+    }
+}
+
+fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<String, String> {
+    let mut output = String::new();
+    for (scenario_index, world) in correlated_stress_worlds().iter().enumerate() {
+        let portfolio = policy_portfolio(world);
+        let balanced_world = world_with_target(world, portfolio.targets[1]);
+        let balanced_plan = exact_dynamic_program(&balanced_world, [true; SOURCES])?.allocation;
+        let prior_exact =
+            exact_portfolio_allocation(world, &portfolio, PortfolioObjective::PriorWeighted)?;
+        let worst_exact =
+            exact_portfolio_allocation(world, &portfolio, PortfolioObjective::WorstPolicy)?;
+        let worst_greedy =
+            greedy_portfolio_allocate(world, &portfolio, PortfolioObjective::WorstPolicy)?;
+
+        let plans = [
+            ("balanced_single_policy_exact", balanced_plan),
+            ("portfolio_prior_weighted_exact", prior_exact.allocation),
+            ("portfolio_worst_case_exact", worst_exact.allocation),
+            ("portfolio_worst_case_greedy", worst_greedy),
+        ];
+        for (method_index, (method, allocation)) in plans.iter().enumerate() {
+            if !allocation.feasible(world) {
+                return Err(format!("portfolio benchmark plan is infeasible: {method}"));
+            }
+            let policy_mses =
+                portfolio_policy_mses(world, allocation, &portfolio, EVAL_N)?;
+            let prior_score =
+                portfolio_objective(&policy_mses, &portfolio, PortfolioObjective::PriorWeighted);
+            let worst_score =
+                portfolio_objective(&policy_mses, &portfolio, PortfolioObjective::WorstPolicy);
+            let mc = multi_policy_monte_carlo(
+                world,
+                allocation,
+                &portfolio,
+                EVAL_N,
+                replicates,
+                seed ^ (scenario_index as u64).wrapping_mul(0x517c_c1b7_2722_0a95)
+                    ^ (method_index as u64).wrapping_mul(0x6eed_0e9d_a4d9_4a4f),
+            );
+            let prior_gap =
+                ((prior_score - prior_exact.objective) / prior_exact.objective.max(EPS)).max(0.0);
+            let worst_gap =
+                ((worst_score - worst_exact.objective) / worst_exact.objective.max(EPS)).max(0.0);
+            let sources = allocation_sources(allocation);
+            use std::fmt::Write;
+            let _ = writeln!(
+                output,
+                "PORTFOLIO_RESULT\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.8}\\t{:.10}\\t{}\\t{}\\t{}\\t{:.8}\\t{:.8}",
+                world.name,
+                method,
+                replicates,
+                world.budget,
+                allocation.cost(world),
+                allocation.total_count(),
+                prior_score,
+                worst_score,
+                policy_mses[0],
+                policy_mses[1],
+                policy_mses[2],
+                mc.bias[0],
+                mc.bias[1],
+                mc.bias[2],
+                mc.variance[0],
+                mc.variance[1],
+                mc.variance[2],
+                mc.mse[0],
+                mc.mse[1],
+                mc.mse[2],
+                mc.covariance[0][1],
+                mc.covariance[0][2],
+                mc.covariance[1][2],
+                mc.selection_accuracy,
+                mc.expected_simple_regret,
+                sources[0],
+                sources[1],
+                sources[2],
+                prior_gap,
+                worst_gap,
             );
         }
     }
