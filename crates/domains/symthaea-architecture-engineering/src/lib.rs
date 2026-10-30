@@ -17,6 +17,7 @@ pub mod multi_fidelity_benchmark;
 pub mod analytical_benchmark;
 pub mod tabular_nas_firewall;
 pub mod multi_fidelity_tabular_nas;
+pub mod nasbench201_trajectory;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
