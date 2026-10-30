@@ -1143,6 +1143,48 @@ mod tests {
     }
 
     #[test]
+    fn multi_event_exclusion_requires_exactly_the_declared_missing_set() {
+        let mut map = fixture();
+        map.events.clear();
+        map.seal().unwrap();
+        map.verify_for_score_excluding_many_and_pitches(
+            &digest('a'),
+            &digest('b'),
+            48_000,
+            48_000,
+            2,
+            &[0, 1],
+            &[60, 64],
+        )
+        .unwrap();
+
+        assert_eq!(
+            map.verify_for_score_excluding_many_and_pitches(
+                &digest('a'),
+                &digest('b'),
+                48_000,
+                48_000,
+                2,
+                &[0, 0],
+                &[60, 64],
+            ),
+            Err(PerformedEventMapError::InvalidExpectedEventCount)
+        );
+        assert_eq!(
+            map.verify_for_score_excluding_many_and_pitches(
+                &digest('a'),
+                &digest('b'),
+                48_000,
+                48_000,
+                2,
+                &[0],
+                &[60, 64],
+            ),
+            Err(PerformedEventMapError::MissingSourceEvent)
+        );
+    }
+
+    #[test]
     fn descendant_ordinals_must_be_contiguous_from_zero() {
         let mut map = fixture();
         map.events
