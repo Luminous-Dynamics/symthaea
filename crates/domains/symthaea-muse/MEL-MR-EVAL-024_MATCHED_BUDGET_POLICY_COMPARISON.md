@@ -18,6 +18,8 @@ The benchmark has two distinct frame domains. Source-isolated event arrays and t
 
 This distinction is required for a 64-frame source whose fixed FIR output is 67 frames: support in frames 64–67 is valid rendered evidence, not an out-of-range source event.
 
+Every event must also carry the digest of its replay-verified EVAL-017 support scan, even when its interval list is empty. An empty list with a valid digest means that a whole-output scan found no windows above the declared measurement floor; it is not equivalent to a missing scan and does not prove mathematical zero influence. Missing evidence rejects before the candidate planner runs.
+
 A policy's requested budget is not its measured cost. Temporal-only and routing-only selection can legitimately return fewer pairs than requested. The evaluator records both the requested budget and selected pair count, then computes cost from the actual selected probes.
 
 ## Policies

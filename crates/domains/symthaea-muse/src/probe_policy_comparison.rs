@@ -101,6 +101,7 @@ pub enum ProbePolicyComparisonError {
     EventCountMismatch,
     FrameCountMismatch,
     InvalidSupport,
+    MissingSupportEvidence,
     InvalidDigest,
     FactorialReference(FactorialReferenceError),
     ProbePlan(InteractionProbePlanError),
@@ -209,6 +210,11 @@ fn normalize_supports(
         if event.acoustic_support.len() > 100_000
             || event.routing_domains.len() > 256
         {
+            return Err(ProbePolicyComparisonError::InvalidSupport);
+        }
+        let support_digest = event.support_evidence_sha256.as_deref()
+            .ok_or(ProbePolicyComparisonError::MissingSupportEvidence)?;
+        if !digest_is_valid(support_digest) {
             return Err(ProbePolicyComparisonError::InvalidSupport);
         }
         let mut intervals = event.acoustic_support.clone();
@@ -1044,6 +1050,34 @@ mod tests {
         ).unwrap();
         let routing = find_row(&report, ProbeSelectionPolicy::RoutingOnly, 7, 2);
         assert_eq!(routing.selected_pair_count, 2);
+    }
+
+    #[test]
+    fn comparison_rejects_missing_support_evidence_for_empty_and_nonempty_intervals() {
+        for empty_support in [false, true] {
+            let (factorial, events, effect, config, mut supports) = fixture();
+            supports[0].support_evidence_sha256 = None;
+            if empty_support {
+                supports[0].acoustic_support.clear();
+            }
+            assert_eq!(
+                compare_probe_policies(
+                    &factorial,
+                    &events,
+                    &effect,
+                    &config,
+                    &digest("score"),
+                    &digest("renderer"),
+                    64,
+                    &supports,
+                    &planner_config(),
+                    &[1],
+                    &[41],
+                    &InteractionProbeBenchmarkConfig::default(),
+                ).unwrap_err(),
+                ProbePolicyComparisonError::MissingSupportEvidence,
+            );
+        }
     }
 
     #[test]
