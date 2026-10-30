@@ -20,6 +20,8 @@
 //!     --manifest /data/scoap.jsonl --ranking-output /output/ranking.tsv \
 //!     --receipt /output/audit.json --evidence-root /data/netlists
 
+#![recursion_limit = "256"]
+
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -1593,39 +1595,4 @@ mod tests {
         );
     }
 
-    fn header_value(alpha_milli: u64, protocol: &str) -> Value {
-        json!({
-            "schema_version": "hardsec-scoap-manifest-v1",
-            "record_order": RECORD_ORDER,
-            "dataset_id": "fixture",
-            "alpha_milli": alpha_milli,
-            "split_protocol": protocol,
-            "analyzer": {
-                "name": "fixture-scoap",
-                "version": "1.0",
-                "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                "sequential_cut_policy": "register_cut"
-            },
-            "designs": [
-                {
-                    "design_id": "design-a",
-                    "base_design_family_id": "family-a",
-                    "split": "train",
-                    "netlist_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                {
-                    "design_id": "design-b",
-                    "base_design_family_id": "family-b",
-                    "split": "validation",
-                    "netlist_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                },
-                {
-                    "design_id": "design-c",
-                    "base_design_family_id": "family-c",
-                    "split": "test",
-                    "netlist_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-                }
-            ]
-        })
-    }
 }
