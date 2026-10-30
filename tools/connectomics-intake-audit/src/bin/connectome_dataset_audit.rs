@@ -172,10 +172,28 @@ fn archive_bank(source_archive: &str) -> Option<&'static str> {
 
 fn scalar_key(value: Option<&Value>) -> Option<String> {
     match value? {
-        Value::String(value) if !value.trim().is_empty() && value != "None" => {
-            Some(value.trim().to_string())
+        Value::String(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() || trimmed == "None" {
+                return None;
+            }
+            if let Ok(integer) = trimmed.parse::<i128>() {
+                return Some(integer.to_string());
+            }
+            if let Ok(integer) = trimmed.parse::<u128>() {
+                return Some(integer.to_string());
+            }
+            Some(trimmed.to_string())
         }
-        Value::Number(value) => Some(value.to_string()),
+        Value::Number(value) => {
+            if let Some(integer) = value.as_i64() {
+                return Some(integer.to_string());
+            }
+            if let Some(integer) = value.as_u64() {
+                return Some(integer.to_string());
+            }
+            Some(value.to_string())
+        }
         _ => None,
     }
 }
@@ -246,7 +264,8 @@ fn lineage_key(row: &Row, metadata: &Value, bank: &str) -> Option<String> {
                 if !value.is_finite() {
                     return None;
                 }
-                coords.push(value.to_string());
+                // Python float equality treats -0.0 and 0.0 as the same tuple element.
+                coords.push(if value == 0.0 { "0".to_string() } else { value.to_string() });
             }
             format!("{pre}|{post}|{}", coords.join(","))
         }
@@ -929,6 +948,16 @@ mod tests {
         rows[4].row.metadata = rows[4].metadata.to_string();
         let report = report(&rows);
         assert!(report.errors.iter().any(|finding| finding.code == "spatial_cube_cross_split"));
+    }
+
+    #[test]
+    fn canonicalizes_numeric_strings_like_upstream_python_int_split_keys() {
+        let mut rows = valid_dataset();
+        rows[0].metadata["operation_id"] = json!("0001");
+        rows[1].metadata["operation_id"] = json!(1);
+        let first = lineage_key(&rows[0].row, &rows[0].metadata, &rows[0].bank).unwrap();
+        let second = lineage_key(&rows[1].row, &rows[1].metadata, &rows[1].bank).unwrap();
+        assert_eq!(first, second);
     }
 
 }
