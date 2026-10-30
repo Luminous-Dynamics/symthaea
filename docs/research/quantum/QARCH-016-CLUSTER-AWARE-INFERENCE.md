@@ -83,6 +83,8 @@ The exact power sensitivity table assumes independent families and a common prob
 
 This is why we should not claim that 20 or 30 families is universally sufficient. Use the expected family-level effect, practical margin, target family distribution and full Holm family to perform a design-specific power analysis. Exact sign tests are discrete and conservative at small K; do not hide this limitation.
 
+This conservative choice is consistent with the broader clustered-inference literature: cluster-level analyses target a typical-cluster estimand, while individual-level methods need clustering and often small-sample corrections; ignoring clustering can inflate type-I error. Studies also show that few clusters can sharply reduce power, and that resampling methods are not automatically safe with few or highly unbalanced clusters. QARCH-016 therefore starts with an interpretable family-level exact test and defers bootstrap or hierarchical alternatives until they pass their own calibrated null simulations. See [small-cluster analyses](https://academic.oup.com/ije/article/47/1/321/4091562), [cluster-trial design guidance](https://academic.oup.com/ije/article/52/5/1648/7172835), and [cluster-robust inference practice](https://doi.org/10.1016/j.jeconom.2022.04.001).
+
 ## Target-population boundary
 
 This method estimates an equally weighted family-level median effect. It does not estimate an instance-weighted effect when family sizes differ, nor does it automatically transport results to future workloads. If deployment traffic weights families unequally, preregister those weights and use a separately justified weighted/cluster-aware estimator; do not weight by observed family size after seeing outcomes.
