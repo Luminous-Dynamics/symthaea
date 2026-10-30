@@ -149,7 +149,7 @@ Use external suites as complementing reference points rather than combine incomp
 - [AgentSuite/COBA](https://proceedings.mlr.press/v306/suh26a.html): benchmark validity methods.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196): clean-to-shifted execution evaluation.
 - [TestJack](https://arxiv.org/abs/2610.10619): requirement-grounded evaluator evolution and executable witness tests for apparently passing patches.
-- BASALT suite-manifest v3: frozen atomic requirement ledger with source-span, expectation, ambiguity, and blocking-check coverage commitments.
+- BASALT suite-manifest v3: frozen atomic requirement ledger with source-span bounds, expectation, ambiguity, and bidirectional blocking-check coverage commitments.
 - [OpenAI SWE-bench Pro audit (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/): task, ground-truth and grading quality audit.
 - [Epoch AI Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review): reviewer findings about scoring defects.
 - [HypeCodeNet / The Natural Geometry of Code](https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html): motivation for evaluating hyperbolic structural representations.
