@@ -444,6 +444,7 @@ impl DirectionBoard {
         descriptor: DirectionDescriptor,
         verifier_receipt_sha256: &str,
     ) -> Result<String, DirectionBoardError> {
+        self.validate_integrity()?;
         validate_sha256("verifier_receipt_sha256", verifier_receipt_sha256)?;
         let canonical = descriptor.canonicalized()?;
         let digest = canonical.digest()?;
@@ -469,6 +470,7 @@ impl DirectionBoard {
         &mut self,
         proposal: NewDirectionProposal,
     ) -> Result<Option<String>, DirectionBoardError> {
+        self.validate_integrity()?;
         self.validate_proposal(&proposal)?;
         if self.proposal_ids.contains(&proposal.proposal_id) {
             return Err(DirectionBoardError::new(
@@ -583,6 +585,7 @@ impl DirectionBoard {
         &mut self,
         attempt: DirectionAttempt,
     ) -> Result<(), DirectionBoardError> {
+        self.validate_integrity()?;
         self.validate_attempt(&attempt)?;
         if self.attempt_ids.contains(&attempt.attempt_id) {
             return Err(DirectionBoardError::new(
@@ -616,6 +619,97 @@ impl DirectionBoard {
         &self.config
     }
 
+    /// Validate a deserialized board before it is used to allocate or export evidence.
+    /// This checks map identity, profile consistency, canonical direction digests and
+    /// the presence/shape of every referenced verifier receipt.
+    pub fn validate_integrity(&self) -> Result<(), DirectionBoardError> {
+        if self.schema != BOARD_SCHEMA || self.version != BOARD_VERSION {
+            return Err(DirectionBoardError::new(
+                "board.schema",
+                "unsupported direction board schema/version",
+            ));
+        }
+        self.config.validate()?;
+        if self.attempt_ids.len() != self.attempts.len()
+            || self.attempt_ids.iter().any(|id| !self.attempts.contains_key(id))
+        {
+            return Err(DirectionBoardError::new(
+                "board.attempt_ids",
+                "attempt ID index does not match full attempt records",
+            ));
+        }
+        if self.proposal_ids.len() != self.proposals.len()
+            || self.proposal_ids.iter().any(|id| !self.proposals.contains_key(id))
+        {
+            return Err(DirectionBoardError::new(
+                "board.proposal_ids",
+                "proposal ID index does not match full proposal records",
+            ));
+        }
+        for (direction_id, stats) in &self.directions {
+            validate_sha256("board.direction_id", direction_id)?;
+            validate_sha256(
+                "board.direction.verifier_receipt_sha256",
+                &stats.verifier_receipt_sha256,
+            )?;
+            if stats.direction_sha256 != *direction_id
+                || stats.descriptor.digest()? != *direction_id
+            {
+                return Err(DirectionBoardError::new(
+                    "board.directions",
+                    "direction map key, descriptor and stored digest disagree",
+                ));
+            }
+        }
+        for (attempt_id, attempt) in &self.attempts {
+            if attempt_id != &attempt.attempt_id
+                || !self.directions.contains_key(&attempt.direction_sha256)
+            {
+                return Err(DirectionBoardError::new(
+                    "board.attempts",
+                    "attempt map key or direction reference is invalid",
+                ));
+            }
+            self.validate_attempt(attempt)?;
+        }
+        for (proposal_id, proposal) in &self.proposals {
+            if proposal_id != &proposal.proposal_id {
+                return Err(DirectionBoardError::new(
+                    "board.proposals",
+                    "proposal map key does not match proposal_id",
+                ));
+            }
+            self.validate_proposal(proposal)?;
+            let direction_id = proposal.descriptor.digest()?;
+            match proposal.disposition {
+                NewDirectionDisposition::Admitted => {
+                    let direction = self.directions.get(&direction_id).ok_or_else(|| {
+                        DirectionBoardError::new(
+                            "board.proposals",
+                            "admitted proposal has no registered direction",
+                        )
+                    })?;
+                    if direction.verifier_receipt_sha256 != proposal.verifier_receipt_sha256 {
+                        return Err(DirectionBoardError::new(
+                            "board.proposals",
+                            "admission receipt differs from direction registration receipt",
+                        ));
+                    }
+                }
+                NewDirectionDisposition::Duplicate => {
+                    if !self.directions.contains_key(&direction_id) {
+                        return Err(DirectionBoardError::new(
+                            "board.proposals",
+                            "duplicate proposal does not reference a known direction",
+                        ));
+                    }
+                }
+                NewDirectionDisposition::Rejected | NewDirectionDisposition::Inconclusive => {}
+            }
+        }
+        Ok(())
+    }
+
     pub fn direction_stats(&self) -> Vec<DirectionStats> {
         self.directions.values().cloned().collect()
     }
@@ -640,6 +734,7 @@ impl DirectionBoard {
     /// each arm. Remaining evaluations are assigned by largest-remainder proportional
     /// allocation over local-record yield plus the exploration bonus.
     pub fn recommend(&self, evaluation_budget: usize) -> Result<DirectionAllocationPlan, DirectionBoardError> {
+        self.validate_integrity()?;
         if evaluation_budget == 0 {
             return Err(DirectionBoardError::new(
                 "evaluation_budget",
@@ -757,6 +852,7 @@ impl DirectionBoard {
     }
 
     pub fn digest(&self) -> Result<String, DirectionBoardError> {
+        self.validate_integrity()?;
         let payload = BoardDigestPayload {
             schema: BOARD_SCHEMA,
             version: BOARD_VERSION,
