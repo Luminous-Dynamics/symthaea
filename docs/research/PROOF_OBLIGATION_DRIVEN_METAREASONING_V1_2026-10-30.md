@@ -179,6 +179,8 @@ Never promote an answer just because the budget expired.
 
 POAR measures whether proof-aware scheduling achieves better correctness/resource trade-offs than generic adaptive reasoning. It is a custom benchmark, not a substitute for LongCoT, GRACE, or official memory benchmarks.
 
+The research crate now includes a public deterministic POAR-v1 conformance runner with 16 fixtures. It checks expected scheduler choices and one receipt lifecycle (valid promotion, later revocation, stale replay rejection). This is a contract smoke suite, not an evaluation of a learned model, not a hidden-label benchmark, and not an independent proof verifier. The confirmatory benchmark still requires separate hidden source-truth labels, held-out source/rule families, independently implemented evaluators, and matched baselines.
+
 ### Deterministic task families
 
 1. **Single missing premise:** one cheap retrieval completes a valid proof; more generation adds no support.
@@ -196,6 +198,7 @@ POAR measures whether proof-aware scheduling achieves better correctness/resourc
 13. **Long dependency chain:** local steps are tractable, but evidence dependencies must be retained over increasing chain depth.
 14. **Null-benefit control:** the generic scheduler's additional complexity should not improve an already trivial/cached task.
 15. **Stale receipt replay:** a valid proof receipt is followed by a newer revocation/correction; replaying the old receipt must be rejected against the current state identity, without mutating any obligation in a multi-target batch.
+16. **Unchanged-state loop:** repeating the same operation against the same evidence-state identity must terminate with an explicit no-progress stop.
 
 The task generator and independent oracle must keep hidden proof labels, hidden outcomes, and source-truth labels outside the runtime planner input. Hold out rule-template families and source families, not just random instances.
 
@@ -320,7 +323,7 @@ The distinctive hypothesis is **proof-carrying adaptive computation**: latent dy
 
 1. Preserve the existing COG-META prerequisites: finish/qualify #5469 inventory before #5470 chooses type ownership; do not bypass the dependency chain with speculative public types.
 2. Implement a **research-only obligation adapter** from existing proof/query outputs to the existing shadow-scheduler input. Keep it behind a feature/test boundary; it cannot change production routing.
-3. Build POAR's deterministic synthetic generator and independent oracle. Verify the generator itself with mutation controls and hidden-label isolation.
+3. Keep the public POAR-v1 runner as a deterministic contract smoke suite; separately build the synthetic data generator and independent oracle with mutation controls and hidden-label isolation before model comparisons.
 4. Add proof-directed operation routing in a standalone evaluation harness: obligation -> eligible operation set -> receipt -> proof delta.
 5. Compare P3 generic COG-META against P4 fixed proof routing before fitting any value predictor.
 6. Only then add P5 prospective VOC calibration using #5476, with prediction-before-outcome binding and explicit missing-counterfactual states.
