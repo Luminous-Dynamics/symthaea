@@ -204,6 +204,58 @@ fn decoded_pcm_f32_le_sha256(audio: &AudioView<'_>) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+/// Build the process-independent execution profile for FluidSynth. The exact
+/// output and input paths are intentionally normalized because they are
+/// temporary artifact locations, not renderer settings; the input MIDI bytes
+/// and output PCM are committed independently by the receipt. All actual
+/// options, SoundFont path, and the exact child environment digest remain bound.
+fn renderer_execution_profile_sha256(
+    receipt: &RendererExecutionReceipt,
+) -> Result<(String, String), CounterfactualInfluenceError> {
+    let process = receipt
+        .process_observation
+        .as_ref()
+        .ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?;
+
+    let identity_bytes = serde_json::to_vec(&(
+        receipt.backend,
+        process.executable_path.as_str(),
+        process.executable_sha256_after.as_str(),
+        process.soundfont_path.as_str(),
+        process.soundfont_sha256_after.as_str(),
+    ))
+    .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+
+    let mut normalized_arguments = process.arguments.clone();
+    let output_flag = normalized_arguments
+        .iter()
+        .position(|argument| argument == "-F")
+        .ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?;
+    if output_flag + 1 >= normalized_arguments.len() {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    normalized_arguments[output_flag + 1] = "<output-wav>".to_owned();
+
+    // In this adapter's fixed argv contract, the final argument is the exact
+    // input MIDI path. Its bytes are separately receipt-bound as input_midi.
+    let input_path = normalized_arguments
+        .last_mut()
+        .ok_or(CounterfactualInfluenceError::RendererReceiptInvalid)?;
+    if input_path.starts_with('-') {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    *input_path = "<input-midi>".to_owned();
+
+    let config_bytes = serde_json::to_vec(&(
+        receipt.render_config_sha256.as_str(),
+        normalized_arguments,
+        process.environment_sha256.as_str(),
+    ))
+    .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+
+    Ok((sha256_hex(&identity_bytes), sha256_hex(&config_bytes)))
+}
+
 /// Verify the receipt against its exact serialized Score/config/MIDI-or-schedule,
 /// executable/assets, output WAV and process observation, then bind the decoded
 /// PCM view to the receipt. The caller must not mint this token from self-asserted
@@ -286,12 +338,8 @@ pub(crate) fn verify_renderer_audio_binding(
         return Err(CounterfactualInfluenceError::RendererAudioMismatch);
     }
 
-    let identity_bytes = serde_json::to_vec(&(
-        receipt.backend,
-        receipt.renderer_executable_sha256.as_deref(),
-        receipt.soundfont_sha256.as_deref(),
-    ))
-    .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    let (renderer_identity_sha256, renderer_config_sha256) =
+        renderer_execution_profile_sha256(receipt)?;
     let input_artifact_sha256 = receipt
         .input_midi_sha256
         .clone()
@@ -300,8 +348,8 @@ pub(crate) fn verify_renderer_audio_binding(
     Ok(VerifiedRendererAudioBinding {
         receipt_sha256: receipt.receipt_sha256.clone(),
         audio_sha256: audio_sha256(audio),
-        renderer_identity_sha256: sha256_hex(&identity_bytes),
-        renderer_config_sha256: receipt.render_config_sha256.clone(),
+        renderer_identity_sha256,
+        renderer_config_sha256,
         source_score_sha256: receipt.score_sha256.clone(),
         input_artifact_sha256,
         performed_event_map_sha256: parsed_map.receipt_sha256,
