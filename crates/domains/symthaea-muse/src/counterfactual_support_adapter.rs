@@ -113,19 +113,10 @@ pub struct CounterfactualSupportAdapterReport {
 }
 
 impl CounterfactualSupportAdapterReport {
-    /// The vector can be passed directly to EVAL-019. Its per-event support
-    /// digests are mandatory even for measured-empty support.
-    pub fn planner_event_supports(&self) -> Vec<EventInteractionSupport> {
-        self.events
-            .iter()
-            .map(|event| event.support.clone())
-            .collect()
-    }
-
-    /// True means the support manifest is structurally ready for EVAL-019.
-    /// It does not mean routing is complete: the planner must conservatively
-    /// expand all pairs when routing_complete is false.
-    pub fn planner_ready(&self) -> bool {
+    /// Structural receipt check only. To authorize planner use, obtain the
+    /// opaque VerifiedCounterfactualSupportAdapterReport by replaying the
+    /// original event inputs with verify_counterfactual_support_adapter_report.
+    pub fn receipt_is_intact(&self) -> bool {
         self.events.len() == self.event_count
             && self.event_count >= 2
             && !self.routing_complete
@@ -138,6 +129,27 @@ impl CounterfactualSupportAdapterReport {
             })
             && adapter_report_sha256(self)
                 .is_ok_and(|digest| self.receipt_sha256 == digest)
+    }
+}
+
+/// Opaque aggregate token. Its planner support vector can only be obtained
+/// after the original EVAL-017 measurements have been replay-verified.
+#[derive(Debug, Clone)]
+pub struct VerifiedCounterfactualSupportAdapterReport {
+    report: CounterfactualSupportAdapterReport,
+}
+
+impl VerifiedCounterfactualSupportAdapterReport {
+    pub fn report(&self) -> &CounterfactualSupportAdapterReport {
+        &self.report
+    }
+
+    pub fn planner_event_supports(&self) -> Vec<EventInteractionSupport> {
+        self.report
+            .events
+            .iter()
+            .map(|event| event.support.clone())
+            .collect()
     }
 }
 
@@ -458,8 +470,9 @@ fn assemble_from_verified_events(
 /// source event must be present exactly once, including measured-empty events.
 pub fn assemble_counterfactual_support_adapter_report(
     events: &[VerifiedCounterfactualEventSupport],
-) -> Result<CounterfactualSupportAdapterReport, CounterfactualSupportAdapterError> {
-    assemble_from_verified_events(events)
+) -> Result<VerifiedCounterfactualSupportAdapterReport, CounterfactualSupportAdapterError> {
+    let report = assemble_from_verified_events(events)?;
+    Ok(VerifiedCounterfactualSupportAdapterReport { report })
 }
 
 /// Replay the aggregate adapter report from every original EVAL-017 report,
@@ -467,12 +480,12 @@ pub fn assemble_counterfactual_support_adapter_report(
 pub fn verify_counterfactual_support_adapter_report(
     supplied: &CounterfactualSupportAdapterReport,
     replay_inputs: &[CounterfactualSupportReplayInput<'_, '_, '_>],
-) -> Result<bool, CounterfactualSupportAdapterError> {
+) -> Result<VerifiedCounterfactualSupportAdapterReport, CounterfactualSupportAdapterError> {
     if supplied.version != COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION
         || !is_sha256(&supplied.receipt_sha256)
         || supplied.receipt_sha256 != adapter_report_sha256(supplied)?
     {
-        return Ok(false);
+        return Err(CounterfactualSupportAdapterError::InvalidAdapterReceipt);
     }
     let mut verified = Vec::with_capacity(replay_inputs.len());
     for replay in replay_inputs {
@@ -483,32 +496,145 @@ pub fn verify_counterfactual_support_adapter_report(
         )?);
     }
     let expected = assemble_from_verified_events(&verified)?;
-    Ok(expected == *supplied)
+    if expected != *supplied {
+        return Err(CounterfactualSupportAdapterError::InvalidAdapterReceipt);
+    }
+    Ok(VerifiedCounterfactualSupportAdapterReport { report: expected })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn planner_support_evidence_digest_is_mandatory_even_for_empty_measurement() {
-        let empty = EventInteractionSupport {
-            source_event_index: 0,
-            acoustic_support: Vec::new(),
-            routing_domains: vec!["fluidsynth:effects-group:0".to_owned()],
-            routing_complete: false,
-            support_evidence_sha256: None,
+    fn digest(label: &str) -> String {
+        format!("{:x}", Sha256::digest(label.as_bytes()))
+    }
+
+    fn event(index: usize, intervals: Vec<AcousticSupportInterval>) -> VerifiedCounterfactualEventSupport {
+        let assignment = build_effects_group_assignment(4).unwrap();
+        let mut evidence = CounterfactualEventSupportEvidence {
+            version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
+            source_event_index: index,
+            source_event_id: format!("score_event_index:{index}"),
+            expected_score_event_count: 2,
+            intervention: EventIntervention::Remove,
+            influence_report_sha256: digest(&format!("influence-{index}")),
+            source_score_sha256: digest("score"),
+            baseline_event_map_artifact_sha256: digest("baseline-map-bytes"),
+            baseline_event_map_receipt_sha256: digest("baseline-map-receipt"),
+            baseline_schedule_sha256: digest("baseline-schedule"),
+            baseline_renderer_receipt_sha256: digest("baseline-render"),
+            counterfactual_renderer_receipt_sha256: digest(&format!("counterfactual-render-{index}")),
+            baseline_audio_sha256: digest("baseline-audio"),
+            counterfactual_audio_sha256: digest(&format!("counterfactual-audio-{index}")),
+            repeatability_calibration_sha256: digest("repeatability"),
+            renderer_identity_sha256: digest("renderer"),
+            renderer_config_sha256: digest("renderer-config-effects-groups-4"),
+            effects_group_assignment: assignment.clone(),
+            sample_rate_hz: 48_000,
+            channels: 2,
+            output_frame_count: 67,
+            disposition: if intervals.is_empty() {
+                InfluenceDisposition::NoEffectAboveNoiseFloor
+            } else {
+                InfluenceDisposition::EffectDetected
+            },
+            support: EventInteractionSupport {
+                source_event_index: index,
+                acoustic_support: intervals,
+                routing_domains: vec![format!("fluidsynth:effects-group:{}", index % 4)],
+                routing_complete: false,
+                support_evidence_sha256: None,
+            },
+            evidence_sha256: String::new(),
         };
-        assert!(empty.support_evidence_sha256.is_none());
+        let evidence_sha = event_evidence_sha256(&evidence).unwrap();
+        evidence.evidence_sha256 = evidence_sha.clone();
+        evidence.support.support_evidence_sha256 = Some(evidence_sha);
+        VerifiedCounterfactualEventSupport { evidence }
     }
 
     #[test]
-    fn effect_group_channel_mapping_matches_the_receipt_bound_assignment() {
+    fn measured_empty_support_still_has_replay_evidence_digest() {
+        let verified = event(0, Vec::new());
+        assert!(verified.evidence.support.acoustic_support.is_empty());
+        assert_eq!(
+            verified.evidence.support.support_evidence_sha256.as_deref(),
+            Some(verified.evidence.evidence_sha256.as_str())
+        );
+        assert!(is_sha256(&verified.evidence.evidence_sha256));
+        assert_eq!(
+            verified.evidence.disposition,
+            InfluenceDisposition::NoEffectAboveNoiseFloor
+        );
+    }
+
+    #[test]
+    fn event_evidence_digest_rejects_interval_tampering() {
+        let verified = event(0, vec![AcousticSupportInterval { start_frame: 60, end_frame: 67 }]);
+        let mut altered = verified.evidence.clone();
+        altered.support.acoustic_support[0].end_frame = 68;
+        assert_ne!(
+            altered.evidence_sha256,
+            event_evidence_sha256(&altered).unwrap()
+        );
+    }
+
+    #[test]
+    fn effect_group_channel_mapping_matches_receipt_bound_assignment() {
         let assignment = build_effects_group_assignment(4).unwrap();
         assert!(verify_effects_group_assignment(&assignment));
         assert_eq!(effects_group_for_midi_channel(0, 4), Some(0));
         assert_eq!(effects_group_for_midi_channel(4, 4), Some(0));
         assert_eq!(effects_group_for_midi_channel(7, 4), Some(3));
         assert_eq!(effects_group_for_midi_channel(16, 4), None);
+    }
+
+    #[test]
+    fn aggregate_requires_every_event_once_and_keeps_routing_incomplete() {
+        let events = vec![
+            event(1, Vec::new()),
+            event(0, vec![AcousticSupportInterval { start_frame: 60, end_frame: 67 }]),
+        ];
+        let report = assemble_counterfactual_support_adapter_report(&events).unwrap();
+        assert!(report.report().receipt_is_intact());
+        assert!(report.report().planner_ready());
+        assert_eq!(report.report().output_frame_count, 67);
+        assert!(!report.report().routing_complete);
+        assert_eq!(report.planner_event_supports().len(), 2);
+        assert_eq!(report.planner_event_supports()[0].source_event_index, 0);
+        assert_eq!(report.planner_event_supports()[1].source_event_index, 1);
+        assert!(report.planner_event_supports()[1].acoustic_support.is_empty());
+        assert!(report.planner_event_supports().iter().all(|support| {
+            support.support_evidence_sha256.as_ref().is_some_and(|digest| is_sha256(digest))
+                && !support.routing_complete
+        }));
+    }
+
+    #[test]
+    fn aggregate_rejects_missing_or_duplicate_source_events() {
+        assert!(matches!(
+            assemble_counterfactual_support_adapter_report(&[event(0, Vec::new())]),
+            Err(CounterfactualSupportAdapterError::EventCountMismatch)
+        ));
+        assert!(matches!(
+            assemble_counterfactual_support_adapter_report(&[event(0, Vec::new()), event(0, Vec::new())]),
+            Err(CounterfactualSupportAdapterError::DuplicateOrMissingEvent)
+        ));
+    }
+
+    #[test]
+    fn aggregate_rejects_mixed_renderer_or_effects_topology() {
+        let mut other = event(1, Vec::new());
+        other.evidence.renderer_config_sha256 = digest("different-effects-groups");
+        other.evidence.effects_group_assignment = build_effects_group_assignment(8).unwrap();
+        other.evidence.support.routing_domains = vec!["fluidsynth:effects-group:1".to_owned()];
+        other.evidence.evidence_sha256 = event_evidence_sha256(&other.evidence).unwrap();
+        other.evidence.support.support_evidence_sha256 =
+            Some(other.evidence.evidence_sha256.clone());
+        assert!(matches!(
+            assemble_counterfactual_support_adapter_report(&[event(0, Vec::new()), other]),
+            Err(CounterfactualSupportAdapterError::InconsistentSourceOrRendererContext)
+        ));
     }
 }
