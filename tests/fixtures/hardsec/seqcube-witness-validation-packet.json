@@ -33,7 +33,7 @@
       "evidence_id": "seqcube-active-payload",
       "kind": "payload_effect_trace",
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
-      "evidence_sha256": "16426a30ee631d410758aaf89b2c08222881c6ca94dc8afad164f527b72d3106",
+      "evidence_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
       "local_path": "replay/expected_boundary.json",
       "witness_local_path": "replay/expected_boundary.json",
@@ -43,7 +43,7 @@
       "scope": "paired clean/infected primary output difference first observed at cycle 8",
       "stimuli_count": 10,
       "payload_effects_observed": 1,
-      "witness_sha256": "16426a30ee631d410758aaf89b2c08222881c6ca94dc8afad164f527b72d3106"
+      "witness_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d"
     },
     {
       "evidence_id": "seqcube-inactive-trace",
@@ -63,7 +63,7 @@
       "evidence_id": "seqcube-inactive-payload",
       "kind": "payload_effect_trace",
       "subject_sha256": "17dbd7add0e8cf2705d9368e3cd3ccf62cdb52f3b8dacf3e33a04b65ea9941de",
-      "evidence_sha256": "16426a30ee631d410758aaf89b2c08222881c6ca94dc8afad164f527b72d3106",
+      "evidence_sha256": "30a1c31c4da276ea60940f5dccd10e95e6736a534ed75a502dc19436cf32c57d",
       "uri": "https://github.com/kxiaud/seqcube-ht-witness-validation-artifact/blob/e5acac37af6dbe1fa53b0be93199bb81a62c5320/replay/expected_boundary.json",
       "status": "pass",
       "tool": "SeqCube-HT reference verifier (publisher-reported)",
@@ -88,7 +88,7 @@
       "proof_scope": "bounded",
       "formal_result": "bounded_no_counterexample",
       "property_id": "inactive_trigger_activation",
-      "assumptions_sha256": "30b49d7b3fd7cb8087b37923c286923e1143457fa615b285a73a239a1b3d3fb0",
+      "assumptions_sha256": "2aa4fe1cd30f8282baf052dac354b296cff93b703cbe5ed4e59285510b61e4d9",
       "bound_cycles": 10
     }
   ],
