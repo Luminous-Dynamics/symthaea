@@ -618,7 +618,7 @@ mod tests {
         let rows = run_benchmark();
         assert_eq!(rows.len(), Scenario::all().len() * Policy::all().len());
         let json = render_report(&rows);
-        assert!(json.contains("\"schema_version\": \"cmaq-008-sequential-support-drift-v0.1\""));
+        assert!(json.contains("\"schema_version\": \"cmaq-008-sequential-support-drift-v0.2\""));
         assert!(json.contains("\"episode_count\": 512"));
         assert!(json.contains("\"horizon\": 128"));
     }
