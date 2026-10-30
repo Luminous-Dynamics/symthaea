@@ -29,7 +29,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: eight-pair/seven-family synthetic fixture generator and hostile relation/receipt controls.
 - docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md: balanced 2^5 experimental design for candidate order, score-option order, criterion order, provenance cue and presentation format.
 - src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
-- schema/judge-factorial-plan.schema.json and schema/judge-factorial-receipt.schema.json: preregistered factorial plan and complete-denominator execution receipt contracts.
+- schema/judge-factorial-plan.schema.json, schema/judge-factorial-receipt.schema.json and schema/judge-factorial-report.schema.json: preregistered plan, ordinal-bound complete-denominator receipt and typed report contracts.
 - tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
@@ -44,7 +44,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 
 ## Analyze interacting judge nuisance factors
 
-The Rust factorial analyzer checks a complete five-factor (2^5) design per semantic block: candidate order, score-option order, criterion order, provenance cue and presentation format. It requires every factor cell at every repeat, an exact execution-order permutation, exact condition IDs and input-digest echoes. Missing and ineligible observations are never imputed.
+The Rust factorial analyzer checks a complete five-factor (2^5) design per semantic block: candidate order, score-option order, criterion order, provenance cue and presentation format. It requires every factor cell at every repeat, an exact execution-order permutation, exact condition IDs, input-digest echoes and execution ordinals that must match the committed per-block schedule. Missing and ineligible observations are never imputed.
 
 ```sh
 python3 research/science-bench-refresh/tools/judge_factorial_fixture.py /tmp/judge-factorial
