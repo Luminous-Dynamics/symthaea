@@ -240,6 +240,49 @@ fn frame_sha256(frame: &[PopulationPsu]) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn validate_spatial_frame_binding(
+    audit: &AuditInput,
+    spatial_report: &SpatialFrameReport,
+    spatial_report_hash: &str,
+) -> Result<(), String> {
+    if spatial_report.schema_version != 1 || spatial_report.status != "PASS" {
+        return Err("spatial frame report must be schema v1 with status PASS".into());
+    }
+    if !is_lower_hex(spatial_report_hash, 64)
+        || !is_lower_hex(&spatial_report.canonical_frame_sha256, 64)
+        || !is_lower_hex(&spatial_report.population_frame_sha256, 64)
+    {
+        return Err("spatial frame report and canonical frame digests must be lowercase SHA-256".into());
+    }
+    if audit.source_spatial_frame_report_sha256 != spatial_report_hash {
+        return Err("coverage audit spatial-frame report digest does not match exact report bytes".into());
+    }
+    if audit.source_spatial_frame_sha256 != spatial_report.canonical_frame_sha256 {
+        return Err("coverage audit spatial-frame digest does not match the audited lattice frame".into());
+    }
+    if audit.source_population_frame_sha256 != spatial_report.population_frame_sha256 {
+        return Err("coverage audit population-frame digest does not match the audited eligible PSU population".into());
+    }
+    if frame_sha256(&spatial_report.population_frame) != spatial_report.population_frame_sha256 {
+        return Err("spatial frame report population-frame digest is internally inconsistent".into());
+    }
+    if frame_sha256(&audit.population_frame) != audit.source_population_frame_sha256 {
+        return Err("coverage audit population-frame entries do not match their declared digest".into());
+    }
+    let mut reported = spatial_report.population_frame.clone();
+    let mut declared = audit.population_frame.clone();
+    reported.sort_by(|left, right| left.psu_id.cmp(&right.psu_id));
+    declared.sort_by(|left, right| left.psu_id.cmp(&right.psu_id));
+    if reported.len() != declared.len()
+        || reported.iter().zip(declared.iter()).any(|(left, right)| {
+            left.psu_id != right.psu_id || left.stratum_id != right.stratum_id
+        })
+    {
+        return Err("coverage population_frame must exactly equal the audited spatial report export".into());
+    }
+    Ok(())
+}
+
 fn sampled_outcomes_sha256(outcomes: &[SampledPsuOutcome]) -> Result<String, String> {
     let mut canonical = outcomes.to_vec();
     canonical.sort_by(|left, right| left.psu_id.cmp(&right.psu_id));
@@ -337,6 +380,9 @@ fn validate(
     if !is_lower_hex(proposal_hash, 64)
         || !is_lower_hex(ranking_hash, 64)
         || !is_lower_hex(protocol_hash, 64)
+        || !is_lower_hex(&audit.source_spatial_frame_report_sha256, 64)
+        || !is_lower_hex(&audit.source_spatial_frame_sha256, 64)
+        || !is_lower_hex(&audit.source_population_frame_sha256, 64)
         || !is_lower_hex(&audit.sample_seed_commitment_sha256, 64)
     {
         return Err("proposal/ranking/protocol/seed SHA-256 value is malformed".into());
@@ -381,6 +427,9 @@ fn validate(
     }
     if frame_ids.is_empty() {
         return Err("population frame must contain at least one PSU".into());
+    }
+    if frame_sha256(&audit.population_frame) != audit.source_population_frame_sha256 {
+        return Err("population frame entries do not match source_population_frame_sha256".into());
     }
 
     let mut plans = audit.strata.clone();
@@ -847,6 +896,8 @@ fn evaluate(
         proposal_input_sha256: proposal_hash,
         ranking_report_sha256: ranking_hash,
         sampling_protocol_sha256: protocol_hash,
+        spatial_frame_report_sha256: audit.source_spatial_frame_report_sha256.clone(),
+        spatial_frame_sha256: audit.source_spatial_frame_sha256.clone(),
         sampling_frame_sha256: frame_sha256(&audit.population_frame),
         audit_input_sha256: audit_hash,
         sampled_outcomes_sha256: sampled_outcomes_digest,
