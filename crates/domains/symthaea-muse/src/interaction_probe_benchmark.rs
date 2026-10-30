@@ -275,7 +275,7 @@ pub fn evaluate_interaction_probe_plan(
     let selected_true_positive_count = selected_pairs
         .intersection(&ground_truth_pairs)
         .count();
-    let unmeasured_ground_truth_pair_count =
+    let unselected_ground_truth_pair_count =
         ground_truth_pairs.len().saturating_sub(selected_true_positive_count);
 
     let planned_render_count = probe_plan.estimated_render_count_with_cached_single_removals;
@@ -320,7 +320,7 @@ pub fn evaluate_interaction_probe_plan(
         selected_pair_count,
         selected_true_positive_count,
         selected_pair_recall: ratio(selected_true_positive_count, ground_truth_pairs.len()),
-        unselected_ground_truth_pair_count: unmeasured_ground_truth_pair_count,
+        unselected_ground_truth_pair_count,
         nonzero_higher_order_interaction_count,
         pairwise_total_pcm_l2_norm,
         higher_order_total_pcm_l2_norm,
