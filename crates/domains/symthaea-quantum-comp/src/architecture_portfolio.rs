@@ -202,8 +202,10 @@ pub struct ArchitectureBenchmarkObservation {
     pub measurement_boundary: ArchitectureMeasurementBoundary,
     /// Quality interval; larger is better under the shared contract.
     pub quality: MetricInterval,
-    /// Complete resource vector; lower is better in every dimension.
-    pub resources: ArchitectureResourceEnvelope,
+    /// Complete resource vector for system-level observations; lower is better.
+    /// Algorithm-only references have no physical resource envelope and cannot
+    /// enter the system-level Pareto comparator.
+    pub resources: Option<ArchitectureResourceEnvelope>,
 }
 
 /// Conservative relation between two architecture observations.
@@ -230,6 +232,12 @@ pub enum ArchitectureComparisonError {
     InvalidInterval,
     /// A resource interval includes a negative value.
     NegativeResource,
+    /// A system-level comparison lacks one or both complete resource envelopes.
+    MissingResourceEnvelope,
+    /// Algorithm-only complexity references cannot enter the resource Pareto comparator.
+    AlgorithmOnlyNotComparable,
+    /// Algorithm-only references must not carry a physical resource envelope.
+    UnexpectedResourceEnvelope,
     /// Workload fingerprints differ.
     WorkloadMismatch,
     /// Comparison-contract digests differ.
@@ -251,14 +259,26 @@ pub fn validate_architecture_observation(
     {
         return Err(ArchitectureComparisonError::EmptyIdentifier);
     }
-    if !observation.quality.is_valid() || !observation.resources.is_valid() {
-        if observation.resources.wall_time_seconds.lower < 0.0
-            || observation.resources.energy_joules.lower < 0.0
-            || observation.resources.monetary_cost_usd.lower < 0.0
-        {
-            return Err(ArchitectureComparisonError::NegativeResource);
-        }
+    if !observation.quality.is_valid() {
         return Err(ArchitectureComparisonError::InvalidInterval);
+    }
+    match (observation.measurement_boundary, observation.resources) {
+        (ArchitectureMeasurementBoundary::AlgorithmOnly, Some(_)) => {
+            return Err(ArchitectureComparisonError::UnexpectedResourceEnvelope);
+        }
+        (ArchitectureMeasurementBoundary::AlgorithmOnly, None) => {}
+        (_, None) => return Err(ArchitectureComparisonError::MissingResourceEnvelope),
+        (_, Some(resources)) => {
+            if resources.wall_time_seconds.lower < 0.0
+                || resources.energy_joules.lower < 0.0
+                || resources.monetary_cost_usd.lower < 0.0
+            {
+                return Err(ArchitectureComparisonError::NegativeResource);
+            }
+            if !resources.is_valid() {
+                return Err(ArchitectureComparisonError::InvalidInterval);
+            }
+        }
     }
     Ok(())
 }
@@ -292,12 +312,17 @@ pub fn compare_architecture_pareto(
     if left.measurement_boundary != right.measurement_boundary {
         return Err(ArchitectureComparisonError::MeasurementBoundaryMismatch);
     }
+    if left.measurement_boundary == ArchitectureMeasurementBoundary::AlgorithmOnly {
+        return Err(ArchitectureComparisonError::AlgorithmOnlyNotComparable);
+    }
+    let left_resources = left.resources.ok_or(ArchitectureComparisonError::MissingResourceEnvelope)?;
+    let right_resources = right.resources.ok_or(ArchitectureComparisonError::MissingResourceEnvelope)?;
 
     let same = left.quality == right.quality
-        && left.resources.wall_time_seconds == right.resources.wall_time_seconds
-        && left.resources.energy_joules == right.resources.energy_joules
-        && left.resources.monetary_cost_usd == right.resources.monetary_cost_usd
-        && left.resources.peak_memory == right.resources.peak_memory;
+        && left_resources.wall_time_seconds == right_resources.wall_time_seconds
+        && left_resources.energy_joules == right_resources.energy_joules
+        && left_resources.monetary_cost_usd == right_resources.monetary_cost_usd
+        && left_resources.peak_memory == right_resources.peak_memory;
     if same {
         return Ok(ArchitectureParetoRelation::Equivalent);
     }
@@ -305,13 +330,13 @@ pub fn compare_architecture_pareto(
     let left_quality_no_worse = left.quality.lower >= right.quality.upper;
     let right_quality_no_worse = right.quality.lower >= left.quality.upper;
 
-    let left_resources_no_worse = resources_no_worse(left.resources, right.resources);
-    let right_resources_no_worse = resources_no_worse(right.resources, left.resources);
+    let left_resources_no_worse = resources_no_worse(left_resources, right_resources);
+    let right_resources_no_worse = resources_no_worse(right_resources, left_resources);
 
     let left_strict = left.quality.lower > right.quality.upper
-        || resources_strictly_better(left.resources, right.resources);
+        || resources_strictly_better(left_resources, right_resources);
     let right_strict = right.quality.lower > left.quality.upper
-        || resources_strictly_better(right.resources, left.resources);
+        || resources_strictly_better(right_resources, left_resources);
 
     if left_quality_no_worse && left_resources_no_worse && left_strict {
         return Ok(ArchitectureParetoRelation::LeftDominates);
@@ -560,7 +585,7 @@ mod tests {
     #[test]
     fn negative_resource_is_rejected() {
         let mut invalid = cpu();
-        invalid.resources.energy_joules.lower = -0.1;
+        invalid.resources.as_mut().unwrap().energy_joules.lower = -0.1;
         assert_eq!(
             validate_architecture_observation(&invalid),
             Err(ArchitectureComparisonError::NegativeResource)
@@ -574,7 +599,7 @@ mod tests {
             upper: 1.0,
         };
         let mut record = cpu();
-        record.resources.wall_time_seconds = invalid;
+        record.resources.as_mut().unwrap().wall_time_seconds = invalid;
         assert_eq!(
             validate_architecture_observation(&record),
             Err(ArchitectureComparisonError::InvalidInterval)
