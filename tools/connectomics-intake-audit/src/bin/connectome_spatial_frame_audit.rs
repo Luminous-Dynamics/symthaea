@@ -351,23 +351,32 @@ fn tile_voxel_count(frame: &FrameInput, grid_index: [u64; 3]) -> Result<u128, St
     checked_product(cell_extent, "tile")
 }
 
-fn hash_file(path: &PathBuf) -> Result<(String, u64), String> {
-    let file = File::open(path).map_err(|error| format!("could not open {}: {error}", path.display()))?;
-    let byte_count = file.metadata()
-        .map_err(|error| format!("could not stat {}: {error}", path.display()))?
-        .len();
-    let mut reader = BufReader::new(file);
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = reader.read(&mut buffer)
-            .map_err(|error| format!("could not hash {}: {error}", path.display()))?;
-        if count == 0 {
-            break;
-        }
-        hasher.update(&buffer[..count]);
+struct HashingReader<R: Read> {
+    inner: R,
+    hasher: Sha256,
+    byte_count: u64,
+}
+
+impl<R: Read> HashingReader<R> {
+    fn new(inner: R) -> Self {
+        Self { inner, hasher: Sha256::new(), byte_count: 0 }
     }
-    Ok((hex::encode(hasher.finalize()), byte_count))
+
+    fn finish(self) -> (String, u64) {
+        (hex::encode(self.hasher.finalize()), self.byte_count)
+    }
+}
+
+impl<R: Read> Read for HashingReader<R> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let count = self.inner.read(output)?;
+        if count > 0 {
+            self.hasher.update(&output[..count]);
+            self.byte_count = self.byte_count.checked_add(count as u64)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "eligibility mask byte count overflows u64"))?;
+        }
+        Ok(count)
+    }
 }
 
 fn mask_tile_counts(frame: &FrameInput, scan: &MaskScan) -> Result<Vec<MaskTileCount>, String> {
@@ -427,13 +436,6 @@ fn validate_mask_file(
     path: &PathBuf,
     report: &mut AuditReport,
 ) -> Result<(), String> {
-    let (actual_sha256, artifact_bytes) = hash_file(path)?;
-    if actual_sha256 != frame.eligibility_mask.artifact_sha256 {
-        return Err(format!(
-            "eligibility mask SHA-256 mismatch: manifest declares {}, file is {}",
-            frame.eligibility_mask.artifact_sha256, actual_sha256
-        ));
-    }
     let expected_packed = expected_mask_bytes(frame)?;
     let expected_artifact_bytes = match frame.eligibility_mask.encoding.as_str() {
         "packed_bitset_lsb0_x_fastest_v1" => expected_packed,
@@ -441,20 +443,29 @@ fn validate_mask_file(
             .ok_or_else(|| "hex mask byte count overflows u128".to_string())?,
         other => return Err(format!("unsupported eligibility mask encoding {other}")),
     };
+    let file = File::open(path).map_err(|error| format!("could not open {}: {error}", path.display()))?;
+    let mut hashing_reader = HashingReader::new(BufReader::new(file));
+    let scan = match frame.eligibility_mask.encoding.as_str() {
+        "packed_bitset_lsb0_x_fastest_v1" => scan_mask(frame, &mut hashing_reader)?,
+        "hex_bitset_lsb0_x_fastest_v1" => {
+            let mut decoded_reader = HexBitsetReader { inner: &mut hashing_reader };
+            scan_mask(frame, &mut decoded_reader)?
+        }
+        _ => return Err("unsupported eligibility mask encoding".into()),
+    };
+    // Hash the exact stream that was decoded, avoiding a hash/read TOCTOU gap.
+    let (actual_sha256, artifact_bytes) = hashing_reader.finish();
     if u128::from(artifact_bytes) != expected_artifact_bytes {
         return Err(format!(
             "eligibility mask artifact has {artifact_bytes} bytes; expected {expected_artifact_bytes}"
         ));
     }
-
-    let file = File::open(path).map_err(|error| format!("could not reopen {}: {error}", path.display()))?;
-    let raw_reader = BufReader::new(file);
-    let decoded_reader: Box<dyn Read> = match frame.eligibility_mask.encoding.as_str() {
-        "packed_bitset_lsb0_x_fastest_v1" => Box::new(raw_reader),
-        "hex_bitset_lsb0_x_fastest_v1" => Box::new(HexBitsetReader { inner: raw_reader }),
-        _ => return Err("unsupported eligibility mask encoding".into()),
-    };
-    let scan = scan_mask(frame, decoded_reader)?;
+    if actual_sha256 != frame.eligibility_mask.artifact_sha256 {
+        return Err(format!(
+            "eligibility mask SHA-256 mismatch: manifest declares {}, read bytes are {}",
+            frame.eligibility_mask.artifact_sha256, actual_sha256
+        ));
+    }
     apply_mask_summary(frame, scan, actual_sha256, artifact_bytes, report)
 }
 
