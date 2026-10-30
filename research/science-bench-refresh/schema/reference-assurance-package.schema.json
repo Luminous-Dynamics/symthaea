@@ -582,6 +582,111 @@
             "not": {
               "pattern": "^0{64}$"
             }
+          },
+          "claims": {
+            "items": {
+              "properties": {
+                "text_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "sources": {
+            "items": {
+              "properties": {
+                "snapshot_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "source_identity_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "ancestry_group_sha256": {
+                  "anyOf": [
+                    {
+                      "not": {
+                        "pattern": "^0{64}$"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "spans": {
+            "items": {
+              "properties": {
+                "span_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "adjudicators": {
+            "minItems": 3,
+            "items": {
+              "properties": {
+                "adjudicator_id_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "independence_group_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "conflict_disclosure_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "initial_adjudications": {
+            "minItems": 3,
+            "items": {
+              "properties": {
+                "adjudicator_id_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "rubric_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "rationale_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "resolutions": {
+            "items": {
+              "properties": {
+                "rationale_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
           }
         }
       }
