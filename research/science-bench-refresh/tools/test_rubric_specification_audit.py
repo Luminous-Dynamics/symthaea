@@ -88,6 +88,19 @@ class RubricSpecificationAuditTests(unittest.TestCase):
         self.assertFalse(report["valid"])
         self.assertTrue(any("criterion_ids must be strings" in item for item in report["issues"]))
 
+    def test_unhashable_hostile_test_type_does_not_crash(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["tests"][0]["test_type"] = ["positive"]
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("unsupported test_type" in item for item in report["issues"]))
+
+    def test_non_string_planned_test_id_does_not_crash(self) -> None:
+        value = json.loads(json.dumps(self.fixture))
+        value["criteria"][0]["planned_test_ids"][0] = {"unexpected": "object"}
+        report = MODULE.audit_rubric_specification(value)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("planned_test_ids" in item for item in report["issues"]))
     def test_unknown_fields_are_rejected(self) -> None:
         value = json.loads(json.dumps(self.fixture))
         value["claims_to_trust_me"] = True
