@@ -161,6 +161,7 @@ pub use schema::{
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
 pub use adaptive_evaluation::{
     ADAPTIVE_EVALUATION_SCHEMA, AdaptiveEvaluationAuthorization,
+    ARCHITECTURE_PORTFOLIO_SCHEMA,
     AdaptiveEvaluationError, AdaptiveEvaluationPlan, AdaptiveEvaluationRecord,
     AdaptiveEvaluationRequest, EvaluationDisposition, EvaluationLane,
     authorize_adaptive_evaluation,
