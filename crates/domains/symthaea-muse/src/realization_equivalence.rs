@@ -303,7 +303,7 @@ impl SymbolicRealizationReport {
             && self.protected_content_preserved
             && self.event_count_preserved
             && self.score_context_preserved
-            && self.report_sha256 == report_sha256(self)
+            && report_sha256(self).is_ok_and(|digest| self.report_sha256 == digest)
     }
 }
 
@@ -393,6 +393,7 @@ fn validate_score(score: &Score) -> Result<(), SymbolicRealizationError> {
             "tempo, meter, or total-beat context is invalid",
         ));
     }
+    let mut maximum_end = 0.0_f64;
     for note in &score.notes {
         let onset = note.onset.beats();
         let duration = note.duration.beats();
@@ -409,6 +410,12 @@ fn validate_score(score: &Score) -> Result<(), SymbolicRealizationError> {
                 "note timing and dynamics must be finite and within declared bounds",
             ));
         }
+        maximum_end = maximum_end.max(onset + duration);
+    }
+    if score.total_beats.beats() + 1.0e-9 < maximum_end {
+        return Err(SymbolicRealizationError::InvalidScore(
+            "total-beat context ends before the final note",
+        ));
     }
     Ok(())
 }
@@ -553,14 +560,17 @@ fn candidate_qualification(
     ))
 }
 
-fn report_sha256(report: &SymbolicRealizationReport) -> String {
+fn report_sha256(
+    report: &SymbolicRealizationReport,
+) -> Result<String, SymbolicRealizationError> {
     let mut unsigned = report.clone();
     unsigned.report_sha256.clear();
-    let bytes = serde_json::to_vec(&unsigned).expect("serializing report should not fail");
+    let bytes = serde_json::to_vec(&unsigned)
+        .map_err(|_| SymbolicRealizationError::SerializationFailure)?;
     let mut hasher = Sha256::new();
     hasher.update(REPORT_DOMAIN);
     hash_component(&mut hasher, &bytes);
-    format!("{:x}", hasher.finalize())
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 /// Evaluate a candidate against the source-bound intent contract.
@@ -628,7 +638,7 @@ pub fn evaluate_symbolic_realization(
         violations,
         report_sha256: String::new(),
     };
-    report.report_sha256 = report_sha256(&report);
+    report.report_sha256 = report_sha256(&report)?;
     Ok(report)
 }
 
@@ -641,7 +651,7 @@ pub fn verify_symbolic_realization_report(
     supplied: &SymbolicRealizationReport,
 ) -> Result<bool, SymbolicRealizationError> {
     if supplied.report_sha256.is_empty()
-        || supplied.report_sha256 != report_sha256(supplied)
+        || supplied.report_sha256 != report_sha256(supplied)?
     {
         return Ok(false);
     }
@@ -831,9 +841,9 @@ mod tests {
     }
 
     #[test]
-    fn note_storage_reordering_is_semantically_not_a_new_realization() {
+    fn note_storage_reordering_is_not_counted_as_a_new_musical_realization() {
         let (source, reference, contract) = fixture(64);
-        let mut candidate = candidate_with_pitch(71);
+        let mut candidate = reference.clone();
         candidate.notes.reverse();
         let report = evaluate_symbolic_realization(
             &contract,
@@ -844,8 +854,8 @@ mod tests {
         .expect("candidate evaluates");
         assert!(report.is_accepted(), "{:?}", report.violations);
         assert_eq!(report.exact_reference_match, Some(false));
-        assert_eq!(report.semantic_reference_match, Some(false));
-        assert!(report.accepted_alternative);
+        assert_eq!(report.semantic_reference_match, Some(true));
+        assert!(!report.accepted_alternative);
     }
 
     #[test]
