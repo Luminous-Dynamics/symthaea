@@ -198,8 +198,9 @@ fn report_digest_valid(
 }
 
 /// Evaluate a replay-verified sparse plan against exact exhaustive coalition
-/// truth. total_frames and support intervals use the same frame domain as the
-/// source-isolated signals supplied to EVAL-020.
+/// truth. `total_frames` and support intervals use the renderer-output frame domain,
+/// including fixed-effect tails. Source-isolated event signals remain in the input
+/// frame domain.
 ///
 /// Candidate metrics exclude the independently sampled audit pairs. Selected-plan
 /// metrics include both candidate and audit pairs. Neither treats an unprobed pair as
@@ -238,7 +239,7 @@ pub fn evaluate_interaction_probe_plan(
     {
         return Err(InteractionProbeBenchmarkError::EventCountMismatch);
     }
-    if total_frames != factorial_report.input_frame_count as u64 {
+    if total_frames != factorial_report.output_frame_count as u64 {
         return Err(InteractionProbeBenchmarkError::FrameCountMismatch);
     }
 
@@ -597,6 +598,99 @@ mod tests {
             &InteractionProbeBenchmarkConfig::default(),
         )
         .unwrap());
+    }
+
+    #[test]
+    fn output_support_frame_domain_includes_fir_effect_tails() {
+        let events = vec![
+            source_event_window(0, 0.2, 60, 64),
+            source_event_window(1, 0.3, 60, 64),
+        ];
+        let effect = SyntheticEffect::LinearFir {
+            impulse_response: vec![1.0, 0.5, 0.25, 0.125],
+        };
+        let supports = vec![support(0, 60, 67), support(1, 60, 67)];
+        let factorial_config = FactorialReferenceConfig {
+            sample_rate_hz: 48_000,
+            spectral_window_frames: 64,
+        };
+        let factorial = crate::factorial_ground_truth::build_factorial_ground_truth(
+            &events,
+            &effect,
+            &factorial_config,
+        )
+        .unwrap();
+
+        assert_eq!(factorial.input_frame_count, 64);
+        assert_eq!(factorial.output_frame_count, 67);
+        let cfg = probe_config(0);
+        let score = digest("score");
+        let renderer = digest("renderer");
+        let plan = build_interaction_probe_plan(
+            &score,
+            &renderer,
+            67,
+            &supports,
+            &cfg,
+        )
+        .unwrap();
+        let result = evaluate_interaction_probe_plan(
+            &factorial,
+            &events,
+            &effect,
+            &factorial_config,
+            &plan,
+            &score,
+            &renderer,
+            67,
+            &supports,
+            &cfg,
+            &InteractionProbeBenchmarkConfig::default(),
+        )
+        .unwrap();
+        assert!(verify_interaction_probe_benchmark(
+            &result,
+            &factorial,
+            &events,
+            &effect,
+            &factorial_config,
+            &plan,
+            &score,
+            &renderer,
+            67,
+            &supports,
+            &cfg,
+            &InteractionProbeBenchmarkConfig::default(),
+        )
+        .unwrap());
+
+        assert_eq!(
+            evaluate_interaction_probe_plan(
+                &factorial,
+                &events,
+                &effect,
+                &factorial_config,
+                &plan,
+                &score,
+                &renderer,
+                64,
+                &supports,
+                &cfg,
+                &InteractionProbeBenchmarkConfig::default(),
+            )
+            .unwrap_err(),
+            InteractionProbeBenchmarkError::FrameCountMismatch,
+        );
+
+        let out_of_range = vec![support(0, 60, 68), support(1, 60, 67)];
+        assert!(build_interaction_probe_plan(
+            &score,
+            &renderer,
+            67,
+            &out_of_range,
+            &cfg,
+        )
+        .is_err());
     }
 
     #[test]

@@ -26,7 +26,9 @@ const MAX_TOTAL_ROUTING_SAMPLES: usize = 2_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct AcousticSupportInterval {
+    /// Inclusive frame in the rendered PCM output domain.
     pub start_frame: u64,
+    /// Exclusive frame in the rendered PCM output domain; may include effect tails.
     pub end_frame: u64,
 }
 
@@ -111,6 +113,7 @@ pub struct InteractionProbePlan {
     pub source_score_sha256: String,
     pub renderer_profile_sha256: String,
     pub support_and_topology_sha256: String,
+    /// Exclusive renderer-output frame horizon for acoustic support intervals.
     pub total_frames: u64,
     pub event_count: usize,
     pub config: InteractionProbeConfig,
@@ -524,6 +527,9 @@ fn plan_digest_valid(plan: &InteractionProbePlan) -> Result<bool, InteractionPro
 /// Build a deterministic interaction-probe plan. Every selected pair still
 /// requires an exact four-coalition EVAL-018 report; this function does not
 /// synthesize the missing renders or classify unselected pairs.
+///
+/// `total_frames` is the exclusive renderer-output support horizon. It may exceed
+/// the source-event input length when the renderer contributes release/effect tails.
 pub fn build_interaction_probe_plan(
     source_score_sha256: &str,
     renderer_profile_sha256: &str,
