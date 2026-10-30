@@ -224,7 +224,7 @@ The new Rust module is `proxy_acquisition.rs`, tracked by [#9211](https://github
 - a materializer creates an `ArchitectureFeatures` table only when every candidate has every declared proxy successfully queried; partial data is rejected rather than filled with hidden source values or sentinels;
 - the materializer verifies receipt metadata, receipt digest, per-observation digest, cumulative/remaining time and exact proxy schema before producing the table.
 
-Thirteen Rust tests are authored for candidate metadata isolation, runtime charging, duplicate pair rejection, independent budgets, unknown IDs, deterministic receipts, exact feature schema, target-leak rejection, provenance, topology uniqueness, budget limits, complete table materialization and tamper rejection. They have not been compiled or executed.
+Fourteen Rust tests are authored for candidate metadata isolation, runtime charging, duplicate pair rejection, independent budgets, unknown IDs, deterministic receipts, exact feature schema, target-leak rejection, provenance, topology uniqueness, budget limits, complete table materialization and observation/receipt/timing tamper rejection. They have not been compiled or executed.
 
 This capability boundary is still for trusted in-process policy code; a closure could capture the original feature table externally. For adversarial policy evaluation, the proxy oracle must run in a separate process/container and be the only process able to access source proxy values. The receipt makes the intended capability interface testable; it is not a security sandbox by itself.
 
