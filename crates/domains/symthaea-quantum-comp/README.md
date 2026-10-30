@@ -81,6 +81,7 @@ The crate remains conservative: local reports are not publishable proof, hardwar
 - `receipts` — local research artifact receipt scaffolding for future Mycelix integration.
 - `reporting` — CSV and Markdown report exports.
 - `significance` — paired comparisons and exact sign-test helpers.
+- `adaptive_evaluation` — development/validation/one-shot-confirmatory exposure policy; not a cryptographic holdout.
 - `audit` — conservative local claim-audit helpers.
 - `preflight` — local configuration checks before running experiments.
 - `presets` — stable local run presets for examples and CLI use.

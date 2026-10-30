@@ -1,0 +1,26 @@
+{
+  "schema_version": "symthaea.quantum_comp.adaptive_evaluation.v1",
+  "purpose": "illustrative_null_arithmetic_only",
+  "independent_blocks_per_candidate": 16,
+  "candidate_count": 50,
+  "one_sided_sign_test_threshold_wins": 12,
+  "exact_single_candidate_null_tail": 0.0384063720703125,
+  "independent_candidate_familywise_crossing_probability": 0.8588831611775091,
+  "fresh_independent_confirmation_nominal_tail": 0.0384063720703125,
+  "arithmetic": {
+    "exact_tail_numerator": 2517,
+    "exact_tail_denominator": 65536,
+    "familywise_formula": "1 - (1 - p)^m"
+  },
+  "assumptions": [
+    "each candidate-level test is under its null",
+    "candidate-level test outcomes are independent for this illustrative calculation",
+    "the selected result is the minimum raw p-value among 50 candidates"
+  ],
+  "limitations": [
+    "synthetic analytical fixture only; no measured quantum or classical system data",
+    "real adaptive candidate scores may be correlated",
+    "this calculation is not a reusable-holdout guarantee",
+    "a genuinely fresh confirmatory family set is still subject to the preregistered statistical and quality/resource gates"
+  ]
+}
