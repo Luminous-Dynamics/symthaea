@@ -90,7 +90,7 @@ jobs:
           assert by_key[("sybil_fanout", "naive_claim_sum")]["max_evidence_updates"] == 6
           assert by_key[("sybil_fanout", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
           assert by_key[("sybil_fanout", "eie_gamma_discount_only")]["max_evidence_updates"] == 6
-          assert by_key[("sybil_fanout", "eie_gamma_bounded_batch")]["max_evidence_updates"] == 6
+          assert by_key[("sybil_fanout", "eie_gamma_bounded_batch")]["max_evidence_updates"] == 3
           assert by_key[("common_mode_duplicates", "naive_claim_sum")]["max_evidence_updates"] == 3
           assert by_key[("common_mode_duplicates", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
 
