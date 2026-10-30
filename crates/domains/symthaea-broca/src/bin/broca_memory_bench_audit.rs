@@ -43,18 +43,23 @@ fn path_segments(path: &str) -> Result<Vec<&str>, String> {
     Ok(segments)
 }
 
-fn get_path<'a>(root: &'a Value, path: &str) -> Result<&'a Value, String> {
+/// Resolve an optional path. A missing leaf or parent is a legitimate
+/// counterfactual value; malformed dotted paths are still rejected.
+fn get_path_optional<'a>(root: &'a Value, path: &str) -> Result<Option<&'a Value>, String> {
     let segments = path_segments(path)?;
     let mut current = root;
     for segment in segments {
-        current = match current {
+        let next = match current {
             Value::Object(object) => object.get(segment),
             Value::Array(array) => segment.parse::<usize>().ok().and_then(|index| array.get(index)),
             _ => None,
-        }
-        .ok_or_else(|| format!("JSON path {path:?} does not exist"))?;
+        };
+        let Some(next) = next else {
+            return Ok(None);
+        };
+        current = next;
     }
-    Ok(current)
+    Ok(Some(current))
 }
 
 fn remove_path(root: &mut Value, path: &str) -> Result<(), String> {
@@ -100,16 +105,57 @@ fn remove_path(root: &mut Value, path: &str) -> Result<(), String> {
 }
 
 fn path_changed(left: &Value, right: &Value, path: &str) -> Result<bool, String> {
-    Ok(get_path(left, path)? != get_path(right, path)?)
+    Ok(get_path_optional(left, path)? != get_path_optional(right, path)?)
 }
 
 /// True when the two JSON documents are identical after removing one declared
 /// intervention field from each. This enforces a one-field counterfactual.
+fn remove_path_if_present(root: &mut Value, path: &str) -> Result<(), String> {
+    let segments = path_segments(path)?;
+    fn remove_at(current: &mut Value, segments: &[&str]) -> Result<(), String> {
+        if segments.is_empty() {
+            return Ok(());
+        }
+        if segments.len() == 1 {
+            match current {
+                Value::Object(object) => {
+                    object.remove(segments[0]);
+                }
+                Value::Array(array) => {
+                    let Ok(index) = segments[0].parse::<usize>() else {
+                        return Err(format!("array path segment {:?} is not an index", segments[0]));
+                    };
+                    if index < array.len() {
+                        array.remove(index);
+                    }
+                }
+                _ => {}
+            }
+            return Ok(());
+        }
+        let next = match current {
+            Value::Object(object) => object.get_mut(segments[0]),
+            Value::Array(array) => {
+                let Ok(index) = segments[0].parse::<usize>() else {
+                    return Err(format!("array path segment {:?} is not an index", segments[0]));
+                };
+                array.get_mut(index)
+            }
+            _ => None,
+        };
+        if let Some(next) = next {
+            remove_at(next, &segments[1..])?;
+        }
+        Ok(())
+    }
+    remove_at(root, &segments)
+}
+
 fn equal_except_path(left: &Value, right: &Value, path: &str) -> Result<bool, String> {
     let mut left = left.clone();
     let mut right = right.clone();
-    remove_path(&mut left, path)?;
-    remove_path(&mut right, path)?;
+    remove_path_if_present(&mut left, path)?;
+    remove_path_if_present(&mut right, path)?;
     Ok(left == right)
 }
 
@@ -413,6 +459,14 @@ mod tests {
         case["variants"][2]["oracle"]["status"] = json!("new");
         let error = audit_case(&case).unwrap_err();
         assert!(error.contains("irrelevant presentation change altered oracle"));
+    }
+
+    #[test]
+    fn missing_optional_path_is_a_valid_single_field_intervention() {
+        let before = json!({"state": {"status": "unknown"}});
+        let after = json!({"state": {"status": "unknown", "attempt_status": "not_run"}});
+        assert!(path_changed(&before, &after, "state.attempt_status").unwrap());
+        assert!(equal_except_path(&before, &after, "state.attempt_status").unwrap());
     }
 
     #[test]
