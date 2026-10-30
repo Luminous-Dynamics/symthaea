@@ -1655,6 +1655,7 @@ fn push_error(errors: &mut Vec<ValidationError>, code: &'static str, path: impl 
 mod tests {
     use super::*;
     use serde_json::Value;
+    use std::path::PathBuf;
 
     const EXAMPLE: &str = include_str!("../../benchmarks/basalt/examples/run-record.example.json");
     const MANIFEST: &str = include_str!("../../benchmarks/basalt/examples/suite-manifest.example.json");
