@@ -245,16 +245,36 @@ fn valid_revision(value: &str) -> bool {
 
 fn valid_date(value: &str) -> bool {
     let bytes = value.as_bytes();
-    bytes.len() == 10
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes
             .iter()
             .enumerate()
             .all(|(index, byte)| index == 4 || index == 7 || byte.is_ascii_digit())
-        && value[0..4].parse::<u16>().is_ok()
-        && value[5..7].parse::<u8>().is_ok_and(|month| (1..=12).contains(&month))
-        && value[8..10].parse::<u8>().is_ok_and(|day| (1..=31).contains(&day))
+    {
+        return false;
+    }
+    let Ok(year) = value[0..4].parse::<u16>() else {
+        return false;
+    };
+    let Ok(month) = value[5..7].parse::<u8>() else {
+        return false;
+    };
+    let Ok(day) = value[8..10].parse::<u8>() else {
+        return false;
+    };
+    if year == 0 || !(1..=12).contains(&month) {
+        return false;
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let max_day = match month {
+        2 if leap_year => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    (1..=max_day).contains(&day)
 }
 
 fn digest_framed(domain: &[u8], payload: &[u8]) -> Result<String, String> {
@@ -540,7 +560,7 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         let adjudicators_for_claim = per_claim_adjudicators.get(claim.claim_id.as_str());
         let independence_groups = per_claim_independence_groups.get(claim.claim_id.as_str());
         let count = adjudicators_for_claim.map_or(0, BTreeSet::len);
-        let independent_group_count = independence_groups.map_or(0, BTreeSet::len);
+        let independent_group_count = independence_groups.map_or(0, |set| set.len());
         if fields.purpose.is_audit_candidate()
             && (count < 3 || independent_group_count < 3)
         {
@@ -563,6 +583,9 @@ fn validate_fields(fields: &ReferencePackageFieldsV1) -> Vec<String> {
         }
         if !valid_digest(&resolution.rationale_sha256, allow_zero) {
             issues.push(format!("resolution {} has invalid rationale digest", resolution.resolution_id));
+        }
+        if resolution.decision == ReferenceDecisionV1::Abstain {
+            issues.push(format!("resolution {} cannot replace a resolution with an unqualified abstention", resolution.resolution_id));
         }
         if resolution.prior_record_ids.len() < 2 {
             issues.push(format!("resolution {} must reference at least two prior adjudications", resolution.resolution_id));
@@ -690,7 +713,7 @@ pub fn verify_reference_assurance_package(
         }
     }
     for claim in package.claims.iter().filter(|claim| claim.material) {
-        if panel_counts.get(claim.claim_id.as_str()).map_or(0, BTreeSet::len) < 3 {
+        if panel_counts.get(claim.claim_id.as_str()).map_or(0, |set| set.len()) < 3 {
             missing_panels += 1;
         }
         if decisions_by_claim.get(claim.claim_id.as_str()).is_some_and(|decisions| decisions.len() > 1) {
@@ -771,6 +794,31 @@ mod tests {
         assert!(!report.runner_execution_proven);
         assert!(report.external_anchor_required);
         assert!(!report.scoring_eligible_declared);
+    }
+
+    #[test]
+    fn audit_candidate_passes_structure_but_never_claims_scoring_eligibility() {
+        let mut value = fixture_value();
+        value["purpose"] = json!("audit_candidate");
+        value["validator_source_revision"] = json!(BUILT_GENERATOR_SOURCE_REVISION);
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(report.valid, "{:?}", report.issues);
+        assert!(!report.adjudicator_independence_proven);
+        assert!(!report.source_authenticity_proven);
+        assert!(!report.source_span_bytes_verified);
+        assert!(!report.runner_execution_proven);
+        assert!(report.external_anchor_required);
+        assert!(!report.scoring_eligible_declared);
+    }
+
+    #[test]
+    fn invalid_calendar_day_is_rejected() {
+        let mut value = fixture_value();
+        value["claims"][0]["scope"]["target_date"] = json!("2026-02-30");
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("invalid target_date")));
     }
 
     #[test]
