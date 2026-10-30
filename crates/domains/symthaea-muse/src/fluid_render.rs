@@ -30,7 +30,7 @@ const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
 pub const MAX_EFFECTS_GROUPS: u8 = 128;
 const MIDI_CHANNEL_COUNT: u8 = 16;
 const EFFECTS_GROUP_ASSIGNMENT_DOMAIN: &[u8] =
-    b"luminous-dynamics-muse-fluidsynth-effects-group-assignment-v1\\0";
+    b"luminous-dynamics-muse-fluidsynth-effects-group-assignment-v1\0";
 static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
