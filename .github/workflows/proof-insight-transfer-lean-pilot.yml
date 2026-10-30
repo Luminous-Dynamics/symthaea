@@ -100,12 +100,55 @@ jobs:
                   for line in block.splitlines()
                   if "PITB_STATE_DECL:" in line
               ]
+              json_lines = [
+                  line.split("PITB_STATE_JSON:", 1)[1]
+                  for line in block.splitlines()
+                  if "PITB_STATE_JSON:" in line
+              ]
               if len(goal_lines) != 1:
                   raise SystemExit(f"expected one target goal in {label} proof-state trace")
+              if len(json_lines) != 1:
+                  raise SystemExit(f"expected one machine-readable JSON snapshot in {label} proof-state trace")
+              try:
+                  snapshot = json.loads(json_lines[0])
+              except json.JSONDecodeError as exc:
+                  raise SystemExit(f"invalid JSON proof-state snapshot for {label}: {exc}")
+              if snapshot.get("schema_version") != "pitb.lean-proof-state-snapshot.v0":
+                  raise SystemExit(f"unsupported Lean proof-state snapshot version for {label}")
+              if snapshot.get("label") != label:
+                  raise SystemExit(f"JSON proof-state label mismatch for {label}")
+              if not isinstance(snapshot.get("goal"), str) or normalize(snapshot["goal"]) != normalize(goal_lines[0]):
+                  raise SystemExit(f"structured and readable goal traces disagree for {label}")
+              declarations = snapshot.get("declarations")
+              if not isinstance(declarations, list) or len(declarations) != len(declaration_lines):
+                  raise SystemExit(f"structured and readable declaration counts disagree for {label}")
+              indices = []
+              normalized_declarations = []
+              for item, readable in zip(declarations, declaration_lines, strict=True):
+                  if (
+                      not isinstance(item, dict)
+                      or set(item) != {"index", "user_name", "type"}
+                      or not isinstance(item["index"], int)
+                      or not isinstance(item["user_name"], str)
+                      or not isinstance(item["type"], str)
+                  ):
+                      raise SystemExit(f"malformed structured local declaration in {label}")
+                  indices.append(item["index"])
+                  normalized = normalize(f"{item['user_name']}:{item['type']}")
+                  if normalized != normalize(readable):
+                      raise SystemExit(f"structured/readable local declaration mismatch in {label}")
+                  normalized_declarations.append(normalized)
+              if indices != sorted(indices) or len(indices) != len(set(indices)):
+                  raise SystemExit(f"local declaration indices are not unique and ordered in {label}")
+              canonical_snapshot = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+              canonical_context = json.dumps(declarations, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
               return {
                   "block": block,
-                  "goal": normalize(goal_lines[0]),
-                  "declarations": [normalize(line) for line in declaration_lines],
+                  "goal": normalize(snapshot["goal"]),
+                  "declarations": normalized_declarations,
+                  "structured": snapshot,
+                  "structured_snapshot_sha256": hashlib.sha256(canonical_snapshot).hexdigest(),
+                  "structured_local_context_sha256": hashlib.sha256(canonical_context).hexdigest(),
               }
 
           base_state = extract_state("base")
@@ -118,6 +161,20 @@ jobs:
               raise SystemExit("variant trace still contains the cleared local declaration h")
           if not any(line.startswith("hEq:") for line in variant_state["declarations"]):
               raise SystemExit("variant trace lost the alternate equality route needed to close the same goal")
+
+          irrelevant_base_state = extract_state("irrelevant-base")
+          irrelevant_variant_state = extract_state("irrelevant-variant")
+          if irrelevant_base_state["goal"] != irrelevant_variant_state["goal"]:
+              raise SystemExit("irrelevant-context intervention changed the elaborated goal type")
+          if not any(line.startswith("h:") and normalize(line[2:]) == "a ≤ b" for line in irrelevant_base_state["declarations"]):
+              raise SystemExit("irrelevant-context base lacks the required hypothesis h : a ≤ b")
+          if not any(line.startswith("h:") and normalize(line[2:]) == "a ≤ b" for line in irrelevant_variant_state["declarations"]):
+              raise SystemExit("irrelevant-context removal incorrectly removed required hypothesis h : a ≤ b")
+          if not any(line.startswith("hIrrelevant:") for line in irrelevant_base_state["declarations"]):
+              raise SystemExit("irrelevant-context base lacks hIrrelevant")
+          if any(line.startswith("hIrrelevant:") for line in irrelevant_variant_state["declarations"]):
+              raise SystemExit("irrelevant-context variant still contains removed declaration hIrrelevant")
+
           state_trace_receipt = {
               "operation": "clear h",
               "base_snapshot_sha256": hashlib.sha256(base_state["block"].encode("utf-8")).hexdigest(),
@@ -129,7 +186,24 @@ jobs:
               "required_declaration_present_before": True,
               "required_declaration_absent_after": True,
               "alternate_route_hypothesis_present_after": True,
+              "base_structured_snapshot_sha256": base_state["structured_snapshot_sha256"],
+              "variant_structured_snapshot_sha256": variant_state["structured_snapshot_sha256"],
+              "base_structured_local_context_sha256": base_state["structured_local_context_sha256"],
+              "variant_structured_local_context_sha256": variant_state["structured_local_context_sha256"],
+              "snapshot_schema_version": "pitb.lean-proof-state-snapshot.v0",
               "trace_log_sha256": hashlib.sha256(state_trace_path.read_bytes()).hexdigest(),
+              "irrelevant_context_intervention": {
+                  "operation": "clear hIrrelevant",
+                  "base_snapshot_sha256": irrelevant_base_state["structured_snapshot_sha256"],
+                  "variant_snapshot_sha256": irrelevant_variant_state["structured_snapshot_sha256"],
+                  "base_local_context_sha256": irrelevant_base_state["structured_local_context_sha256"],
+                  "variant_local_context_sha256": irrelevant_variant_state["structured_local_context_sha256"],
+                  "goal_type_sha256": hashlib.sha256(irrelevant_base_state["goal"].encode("utf-8")).hexdigest(),
+                  "goal_type_preserved": True,
+                  "required_hypothesis_present_in_both": True,
+                  "irrelevant_declaration_present_before": True,
+                  "irrelevant_declaration_absent_after": True
+              }
           }
 
           source = Path("PITBCounterfactualPilot.lean")
@@ -192,6 +266,21 @@ jobs:
           state_trace_receipt["case_id"] = state_case["case_id"]
           state_trace_receipt["case_manifest_sha256"] = digest(cases_path)
           state_trace_receipt["target_statement_fragment_sha256"] = state_case["base_statement_fragment_sha256"]
+
+          irrelevant_state_cases = [
+              binding for binding in case_bindings
+              if (binding.get("state_intervention") or {}).get("operation") == "clear hIrrelevant"
+          ]
+          if len(irrelevant_state_cases) != 1:
+              raise SystemExit("expected exactly one manifest case for irrelevant-context removal")
+          irrelevant_state_case = irrelevant_state_cases[0]
+          if irrelevant_state_case["model_outcomes"] != "not_run":
+              raise SystemExit("the irrelevant-context calibration case must remain unscored")
+          if irrelevant_state_case["base_statement_fragment_sha256"] != irrelevant_state_case["variant_statement_fragment_sha256"]:
+              raise SystemExit("irrelevant-context intervention must preserve the exact target statement")
+          state_trace_receipt["irrelevant_context_intervention"]["case_id"] = irrelevant_state_case["case_id"]
+          state_trace_receipt["irrelevant_context_intervention"]["case_manifest_sha256"] = digest(cases_path)
+          state_trace_receipt["irrelevant_context_intervention"]["target_statement_fragment_sha256"] = irrelevant_state_case["base_statement_fragment_sha256"]
 
           receipt = {
               "schema_version": "pitb.lean-pilot-ci-receipt.v0",
