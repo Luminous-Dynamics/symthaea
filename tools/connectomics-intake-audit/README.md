@@ -195,10 +195,13 @@ For each frozen policy/minute budget, the evaluator selects candidates in the sa
 The report exposes:
 - reviewer accept/reject/abstain outcomes crossed with independent correct/incorrect/indeterminate adjudication;
 - accepted-decision precision and applied-correction precision, each excluding indeterminate adjudications from its denominator;
-- candidate-pool correct-proposal review recall and acceptance recall (these are **not whole-connectome recall**);
+- candidate-pool correct-proposal review, acceptance, and actual-application recall (these are **not whole-connectome recall**);
 - incorrect-proposal acceptance rate, actual review minutes, stale conflicts, and before/after oracle query error.
 
 This is still a retrospective replay, not a randomized prospective causal estimate. All candidates in the frozen pool must be independently adjudicated and have review outcomes/time records; the same pool is then replayed under every frozen policy. Reviewer learning/order effects are not modeled. The evaluator does not modify authoritative graph or annotation files.
+
+
+For a defensible offline comparison, the frozen candidate pool should be reviewed in a blinded shadow-evaluation process: reviewers should not see which policy ranked a candidate, and an independent adjudication protocol should determine proposal correctness. This incurs annotation effort to create the outcome corpus; that corpus-construction cost must be reported separately and must not be presented as policy review savings. Policy budgets then replay subsets of the fully adjudicated pool using each candidate's measured review time.
 
 **Information-flow boundary:** never provide the reviewer-outcome file to `connectome-query-impact` or candidate generation. The ranker is a separate binary that does not define or parse this outcome schema. The post-hoc evaluator is the only tool that consumes adjudication/reviewer labels. The synthetic outcome template contains zero placeholders for the two artifact hashes; replace them with SHA-256 digests from the exact files before running it.
 
