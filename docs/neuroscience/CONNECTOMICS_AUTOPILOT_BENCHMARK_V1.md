@@ -406,3 +406,25 @@ The evaluator emits separate nominal Krippendorff alpha, observed/expected disag
 **Interpretation limits:** strict majority is a summary, not biological truth. Agreement is not correctness. Pooled reviewer events share candidates and must not be treated as independent samples. Panel minutes are summed person-minutes, not elapsed queue wall time. The implemented agreement statistic uses pair-count-weighted nominal disagreement; it is not a latent-rater truth model. Dawid–Skene-style aggregation remains future work and requires independent anchor cases and a validated protocol before it can influence any decision.
 
 For collection, use at least three independent adjudicators per candidate where feasible (two is only the executable minimum), blind reviewers to policy/model identity and other votes, randomize candidate order, retain abstentions and unresolved cases, and account for the full-corpus adjudication cost separately. Causal queue-efficiency claims still require a prospective randomized or block-randomized policy trial. No biological multi-rater corpus has yet been evaluated, and no performance gain is claimed.
+
+
+## Candidate-generation recall beyond the proposal pool (SCI-CONNECTOMICS-006)
+
+The queue and unreviewed-tail evaluators condition on the system's proposal pool. That leaves candidate-generation false negatives unidentified: an error the model never proposes cannot appear in either precision or candidate-pool recall denominators. A high-performing queue could therefore optimize the wrong subset of the volume.
+
+A separate, evaluator-only probability audit now defines the missing estimand:
+
+- Sample complete primary sampling units (PSUs) from a declared, exhaustive volume/neuron search frame using stratified simple random sampling without replacement.
+- Independently search every selected PSU exhaustively, retaining selected empty units rather than dropping them.
+- Map each independently verified error to zero or more candidate IDs in the frozen proposal pool. Empty mapping means the generator missed the error; duplicate or unknown candidate references invalidate the run.
+- Estimate finite-frame error totals, covered totals, missed totals, and independent panel person-time with stratified Horvitz–Thompson estimators.
+- Report candidate-generation recall and **impact-weighted candidate-generation recall** separately, with first-order Taylor ratio variance and conservative interval gating.
+- Keep this evaluator isolated from candidate generation and ranking, and distinguish it from #9187's residual-risk sample within the generated candidate pool.
+
+Artifacts:
+- [Protocol V1](CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md)
+- [JSON Schema](CONNECTOME_CANDIDATE_COVERAGE_AUDIT.schema.json)
+- [Synthetic fixture](examples/CONNECTOME_CANDIDATE_COVERAGE_AUDIT.example.json)
+- [Tracking issue #9204](https://github.com/Luminous-Dynamics/symthaea/issues/9204)
+
+This estimates recall only over the finite declared PSU frame and only to the extent that the independent search protocol can detect and adjudicate errors. It is not whole-connectome recall. It does not measure causal queue-policy effects, because the policies do not control this independent sampling process. No biological coverage sample has been evaluated and no SOTA result is claimed.
