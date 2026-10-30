@@ -162,6 +162,20 @@ This extension is inspired by that problem class but defines an independent Broc
 
 Each TaskSpec emits a canonical public event history, a versioned governing-state compiler, a finite legal-action set, and an independent symbolic oracle. Keep hidden world state, gold action, and expected relation outside the reader-visible memory packet.
 
+### Machine-readable D18-D23 fixture corpus
+
+The companion [decision-use-validity-fixtures-v1.json](./decision-use-validity-fixtures-v1.json) contains six cases and 30 variants. Each fixture keeps the public `reader_input` separate from the evaluator-only `oracle`; the adapter must never serialize or prompt the model with the oracle field.
+
+The six decisive flip pairs each alter exactly one path:
+- D18: `governance.plan_locked_at`
+- D19: `analysis.selection_after_outcome_inspection`
+- D20: `comparison.comparability_certificate`
+- D21: `measurement.observation_state`
+- D22: `options.B.future_benefit`
+- D23: `evidence.independent_family_count`
+
+Each invariance control changes only its designated irrelevant path. This single-path constraint is asserted during fixture authoring and should be preserved by any generated expansion. These 30 entries are seed fixtures, not a statistically sufficient held-out benchmark; generate templates and seeds before drawing performance conclusions.
+
 ### Paired causal interventions
 
 For every D18-D23 task, generate:
