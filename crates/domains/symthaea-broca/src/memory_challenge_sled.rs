@@ -146,18 +146,36 @@ impl SledAmlMemoryBackend {
         Ok(())
     }
 
-    fn verify_batch_visible(&self, batch: &PersistedAmlAddBatch) -> Result<(), String> {
-        let hdc_ids: Vec<_> = batch.records.iter().map(|record| record.hdc_id).collect();
+    fn verify_batch_visible(
+        index: &EvidenceIndex,
+        batch: &PersistedAmlAddBatch,
+        payload_root: &Path,
+    ) -> Result<(), String> {
         let now_ms = current_unix_ms()?;
-        let resolved = self.index.resolve(
-            &hdc_ids,
-            &batch.request.user_id,
-            now_ms,
-            &self.payload_root,
-            hdc_ids.len(),
-        )?;
-        if resolved.len() != hdc_ids.len() {
-            return Err("Add batch is not immediately visible through the evidence resolver".into());
+        for record in &batch.records {
+            let EvidencePayload::Text { value } = &record.payload else {
+                return Err("AML Text/Coding Add cannot index non-text evidence".into());
+            };
+            if !value.chars().any(char::is_alphanumeric) {
+                return Err("AML lexical baseline requires at least one searchable alphanumeric token per message".into());
+            }
+            let hits = index.search_bm25(
+                value,
+                &batch.request.user_id,
+                now_ms,
+                payload_root,
+                Bm25Config {
+                    k1: 1.2,
+                    b: 0.75,
+                    max_items: usize::MAX,
+                },
+            )?;
+            if !hits.iter().any(|hit| hit.evidence_id == record.evidence_id) {
+                return Err(format!(
+                    "Add evidence {:?} is not immediately retrievable by its indexed content",
+                    record.evidence_id
+                ));
+            }
         }
         Ok(())
     }
@@ -199,7 +217,7 @@ impl SledAmlMemoryBackend {
                 // Rebuild to pick up a durable write made by another backend
                 // instance that won the compare-and-swap race.
                 self.rebuild_index()?;
-                self.verify_batch_visible(existing)?;
+                Self::verify_batch_visible(&self.index, existing, &self.payload_root)?;
                 Ok(AmlAddCommitReceipt {
                     request_id: request.request_id.clone(),
                     payload_sha256: payload_sha256.to_owned(),
@@ -245,6 +263,10 @@ impl AmlMemoryBackend for SledAmlMemoryBackend {
             stored_at_unix_ms: current_unix_ms()?,
             records,
         };
+        // Prove that every item is query-visible in the candidate index before
+        // committing the durable batch. The success receipt follows only after
+        // the same candidate has also been flushed to disk.
+        Self::verify_batch_visible(&candidate_index, &batch, &self.payload_root)?;
         let encoded = serde_json::to_vec(&batch)
             .map_err(|error| format!("failed to serialize persisted Add batch: {error}"))?;
         let key = request_key(&request.request_id);
@@ -261,7 +283,6 @@ impl AmlMemoryBackend for SledAmlMemoryBackend {
                     .flush()
                     .map_err(|error| format!("AML Add durability flush failed: {error}"))?;
                 self.index = candidate_index;
-                self.verify_batch_visible(&batch)?;
                 Ok(AmlAddCommitReceipt {
                     request_id: request.request_id.clone(),
                     payload_sha256: payload_sha256.to_owned(),
@@ -322,6 +343,11 @@ fn build_evidence_records(
                     .map_err(|_| format!("messages[{index}].timestamp must be non-negative"))
             })
             .transpose()?;
+        if !message.content.chars().any(char::is_alphanumeric) {
+            return Err(format!(
+                "messages[{index}].content must contain a searchable alphanumeric token for the lexical baseline"
+            ));
+        }
         let identity = format!(
             "{}\0{}\0{}",
             request.user_id, request.request_id, index
