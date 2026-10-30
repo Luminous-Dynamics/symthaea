@@ -67,7 +67,8 @@ The pilot now also inspects the assigned proof expression after two checked solu
 
 - **Direct proof-term support:** the local declarations referenced syntactically by the assigned proof expression.
 - **Transitive local dependency closure:** the direct declarations plus free variables occurring in their types and available local values.
-- **The proof term:** the elaborator's pretty-printed representation, retained in the receipt alongside the support rows.
+- **Direct global constants:** the exact Lean declaration names referenced by the proof expression, such as the theorem or constructor implementing the move. This is a direct-reference list, not the full transitive Mathlib/environment dependency closure.
+- **The proof term:** the elaborator's pretty-printed representation, retained in the receipt alongside the support rows and global references.
 
 The two intervention cases now have explicit, case-manifest-bound expectations:
 - After required hypothesis h is cleared, the alternate-route proof must reference hEq and must not reference h.
