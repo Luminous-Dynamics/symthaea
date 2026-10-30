@@ -798,6 +798,11 @@ mod tests {
     fn pairwise_coercivity_detects_a_near_zero_overlap_failure() {
         let mut world = World::shifted_overlap();
         world.offline_distribution = [[0.9997, 0.00005], [0.00005, 0.00005], [0.00005, 0.0001]];
+        // A transition from the dominant offline cell moves to state 1, where
+        // the target selects action 0. The candidate direction doubles there,
+        // so <h,(I-gamma P_pi)h> is negative under this offline measure.
+        world.transition[0][0] = [0.0, 1.0, 0.0];
+        world.target_policy[1] = [1.0, 0.0];
         let truth = exact_q(&world);
         let mut bad = truth;
         bad.values[0][0] += 1.0;
