@@ -221,7 +221,10 @@ impl SqliteAmlMemoryBackend {
         let schema_version: i64 = connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .map_err(|error| format!("failed to read AML SQLite schema version: {error}"))?;
-        if schema_version == 0 {
+        if schema_version == 0 || schema_version == 1 {
+            // Version 2 adds the lifecycle-event table, which was created above
+            // with IF NOT EXISTS. This upgrade is additive and preserves all
+            // previously persisted Add batches.
             connection
                 .pragma_update(None, "user_version", SQLITE_SCHEMA_VERSION)
                 .map_err(|error| format!("failed to set AML SQLite schema version: {error}"))?;
@@ -1237,6 +1240,30 @@ mod tests {
         let cutoff = current_unix_ms().unwrap().saturating_add(1);
         assert_eq!(backend.purge_stored_before(cutoff).unwrap(), 1);
         assert_eq!(backend.persisted_batch_count().unwrap(), 0);
+        assert_eq!(backend.lifecycle_event_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn schema_v1_add_store_migrates_to_v2_lifecycle_table() {
+        let root = tempdir().unwrap();
+        let path = root.path().join("v1.sqlite3");
+        {
+            let connection = Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE aml_add_batches (
+                    request_id TEXT PRIMARY KEY NOT NULL COLLATE BINARY,
+                    payload_sha256 TEXT NOT NULL,
+                    stored_at_unix_ms INTEGER NOT NULL,
+                    body_json BLOB NOT NULL
+                );
+                PRAGMA user_version = 1;"
+            ).unwrap();
+        }
+        let backend = SqliteAmlMemoryBackend::open(&path, root.path()).unwrap();
+        let version: i64 = backend.connection
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SQLITE_SCHEMA_VERSION);
         assert_eq!(backend.lifecycle_event_count().unwrap(), 0);
     }
 
