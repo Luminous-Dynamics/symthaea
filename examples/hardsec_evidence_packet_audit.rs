@@ -989,6 +989,31 @@ mod tests {
     }
 
     #[test]
+    fn witness_validation_mode_rejects_a_detector_object() {
+        let mut packet = base_packet();
+        packet["evaluation_mode"] = json!("witness_validation");
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("must not include a detector object"));
+    }
+
+    #[test]
+    fn witness_validation_mode_cannot_claim_model_detection() {
+        let mut packet = base_packet();
+        packet["evaluation_mode"] = json!("witness_validation");
+        packet.as_object_mut().unwrap().remove("detector");
+        set_claim(
+            &mut packet,
+            "model_suspects_trojan",
+            "supported",
+            vec![],
+        );
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("requires decision=trojan_suspected"));
+    }
+
+    #[test]
     fn accepts_seqcube_witness_only_packet_without_inventing_a_detector() {
         let mut packet = base_packet();
         packet["packet_id"] = json!("seqcube-reference-ctrl-0001");
