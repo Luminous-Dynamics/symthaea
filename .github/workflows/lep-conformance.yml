@@ -95,6 +95,20 @@ jobs:
           fi
           grep -q '"DUPLICATE_JSON_KEY"' "$report"
 
+      - name: Reject oversized statement before JSON deserialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          input="$(mktemp)"
+          report="$(mktemp)"
+          trap 'rm -f "$input" "$report"' EXIT
+          head -c $((16 * 1024 * 1024 + 1)) /dev/zero > "$input"
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- "$input" > "$report"; then
+            echo "oversized statement unexpectedly conformed" >&2
+            cat "$report" >&2
+            exit 1
+          fi
+          grep -q '"STATEMENT_TOO_LARGE"' "$report"
       - name: Collect advisory synthetic performance measurements
         shell: bash
         run: |
