@@ -142,6 +142,9 @@ def validate_package(package: dict[str, Any]) -> list[str]:
     known_sources = set(source_ids)
     known_spans = set(span_ids)
     known_adjudicators = {row["adjudicator_id_sha256"]: row for row in adjudicators}
+    snapshot_digests = [row["snapshot_sha256"] for row in sources]
+    if len(snapshot_digests) != len(set(snapshot_digests)):
+        issues.append("duplicate exact source snapshot")
     known_judgments = {row["record_id"]: row for row in judgments}
 
     for claim in claims:
@@ -302,6 +305,11 @@ class ReferenceAssuranceOracleTests(unittest.TestCase):
         value = copy.deepcopy(self.fixture)
         value["initial_adjudications"][1]["adjudicator_id_sha256"] = value["initial_adjudications"][0]["adjudicator_id_sha256"]
         self.assertTrue(any("duplicate voter" in issue for issue in validate_package(value)))
+
+    def test_duplicate_source_snapshot_is_not_double_counted(self) -> None:
+        value = copy.deepcopy(self.fixture)
+        value["sources"][1]["snapshot_sha256"] = value["sources"][0]["snapshot_sha256"]
+        self.assertTrue(any("duplicate exact source snapshot" in issue for issue in validate_package(value)))
 
     def test_retracted_source_cannot_support_current_claim(self) -> None:
         value = copy.deepcopy(self.fixture)
