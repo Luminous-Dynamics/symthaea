@@ -61,6 +61,12 @@ The current Symtropy ledger stores event evidence IDs and digest syntax; those r
 
 Symtropy's crossed MSA implementation is tracked in [PWR-TX-MFG-003 #2969](https://github.com/Luminous-Dynamics/symtropy/issues/2969). Its v0.1 balanced ANOVA diagnostic can provide a GRR standard deviation for a specific study when the measurement-system study is independently reviewed and accepted for the intended decision. Its guidance bands are not a universal acceptance rule. Symthaea must not infer calibration validity, MSA adequacy or eligibility from an EIG score; it receives observation standard deviation and eligibility only as externally controlled inputs.
 
+## Prior-weighted EIG and hypothesis multiplicity
+
+The default/common-noise compatibility selector retains a uniform prior over the supplied hypothesis instances. New weighted EIG APIs accept non-negative prior masses and normalize them internally; zero-mass hypotheses are excluded. Weighted candidate-noise and weighted finite-scenario maximin selector variants are now available. A key invariant is that duplicating a predictive hypothesis while splitting its original prior mass must not change the acquisition score.
+
+Prior weights are not calibrated by the selector. They must be declared, versioned and estimated without leakage from held-out campaign outcomes. For engineering families, the next step is canonicalizing predictive equivalence classes and comparing uniform-instance, uniform-class, hierarchical and evidence-weighted priors. See [PWR-MFG-PRIOR-001 #9183](https://github.com/Luminous-Dynamics/symthaea/issues/9183).
+
 ## Benchmark
 
 Compare at identical held-out product/lot/campaign pools and identical total acquisition budgets:
