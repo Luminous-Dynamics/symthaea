@@ -78,6 +78,8 @@ struct SpatialFrameReport {
     frame_generator_tool_id: String,
     frame_generator_tool_version: String,
     frame_generator_binary_sha256: String,
+    extent_voxels: [u64; 3],
+    tile_shape_voxels: [u64; 3],
     grid_dimensions: [u64; 3],
     total_grid_cells: u64,
     eligible_grid_cells: u64,
@@ -276,6 +278,50 @@ fn report_count(value: &str, field: &str) -> Result<u128, String> {
         .map_err(|_| format!("spatial frame report {field} must be a base-10 u128 string"))
 }
 
+fn canonical_psu_coordinates(psu_id: &str) -> Result<[u64; 3], String> {
+    let parts = psu_id.split(':').collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return Err(format!("PSU ID {psu_id} must have exactly three colon-separated indices"));
+    }
+    let mut coordinates = [0_u64; 3];
+    for axis in 0..3 {
+        coordinates[axis] = parts[axis].parse::<u64>()
+            .map_err(|_| format!("PSU ID {psu_id} contains an invalid grid index"))?;
+    }
+    if format!("{}:{}:{}", coordinates[0], coordinates[1], coordinates[2]) != psu_id {
+        return Err(format!("PSU ID {psu_id} is not in canonical decimal form"));
+    }
+    Ok(coordinates)
+}
+
+fn checked_voxel_product(values: [u64; 3], label: &str) -> Result<u128, String> {
+    values.iter().try_fold(1_u128, |product, value| {
+        product.checked_mul(u128::from(*value))
+            .ok_or_else(|| format!("{label} voxel product overflows u128"))
+    })
+}
+
+fn expected_mask_tile_volume(
+    report: &SpatialFrameReport,
+    psu_id: &str,
+) -> Result<u128, String> {
+    let coordinates = canonical_psu_coordinates(psu_id)?;
+    let mut clipped_extent = [0_u64; 3];
+    for axis in 0..3 {
+        if report.extent_voxels[axis] == 0 || report.tile_shape_voxels[axis] == 0 {
+            return Err("spatial frame extent and tile shape must be strictly positive".into());
+        }
+        let start = coordinates[axis].checked_mul(report.tile_shape_voxels[axis])
+            .ok_or_else(|| format!("PSU {psu_id} tile start overflows on axis {axis}"))?;
+        if coordinates[axis] >= report.grid_dimensions[axis] || start >= report.extent_voxels[axis] {
+            return Err(format!("PSU {psu_id} is outside the declared spatial extent"));
+        }
+        let remaining = report.extent_voxels[axis] - start;
+        clipped_extent[axis] = remaining.min(report.tile_shape_voxels[axis]);
+    }
+    checked_voxel_product(clipped_extent, "expected clipped tile")
+}
+
 fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> {
     if !report.eligibility_mask_verified {
         return Err("spatial frame report did not verify eligibility-mask artifact bytes".into());
@@ -327,6 +373,20 @@ fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> 
         product.checked_mul(u128::from(*dimension))
             .ok_or_else(|| "spatial frame grid dimension product overflows u128".to_string())
     })?;
+    let expected_grid_dimensions = [
+        1 + (report.extent_voxels[0] - 1) / report.tile_shape_voxels[0].max(1),
+        1 + (report.extent_voxels[1] - 1) / report.tile_shape_voxels[1].max(1),
+        1 + (report.extent_voxels[2] - 1) / report.tile_shape_voxels[2].max(1),
+    ];
+    if report.extent_voxels.iter().any(|value| *value == 0)
+        || report.tile_shape_voxels.iter().any(|value| *value == 0)
+        || report.grid_dimensions != expected_grid_dimensions
+    {
+        return Err("spatial frame grid dimensions do not match its extent and tile shape".into());
+    }
+    if checked_voxel_product(report.extent_voxels, "declared spatial extent")? != declared_voxels {
+        return Err("spatial frame declared voxel count does not match extent product".into());
+    }
     if grid_cells != u128::from(report.total_grid_cells)
         || report.eligible_grid_cells.checked_add(report.excluded_grid_cells) != Some(report.total_grid_cells)
         || report.mask_tile_counts.len() as u128 != grid_cells
@@ -346,6 +406,13 @@ fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> 
         }
         let tile_volume = report_count(&tile.tile_voxel_count, "mask tile volume")?;
         let eligible_volume = report_count(&tile.eligible_voxel_count, "mask tile foreground count")?;
+        let expected_tile_volume = expected_mask_tile_volume(report, &tile.psu_id)?;
+        if tile_volume != expected_tile_volume {
+            return Err(format!(
+                "spatial frame tile {} volume {} does not match clipped lattice volume {}",
+                tile.psu_id, tile_volume, expected_tile_volume
+            ));
+        }
         if tile_volume == 0 || eligible_volume > tile_volume {
             return Err(format!("spatial frame mask tile {} has invalid voxel counts", tile.psu_id));
         }
@@ -1265,12 +1332,12 @@ mod tests {
             eligibility_mask_encoding: "packed_bitset_lsb0_x_fastest_v1".into(),
             eligibility_mask_verified: true,
             eligibility_mask_actual_sha256: "3".repeat(64),
-            eligibility_mask_artifact_byte_count: "5".into(),
+            eligibility_mask_artifact_byte_count: "8".into(),
             eligibility_foreground_voxel_count: "4".into(),
-            eligibility_foreground_voxel_fraction: 0.1,
+            eligibility_foreground_voxel_fraction: 0.0625,
             mask_tile_counts: audit.population_frame.iter().map(|psu| MaskTileCount {
                 psu_id: psu.psu_id.clone(),
-                tile_voxel_count: "10".into(),
+                tile_voxel_count: "16".into(),
                 eligible_voxel_count: "1".into(),
             }).collect(),
             eligibility_selection_rule_sha256: "4".repeat(64),
@@ -1278,11 +1345,13 @@ mod tests {
             frame_generator_tool_id: "test-frame-auditor".into(),
             frame_generator_tool_version: "1.0.0".into(),
             frame_generator_binary_sha256: "6".repeat(64),
+            extent_voxels: [4, 4, 4],
+            tile_shape_voxels: [2, 2, 4],
             grid_dimensions: [2, 2, 1],
             total_grid_cells: 4,
             eligible_grid_cells: 4,
             excluded_grid_cells: 0,
-            declared_voxel_count: "40".into(),
+            declared_voxel_count: "64".into(),
             population_frame: audit.population_frame.clone(),
             status: status.into(),
         }
