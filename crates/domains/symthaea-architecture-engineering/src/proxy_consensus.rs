@@ -383,6 +383,20 @@ fn validate_inputs(
                 "architecture IDs must be non-empty and unique",
             ));
         }
+        if feature.topology_encoding.len() != 6
+            || feature.topology_encoding.iter().any(|operation| *operation >= 5)
+        {
+            return Err(ProxyConsensusError::new(
+                format!("features[{index}].topology_encoding"),
+                "NAS-Bench-201 topology must contain six operation IDs in 0..5",
+            ));
+        }
+        if feature.proxy_scores.contains_key(&config.target_metric_id) {
+            return Err(ProxyConsensusError::new(
+                format!("features[{index}].proxy_scores.{}", config.target_metric_id),
+                "target metric is forbidden in the target-free proxy feature table",
+            ));
+        }
         for proxy_id in config.proxy_directions.keys() {
             let Some(value) = feature.proxy_scores.get(proxy_id) else {
                 return Err(ProxyConsensusError::new(
@@ -720,6 +734,10 @@ mod tests {
             directions.insert(proxy.into(), ProxyDirection::Maximize);
         }
         let cfg = ProxyConsensusConfig {
+            benchmark_artifact_sha256: "a".repeat(64),
+            evaluation_split_id: "challenge-cifar10".into(),
+            proxy_calibration_split_id: "development-cifar100".into(),
+            proxy_calibration_sha256: "b".repeat(64),
             target_metric_id: "val_accuracy".into(),
             proxy_directions: directions,
             anti_correlation_threshold: 0.9,
@@ -783,6 +801,26 @@ mod tests {
         let mut result = build_proxy_consensus(&rows, &config()).unwrap();
         result.prior_percentiles.insert("arch-5".into(), 0.0);
         assert!(apply_consensus_prior(&rows, &result, "tampered_prior").is_err());
+    }
+
+    #[test]
+    fn target_metric_column_is_rejected_even_when_not_selected() {
+        let mut rows = features();
+        for row in &mut rows {
+            row.proxy_scores.insert("val_accuracy".into(), 99.0);
+        }
+        assert!(build_proxy_consensus(&rows, &config()).is_err());
+    }
+
+    #[test]
+    fn invalid_topology_and_missing_proxy_runtime_are_rejected() {
+        let mut invalid_topology = features();
+        invalid_topology[0].topology_encoding.pop();
+        assert!(build_proxy_consensus(&invalid_topology, &config()).is_err());
+
+        let mut missing_runtime = features();
+        missing_runtime[0].proxy_times_seconds.remove("proxy_a");
+        assert!(build_proxy_consensus(&missing_runtime, &config()).is_err());
     }
 
     #[test]
