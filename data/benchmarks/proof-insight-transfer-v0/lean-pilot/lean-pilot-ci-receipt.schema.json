@@ -88,8 +88,12 @@
         },
         "lake_manifest_sha256": {
           "oneOf": [
-            { "$ref": "#/$defs/sha256" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "receipt_schema_path": {
@@ -103,7 +107,10 @@
     "checked_artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": [
+        "path",
+        "sha256"
+      ],
       "properties": {
         "path": {
           "type": "string",
@@ -134,7 +141,13 @@
         "trace_log_sha256",
         "case_id",
         "case_manifest_sha256",
-        "target_statement_fragment_sha256"
+        "target_statement_fragment_sha256",
+        "base_structured_snapshot_sha256",
+        "variant_structured_snapshot_sha256",
+        "base_structured_local_context_sha256",
+        "variant_structured_local_context_sha256",
+        "snapshot_schema_version",
+        "irrelevant_context_intervention"
       ],
       "properties": {
         "operation": {
@@ -179,6 +192,82 @@
         },
         "target_statement_fragment_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "base_structured_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "variant_structured_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "base_structured_local_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "variant_structured_local_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "snapshot_schema_version": {
+          "const": "pitb.lean-proof-state-snapshot.v0"
+        },
+        "irrelevant_context_intervention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "base_snapshot_sha256",
+            "variant_snapshot_sha256",
+            "base_local_context_sha256",
+            "variant_local_context_sha256",
+            "goal_type_sha256",
+            "goal_type_preserved",
+            "required_hypothesis_present_in_both",
+            "irrelevant_declaration_present_before",
+            "irrelevant_declaration_absent_after",
+            "case_id",
+            "case_manifest_sha256",
+            "target_statement_fragment_sha256"
+          ],
+          "properties": {
+            "operation": {
+              "const": "clear hIrrelevant"
+            },
+            "base_snapshot_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "variant_snapshot_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "base_local_context_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "variant_local_context_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "goal_type_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "goal_type_preserved": {
+              "const": true
+            },
+            "required_hypothesis_present_in_both": {
+              "const": true
+            },
+            "irrelevant_declaration_present_before": {
+              "const": true
+            },
+            "irrelevant_declaration_absent_after": {
+              "const": true
+            },
+            "case_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "case_manifest_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "target_statement_fragment_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
         }
       }
     },
@@ -197,17 +286,39 @@
         "axiom_allowlist"
       ],
       "properties": {
-        "lake_build": { "const": "passed" },
-        "direct_reelaboration_with_structured_state_trace": { "const": "passed" },
-        "same_goal_and_required_hypothesis_withdrawal_verified_from_trace": { "const": "passed" },
-        "lean_kernel_checked_examples": { "const": "passed" },
-        "nanoda_independent_type_check": { "const": "passed" },
-        "sorry_disallowed_by_nanoda": { "const": true },
-        "axiom_audit": { "const": "passed" },
-        "unlisted_axioms_disallowed": { "const": true },
+        "lake_build": {
+          "const": "passed"
+        },
+        "direct_reelaboration_with_structured_state_trace": {
+          "const": "passed"
+        },
+        "same_goal_and_required_hypothesis_withdrawal_verified_from_trace": {
+          "const": "passed"
+        },
+        "lean_kernel_checked_examples": {
+          "const": "passed"
+        },
+        "nanoda_independent_type_check": {
+          "const": "passed"
+        },
+        "sorry_disallowed_by_nanoda": {
+          "const": true
+        },
+        "axiom_audit": {
+          "const": "passed"
+        },
+        "unlisted_axioms_disallowed": {
+          "const": true
+        },
         "axiom_allowlist": {
           "type": "array",
-          "items": { "enum": ["propext", "Classical.choice", "Quot.sound"] },
+          "items": {
+            "enum": [
+              "propext",
+              "Classical.choice",
+              "Quot.sound"
+            ]
+          },
           "uniqueItems": true
         }
       }
@@ -259,15 +370,25 @@
           },
           "contract_precondition": {
             "oneOf": [
-              { "type": "object" },
-              { "type": "string" },
-              { "type": "null" }
+              {
+                "type": "object"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "state_intervention": {
             "oneOf": [
-              { "type": "object" },
-              { "type": "null" }
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "model_outcomes": {
