@@ -1086,6 +1086,24 @@ mod tests {
     }
 
     #[test]
+    fn opaque_proof_token_rejects_tampered_session_coverage() {
+        let req = request(
+            ProofVerificationState::VerifiedOptimal,
+            vec![supported_claim("C1")],
+            progress(true, false),
+        );
+        let mut token = token_for(&req);
+        token
+            .selected_proofs
+            .get_mut("C1")
+            .unwrap()
+            .2 = BTreeSet::from(["session-forged".into()]);
+
+        let error = decide_lifecycle_action(req, Some(&token)).unwrap_err();
+        assert!(error.contains("session coverage"));
+    }
+
+    #[test]
     fn all_current_looking_claims_without_independent_verification_cannot_answer() {
         let decision = decide_with_test_token(request(
             ProofVerificationState::SearchLimitReached,
