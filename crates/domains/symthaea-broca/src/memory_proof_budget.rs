@@ -88,7 +88,7 @@ pub struct ProofEvidenceCandidate {
     /// Rank from the broad candidate retriever; 1 is best. It is diagnostic,
     /// not the sufficiency objective or an exclusion threshold.
     pub retrieval_rank: u32,
-    /// Exact cost from the pinned packet tokenizer/renderer.
+    /// Exact rendered evidence-block cost, including locator metadata and excerpt text.
     pub token_cost: u32,
 }
 
@@ -98,12 +98,14 @@ impl ProofEvidenceCandidate {
             ("evidence_id", self.evidence_id.as_str()),
             ("source_revision_id", self.source_revision_id.as_str()),
             ("source_pointer", self.source_pointer.as_str()),
-            ("source_span_text", self.source_span_text.as_str()),
             ("source_family_id", self.source_family_id.as_str()),
             ("scope_id", self.scope_id.as_str()),
             ("authorized_principal_id", self.authorized_principal_id.as_str()),
         ] {
             require_non_empty(value, field)?;
+        }
+        if self.source_span_text.is_empty() {
+            return Err("source_span_text must not be empty".into());
         }
         valid_sha256(&self.payload_sha256, "payload_sha256")?;
         valid_sha256(&self.source_span_sha256, "source_span_sha256")?;
@@ -198,7 +200,7 @@ pub struct ProofObligation {
     pub alternatives: Vec<ProofJustification>,
     /// Count distinct source families within the selected proof, not revisions.
     pub minimum_independent_families: u32,
-    /// Token cost of the selected conclusion's rendered proof/dependency envelope.
+    /// Token cost of this selected proof's conclusion/dependency envelope.
     pub selection_overhead_tokens: u32,
 }
 
@@ -1479,41 +1481,33 @@ mod tests {
     }
 
     #[test]
-    fn packet_fixed_and_per_proof_overheads_change_minimum_choice() {
+    fn fixed_and_per_obligation_proof_envelope_costs_are_counted() {
         let mut req = request(
             vec![
-                candidate("A-short-source", "family-A", 1),
-                candidate("B-long-source", "family-B", 2),
+                candidate("A", "family-A", 1),
+                candidate("B", "family-B", 2),
+                candidate("C", "family-C", 3),
             ],
-            vec![obligation(
-                "claim-1",
-                vec![
-                    justification("proof-A", &["A-short-source"]),
-                    justification("proof-B", &["B-long-source"]),
-                ],
-            )],
-            10,
+            vec![
+                obligation("claim-1", vec![justification("p1", &["A"])]),
+                obligation("claim-2", vec![justification("p2", &["B", "C"])]),
+            ],
+            20,
         );
         req.fixed_packet_overhead_tokens = 3;
-        req.obligations[0].selection_overhead_tokens = 0;
-        // With no per-proof differentiation, the 1-token source is selected.
-        let cheap = solve_proof_budget(req.clone()).unwrap();
-        assert_eq!(cheap.selected_proofs[0].justification_id, "proof-A");
-        assert_eq!(cheap.total_token_cost, 4);
+        req.obligations[0].selection_overhead_tokens = 2;
+        req.obligations[1].selection_overhead_tokens = 4;
+        let result = solve_proof_budget(req.clone()).unwrap();
+        // Evidence 1 + 2 + 3, proof envelopes 2 + 4, fixed header 3.
+        assert_eq!(result.total_token_cost, 15);
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        verify_proof_packet(&req, &result).unwrap();
 
-        // The short-source proof requires a larger proof envelope.
-        req.obligations[0].selection_overhead_tokens = 0;
-        req.obligations[0].alternatives[0].evidence_dependencies = vec!["A-short-source".into()];
-        // Use one overhead per obligation: both alternatives share this envelope.
-        assert_eq!(solve_proof_budget(req.clone()).unwrap().total_token_cost, 4);
-        // A packet-wide proof overhead applies regardless of the branch, while
-        // the evidence portion remains exact and auditable.
-        req.fixed_packet_overhead_tokens = 5;
-        let framed = solve_proof_budget(req).unwrap();
-        assert_eq!(framed.status, ProofBudgetStatus::Supported);
-        assert_eq!(framed.total_token_cost, 6);
+        req.token_budget = 14;
+        let insufficient = solve_proof_budget(req).unwrap();
+        assert_eq!(insufficient.status, ProofBudgetStatus::BudgetInsufficient);
+        assert!(insufficient.evidence.is_empty());
     }
-
     #[test]
     fn independent_verifier_rejects_dependency_edge_tampering() {
         let req = request(
