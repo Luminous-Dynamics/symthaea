@@ -119,6 +119,37 @@ Include a global-rerun reference and a no-invalidation negative control. The no-
 
 No result is confirmatory solely because this catalog parses, a runner exits zero, a signature verifies, or an observer reports `complete`.
 
+## Industry comparison and the BASALT differentiation
+
+The relevant industry benchmarks now measure several adjacent dimensions, but no single score should be treated as a dependency-observation qualification result.
+
+- **[SWE-Shift (23 October 2026)](https://arxiv.org/abs/2610.32196)** is the closest adjacent benchmark. It evaluates 120 scenarios across 12 change families and nine intervention positions. All 17 evaluated systems had lower shifted than clean success; its reported GPT-6 Astra condition moved from 67.35% clean to 24.79% shifted, with 20.34% paired success. It explicitly includes stale or misbound evidence and tool/session changes. BASALT should reuse compatible paired-continuation ideas, then add independently known hidden inputs, observer loss, dependency recall, false invalidation and replay qualification. These paper results are external context, not a BASALT baseline score.
+- **[Scale AI SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full)** (22 September 2026) refreshed its public set to 642 tasks over 11 repositories after removing 89 tasks judged invalid and correcting 69 instruction/test contradictions. It re-grades diffs on pristine images and reports catching checksum manipulation and module-cache edits; it also describes residual trust boundaries around its model relay and patch-controlled code executed by the verifier. BASALT should compose with these strong benchmark-integrity practices, while independently qualifying whether the runner observed all dependencies that influenced a check.
+- **[Artificial Analysis Coding Agent Index v2.0](https://artificialanalysis.ai/methodology/coding-agents-benchmarking)** equal-weights 100 FrontierCode repository-engineering tasks, 66 Terminal-Bench tasks and 124 repository-Q&A tasks. It uses three attempts per task and reports cost, token usage, execution time and trajectory-based reward-hacking review. This is a useful broad capability/efficiency comparison, but its aggregate score is not a coverage-completeness score.
+
+### What BASALT should claim only after a matched experiment
+
+Treat BASALT as a new **evidence-lifecycle and change-resilience axis**, not as a replacement leaderboard. Run the same agent, task cohort, saved checkpoint, tool policy, budget, observer/verifier bundle and intervention schedule across these arms:
+
+1. **No invalidation:** deliberately unsafe lower-cost control; never eligible for confirmatory evidence retention.
+2. **Global rerun:** conservative safety and cost reference.
+3. **Manifest/build-system metadata:** practical low-cost selective baseline.
+4. **Kernel tracing without hermetic isolation:** measures what tracing alone misses.
+5. **Hermetic candidate observer:** read-only workspace snapshot, pinned toolchain closure, explicit process supervision and denied network during scored verification.
+6. **Composed observer + independent replay:** candidate production path, promoted only after qualification.
+
+For every arm, publish the full task-level transition matrix, not only a pass rate: clean success, shifted success, paired success, stale evidence accepted, stale evidence rejected, unaffected evidence retained, unresolved, and run invalidated. Also report per-family recall/false-attribution intervals, verifier integrity, checks rerun, CPU/I/O/storage overhead, p50/p95 recovery latency and cost per independently verified fix.
+
+Proposed stretch targets—not measured results or external standards:
+
+- zero stale-evidence false accepts in the qualified challenge and held-out mutation corpus;
+- 100% detection or explicit unresolved/fail-closed disposition for supported-profile seeded hidden-input and observer-loss controls;
+- at least 30% less re-verification work than global rerun, conditional on all safety gates passing;
+- at least +3 percentage points in paired shifted-task success against a strong matched baseline, or a statistically supported non-inferior success rate with materially lower cost;
+- no more than 5% false invalidation on independently proven unrelated-change controls, with channel-specific intervals and no silent unresolved outcomes.
+
+The 33-case catalog is conformance coverage, not a sufficiently large efficacy study. Split by repository/task lineage, keep an untouched confirmatory holdout, preregister intervention positions and stopping rules, and report exact paired intervals. Never compare a BASALT percentage directly to a SWE-Shift, SWE-Bench Pro or Artificial Analysis score unless the task, harness, retry policy, budget and evaluator are matched.
+
 ## Current execution status
 
 This commit authors the schema, 33 challenge definitions and the qualification protocol only. The corpus has not been executed; no observer is qualified; no Rust build or test result is claimed. The next runtime milestone belongs to the Linux runner implementation and independently instrumented challenge harness tracked by #9210/#9239.
