@@ -1,0 +1,568 @@
+{
+  "schema_version": "broca-lifecycle-action-fixtures-v1",
+  "policy_version": "BROCA-LIFECYCLE-ACTION-V1",
+  "created_at": "2026-10-30",
+  "case_count": 60,
+  "source_protocol": "Deterministic synthetic state/proof/retrieval truth table. ANSWER is deliberately excluded here: it has a separate integration test requiring a real independently verified proof packet and opaque in-process token.",
+  "proof_statuses": [
+    "not_run",
+    "search_limit_reached",
+    "no_eligible_proof",
+    "budget_insufficient",
+    "rejected"
+  ],
+  "claim_lifecycle_states": [
+    "supported_current",
+    "stale_only",
+    "conflicted",
+    "missing",
+    "unauthorized",
+    "provenance_invalid"
+  ],
+  "retrieval_progress": [
+    "exhausted",
+    "continuation_available"
+  ],
+  "cases": [
+    {
+      "case_id": "not_run__supported_current__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "supported_current",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "not_run__supported_current__continue",
+      "proof_status": "not_run",
+      "claim_state": "supported_current",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "not_run__stale_only__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "stale_only",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "warn_stale"
+    },
+    {
+      "case_id": "not_run__stale_only__continue",
+      "proof_status": "not_run",
+      "claim_state": "stale_only",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "not_run__conflicted__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "conflicted",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "explain_conflict"
+    },
+    {
+      "case_id": "not_run__conflicted__continue",
+      "proof_status": "not_run",
+      "claim_state": "conflicted",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "not_run__missing__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "missing",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "not_run__missing__continue",
+      "proof_status": "not_run",
+      "claim_state": "missing",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "not_run__unauthorized__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "unauthorized",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "not_run__unauthorized__continue",
+      "proof_status": "not_run",
+      "claim_state": "unauthorized",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "not_run__provenance_invalid__exhausted",
+      "proof_status": "not_run",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "not_run__provenance_invalid__continue",
+      "proof_status": "not_run",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__supported_current__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "supported_current",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "search_limit_reached__supported_current__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "supported_current",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__stale_only__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "stale_only",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "warn_stale"
+    },
+    {
+      "case_id": "search_limit_reached__stale_only__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "stale_only",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__conflicted__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "conflicted",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "explain_conflict"
+    },
+    {
+      "case_id": "search_limit_reached__conflicted__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "conflicted",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__missing__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "missing",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "search_limit_reached__missing__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "missing",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__unauthorized__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "unauthorized",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "search_limit_reached__unauthorized__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "unauthorized",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "search_limit_reached__provenance_invalid__exhausted",
+      "proof_status": "search_limit_reached",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "search_limit_reached__provenance_invalid__continue",
+      "proof_status": "search_limit_reached",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__supported_current__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "supported_current",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "no_eligible_proof__supported_current__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "supported_current",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__stale_only__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "stale_only",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "warn_stale"
+    },
+    {
+      "case_id": "no_eligible_proof__stale_only__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "stale_only",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__conflicted__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "conflicted",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "explain_conflict"
+    },
+    {
+      "case_id": "no_eligible_proof__conflicted__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "conflicted",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__missing__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "missing",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "no_eligible_proof__missing__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "missing",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__unauthorized__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "unauthorized",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "no_eligible_proof__unauthorized__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "unauthorized",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "no_eligible_proof__provenance_invalid__exhausted",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "no_eligible_proof__provenance_invalid__continue",
+      "proof_status": "no_eligible_proof",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__supported_current__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "supported_current",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "budget_insufficient__supported_current__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "supported_current",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__stale_only__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "stale_only",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "warn_stale"
+    },
+    {
+      "case_id": "budget_insufficient__stale_only__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "stale_only",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__conflicted__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "conflicted",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "explain_conflict"
+    },
+    {
+      "case_id": "budget_insufficient__conflicted__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "conflicted",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__missing__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "missing",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "budget_insufficient__missing__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "missing",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__unauthorized__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "unauthorized",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "budget_insufficient__unauthorized__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "unauthorized",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "budget_insufficient__provenance_invalid__exhausted",
+      "proof_status": "budget_insufficient",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "budget_insufficient__provenance_invalid__continue",
+      "proof_status": "budget_insufficient",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__supported_current__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "supported_current",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "rejected__supported_current__continue",
+      "proof_status": "rejected",
+      "claim_state": "supported_current",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__stale_only__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "stale_only",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "warn_stale"
+    },
+    {
+      "case_id": "rejected__stale_only__continue",
+      "proof_status": "rejected",
+      "claim_state": "stale_only",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__conflicted__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "conflicted",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "explain_conflict"
+    },
+    {
+      "case_id": "rejected__conflicted__continue",
+      "proof_status": "rejected",
+      "claim_state": "conflicted",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__missing__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "missing",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "rejected__missing__continue",
+      "proof_status": "rejected",
+      "claim_state": "missing",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__unauthorized__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "unauthorized",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "rejected__unauthorized__continue",
+      "proof_status": "rejected",
+      "claim_state": "unauthorized",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    },
+    {
+      "case_id": "rejected__provenance_invalid__exhausted",
+      "proof_status": "rejected",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": true,
+      "retrieval_can_continue": false,
+      "remaining_calls": 0,
+      "expected_action": "abstain"
+    },
+    {
+      "case_id": "rejected__provenance_invalid__continue",
+      "proof_status": "rejected",
+      "claim_state": "provenance_invalid",
+      "retrieval_complete": false,
+      "retrieval_can_continue": true,
+      "remaining_calls": 2,
+      "expected_action": "retrieve_more"
+    }
+  ]
+}
