@@ -25,6 +25,9 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
+/// FluidSynth permits 1..=128 independently configured effects groups.
+pub const MAX_EFFECTS_GROUPS: u8 = 128;
+const MIDI_CHANNEL_COUNT: u8 = 16;
 static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
@@ -106,6 +109,17 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
                 .find(|p| p.is_file())
         })?;
     Some((binary, soundfont))
+}
+
+/// Return the FluidSynth effects-group index assigned to a zero-based MIDI
+/// channel. FluidSynth wraps channel indices modulo the configured group count.
+/// This describes the synth's effects-group assignment only; it does not prove
+/// independence from later master processing or other shared output stages.
+pub fn effects_group_for_midi_channel(midi_channel: u8, effects_groups: u8) -> Option<u8> {
+    if midi_channel >= MIDI_CHANNEL_COUNT || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
+    Some(midi_channel % effects_groups)
 }
 
 /// Captured local observation of one FluidSynth child-process invocation.
@@ -262,6 +276,24 @@ pub fn render_midi_to_wav_observed(
     sample_rate: u32,
     color: Option<RenderColor>,
 ) -> Option<FluidSynthRenderObservation> {
+    // Preserve the historical FluidSynth behavior explicitly: one shared
+    // reverb/chorus effects group for all MIDI channels.
+    render_midi_to_wav_observed_with_effects_groups(midi_path, sample_rate, color, 1)
+}
+
+/// Execute FluidSynth with an explicit effects-group count. The exact setting
+/// is included in argv and therefore in RendererProcessObservation receipts.
+/// Values outside FluidSynth's documented 1..=128 range and zero sample rates
+/// are rejected before spawning a child process.
+pub fn render_midi_to_wav_observed_with_effects_groups(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    effects_groups: u8,
+) -> Option<FluidSynthRenderObservation> {
+    if sample_rate == 0 || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
     let (binary, soundfont) = available()?;
     let binary = binary.canonicalize().ok()?;
     let soundfont = soundfont.canonicalize().ok()?;
@@ -279,7 +311,10 @@ pub fn render_midi_to_wav_observed(
         nonce
     ));
 
-    let mut arguments = Vec::<OsString>::new();
+    let mut arguments = vec![
+        OsString::from("-o"),
+        OsString::from(format!("synth.effects-groups={effects_groups}")),
+    ];
     if let Some(c) = color {
         arguments.push(OsString::from("-o"));
         arguments.push(OsString::from(format!(
@@ -507,6 +542,26 @@ fn master_wav(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn effects_group_mapping_matches_fluid_synth_modulo_semantics() {
+        for channel in 0..MIDI_CHANNEL_COUNT {
+            assert_eq!(effects_group_for_midi_channel(channel, 1), Some(0));
+            assert_eq!(effects_group_for_midi_channel(channel, 4), Some(channel % 4));
+            assert_eq!(effects_group_for_midi_channel(channel, 16), Some(channel));
+        }
+        assert_eq!(effects_group_for_midi_channel(15, 128), Some(15));
+        assert_eq!(effects_group_for_midi_channel(16, 16), None);
+        assert_eq!(effects_group_for_midi_channel(0, 0), None);
+    }
+
+    #[test]
+    fn explicit_effects_group_setting_is_content_addressable_in_ordered_argv() {
+        let setting = format!("synth.effects-groups={}", MAX_EFFECTS_GROUPS);
+        assert_eq!(setting, "synth.effects-groups=128");
+        let single_group = "synth.effects-groups=1";
+        assert_ne!(sha256_hex(setting.as_bytes()), sha256_hex(single_group.as_bytes()));
+    }
 
     #[test]
     fn child_environment_commitment_is_order_independent_and_content_sensitive() {
