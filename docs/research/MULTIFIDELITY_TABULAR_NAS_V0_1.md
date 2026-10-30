@@ -147,7 +147,7 @@ The initial module implements:
 
 Fifteen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports and empty queries. They have not been compiled or executed.
 
-## 7. Trajectory-preserving promotion (R-MF-NAS-inspired)
+## 8. Trajectory-preserving promotion (R-MF-NAS-inspired)
 
 A proxy-ranked top-k shortlist can discard strong architectures encountered earlier in a local-search trajectory. R-MF-NAS (Phan & Luong, ACM TELO, published 29 June 2026) documents this failure: high-performing candidates can appear early or midway through proxy-guided local search, while the terminal proxy elite may be weak. Its R-MF-NAS selector therefore adds first-improvement neighbors and 2-opt escape candidates to the successive-halving pool instead of selecting only the highest terminal proxy scores. In its reported 500-run results, the worst proxy variant on NB201-CIFAR100 improves from a mean ± SD of 69.96 ± 3.45 for MF-NAS to 71.46 ± 1.05 for R-MF-NAS; for NBASR-TIMIT the cross-proxy SD falls from 19.01 to 0.42. These are published results, not Symthaea measurements. [ACM paper](https://doi.org/10.1145/3774940).
 
@@ -163,7 +163,7 @@ The archive's target-metric ID is explicit and must differ from the proxy ID. Th
 
 This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. It is an independently testable archive/promotion primitive inspired by the published finding. Nine Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, distinct quota accounting, digest binding and invalid inputs. They have not been compiled or executed.
 
-## 8. External benchmark and data limitations
+## 9. External benchmark and data limitations
 
 The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201 or CoRA-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
 
