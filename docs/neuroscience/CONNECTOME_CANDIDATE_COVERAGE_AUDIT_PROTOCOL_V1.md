@@ -115,6 +115,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --proposals frozen-proposals.json \
   --ranking-report frozen-ranking-report.json \
   --sampling-protocol CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md \
+  --spatial-frame spatial-frame.json \
   --spatial-frame-report spatial-frame-report.json \
   --audit independent-volume-search-audit.json \
   --output candidate-coverage-report.json
@@ -136,6 +137,7 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome-candidate-coverage-audit -- \
   --proposals frozen-proposals.json --ranking-report frozen-ranking-report.json \
   --sampling-protocol CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md \
+  --spatial-frame spatial-frame.json \
   --spatial-frame-report spatial-frame-report.json \
   --audit independent-volume-search-audit.json --output candidate-coverage-report.json
 ```
