@@ -527,7 +527,7 @@ fn estimate(
         };
         scores.push(score);
     }
-    let interval_valid = !matches!(estimator, Estimator::DmInSample | Estimator::DrInSample);
+    let interval_valid = !matches!(estimator, Estimator::DmPilot | Estimator::DmInSample | Estimator::DrInSample);
     mean_and_se(&scores, interval_valid)
 }
 
@@ -757,6 +757,15 @@ mod tests {
         assert!(result.value.is_finite());
         assert!(result.standard_error.is_finite());
         assert!(result.interval_valid);
+
+        let pilot_dm = estimate(
+            &rows,
+            policy,
+            Logger { p1: [0.5, 0.5] },
+            Estimator::DmPilot,
+            [[0.5; 2]; 2],
+        ).unwrap();
+        assert!(!pilot_dm.interval_valid);
 
         let in_sample_dm = estimate(
             &rows,
