@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::Path;
 
@@ -499,6 +499,14 @@ fn load_spec_artifacts(
 ) -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
     let manifest: SuiteManifest = serde_json::from_slice(manifest_bytes)
         .map_err(|error| anyhow::anyhow!("cannot resolve task specifications from an invalid manifest: {error}"))?;
+    let canonical_root = fs::canonicalize(spec_root)
+        .map_err(|error| anyhow::anyhow!("cannot resolve BASALT specification root {}: {error}", spec_root.display()))?;
+    if !canonical_root.is_dir() {
+        anyhow::bail!("BASALT specification root {} is not a directory", canonical_root.display());
+    }
+
+    // Artifacts are keyed by their content identity, not task ID. This avoids
+    // duplicate in-memory copies when multiple tasks intentionally share a spec.
     let mut artifacts = BTreeMap::new();
     for task in manifest.tasks {
         let Some(hex_digest) = task.spec_digest.strip_prefix("sha256:") else {
@@ -509,11 +517,49 @@ fn load_spec_artifacts(
         {
             continue;
         }
-        let path = spec_root.join(format!("{hex_digest}.txt"));
-        if path.is_file() {
-            let bytes = read_bounded(&path, MAX_TASK_SPEC_BYTES)?;
-            artifacts.insert(task.task_id, bytes);
+        if artifacts.contains_key(&task.spec_digest) {
+            continue;
         }
+
+        let path = spec_root.join(format!("{hex_digest}.txt"));
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "cannot inspect BASALT specification artifact {}: {error}",
+                    path.display()
+                ));
+            }
+        };
+        if metadata.file_type().is_symlink() {
+            anyhow::bail!(
+                "BASALT specification artifact {} must not be a symbolic link",
+                path.display()
+            );
+        }
+        if !metadata.is_file() {
+            anyhow::bail!(
+                "BASALT specification artifact {} is not a regular file",
+                path.display()
+            );
+        }
+
+        let canonical_path = fs::canonicalize(&path).map_err(|error| {
+            anyhow::anyhow!(
+                "cannot resolve BASALT specification artifact {}: {error}",
+                path.display()
+            )
+        })?;
+        if !canonical_path.starts_with(&canonical_root) {
+            anyhow::bail!(
+                "BASALT specification artifact {} resolves outside --spec-root",
+                path.display()
+            );
+        }
+
+        let bytes = read_bounded(&canonical_path, MAX_TASK_SPEC_BYTES)?;
+        artifacts.insert(task.spec_digest, bytes);
     }
     Ok(artifacts)
 }
@@ -938,7 +984,7 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
             report,
             &task_path,
             task,
-            spec_artifacts.get(&task.task_id).map(Vec::as_slice),
+            spec_artifacts.get(&task.spec_digest).map(Vec::as_slice),
         );
     }
 
@@ -1614,8 +1660,43 @@ mod tests {
     const MANIFEST: &str = include_str!("../../benchmarks/basalt/examples/suite-manifest.example.json");
     const EXAMPLE_SPEC: &str = include_str!("../../benchmarks/basalt/specifications/ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac.txt");
 
+    const EXAMPLE_SPEC_DIGEST: &str =
+        "sha256:ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac";
+
     fn synthetic_specs() -> BTreeMap<String, Vec<u8>> {
-        BTreeMap::from([("rust-repair-0001".to_string(), EXAMPLE_SPEC.as_bytes().to_vec())])
+        BTreeMap::from([(EXAMPLE_SPEC_DIGEST.to_string(), EXAMPLE_SPEC.as_bytes().to_vec())])
+    }
+
+    struct TemporarySpecRoot(PathBuf);
+
+    impl TemporarySpecRoot {
+        fn new() -> Self {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "basalt-spec-loader-{}-{}",
+                std::process::id(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&path).expect("temporary specification root is created");
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+
+        fn write_example(&self) {
+            let filename = format!("{}.txt", EXAMPLE_SPEC_DIGEST.trim_start_matches("sha256:"));
+            fs::write(self.path().join(filename), EXAMPLE_SPEC.as_bytes())
+                .expect("synthetic specification artifact is written");
+        }
+    }
+
+    impl Drop for TemporarySpecRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
 
     fn validate_value(mutator: impl FnOnce(&mut Value)) -> ValidationReport {
@@ -1637,6 +1718,77 @@ mod tests {
             Value::String(format!("sha256:{}", sha256_hex(&manifest_bytes)));
         let bytes = serde_json::to_vec_pretty(&value).expect("record serializes");
         validate_bytes(&bytes, &manifest_bytes, &synthetic_specs())
+    }
+
+    #[test]
+    fn artifact_loader_reads_digest_named_file_and_indexes_by_digest() {
+        let root = TemporarySpecRoot::new();
+        root.write_example();
+
+        let artifacts = load_spec_artifacts(MANIFEST.as_bytes(), root.path())
+            .expect("content-addressed specification artifact loads");
+        assert_eq!(artifacts.len(), 1);
+        assert_eq!(
+            artifacts.get(EXAMPLE_SPEC_DIGEST).map(Vec::as_slice),
+            Some(EXAMPLE_SPEC.as_bytes())
+        );
+    }
+
+    #[test]
+    fn artifact_loader_deduplicates_shared_specification_bytes() {
+        let root = TemporarySpecRoot::new();
+        root.write_example();
+
+        let mut manifest: Value = serde_json::from_str(MANIFEST).expect("manifest parses");
+        let mut second_task = manifest["tasks"][0].clone();
+        second_task["task_id"] = Value::String("rust-repair-0002".into());
+        manifest["tasks"].as_array_mut().unwrap().push(second_task);
+        let bytes = serde_json::to_vec(&manifest).expect("manifest serializes");
+
+        let artifacts = load_spec_artifacts(&bytes, root.path())
+            .expect("shared content-addressed artifact loads");
+        assert_eq!(artifacts.len(), 1);
+        assert!(artifacts.contains_key(EXAMPLE_SPEC_DIGEST));
+    }
+
+    #[test]
+    fn artifact_loader_rejects_directory_at_artifact_path() {
+        let root = TemporarySpecRoot::new();
+        let filename = format!("{}.txt", EXAMPLE_SPEC_DIGEST.trim_start_matches("sha256:"));
+        fs::create_dir(root.path().join(filename)).expect("artifact path directory is created");
+
+        let result = load_spec_artifacts(MANIFEST.as_bytes(), root.path());
+        assert!(result.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_loader_rejects_symbolic_link_artifact() {
+        use std::os::unix::fs::symlink;
+
+        let root = TemporarySpecRoot::new();
+        let outside = TemporarySpecRoot::new();
+        let outside_file = outside.path().join("outside.txt");
+        fs::write(&outside_file, EXAMPLE_SPEC.as_bytes()).expect("outside artifact is written");
+        let filename = format!("{}.txt", EXAMPLE_SPEC_DIGEST.trim_start_matches("sha256:"));
+        symlink(&outside_file, root.path().join(filename)).expect("artifact symlink is created");
+
+        let result = load_spec_artifacts(MANIFEST.as_bytes(), root.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn artifact_loader_enforces_per_specification_size_limit() {
+        let root = TemporarySpecRoot::new();
+        let filename = format!("{}.txt", EXAMPLE_SPEC_DIGEST.trim_start_matches("sha256:"));
+        fs::write(
+            root.path().join(filename),
+            vec![b'x'; MAX_TASK_SPEC_BYTES as usize + 1],
+        )
+        .expect("oversized artifact is written");
+
+        let result = load_spec_artifacts(MANIFEST.as_bytes(), root.path());
+        assert!(result.is_err());
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
