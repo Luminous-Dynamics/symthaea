@@ -167,6 +167,8 @@ pub use clustered_advantage::{
     ClusteredBenchmarkObservation, ClusterEffectSummary, analyze_clustered_advantage,
     ClusterNullStressConfig, ClusterNullStressPoint, ClusterNullStressReport,
     WilsonRateInterval, run_cluster_null_stress,
+    ClusterSignPowerCase, ClusterSignPowerPlanConfig, ClusterSignPowerPlanPoint,
+    plan_cluster_sign_test_power,
 };
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
