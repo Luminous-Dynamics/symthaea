@@ -498,6 +498,24 @@ fn audit_exact_source_hash_splits(
                 "identical evaluated artifact has inconsistent labels for sha256={digest}"
             ));
         }
+        let design_ids = rows
+            .iter()
+            .map(|sample| sample.design_id.as_str())
+            .collect::<BTreeSet<_>>();
+        if design_ids.len() > 1 {
+            return Err(format!(
+                "identical evaluated artifact has inconsistent design_id metadata for sha256={digest}"
+            ));
+        }
+        let base_families = rows
+            .iter()
+            .map(|sample| sample.base_design_family_id.as_str())
+            .collect::<BTreeSet<_>>();
+        if base_families.len() > 1 {
+            return Err(format!(
+                "identical evaluated artifact has inconsistent base_design_family_id metadata for sha256={digest}"
+            ));
+        }
         let splits = rows
             .iter()
             .map(|sample| sample.split.as_str())
@@ -1026,6 +1044,8 @@ mod tests {
         let mut target: Vec<String> = lines[target_row].split('\t').map(str::to_owned).collect();
         target[2] = source[2].clone();
         target[3] = source[3].clone();
+        target[5] = source[5].clone();
+        target[6] = source[6].clone();
         lines[target_row] = target.join("\t");
         fs::write(&fixture.manifest, lines.join("\n") + "\n").unwrap();
     }
@@ -1120,6 +1140,22 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn rejects_benign_control_reuse_with_conflicting_design_lineage() {
+        let fixture = Fixture::new(
+            "leave_benchmark_source_out",
+            &[
+                ("s1", "train", "host-a", ""),
+                ("s2", "validation", "host-b", "trojan-b"),
+                ("s3", "test", "host-c", ""),
+            ],
+        );
+        reuse_evaluated_artifact(&fixture, 1, 3);
+        set_manifest_field(&fixture, 3, 5, "different-host");
+        let error = run(fixture.args()).unwrap_err();
+        assert!(error.contains("inconsistent design_id metadata"));
     }
 
     #[test]
