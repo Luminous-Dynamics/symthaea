@@ -1612,7 +1612,7 @@ mod tests {
 
     #[test]
     fn role_scope_policy_rejects_wildcard_and_ambiguous_grants() {
-        let (store, policy_key, _, _) = store();
+        let (_store, policy_key, _, _) = store();
         let mut wildcard = role_policy(4, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z");
         wildcard.readable_scopes.get_mut("security-agent").unwrap().insert("*".into());
         assert!(SignedRoleScopePolicy::sign("policy-root", wildcard, &policy_key).unwrap_err().contains("wildcard"));
