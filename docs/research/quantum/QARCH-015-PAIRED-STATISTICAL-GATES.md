@@ -21,7 +21,7 @@ Quality non-inferiority requires:
 D_{Q,i}=Q_{q,i}-Q_{c,i}>-delta_Q
 ]
 
-Resource superiority requires a predeclared practical reduction (delta_R):
+Resource superiority requires a predeclared practical reduction from the classical resource baseline (delta_R):
 
 [
 D_{R,i}=log(R_{c,i})-log(R_{q,i})>log(1+delta_R)
