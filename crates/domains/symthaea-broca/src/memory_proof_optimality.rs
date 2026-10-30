@@ -572,17 +572,31 @@ mod tests {
     }
 
     #[test]
-    fn independent_verifier_does_not_count_correlated_revisions_as_independent_families() {
+    fn independent_verifier_prefers_a_valid_distinct_family_proof_over_correlated_revisions() {
         let mut req = request();
+        req.candidates = vec![
+            candidate("revision-a1", "family-a", 1),
+            candidate("revision-a2", "family-a", 1),
+            candidate("source-b", "family-b", 5),
+            candidate("source-c", "family-c", 6),
+        ];
         req.obligations[0].minimum_independent_families = 2;
-        req.obligations[0].alternatives = vec![ProofJustification {
-            justification_id: "correlated-pair".into(),
-            evidence_dependencies: vec!["cheap".into(), "expensive".into()],
-        }];
-        req.candidates[0].source_family_id = "same-family".into();
-        req.candidates[1].source_family_id = "same-family".into();
+        req.obligations[0].alternatives = vec![
+            ProofJustification {
+                justification_id: "correlated-cheap".into(),
+                evidence_dependencies: vec!["revision-a1".into(), "revision-a2".into()],
+            },
+            ProofJustification {
+                justification_id: "independent-support".into(),
+                evidence_dependencies: vec!["source-b".into(), "source-c".into()],
+            },
+        ];
 
         let result = solve_proof_budget(req.clone()).unwrap();
-        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.selected_proofs[0].justification_id, "independent-support");
+        let receipt = verify_minimum_cost_optimality(&req, &result).unwrap();
+        assert_eq!(receipt.minimum_token_cost, 16);
+        assert_eq!(receipt.complete_combinations, 1);
     }
 }
