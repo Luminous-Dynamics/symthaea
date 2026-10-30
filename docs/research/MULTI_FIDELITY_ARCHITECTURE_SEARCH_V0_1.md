@@ -5,6 +5,7 @@
 **Parent program:** [#8888](https://github.com/Luminous-Dynamics/symthaea/issues/8888)
 **Search generalization proposal:** [held-out landscape suite v0.1](./ARCHITECTURE_SEARCH_HELD_OUT_LANDSCAPES_V0_1.md)
 **Current draft PR:** [#8890](https://github.com/Luminous-Dynamics/symthaea/pull/8890)
+**Next external-validity milestone:** [Public tabular NAS benchmark bridge](https://github.com/Luminous-Dynamics/symthaea/issues/9071); design proposal only.
 
 ## 1. Research question
 
@@ -202,6 +203,7 @@ This pilot compares the cost-aware scheduler to full-fidelity random search only
 - Unit/property tests validate fidelity identity, uncertainty handling, deterministic selection, exploration boundaries and exact cost arithmetic.
 - Synthetic rank-reversal and uncertainty-miscalibration sweeps compare all pinned policies under equal total cost budgets.
 - Add a separate canonical analytical multi-fidelity suite (e.g., Forrester, Rosenbrock, shifted/rotated Rastrigin, noisy functions) before claiming general optimization competence.
+- Run on pinned public tabular NAS benchmark spaces before spending significant compute on real architecture training; see [#9071](https://github.com/Luminous-Dynamics/symthaea/issues/9071) and [NASLib's documented queryable spaces](https://automl.github.io/NASLib/search_spaces/overview/).
 - A prospective holdout demonstrates results with raw per-seed data, uncertainty estimates and reproducible receipts.
 - Failed/invalid evaluations and retries are accounted for.
 - A reviewer accepts the claim boundary.
