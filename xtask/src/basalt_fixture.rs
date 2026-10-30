@@ -51,6 +51,7 @@ struct FixtureEvidence {
     worker_binary_name: &'static str,
     workspace_relative_path: &'static str,
     gitignore_content_digest: String,
+    git_baseline_commit: String,
     executions: Vec<ExecutionEvidence>,
     qualification_eligible: bool,
 }
@@ -61,6 +62,8 @@ struct ExecutionEvidence {
     resource_id: String,
     relative_path: String,
     task_mode: String,
+    git_tracking_state: String,
+    git_baseline_commit: String,
     before_input_digest: String,
     after_input_digest: String,
     baseline_output_digest: String,
@@ -199,7 +202,8 @@ pub fn run(
     fs::create_dir(&workspace)
         .with_context(|| format!("creating fixture workspace {}", workspace.display()))?;
 
-    // Make the untracked fixture visibly ignored by Git-based tooling.
+    // The fixture is a real, isolated Git repository. The hidden resource is
+    // ignored/untracked; the docs control is committed/tracked at baseline.
     let gitignore = b"unlisted-secret.txt\n";
     write_new_synced(&workspace.join(".gitignore"), gitignore)?;
 
@@ -243,6 +247,14 @@ pub fn run(
         });
     }
 
+    let docs_plan = plans.iter().find(|plan| plan.relative_path == Path::new("docs/unused.md"));
+    if let Some(plan) = docs_plan {
+        let docs_path = workspace.join(&plan.relative_path);
+        fs::create_dir_all(docs_path.parent().context("docs fixture has no parent")?)?;
+        write_new_synced(&docs_path, &plan.before_bytes)?;
+    }
+    let git_baseline_commit = initialize_git_fixture(&workspace, docs_plan.is_some())?;
+
     // A deterministic, machine-readable fixture plan is itself content-addressed.
     let plan_bytes = serde_json::to_vec(&json!({
         "catalog_digest": sha256_tagged(&catalog_bytes),
@@ -268,6 +280,11 @@ pub fn run(
         }
 
         write_synced(&resource_path, &plan.before_bytes)?;
+        let git_tracking_state = verify_git_tracking_state(
+            &workspace,
+            &plan.relative_path,
+            plan.resource_id.as_str(),
+        )?;
         let (baseline, baseline_pid) =
             run_worker(&worker_binary_path, plan.mode, &resource_path)?;
         let expected_baseline = if plan.mode == "consume" {
@@ -344,6 +361,8 @@ pub fn run(
             resource_id: plan.resource_id.clone(),
             relative_path: plan.relative_path.to_string_lossy().into_owned(),
             task_mode: plan.mode.to_string(),
+            git_tracking_state,
+            git_baseline_commit: git_baseline_commit.clone(),
             before_input_digest: before_digest,
             after_input_digest: after_digest,
             baseline_output_digest: baseline.output_digest,
@@ -388,6 +407,7 @@ pub fn run(
         worker_binary_name: "basalt_observer_fixture_worker",
         workspace_relative_path: "workspace",
         gitignore_content_digest: sha256_tagged(gitignore),
+        git_baseline_commit: git_baseline_commit.clone(),
         executions,
         qualification_eligible: false,
     };
@@ -411,6 +431,77 @@ pub fn run(
         worker_binary_digest,
         qualification_eligible: false,
     })
+}
+
+fn initialize_git_fixture(workspace: &Path, has_tracked_docs: bool) -> anyhow::Result<String> {
+    run_git(workspace, &["init", "--quiet"])?;
+    run_git(workspace, &["config", "user.name", "BASALT Fixture Harness"])?;
+    run_git(workspace, &["config", "user.email", "basalt-fixture@example.invalid"])?;
+    if has_tracked_docs {
+        run_git(workspace, &["add", "--", ".gitignore", "docs/unused.md"])?;
+    } else {
+        run_git(workspace, &["add", "--", ".gitignore"])?;
+    }
+    run_git(workspace, &["commit", "--quiet", "-m", "BASALT fixture baseline"])?;
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(workspace)
+        .output()
+        .context("resolving fixture baseline Git commit")?;
+    if !output.status.success() {
+        bail!("git rev-parse HEAD failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
+}
+
+fn verify_git_tracking_state(
+    workspace: &Path,
+    relative_path: &Path,
+    resource_id: &str,
+) -> anyhow::Result<String> {
+    let path = relative_path.to_string_lossy();
+    let ignored = Command::new("git")
+        .args(["check-ignore", "-q", "--", path.as_ref()])
+        .current_dir(workspace)
+        .status()
+        .context("checking fixture ignore state")?
+        .success();
+    let tracked = Command::new("git")
+        .args(["ls-files", "--error-unmatch", "--", path.as_ref()])
+        .current_dir(workspace)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .context("checking fixture Git index membership")?
+        .success();
+
+    match resource_id {
+        "fixture:unlisted-secret.txt" if ignored && !tracked => Ok("ignored_untracked".to_string()),
+        "fixture:docs/unused.md" if !ignored && tracked => Ok("tracked".to_string()),
+        "fixture:unlisted-secret.txt" => {
+            bail!("hidden fixture must be ignored and absent from the Git index")
+        }
+        "fixture:docs/unused.md" => {
+            bail!("docs fixture must be tracked and not ignored at baseline")
+        }
+        _ => bail!("no Git tracking-state assertion is defined for {resource_id}"),
+    }
+}
+
+fn run_git(workspace: &Path, args: &[&str]) -> anyhow::Result<()> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(workspace)
+        .output()
+        .with_context(|| format!("executing git {}", args.join(" ")))?;
+    if !output.status.success() {
+        bail!(
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    Ok(())
 }
 
 fn fixture_resource(resource_id: &str) -> anyhow::Result<(PathBuf, &str)> {
