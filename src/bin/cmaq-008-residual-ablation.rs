@@ -471,8 +471,26 @@ struct ModeResults {
     seeds: Vec<SeedResult>,
 }
 
-fn run() -> Result<Vec<ModeResults>, String> {
-    let mut reports = Vec::with_capacity(Objective::ALL.len());
+struct RunReport {
+    linear_baseline: [Metrics; 2],
+    modes: Vec<ModeResults>,
+}
+
+fn run() -> Result<RunReport, String> {
+    let training = dataset(DATA_SEED, TRAIN_SAMPLES, Law::Source);
+    let linear = LinearArxBaseline::fit(&training, LINEAR_RIDGE)?;
+    let source_eval = dataset(DATA_SEED ^ 0x1111_2222_3333_4444, EVAL_SAMPLES, Law::Source);
+    let reversal_eval = dataset(
+        DATA_SEED ^ 0xAAAA_BBBB_CCCC_DDDD,
+        EVAL_SAMPLES,
+        Law::ActionEffectReversal,
+    );
+    let linear_baseline = [
+        linear.evaluate(&source_eval)?,
+        linear.evaluate(&reversal_eval)?,
+    ];
+
+    let mut modes = Vec::with_capacity(Objective::ALL.len());
     for objective in Objective::ALL {
         let results = MODEL_SEEDS
             .iter()
@@ -493,15 +511,15 @@ fn run() -> Result<Vec<ModeResults>, String> {
                 objective.name()
             ));
         }
-        reports.push(ModeResults {
+        modes.push(ModeResults {
             objective,
             seeds: results,
         });
     }
-    Ok(reports)
+    Ok(RunReport { linear_baseline, modes })
 }
 
-fn render(reports: &[ModeResults]) -> String {
+fn render(report: &RunReport) -> String {
     let mut out = format!(
         concat!(
             "{{\n",
@@ -510,20 +528,34 @@ fn render(reports: &[ModeResults]) -> String {
             "  \"dimensions\": {{\"hdc\": {}, \"hidden\": {}}},\n",
             "  \"training\": {{\"samples\": {}, \"epochs\": {}, \"seeds\": {}, \"learning_rate\": {:.6}}},\n",
             "  \"evaluation_samples_per_regime_per_seed\": {},\n",
-            "  \"regimes\": [\"source_holdout\", \"action_effect_reversal\"],\n",
-            "  \"objectives\": [\n"
+            "  \"regimes\": [\"source_holdout\", \"action_effect_reversal\"],\n"
         ),
         REPORT_SCHEMA, DIM, HIDDEN, TRAIN_SAMPLES, EPOCHS, MODEL_SEEDS.len(), LEARNING_RATE, EVAL_SAMPLES
     );
+    out.push_str(&format!(
+        concat!(
+            "  \"linear_arx_baseline\": {{",
+            "\"features\": {}, \"ridge\": {:.8},",
+            "\"source\": {{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8}}},",
+            "\"action_effect_reversal\": {{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8}}}",
+            "}},\n",
+            "  \"objectives\": [\n"
+        ),
+        LINEAR_FEATURES, LINEAR_RIDGE,
+        report.linear_baseline[0].mse, report.linear_baseline[0].mae,
+        report.linear_baseline[0].persistence_mse, report.linear_baseline[0].zero_mse,
+        report.linear_baseline[1].mse, report.linear_baseline[1].mae,
+        report.linear_baseline[1].persistence_mse, report.linear_baseline[1].zero_mse
+    ));
 
-    for (mode_index, mode) in reports.iter().enumerate() {
+    for (mode_index, mode) in report.modes.iter().enumerate() {
         let source = aggregate(&mode.seeds, 0);
         let reversal = aggregate(&mode.seeds, 1);
         let paired_delta = |regime_index: usize| {
             if mode.objective == Objective::AbsoluteNextState {
                 (0.0, 0.0, 0.0)
             } else {
-                let deltas = mode.seeds.iter().zip(&reports[0].seeds)
+                let deltas = mode.seeds.iter().zip(&report.modes[0].seeds)
                     .map(|(candidate, absolute)| {
                         candidate.regimes[regime_index].mse - absolute.regimes[regime_index].mse
                     })
@@ -531,8 +563,17 @@ fn render(reports: &[ModeResults]) -> String {
                 mean_ci95(&deltas)
             }
         };
+        let paired_linear_delta = |regime_index: usize| {
+            let baseline = report.linear_baseline[regime_index].mse;
+            let deltas = mode.seeds.iter()
+                .map(|candidate| candidate.regimes[regime_index].mse - baseline)
+                .collect::<Vec<_>>();
+            mean_ci95(&deltas)
+        };
         let source_pair = paired_delta(0);
         let reversal_pair = paired_delta(1);
+        let source_linear_pair = paired_linear_delta(0);
+        let reversal_linear_pair = paired_linear_delta(1);
         out.push_str(&format!(
             concat!(
                 "    {{\"objective\":\"{}\",",
@@ -540,11 +581,13 @@ fn render(reports: &[ModeResults]) -> String {
                 "\"source\":{{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8},",
                 "\"mse_to_persistence_ratio\":{:.8},\"mse_delta_vs_persistence\":{:.8},",
                 "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8},",
-                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8}}},",
+                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8},",
+                "\"paired_mse_delta_vs_linear_arx\":{:.8},\"paired_linear_ci95_low\":{:.8},\"paired_linear_ci95_high\":{:.8}}},",
                 "\"action_effect_reversal\":{{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8},",
                 "\"mse_to_persistence_ratio\":{:.8},\"mse_delta_vs_persistence\":{:.8},",
                 "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8},",
-                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8}}},",
+                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8},",
+                "\"paired_mse_delta_vs_linear_arx\":{:.8},\"paired_linear_ci95_low\":{:.8},\"paired_linear_ci95_high\":{:.8}}},",
                 "\"per_seed\":["
             ),
             mode.objective.name(),
@@ -553,10 +596,12 @@ fn render(reports: &[ModeResults]) -> String {
             source.mse_to_persistence_ratio, source.mse_delta_vs_persistence,
             source.mse_delta_vs_persistence_ci95_low, source.mse_delta_vs_persistence_ci95_high,
             source_pair.0, source_pair.1, source_pair.2,
+            source_linear_pair.0, source_linear_pair.1, source_linear_pair.2,
             reversal.mse, reversal.mae, reversal.persistence_mse, reversal.zero_mse,
             reversal.mse_to_persistence_ratio, reversal.mse_delta_vs_persistence,
             reversal.mse_delta_vs_persistence_ci95_low, reversal.mse_delta_vs_persistence_ci95_high,
-            reversal_pair.0, reversal_pair.1, reversal_pair.2
+            reversal_pair.0, reversal_pair.1, reversal_pair.2,
+            reversal_linear_pair.0, reversal_linear_pair.1, reversal_linear_pair.2
         ));
         for (seed_index, row) in mode.seeds.iter().enumerate() {
             out.push_str(&format!(
@@ -621,15 +666,17 @@ mod tests {
 
     #[test]
     fn report_contains_paired_objectives_and_finite_metrics() {
-        let reports = run().unwrap();
-        assert_eq!(reports.len(), 2);
-        let output = render(&reports);
+        let report = run().unwrap();
+        assert_eq!(report.modes.len(), 2);
+        let report = run_report_for_test();
+        let output = render(&report);
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(
             parsed["schema_version"],
             "cmaq-008-residual-ablation-v0.1"
         );
         assert_eq!(parsed["objectives"].as_array().unwrap().len(), 2);
+        assert!(parsed["linear_arx_baseline"]["source"]["mse"].is_finite());
         for objective in parsed["objectives"].as_array().unwrap() {
             for regime in ["source", "action_effect_reversal"] {
                 for metric in [
