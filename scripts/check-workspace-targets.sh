@@ -34,6 +34,8 @@ EXCLUDES=(
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
   "crates/domains/symthaea-perception"
+  "crates/domains/symthaea-rea-evidence-verifier"
+  "crates/bridges/symthaea-proof-insights"
 )
 
 is_excluded() {
