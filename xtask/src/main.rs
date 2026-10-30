@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod basalt_state;
 mod basalt_observer;
 mod basalt_observer_result;
+mod basalt_fixture;
 mod basalt_validate;
 mod crate_status;
 mod duplicate_scan;
@@ -41,6 +42,28 @@ enum Commands {
         /// Path to the raw observer-receipt ledger (treated as untrusted).
         #[arg(long)]
         receipts: PathBuf,
+    },
+    /// Execute controlled counterfactual fixtures and write a separate BASALT oracle ledger.
+    BasaltObserverFixtureRun {
+        /// Path to the challenge catalog.
+        #[arg(long)]
+        catalog: PathBuf,
+        /// Output directory; a unique run subdirectory is created inside it.
+        #[arg(long)]
+        out_dir: PathBuf,
+        /// Case ID to execute; reciprocal paired controls are added automatically.
+        #[arg(long = "case-id", action = clap::ArgAction::Append, required = true)]
+        case_ids: Vec<String>,
+    },
+    /// Internal child-process task used by the counterfactual oracle harness.
+    #[command(hide = true)]
+    BasaltObserverFixtureWorker {
+        /// Task mode: consume or ignore.
+        #[arg(long)]
+        mode: String,
+        /// Fixture resource path.
+        #[arg(long)]
+        input: PathBuf,
     },
     /// Validate a BASALT versioned run record and its cross-record evidence invariants.
     BasaltValidate {
@@ -135,6 +158,18 @@ fn main() -> anyhow::Result<()> {
             if !report.adjudication_passed {
                 anyhow::bail!("BASALT observer result adjudication failed");
             }
+        }
+        Commands::BasaltObserverFixtureRun {
+            catalog,
+            out_dir,
+            case_ids,
+        } => {
+            let report = basalt_fixture::run(&catalog, &out_dir, &case_ids)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::BasaltObserverFixtureWorker { mode, input } => {
+            let output = basalt_fixture::run_worker_command(&mode, &input)?;
+            println!("{}", serde_json::to_string(&output)?);
         }
         Commands::BasaltValidate { input, manifest, spec_root } => {
             let report = basalt_validate::validate_file(&input, &manifest, &spec_root)?;
