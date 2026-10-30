@@ -163,9 +163,32 @@ The archive's target-metric ID is explicit and must differ from the proxy ID. Th
 
 This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. It is an independently testable archive/promotion primitive inspired by the published finding. Nine Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, distinct quota accounting, digest binding and invalid inputs. They have not been compiled or executed.
 
-## 9. External benchmark and data limitations
+## 9. Target-free multi-proxy consensus prior (CoRA-inspired)
 
-The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201 or CoRA-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
+CoRA-NAS (Yang et al., arXiv:2609.11884, September 2026) uses per-proxy percentile ranks, a leave-one-out Spearman agreement gate (threshold -0.3; minimum three retained proxies), and a sum of log-percentile ranks as a composite prior. Its paper is explicit that agreement does not prove accuracy: the gate catches clear sign-flips but does not identify all weak-positive proxy dilution. Its attempted training-dynamics B-signal features did not improve the residual model in the reported ablation. These limitations should remain visible in the benchmark.
+
+The new Rust module is `proxy_consensus.rs`, tracked by [#9192](https://github.com/Luminous-Dynamics/symthaea/issues/9192). It adds:
+- declared maximize/minimize direction for every proxy;
+- average midranks for tied proxy values;
+- leave-one-out Spearman agreement against the mean rank of other proxies;
+- rejection of proxies below the anti-correlation threshold, with a deterministic minimum-retained fallback;
+- a distinct `undefined_agreement` diagnostic for constant/degenerate proxies;
+- CoRA-style `sum(ln(rank/N))` aggregation and final rank-percentile prior;
+- per-proxy gate diagnostics, exact source benchmark digest, disjoint evaluation/calibration split IDs and a calibration-decision digest;
+- content digests binding proxy values, runtimes, topology, configuration and all consensus outputs;
+- `apply_consensus_prior`, which verifies the consensus result against the exact input catalog before adding a derived proxy feature for trajectory search.
+
+The module rejects non-finite scores, missing/negative proxy runtime, malformed NAS-Bench-201 topology, target-metric columns even when not explicitly selected, and use of the target metric ID as a proxy. It accepts no target labels or accuracy correlations. A constant proxy has undefined correlation and is not treated as passing the gate; it is retained only when the configured minimum-proxy fallback requires it.
+
+The full target-free chain is now composable in the tests:
+
+`declared static proxy features -> leave-one-out consensus prior -> first-improvement/2-opt trajectory archive -> quota-controlled promotion plan -> multi-fidelity query firewall`
+
+The composite prior is still only a hypothesis for allocating training resources. The pipeline test verifies composition without target labels; it does not establish that consensus improves NAS performance. Fourteen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection, tamper detection and end-to-end composition. They have not been compiled or executed.
+
+## 10. External benchmark and data limitations
+
+The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201, CoRA-NAS or R-MF-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
 
 The observed NASLib API structure is:
 - `nb201_data[architecture_string][dataset_key]["eval_acc1es"]`;
@@ -175,10 +198,10 @@ The observed NASLib API structure is:
 
 The SuiteZero importer uses six-integer tuple-string architecture IDs, while the NASLib learning-curve pickle uses graph-string keys. The curve importer now reproduces the official NASLib `convert_op_indices_to_str` mapping exactly (edge order `(1,2),(1,3),(1,4),(2,3),(2,4),(3,4)`; op IDs 0..4 map to `skip_connect, none, nor_conv_3x3, nor_conv_1x1, avg_pool_3x3`). A pinned unit test checks the conversion against a concrete NASLib example. Directly comparing the two key formats would have rejected valid data; this mismatch is fixed in the importer. The CIFAR-10 pickle is documented upstream as `nb201_cifar10_full_training.pickle`, Google Drive ID `1sh8pEhdrgZ97-VFBVL94rI36gedExVgJ`; NASLib's Colab artifact log reports 117 MB. The importer requires a caller-supplied expected raw SHA-256 and checks it **before** unpickling. Pickle deserialization can execute code: only use the official artifact after verifying the expected digest from a trusted, independent source. The importer validates exact architecture-set equality against SuiteZero, validates complete curves, checks the final curve point against SuiteZero `val_accuracy` within a declared tolerance, and emits the multi-fidelity canonical schema. It records the raw curve digest and SuiteZero canonical-import digest in a composite source provenance digest.
 
-Eight standard-library Python tests are authored in `scripts/research/test_import_naslib_nb201_learning_curves.py` for epoch mapping, endpoint agreement, missing/extra architectures, missing/short curves, non-finite values, schedule/budget guards and pre-unpickle SHA verification. They have not been executed. The real 117 MB artifact has not been downloaded or hash-pinned, so importer validation remains synthetic until that step is completed. The 4.7 GB checkpoint or 226 GB trained-weight archive is not a prerequisite for this initial curve table.
+Nine standard-library Python tests are authored in `scripts/research/test_import_naslib_nb201_learning_curves.py` for epoch mapping, endpoint agreement, missing/extra architectures, missing/short curves, non-finite values, schedule/budget guards and pre-unpickle SHA verification. They have not been executed. The real 117 MB artifact has not been downloaded or hash-pinned, so importer validation remains synthetic until that step is completed. The 4.7 GB checkpoint or 226 GB trained-weight archive is not a prerequisite for this initial curve table.
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 This module makes multi-fidelity resource use auditable. It does not implement ZAPS, CoRA, Hyperband, BOHB, DEHB or an optimizer. Passing its synthetic tests would qualify only the evaluator contract, not NAS search quality, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
