@@ -20,6 +20,7 @@ pub mod multi_fidelity_tabular_nas;
 pub mod nasbench201_trajectory;
 pub mod proxy_consensus;
 pub mod proxy_acquisition;
+pub mod learning_curve_promotion;
 pub mod cross_task_transfer_gate;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
