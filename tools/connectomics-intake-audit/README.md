@@ -278,9 +278,23 @@ The `connectome-spatial-frame-audit` binary verifies exact, disjoint 3D lattice 
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome-spatial-frame-audit -- \
   --frame docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME.example.json \
+  --eligibility-mask docs/neuroscience/examples/CONNECTOME_SPATIAL_FRAME_ELIGIBILITY_MASK.hex \
   --output spatial-frame-report.json
 ```
 
 Then pass the exact report bytes to candidate coverage with `--spatial-frame-report spatial-frame-report.json`. The coverage audit rejects any report whose SHA-256, complete lattice digest, eligible population digest, or exact PSU/stratum export does not match the audit input. A frame pass proves tiling only inside the declared box; source-volume and eligibility-mask completeness must be independently verified.
 
 The verifier permits NOT_APPLICABLE only for a non-critical gate with a documented scope note. A critical NOT_APPLICABLE gate blocks full certification. Every uncertainty component must declare assumptions; estimated components need a point estimate, and non-estimable components cannot carry one or an interval.
+
+
+## Joint correction portfolio evaluator
+
+The `connectome-portfolio-audit` binary performs exact subset optimization for up to 20 interacting graph-edit candidates on small, frozen evaluation graphs. It compares probability-weighted query sensitivity, probability per minute, uncertainty per minute, and deterministic-random rankings against an evaluator-only exact optimum. It reports pairwise interactions, regret, and reverse-application-order sensitivity. See `docs/neuroscience/CONNECTOME_CORRECTION_PORTFOLIO_AUDIT_PROTOCOL_V1.md`.
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-portfolio-audit -- \
+  --input docs/neuroscience/examples/CONNECTOME_CORRECTION_PORTFOLIO.example.json \
+  --output correction-portfolio-report.json
+```
+
+The exact optimum is bounded to the submitted candidate pool, budget, graph, query bundle, and canonical candidate-ID application order. Reference query values are evaluation-only and are never consumed by the candidate ranking policies.
