@@ -1,7 +1,10 @@
-use lep_conformance::{ValidationReport, parse_json_unique_keys, verify_statement};
+use lep_conformance::{
+    MAX_STATEMENT_BYTES, ValidationReport, parse_json_unique_keys, verify_statement,
+};
 use serde_json::Value;
 use std::env;
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::process::ExitCode;
 
 fn emit(report: &ValidationReport) {
@@ -26,8 +29,8 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    let bytes = match fs::read(&path) {
-        Ok(bytes) => bytes,
+    let file = match File::open(&path) {
+        Ok(file) => file,
         Err(error) => {
             let report =
                 ValidationReport::invalid_json(format!("Unable to read statement file: {error}"));
@@ -35,6 +38,23 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let mut bytes = Vec::new();
+    if let Err(error) = file
+        .take(MAX_STATEMENT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+    {
+        let report =
+            ValidationReport::invalid_json(format!("Unable to read statement file: {error}"));
+        emit(&report);
+        return ExitCode::from(2);
+    }
+    if bytes.len() > MAX_STATEMENT_BYTES {
+        let report = ValidationReport::invalid_json(format!(
+            "Statement exceeds maximum size of {MAX_STATEMENT_BYTES} bytes."
+        ));
+        emit(&report);
+        return ExitCode::from(2);
+    }
 
     let statement: Value = match parse_json_unique_keys(&bytes) {
         Ok(value) => value,
