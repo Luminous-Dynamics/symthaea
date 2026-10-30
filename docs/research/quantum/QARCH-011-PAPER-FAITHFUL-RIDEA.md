@@ -87,6 +87,8 @@ For A=(f_hat-bar_f)(bar_f-f_star), A<0 means the cross-term offsets the sum of t
 
 The frozen negative control sets f_star=0.5, bar_f=1, B_infinity=0.5, tau0=0, c=2, tau2=0, giving tau=1. For f_hat=-1 and f_hat=3, the absolute gap is 2 in both cases, so the printed sigmoid gate assigns the same weight 0.7310586. But A is -1 in the first case and +1 in the second; their actual squared errors are 2.25 and 6.25. The same magnitude gate therefore cannot distinguish an offsetting interaction from a reinforcing one.
 
+This is not just an arbitrary predictor pair. The fixture supplies a finite model-class witness: the true regression output is 0.5 at the single design, and the model class contains constant predictors -1, 1 and 3. The constant-one model is the unique best-in-class predictor (squared error 0.25; B_infinity=0.5). With admissible noisy outcomes y=-2 or y=3, the constant-minus-one or constant-three model respectively becomes the empirical risk minimizer. Thus both sign cases are compatible with a finite-class ERM setting, bounded outcomes y_infinity=3, and the same printed tau threshold.
+
 This is why the module exposes a separate evaluate_signed_interaction_oracle function. It requires f_star and is explicitly evaluator-only; it must never be passed into deployed experiment selection. The gate function reproduces the printed magnitude formula but its return value is not a certificate that the signed interaction is beneficial.
 
 The issue [QARCH-012 #9092](https://github.com/Luminous-Dynamics/symthaea/issues/9092) tracks an independent audit of the sign/inequality relationship in Proposition 1, Theorem 1, Theorem 2 and Appendix C. Until that audit is resolved, do not claim that the printed magnitude gate alone guarantees de-amplification.
