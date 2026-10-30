@@ -324,6 +324,153 @@ fn expected_information_gain_with_steps<H, E>(
     Some(information_gain.clamp(0.0, (predictions.len() as f64).ln()))
 }
 
+/// Expected information gain in nats under explicit (possibly unnormalized) prior weights.
+///
+/// Unlike the uniform-prior API, this function does not count duplicated hypotheses as
+/// additional prior mass unless the caller assigns them additional weight. Zero-weight
+/// hypotheses are ignored. The remaining finite, non-negative weights are normalized
+/// internally and must leave at least two positive-mass hypotheses.
+///
+/// The prior is over the supplied hypothesis instances. Callers should aggregate
+/// observationally equivalent hypotheses into equivalence classes when their multiplicity
+/// is an artifact of candidate generation, and must not estimate prior weights from held-out
+/// outcomes. Measurement noise remains an independently supplied Gaussian standard deviation.
+pub fn expected_information_gain_nats_with_prior_weights<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    expected_information_gain_with_prior_weights_and_steps(
+        experiment,
+        hypotheses,
+        prior_weights,
+        observation_std_dev,
+        INFORMATION_GAIN_QUADRATURE_STEPS,
+        predict,
+    )
+}
+
+fn expected_information_gain_with_prior_weights_and_steps<H, E>(
+    experiment: &E,
+    hypotheses: &[H],
+    prior_weights: &[f64],
+    observation_std_dev: f64,
+    quadrature_steps: usize,
+    predict: impl Fn(&H, &E) -> Option<f64>,
+) -> Option<f64> {
+    if quadrature_steps == 0
+        || hypotheses.len() < 2
+        || hypotheses.len() != prior_weights.len()
+        || !observation_std_dev.is_finite()
+        || observation_std_dev <= 0.0
+        || prior_weights.iter().any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return None;
+    }
+
+    let prior_total: f64 = prior_weights.iter().sum();
+    if !prior_total.is_finite() || prior_total <= 0.0 {
+        return None;
+    }
+    let normalized: Vec<f64> = prior_weights.iter().map(|weight| weight / prior_total).collect();
+    let mut weighted_predictions = Vec::new();
+    for (hypothesis, prior_probability) in hypotheses.iter().zip(normalized.iter().copied()) {
+        if prior_probability == 0.0 {
+            continue;
+        }
+        let prediction = predict(hypothesis, experiment)?;
+        if !prediction.is_finite() {
+            return None;
+        }
+        weighted_predictions.push((prediction, prior_probability));
+    }
+    if weighted_predictions.len() < 2 {
+        return None;
+    }
+
+    let prior_entropy = -weighted_predictions
+        .iter()
+        .map(|(_, probability)| probability * probability.ln())
+        .sum::<f64>();
+    if !prior_entropy.is_finite() || prior_entropy <= 0.0 {
+        return None;
+    }
+
+    // Scale means and noise by one finite magnitude before subtraction to avoid
+    // overflow for large, opposite-sign predictions while preserving ratios.
+    let mean_scale = weighted_predictions
+        .iter()
+        .map(|(prediction, _)| prediction.abs())
+        .fold(observation_std_dev, f64::max);
+    let scaled: Vec<(f64, f64)> = weighted_predictions
+        .iter()
+        .map(|(prediction, probability)| (prediction / mean_scale, *probability))
+        .collect();
+    let scaled_noise = observation_std_dev / mean_scale;
+    if scaled_noise == 0.0 {
+        return Some(noiseless_information_gain_with_prior_weights(
+            &weighted_predictions,
+        )
+        .clamp(0.0, prior_entropy));
+    }
+
+    let step_width = 2.0 * INFORMATION_GAIN_Z_LIMIT / quadrature_steps as f64;
+    let mut quadrature = Vec::with_capacity(quadrature_steps);
+    for step_index in 0..quadrature_steps {
+        let z = -INFORMATION_GAIN_Z_LIMIT + (step_index as f64 + 0.5) * step_width;
+        quadrature.push((z, (-0.5 * z * z).exp() * step_width));
+    }
+    let weight_sum: f64 = quadrature.iter().map(|(_, weight)| weight).sum();
+    let mut log_terms = Vec::with_capacity(scaled.len());
+    let mut information_gain = 0.0;
+
+    for &(true_mean, true_probability) in &scaled {
+        for &(z, quadrature_weight) in &quadrature {
+            log_terms.clear();
+            for &(other_mean, other_probability) in &scaled {
+                let separation = (true_mean - other_mean) / scaled_noise;
+                let log_likelihood_ratio = if separation == 0.0 {
+                    0.0
+                } else if !separation.is_finite() || separation.abs() > 1.0e6 {
+                    f64::NEG_INFINITY
+                } else {
+                    -0.5 * separation * separation - z * separation
+                };
+                log_terms.push(other_probability.ln() + log_likelihood_ratio);
+            }
+            let log_mixture_ratio = log_sum_exp(&log_terms);
+            information_gain -= (quadrature_weight / weight_sum)
+                * true_probability
+                * log_mixture_ratio;
+        }
+    }
+
+    if !information_gain.is_finite() {
+        return None;
+    }
+    Some(information_gain.clamp(0.0, prior_entropy))
+}
+
+fn noiseless_information_gain_with_prior_weights(weighted_predictions: &[(f64, f64)]) -> f64 {
+    let mut groups: Vec<(f64, f64)> = Vec::new();
+    for &(prediction, probability) in weighted_predictions {
+        if let Some((_, total_probability)) = groups
+            .iter_mut()
+            .find(|(existing, _)| *existing == prediction)
+        {
+            *total_probability += probability;
+        } else {
+            groups.push((prediction, probability));
+        }
+    }
+    -groups
+        .iter()
+        .map(|(_, probability)| probability * probability.ln())
+        .sum::<f64>()
+}
+
 /// Select the candidate maximizing expected information gain per unit cost when each
 /// candidate has its own observation-noise standard deviation and prevalidated eligibility.
 ///
@@ -790,6 +937,97 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn weighted_eig_is_invariant_to_duplicate_hypotheses_with_split_prior_mass() {
+        let hypotheses = [0_usize, 1];
+        let two_hypothesis_gain = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[0.5, 0.5],
+            0.25,
+            |hypothesis, _| Some(*hypothesis as f64),
+        )
+        .unwrap();
+
+        let duplicated_hypotheses = [0_usize, 1, 2];
+        let duplicated_gain = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &duplicated_hypotheses,
+            &[0.25, 0.25, 0.5],
+            0.25,
+            |hypothesis, _| Some(if *hypothesis == 2 { 1.0 } else { 0.0 }),
+        )
+        .unwrap();
+        assert!((two_hypothesis_gain - duplicated_gain).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn weighted_eig_respects_prior_entropy_and_asymmetric_hypothesis_mass() {
+        let hypotheses = [0.0_f64, 2.0];
+        let uniform = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[1.0, 1.0],
+            0.05,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .unwrap();
+        let skewed = expected_information_gain_nats_with_prior_weights(
+            &(),
+            &hypotheses,
+            &[9.0, 1.0],
+            0.05,
+            |hypothesis, _| Some(*hypothesis),
+        )
+        .unwrap();
+        let binary_entropy = -(0.9_f64 * 0.9_f64.ln() + 0.1_f64 * 0.1_f64.ln());
+        assert!(uniform > skewed);
+        assert!(skewed <= binary_entropy + 1.0e-12);
+        assert!(skewed > 0.0);
+    }
+
+    #[test]
+    fn weighted_eig_fails_closed_on_invalid_or_degenerate_priors() {
+        let hypotheses = [0_usize, 1];
+        let predict = |hypothesis: &usize, _| Some(*hypothesis as f64);
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[1.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[f64::NAN, 1.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[-0.1, 1.1], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[1.0, 0.0], 1.0, predict
+        )
+        .is_none());
+        assert!(expected_information_gain_nats_with_prior_weights(
+            &(), &hypotheses, &[0.0, 0.0], 1.0, predict
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn weighted_eig_zero_noise_limit_is_entropy_of_distinct_prediction_mass() {
+        let hypotheses = [0_usize, 1, 2];
+        let gain = expected_information_gain_with_prior_weights_and_steps(
+            &(),
+            &hypotheses,
+            &[0.2, 0.3, 0.5],
+            1.0e-300,
+            INFORMATION_GAIN_QUADRATURE_STEPS,
+            |hypothesis, _| Some(if *hypothesis < 2 { 7.0 } else { 9.0 }),
+        )
+        .unwrap();
+        let expected = -(0.5_f64 * 0.5_f64.ln() + 0.5_f64 * 0.5_f64.ln());
+        assert!((gain - expected).abs() < 1.0e-8);
     }
 
     #[test]
