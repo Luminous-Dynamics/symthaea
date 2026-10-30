@@ -171,14 +171,14 @@ pub struct CounterfactualInfluenceReport {
 /// must create the counterfactual schedule by changing only the declared event;
 /// this module binds the bytes but does not independently parse the schedule.
 pub struct CounterfactualInfluenceInput<'view, 'audio> {
-    pub source_event_id: &'a str,
+    pub source_event_id: &'view str,
     pub intervention: EventIntervention,
-    pub source_score_bytes: &'a [u8],
-    pub performed_event_map_bytes: &'a [u8],
-    pub baseline_schedule_bytes: &'a [u8],
-    pub counterfactual_schedule_bytes: &'a [u8],
-    pub renderer_identity_bytes: &'a [u8],
-    pub renderer_config_bytes: &'a [u8],
+    pub source_score_bytes: &'view [u8],
+    pub performed_event_map_bytes: &'view [u8],
+    pub baseline_schedule_bytes: &'view [u8],
+    pub counterfactual_schedule_bytes: &'view [u8],
+    pub renderer_identity_bytes: &'view [u8],
+    pub renderer_config_bytes: &'view [u8],
     pub baseline_audio: &'view AudioView<'audio>,
     pub counterfactual_audio: &'view AudioView<'audio>,
 }
@@ -906,7 +906,17 @@ mod tests {
         let anchor = audio(&base);
         let one = [audio(&base)];
         assert_eq!(
-            calibrate_repeatability(&anchor, &one, &config()).unwrap_err(),
+            calibrate_repeatability(
+                &anchor,
+                &one,
+                br#"{"score":"frozen"}"#,
+                br#"{"map":"frozen"}"#,
+                b"schedule-with-event-17",
+                b"renderer-fixture-v1",
+                b"config-seed-4-samplerate-48000",
+                &config(),
+            )
+            .unwrap_err(),
             CounterfactualInfluenceError::TooFewNoopRenders
         );
 
