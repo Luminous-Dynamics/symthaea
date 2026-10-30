@@ -79,3 +79,23 @@ bash deploy/aml/external-smoke.sh
 The script verifies public HTTPS health, that unauthenticated Add is rejected, authenticated Add response echoes, read-after-write Search visibility, and isolation from a second `user_id`. It creates one random, non-sensitive smoke message under a unique user ID. That record remains subject to the configured retention worker; the API does not provide a per-user immediate delete route.
 
 This is a local operator check only. It is not the organizer's official Smoke/Full test, an access review, or evidence that the endpoint has been accepted for evaluation.
+## Official Agent Memory Leaderboard Cycle 2 release gates
+
+The official Cycle 2 materials deadline is **31 October 2026 at 23:59 UTC+8 (17:59 SAST)**. Evaluation closes **4 November 2026 at 23:59 UTC+8 (17:59 SAST)**. The deadline is close; this scaffold alone is not an eligible submission. The organizer requires stable, publicly reachable participant-hosted Add/Search endpoints, a fixed version and materials, organizer review, an issued Evaluation Key, a passed Smoke run, and then a Full run. Repository-only and Docker-only submissions are not deployed by the platform.
+
+Before applying, verify the selected board and model rules against the current official guide:
+
+- Open-source Methods (Academic) entries must use text-embedding-v4 for embeddings and gpt-4o-mini for LLM-related components. The official Full-evaluation checklist separately says open-source Methods are expected to use gpt-4o-mini during Add.
+- This branch's current AML backend is lexical BM25 only: it does not call an embedding model or an LLM during Add/Search. Therefore it has no embedding model to declare; **do not self-certify the no-LLM Add path as compliant without confirming that interpretation with the organizer**. Any LLM-related Add component introduced for the Academic board must use gpt-4o-mini; any embedding component must use text-embedding-v4. The competition guide also describes the Industry board for self-trained/other open-weight model entries; confirm which board is correct before registering.
+- The organizer's platform deterministically chunks ordinary Textual Add inputs at 20 messages or 2,000 adapter-counted words, whichever boundary is reached first. The participant server receives the chunks and must preserve their order and identifiers; do not re-chunk already formed API requests.
+- Formal Search may request top_k=100; the service supports this limit. Add and Search must use the identical user_id. session_id organizes source provenance but is not a Search filter. Synchronous Add must return HTTP 200 only after durable persistence and immediate read-after-write visibility.
+- The organizer accepts Token, Bearer, or X-Api-Key authentication. The unauthenticated Health GET is allowed; unauthenticated Add/Search are not allowed for a formal public endpoint.
+
+Official references:
+- Participation and eligibility: https://agentmemories.ai/evaluation
+- Add/Search request and response contract: https://agentmemoryleaderboard.ai/api-guide
+- Competition board and model requirements: https://agentmemories.ai/competition
+
+## Current qualification status
+
+**Not yet qualified.** This scaffold has not been built or deployed; there is no public endpoint, DNS/TLS check, organizer-issued Evaluation Key, successful Smoke, Full evaluation, or organizer compliance review. Do not submit it as a completed participant deployment. The external smoke script is an operator-side preflight only and does not substitute for the official Smoke.
