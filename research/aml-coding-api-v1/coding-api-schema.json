@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aml-coding-api-v1/coding-api-schema.json",
+  "title": "Agent Memory Challenge Cycle 2 Text/Coding Add/Search API",
+  "description": "Wire contract for participant-hosted Textual/Coding memory Add and Search endpoints. This schema does not prove persistence, authorization, immediate searchability, or deployment compliance.",
+  "$defs": {
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "integer",
+          "description": "Optional Unix timestamp in milliseconds."
+        }
+      }
+    },
+    "addRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "messages",
+        "user_id",
+        "session_id"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/message"
+          },
+          "description": "Ordered source messages; preserve the exact order."
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Sole memory retrieval isolation key."
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source session grouping metadata; not a Search filter."
+        }
+      }
+    },
+    "addResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "success",
+        "request_id",
+        "user_id",
+        "session_id"
+      ],
+      "properties": {
+        "success": {
+          "const": true
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "searchRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query",
+        "user_id",
+        "top_k"
+      ],
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Original benchmark query. Search must not return a generated answer or use gold labels."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Optional top-level answer choices; omit for open-ended questions."
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Sole retrieval isolation scope; must match Add."
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of evidence items to return; formal evaluations use 100."
+        }
+      }
+    },
+    "searchResult": {
+      "type": "object",
+      "required": [
+        "id",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable memory identifier."
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Evidence content, not a generated answer."
+        },
+        "score": {
+          "type": "number",
+          "description": "Optional relevance score; greater means more relevant."
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional source or persistence timestamp."
+        }
+      }
+    },
+    "searchResponse": {
+      "type": "object",
+      "required": [
+        "data"
+      ],
+      "properties": {
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/searchResult"
+          },
+          "description": "Relevance-ordered; empty results must be data: []."
+        }
+      },
+      "description": "Unknown response fields are ignored by the platform; participants should emit only declared fields."
+    }
+  },
+  "x-runtimeInvariants": [
+    "Add returns HTTP 200 only after durable persistence and immediate Search visibility.",
+    "Add success echoes request_id, user_id, and session_id byte-for-byte.",
+    "A retry of the same logical write keeps the same request_id and identical payload.",
+    "Search uses user_id as the only retrieval-isolation field; session_id is not sent to Search.",
+    "Search response order is preserved by the platform and must already be ranked by relevance.",
+    "Search response item count must not exceed top_k; overflow is a contract error, not a truncate-and-pass condition.",
+    "Search returns evidence only; no final answer, evaluator label, or gold answer.",
+    "Do not send metadata, app_id, agent_id, async_mode, or unapproved Search filters.",
+    "The synchronous default is HTTP 200. HTTP 202 is only permitted when the submitted version has an approved Add task-status endpoint.",
+    "Open-source Methods uses text-embedding-v4 for embeddings and gpt-4o-mini for LLM-related components; rerankers are unrestricted.",
+    "Evaluation data is for evaluation only, must not be used for training or shared, and must be deleted within 30 days after the run."
+  ]
+}
