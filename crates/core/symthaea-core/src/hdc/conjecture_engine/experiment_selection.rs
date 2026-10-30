@@ -371,6 +371,84 @@ pub fn select_experiment_by_information_gain_per_cost_with_noise_and_eligibility
     best
 }
 
+/// Select an eligible experiment by worst-case information gain across a finite
+/// set of model-discrepancy scenarios, normalized by acquisition cost.
+///
+/// This is a conservative finite-set robustness baseline: every candidate must retain
+/// strictly positive information gain under every declared scenario. The returned
+/// score is the minimum scenario EIG (nats) divided by cost. It does not guarantee
+/// robustness outside the supplied scenario set, and it is not the R-IDeA criterion.
+///
+/// Eligibility is evaluated before cost, noise, or prediction callbacks. A candidate
+/// with an incomplete or non-finite prediction in any scenario is skipped rather than
+/// being scored on only its favorable scenarios. Empty scenario sets, invalid noise,
+/// invalid costs, and zero worst-case information gain fail closed with None.
+///
+/// The caller must ensure all scenarios share the same hypothesis meaning and prior,
+/// and that all candidate predictions represent the same measurand/unit. Measurement
+/// uncertainty is supplied independently by the metrology process.
+pub fn select_experiment_by_worst_case_information_gain_per_cost<'a, H, E, S>(
+    candidates: &'a [E],
+    hypotheses: &[H],
+    model_scenarios: &[S],
+    eligible: impl Fn(&E) -> bool + Copy,
+    observation_std_dev: impl Fn(&E) -> f64 + Copy,
+    predict: impl Fn(&H, &E, &S) -> Option<f64> + Copy,
+    cost: impl Fn(&E) -> f64 + Copy,
+) -> Option<(&'a E, f64)> {
+    if model_scenarios.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&'a E, f64)> = None;
+    for experiment in candidates {
+        // Hard constraints precede all information and cost calculations.
+        if !eligible(experiment) {
+            continue;
+        }
+        let experiment_cost = cost(experiment);
+        if !experiment_cost.is_finite() || experiment_cost <= 0.0 {
+            continue;
+        }
+        let noise = observation_std_dev(experiment);
+        if !noise.is_finite() || noise <= 0.0 {
+            continue;
+        }
+
+        let mut worst_case_information_gain = f64::INFINITY;
+        let mut complete = true;
+        for scenario in model_scenarios {
+            let information_gain = expected_information_gain_nats(
+                experiment,
+                hypotheses,
+                noise,
+                |hypothesis, candidate| predict(hypothesis, candidate, scenario),
+            );
+            let Some(information_gain) = information_gain else {
+                complete = false;
+                break;
+            };
+            if !information_gain.is_finite() || information_gain <= 0.0 {
+                complete = false;
+                break;
+            }
+            worst_case_information_gain = worst_case_information_gain.min(information_gain);
+        }
+        if !complete {
+            continue;
+        }
+
+        let score = worst_case_information_gain / experiment_cost;
+        if score.is_finite()
+            && score > 0.0
+            && best.is_none_or(|(_, best_score)| score > best_score)
+        {
+            best = Some((experiment, score));
+        }
+    }
+    best
+}
+
 /// Select the candidate maximizing expected information gain per unit cost.
 ///
 /// Candidates with non-positive/non-finite costs, incomplete predictions, or zero
@@ -714,6 +792,109 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn robust_selector_rejects_nominally_informative_candidate_that_fails_under_shift() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["fragile", "robust"];
+        let scenarios = ["nominal", "boundary_shift"];
+        let predict = |hypothesis: &usize, candidate: &&str, scenario: &&str| {
+            match (*candidate, *scenario, *hypothesis) {
+                ("fragile", "nominal", 0) => Some(0.0),
+                ("fragile", "nominal", 1) => Some(5.0),
+                ("fragile", "boundary_shift", _) => Some(2.0),
+                ("robust", _, 0) => Some(0.0),
+                ("robust", _, 1) => Some(1.0),
+                _ => None,
+            }
+        };
+        let nominal = select_experiment_by_information_gain_per_cost_with_noise_and_eligibility(
+            &candidates,
+            &hypotheses,
+            |_| true,
+            |_| 0.1,
+            |hypothesis, candidate| predict(hypothesis, candidate, &"nominal"),
+            |_| 1.0,
+        )
+        .expect("nominal EIG has a positive-information candidate");
+        assert_eq!(*nominal.0, "fragile");
+
+        let robust = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |_| true,
+            |_| 0.1,
+            predict,
+            |_| 1.0,
+        )
+        .expect("robust candidate retains information in both scenarios");
+        assert_eq!(*robust.0, "robust");
+        assert!(robust.1.is_finite() && robust.1 > 0.0);
+    }
+
+    #[test]
+    fn robust_selector_fails_closed_on_empty_scenario_set_or_incomplete_scenario() {
+        let hypotheses = [0_usize, 1];
+        let candidates = [0_usize, 1];
+        assert!(select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &[],
+            |_| true,
+            |_| 1.0,
+            |hypothesis, candidate, _scenario: &usize| {
+                Some((*hypothesis * (*candidate + 1)) as f64)
+            },
+            |_| 1.0,
+        )
+        .is_none());
+
+        let scenarios = [0_usize, 1];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |_| true,
+            |_| 1.0,
+            |hypothesis, candidate, scenario| {
+                if *candidate == 0 && *scenario == 1 {
+                    None
+                } else {
+                    Some((*hypothesis * (*candidate + 1)) as f64)
+                }
+            },
+            |_| 1.0,
+        );
+        assert_eq!(selected.map(|(candidate, _)| *candidate), Some(1));
+    }
+
+    #[test]
+    fn robust_selector_applies_eligibility_before_cost_noise_or_scenario_predictions() {
+        let hypotheses = [0_usize, 1];
+        let candidates = ["blocked", "eligible"];
+        let scenarios = [0_usize, 1];
+        let selected = select_experiment_by_worst_case_information_gain_per_cost(
+            &candidates,
+            &hypotheses,
+            &scenarios,
+            |candidate| *candidate == "eligible",
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+            |hypothesis, candidate, scenario| {
+                assert_ne!(*candidate, "blocked");
+                Some((*hypothesis + *scenario) as f64)
+            },
+            |candidate| {
+                assert_ne!(*candidate, "blocked");
+                1.0
+            },
+        )
+        .expect("eligible candidate is informative in each scenario");
+        assert_eq!(*selected.0, "eligible");
     }
 
     #[test]
