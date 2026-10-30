@@ -22,6 +22,10 @@ use super::tabular_nas_firewall::ArchitectureFeatures;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProxyConsensusConfig {
+    pub benchmark_artifact_sha256: String,
+    pub evaluation_split_id: String,
+    pub proxy_calibration_split_id: String,
+    pub proxy_calibration_sha256: String,
     pub target_metric_id: String,
     pub proxy_directions: BTreeMap<String, ProxyDirection>,
     pub anti_correlation_threshold: f64,
@@ -275,7 +279,7 @@ pub fn apply_consensus_prior(
         ));
     }
     let recomputed = build_proxy_consensus(features, &result.config)?;
-    if recomputed.result_sha256 != result.result_sha256 {
+    if recomputed.result_sha256 != result.result_sha256 || &recomputed != result {
         return Err(ProxyConsensusError::new(
             "result.result_sha256",
             "feature catalog or consensus result does not match its content digest",
@@ -317,8 +321,31 @@ fn validate_inputs(
     if features.is_empty() {
         return Err(ProxyConsensusError::new("features", "at least one architecture is required"));
     }
-    if config.target_metric_id.trim().is_empty() {
-        return Err(ProxyConsensusError::new("target_metric_id", "must be non-empty"));
+    if config.target_metric_id.trim().is_empty()
+        || config.evaluation_split_id.trim().is_empty()
+        || config.proxy_calibration_split_id.trim().is_empty()
+    {
+        return Err(ProxyConsensusError::new(
+            "target_metric_id",
+            "target metric and split IDs must be non-empty",
+        ));
+    }
+    if config.evaluation_split_id == config.proxy_calibration_split_id {
+        return Err(ProxyConsensusError::new(
+            "proxy_calibration_split_id",
+            "strict no-oracle consensus requires a disjoint calibration split",
+        ));
+    }
+    for (field, digest) in [
+        ("benchmark_artifact_sha256", config.benchmark_artifact_sha256.as_str()),
+        ("proxy_calibration_sha256", config.proxy_calibration_sha256.as_str()),
+    ] {
+        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(ProxyConsensusError::new(
+                field,
+                "must be exactly 64 hexadecimal characters",
+            ));
+        }
     }
     if config.proxy_directions.is_empty() {
         return Err(ProxyConsensusError::new("proxy_directions", "at least one proxy is required"));
@@ -454,6 +481,10 @@ fn digest_feature_catalog(
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.nasbench201.proxy-consensus-catalog.v0.1");
     update_string(&mut hasher, &config.target_metric_id);
+    update_string(&mut hasher, &config.benchmark_artifact_sha256);
+    update_string(&mut hasher, &config.evaluation_split_id);
+    update_string(&mut hasher, &config.proxy_calibration_split_id);
+    update_string(&mut hasher, &config.proxy_calibration_sha256);
     hasher.update(config.anti_correlation_threshold.to_bits().to_be_bytes());
     hasher.update((config.minimum_retained_proxies as u64).to_be_bytes());
     hasher.update((config.proxy_directions.len() as u64).to_be_bytes());
@@ -489,6 +520,10 @@ fn digest_result(
     let mut hasher = Sha256::new();
     hasher.update(b"symthaea.nasbench201.proxy-consensus-result.v0.1");
     update_string(&mut hasher, &config.target_metric_id);
+    update_string(&mut hasher, &config.benchmark_artifact_sha256);
+    update_string(&mut hasher, &config.evaluation_split_id);
+    update_string(&mut hasher, &config.proxy_calibration_split_id);
+    update_string(&mut hasher, &config.proxy_calibration_sha256);
     update_string(&mut hasher, catalog_sha256);
     hasher.update(config.anti_correlation_threshold.to_bits().to_be_bytes());
     hasher.update((config.minimum_retained_proxies as u64).to_be_bytes());
@@ -592,6 +627,10 @@ mod tests {
             directions.insert(proxy.into(), ProxyDirection::Maximize);
         }
         ProxyConsensusConfig {
+            benchmark_artifact_sha256: "a".repeat(64),
+            evaluation_split_id: "challenge-cifar10".into(),
+            proxy_calibration_split_id: "development-cifar100".into(),
+            proxy_calibration_sha256: "b".repeat(64),
             target_metric_id: "val_accuracy".into(),
             proxy_directions: directions,
             anti_correlation_threshold: -0.3,
@@ -631,6 +670,10 @@ mod tests {
             row.proxy_times_seconds.insert("proxy_a".into(), 0.01);
         }
         let cfg = ProxyConsensusConfig {
+            benchmark_artifact_sha256: "a".repeat(64),
+            evaluation_split_id: "challenge-latency".into(),
+            proxy_calibration_split_id: "development-latency".into(),
+            proxy_calibration_sha256: "b".repeat(64),
             target_metric_id: "latency".into(),
             proxy_directions: directions,
             anti_correlation_threshold: -1.0,
@@ -650,6 +693,10 @@ mod tests {
         let mut directions = BTreeMap::new();
         directions.insert("p".into(), ProxyDirection::Maximize);
         let cfg = ProxyConsensusConfig {
+            benchmark_artifact_sha256: "a".repeat(64),
+            evaluation_split_id: "challenge".into(),
+            proxy_calibration_split_id: "development".into(),
+            proxy_calibration_sha256: "b".repeat(64),
             target_metric_id: "accuracy".into(),
             proxy_directions: directions,
             anti_correlation_threshold: -0.3,
@@ -716,6 +763,26 @@ mod tests {
             .unwrap();
         assert_eq!(constant.reason, ProxyGateReason::UndefinedAgreement);
         assert!(!constant.retained);
+    }
+
+    #[test]
+    fn strict_no_oracle_manifest_requires_separate_calibration_split_and_digests() {
+        let rows = features();
+        let mut invalid = config();
+        invalid.proxy_calibration_split_id = invalid.evaluation_split_id.clone();
+        assert!(build_proxy_consensus(&rows, &invalid).is_err());
+
+        let mut invalid = config();
+        invalid.proxy_calibration_sha256 = "invalid".into();
+        assert!(build_proxy_consensus(&rows, &invalid).is_err());
+    }
+
+    #[test]
+    fn apply_consensus_rejects_tampered_public_prior_fields() {
+        let rows = features();
+        let mut result = build_proxy_consensus(&rows, &config()).unwrap();
+        result.prior_percentiles.insert("arch-5".into(), 0.0);
+        assert!(apply_consensus_prior(&rows, &result, "tampered_prior").is_err());
     }
 
     #[test]
