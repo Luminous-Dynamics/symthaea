@@ -75,9 +75,12 @@ Then run the Rust auditor from the Symthaea checkout:
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-dataset-audit -- \\
   --input /path/to/connectomebench2_metadata.jsonl \\
+  --dataset-revision-commit-sha <resolved-v2-commit-sha> \\
   --cube-edge-nm 50000 \\
   --output connectomebench2-lineage-audit.json
 ```
+
+The `--dataset-revision-commit-sha` argument is required and must be the exact 40-character commit SHA resolved from the Hugging Face `v2` revision used to download the dataset; do not pass the literal string `v2`. The report records both this dataset commit and the pinned upstream code commit. The SHA is operator-supplied provenance: the offline auditor does not contact Hugging Face or independently prove that the local files came from that commit.
 
 The export SQL reads `metadata/train.parquet`, `metadata/val.parquet`, and `metadata/test.parquet`, and deliberately excludes geometry and EM bytes. The auditor fails closed on malformed/unknown sidecar fields, bad sample-hash composition, duplicate combined IDs, sample-type/strategy mismatches, incorrect `same_neuron` or derived label values, mask-flag drift, task-routing drift, missing source split-group keys, operation-group reuse across splits, and spatial-cube reuse across splits. It reconstructs the upstream grouping key by archive bank: `operation_id` for edit/adjacent-control rows, `source_operation_id` for junction controls, and the pre/post root plus synapse coordinate for synapse controls. It normalizes the source-side `val` spelling to `validation`.
 
