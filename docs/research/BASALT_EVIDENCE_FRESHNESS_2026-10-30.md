@@ -35,11 +35,11 @@ The fixture illustrates four directly invalidated evidence records, one transiti
 9. A result is `usable_for_success` only when it is fresh, its outcome is `pass`, and every declared evidence dependency is itself usable. A fresh failure is still a fresh failure; a stale pass is not usable.
 10. The emitted re-verification plan lists stale evidence IDs in original topological/creation order. It is a deterministic candidate queue, not proof that a runner has executed the checks. A structurally valid audit may still contain stale evidence: command success means the timeline was internally consistent, not that every check is current or that the task has passed. Consumers must inspect freshness and `usable_for_success` fields.
 
-The implementation maintains reverse resource and evidence indexes. Evidence leaves those indexes when first invalidated, so later workspace changes do not repeatedly rescan already-stale nodes. Bounds are explicit: 64 MiB input, 20,000 timeline entries, 100,000 initial resources, 4,096 resource pins or evidence parents per record, and 250,000 total dependency edges.
+The implementation maintains reverse resource and evidence indexes. Evidence leaves those indexes when first invalidated, so later workspace changes do not repeatedly rescan already-stale nodes. A final topological provenance pass closes the full stale-ancestor and invalidation-event history across multi-parent DAGs, independent of traversal order; a diamond-dependency regression covers converging stale parents. Bounds are explicit: 64 MiB input, 20,000 timeline entries, 100,000 initial resources, 4,096 resource pins or evidence parents per record, and 250,000 total dependency edges.
 
 ## Trust boundary
 
-The auditor establishes consistency of the supplied timeline and derives freshness relative to its declared resource/event history. It does **not** establish:
+The auditor establishes consistency of the supplied timeline and derives freshness relative to its declared resource/event history. It performs a topological closure pass so a descendant reports all stale ancestors, including multiple converging paths. It does **not** establish:
 - that a runner observed every real workspace change;
 - that a resource digest was measured against the actual filesystem or process environment;
 - that event/evidence digests came from a trusted producer;
@@ -47,7 +47,7 @@ The auditor establishes consistency of the supplied timeline and derives freshne
 - that a verifier is semantically adequate for the task;
 - that a final tree or runner identity is authentic.
 
-The `event_digest` is recomputed as SHA-256 over compact canonical JSON with the domain `basalt.resource-change.v1`, schema version, run ID, sequence, event ID, change kind, resource ID, and before/after digests. This detects payload edits but is not an issuer signature: an actor able to rewrite the timeline can also recompute the hash. The `evidence_digest` is currently format-checked but its referenced evidence bytes are not resolved here. No issuer signatures are verified in this slice. Confirmatory scoring therefore remains gated on authenticated receipts (#9034), isolated runner delivery, exact source/environment identity, and qualified oracles (#9115). No claim of execution or SOTA superiority follows from the example fixture.
+The `event_digest` is recomputed as SHA-256 over compact canonical JSON with the domain `basalt.resource-change.v1`, schema version, run ID, sequence, event ID, change kind, resource ID, and before/after digests. This detects payload edits but is not an issuer signature: an actor able to rewrite the timeline can also recompute the hash. The `evidence_digest` is currently format-checked but its referenced evidence bytes are not resolved here. No issuer signatures are verified in this slice. Trusted change-event delivery, signed evidence receipts, and isolated runner integration remain mandatory before confirmatory scoring; the next implementation boundary is tracked in [#9210](https://github.com/Luminous-Dynamics/symthaea/issues/9210). Confirmatory scoring therefore remains gated on authenticated receipts (#9034), isolated runner delivery, exact source/environment identity, and qualified oracles (#9115). No claim of execution or SOTA superiority follows from the example fixture.
 
 ## Research hypothesis
 
