@@ -103,6 +103,70 @@ impl AmlAddRequest {
     }
 }
 
+/// Receipt returned by a backend only after its durable commit and immediate
+/// read-after-write Search visibility barrier have both completed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AmlAddCommitReceipt {
+    pub request_id: String,
+    pub payload_sha256: String,
+    pub durable: bool,
+    pub searchable: bool,
+}
+
+/// Backend boundary. Implementations must enforce durable idempotency and
+/// isolate Search exclusively by request.user_id. This trait intentionally
+/// leaves storage/index implementation choices open.
+pub trait AmlMemoryBackend {
+    fn commit_add_and_confirm_searchable(
+        &mut self,
+        request: &AmlAddRequest,
+        payload_sha256: &str,
+    ) -> Result<AmlAddCommitReceipt, String>;
+
+    fn search_ranked(
+        &self,
+        request: &AmlSearchRequest,
+    ) -> Result<AmlSearchResponse, String>;
+}
+
+/// Execute the participant-side Add contract. An HTTP handler may emit 200
+/// only after this returns successfully.
+pub fn execute_aml_add<B: AmlMemoryBackend>(
+    backend: &mut B,
+    request: AmlAddRequest,
+) -> Result<AmlAddResponse, String> {
+    request.validate()?;
+    let payload_sha256 = request.payload_sha256()?;
+    let receipt = backend.commit_add_and_confirm_searchable(&request, &payload_sha256)?;
+    if receipt.request_id != request.request_id {
+        return Err("backend commit receipt request_id mismatch".into());
+    }
+    if receipt.payload_sha256 != payload_sha256 {
+        return Err("backend commit receipt payload digest mismatch".into());
+    }
+    if !receipt.durable {
+        return Err("backend has not durably persisted the Add request".into());
+    }
+    if !receipt.searchable {
+        return Err("backend has not made the Add request immediately searchable".into());
+    }
+    Ok(request.success_response())
+}
+
+/// Execute the participant-side Search contract. The backend receives the
+/// request with its sole user_id isolation scope; the returned evidence is
+/// validated but never rewritten, re-ranked, or converted into an answer.
+pub fn execute_aml_search<B: AmlMemoryBackend>(
+    backend: &B,
+    request: AmlSearchRequest,
+) -> Result<AmlSearchResponse, String> {
+    request.validate()?;
+    let response = backend.search_ranked(&request)?;
+    response.validate_for(&request)?;
+    Ok(response)
+}
+
 /// Successful AML Add response. HTTP status must be 200 for the synchronous
 /// contract; this value alone cannot prove that persistence/searchability occurred.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -247,6 +311,18 @@ impl AmlSearchResponse {
             result.validate(index)?;
             if !seen_ids.insert(result.id.as_str()) {
                 return Err(format!("Search returned duplicate memory ID {:?}", result.id));
+            }
+        }
+        // When every candidate supplies a scalar score, its order must agree
+        // with the stated higher-is-more-relevant score convention. If scores
+        // are absent or partial, preserve the backend's opaque ranked order.
+        if self.data.iter().all(|result| result.score.is_some()) {
+            for pair in self.data.windows(2) {
+                if pair[0].score.expect("all scores present")
+                    < pair[1].score.expect("all scores present")
+                {
+                    return Err("Search scores are not ordered from higher to lower relevance".into());
+                }
             }
         }
         Ok(())
@@ -513,6 +589,29 @@ mod tests {
         });
         let response: AmlSearchResponse = serde_json::from_value(json).unwrap();
         response.validate_for(&search_request(10)).unwrap();
+        assert_eq!(response.data[0].id, "mem-1");
+    }
+
+    #[test]
+    fn search_response_rejects_score_order_inversion_when_all_scores_are_present() {
+        let request = search_request(10);
+        let response = AmlSearchResponse {
+            data: vec![result("mem-1", "less relevant", 0.7), result("mem-2", "more relevant", 0.9)],
+        };
+        assert!(response.validate_for(&request).unwrap_err().contains("ordered from higher to lower"));
+    }
+
+    #[test]
+    fn backend_can_preserve_rank_order_when_optional_scores_are_missing() {
+        let request = search_request(10);
+        let response = AmlSearchResponse {
+            data: vec![
+                AmlSearchResult { id: "mem-1".into(), content: "rank one".into(), score: Some(0.9), created_at: None },
+                AmlSearchResult { id: "mem-2".into(), content: "rank two".into(), score: None, created_at: None },
+                AmlSearchResult { id: "mem-3".into(), content: "rank three".into(), score: Some(0.1), created_at: None },
+            ],
+        };
+        response.validate_for(&request).unwrap();
         assert_eq!(response.data[0].id, "mem-1");
     }
 
