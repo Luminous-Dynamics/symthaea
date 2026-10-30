@@ -1007,6 +1007,35 @@ mod tests {
     }
 
     #[test]
+    fn mixed_state_identities_reject_multi_obligation_receipt_transactionally() {
+        let mut obligations = vec![
+            o("fresh", ObligationState::CandidateEvidenceAvailable, 5)
+                .with_state_identity("state-1"),
+            o("stale", ObligationState::CandidateEvidenceAvailable, 5)
+                .with_state_identity("state-2"),
+        ];
+        let receipt = OperationReceipt {
+            producer_id: "planner-v1".into(),
+            operation_id: "verify-pair".into(),
+            progress_key: "state-1".into(),
+            obligation_ids: BTreeSet::from(["fresh".into(), "stale".into()]),
+            status: OperationStatus::Completed,
+            verifier: Some(receipt_verifier(
+                "verify-pair", &["fresh", "stale"],
+                ProofVerdict::Valid, EvidenceVerdict::Admissible,
+            )),
+        };
+        assert_eq!(
+            apply_operation_receipt(&mut obligations, &receipt),
+            Err(ReceiptError::ProgressBindingMismatch)
+        );
+        assert_eq!(obligations[0].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(obligations[1].state, ObligationState::CandidateEvidenceAvailable);
+        assert_eq!(obligations[0].state_identity, "state-1");
+        assert_eq!(obligations[1].state_identity, "state-2");
+    }
+
+    #[test]
     fn mixed_external_and_internal_obligations_do_not_claim_full_external_stop() {
         let obligations = [
             o("external", ObligationState::UnresolvableWithoutExternalInput, 8),
