@@ -748,6 +748,16 @@ mod tests {
     }
 
     #[test]
+    fn ineligible_candidates_cannot_carry_numeric_profiles() {
+        let mut data = context();
+        data.profiles[0].eligibility_status = ExperimentEligibilityStatus::NotCalibrated;
+        assert_eq!(
+            rank_rida_ablations(&problem(), &data),
+            Err(RidaAblationError::IneligibleCandidateContainsMetrics)
+        );
+    }
+
+    #[test]
     fn no_eligible_candidates_is_a_hard_error() {
         let mut data = context();
         for profile in &mut data.profiles {
