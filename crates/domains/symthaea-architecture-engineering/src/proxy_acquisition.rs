@@ -225,6 +225,16 @@ impl ProxyAcquisitionRun {
             }
             observed_architectures.insert(observation.architecture_id.as_str());
             summed_seconds += observation.measured_seconds;
+            let expected_remaining = self.manifest.max_total_proxy_seconds - summed_seconds;
+            if observation.cumulative_proxy_seconds.to_bits() != summed_seconds.to_bits()
+                || observation.remaining_proxy_seconds.to_bits() != expected_remaining.to_bits()
+                || attempt.cumulative_seconds_after_attempt.to_bits() != summed_seconds.to_bits()
+            {
+                return Err(ProxyAcquisitionError::new(
+                    format!("observations[{index}]"),
+                    "cumulative or remaining proxy-time accounting does not reconcile",
+                ));
+            }
         }
         if observed_architectures.len() != self.receipt.unique_architectures_observed
             || summed_seconds.to_bits() != self.receipt.total_proxy_seconds.to_bits()
@@ -1065,6 +1075,19 @@ mod tests {
             }
         });
         run.receipt.total_proxy_seconds += 1.0;
+        assert!(run.to_complete_feature_table().is_err());
+    }
+
+    #[test]
+    fn tampered_cumulative_time_is_rejected() {
+        let benchmark = benchmark(12, 10.0);
+        let mut run = benchmark.run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                oracle.query(&candidate.architecture_id, "proxy_a").unwrap();
+                oracle.query(&candidate.architecture_id, "proxy_b").unwrap();
+            }
+        });
+        run.observations[0].remaining_proxy_seconds = 0.0;
         assert!(run.to_complete_feature_table().is_err());
     }
 
