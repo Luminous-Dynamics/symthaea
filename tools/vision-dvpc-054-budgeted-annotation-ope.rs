@@ -2004,7 +2004,7 @@ fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<Strin
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "PORTFOLIO_CONFIG\\t{}\\t{}\\t{}\\t{:.8}",
+                "PORTFOLIO_CONFIG\t{}\t{}\t{}\t{:.8}",
                 world.name,
                 policy,
                 portfolio.names[policy],
@@ -2053,7 +2053,7 @@ fn policy_portfolio_benchmark_rows(replicates: usize, seed: u64) -> Result<Strin
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "PORTFOLIO_RESULT\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.10}\\t{:.8}\\t{:.10}\\t{}\\t{}\\t{}\\t{:.8}\\t{:.8}",
+                "PORTFOLIO_RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.10}\t{}\t{}\t{}\t{:.8}\t{:.8}",
                 world.name,
                 method,
                 replicates,
@@ -2635,16 +2635,16 @@ mod tests {
         assert_eq!(first, second);
         let results: Vec<_> = first
             .lines()
-            .filter(|line| line.starts_with("PORTFOLIO_RESULT\\\\t"))
+            .filter(|line| line.starts_with("PORTFOLIO_RESULT\\\t"))
             .collect();
         let configs: Vec<_> = first
             .lines()
-            .filter(|line| line.starts_with("PORTFOLIO_CONFIG\\\\t"))
+            .filter(|line| line.starts_with("PORTFOLIO_CONFIG\\\t"))
             .collect();
         assert_eq!(results.len(), 12);
         assert_eq!(configs.len(), 9);
         for row in results {
-            assert_eq!(row.split('\\\\t').count(), 31);
+            assert_eq!(row.split('\\\t').count(), 31);
         }
     }
 
