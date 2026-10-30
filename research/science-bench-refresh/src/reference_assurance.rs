@@ -993,6 +993,43 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_exact_source_snapshot_is_rejected() {
+        let mut value = fixture_value();
+        value["sources"][1]["snapshot_sha256"] = value["sources"][0]["snapshot_sha256"].clone();
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("repeats an exact snapshot digest")));
+    }
+
+    #[test]
+    fn unknown_source_ancestry_is_visible_not_assumed_independent() {
+        let mut value = fixture_value();
+        value["sources"][0]["ancestry_group_sha256"] = Value::Null;
+        value["sources"][1]["ancestry_group_sha256"] = Value::Null;
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.referenced_source_ancestry_groups, 0);
+        assert_eq!(report.referenced_sources_with_unknown_ancestry, 2);
+        assert!(!report.adjudicator_independence_proven);
+    }
+
+    #[test]
+    fn insufficient_evidence_is_not_forced_into_a_gold_label() {
+        let mut value = fixture_value();
+        for record in value["initial_adjudications"].as_array_mut().unwrap() {
+            record["decision"] = json!("insufficient_evidence");
+            record["evidence_span_ids"] = json!([]);
+        }
+        reseal(&mut value);
+        let report = verify_value(&value);
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.material_claims_without_cited_evidence, 1);
+        assert_eq!(report.claims_with_disagreement, 0);
+        assert_eq!(report.initial_adjudication_count, 3);
+    }
+
+    #[test]
     fn target_date_must_be_inside_validity_interval() {
         let mut value = fixture_value();
         value["claims"][0]["scope"]["valid_from"] = json!("2027-01-01");
