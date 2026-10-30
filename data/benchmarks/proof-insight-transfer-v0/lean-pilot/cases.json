@@ -16,7 +16,8 @@
       ],
       "contract_precondition": null,
       "model_outcomes": "not_run",
-      "note": "The proof by reflexivity demonstrates definitional equality of proposition terms."
+      "note": "The proof by reflexivity demonstrates definitional equality of proposition terms.",
+      "proof_term_support": null
     },
     {
       "case_id": "identity-proposition-equivalence",
@@ -29,7 +30,8 @@
       ],
       "contract_precondition": null,
       "model_outcomes": "not_run",
-      "note": "Both directions of the stated equivalence are proved explicitly; do not infer definitional equality from this result."
+      "note": "Both directions of the stated equivalence are proved explicitly; do not infer definitional equality from this result.",
+      "proof_term_support": null
     },
     {
       "case_id": "remove-order-premise",
@@ -43,7 +45,8 @@
       ],
       "contract_precondition": "a ≤ b",
       "model_outcomes": "not_run",
-      "note": "The base uses the premise to lift order through Nat.succ; the counterfactual universal statement is refuted by the checked instance a=1, b=0."
+      "note": "The base uses the premise to lift order through Nat.succ; the counterfactual universal statement is refuted by the checked instance a=1, b=0.",
+      "proof_term_support": null
     },
     {
       "case_id": "fixed-target-hypothesis-clear-replan",
@@ -63,7 +66,17 @@
         "expected_action_policy": "move_forbidden_or_replan"
       },
       "model_outcomes": "not_run",
-      "note": "The Lean theorem traces the goal before and after clearing h and proves the unchanged target by an alternate route using hEq. This is an elaboration calibration, not a model run or serialized state-replay benchmark row."
+      "note": "The Lean theorem traces the goal before and after clearing h and proves the unchanged target by an alternate route using hEq. This is an elaboration calibration, not a model run or serialized state-replay benchmark row.",
+      "proof_term_support": {
+        "receipt_label": "alternate-route-after-required-hypothesis-withdrawal",
+        "must_include_direct_declarations": [
+          "hEq"
+        ],
+        "must_exclude_direct_declarations": [
+          "h"
+        ],
+        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity."
+      }
     },
     {
       "case_id": "fixed-target-irrelevant-context-removal",
@@ -85,7 +98,17 @@
         "expected_action_policy": "preserve_eligibility"
       },
       "model_outcomes": "not_run",
-      "note": "The Lean tactic trace captures the same goal before and after deleting an irrelevant local declaration; the proof closes with the unchanged original move Nat.succ_le_succ h. This is a positive context-invariance calibration, not a model outcome."
+      "note": "The Lean tactic trace captures the same goal before and after deleting an irrelevant local declaration; the proof closes with the unchanged original move Nat.succ_le_succ h. This is a positive context-invariance calibration, not a model outcome.",
+      "proof_term_support": {
+        "receipt_label": "original-route-after-irrelevant-context-removal",
+        "must_include_direct_declarations": [
+          "h"
+        ],
+        "must_exclude_direct_declarations": [
+          "hIrrelevant"
+        ],
+        "interpretation": "Actual free variables in the kernel-checked proof term; usage is not logical necessity."
+      }
     }
   ],
   "exclusions": [
