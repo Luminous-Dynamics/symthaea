@@ -13,7 +13,8 @@
     "query_bundle_sha256",
     "graph",
     "queries",
-    "candidates"
+    "candidates",
+    "review_budgets_minutes"
   ],
   "properties": {
     "schema_version": {
@@ -55,6 +56,16 @@
       "items": {
         "$ref": "#/$defs/candidate"
       }
+    },
+    "review_budgets_minutes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "description": "Prerecorded fixed expert-minute budgets for the matched-policy replay."
     }
   },
   "$defs": {
