@@ -37,7 +37,7 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ProposalInput {
     schema_version: u32,
@@ -51,7 +51,7 @@ struct ProposalInput {
     review_budgets_minutes: Vec<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Edge {
     source: u64,
@@ -59,7 +59,7 @@ struct Edge {
     weight: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Query {
     query_id: String,
@@ -70,7 +70,7 @@ struct Query {
     metric: QueryMetric,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum QueryMetric {
     EdgeWeight { source: u64, target: u64 },
@@ -80,14 +80,14 @@ enum QueryMetric {
     TriadMotifCount { motif: TriadMotif },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum TriadMotif {
     FeedForwardLoop,
     DirectedThreeCycle,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Candidate {
     candidate_id: String,
@@ -97,7 +97,7 @@ struct Candidate {
     changes: Vec<EdgeChange>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum EdgeChange {
     AddWeight { source: u64, target: u64, weight: f64 },
@@ -119,7 +119,7 @@ impl EdgeChange {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct FrozenRankingReport {
     schema_version: u32,
     input_sha256: String,
@@ -127,14 +127,14 @@ struct FrozenRankingReport {
     policy_budget_results: Vec<FrozenPolicyOrder>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct FrozenPolicyOrder {
     policy: String,
     review_budget_minutes: f64,
     policy_order_candidate_ids: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct OutcomeFile {
     schema_version: u32,
@@ -144,7 +144,7 @@ struct OutcomeFile {
     candidate_outcomes: Vec<CandidateOutcome>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CandidateOutcome {
     candidate_id: String,
@@ -153,7 +153,7 @@ struct CandidateOutcome {
     actual_review_minutes: f64,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Adjudication {
     Correct,
@@ -161,7 +161,7 @@ enum Adjudication {
     Indeterminate,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ReviewerDecision {
     Accept,
@@ -271,7 +271,7 @@ fn validate_proposals(input: &ProposalInput) -> Result<(), String> {
     if input.graph.is_empty() || input.queries.is_empty() || input.candidates.is_empty() {
         return Err("proposal graph, queries, and candidates must all be non-empty".into());
     }
-    if input.queries.iter().any(|query| matches!(query.metric, QueryMetric::TriadMotifCount { .. }))
+    if input.queries.iter().any(|query| matches!(&query.metric, QueryMetric::TriadMotifCount { .. }))
         && input.graph.len() > 4096
     {
         return Err("triad motif evaluation is limited to subgraphs with at most 4096 directed edges".into());
@@ -767,7 +767,7 @@ mod tests {
         })).unwrap()
     }
 
-    fn make_outcomes(proposals: &ProposalInput, proposal_hash: &str, ranking_hash: &str) -> OutcomeFile {
+    fn make_outcomes(_proposals: &ProposalInput, proposal_hash: &str, ranking_hash: &str) -> OutcomeFile {
         serde_json::from_value(json!({
             "schema_version":1,
             "source_input_sha256":proposal_hash,
