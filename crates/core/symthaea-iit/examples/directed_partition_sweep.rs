@@ -19,11 +19,12 @@ struct Fixture {
     expected_unique_cuts: usize,
 }
 
-const FIXTURES: [Fixture; 4] = [
+const FIXTURES: [Fixture; 5] = [
     Fixture { units: 2, expected_assignments: 9, expected_unique_cuts: 3 },
     Fixture { units: 3, expected_assignments: 54, expected_unique_cuts: 22 },
     Fixture { units: 4, expected_assignments: 306, expected_unique_cuts: 150 },
     Fixture { units: 5, expected_assignments: 1_863, expected_unique_cuts: 1_061 },
+    Fixture { units: 6, expected_assignments: 12_348, expected_unique_cuts: 7_896 },
 ];
 
 fn median_duration(samples: &mut [Duration]) -> Duration {
