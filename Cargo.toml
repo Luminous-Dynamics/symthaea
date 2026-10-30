@@ -20,6 +20,11 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # These paths are matched by crates/core/* but are not Cargo packages.
+    # The observation-attestation Rust sources are compiled through a separate
+    # focused harness; neither directory may be enumerated as a workspace member.
+    "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
@@ -31,6 +36,9 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Directories selected by the workspace glob but not yet Cargo packages.
+    "crates/domains/symthaea-rea-evidence-verifier",
+    "crates/bridges/symthaea-proof-insights",
 ]
 default-members = [
     "xtask",

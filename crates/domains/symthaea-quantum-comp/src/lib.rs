@@ -68,6 +68,7 @@ pub mod rng;
 pub mod robustness;
 pub mod schema;
 pub mod significance;
+pub mod paired_advantage;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -155,6 +156,11 @@ pub use schema::{
     RESEARCH_BUNDLE_SCHEMA, RESEARCH_RECEIPT_SCHEMA, known_schema_labels,
 };
 pub use significance::{PairedDifferenceSummary, exact_two_sided_sign_test_p_value};
+pub use paired_advantage::{
+    ExactSignTest, HolmAdjustedPValue, PairedAdvantageConfig, PairedAdvantageError,
+    PairedAdvantageReport, PairedBenchmarkObservation, RawHypothesis,
+    analyze_paired_advantage, exact_one_sided_sign_test_p_value, holm_adjust,
+};
 pub use stability::{
     AlphaStability, StabilityRecord, catalog_has_no_deprecated_surfaces, stability_catalog,
 };
