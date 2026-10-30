@@ -31,6 +31,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - name: Check formatting for standalone research source
+        run: rustfmt --edition=2024 --check tools/vision-dvpc-053-crossfit-dr-ope.rs
       - name: Compile and run known-answer and falsification tests
         run: |
           rustc --edition=2024 -O --test tools/vision-dvpc-053-crossfit-dr-ope.rs -o /tmp/vis-dvpc-053-tests
