@@ -237,6 +237,8 @@ pub struct Iit4SystemPhiSearchConfig {
     pub decimal_precision: u32,
     pub max_partition_combinations: usize,
     pub max_state_pair_evaluations: usize,
+    /// Hard cap on the Cartesian product of specified-state pairs and partitions.
+    pub max_partition_score_evaluations: usize,
     pub include_total_cut: bool,
 }
 
@@ -246,6 +248,7 @@ impl Default for Iit4SystemPhiSearchConfig {
             decimal_precision: 6,
             max_partition_combinations: 100_000,
             max_state_pair_evaluations: 1_024,
+            max_partition_score_evaluations: 1_000_000,
             include_total_cut: false,
         }
     }
@@ -337,6 +340,7 @@ impl Iit4SystemPhiAnalysis {
         receipt_u32(&mut bytes, self.search_config.decimal_precision);
         receipt_usize(&mut bytes, self.search_config.max_partition_combinations);
         receipt_usize(&mut bytes, self.search_config.max_state_pair_evaluations);
+        receipt_usize(&mut bytes, self.search_config.max_partition_score_evaluations);
         bytes.push(u8::from(self.search_config.include_total_cut));
 
         bytes.push(match self.status {
@@ -533,6 +537,11 @@ pub enum SystemPhiError {
     StatePairBudgetExceeded {
         candidate_pairs: usize,
         max_state_pairs: usize,
+    },
+    #[error("partition-score evaluation count {candidate_evaluations} exceeds the configured budget of {max_evaluations}")]
+    PartitionScoreBudgetExceeded {
+        candidate_evaluations: usize,
+        max_evaluations: usize,
     },
     #[error("specified-state pair count overflow")]
     StatePairCounterOverflow,
@@ -2418,6 +2427,12 @@ impl BinaryCausalModel {
             .len()
             .checked_mul(state_pair_count)
             .ok_or(SystemPhiError::StatePairCounterOverflow)?;
+        if partition_score_evaluations > config.max_partition_score_evaluations {
+            return Err(SystemPhiError::PartitionScoreBudgetExceeded {
+                candidate_evaluations: partition_score_evaluations,
+                max_evaluations: config.max_partition_score_evaluations,
+            });
+        }
 
         let state_pairs = intrinsic.state_pairs();
         let mut state_pair_results = Vec::with_capacity(state_pair_count);
@@ -3426,6 +3441,31 @@ mod tests {
         assert!(matches!(
             non_finite.receipt_sha256(),
             Err(Iit4SystemPhiReceiptError::NonFiniteFloat { field: "phi_s" })
+        ));
+    }
+
+    #[test]
+    fn system_search_fails_closed_when_total_partition_score_budget_is_exceeded() {
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2,
+                0.1, 0.8,
+                0.9, 0.2,
+                0.9, 0.8,
+            ],
+            vec![false, true, true, false],
+        ).unwrap();
+        let config = Iit4SystemPhiSearchConfig {
+            max_partition_score_evaluations: 2,
+            ..Iit4SystemPhiSearchConfig::default()
+        };
+        assert!(matches!(
+            model.analyze_iit4_2023_system_phi_s(&[0, 1], &[true, false], config),
+            Err(SystemPhiError::PartitionScoreBudgetExceeded {
+                candidate_evaluations: 3,
+                max_evaluations: 2,
+            })
         ));
     }
 
