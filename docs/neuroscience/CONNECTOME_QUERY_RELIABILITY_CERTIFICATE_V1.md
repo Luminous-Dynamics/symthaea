@@ -110,3 +110,6 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 This is an internal consistency verifier only. It does not fetch source artifacts, independently verify external digest claims, establish the completeness of a dependency closure, or prove biological truth. A successful run means only that the supplied certificate is internally consistent under V1 rules. The example is expected to pass as `CONDITIONAL`, not as a biological certification.
+
+
+A `CERTIFIED_WITHIN_DECLARED_SCOPE` certificate requires all critical quality gates to be `PASS`; non-critical gates may be `NOT_APPLICABLE` only with a non-empty scope justification. A critical gate marked `NOT_APPLICABLE`, `NOT_ESTIMABLE`, or `FAIL` blocks full certification. A `CONDITIONAL` certificate cannot conceal a failed critical gate. Every uncertainty component must declare at least one explicit assumption; `ESTIMATED` components require a point estimate, while `NOT_ESTIMABLE` components must not carry one or an interval.
