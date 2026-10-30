@@ -38,7 +38,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const SQLITE_SCHEMA_VERSION: i64 = 2;
+const SQLITE_SCHEMA_VERSION: i64 = 3;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn require_non_empty(value: &str, field: &str) -> Result<(), String> {
@@ -123,6 +123,7 @@ struct PersistedLifecycleRow {
     sequence: i64,
     event_id: String,
     recorded_at_unix_ms: i64,
+    event_sha256: String,
     body_json: Vec<u8>,
 }
 
@@ -188,6 +189,7 @@ impl SqliteAmlMemoryBackend {
                      sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                      event_id TEXT UNIQUE NOT NULL COLLATE BINARY,
                      recorded_at_unix_ms INTEGER NOT NULL CHECK (recorded_at_unix_ms >= 0),
+                     event_sha256 TEXT NOT NULL,
                      body_json BLOB NOT NULL
                  );
                  CREATE INDEX IF NOT EXISTS aml_evidence_lifecycle_events_recorded_at
