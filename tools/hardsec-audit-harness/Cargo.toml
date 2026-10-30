@@ -27,3 +27,8 @@ path = "../../examples/hardsec_trigger_budget.rs"
 name = "hardsec_evidence_packet_audit"
 path = "../../examples/hardsec_evidence_packet_audit.rs"
 required-features = ["hardsec-evidence-audit"]
+
+[[example]]
+name = "hardsec_challenge_profile_audit"
+path = "../../examples/hardsec_challenge_profile_audit.rs"
+required-features = ["hardsec-evidence-audit"]
