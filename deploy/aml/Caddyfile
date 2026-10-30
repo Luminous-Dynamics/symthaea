@@ -1,0 +1,4 @@
+{$AML_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy broca:8080
+}
