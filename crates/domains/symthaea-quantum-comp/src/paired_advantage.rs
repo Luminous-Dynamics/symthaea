@@ -475,6 +475,18 @@ mod tests {
     }
 
     #[test]
+    fn exact_fractional_reduction_boundary_is_a_tie_not_a_win() {
+        let mut observations = fixture_observations();
+        for observation in &mut observations {
+            observation.quantum_resource_per_accepted_answer = 90.0;
+            observation.classical_resource_per_accepted_answer = 100.0;
+        }
+        let report = analyze_paired_advantage(&observations, fixture_config()).unwrap();
+        assert_eq!(report.resource_superiority.wins, 0);
+        assert_eq!(report.resource_superiority.ties, 16);
+    }
+
+    #[test]
     fn resource_wins_below_the_practical_margin_are_not_wins() {
         let mut observations = fixture_observations();
         for observation in observations.iter_mut().take(13) {
