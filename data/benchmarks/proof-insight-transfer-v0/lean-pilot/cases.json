@@ -64,6 +64,28 @@
       },
       "model_outcomes": "not_run",
       "note": "The Lean theorem traces the goal before and after clearing h and proves the unchanged target by an alternate route using hEq. This is an elaboration calibration, not a model run or serialized state-replay benchmark row."
+    },
+    {
+      "case_id": "fixed-target-irrelevant-context-removal",
+      "mutation_kind": "irrelevant_context_removed",
+      "base_statement": "(a b : Nat) (h : a ≤ b) (hIrrelevant : 17 = 17) : Nat.succ a ≤ Nat.succ b",
+      "variant_statement": "(a b : Nat) (h : a ≤ b) (hIrrelevant : 17 = 17) : Nat.succ a ≤ Nat.succ b",
+      "expected_relation": "same_target_statement_and_goal_type",
+      "evidence_declarations": [
+        "same_goal_after_irrelevant_hypothesis_clear"
+      ],
+      "contract_precondition": "h : a ≤ b remains present; hIrrelevant : 17 = 17 is removed and is not part of the original move's support",
+      "state_intervention": {
+        "kind": "irrelevant_declaration_removed",
+        "operation": "clear hIrrelevant",
+        "target_statement_preserved": true,
+        "goal_type_preserved": true,
+        "required_hypothesis_preserved": true,
+        "irrelevant_declaration_removed": true,
+        "expected_action_policy": "preserve_eligibility"
+      },
+      "model_outcomes": "not_run",
+      "note": "The Lean tactic trace captures the same goal before and after deleting an irrelevant local declaration; the proof closes with the unchanged original move Nat.succ_le_succ h. This is a positive context-invariance calibration, not a model outcome."
     }
   ],
   "exclusions": [
