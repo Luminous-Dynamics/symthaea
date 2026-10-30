@@ -136,3 +136,5 @@ The deterministic policy truth table is also versioned at [lifecycle-action-fixt
 ## 16. Calibrated retrieval stopping and value-of-information
 
 See [RETRIEVAL_VALUE_OF_INFORMATION.md](RETRIEVAL_VALUE_OF_INFORMATION.md) and [retrieval-value-fixtures-v1.json](retrieval-value-fixtures-v1.json) for the conservative utility gate that decides whether another retrieval call is worth its marginal correctness/lifecycle benefit, harm risk and measured cost. This builds on HALT's claim–evidence coverage stop condition and adds the budgeted utility, calibration, retrieval-harm and realized-budget evaluation required by Active RAG research. It is not yet trained or measured; the fixture corpus is synthetic policy conformance only.
+The supported orchestrator entry point is `decide_lifecycle_action_with_voi`: it derives unresolved claims from the lifecycle ledger, checks the exact `EvidenceIndexSnapshotReceipt` and VOI estimate bindings, and passes the receipt into the lifecycle decision digest. Early-stop and budget-exhausted states remain distinguishable.
+
