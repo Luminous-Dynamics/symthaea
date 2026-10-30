@@ -1176,6 +1176,76 @@ mod tests {
         );
     }
 
+    struct ManufacturingAdapterCandidate {
+        id: String,
+        representative: f64,
+        amplification_risk: f64,
+        noise: f64,
+        cost: f64,
+        cost_unit: String,
+        eligible: bool,
+    }
+
+    #[test]
+    fn consumes_symtropy_manufacturing_adapter_and_selects_representative_low_risk_candidate() {
+        const ADAPTER: &str =
+            include_str!("fixtures/manufacturing-robustness-adapter-synthetic.csv");
+        let mut lines = ADAPTER.lines();
+        assert_eq!(
+            lines.next(),
+            Some("candidate_id,representativeness_score,amplification_risk,observation_std_uncertainty,acquisition_cost,cost_unit,eligible,eligibility_state,eligibility_receipt_sha256")
+        );
+        let candidates: Vec<ManufacturingAdapterCandidate> = lines
+            .map(|line| {
+                let fields: Vec<&str> = line.split(',').collect();
+                assert_eq!(fields.len(), 9);
+                assert_eq!(fields[7], "ELIGIBLE");
+                assert_eq!(fields[8].len(), 64);
+                let candidate = ManufacturingAdapterCandidate {
+                    id: fields[0].to_string(),
+                    representative: fields[1].parse().unwrap(),
+                    amplification_risk: fields[2].parse().unwrap(),
+                    noise: fields[3].parse().unwrap(),
+                    cost: fields[4].parse().unwrap(),
+                    cost_unit: fields[5].to_string(),
+                    eligible: fields[6].parse().unwrap(),
+                };
+                assert!((0.0..=1.0).contains(&candidate.representative));
+                assert!((0.0..=1.0).contains(&candidate.amplification_risk));
+                assert!(candidate.noise.is_finite() && candidate.noise > 0.0);
+                assert!(candidate.cost.is_finite() && candidate.cost > 0.0);
+                candidate
+            })
+            .collect();
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates.iter().all(|candidate| candidate.cost_unit == "USD_2026"));
+
+        let hypotheses = [0_usize, 1];
+        let discrepancy_scenarios = [0_u8, 1_u8];
+        let predict = |hypothesis: &usize,
+                       candidate: &ManufacturingAdapterCandidate,
+                       scenario: &u8| {
+            let signal = if candidate.id == "TX-CAND-OOD-002" { 10.0 } else { 2.0 };
+            Some(*hypothesis as f64 * signal * (1.0 + f64::from(*scenario) * 0.1))
+        };
+        let (chosen, score) =
+            select_experiment_by_representative_deamplifying_worst_case_eig_per_cost(
+                &candidates,
+                &hypotheses,
+                &[0.5, 0.5],
+                &discrepancy_scenarios,
+                |candidate| candidate.eligible,
+                |candidate| candidate.representative,
+                |candidate| candidate.amplification_risk,
+                |candidate| candidate.noise,
+                predict,
+                |candidate| candidate.cost,
+            )
+            .expect("the manufacturing adapter contains an eligible positive-information candidate");
+        assert_eq!(chosen.id, "TX-CAND-REP-001");
+        assert!(score.is_finite() && score > 0.0);
+    }
+
     #[test]
     fn information_gain_selector_maximizes_information_per_cost_not_raw_information() {
         let hypotheses = [0_usize, 1, 2, 3];
