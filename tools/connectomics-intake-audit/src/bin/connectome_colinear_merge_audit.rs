@@ -274,20 +274,17 @@ fn feature_gain(samples: &[Sample], split: usize, half_window: usize, feature: F
 }
 
 fn score_at(track: &Track, split: usize, input: &Input, multi_feature: bool) -> f64 {
-    let features: &[Feature] = if multi_feature {
-        &[Feature::Radius, Feature::Tangent, Feature::Membrane, Feature::Synapse]
-    } else {
-        &[Feature::Radius]
-    };
-    let gains = features.iter()
-        .map(|feature| feature_gain(
-            &track.samples,
-            split,
-            input.detector.half_window_samples,
-            *feature,
-            feature.sigma(&input.noise),
-        ))
-        .sum::<f64>();
+    let half_window = input.detector.half_window_samples;
+    let mut gains = feature_gain(
+        &track.samples, split, half_window, Feature::Radius, Feature::Radius.sigma(&input.noise)
+    );
+    if multi_feature {
+        for feature in [Feature::Tangent, Feature::Membrane, Feature::Synapse] {
+            gains += feature_gain(
+                &track.samples, split, half_window, feature, feature.sigma(&input.noise)
+            );
+        }
+    }
     gains.sqrt()
 }
 
