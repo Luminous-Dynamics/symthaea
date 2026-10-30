@@ -53,7 +53,7 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
     if spec.get("schema") != "symthaea.science_bench_refresh_rubric_specification.v1":
         issues.append("unsupported rubric specification schema")
     purpose = spec.get("purpose")
-    if purpose not in {"example_only", "qualified_rubric"}:
+    if not isinstance(purpose, str) or purpose not in {"example_only", "qualified_rubric"}:
         issues.append("purpose must be example_only or qualified_rubric")
     example = purpose == "example_only"
 
@@ -174,7 +174,7 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
             issues.append(f"duplicate test_id {test_id}")
         tests_by_id[test_id] = test
         test_type = test.get("test_type")
-        if test_type not in {"positive", "negative", "edge_case", "adversarial", "meaning_preserving", "meaning_changing"}:
+        if not isinstance(test_type, str) or test_type not in {"positive", "negative", "edge_case", "adversarial", "meaning_preserving", "meaning_changing"}:
             issues.append(f"test {test_id} has unsupported test_type")
         candidate_digest = test.get("candidate_pair_sha256")
         if not isinstance(candidate_digest, str) or HEX64.fullmatch(candidate_digest) is None:
@@ -185,6 +185,9 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(criterion_ids, list) or not criterion_ids:
             issues.append(f"test {test_id} requires criterion_ids")
             continue
+        if any(not isinstance(item, str) for item in criterion_ids):
+            issues.append(f"test {test_id} criterion_ids must be strings")
+            continue
         if len(criterion_ids) != len(set(criterion_ids)):
             issues.append(f"test {test_id} repeats a criterion_id")
         for criterion_id in criterion_ids:
@@ -193,7 +196,7 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
             elif test_type in coverage[criterion_id]:
                 coverage[criterion_id][test_type] += 1
         behavior = test.get("expected_judge_behavior")
-        if behavior not in {
+        if not isinstance(behavior, str) or behavior not in {
             "accept_supported", "reject_unsupported",
             "abstain_or_mark_scope_ambiguous", "no_unearned_score_uplift",
             "directional_criterion_sensitivity",
@@ -225,6 +228,9 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
         source = dependency.get("from_criterion_id")
         target = dependency.get("to_criterion_id")
         relation = dependency.get("relation")
+        if not isinstance(source, str) or not isinstance(target, str) or not isinstance(relation, str):
+            issues.append(f"{context} source, target and relation must be strings")
+            continue
         if source not in criteria_by_id or target not in criteria_by_id:
             issues.append(f"{context} references an unknown criterion")
         if source == target:
