@@ -51,6 +51,14 @@ NB201_GOOGLE_DRIVE_IDS = {
     "cifar100": "1hV6-mCUKInIK1iqZ0jfBkcKaFmftlBtp",
     "ImageNet16-120": "1FVCn54aQwD6X6NazaIZ_yjhj47mOGdIH",
 }
+NB201_EDGE_LIST = ((1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4))
+NB201_OPERATION_NAMES = (
+    "skip_connect",
+    "none",
+    "nor_conv_3x3",
+    "nor_conv_1x1",
+    "avg_pool_3x3",
+)
 
 
 class ImportErrorDetail(ValueError):
@@ -73,6 +81,39 @@ def parse_epochs(value: str) -> tuple[int, ...]:
     if tuple(sorted(set(epochs))) != epochs:
         raise ImportErrorDetail("fidelity epochs must be strictly increasing and unique")
     return epochs
+
+
+def suitezero_id_to_naslib_curve_key(architecture_id: str) -> str:
+    """Match NASLib convert_op_indices_to_str exactly for a SuiteZero tuple-string ID."""
+    import ast
+
+    try:
+        parsed = ast.literal_eval(architecture_id)
+    except (SyntaxError, ValueError) as error:
+        raise ImportErrorDetail(f"invalid SuiteZero NAS-Bench-201 architecture ID {architecture_id!r}") from error
+    if not isinstance(parsed, (tuple, list)) or len(parsed) != len(NB201_EDGE_LIST):
+        raise ImportErrorDetail("NAS-Bench-201 architecture IDs must contain exactly six operation indices")
+    operations: list[int] = []
+    for index, operation in enumerate(parsed):
+        if isinstance(operation, bool) or not isinstance(operation, int):
+            raise ImportErrorDetail(f"architecture operation {index} must be an integer")
+        if not 0 <= operation < len(NB201_OPERATION_NAMES):
+            raise ImportErrorDetail(f"architecture operation {index} is outside 0..4")
+        operations.append(operation)
+    if architecture_id != str(tuple(operations)):
+        raise ImportErrorDetail(
+            f"architecture ID {architecture_id!r} is not in canonical tuple-string form"
+        )
+
+    edge_to_operation = {
+        edge: NB201_OPERATION_NAMES[operation]
+        for edge, operation in zip(NB201_EDGE_LIST, operations)
+    }
+    operation_edges = [
+        "{}~{}".format(edge_to_operation[(source, target)], source - 1)
+        for source, target in sorted(edge_to_operation, key=lambda edge: edge[1])
+    ]
+    return "|{}|+|{}|{}|+|{}|{}|{}|".format(*operation_edges)
 
 
 def _finite_float(value: Any, field: str) -> float:
@@ -199,13 +240,19 @@ def build_multifidelity_import(
         raise ImportErrorDetail("NASLib pickle must contain a top-level nb201_data dictionary")
     nb201_data = curve_data["nb201_data"]
     dataset_key = NB201_DATASET_KEYS[dataset]
+    curve_key_by_architecture_id = {
+        architecture_id: suitezero_id_to_naslib_curve_key(architecture_id)
+        for architecture_id in features_by_id
+    }
+    if len(set(curve_key_by_architecture_id.values())) != len(curve_key_by_architecture_id):
+        raise ImportErrorDetail("SuiteZero architecture IDs collide after NASLib curve-key conversion")
     curve_architecture_keys = set(nb201_data)
-    expected_architecture_keys = set(features_by_id)
-    if curve_architecture_keys != expected_architecture_keys:
-        missing = sorted(expected_architecture_keys - curve_architecture_keys)[:5]
-        unexpected = sorted(curve_architecture_keys - expected_architecture_keys)[:5]
+    expected_curve_keys = set(curve_key_by_architecture_id.values())
+    if curve_architecture_keys != expected_curve_keys:
+        missing = sorted(expected_curve_keys - curve_architecture_keys)[:5]
+        unexpected = sorted(curve_architecture_keys - expected_curve_keys)[:5]
         raise ImportErrorDetail(
-            f"SuiteZero and learning-curve architecture sets differ; missing curves={missing}, unexpected curves={unexpected}"
+            f"SuiteZero/NASLib architecture sets differ after key conversion; missing curves={missing}, unexpected curves={unexpected}"
         )
 
     expected_final_epoch = epochs[-1]
@@ -218,21 +265,22 @@ def build_multifidelity_import(
     minimum_curve_length = None
 
     for architecture_id in sorted(features_by_id):
-        architecture_record = nb201_data[architecture_id]
+        curve_key = curve_key_by_architecture_id[architecture_id]
+        architecture_record = nb201_data[curve_key]
         if not isinstance(architecture_record, dict) or not isinstance(architecture_record.get(dataset_key), dict):
-            raise ImportErrorDetail(f"learning-curve record for {architecture_id!r} is missing dataset {dataset_key!r}")
+            raise ImportErrorDetail(f"learning-curve record for {architecture_id!r} (NASLib key {curve_key!r}) is missing dataset {dataset_key!r}")
         task_record = architecture_record[dataset_key]
         curve = task_record.get("eval_acc1es")
         if not isinstance(curve, (list, tuple)):
-            raise ImportErrorDetail(f"{architecture_id}.{dataset_key}.eval_acc1es must be a list")
+            raise ImportErrorDetail(f"{curve_key}.{dataset_key}.eval_acc1es must be a list")
         minimum_curve_length = len(curve) if minimum_curve_length is None else min(minimum_curve_length, len(curve))
         if len(curve) < expected_final_epoch:
             raise ImportErrorDetail(
-                f"{architecture_id} has {len(curve)} validation points; requested fidelity requires epoch {expected_final_epoch}"
+                f"{architecture_id} / {curve_key} has {len(curve)} validation points; requested fidelity requires epoch {expected_final_epoch}"
             )
         final_curve_accuracy = _finite_float(
             curve[expected_final_epoch - 1],
-            f"{architecture_id}.{dataset_key}.eval_acc1es[{expected_final_epoch - 1}]",
+            f"{curve_key}.{dataset_key}.eval_acc1es[{expected_final_epoch - 1}]",
         )
         source_accuracy = suitezero_target_by_id[architecture_id]
         final_delta = abs(final_curve_accuracy - source_accuracy)
@@ -245,7 +293,7 @@ def build_multifidelity_import(
         for fidelity_index, epoch in enumerate(epochs):
             value = _finite_float(
                 curve[epoch - 1],
-                f"{architecture_id}.{dataset_key}.eval_acc1es[{epoch - 1}]",
+                f"{curve_key}.{dataset_key}.eval_acc1es[{epoch - 1}]",
             )
             target_labels.append(
                 {
