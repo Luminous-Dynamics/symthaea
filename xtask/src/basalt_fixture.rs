@@ -474,6 +474,50 @@ fn sha256_tagged(bytes: &[u8]) -> String {
     format!("sha256:{encoded}")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_path(label: &str) -> PathBuf {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock follows UNIX epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "basalt-fixture-test-{}-{now}-{label}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn ignore_worker_does_not_open_or_stat_resource() {
+        let missing = test_path("must-not-exist");
+        let output = run_worker_command("ignore", &missing)
+            .expect("ignore mode must not touch the resource path");
+        assert_eq!(output.bytes_read, 0);
+        assert_eq!(output.output_digest, sha256_tagged(INDEPENDENT_TASK_OUTPUT));
+        assert!(!missing.exists());
+    }
+
+    #[test]
+    fn consume_worker_reads_exact_fixture_bytes() {
+        let path = test_path("consume");
+        let bytes = b"fixture payload";
+        fs::write(&path, bytes).expect("fixture writes");
+        let output = run_worker_command("consume", &path).expect("consume mode reads");
+        assert_eq!(output.bytes_read, bytes.len() as u64);
+        assert_eq!(output.output_digest, sha256_tagged(bytes));
+        fs::remove_file(path).expect("fixture cleanup");
+    }
+
+    #[test]
+    fn fixture_resource_mapping_rejects_unimplemented_resources() {
+        assert!(fixture_resource("fixture:unlisted-secret.txt").is_ok());
+        assert!(fixture_resource("fixture:docs/unused.md").is_ok());
+        assert!(fixture_resource("fixture:arbitrary-input").is_err());
+    }
+}
+
 fn sha256_file(path: &Path) -> anyhow::Result<String> {
     use std::io::Read;
     let mut file = fs::File::open(path)?;
