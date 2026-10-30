@@ -14,6 +14,7 @@ autoexamples = false
 [features]
 default = []
 hardsec-evidence-audit = ["dep:sha2"]
+hardsec-selective-eval = ["dep:sha2"]
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -27,3 +28,8 @@ path = "../../examples/hardsec_trigger_budget.rs"
 name = "hardsec_evidence_packet_audit"
 path = "../../examples/hardsec_evidence_packet_audit.rs"
 required-features = ["hardsec-evidence-audit"]
+
+[[example]]
+name = "hardsec_selective_eval"
+path = "../../examples/hardsec_selective_eval.rs"
+required-features = ["hardsec-selective-eval"]
