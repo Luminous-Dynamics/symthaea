@@ -47,7 +47,7 @@ pub use factor_graph::{
 mod sparse_causal;
 pub use sparse_causal::{
     SparseBinaryCausalModel, SparseCausalError, SparseEq4Report, SparseMechanismCpt,
-    MAX_LOCAL_PARENTS, MAX_SPARSE_UNITS,
+    MAX_LOCAL_PARENTS, MAX_SPARSE_UNITS, SPARSE_IIT4_EQ4_ALGORITHM_ID,
 };
 
 /// Maximum dense binary units accepted by this in-memory v0.1 representation.
