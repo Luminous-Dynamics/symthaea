@@ -706,6 +706,9 @@ fn validate_sha256(value: &str, field: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory_proof_budget::{
+        ProofEvidenceCandidate, ProofJustification, ProofObligation, solve_proof_budget,
+    };
 
     fn digest(value: &str) -> String {
         format!("{:x}", Sha256::digest(value.as_bytes()))
@@ -838,6 +841,91 @@ mod tests {
             retrieval,
             required_claims: claims,
         }
+    }
+
+    fn real_proof_request() -> ProofBudgetRequest {
+        let excerpt = "verified current evidence";
+        ProofBudgetRequest {
+            decision_id: "decision-real".into(),
+            principal_id: "principal-1".into(),
+            scope_id: "scope-1".into(),
+            valid_at_unix_ms: 200,
+            known_at_unix_ms: 300,
+            policy_id: "policy-v1".into(),
+            policy_sha256: digest("policy"),
+            fixed_packet_overhead_tokens: 2,
+            token_budget: 64,
+            max_search_nodes: 1000,
+            tokenizer_id: "test-tokenizer".into(),
+            tokenizer_version: "1".into(),
+            tokenizer_sha256: digest("tokenizer"),
+            packet_renderer_sha256: digest("renderer"),
+            candidates: vec![ProofEvidenceCandidate {
+                evidence_id: "E1".into(),
+                source_revision_id: "REV-E1".into(),
+                source_pointer: "/messages/0/content".into(),
+                source_span_text: excerpt.into(),
+                source_span_start: 0,
+                source_span_end: excerpt.len() as u64,
+                source_family_id: "family-1".into(),
+                scope_id: "scope-1".into(),
+                payload_sha256: digest("payload"),
+                source_span_sha256: digest(excerpt),
+                resolved_span_sha256: digest(excerpt),
+                conflicts_with: BTreeSet::new(),
+                recorded_at_unix_ms: 100,
+                retracted_at_unix_ms: None,
+                valid_from_unix_ms: Some(10),
+                valid_until_unix_ms: None,
+                authorized_principal_id: "principal-1".into(),
+                authorization_accepted: true,
+                authorization_receipt_sha256: digest("authorization receipt"),
+                retrieval_rank: 1,
+                token_cost: 3,
+            }],
+            obligations: vec![ProofObligation {
+                conclusion_id: "C1".into(),
+                alternatives: vec![ProofJustification {
+                    justification_id: "proof-C1".into(),
+                    evidence_dependencies: vec!["E1".into()],
+                }],
+                minimum_independent_families: 1,
+                selection_overhead_tokens: 1,
+            }],
+        }
+    }
+
+    #[test]
+    fn verified_proof_token_is_created_only_from_the_independent_packet_verifier() {
+        let proof_request = real_proof_request();
+        let result = solve_proof_budget(proof_request.clone()).unwrap();
+        assert_eq!(result.status, crate::memory_proof_budget::ProofBudgetStatus::Supported);
+        let token = verify_proof_packet_for_lifecycle(&proof_request, &result).unwrap();
+
+        let lifecycle_request = LifecyclePolicyRequest {
+            decision_id: proof_request.decision_id.clone(),
+            principal_id: proof_request.principal_id.clone(),
+            scope_id: proof_request.scope_id.clone(),
+            valid_at_unix_ms: proof_request.valid_at_unix_ms,
+            known_at_unix_ms: proof_request.known_at_unix_ms,
+            proof_status: ProofVerificationState::VerifiedOptimal,
+            proof_packet_sha256: result.packet_sha256.clone(),
+            retrieval: progress(true, false),
+            required_claims: vec![ClaimLifecycleLedgerEntry {
+                conclusion_id: "C1".into(),
+                state: ClaimLifecycleState::SupportedCurrent,
+                selected_justification_id: Some("proof-C1".into()),
+                current_evidence_ids: BTreeSet::from(["E1".into()]),
+                stale_evidence_ids: BTreeSet::new(),
+                conflicting_evidence_ids: BTreeSet::new(),
+                rejected_evidence_ids: BTreeSet::new(),
+            }],
+        };
+        let decision = decide_lifecycle_action(lifecycle_request, Some(&token)).unwrap();
+        assert_eq!(decision.action, LifecycleAction::Answer);
+        assert_eq!(decision.proof_request_sha256.as_deref(), Some(token.request_sha256.as_str()));
+        assert_eq!(decision.proof_packet_sha256.as_deref(), Some(token.packet_sha256.as_str()));
+        assert!(decision.answer_is_permitted().unwrap());
     }
 
     #[test]
