@@ -1,0 +1,45 @@
+{
+  "schema_version": "broca-retrieval-calibration-fixtures-v1",
+  "policy_version": "BROCA-RETRIEVAL-CALIBRATION-V1",
+  "created_at": "2026-10-30",
+  "source_protocol": "Synthetic fixture scenarios for finite-sample lower-bound coverage; observations are generated deterministically with all predicted lower bounds set to 100 micro-utility and covered actual net value 250 versus uncovered -100.",
+  "scenarios": [
+    {
+      "case_id": "perfect_coverage_single_slice",
+      "sample_count": 300,
+      "covered_count": 300,
+      "family_size": 1,
+      "target_lower_bound_coverage": 0.9,
+      "minimum_audit_observations": 30,
+      "expected_pass": true
+    },
+    {
+      "case_id": "undercoverage_single_slice",
+      "sample_count": 300,
+      "covered_count": 240,
+      "family_size": 1,
+      "target_lower_bound_coverage": 0.9,
+      "minimum_audit_observations": 30,
+      "expected_pass": false
+    },
+    {
+      "case_id": "perfect_coverage_large_family",
+      "sample_count": 300,
+      "covered_count": 300,
+      "family_size": 100,
+      "target_lower_bound_coverage": 0.9,
+      "minimum_audit_observations": 30,
+      "expected_pass": false
+    },
+    {
+      "case_id": "sample_below_minimum",
+      "sample_count": 29,
+      "covered_count": 29,
+      "family_size": 1,
+      "target_lower_bound_coverage": 0.9,
+      "minimum_audit_observations": 30,
+      "expected_pass": false,
+      "expected_error": "below required minimum"
+    }
+  ]
+}
