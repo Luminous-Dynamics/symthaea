@@ -20,6 +20,8 @@ use std::sync::OnceLock;
 pub const STATEMENT_TYPE: &str = "https://in-toto.io/Statement/v1";
 pub const PREDICATE_TYPE: &str = "https://luminousdynamics.io/attestations/evidence/v0.1";
 pub const SCHEMA_VERSION: &str = "0.1.0";
+/// Maximum serialized LEP Statement size accepted by the offline CLI and parser.
+pub const MAX_STATEMENT_BYTES: usize = 16 * 1024 * 1024;
 
 /// A JSON value deserialized with duplicate object keys rejected.
 ///
@@ -138,6 +140,11 @@ impl<'de> Deserialize<'de> for StrictJsonValue {
 /// Call this before any schema or semantic validation. It also requires that
 /// the input contain exactly one complete JSON value.
 pub fn parse_json_unique_keys(input: &[u8]) -> Result<Value, String> {
+    if input.len() > MAX_STATEMENT_BYTES {
+        return Err(format!(
+            "statement exceeds maximum size of {MAX_STATEMENT_BYTES} bytes"
+        ));
+    }
     let mut deserializer = serde_json::Deserializer::from_slice(input);
     let StrictJsonValue(value) =
         StrictJsonValue::deserialize(&mut deserializer).map_err(|error| error.to_string())?;
@@ -188,6 +195,8 @@ impl ValidationReport {
         let message = message.into();
         let code = if message.contains("duplicate JSON object key") {
             "DUPLICATE_JSON_KEY"
+        } else if message.contains("maximum size") {
+            "STATEMENT_TOO_LARGE"
         } else {
             "INVALID_JSON"
         };
@@ -1472,6 +1481,31 @@ mod tests {
                 report.violations
             );
         }
+    }
+
+    #[test]
+    fn strict_parser_rejects_oversized_statements_before_deserialization() {
+        let input = vec![b' '; MAX_STATEMENT_BYTES + 1];
+        let error = parse_json_unique_keys(&input).expect_err("oversized input must fail closed");
+        assert!(
+            error.contains(&format!("maximum size of {MAX_STATEMENT_BYTES} bytes")),
+            "unexpected size-limit error: {error}"
+        );
+        let report = ValidationReport::invalid_json(error);
+        assert_eq!(report.violations[0].code, "STATEMENT_TOO_LARGE");
+        assert!(!report.conforms);
+    }
+
+    #[test]
+    fn strict_parser_rejects_excessive_nesting() {
+        let depth = 256;
+        let input = format!("{}0{}", "[".repeat(depth), "]".repeat(depth));
+        let error = parse_json_unique_keys(input.as_bytes())
+            .expect_err("serde_json's default recursion limit must reject deep nesting");
+        assert!(
+            error.contains("recursion limit"),
+            "unexpected nesting error: {error}"
+        );
     }
 
     #[test]
