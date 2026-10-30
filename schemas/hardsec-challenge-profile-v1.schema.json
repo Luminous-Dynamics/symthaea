@@ -939,7 +939,11 @@
       "then": {
         "properties": {
           "dataset_role": {
-            "const": "evaluation_corpus_member"
+            "const": "evaluation_corpus_member",
+            "enum": [
+              "evaluation_corpus_member",
+              "reference_fixture_only"
+            ]
           },
           "trigger": {
             "properties": {
