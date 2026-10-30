@@ -881,6 +881,45 @@ mod tests {
     }
 
     #[test]
+    fn same_adjudicator_cannot_vote_twice_on_one_claim() {
+        let mut value = fixture_value();
+        value["initial_adjudications"][1]["adjudicator_id_sha256"] =
+            value["initial_adjudications"][0]["adjudicator_id_sha256"].clone();
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("duplicate initial votes from one adjudicator")));
+    }
+
+    #[test]
+    fn one_declared_independence_group_cannot_supply_multiple_votes() {
+        let mut value = fixture_value();
+        value["adjudicators"][1]["independence_group_sha256"] =
+            value["adjudicators"][0]["independence_group_sha256"].clone();
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("one declared independence group")));
+    }
+
+    #[test]
+    fn mirrors_in_one_ancestry_group_are_counted_once() {
+        let mut value = fixture_value();
+        value["sources"][1]["ancestry_group_sha256"] =
+            value["sources"][0]["ancestry_group_sha256"].clone();
+        let report = verify_value(&value);
+        assert!(report.valid, "{:?}", report.issues);
+        assert_eq!(report.referenced_source_ancestry_groups, 1);
+    }
+
+    #[test]
+    fn target_date_must_be_inside_validity_interval() {
+        let mut value = fixture_value();
+        value["claims"][0]["scope"]["valid_from"] = json!("2027-01-01");
+        let report = verify_value(&value);
+        assert!(!report.valid);
+        assert!(report.issues.iter().any(|issue| issue.contains("outside its declared validity")));
+    }
+
+    #[test]
     fn unknown_fields_are_rejected() {
         let mut value = fixture_value();
         value["unrecognized_trust_me"] = json!(true);
