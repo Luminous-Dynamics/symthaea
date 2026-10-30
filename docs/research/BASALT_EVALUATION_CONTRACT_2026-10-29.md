@@ -72,6 +72,16 @@ The rubric definition is a frozen measurement instrument, not a score. This vali
 
 The synthetic example rubric is illustrative only. Its criterion weights and anchors are not empirical or validated rating standards.
 
+## Oracle strength and evaluator evolution
+
+A fixed verifier is necessary for reproducibility but may not cover every behavior required by the task. TestJack (7 October 2026) demonstrates a concrete evaluator-evolution approach: decompose the prompt into testable requirements, propose tests for uncovered behavior, validate each test against the ground-truth patch, and use an independent reviewer to reject tests that encode incidental reference-implementation details. Across the paper's five evaluated coding benchmarks, the authors reported that 1,545 of 4,487 trials previously marked as passing (34.4%) violated task requirements; the reported aggregate resolution rate fell from 50.6% to 33.2%. These findings are specific to that study, not a universal rate and not a BASALT result.
+
+BASALT tracks an implementation protocol in [#9115](https://github.com/Luminous-Dynamics/symthaea/issues/9115). The task specification and independently reviewed requirement ledger—not the reference patch—define expected behavior. The reference patch is an executable test oracle only. A candidate-conditioned witness test is accepted only when it is grounded in a frozen requirement, passes on the pinned reference, and is reviewed against incidental-reference overfit. Ambiguous or unsupported requirements become task defects, not post-hoc candidate failures.
+
+Accepted witness tests are task-scoped and replayed against every system/attempt arm for that task before publishing an oracle-hardened comparison. Preserve the original fixed-suite result separately from the hardened result. The report must distinguish deeply audited trials, trials screened by shared witnesses, and static-suite-only trials. Deep-audit sampling probability, witness yield, false-reference-rejection rate, replay coverage, evaluator cost, and per-task paired outcomes remain visible. Test-generation and replay costs are not silently charged to only one agent arm.
+
+This does not prove correctness beyond the tested requirement surface. LLM-generated tests and reviewers require separate qualification; the reference patch cannot resolve ambiguous task intent; and no candidate-specific test may be used to rank systems unless the same accepted witness pool is replayed across all arms. See also evaluator reliability and reference assurance in [#9059](https://github.com/Luminous-Dynamics/symthaea/issues/9059) and [#9081](https://github.com/Luminous-Dynamics/symthaea/issues/9081).
+
 ## Analysis plan
 Patch-quality ratings are a separate secondary endpoint tracked in [#9084](https://github.com/Luminous-Dynamics/symthaea/issues/9084). Report them only conditional on strict verified success; no maintainability/readability score may compensate for a failed blocking obligation. Preserve raw criterion ratings, evidence, adjudication, and reviewer agreement rather than publishing only a composite.
 
@@ -119,6 +129,7 @@ BASALT's differentiated aim should be **verified change per unit cost under cont
 - [Vals AI Terminal-Bench 4.0 leaderboard and methodology](https://www.vals-ai.com/benchmarks/terminal-bench-4)
 - [OpenAI: Separating signal from noise in coding evaluations (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/)
 - [Epoch AI: Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review)
+- [TestJack: evaluator evolution with requirement-grounded witness tests (October 2026)](https://arxiv.org/abs/2610.10619)
 - [in-toto Attestation Framework v1.2](https://github.com/in-toto/attestation/blob/main/spec/README.md)
 - [SLSA v1.2 specification](https://slsa.dev/spec/v1.2/)
 - [GitHub artifact attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
