@@ -934,20 +934,25 @@ fn run() -> Result<(), String> {
     let proposal_bytes = read_file(&args.proposals, "proposal input")?;
     let ranking_bytes = read_file(&args.ranking_report, "ranking report")?;
     let protocol_bytes = read_file(&args.sampling_protocol, "sampling protocol")?;
+    let spatial_frame_report_bytes = read_file(&args.spatial_frame_report, "spatial frame report")?;
     let audit_bytes = read_file(&args.audit, "coverage audit")?;
 
     let proposal_hash = sha256(&proposal_bytes);
     let ranking_hash = sha256(&ranking_bytes);
     let protocol_hash = sha256(&protocol_bytes);
+    let spatial_frame_report_hash = sha256(&spatial_frame_report_bytes);
     let audit_hash = sha256(&audit_bytes);
 
     let proposals: ProposalInput = serde_json::from_slice(&proposal_bytes)
         .map_err(|error| format!("invalid proposal JSON: {error}"))?;
     let ranking: RankingInput = serde_json::from_slice(&ranking_bytes)
         .map_err(|error| format!("invalid ranking-report JSON: {error}"))?;
+    let spatial_frame_report: SpatialFrameReport = serde_json::from_slice(&spatial_frame_report_bytes)
+        .map_err(|error| format!("invalid spatial-frame report JSON: {error}"))?;
     let audit: AuditInput = serde_json::from_slice(&audit_bytes)
         .map_err(|error| format!("invalid coverage-audit JSON: {error}"))?;
 
+    validate_spatial_frame_binding(&audit, &spatial_frame_report, &spatial_frame_report_hash)?;
     let (frame, outcomes, selected) = validate(
         &proposals, &ranking, &audit, &proposal_hash, &ranking_hash, &protocol_hash,
     )?;
