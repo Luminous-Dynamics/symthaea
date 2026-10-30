@@ -114,3 +114,9 @@ No retrieval reduction, calibration score, LifeEM improvement or SOTA result is 
 - CONFRAG, *Confidence-Guided Retrieval-Augmented Generation*, EMNLP 2026 Industry Track: https://aclanthology.org/2026.emnlp-industry.171/
 - AgentAbstain, NeurIPS 2026 Evaluations & Datasets Track: https://agentabstain.github.io/
 - Evidence Sufficiency Benchmark, *Do LLMs Know When Evidence is Insufficient?* (2026): https://doi.org/10.32604/cmc.2026.086343
+
+## Calibration capability required for orchestration
+
+See [RETRIEVAL_CALIBRATION_AUDIT.md](RETRIEVAL_CALIBRATION_AUDIT.md). The canonical VOI-to-lifecycle adapter now requires an opaque `ValidatedRetrievalCalibration` capability. It can only be minted by the finite-sample audit when the one-sided Hoeffding lower confidence bound on empirical lower-bound coverage meets the pre-registered target after Bonferroni correction across the fixed family of slices/settings. The capability binds estimator artifact, feature schema, utility schema, calibration split and exact audit report digest. A raw VOI estimate may still be inspected or tested diagnostically, but it cannot be used by the canonical production adapter without a passing capability.
+
+Brier score and ECE are reported as diagnostics, not pass/fail safety evidence. The finite-sample interpretation assumes a fixed estimator and i.i.d./exchangeable audit queries; adaptive tuning after inspecting the audit split invalidates the fixed-sample claim and requires sequential risk control (e.g. adaptive Learn-then-Test / e-process).
