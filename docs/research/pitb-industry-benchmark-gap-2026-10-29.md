@@ -179,6 +179,8 @@ A PITB systems cohort should compare:
 
 Measure cold/warm state-acquisition time, branch-start latency, branches per second, p50/p95 wall time, peak memory, proof-check time, verified solves per compute budget, and the overhead of snapshot creation/restoration. Every branch must retain the exact goal, environment, local context and source identity; a stale or mismatched state is a correctness failure, not a cache miss to silently ignore.
 
+**Proposed systems qualification targets:** at least 5× median branch-start latency improvement over cold reconstruction on the predeclared branch-heavy cohort; at least 2× as many verified branch attempts within the same fixed wall-time budget; zero accepted state-identity mismatches in the finite tamper/invalidation suite; and no regression in exact-target kernel or semantic correctness. These are engineering targets, not published PITB results. Require paired runs, the same Lean revision, toolchain, theorem context, branch schedule and hardware, plus p50/p95 and peak-memory reporting. If a reusable live-state runtime is not available, report only cold/warm baselines and do not claim snapshot-reuse performance.
+
 The research distinction is important: the current Lean pilot emits content-addressed representations of the goal and local context. It does **not** persist or restore Lean's live metavariable context. Reusing those JSON records as though they were live proof states would be a category error. The published Lean snapshotting work is therefore a systems direction to prototype separately, not a capability already implemented in PITB.
 
 #### Three evidence layers for proof support
