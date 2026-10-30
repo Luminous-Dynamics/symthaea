@@ -578,6 +578,98 @@ fn groups(predictions: &[Prediction], point: OperatingPoint) -> Vec<GroupSummary
 fn ratio_within(value: Option<f64>, cap: f64) -> bool {
     value.is_none_or(|rate| rate <= cap + 1e-12)
 }
+/// Exact one-sided Clopper-Pearson upper confidence limit for a binomial
+/// event probability. `alpha` is the upper-tail significance level.
+fn clopper_pearson_upper(events: u64, trials: u64, alpha: f64) -> Result<Option<f64>, String> {
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err("alpha must be finite and in (0, 1)".to_owned());
+    }
+    if trials == 0 {
+        return Ok(None);
+    }
+    if events > trials {
+        return Err("events cannot exceed trials".to_owned());
+    }
+    if events == trials {
+        return Ok(Some(1.0));
+    }
+    if events == 0 {
+        return Ok(Some(-((alpha.ln() / trials as f64).exp_m1())));
+    }
+
+    let mut lower = 0.0;
+    let mut upper = 1.0;
+    for _ in 0..80 {
+        let midpoint = lower + (upper - lower) * 0.5;
+        let cdf = binomial_cdf(events, trials, midpoint);
+        if cdf > alpha {
+            lower = midpoint;
+        } else {
+            upper = midpoint;
+        }
+    }
+    Ok(Some(upper))
+}
+
+fn binomial_cdf(max_events: u64, trials: u64, probability: f64) -> f64 {
+    if probability <= 0.0 {
+        return 1.0;
+    }
+    if probability >= 1.0 {
+        return if max_events >= trials { 1.0 } else { 0.0 };
+    }
+
+    // Sum binomial masses in log space using the recurrence
+    // P(X=k+1)/P(X=k) = ((n-k)/(k+1)) * (p/(1-p)).
+    let log_p = probability.ln();
+    let log_not_p = (-probability).ln_1p();
+    let mut log_mass = trials as f64 * log_not_p;
+    let mut max_log = f64::NEG_INFINITY;
+    let mut scaled_sum = 0.0;
+
+    for events in 0..=max_events {
+        if log_mass > max_log {
+            scaled_sum = if max_log.is_finite() {
+                scaled_sum * (max_log - log_mass).exp() + 1.0
+            } else {
+                1.0
+            };
+            max_log = log_mass;
+        } else {
+            scaled_sum += (log_mass - max_log).exp();
+        }
+
+        if events < max_events {
+            log_mass += ((trials - events) as f64).ln()
+                - ((events + 1) as f64).ln()
+                + log_p
+                - log_not_p;
+        }
+    }
+
+    (max_log.exp() * scaled_sum).clamp(0.0, 1.0)
+}
+
+fn minimum_zero_failure_groups(target_upper_bound: f64, alpha: f64) -> Result<Option<u64>, String> {
+    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+        return Err("alpha must be finite and in (0, 1)".to_owned());
+    }
+    if !target_upper_bound.is_finite() || !(0.0..=1.0).contains(&target_upper_bound) {
+        return Err("target upper bound must be finite and in [0, 1]".to_owned());
+    }
+    if target_upper_bound == 0.0 {
+        return Ok(None);
+    }
+    if target_upper_bound == 1.0 {
+        return Ok(Some(1));
+    }
+    let required = (alpha.ln() / (-target_upper_bound).ln_1p()).ceil();
+    if !required.is_finite() || required > u64::MAX as f64 {
+        return Ok(None);
+    }
+    Ok(Some((required as u64).max(1)))
+}
+
 
 fn metrics_json(value: Rates) -> Value {
     json!({
@@ -675,6 +767,30 @@ fn build_receipt(
         group_coverage_sum / per_group.len() as f64
     };
 
+    // A group is a failure if it contains >=1 false alert or >=1 false clear.
+    // This is a group-level event rate, not a gate-level FPR/FNR bound.
+    // Bonferroni allocates alpha=0.05 across the two reported risks.
+    let group_trials = per_group.len() as u64;
+    let false_alert_groups = per_group
+        .iter()
+        .filter(|group| group.metrics.counts.false_alerts > 0)
+        .count() as u64;
+    let false_clear_groups = per_group
+        .iter()
+        .filter(|group| group.metrics.counts.false_clears > 0)
+        .count() as u64;
+    let familywise_alpha = 0.05;
+    let alpha_per_risk = familywise_alpha / 2.0;
+    let false_alert_group_upper =
+        clopper_pearson_upper(false_alert_groups, group_trials, alpha_per_risk)?;
+    let false_clear_group_upper =
+        clopper_pearson_upper(false_clear_groups, group_trials, alpha_per_risk)?;
+    let zero_failure_group_targets = json!({
+        "one_percent": minimum_zero_failure_groups(0.01, alpha_per_risk)?,
+        "half_percent": minimum_zero_failure_groups(0.005, alpha_per_risk)?,
+        "zero_percent": minimum_zero_failure_groups(0.0, alpha_per_risk)?,
+    });
+
     Ok(json!({
         "schema_version": RECEIPT_SCHEMA,
         "result": "evaluated",
@@ -727,6 +843,26 @@ fn build_receipt(
             "group_id": group.group_id,
             "metrics": metrics_json(group.metrics),
         })).collect::<Vec<_>>(),
+        "family_level_failure_bounds": {
+            "scope": "probability_an_independent_held_out_group_has_any_error_of_the_named_type",
+            "assumption": "held-out groups are independent and exchangeable draws from the target family population; this is not established by the evaluator",
+            "error_event_definition": "at least one false decision of the named type within a group",
+            "method": "one_sided_exact_clopper_pearson_binomial_upper_bound",
+            "confidence_level_familywise": 0.95,
+            "familywise_alpha": familywise_alpha,
+            "bonferroni_alpha_per_risk": alpha_per_risk,
+            "group_count": group_trials,
+            "false_alert_failure_groups": false_alert_groups,
+            "false_alert_group_failure_upper_bound": false_alert_group_upper,
+            "false_clear_failure_groups": false_clear_groups,
+            "false_clear_group_failure_upper_bound": false_clear_group_upper,
+            "minimum_independent_groups_if_zero_failures": zero_failure_group_targets,
+            "notes": [
+                "These are family-level any-error bounds, not per-gate false-alert or false-clear bounds.",
+                "A small number of families produces broad upper bounds even with zero observed group failures.",
+                "Group independence and representativeness are assumptions supplied by the experimental design, not verified from the score ledger."
+            ]
+        },
         "generalization": {
             "held_out_group_count": per_group.len(),
             "macro_group_coverage": macro_group_coverage,
