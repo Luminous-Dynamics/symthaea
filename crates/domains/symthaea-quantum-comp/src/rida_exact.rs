@@ -284,11 +284,18 @@ pub fn derive_de_amplification_threshold(
     Ok(DeAmplificationThreshold::Finite(tau))
 }
 
-/// Calculate the paper's DeA sigmoid weight for one candidate design.
+/// Calculate the paper's printed magnitude-only DeA sigmoid gate.
 ///
 /// A well-specified model (threshold status WellSpecified) receives neutral
 /// weight 1. Otherwise:
 /// DeA(xi) = sigmoid((|f_hat(xi) - g(xi)| - tau) / kappa).
+///
+/// IMPORTANT: this formula uses an absolute gap and therefore cannot, by
+/// itself, identify the sign of the generalization-error interaction. It
+/// reproduces the printed acquisition term, not a signed certificate that a
+/// sample de-amplifies error. The proposition/theorem sign relationship is
+/// under explicit audit in QARCH-012. Do not use this value as proof that the
+/// signed interaction is negative or that test error will decrease.
 pub fn score_de_amplification(
     current_prediction: f64,
     proxy_prediction: f64,
@@ -351,6 +358,121 @@ pub fn score_r_idea(
         r_i,
         de_amplification_weight,
         score,
+    })
+}
+
+/// Sign of the cross-term in the squared-error decomposition.
+///
+/// For A = (f_hat - bar_f) * (bar_f - f_star), a negative value offsets the
+/// sum of the separate misspecification and estimation squared errors; a
+/// positive value reinforces that sum. This diagnostic is evaluator/oracle
+/// only because it requires the true function value f_star.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignedErrorInteraction {
+    /// The cross-term is negative and reduces the sum of the two squared components.
+    Offsetting,
+    /// The cross-term is positive and increases the sum of the two squared components.
+    Reinforcing,
+    /// The cross-term is exactly zero.
+    Neutral,
+}
+
+/// Evaluator-only decomposition of one point's squared prediction error.
+///
+/// This structure requires f_star and must never be passed to deployment
+/// selection or used to train the proxy. It is provided to test whether a
+/// magnitude-only DeA gate actually identifies signed error cancellation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EvaluatorOnlySignedErrorDiagnostic {
+    /// bar_f - f_star: the signed misspecification error.
+    pub misspecification_error: f64,
+    /// f_hat - bar_f: the signed estimation error.
+    pub estimation_error: f64,
+    /// A = (f_hat - bar_f) * (bar_f - f_star), without the factor of two.
+    pub signed_interaction: f64,
+    /// 2*A: the cross-term in the squared-error identity.
+    pub decomposition_cross_term: f64,
+    /// (bar_f - f_star)^2.
+    pub misspecification_squared_error: f64,
+    /// (f_hat - bar_f)^2.
+    pub estimation_squared_error: f64,
+    /// Sum of the two squared components before the cross-term.
+    pub component_sum: f64,
+    /// (f_hat - f_star)^2: actual pointwise squared prediction error.
+    pub actual_squared_error: f64,
+    /// Whether the cross-term offsets or reinforces the two squared components.
+    pub interaction: SignedErrorInteraction,
+}
+
+/// Compute the signed squared-error decomposition for one evaluator-only point.
+///
+/// Identity:
+/// (f_hat - f_star)^2 = (bar_f - f_star)^2
+///                    + (f_hat - bar_f)^2
+///                    + 2*(bar_f - f_star)*(f_hat - bar_f).
+///
+/// The true value is an evaluator-only input. This function is not suitable
+/// for deployed acquisition because f_star is unknown in real experiments.
+pub fn evaluate_signed_interaction_oracle(
+    current_prediction: f64,
+    best_in_class_prediction: f64,
+    true_prediction: f64,
+) -> Result<EvaluatorOnlySignedErrorDiagnostic, RidaExactError> {
+    if !current_prediction.is_finite()
+        || !best_in_class_prediction.is_finite()
+        || !true_prediction.is_finite()
+    {
+        return Err(RidaExactError::NonFiniteProxyValue);
+    }
+
+    let misspecification_error = best_in_class_prediction - true_prediction;
+    let estimation_error = current_prediction - best_in_class_prediction;
+    let signed_interaction = estimation_error * misspecification_error;
+    let decomposition_cross_term = 2.0 * signed_interaction;
+    let misspecification_squared_error = misspecification_error * misspecification_error;
+    let estimation_squared_error = estimation_error * estimation_error;
+    let component_sum = misspecification_squared_error + estimation_squared_error;
+    let actual_squared_error =
+        (current_prediction - true_prediction) * (current_prediction - true_prediction);
+    let reconstructed_error = component_sum + decomposition_cross_term;
+
+    if [
+        misspecification_error,
+        estimation_error,
+        signed_interaction,
+        decomposition_cross_term,
+        misspecification_squared_error,
+        estimation_squared_error,
+        component_sum,
+        actual_squared_error,
+        reconstructed_error,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+        || (actual_squared_error - reconstructed_error).abs()
+            > 1.0e-10 * actual_squared_error.abs().max(1.0)
+    {
+        return Err(RidaExactError::InvalidDerivedScore);
+    }
+
+    let interaction = if signed_interaction < 0.0 {
+        SignedErrorInteraction::Offsetting
+    } else if signed_interaction > 0.0 {
+        SignedErrorInteraction::Reinforcing
+    } else {
+        SignedErrorInteraction::Neutral
+    };
+
+    Ok(EvaluatorOnlySignedErrorDiagnostic {
+        misspecification_error,
+        estimation_error,
+        signed_interaction,
+        decomposition_cross_term,
+        misspecification_squared_error,
+        estimation_squared_error,
+        component_sum,
+        actual_squared_error,
+        interaction,
     })
 }
 
@@ -600,6 +722,37 @@ mod tests {
             score_de_amplification(100.0, 0.0, DeAmplificationThreshold::WellSpecified, 1.0)
                 .unwrap(),
             1.0
+        );
+    }
+
+    #[test]
+    fn magnitude_dea_gate_cannot_identify_signed_error_offsetting() {
+        let threshold = DeAmplificationThreshold::Finite(1.0);
+        let kappa = 1.0;
+        let left_gate = score_de_amplification(-1.0, 1.0, threshold, kappa).unwrap();
+        let right_gate = score_de_amplification(3.0, 1.0, threshold, kappa).unwrap();
+        assert!((left_gate - right_gate).abs() < 1.0e-12);
+        assert!((left_gate - 0.731_058_578_630_004_9).abs() < 1.0e-12);
+
+        let left = evaluate_signed_interaction_oracle(-1.0, 1.0, 0.5).unwrap();
+        let right = evaluate_signed_interaction_oracle(3.0, 1.0, 0.5).unwrap();
+        assert_eq!(left.interaction, SignedErrorInteraction::Offsetting);
+        assert_eq!(right.interaction, SignedErrorInteraction::Reinforcing);
+        assert!((left.signed_interaction - (-1.0)).abs() < 1.0e-12);
+        assert!((right.signed_interaction - 1.0).abs() < 1.0e-12);
+        assert!((left.actual_squared_error - 2.25).abs() < 1.0e-12);
+        assert!((right.actual_squared_error - 6.25).abs() < 1.0e-12);
+
+        let threshold_from_paper =
+            derive_de_amplification_threshold(0.0, 0.5, 2.0, 0.0).unwrap();
+        assert_eq!(threshold_from_paper, DeAmplificationThreshold::Finite(1.0));
+    }
+
+    #[test]
+    fn signed_interaction_oracle_rejects_non_finite_truth() {
+        assert_eq!(
+            evaluate_signed_interaction_oracle(1.0, 0.5, f64::NAN),
+            Err(RidaExactError::NonFiniteProxyValue)
         );
     }
 
