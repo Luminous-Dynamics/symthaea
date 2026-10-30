@@ -1030,7 +1030,7 @@ jobs:
           jq empty "$schema" "$fixture"
           cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
             verify-reference-assurance-package "$fixture" > /tmp/sbr-reference-assurance-report.json
-          jq -e '.valid == true and .package_commitment_matches == true and .claim_count == 1 and .material_claim_count == 1 and .initial_adjudication_count == 3 and .claims_with_disagreement == 1 and .claims_missing_minimum_panel == 0 and .adjudicator_independence_proven == false and .source_authenticity_proven == false and .source_span_bytes_verified == false and .runner_execution_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false' \
+          jq -e '.valid == true and .package_commitment_matches == true and .claim_count == 1 and .material_claim_count == 1 and .initial_adjudication_count == 3 and .claims_with_disagreement == 1 and .claims_missing_minimum_panel == 0 and .referenced_sources_with_unknown_ancestry == 0 and .material_claims_without_cited_evidence == 0 and .adjudicator_independence_proven == false and .source_authenticity_proven == false and .source_span_bytes_verified == false and .runner_execution_proven == false and .external_anchor_required == true and .scoring_eligible_declared == false' \
             /tmp/sbr-reference-assurance-report.json >/dev/null
           cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
             verify-reference-assurance-package "$fixture" > /tmp/sbr-reference-assurance-report-repeat.json
