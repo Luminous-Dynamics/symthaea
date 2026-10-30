@@ -129,7 +129,7 @@
     {
       "experiment_id": "A-high-info-out-of-distribution",
       "nominal_evsi_per_cost": 0.9,
-      "information_gain_per_cost": null,
+      "information_gain_per_cost": 0.7136030428840436,
       "informativeness_score": 1,
       "representativeness_score": 0.30000000000000004,
       "target_weighted_validation_error": 0.26,
@@ -149,7 +149,7 @@
     {
       "experiment_id": "B-representative-low-info",
       "nominal_evsi_per_cost": 0.3,
-      "information_gain_per_cost": null,
+      "information_gain_per_cost": 0.06593194462450902,
       "informativeness_score": 0.3333333333333333,
       "representativeness_score": 1,
       "target_weighted_validation_error": 0.2,
@@ -169,7 +169,7 @@
     {
       "experiment_id": "C-balanced-rid",
       "nominal_evsi_per_cost": 0.6,
-      "information_gain_per_cost": null,
+      "information_gain_per_cost": 0.2780719051126377,
       "informativeness_score": 0.6666666666666666,
       "representativeness_score": 0.9,
       "target_weighted_validation_error": 0.30000000000000004,
@@ -189,7 +189,7 @@
     {
       "experiment_id": "D-alternative-mix",
       "nominal_evsi_per_cost": 0.45,
-      "information_gain_per_cost": null,
+      "information_gain_per_cost": 0.15145182170538418,
       "informativeness_score": 0.5,
       "representativeness_score": 0.7,
       "target_weighted_validation_error": 0.25,
@@ -369,5 +369,82 @@
     "de_amplification_only_winner": "B-representative-low-info",
     "full_rid_proxy_winner": "C-balanced-rid",
     "conclusion": "This synthetic design checks that the transparent three-component proxy can select a balanced candidate while one-component baselines expose different tradeoffs. It does not demonstrate superior real-world experiment selection."
+  },
+  "target_distribution_shift_case": {
+    "case_id": "QARCH-010-TARGET-SHIFT-002",
+    "evidence_class": "synthetic_analytic_fixture",
+    "target_regime_probabilities": [
+      0.1,
+      0.2,
+      0.7
+    ],
+    "validation_artifact_digest": "synthetic-validation-regimes-shifted-sha256-v1",
+    "evaluation_artifact_digest": "synthetic-evaluator-only-regimes-shifted-sha256-v1",
+    "expected_component_scores": [
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "representativeness_score": 0.7999999999999999,
+        "informativeness_score": 1,
+        "target_weighted_validation_error": 0.66,
+        "sampling_weighted_validation_error": 0.8200000000000001,
+        "validation_error_distribution_gap": 0.16000000000000003,
+        "de_amplification_score": 0.84,
+        "full_rid_proxy_score": 0.8759038279775778
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "representativeness_score": 0.7,
+        "informativeness_score": 0.5,
+        "target_weighted_validation_error": 0.13,
+        "sampling_weighted_validation_error": 0.16000000000000003,
+        "validation_error_distribution_gap": 0.030000000000000027,
+        "de_amplification_score": 0.97,
+        "full_rid_proxy_score": 0.6976109029171582
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "representativeness_score": 0.5,
+        "informativeness_score": 0.6666666666666666,
+        "target_weighted_validation_error": 0.29,
+        "sampling_weighted_validation_error": 0.36,
+        "validation_error_distribution_gap": 0.07,
+        "de_amplification_score": 0.9299999999999999,
+        "full_rid_proxy_score": 0.6767899452107007
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "representativeness_score": 0.5,
+        "informativeness_score": 0.3333333333333333,
+        "target_weighted_validation_error": 0.2,
+        "sampling_weighted_validation_error": 0.2,
+        "validation_error_distribution_gap": 0,
+        "de_amplification_score": 1,
+        "full_rid_proxy_score": 0.5503212081491045
+      }
+    ],
+    "expected_full_rid_proxy_ranking": [
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "score": 0.8759038279775778,
+        "rank": 1
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "score": 0.6976109029171582,
+        "rank": 2
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "score": 0.6767899452107007,
+        "rank": 3
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "score": 0.5503212081491045,
+        "rank": 4
+      }
+    ],
+    "expected_full_rid_proxy_winner": "A-high-info-out-of-distribution",
+    "prohibited_claim": "A target-distribution change must alter the declared objective only; this synthetic result does not demonstrate deployment performance."
   }
 }
