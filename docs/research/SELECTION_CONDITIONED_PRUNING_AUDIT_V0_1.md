@@ -27,7 +27,9 @@ The proposed control loop is:
 7. Invert the finite-population hypergeometric distribution to obtain a one-sided upper confidence bound on the number of false-pruned candidates in the complete pruned population.
 8. Continue pruning only when the pre-registered minimum sample size is met and the upper bound is within the risk budget. Otherwise disable pruning at that rung.
 
-The initial implementation reports aggregate audit statistics and a disposition. It does not return sentinel identities or raw scores to the search policy. The integrating service must preserve this information boundary; the Rust module alone is not process isolation or cryptographic access control.
+The Rust API now binds the sample to a private receipt containing the seed, the sorted complete pruned population, the sampled IDs, and domain-separated SHA-256 digests. A persisted receipt can be reconstituted only by replaying the declared seed against the complete population and matching the exact sampled-ID sequence. The audit rejects duplicate, missing, unexpected, or out-of-sample outcomes; it requires exactly one target-fidelity result for every committed sentinel. The report contains only aggregate statistics and the receipt digests, not sentinel identities or raw scores.
+
+The sample generator is deterministic and uses a seeded SplitMix64 stream with rejection-based bounded draws. It is reproducible, not a cryptographic random-number generator. The evaluator must choose/commit the seed independently before candidate outcomes are visible and protect raw audit outcomes from the search policy. The integrating service must preserve this information boundary; the Rust module alone is not process isolation or cryptographic access control.
 
 ## 3. Finite-population risk bound
 
@@ -90,12 +92,17 @@ Do not compare an audit-enabled method against a baseline that is charged only f
 
 The first code increment provides:
 
+- canonicalized candidate populations and a private sample receipt with seed, population digest and sample digest;
+- receipt verification by deterministic replay, preventing caller-supplied cherry-picked sample IDs;
 - deterministic, seeded uniform sentinel sampling without replacement;
 - validation of duplicate/empty IDs, selected/pruned overlap, out-of-population sentinels, mixed target fidelities, non-finite scores, and invalid risk limits;
 - selection-frontier comparison at the same target fidelity;
 - exact finite-population hypergeometric upper-bound inversion;
 - aggregate-only audit report with three dispositions;
+- exact one-outcome-per-sentinel enforcement, preventing silent omission of failed or missing audit results;
 - explicit cumulative-cost audit accounting.
+
+Thirteen Rust unit tests are authored for receipt replay, deterministic sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow. They have not been compiled or executed.
 
 Authored unit tests cover reproducible sampling, uniqueness, census behavior, monotone bounds, false-prune detection, insufficient-sample fail-closed behavior, mixed-fidelity rejection, invalid IDs/scores/configurations, and cost overflow.
 
