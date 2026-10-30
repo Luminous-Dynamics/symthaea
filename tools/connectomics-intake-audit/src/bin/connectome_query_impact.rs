@@ -73,6 +73,7 @@ enum QueryMetric {
 #[serde(deny_unknown_fields)]
 struct Candidate {
     candidate_id: String,
+    evidence_sha256: String,
     estimated_error_probability: f64,
     review_minutes: f64,
     evidence_sha256: String,
@@ -436,6 +437,7 @@ fn evaluate_candidate(
     Ok(CandidateEvaluation {
         rank: 0,
         candidate_id: candidate.candidate_id.clone(),
+        evidence_sha256: candidate.evidence_sha256.clone(),
         estimated_error_probability: candidate.estimated_error_probability,
         review_minutes: candidate.review_minutes,
         weighted_query_impact,
