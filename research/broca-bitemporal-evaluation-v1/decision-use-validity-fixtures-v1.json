@@ -350,7 +350,7 @@
       "decision": "classify_observation",
       "intervention_contract": {
         "kind": "flip_and_invariance",
-        "decisive_path": "measurement.attempt_status",
+        "decisive_path": "measurement.observation_state",
         "invariant_path": "instrument.operator_note"
       },
       "variants": [
@@ -456,9 +456,9 @@
       "name": "sunk_cost_does_not_change_prospective_choice",
       "decision": "allocate_next_incremental_budget",
       "intervention_contract": {
-        "kind": "invariance",
-        "decisive_path": "prospective.net_payoff",
-        "invariant_path": "history.sunk_cost"
+        "kind": "flip_and_invariance",
+        "decisive_path": "options.B.future_benefit",
+        "invariant_path": "history.sunk_cost_A"
       },
       "variants": [
         {
@@ -525,7 +525,7 @@
             },
             "history": {
               "sunk_cost_A": 0,
-              "sunk_cost_B": 500
+              "sunk_cost_B": 0
             }
           },
           "oracle": {
@@ -573,7 +573,7 @@
             },
             "history": {
               "sunk_cost_A": 200,
-              "sunk_cost_B": 900
+              "sunk_cost_B": 0
             }
           },
           "oracle": {
