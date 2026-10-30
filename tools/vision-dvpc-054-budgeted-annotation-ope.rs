@@ -2605,27 +2605,55 @@ mod tests {
         )
         .unwrap()
         .allocation;
-        let metrics = multi_policy_monte_carlo(&world, &allocation, &portfolio, 64, 1024, 0x0570_001);
+        let metrics = multi_policy_monte_carlo(
+            &world,
+            &allocation,
+            &portfolio,
+            64,
+            MC_TEST_REPLICATES,
+            0x0570_001,
+        );
+        let exact_mses = portfolio_policy_mses(&world, &allocation, &portfolio, 64).unwrap();
         assert!((0.0..=1.0).contains(&metrics.selection_accuracy));
         assert!(metrics.expected_simple_regret >= 0.0);
         for policy in 0..PORTFOLIO_POLICIES {
             assert!(metrics.mse[policy] >= 0.0);
             assert!(metrics.variance[policy] >= 0.0);
-            assert!((metrics.mse[policy] - metrics.bias[policy].powi(2) - metrics.variance[policy]).abs() < 1e-10);
+            assert!(
+                (metrics.mse[policy] - metrics.bias[policy].powi(2) - metrics.variance[policy]).abs()
+                    < 1e-10
+            );
+            let relative_mse_error =
+                (metrics.mse[policy] - exact_mses[policy]).abs() / exact_mses[policy].max(1e-12);
+            assert!(
+                relative_mse_error < 0.20,
+                "policy={}, analytic MSE={}, empirical MSE={}, rel={relative_mse_error}",
+                portfolio.names[policy],
+                exact_mses[policy],
+                metrics.mse[policy]
+            );
         }
-        for vector in [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-            [1.0, -1.0, 0.5],
-            [-0.25, 0.75, 2.0],
-        ] {
-            let quadratic = (0..PORTFOLIO_POLICIES)
-                .flat_map(|i| (0..PORTFOLIO_POLICIES).map(move |j| (i, j)))
-                .map(|(i, j)| vector[i] * metrics.covariance[i][j] * vector[j])
-                .sum::<f64>();
-            assert!(quadratic >= -1e-10, "portfolio covariance quadratic={quadratic}");
+        for i in 0..PORTFOLIO_POLICIES {
+            assert!(metrics.covariance[i][i] >= -1e-12);
+            for j in (i + 1)..PORTFOLIO_POLICIES {
+                assert!(
+                    (metrics.covariance[i][j] - metrics.covariance[j][i]).abs() < 1e-12
+                );
+                let principal_minor = metrics.covariance[i][i] * metrics.covariance[j][j]
+                    - metrics.covariance[i][j].powi(2);
+                assert!(principal_minor >= -1e-10);
+            }
         }
+        let determinant = metrics.covariance[0][0]
+            * (metrics.covariance[1][1] * metrics.covariance[2][2]
+                - metrics.covariance[1][2] * metrics.covariance[2][1])
+            - metrics.covariance[0][1]
+                * (metrics.covariance[1][0] * metrics.covariance[2][2]
+                    - metrics.covariance[1][2] * metrics.covariance[2][0])
+            + metrics.covariance[0][2]
+                * (metrics.covariance[1][0] * metrics.covariance[2][1]
+                    - metrics.covariance[1][1] * metrics.covariance[2][0]);
+        assert!(determinant >= -1e-10, "portfolio covariance determinant={determinant}");
     }
 
     #[test]
