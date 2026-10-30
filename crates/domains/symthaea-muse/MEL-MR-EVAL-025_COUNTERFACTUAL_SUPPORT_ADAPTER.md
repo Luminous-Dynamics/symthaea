@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-025 — replay-verified FluidSynth support adapter
 
-**Status:** adapter and six focused source tests authored; no compile, test, real FluidSynth render or dataset run claimed.
+**Status:** adapter and seven focused source tests authored; no compile, test, real FluidSynth render or dataset run claimed.
 
 ## Objective
 
