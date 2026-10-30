@@ -145,7 +145,8 @@
         },
         "attempts_per_task": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 10000
         },
         "expected_task_count": {
           "type": "integer",
