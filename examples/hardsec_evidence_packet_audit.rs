@@ -1161,6 +1161,7 @@ mod tests {
         base: PathBuf,
         packet: PathBuf,
         receipt: PathBuf,
+        evidence_root: PathBuf,
     }
 
     impl Fixture {
@@ -1172,8 +1173,10 @@ mod tests {
             ));
             let packet_dir = base.join("input");
             let receipt_dir = base.join("output");
+            let evidence_root = base.join("evidence");
             fs::create_dir_all(&packet_dir).unwrap();
             fs::create_dir_all(&receipt_dir).unwrap();
+            fs::create_dir_all(&evidence_root).unwrap();
             let packet = packet_dir.join("packet.json");
             let receipt = receipt_dir.join("receipt.json");
             fs::write(&packet, serde_json::to_vec_pretty(value).unwrap()).unwrap();
@@ -1181,6 +1184,7 @@ mod tests {
                 base,
                 packet,
                 receipt,
+                evidence_root,
             }
         }
 
@@ -1196,6 +1200,29 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.base);
         }
+    }
+
+    fn packet_with_hashed_local_evidence(fixture: &Fixture) -> Value {
+        let netlist = b"synthetic clean/infected netlist fixture\n";
+        let trace = b"synthetic reset-consistent trace fixture\n";
+        let netlist_path = fixture.evidence_root.join("netlists/design.v");
+        let trace_path = fixture.evidence_root.join("traces/activation.json");
+        fs::create_dir_all(netlist_path.parent().unwrap()).unwrap();
+        fs::create_dir_all(trace_path.parent().unwrap()).unwrap();
+        fs::write(&netlist_path, netlist).unwrap();
+        fs::write(&trace_path, trace).unwrap();
+
+        let netlist_sha256 = sha256_bytes(netlist);
+        let trace_sha256 = sha256_bytes(trace);
+        let mut packet = base_packet();
+        packet["subject"]["netlist_sha256"] = json!(netlist_sha256);
+        packet["subject"]["local_path"] = json!("netlists/design.v");
+        packet["evidence"][0]["subject_sha256"] = json!(netlist_sha256);
+        packet["evidence"][0]["evidence_sha256"] = json!(trace_sha256);
+        packet["evidence"][0]["witness_sha256"] = json!(trace_sha256);
+        packet["evidence"][0]["local_path"] = json!("traces/activation.json");
+        packet["evidence"][0]["witness_local_path"] = json!("traces/activation.json");
+        packet
     }
 
     fn add_evidence(packet: &mut Value, item: Value) {
@@ -1400,6 +1427,86 @@ mod tests {
         assert_eq!(summary.model_sha256, None);
         assert_eq!(summary.evidence_count, 5);
         assert_eq!(summary.claims.len(), 5);
+    }
+
+    #[test]
+    fn verifies_subject_evidence_and_witness_bytes_under_root() {
+        let fixture = Fixture::new(&base_packet());
+        let packet = packet_with_hashed_local_evidence(&fixture);
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        let verified = verify_evidence_bytes(&fixture.evidence_root, &summary).unwrap();
+        assert_eq!(verified["status"], "verified");
+        assert_eq!(verified["verified_file_count"], 3);
+    }
+
+    #[test]
+    fn rejects_tampered_evidence_bytes_under_root() {
+        let fixture = Fixture::new(&base_packet());
+        let packet = packet_with_hashed_local_evidence(&fixture);
+        fs::write(
+            fixture.evidence_root.join("traces/activation.json"),
+            b"tampered trace\n",
+        )
+        .unwrap();
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
+            .unwrap_err()
+            .contains("SHA-256 mismatch"));
+    }
+
+    #[test]
+    fn rejects_tampered_subject_netlist_bytes_under_root() {
+        let fixture = Fixture::new(&base_packet());
+        let packet = packet_with_hashed_local_evidence(&fixture);
+        fs::write(
+            fixture.evidence_root.join("netlists/design.v"),
+            b"tampered netlist\n",
+        )
+        .unwrap();
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
+            .unwrap_err()
+            .contains("subject netlist"));
+    }
+
+    #[test]
+    fn rejects_missing_local_path_when_byte_verification_is_requested() {
+        let fixture = Fixture::new(&base_packet());
+        let mut packet = packet_with_hashed_local_evidence(&fixture);
+        packet["evidence"][0].as_object_mut().unwrap().remove("local_path");
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
+            .unwrap_err()
+            .contains("local_path is required"));
+    }
+
+    #[test]
+    fn rejects_parent_traversal_in_local_evidence_path() {
+        let fixture = Fixture::new(&base_packet());
+        let mut packet = packet_with_hashed_local_evidence(&fixture);
+        packet["evidence"][0]["local_path"] = json!("../outside/trace.json");
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("must not contain"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_evidence_artifact() {
+        use std::os::unix::fs::symlink;
+
+        let fixture = Fixture::new(&base_packet());
+        let packet = packet_with_hashed_local_evidence(&fixture);
+        let target = fixture.evidence_root.join("traces/activation.json");
+        let link = fixture.evidence_root.join("traces/linked.json");
+        symlink(&target, &link).unwrap();
+        let mut packet = packet;
+        packet["evidence"][0]["local_path"] = json!("traces/linked.json");
+        packet["evidence"][0]["witness_local_path"] = json!("traces/activation.json");
+        let summary = validate_packet(&packet, "0".repeat(64)).unwrap();
+        assert!(verify_evidence_bytes(&fixture.evidence_root, &summary)
+            .unwrap_err()
+            .contains("must not be a symlink"));
     }
 
     #[test]
