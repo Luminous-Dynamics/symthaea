@@ -657,6 +657,9 @@ mod tests {
         input.queries[1].reference_value = Some(3.0);
         input.queries[2].reference_value = Some(4.0);
         input.queries[3].reference_value = Some(1.0);
+        if input.queries.len() > 4 {
+            input.queries[4].reference_value = Some(12.0);
+        }
         input
     }
 
@@ -858,6 +861,7 @@ mod tests {
             .expect("checked-in query-impact fixture parses");
         let report = score(&input, "0".repeat(64)).expect("query-impact fixture scores");
         assert_eq!(report.candidate_count, 3);
+        assert!(input.queries.iter().any(|query| matches!(&query.metric, QueryMetric::TriadMotifCount { motif: TriadMotif::FeedForwardLoop })));
         assert!(report.candidate_evaluations.iter().any(|item| item.candidate_id == "remove_second_leg"
             && item.overlaps_with_candidates == vec!["remove_part_of_second_leg".to_string()]));
         assert_eq!(report.status, "RANKED_FOR_HUMAN_REVIEW_ONLY");
