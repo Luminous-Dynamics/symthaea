@@ -21,6 +21,7 @@ use crate::memory_proof_budget::{
     verify_proof_budget_result,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Provenance retained outside reader-visible text.
@@ -29,6 +30,8 @@ pub struct VerifiedReaderEvidence {
     pub evidence_id: String,
     pub source_revision_id: String,
     pub source_pointer: String,
+    pub source_span_start: u64,
+    pub source_span_end: u64,
     pub source_family_id: String,
     pub payload_sha256: String,
     pub source_span_sha256: String,
@@ -42,6 +45,7 @@ pub struct VerifiedReaderEvidence {
 pub struct VerifiedReaderClaimProof {
     pub conclusion_id: String,
     pub justification_id: String,
+    pub selection_overhead_tokens: u32,
     /// Complete conjunctive dependency set in canonical order.
     pub evidence_dependencies: Vec<String>,
 }
@@ -75,6 +79,7 @@ pub struct VerifiedProofReaderContext {
     pub tokenizer_version: String,
     pub tokenizer_sha256: String,
     pub packet_renderer_sha256: String,
+    pub fixed_packet_overhead_tokens: u64,
     pub total_token_cost: u64,
     pub token_budget: u64,
     pub context_items: Vec<MemoryContextItem>,
@@ -158,8 +163,39 @@ impl VerifiedProofReaderContext {
         Ok(())
     }
 
-    /// Check that reader-visible spans and control-plane provenance remain aligned.
+    /// Fail closed if the control-plane metadata and reader context ever drift.
     pub fn verify_internal_consistency(&self) -> Result<(), String> {
+        fn valid_sha256(value: &str) -> bool {
+            value.len() == 64
+                && value.bytes().all(|byte| {
+                    byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                })
+        }
+        fn sha256(bytes: &[u8]) -> String {
+            format!("{:x}", Sha256::digest(bytes))
+        }
+
+        for (field, value) in [
+            ("request_sha256", self.request_sha256.as_str()),
+            ("packet_sha256", self.packet_sha256.as_str()),
+            ("tokenizer_sha256", self.tokenizer_sha256.as_str()),
+            ("packet_renderer_sha256", self.packet_renderer_sha256.as_str()),
+        ] {
+            if !valid_sha256(value) {
+                return Err(format!("{field} must be a 64-character lowercase SHA-256 digest"));
+            }
+        }
+        for (field, value) in [
+            ("decision_id", self.decision_id.as_str()),
+            ("principal_id", self.principal_id.as_str()),
+            ("scope_id", self.scope_id.as_str()),
+            ("tokenizer_id", self.tokenizer_id.as_str()),
+            ("tokenizer_version", self.tokenizer_version.as_str()),
+        ] {
+            if value.trim().is_empty() || value.trim() != value {
+                return Err(format!("{field} must be non-empty and trimmed"));
+            }
+        }
         if self.context_items.len() != self.evidence.len() {
             return Err(format!(
                 "reader item count {} differs from evidence metadata count {}",
@@ -175,6 +211,8 @@ impl VerifiedProofReaderContext {
         }
 
         let mut evidence_ids = BTreeSet::new();
+        let mut total_cost = self.fixed_packet_overhead_tokens;
+        let mut previous_evidence_id: Option<&str> = None;
         for (index, (item, evidence)) in self
             .context_items
             .iter()
@@ -184,20 +222,47 @@ impl VerifiedProofReaderContext {
             if item.kind != MemoryContextType::Text || item.value.trim().is_empty() {
                 return Err(format!("reader evidence item {index} is not non-empty text"));
             }
+            if sha256(item.value.as_bytes()) != evidence.source_span_sha256 {
+                return Err(format!(
+                    "reader evidence item {index} no longer matches its verified source-span digest"
+                ));
+            }
             if evidence.evidence_id.trim().is_empty()
                 || !evidence_ids.insert(evidence.evidence_id.as_str())
             {
                 return Err(format!("reader evidence item {index} has an empty or duplicate ID"));
             }
+            if previous_evidence_id.is_some_and(|previous| previous >= evidence.evidence_id.as_str()) {
+                return Err("reader evidence items are not in canonical ascending evidence-ID order".into());
+            }
+            previous_evidence_id = Some(evidence.evidence_id.as_str());
             if evidence.source_revision_id.trim().is_empty()
                 || evidence.source_pointer.trim().is_empty()
                 || evidence.source_family_id.trim().is_empty()
             {
                 return Err(format!("reader evidence item {index} has incomplete provenance"));
             }
+            if evidence.source_span_end <= evidence.source_span_start
+                || evidence.source_span_end - evidence.source_span_start != item.value.len() as u64
+            {
+                return Err(format!("reader evidence item {index} has inconsistent UTF-8 byte offsets"));
+            }
+            if !valid_sha256(&evidence.payload_sha256)
+                || !valid_sha256(&evidence.source_span_sha256)
+                || !valid_sha256(&evidence.authorization_receipt_sha256)
+            {
+                return Err(format!("reader evidence item {index} has malformed provenance digest"));
+            }
+            if evidence.retrieval_rank == 0 || evidence.token_cost == 0 {
+                return Err(format!("reader evidence item {index} has invalid retrieval rank or token cost"));
+            }
+            total_cost = total_cost
+                .checked_add(u64::from(evidence.token_cost))
+                .ok_or_else(|| "reader evidence token cost overflow".to_string())?;
         }
 
         let mut conclusions = BTreeSet::new();
+        let mut previous_conclusion_id: Option<&str> = None;
         for proof in &self.claim_proofs {
             if proof.conclusion_id.trim().is_empty()
                 || proof.justification_id.trim().is_empty()
@@ -205,6 +270,10 @@ impl VerifiedProofReaderContext {
             {
                 return Err("claim proof metadata has an empty or duplicate conclusion".into());
             }
+            if previous_conclusion_id.is_some_and(|previous| previous >= proof.conclusion_id.as_str()) {
+                return Err("claim proof metadata is not in canonical ascending conclusion order".into());
+            }
+            previous_conclusion_id = Some(proof.conclusion_id.as_str());
             if proof.evidence_dependencies.is_empty() {
                 return Err(format!("selected proof {:?} has no dependencies", proof.justification_id));
             }
@@ -223,6 +292,16 @@ impl VerifiedProofReaderContext {
                     ));
                 }
             }
+            total_cost = total_cost
+                .checked_add(u64::from(proof.selection_overhead_tokens))
+                .ok_or_else(|| "reader proof-envelope token cost overflow".to_string())?;
+        }
+
+        if total_cost != self.total_token_cost {
+            return Err(format!(
+                "reader context token cost mismatch: metadata says {}, recomputed {}",
+                self.total_token_cost, total_cost
+            ));
         }
         Ok(())
     }
@@ -261,6 +340,8 @@ pub fn build_verified_proof_reader_context(
             evidence_id: evidence.evidence_id.clone(),
             source_revision_id: evidence.source_revision_id.clone(),
             source_pointer: evidence.source_pointer.clone(),
+            source_span_start: evidence.source_span_start,
+            source_span_end: evidence.source_span_end,
             source_family_id: evidence.source_family_id.clone(),
             payload_sha256: evidence.payload_sha256.clone(),
             source_span_sha256: evidence.source_span_sha256.clone(),
@@ -275,6 +356,7 @@ pub fn build_verified_proof_reader_context(
         .map(|proof: &SelectedProof| VerifiedReaderClaimProof {
             conclusion_id: proof.conclusion_id.clone(),
             justification_id: proof.justification_id.clone(),
+            selection_overhead_tokens: proof.selection_overhead_tokens,
             evidence_dependencies: proof.evidence_dependencies.clone(),
         })
         .collect();
@@ -294,6 +376,7 @@ pub fn build_verified_proof_reader_context(
         tokenizer_version: request.tokenizer_version.clone(),
         tokenizer_sha256: request.tokenizer_sha256.clone(),
         packet_renderer_sha256: request.packet_renderer_sha256.clone(),
+        fixed_packet_overhead_tokens: request.fixed_packet_overhead_tokens,
         total_token_cost: result.total_token_cost,
         token_budget: request.token_budget,
         context_items,
