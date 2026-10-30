@@ -145,7 +145,32 @@ The 2026 paper [MF-NAS](https://doi.org/10.1145/3774940) studies proxy-guided lo
 
 For deployed serving, [MLPerf Endpoints v1.0](https://mlcommons.org/2026/10/open-submissions-endpoints-v1-0/) provides a separate whole-system performance frontier and power-reporting conventions. Pin its evolving rules and keep serving-system claims distinct from search-policy claims.
 
-## 10. Authored synthetic pilot harness
+## 10. Canonical analytical objective layer
+
+The module `src/analytical_benchmark.rs` adds an independent continuous search space with four well-known minimization objectives and known global optimum value zero:
+
+- **Sphere:** separable convex baseline.
+- **Rosenbrock:** narrow curved valley and ill-conditioning.
+- **Rastrigin:** multimodal search surface with many local minima.
+- **Ackley:** multimodality with a broad outer region and a central basin.
+
+The global optimum point is explicitly available for each objective (all zeros except the Rosenbrock vector of ones). The suite supports dimensions 2–64. Each seed creates a deterministic pool of 256 candidate points within function-specific bounds. The promotion policy and full-fidelity random baseline draw from the same pool, so their discrete pool-selection comparison is paired. This does **not** measure continuous proposal quality outside the pool.
+
+The analytical objective functions are standard forms, but the fidelity transforms used in this pilot are custom synthetic controls—not a faithful implementation of the published 14-problem L1 multi-fidelity suite. They include rank-preserving, rank-reversal, late-emerging-quality, and deliberately miscalibrated-uncertainty response rules.
+
+CLI examples:
+```text
+cargo run -p symthaea-architecture-engineering -- analytical-sweep sphere 8 rank_preserving 100
+cargo run -p symthaea-architecture-engineering -- analytical-sweep rosenbrock 8 rank_reversal 100
+cargo run -p symthaea-architecture-engineering -- analytical-sweep rastrigin 8 late_emerging_quality 100
+cargo run -p symthaea-architecture-engineering -- analytical-sweep ackley 8 miscalibrated_uncertainty 100
+```
+
+Each JSON run records the objective values of promoted finalists and a random baseline under the same 832 synthetic cost units, top-10 retention among the common candidate pool, F0 rank correlation, uncertainty diagnostics, and a candidate/fidelity trace whose costs must reconcile to each arm's total. Seven unit tests are authored for global optima, invalid input, deterministic replay, equal cost, reversed ranking, uncertainty under-coverage and seed-count checks. **They have not been compiled or run.**
+
+The external benchmark target is the 2026 analytical multi-fidelity benchmark framework, which uses Forrester (continuous/discontinuous), Rosenbrock, shifted/rotated Rastrigin, heterogeneous and noisy functions, and a coupled spring-mass system to test distinct mathematical difficulties. This pilot currently implements only the standard Rosenbrock and Rastrigin objective forms plus Sphere and Ackley; future work should implement the published transformations and additional problems or use the reference implementation where practical, with version/digest pinned. Source: [Mainini et al., Archives of Computational Methods in Engineering](https://doi.org/10.1007/s11831-025-10392-8).
+
+## 11. Authored synthetic pilot harness
 
 The new module `src/multi_fidelity_benchmark.rs` connects the promotion scheduler to an exhaustive 256-candidate objective oracle and defines three controlled fidelity regimes:
 
@@ -171,7 +196,7 @@ A separate Python arithmetic mirror (not Rust execution) checked the intended F0
 
 This pilot compares the cost-aware scheduler to full-fidelity random search only. It does not establish an advantage over Hyperband, MF-NAS, TPE/Bayesian optimization, or model-training systems. Those comparisons remain necessary before making general search-policy claims.
 
-## 11. Definition of done
+## 12. Definition of done
 
 - Promotion primitive tests compile and pass at the exact source revision.
 - Unit/property tests validate fidelity identity, uncertainty handling, deterministic selection, exploration boundaries and exact cost arithmetic.
