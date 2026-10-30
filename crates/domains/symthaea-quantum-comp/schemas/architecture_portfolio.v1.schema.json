@@ -9,7 +9,7 @@
     "schema_version": {"const": "symthaea.quantum_comp.architecture_portfolio.v1"},
     "record_id": {"type": "string", "minLength": 1},
     "architecture_id": {"type": "string", "minLength": 1},
-    "architecture_family": {"enum": ["classical_cpu","classical_gpu","npu","fpga","neuromorphic_digital","neuromorphic_mixed_signal","digital_processing_in_memory","near_memory_compute","analog_compute_in_memory","photonic_linear","photonic_reservoir","quantum_gate_superconducting","quantum_gate_trapped_ion","quantum_gate_neutral_atom","quantum_gate_photonic","quantum_annealing","physical_reservoir","spintronic","probabilistic","reversible","hybrid_heterogeneous"]},
+    "architecture_family": {"enum": ["classical_cpu","classical_gpu","npu","fpga","neuromorphic_digital","neuromorphic_mixed_signal","digital_processing_in_memory","near_memory_compute","analog_compute_in_memory","photonic_linear","photonic_reservoir","superconducting_digital","quantum_gate_superconducting","quantum_gate_trapped_ion","quantum_gate_neutral_atom","quantum_gate_photonic","quantum_annealing","physical_reservoir","spintronic","probabilistic","reversible","hybrid_heterogeneous"]},
     "workload_kind": {"enum": ["hdc_algebra","sparse_event_perception","streaming_sensor_fusion","continuous_time_dynamics","continual_learning","edge_control","combinatorial_optimization","dense_tensor_inference","other"]},
     "workload_fingerprint": {"type": "string", "minLength": 1},
     "comparison_contract_fingerprint": {"type": "string", "minLength": 1},

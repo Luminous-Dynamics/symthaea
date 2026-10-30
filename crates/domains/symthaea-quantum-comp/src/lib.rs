@@ -73,6 +73,7 @@ pub mod clustered_advantage;
 pub mod adaptive_evaluation;
 pub mod architecture_portfolio;
 pub mod architecture_routing;
+pub mod architecture_evidence;
 pub mod stability;
 pub mod statistics;
 pub mod substrate;
@@ -155,7 +156,8 @@ pub use replay::{ReplayCommand, ReplayPlan, ReplayScope, supported_replay_scopes
 pub use reporting::{ReportTable, robustness_to_markdown};
 pub use robustness::{MethodRobustness, NoiseRobustnessSummary};
 pub use schema::{
-    BINDING_PROBE_SCHEMA, CRATE_VERSION, EXPERIMENT_MATRIX_SCHEMA, FIXTURE_CATALOG_SCHEMA,
+    ARCHITECTURE_EVIDENCE_RECEIPT_SCHEMA, BINDING_PROBE_SCHEMA, CRATE_VERSION,
+    EXPERIMENT_MATRIX_SCHEMA, FIXTURE_CATALOG_SCHEMA,
     INTEGRATION_DECLARATION_SCHEMA, NOISE_SWEEP_SCHEMA, RELEASE_GATE_SCHEMA, REPLAY_PLAN_SCHEMA,
     RESEARCH_BUNDLE_SCHEMA, RESEARCH_RECEIPT_SCHEMA, known_schema_labels,
 };
@@ -174,6 +176,13 @@ pub use architecture_portfolio::{
     ArchitectureParetoRelation, ArchitectureResourceEnvelope,
     ArchitectureWorkloadKind, ComputeArchitectureFamily, MemoryInterval,
     MetricInterval,
+};
+pub use architecture_evidence::{
+    compare_architecture_evidence_records, select_architecture_candidate_from_evidence,
+    validate_architecture_evidence_receipt, validate_architecture_evidence_record,
+    validate_architecture_evidence_record_for_comparison,
+    ArchitectureBenchmarkSuite, ArchitectureEvidenceError, ArchitectureEvidenceOrigin,
+    ArchitectureEvidenceReceipt, ArchitectureEvidenceRecord,
 };
 pub use architecture_routing::{
     select_architecture_candidate, ArchitectureResourceLimits,

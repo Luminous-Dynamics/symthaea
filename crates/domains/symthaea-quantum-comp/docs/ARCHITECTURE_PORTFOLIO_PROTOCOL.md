@@ -16,6 +16,7 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | Analog compute-in-memory | RRAM/memristor, PCM, flash/NOR arrays | Data-local matrix/vector operations where conversion and correction costs do not erase array gains |
 | Classical photonic linear | Interferometric, diffractive or wavelength-multiplexed optics | High-throughput linear transforms and low-latency optical paths |
 | Photonic / physical reservoir | Physical dynamical substrate | Temporal feature expansion and reservoir tasks with cheap readout |
+| Superconducting digital | Cryogenic classical logic: SFQ, RQL and AQFP families | High-speed logic or specialised low-switching-energy computation, only when cryogenic, memory, I/O and cooling costs are measured |
 | Gate quantum | Superconducting, trapped-ion, neutral-atom and photonic systems | Specific quantum algorithms/sampling tasks under explicit logical/physical resource accounting |
 | Quantum annealing | Annealing / Ising architecture | Formulations that map faithfully to its native optimization model |
 | Spintronic / probabilistic | Spin devices and p-bits | Stochastic sampling or specialized low-energy probabilistic inference |
@@ -25,6 +26,8 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 Memory-centric designs require separate labels for where computation occurs (in-array, in-module/stack, or adjacent to memory), how it is computed (digital or analog), and the memory substrate (SRAM, DRAM, flash, RRAM, PCM, etc.). Digital HBM/DRAM processing-in-memory is not analog memristor compute-in-memory; near-memory logic is not in-array compute.
 
 For these workloads, report bytes moved at each hierarchy boundary, bank bandwidth/parallelism, precision, host/device transfers, and end-to-end energy/latency. For analog arrays, include ADC/DAC, sensing, calibration, programming, correction and readout. Do not compare an array-only peak with a full-system PIM or GPU result.
+
+Superconducting digital logic is a classical computing substrate, not a quantum processor. SFQ, RQL and AQFP have different clocking, bias, memory and latency/energy trade-offs. System claims must include refrigeration wall power, cryogenic memory, warm/cold I/O, control electronics, packaging and usable throughput. Chip-only switching energy or a modelled accelerator efficiency is not a full-system result. Keep this family distinct from superconducting gate-model quantum systems.
 
 An event camera is a sensor modality, not a neuromorphic compute family. Classical photonic matrix multiplication is not quantum photonics. Quantum-inspired software on CPU/GPU remains a classical implementation. A CfC or continuous-time model must not be forced into a spiking-network representation merely to qualify as neuromorphic.
 
@@ -167,3 +170,28 @@ Among eligible candidates, the caller chooses one lexicographic resource priorit
 The next empirical stage is to populate a capability atlas from canonical Symthaea tasks and compatible NeuroBench/MLPerf/QOBLIB suites, then compare this transparent constrained selector against best-static, hand-coded, learned and empirical-oracle policies. Only then should we report routing regret, feasibility violations, switching cost, cold-start penalty and out-of-domain abstention. The first goal is **zero hard-constraint violations on the measured operating region**, not maximum average reward.
 
 All unit-test examples are synthetic logic checks. They do not represent hardware, measured energy, or architecture advantage.
+
+
+## Evidence-bound atlas admission (QARCH-020)
+
+Each normalized architecture observation can be paired with an evidence receipt that binds:
+
+- the observation ID, exact workload fingerprint and comparison-contract fingerprint;
+- a public DOI, URL, repository path or immutable source-registry reference;
+- the benchmark suite/version and upstream case ID;
+- source/document, runner (when available), fixture, run manifest, environment, raw output, interval analysis and summary digests;
+- evidence origin (direct measurement, published result, simulation execution or analytical reference);
+- executor/device/toolchain identities where disclosed;
+- attempted/failed run counts and declared aggregation and interval methods.
+
+The evidence-bound comparison and selection entry points validate every receipt before admitting observations. A single malformed receipt rejects the supplied atlas slice; candidate feasibility exclusions still appear in the ordinary routing report after receipt admission succeeds.
+
+### Origin is not evidence maturity
+
+The observation's `evidence_class` answers *what kind of evidence is represented* (simulation, hardware emulation, physical prototype, production system or algorithmic reference). The receipt's `origin` answers *where this particular record came from* (direct run, published result, executed simulation or analytical reference). These fields are both retained because a published paper can describe a physical prototype, a simulation or an analytical method; it is not a local reproduction merely because its result is cited.
+
+Direct measurement requires a device, toolchain and runner identity. Published physical/production results require the reported device identity, but undisclosed runner/toolchain values remain unknown. Simulations cannot be promoted to physical evidence. Analytical references cannot enter the system-level resource comparator.
+
+A SHA-256 digest is content identity only. It does not authenticate the submitter, certify the meter, prove chain of custody or prove that a publication's reported measurement is correct. Published results may retain unknown repeat counts, toolchains, interval methods and aggregation methods as absent values. Such records remain visible as references, but the evidence-bound system comparison/routing path refuses to rank them until repeat counts and uncertainty/aggregation provenance are available. Cryptographic attestation and trusted measurement capture are separate capabilities.
+
+All fixture hashes and identities are fabricated test values. They do not refer to actual devices, benchmark submissions or measurements.

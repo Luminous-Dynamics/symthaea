@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.quantum_comp.architecture_evidence_receipt.v1",
+  "title": "QARCH architecture evidence receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_record_id",
+    "workload_fingerprint",
+    "comparison_contract_fingerprint",
+    "benchmark_suite",
+    "source_reference",
+    "benchmark_version",
+    "workload_case_id",
+    "origin",
+    "source_artifact_sha256",
+    "fixture_sha256",
+    "run_manifest_sha256",
+    "environment_sha256",
+    "raw_output_sha256",
+    "interval_analysis_sha256",
+    "summary_sha256",
+    "executor_identity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.quantum_comp.architecture_evidence_receipt.v1"
+    },
+    "observation_record_id": {"type": "string", "minLength": 1},
+    "workload_fingerprint": {"type": "string", "minLength": 1},
+    "comparison_contract_fingerprint": {"type": "string", "minLength": 1},
+    "benchmark_suite": {
+      "enum": [
+        "symthaea_canonical",
+        "neurobench",
+        "ml_perf_tiny",
+        "ml_perf_edge",
+        "ml_perf_power",
+        "qoblib",
+        "quops",
+        "qed_c",
+        "ionq_applications",
+        "other"
+      ]
+    },
+    "source_reference": {"type": "string", "minLength": 1},
+    "benchmark_version": {"type": "string", "minLength": 1},
+    "workload_case_id": {"type": "string", "minLength": 1},
+    "origin": {
+      "enum": [
+        "direct_measurement",
+        "published_result",
+        "simulation_execution",
+        "analytical_reference"
+      ]
+    },
+    "source_revision": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+    },
+    "source_artifact_sha256": {"$ref": "#/$defs/sha256"},
+    "runner_artifact_sha256": {"$ref": "#/$defs/sha256"},
+    "fixture_sha256": {"$ref": "#/$defs/sha256"},
+    "run_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "environment_sha256": {"$ref": "#/$defs/sha256"},
+    "raw_output_sha256": {"$ref": "#/$defs/sha256"},
+    "interval_analysis_sha256": {"$ref": "#/$defs/sha256"},
+    "summary_sha256": {"$ref": "#/$defs/sha256"},
+    "executor_identity": {"type": "string", "minLength": 1},
+    "device_identity": {"type": "string", "minLength": 1},
+    "toolchain_identity": {"type": "string", "minLength": 1},
+    "repeat_count": {"type": "integer", "minimum": 1},
+    "failed_run_count": {"type": "integer", "minimum": 0},
+    "interval_method_id": {"type": "string", "minLength": 1},
+    "aggregation_method_id": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"origin": {"const": "direct_measurement"}}},
+      "then": {
+        "required": [
+          "device_identity",
+          "toolchain_identity",
+          "runner_artifact_sha256",
+          "repeat_count",
+          "failed_run_count",
+          "interval_method_id",
+          "aggregation_method_id"
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"origin": {"const": "simulation_execution"}}},
+      "then": {
+        "required": [
+          "toolchain_identity",
+          "runner_artifact_sha256",
+          "repeat_count",
+          "failed_run_count",
+          "interval_method_id",
+          "aggregation_method_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {"origin": {"const": "analytical_reference"}}
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {"required": ["device_identity"]},
+            {"required": ["toolchain_identity"]}
+          ]
+        }
+      }
+    },
+    {
+      "if": {"required": ["repeat_count"]},
+      "then": {"required": ["failed_run_count"]}
+    },
+    {
+      "if": {"required": ["failed_run_count"]},
+      "then": {"required": ["repeat_count"]}
+    },
+    {
+      "if": {"required": ["interval_method_id"]},
+      "then": {"required": ["aggregation_method_id"]}
+    },
+    {
+      "if": {"required": ["aggregation_method_id"]},
+      "then": {"required": ["interval_method_id"]}
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    }
+  }
+}

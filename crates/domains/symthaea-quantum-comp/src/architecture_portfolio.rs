@@ -32,6 +32,8 @@ pub enum ComputeArchitectureFamily {
     PhotonicLinear,
     /// Photonic physical-reservoir computation.
     PhotonicReservoir,
+    /// Classical cryogenic digital logic, including SFQ, RQL and AQFP families.
+    SuperconductingDigital,
     /// Gate-model superconducting quantum processors.
     QuantumGateSuperconducting,
     /// Gate-model trapped-ion quantum processors.
@@ -465,6 +467,14 @@ mod tests {
         assert_ne!(
             ComputeArchitectureFamily::NearMemoryCompute,
             ComputeArchitectureFamily::AnalogComputeInMemory
+        );
+    }
+
+    #[test]
+    fn superconducting_digital_is_not_superconducting_quantum() {
+        assert_ne!(
+            ComputeArchitectureFamily::SuperconductingDigital,
+            ComputeArchitectureFamily::QuantumGateSuperconducting
         );
     }
 
