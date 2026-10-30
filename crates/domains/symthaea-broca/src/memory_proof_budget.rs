@@ -947,12 +947,8 @@ pub fn verify_proof_budget_result(
     request: &ProofBudgetRequest,
     result: &ProofBudgetResult,
 ) -> Result<(), String> {
-    verify_proof_packet(request, result)?;
-    let recomputed = solve_proof_budget(request.clone())?;
-    if &recomputed != result {
-        return Err("proof-budget result is valid but differs from the independently recomputed optimum".into());
-    }
-    Ok(())
+    crate::memory_proof_optimality::verify_minimum_cost_optimality(request, result)
+        .map(|_| ())
 }
 
 #[cfg(test)]
