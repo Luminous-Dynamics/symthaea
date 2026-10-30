@@ -43,6 +43,8 @@ pub struct ProofCandidateAdmission {
     pub source_sha256: String,
     pub source_pointer: String,
     pub source_family_id: String,
+    /// Trusted canonical session identity. It must not be guessed from text.
+    pub source_session_id: Option<String>,
     pub scope_id: String,
     /// Digest of the exact EvidenceIndex state that produced this hit.
     pub index_state_sha256: String,
@@ -230,6 +232,14 @@ pub fn admit_lexical_hits_for_proof_budget(
                 admission.evidence_id
             ));
         }
+        if admission.source_session_id.as_ref().is_some_and(|session_id| {
+            session_id.trim().is_empty() || session_id.trim() != session_id
+        }) {
+            return Err(format!(
+                "admission {:?} has an invalid source session ID",
+                admission.evidence_id
+            ));
+        }
         if admission.source_trajectory_id != hit.source.trajectory_id
             || admission.source_step_id != hit.source.step_id
             || admission.source_step_index != hit.source.step_index
@@ -288,6 +298,7 @@ pub fn admit_lexical_hits_for_proof_budget(
             source_span_start: 0,
             source_span_end: span_len,
             source_family_id: admission.source_family_id.clone(),
+            source_session_id: admission.source_session_id.clone(),
             scope_id: admission.scope_id.clone(),
             payload_sha256: hit.content_sha256.clone(),
             source_span_sha256: resolved_digest.clone(),
@@ -378,6 +389,7 @@ mod tests {
             source_sha256: digest("canonical source"),
             source_pointer: "/messages/2/content".into(),
             source_family_id: format!("family-{id}"),
+            source_session_id: Some(format!("session-{id}")),
             scope_id: "scope-1".into(),
             index_state_sha256: digest("index state"),
             recorded_at_unix_ms: 100,
@@ -423,6 +435,7 @@ mod tests {
                     evidence_dependencies: vec!["A".into()],
                 }],
                 minimum_independent_families: 1,
+                minimum_distinct_sessions: 0,
                 selection_overhead_tokens: 3,
             }],
         }
@@ -741,6 +754,7 @@ mod tests {
             source_span_start: 0,
             source_span_end: 3,
             source_family_id: "family-old".into(),
+            source_session_id: Some("session-old".into()),
             scope_id: "scope-1".into(),
             payload_sha256: digest("old"),
             source_span_sha256: digest("old"),
