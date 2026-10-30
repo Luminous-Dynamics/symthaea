@@ -3030,6 +3030,56 @@ mod tests {
     }
 
     #[test]
+    fn min_fill_iit4_eq4_matches_dense_with_external_background_and_tiny_joint_likelihood() {
+        let n_units = 4;
+        let mut tpm = Vec::with_capacity((1usize << n_units) * n_units);
+        let mut connectivity = vec![false; n_units * n_units];
+        for target in [0usize, 1] {
+            connectivity[target * n_units + target] = true;
+            connectivity[(1 - target) * n_units + target] = true;
+        }
+        for target in [2usize, 3] {
+            connectivity[target * n_units + target] = true;
+            connectivity[(5 - target) * n_units + target] = true;
+        }
+
+        for past_state in 0..(1usize << n_units) {
+            let left_parity = ((past_state & 1) != 0) ^ ((past_state & 2) != 0);
+            let right_parity = ((past_state & 4) != 0) ^ ((past_state & 8) != 0);
+            let left_likelihood = if left_parity { 2e-100 } else { 1e-100 };
+            let right_likelihood = if right_parity { 2e-100 } else { 1e-100 };
+            tpm.extend([
+                left_likelihood,
+                left_likelihood,
+                right_likelihood,
+                right_likelihood,
+            ]);
+        }
+
+        let model = BinaryCausalModel::new(n_units, tpm, connectivity).unwrap();
+        let candidate = [0, 2];
+        let state = [true, true, true, true];
+        let dense = model
+            .forward_cause_likelihood_iit4_factors_dense(
+                &candidate, &candidate, &state, &candidate,
+            )
+            .unwrap();
+        let min_fill = model
+            .forward_cause_likelihood_iit4_system_factors_min_fill(&candidate, &state)
+            .unwrap();
+
+        for (target, (expected, actual)) in dense.iter().zip(&min_fill).enumerate() {
+            for (state_index, (expected, actual)) in expected.iter().zip(actual).enumerate() {
+                let tolerance = expected.abs() * 1e-12;
+                assert!(
+                    (expected - actual).abs() <= tolerance,
+                    "embedded target={target}, state={state_index}: dense={expected:.17e}, log-min-fill={actual:.17e}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn min_fill_partitioned_eq4_likelihoods_match_independent_dense_projection() {
         let model = sparse_five_unit_model();
         let candidate = [0, 2, 4];
