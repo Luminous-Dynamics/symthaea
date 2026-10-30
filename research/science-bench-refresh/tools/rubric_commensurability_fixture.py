@@ -73,8 +73,8 @@ def criterion(
     }
 
 
-def build_fields() -> dict[str, Any]:
-    constructs = [
+def build_constructs() -> list[dict[str, str]]:
+    return [
         {
             "construct_id": "factual_accuracy",
             "definition_sha256": digest("construct:factual-accuracy:definition:v1"),
@@ -86,6 +86,9 @@ def build_fields() -> dict[str, Any]:
             "scope_sha256": digest("construct:evidence-support:scope:v1"),
         },
     ]
+
+
+def build_fields(constructs: list[dict[str, str]], ontology_sha256: str) -> dict[str, Any]:
     left = {
         "rubric_id": "rubric-independent-left",
         "rubric_revision": "v1",
@@ -118,7 +121,7 @@ def build_fields() -> dict[str, Any]:
         "analyzer_source_revision": git_revision(),
         "purpose": "qualified_run",
         "comparison_id": "rubric-commensurability-synthetic-001",
-        "construct_ontology_sha256": digest("frozen-construct-ontology-v1"),
+        "construct_ontology_sha256": ontology_sha256,
         "constructs": constructs,
         "left_instrument": left,
         "right_instrument": right,
@@ -133,7 +136,21 @@ def main() -> int:
         return 2
     output_dir = Path(sys.argv[1])
     output_dir.mkdir(parents=True, exist_ok=True)
-    fields = build_fields()
+    constructs = build_constructs()
+    constructs_path = output_dir / "construct-ontology.example.json"
+    constructs_path.write_text(
+        json.dumps(constructs, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    ontology_command = [
+        "cargo", "run", "--quiet", "--locked", "--manifest-path", str(MANIFEST),
+        "--", "commit-rubric-construct-ontology", str(constructs_path),
+    ]
+    ontology_result = subprocess.run(
+        ontology_command, cwd=ROOT, check=True, capture_output=True, text=True
+    )
+    ontology_sha256 = json.loads(ontology_result.stdout)["construct_ontology_sha256"]
+    fields = build_fields(constructs, ontology_sha256)
     fields_path = output_dir / "rubric-commensurability-plan-fields.example.json"
     fields_path.write_text(json.dumps(fields, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     command = [
