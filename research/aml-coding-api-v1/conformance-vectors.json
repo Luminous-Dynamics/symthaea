@@ -281,6 +281,24 @@
           }
         ]
       }
+    },
+    {
+      "id": "SEARCH-RESP-008",
+      "operation": "search_response",
+      "valid": true,
+      "request_top_k": 10,
+      "reason": "unknown response fields are ignored by the platform",
+      "body": {
+        "data": [
+          {
+            "id": "mem-1",
+            "content": "ranked evidence",
+            "score": 0.91,
+            "provider_extension": "ignored"
+          }
+        ],
+        "provider_response_extension": "ignored"
+      }
     }
   ],
   "semantic_checks": [
@@ -319,6 +337,22 @@
     {
       "id": "PRIVACY-001",
       "requirement": "Evaluation data must not be used for training or shared, and must be deleted within 30 days after the run."
+    },
+    {
+      "id": "HTTP-202-001",
+      "requirement": "Return HTTP 200 synchronously by default; HTTP 202 is permitted only when the reviewed version has an approved Add task-status endpoint."
+    },
+    {
+      "id": "MODEL-001",
+      "requirement": "Open-source Methods uses text-embedding-v4 for embeddings and gpt-4o-mini for LLM-related components; rerankers are unrestricted."
+    },
+    {
+      "id": "RETENTION-001",
+      "requirement": "Evaluation data is only for the current evaluation, not training or sharing, and is deleted within 30 days after completion."
+    },
+    {
+      "id": "CAMBENCH-001",
+      "requirement": "Target the official CAMBench Coding suite: 150 software-engineering tasks in relevant and noisy memory conditions, 300 attempts; SWEContextBench is reference-only for AML Coding."
     }
   ]
 }
