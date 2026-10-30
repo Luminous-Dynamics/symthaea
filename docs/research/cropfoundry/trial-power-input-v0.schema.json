@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cropfoundry-trial-power-input-v0.schema.json",
+  "title": "CropFoundry field-trial power input v0",
+  "description": "Screening calculator input for a balanced two-arm parallel trial. Does not replace design-specific power simulation or statistical review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "protocol_uri",
+    "variance_evidence_uri",
+    "endpoint",
+    "design"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cropfoundry-trial-power-input-v0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_uri": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variance_evidence_uri": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Citation/URI for an independent pilot or historical source of residual variance; recorded, not verified."
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "unit",
+        "minimum_detectable_effect_abs",
+        "residual_sd",
+        "familywise_alpha",
+        "target_power",
+        "co_primary_endpoint_count"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_detectable_effect_abs": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "residual_sd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "familywise_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 0.2
+        },
+        "target_power": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 0.999
+        },
+        "co_primary_endpoint_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_type",
+        "allocation_unit",
+        "randomization_method",
+        "blocking_unit",
+        "plots_per_cluster",
+        "intracluster_correlation",
+        "attrition_fraction",
+        "planned_site_season_count"
+      ],
+      "properties": {
+        "design_type": {
+          "const": "parallel_two_arm_clustered"
+        },
+        "allocation_unit": {
+          "enum": [
+            "plot",
+            "farm",
+            "greenhouse_cluster"
+          ]
+        },
+        "plots_per_cluster": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intracluster_correlation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "attrition_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "planned_site_season_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "randomization_method": {
+          "enum": [
+            "completely_randomized",
+            "randomized_complete_block",
+            "stratified_randomized",
+            "cluster_randomized",
+            "other_preregistered"
+          ]
+        },
+        "blocking_unit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Explicit block identifier/unit, or the string none. This preflight records it but does not model block efficiency."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "design": {
+            "properties": {
+              "allocation_unit": {
+                "const": "plot"
+              }
+            },
+            "required": [
+              "allocation_unit"
+            ]
+          }
+        },
+        "required": [
+          "design"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "properties": {
+              "plots_per_cluster": {
+                "const": 1
+              },
+              "randomization_method": {
+                "not": {
+                  "const": "cluster_randomized"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "design": {
+            "properties": {
+              "allocation_unit": {
+                "enum": [
+                  "farm",
+                  "greenhouse_cluster"
+                ]
+              }
+            },
+            "required": [
+              "allocation_unit"
+            ]
+          }
+        },
+        "required": [
+          "design"
+        ]
+      },
+      "then": {
+        "properties": {
+          "design": {
+            "properties": {
+              "plots_per_cluster": {
+                "minimum": 2
+              },
+              "randomization_method": {
+                "enum": [
+                  "cluster_randomized",
+                  "other_preregistered"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

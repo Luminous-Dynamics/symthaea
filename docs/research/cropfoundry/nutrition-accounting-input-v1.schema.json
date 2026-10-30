@@ -1,0 +1,931 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cropfoundry-nutrition-accounting-input-v1.schema.json",
+  "title": "CropFoundry nutrition accounting input v1",
+  "description": "One batch × nutrient accounting record. Values are not nutrition recommendations, and evidence/rights are reviewed separately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "nutrient_id",
+    "concentration_mg_per_kg",
+    "concentration_mass_basis",
+    "concentration_stage",
+    "concentration_provenance",
+    "concentration_evidence_uri",
+    "edible_mass_kg_at_concentration_stage",
+    "edible_mass_basis_at_concentration_stage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cropfoundry-nutrition-accounting-input-v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nutrient_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "concentration_mg_per_kg": {
+      "type": "number",
+      "minimum": 0
+    },
+    "concentration_mass_basis": {
+      "enum": [
+        "fresh_edible_mass",
+        "dry_edible_mass"
+      ]
+    },
+    "concentration_stage": {
+      "enum": [
+        "measured_at_serving",
+        "measured_before_preparation"
+      ]
+    },
+    "concentration_provenance": {
+      "enum": [
+        "direct_assay",
+        "literature_value",
+        "model_estimate"
+      ]
+    },
+    "concentration_evidence_uri": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assay_method": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "concentration_lower_mg_per_kg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "concentration_upper_mg_per_kg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "edible_mass_kg_at_concentration_stage": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "edible_mass_basis_at_concentration_stage": {
+      "enum": [
+        "fresh_edible_mass",
+        "dry_edible_mass"
+      ]
+    },
+    "edible_mass_lower_kg_at_concentration_stage": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "edible_mass_upper_kg_at_concentration_stage": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "servings_in_batch": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "retention_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "retention_evidence_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "retention_lower_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "retention_upper_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bioavailability_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bioavailability_evidence_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "bioavailability_lower_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bioavailability_upper_fraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "uncertainty_interval_kind": {
+      "enum": [
+        "confidence_interval95",
+        "credible_interval95",
+        "measurement_tolerance",
+        "sensitivity_bounds",
+        "observed_range",
+        null
+      ]
+    },
+    "uncertainty_evidence_uri": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "water_liters": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "land_square_meters": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "energy_kwh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "cost_amount": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "currency_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Za-z]{3}$"
+    },
+    "source_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "water_boundary": {
+      "enum": [
+        "irrigation_applied",
+        "total_applied_water",
+        "crop_consumptive_use",
+        "blue_water_footprint",
+        "green_water_footprint",
+        "full_supply_chain_water_footprint",
+        null
+      ]
+    },
+    "land_boundary": {
+      "enum": [
+        "allocated_cultivated_area",
+        "harvested_area",
+        "full_supply_chain_land_footprint",
+        null
+      ]
+    },
+    "energy_boundary": {
+      "enum": [
+        "on_farm_operations",
+        "irrigation_pumping",
+        "postharvest_processing",
+        "full_supply_chain_energy",
+        null
+      ]
+    },
+    "cost_boundary": {
+      "enum": [
+        "farm_gate",
+        "production_only",
+        "postharvest_processing",
+        "delivered_to_market",
+        "delivered_to_serving",
+        null
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "concentration_provenance": {
+            "const": "direct_assay"
+          }
+        },
+        "required": [
+          "concentration_provenance"
+        ]
+      },
+      "then": {
+        "required": [
+          "assay_method",
+          "source_sha256"
+        ],
+        "properties": {
+          "assay_method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "concentration_stage": {
+            "const": "measured_before_preparation"
+          }
+        },
+        "required": [
+          "concentration_stage"
+        ]
+      },
+      "then": {
+        "required": [
+          "retention_fraction",
+          "retention_evidence_uri"
+        ],
+        "properties": {
+          "retention_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "retention_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "concentration_stage": {
+            "const": "measured_at_serving"
+          }
+        },
+        "required": [
+          "concentration_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retention_fraction": {
+            "type": "null"
+          },
+          "retention_lower_fraction": {
+            "type": "null"
+          },
+          "retention_upper_fraction": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": [
+              "concentration_lower_mg_per_kg"
+            ],
+            "properties": {
+              "concentration_lower_mg_per_kg": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "concentration_upper_mg_per_kg"
+            ],
+            "properties": {
+              "concentration_upper_mg_per_kg": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "edible_mass_lower_kg_at_concentration_stage"
+            ],
+            "properties": {
+              "edible_mass_lower_kg_at_concentration_stage": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "edible_mass_upper_kg_at_concentration_stage"
+            ],
+            "properties": {
+              "edible_mass_upper_kg_at_concentration_stage": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "retention_lower_fraction"
+            ],
+            "properties": {
+              "retention_lower_fraction": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "retention_upper_fraction"
+            ],
+            "properties": {
+              "retention_upper_fraction": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "bioavailability_lower_fraction"
+            ],
+            "properties": {
+              "bioavailability_lower_fraction": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "required": [
+              "bioavailability_upper_fraction"
+            ],
+            "properties": {
+              "bioavailability_upper_fraction": {
+                "type": "number"
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "concentration_lower_mg_per_kg",
+          "concentration_upper_mg_per_kg",
+          "edible_mass_lower_kg_at_concentration_stage",
+          "edible_mass_upper_kg_at_concentration_stage",
+          "uncertainty_interval_kind",
+          "uncertainty_evidence_uri"
+        ],
+        "properties": {
+          "concentration_lower_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "concentration_upper_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_lower_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_upper_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uncertainty_interval_kind": {
+            "enum": [
+              "confidence_interval95",
+              "credible_interval95",
+              "measurement_tolerance",
+              "sensitivity_bounds",
+              "observed_range"
+            ]
+          },
+          "uncertainty_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "concentration_stage": {
+                  "const": "measured_before_preparation"
+                }
+              },
+              "required": [
+                "concentration_stage"
+              ]
+            },
+            "then": {
+              "required": [
+                "retention_lower_fraction",
+                "retention_upper_fraction"
+              ],
+              "properties": {
+                "retention_lower_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "retention_upper_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bioavailability_lower_fraction": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bioavailability_lower_fraction"
+        ]
+      },
+      "then": {
+        "required": [
+          "bioavailability_fraction",
+          "bioavailability_upper_fraction",
+          "bioavailability_evidence_uri"
+        ],
+        "properties": {
+          "bioavailability_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bioavailability_upper_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bioavailability_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bioavailability_upper_fraction": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bioavailability_upper_fraction"
+        ]
+      },
+      "then": {
+        "required": [
+          "bioavailability_fraction",
+          "bioavailability_lower_fraction",
+          "bioavailability_evidence_uri"
+        ],
+        "properties": {
+          "bioavailability_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bioavailability_lower_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bioavailability_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cost_amount"
+        ]
+      },
+      "then": {
+        "required": [
+          "currency_code",
+          "cost_boundary"
+        ],
+        "properties": {
+          "currency_code": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "bioavailability_fraction": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bioavailability_fraction"
+        ]
+      },
+      "then": {
+        "required": [
+          "bioavailability_evidence_uri"
+        ],
+        "properties": {
+          "bioavailability_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "uncertainty_interval_kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "uncertainty_interval_kind"
+            ]
+          },
+          {
+            "properties": {
+              "uncertainty_evidence_uri": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "uncertainty_evidence_uri"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "required": [
+          "concentration_lower_mg_per_kg",
+          "concentration_upper_mg_per_kg",
+          "edible_mass_lower_kg_at_concentration_stage",
+          "edible_mass_upper_kg_at_concentration_stage",
+          "uncertainty_interval_kind",
+          "uncertainty_evidence_uri"
+        ],
+        "properties": {
+          "concentration_lower_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "concentration_upper_mg_per_kg": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_lower_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "edible_mass_upper_kg_at_concentration_stage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uncertainty_interval_kind": {
+            "enum": [
+              "confidence_interval95",
+              "credible_interval95",
+              "measurement_tolerance",
+              "sensitivity_bounds",
+              "observed_range"
+            ]
+          },
+          "uncertainty_evidence_uri": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "water_liters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "water_liters"
+        ]
+      },
+      "then": {
+        "required": [
+          "water_boundary"
+        ],
+        "properties": {
+          "water_boundary": {
+            "enum": [
+              "irrigation_applied",
+              "total_applied_water",
+              "crop_consumptive_use",
+              "blue_water_footprint",
+              "green_water_footprint",
+              "full_supply_chain_water_footprint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "water_boundary": {
+            "enum": [
+              "irrigation_applied",
+              "total_applied_water",
+              "crop_consumptive_use",
+              "blue_water_footprint",
+              "green_water_footprint",
+              "full_supply_chain_water_footprint"
+            ]
+          }
+        },
+        "required": [
+          "water_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "water_liters"
+        ],
+        "properties": {
+          "water_liters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "land_square_meters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "land_square_meters"
+        ]
+      },
+      "then": {
+        "required": [
+          "land_boundary"
+        ],
+        "properties": {
+          "land_boundary": {
+            "enum": [
+              "allocated_cultivated_area",
+              "harvested_area",
+              "full_supply_chain_land_footprint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "land_boundary": {
+            "enum": [
+              "allocated_cultivated_area",
+              "harvested_area",
+              "full_supply_chain_land_footprint"
+            ]
+          }
+        },
+        "required": [
+          "land_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "land_square_meters"
+        ],
+        "properties": {
+          "land_square_meters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "energy_kwh": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "energy_kwh"
+        ]
+      },
+      "then": {
+        "required": [
+          "energy_boundary"
+        ],
+        "properties": {
+          "energy_boundary": {
+            "enum": [
+              "on_farm_operations",
+              "irrigation_pumping",
+              "postharvest_processing",
+              "full_supply_chain_energy"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "energy_boundary": {
+            "enum": [
+              "on_farm_operations",
+              "irrigation_pumping",
+              "postharvest_processing",
+              "full_supply_chain_energy"
+            ]
+          }
+        },
+        "required": [
+          "energy_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "energy_kwh"
+        ],
+        "properties": {
+          "energy_kwh": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "cost_amount"
+        ]
+      },
+      "then": {
+        "required": [
+          "cost_boundary"
+        ],
+        "properties": {
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cost_boundary": {
+            "enum": [
+              "farm_gate",
+              "production_only",
+              "postharvest_processing",
+              "delivered_to_market",
+              "delivered_to_serving"
+            ]
+          }
+        },
+        "required": [
+          "cost_boundary"
+        ]
+      },
+      "then": {
+        "required": [
+          "cost_amount"
+        ],
+        "properties": {
+          "cost_amount": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  ]
+}

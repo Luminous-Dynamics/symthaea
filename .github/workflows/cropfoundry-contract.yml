@@ -1,0 +1,153 @@
+name: CropFoundry contract validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cropfoundry-contract.yml"
+      - "Cargo.toml"
+      - "xtask/**"
+      - "docs/research/cropfoundry/**"
+  push:
+    branches:
+      - main
+      - research/cropfoundry-benchmark-contract-2026-10
+    paths:
+      - ".github/workflows/cropfoundry-contract.yml"
+      - "Cargo.toml"
+      - "xtask/**"
+      - "docs/research/cropfoundry/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cropfoundry-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate CropFoundry contracts (not crop performance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check xtask formatting
+        run: cargo fmt -p xtask -- --check
+
+      - name: Test fail-closed contract validator
+        run: cargo test -p xtask cropfoundry
+
+      - name: Validate checked-in contracts
+        run: cargo run -q -p xtask -- cropfoundry-validate
+
+      - name: Check local CSV auditor CLI
+        run: cargo run -q -p xtask -- cropfoundry-audit-csv --help
+
+      - name: Execute synthetic irrigation-policy harness
+        run: |
+          cargo run -q -p xtask -- cropfoundry-water-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-water-policy.json"
+          test -s "$RUNNER_TEMP/cropfoundry-water-policy.json"
+
+      - name: Execute synthetic robust-policy diagnostics
+        run: |
+          cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"benchmark_id": "CF-025"' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"tail_sample_count": 1' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+          grep -q '"pareto_front_member": true' "$RUNNER_TEMP/cropfoundry-robust-policy.json"
+
+      - name: Check postharvest mass-balance audit CLI
+        run: cargo run -q -p xtask -- cropfoundry-postharvest-audit --help
+
+      - name: Execute synthetic postharvest mass-balance fixture
+        run: |
+          cat > "$RUNNER_TEMP/cropfoundry-postharvest.csv" <<'CSV'
+          lot_id;stage_id;replicate_id;measurement_time;mass_unit;measurement_method;input_mass_kg;marketable_output_mass_kg;edible_discard_mass_kg;inedible_removed_mass_kg;moisture_loss_mass_kg;handling_loss_mass_kg
+          synthetic-lot-1;harvest;replicate-1;2026-10-19T08:00:00Z;kg;calibrated-scale;10;8;1;0.5;0.4;0.1
+          CSV
+          cargo run -q -p xtask -- cropfoundry-postharvest-audit \
+            --input "$RUNNER_TEMP/cropfoundry-postharvest.csv" \
+            --source-id SYNTHETIC-CI-FIXTURE \
+            --source-uri urn:cropfoundry:postharvest-ci-fixture-v0 \
+            --delimiter ';' \
+            --out "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
+          grep -q '"row_checks_pass": true' "$RUNNER_TEMP/cropfoundry-postharvest-receipt.json"
+
+      - name: Check nutrient-accounting CLI
+        run: cargo run -q -p xtask -- cropfoundry-nutrition-accounting --help
+
+      - name: Execute checked-in synthetic nutrient-accounting fixture
+        run: |
+          cp docs/research/cropfoundry/nutrition-accounting-example-v1.json \
+            "$RUNNER_TEMP/cropfoundry-nutrition-input.json"
+          cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
+            --input "$RUNNER_TEMP/cropfoundry-nutrition-input.json" \
+            --out "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"accounting_pass": true' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"input_sha256":' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"nutrient_mass_delivered_interval_lower_mg": 10.5' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"nutrient_mass_delivered_interval_upper_mg": 13.6' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"bioavailable_nutrient_mass_delivered_interval_lower_mg": 2.1' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"bioavailable_nutrient_mass_delivered_interval_upper_mg": 4.08' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+
+      - name: Check nutrition portfolio CLI
+        run: cargo run -q -p xtask -- cropfoundry-nutrition-portfolio --help
+
+      - name: Execute checked-in synthetic nutrition portfolio fixture
+        run: |
+          cargo run -q -p xtask -- cropfoundry-nutrition-portfolio \
+            --input docs/research/cropfoundry/nutrition-portfolio-example-v0.json \
+            --out "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"accounting_pass": true' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"common_resource_count": 3' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_water_liters": 22.0' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_delivered_mg": 19.0' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"total_delivered_mg": 16.5' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"nutrient_interval_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"bioavailability_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"iron": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+
+      - name: Check robust-policy CLI
+        run: cargo run -q -p xtask -- cropfoundry-robust-policy-demo --help
+
+      - name: Execute robust policy on the deterministic sensitivity lattice
+        run: |
+          cargo run -q -p xtask -- cropfoundry-robust-policy-demo \
+            --out "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"receipt_schema": "cropfoundry-robust-policy-receipt-v1"' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"benchmark_id": "CF-025"' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_count": 30' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"policy_count": 5' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"tail_sample_count": 2' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"upper_tail_scenario_ids": \[' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_policy_diagnostics_count": 150' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"scenario_policy_diagnostics": \[' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"calibrated_probability_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+          grep -q '"biological_performance_claim": false' "$RUNNER_TEMP/cropfoundry-robust-policy-receipt.json"
+
+      - name: Check trial-power preflight CLI
+        run: cargo run -q -p xtask -- cropfoundry-trial-power-plan --help
+
+      - name: Execute synthetic field-trial power preflight
+        run: |
+          cargo run -q -p xtask -- cropfoundry-trial-power-plan \
+            --input docs/research/cropfoundry/trial-power-input-example-v0.json \
+            --out "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"receipt_schema": "cropfoundry-trial-power-receipt-v0"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"clusters_required_per_arm": 20' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"total_planned_plots_two_arms": 200' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"target_power": 0.9' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"total_planned_plots_two_arms": 270' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"field_efficacy_claim": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"randomization_method": "cluster_randomized"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"blocking_unit": "farm"' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"
+          grep -q '"power_sensitivity": \[' "$RUNNER_TEMP/cropfoundry-trial-power-receipt.json"

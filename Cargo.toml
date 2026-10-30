@@ -20,11 +20,19 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # Examples-only orphan directory; the real symthaea package is at the repository root.
+    "crates/core/symthaea",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # Stale observation-attestation scaffold has no Cargo.toml. Keep the
+    # glob-matched directory out until it is restored as a valid crate.
+    "crates/core/symthaea-observation-attestation",
+    # Source-only REA verifier directory has no Cargo.toml on this branch.
+    # Keep it outside workspace glob discovery until its package manifest is restored.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s
