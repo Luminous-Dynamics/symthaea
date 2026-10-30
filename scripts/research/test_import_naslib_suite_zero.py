@@ -121,6 +121,25 @@ class SuiteZeroImporterTests(unittest.TestCase):
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             _build(json.dumps(source).encode())
 
+    def test_rejects_unpinned_source_commit_and_non_finite_target(self):
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            _build(source_commit="zerocost")
+
+        source = {
+            "cifar10": {
+                str((0, 1, 2, 3, 4, 0)): _record(float("nan"), 100.0),
+                str((4, 3, 2, 1, 0, 4)): _record(89.0, 120.0),
+            }
+        }
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            _build(json.dumps(source).encode())
+
+    def test_rejects_missing_dataset_and_unknown_proxy_selection(self):
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            _build(json.dumps({"cifar100": {}}).encode())
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            _build(proxy_names=("params", "invented_proxy"))
+
     def test_rejects_query_budget_and_top_k_outside_table(self):
         with self.assertRaises(IMPORTER.ImportErrorDetail):
             _build(max_unique_queries=3)
