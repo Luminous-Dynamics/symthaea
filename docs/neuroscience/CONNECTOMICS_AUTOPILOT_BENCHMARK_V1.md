@@ -497,3 +497,13 @@ These remain research targets, not measured Symthaea results:
 6. No authoritative automatic mutations, no hidden audit-label leakage, and exact provenance for every input, model, policy, sample, correction, and output.
 
 A pooled pass cannot override a failed critical-family, false-correction, false-join, or integrity gate.
+
+
+### Query-scoped proof-carrying reliability certificates (SCI-CONNECTOMICS-012)
+
+- [Protocol V1](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE_V1.md)
+- [Issue #9255](https://github.com/Luminous-Dynamics/symthaea/issues/9255)
+
+Replace a global "proofread / not proofread" flag with a scoped certificate for each scientific question. Each certificate binds the exact query, code, data revisions, dependency closure, corrections, sampling evidence, family-specific coverage, rater disagreement, null models, and uncertainty. A relevant edit or source revision invalidates the certificate; provably unrelated edits need not.
+
+The certificate must explicitly distinguish observed evidence, design-based sampling uncertainty, in-pool risk, multi-list unseen-error sensitivity, correction interactions, and query-model uncertainty. It may not convert these components into one aggregate confidence score unless a validated joint model exists. Its state is CERTIFIED_WITHIN_DECLARED_SCOPE, CONDITIONAL, NOT_CERTIFIED, or INVALIDATED_BY_REVISION. A digest establishes evidence identity, not biological truth.
