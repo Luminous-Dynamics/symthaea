@@ -209,7 +209,7 @@ The full target-free chain is now composable in the tests:
 
 `declared static proxy features -> leave-one-out consensus prior -> first-improvement/2-opt trajectory archive -> quota-controlled promotion plan -> multi-fidelity query firewall`
 
-The composite prior is still only a hypothesis for allocating training resources. The pipeline test verifies composition without target labels; it does not establish that consensus improves NAS performance. Fifteen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection in both value and runtime columns, malformed/duplicate topology, tamper detection and end-to-end composition. They have not been compiled or executed.
+The composite prior is still only a hypothesis for allocating training resources. The pipeline tests verify composition both up to promotion planning and through the multi-fidelity Successive Halving query oracle, without exposing target labels to consensus or trajectory generation; this does not establish that the composite strategy improves NAS performance. Sixteen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection in both value and runtime columns, malformed/duplicate topology, tamper detection and end-to-end composition. They have not been compiled or executed.
 
 ## 10. External benchmark and data limitations
 
