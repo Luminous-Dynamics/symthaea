@@ -546,3 +546,14 @@ The `connectome-spatial-frame-audit` executable validates exact 3D lattice tilin
 
 
 The downstream #9204 invocation supplies both the exact spatial-frame manifest and the exact PASS report. It recomputes the manifest byte digest and checks it against the report, then verifies that the audit's eligible PSU/stratum rows exactly equal the report export. The coverage report retains separate hashes for the manifest, report, complete lattice, and eligible population.
+
+### Hidden co-linear merge boundary detection (SCI-CONNECTOMICS-014)
+
+- [Protocol V1](CONNECTOME_HIDDEN_COLINEAR_MERGE_BENCHMARK_V1.md)
+- [Issue #9265](https://github.com/Luminous-Dynamics/symthaea/issues/9265)
+
+NEURD's paper identifies a specific blind spot: some merge errors are co-linear in the skeleton and collapse into one non-branching segment, leaving no graph junction for ordinary node/branch rules to inspect. The proposed response is an intra-segment arclength scan using independent skeleton, mesh, EM, synapse and compartment evidence. Benchmark internal boundary localization in nanometres, candidate recall per independently sampled PSU, and false alarms per kilometre of cable. Preserve biological taper, boutons, spines, and true compartment transitions as negative controls.
+
+### Spatial PSU frame integrity (SCI-CONNECTOMICS-013)
+
+The spatial-frame auditor reports voxel *tile* volumes for eligible/excluded lattice cells; these are not counts of foreground voxels in the external eligibility mask. The mask itself is only digest-bound and must be independently inspected. The candidate coverage tool now takes both the exact frame manifest and exact frame-audit report and checks their byte digests, full lattice digest, and eligible population digest. This is a provenance/geometry gate, not proof of biological completeness.
