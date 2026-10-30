@@ -1,0 +1,14 @@
+pr_number=8954
+pr_head_sha=9f120920153c78374c3b6142a471f2a55fc5afb5
+workflow_run_id=41034364208
+workflow_run_number=36
+workflow_merge_commit_sha=3d89fe67866905474fb782c493046d38d8f2c2b6
+cargo_lock_sha256=4852031e92a96c787124c18d63a30a40a61a7d52c24f266933caaf06624949ad
+rustc=rustc 1.96.0 (ac68faa20 2026-05-25)
+host=x86_64-unknown-linux-gnu
+suite=LEP-PERF-0.1
+warmup_iterations_per_path=20
+measured_iterations_per_path=100
+artifact_id=12967825982
+artifact_sha256=506bbde513069ed25f11defcd9ea2f440d03aee7934b019e0b20a3c2cd9e5e95
+scope=Synthetic local parsing and validation only; excludes signatures, artifact I/O, domain execution, and network.
