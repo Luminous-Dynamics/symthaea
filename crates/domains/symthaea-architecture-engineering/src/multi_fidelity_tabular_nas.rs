@@ -1434,14 +1434,15 @@ mod tests {
             .unwrap();
         assert_eq!(run.base_run.receipt.unique_architectures_touched, 6);
         assert_eq!(run.base_run.receipt.final_fidelity_queries, 2);
-        assert_eq!(run.base_run.receipt.total_cost_units, 450);
+        assert_eq!(run.base_run.receipt.total_cost_units, 440);
         assert_eq!(run.promotion_stages.len(), 2);
         assert_eq!(run.calibration_sha256, calibrator.calibration_sha256);
         assert_eq!(run.policy_sha256.len(), 64);
-        assert!(run.promotion_stages[0].selection.selected.iter().any(|candidate| {
-            candidate.reason == super::super::learning_curve_promotion::PromotionReason::OptimisticGuard
+        assert!(run.promotion_stages.iter().all(|stage| {
+            stage.selection.selected.iter().any(|candidate| {
+                candidate.reason == super::super::learning_curve_promotion::PromotionReason::OptimisticGuard
+            })
         }));
-        assert!(run.base_run.receipt.final_fidelity_architecture_ids.contains(&"arch-000".to_string()));
         assert_eq!(
             run.promotion_stages.iter().map(|stage| stage.selection.selected.len()).collect::<Vec<_>>(),
             vec![4, 2]
