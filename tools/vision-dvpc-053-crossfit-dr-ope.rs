@@ -371,7 +371,9 @@ fn oracle_mse_shrinkage_weight(model: [[f64; 2]; 2], truth: [[f64; 2]; 2]) -> f6
     if denominator <= EPS { 0.0 } else { (1.0 - numerator / denominator).clamp(0.0, 1.0) }
 }
 
-fn logger_from_model(model: [[f64; 2]; 2], floor: f64) -> Result<Logger, String> {
+/// Target-aware Neyman logger: mu(a|x) is proportional to
+/// pi_target(a|x) * sqrt(q_hat(a|x)), with a positive propensity floor.
+fn logger_from_model(model: [[f64; 2]; 2], policy: Policy, floor: f64) -> Result<Logger, String> {
     if !floor.is_finite() || floor <= 0.0 || floor >= 0.5 {
         return Err("logger floor must lie in (0,0.5)".into());
     }
@@ -380,12 +382,20 @@ fn logger_from_model(model: [[f64; 2]; 2], floor: f64) -> Result<Logger, String>
         if model[x].iter().any(|q| !q.is_finite() || *q < 0.0 || *q > 1.0) {
             return Err("reward model must contain finite probabilities".into());
         }
-        let s0 = model[x][0].sqrt();
-        let s1 = model[x][1].sqrt();
-        if s0 + s1 <= EPS {
-            return Err("reward model has no action mass".into());
+        let pi1 = policy.p1[x];
+        if !pi1.is_finite() || !(0.0..=1.0).contains(&pi1) {
+            return Err("target policy must contain finite probabilities".into());
         }
-        logger.p1[x] = (s1 / (s0 + s1)).clamp(floor, 1.0 - floor);
+        let action0_mass = (1.0 - pi1) * model[x][0].sqrt();
+        let action1_mass = pi1 * model[x][1].sqrt();
+        let total = action0_mass + action1_mass;
+        if total <= EPS {
+            // No reward information: retain target-action proportions before
+            // applying the required exploration floor.
+            logger.p1[x] = pi1.clamp(floor, 1.0 - floor);
+        } else {
+            logger.p1[x] = (action1_mass / total).clamp(floor, 1.0 - floor);
+        }
     }
     Ok(logger)
 }
@@ -581,7 +591,7 @@ fn benchmark(replicates: usize) -> Result<String, String> {
                         let logger = if logger_kind == LoggerKind::Uniform {
                             Logger { p1: [0.5, 0.5] }
                         } else {
-                            logger_from_model(q_model, ACTION_FLOOR)?
+                            logger_from_model(q_model, policy, ACTION_FLOOR)?
                         };
                         let evaluation_seed = mixed_seed(
                             scenario,
@@ -713,6 +723,15 @@ mod tests {
     }
 
     #[test]
+    fn model_logger_uses_target_weighted_neyman_allocation() {
+        let model = [[0.25, 1.0], [1.0, 0.25]];
+        let policy = Policy { id: 17, p1: [0.8, 0.2] };
+        let logger = logger_from_model(model, policy, ACTION_FLOOR).unwrap();
+        assert!((logger.p1[0] - (0.8 / 0.9)).abs() < 1e-12);
+        assert!((logger.p1[1] - (0.1 / 0.9)).abs() < 1e-12);
+    }
+
+    #[test]
     fn support_absence_fails_closed_instead_of_returning_a_value() {
         let policy = Policy { id: 0, p1: [0.8, 0.5] };
         let logger = Logger { p1: [0.0, 0.5] };
@@ -787,7 +806,7 @@ mod tests {
     #[test]
     fn invalid_shrinkage_inputs_and_model_inputs_fail_closed() {
         assert!(shrink_model([[0.5; 2]; 2], f64::NAN).is_err());
-        assert!(logger_from_model([[f64::NAN, 0.5], [0.2, 0.8]], ACTION_FLOOR).is_err());
+        assert!(logger_from_model([[f64::NAN, 0.5], [0.2, 0.8]], TARGET_POLICIES[0], ACTION_FLOOR).is_err());
         assert!(calibration_shrinkage_weight([[0.5; 2]; 2], &[]).is_err());
         assert!(sample_dataset(0, Logger { p1: [0.5, 0.5] }, [0.5, 0.5], SOURCE_REWARD, 1).is_err());
     }
