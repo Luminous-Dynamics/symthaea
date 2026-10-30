@@ -25,7 +25,7 @@ The signed envelope uses its own schema and domain-separation strings:
 
 The policy is signed by a trusted key with the existing policy-signing role. A separate trusted ingress key signs a receipt binding the accepted time, policy version, signer identity, and policy signature digest. Existing trust-store configuration rejects duplicate key material and keys with multiple signing roles.
 
-Activation begins at the receipt's `accepted_at`, not the source-controlled `recorded_at`. The signed `valid_until` is exclusive. The trust store checks both signers' key windows at the trusted acceptance time and rejects a policy that was already expired when accepted.
+Activation begins at the receipt's `accepted_at`, not the source-controlled `recorded_at`. The signed `valid_until` is exclusive. The trust store checks both signers' key windows at the trusted acceptance time and rejects a policy that was already expired when accepted. Because the evidence API uses millisecond timestamps, accepted-at is rounded up and expiry is rounded down; a sub-millisecond window that cannot be represented safely is rejected.
 
 ### Verification and use
 
