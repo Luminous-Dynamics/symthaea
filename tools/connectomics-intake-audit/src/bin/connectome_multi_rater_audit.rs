@@ -326,8 +326,8 @@ fn nominal_alpha(units: &[Vec<String>]) -> ReliabilityMetrics {
     }
 }
 
-fn decision_is_correct(decision: ReviewerDecision, gold: Adjudication) -> Option<bool> {
-    match (decision, gold) {
+fn decision_is_correct(decision: ReviewerDecision, reference: Adjudication) -> Option<bool> {
+    match (decision, reference) {
         (ReviewerDecision::Accept, Adjudication::Correct)
         | (ReviewerDecision::Reject, Adjudication::Incorrect) => Some(true),
         (ReviewerDecision::Accept, Adjudication::Incorrect)
@@ -344,15 +344,15 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
     let mut accepted = 0usize;
     let mut rejected = 0usize;
     let mut abstained = 0usize;
-    let mut determinate_gold = 0usize;
+    let mut determinate_reference = 0usize;
     let mut actionable_determinate = 0usize;
     let mut correct_actions = 0usize;
     let mut accepted_correct = 0usize;
     let mut accepted_determinate = 0usize;
-    let mut incorrect_gold_reviews = 0usize;
-    let mut incorrect_gold_accepts = 0usize;
-    let mut correct_gold_reviews = 0usize;
-    let mut correct_gold_accepts = 0usize;
+    let mut incorrect_reference_reviews = 0usize;
+    let mut incorrect_reference_accepts = 0usize;
+    let mut correct_reference_reviews = 0usize;
+    let mut correct_reference_accepts = 0usize;
     let mut calibration: Vec<(f64, f64)> = Vec::new();
     let mut minutes: Vec<f64> = Vec::new();
 
@@ -367,19 +367,19 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
         let Some(reference) = observation.adjudication_reference.filter(|value| value.is_determinate()) else {
             continue;
         };
-        determinate_gold += 1;
+        determinate_reference += 1;
 
         match reference {
             Adjudication::Incorrect => {
-                incorrect_gold_reviews += 1;
+                incorrect_reference_reviews += 1;
                 if observation.decision == ReviewerDecision::Accept {
-                    incorrect_gold_accepts += 1;
+                    incorrect_reference_accepts += 1;
                 }
             }
             Adjudication::Correct => {
-                correct_gold_reviews += 1;
+                correct_reference_reviews += 1;
                 if observation.decision == ReviewerDecision::Accept {
-                    correct_gold_accepts += 1;
+                    correct_reference_accepts += 1;
                 }
             }
             Adjudication::Indeterminate => {}
@@ -436,17 +436,17 @@ fn decision_metrics(observations: &[ReviewObservation]) -> DecisionMetrics {
         accepted_count: accepted,
         rejected_count: rejected,
         abstained_count: abstained,
-        determinate_adjudication_reference_review_count: determinate_gold,
+        determinate_adjudication_reference_review_count: determinate_reference,
         actionable_determinate_review_count: actionable_determinate,
         correct_action_count: correct_actions,
         actionable_decision_accuracy: (actionable_determinate > 0)
             .then_some(correct_actions as f64 / actionable_determinate as f64),
         accepted_decision_precision: (accepted_determinate > 0)
             .then_some(accepted_correct as f64 / accepted_determinate as f64),
-        false_accept_rate_on_incorrect_proposals: (incorrect_gold_reviews > 0)
-            .then_some(incorrect_gold_accepts as f64 / incorrect_gold_reviews as f64),
-        correct_proposal_accept_rate: (correct_gold_reviews > 0)
-            .then_some(correct_gold_accepts as f64 / correct_gold_reviews as f64),
+        false_accept_rate_on_incorrect_proposals: (incorrect_reference_reviews > 0)
+            .then_some(incorrect_reference_accepts as f64 / incorrect_reference_reviews as f64),
+        correct_proposal_accept_rate: (correct_reference_reviews > 0)
+            .then_some(correct_reference_accepts as f64 / correct_reference_reviews as f64),
         abstention_rate: (!observations.is_empty())
             .then_some(abstained as f64 / observations.len() as f64),
         total_review_minutes: minutes.iter().sum(),
@@ -666,7 +666,7 @@ fn evaluate(
             "Pooled reviewer observations share candidates and are descriptive; do not treat them as independent samples or attach naive row-level confidence intervals.".into(),
             "Panel minutes are the sum of all independent reviewer events, not the elapsed wall-clock time of a real queue.".into(),
             "This retrospective audit does not estimate causal policy effects or queue-order/learning effects; use a prospective randomized or blocked trial for those claims.".into(),
-            "Confidence Brier score and 10-bin ECE are calculated only for accept/reject reviews with determinate adjudication consensus; abstentions and unresolved gold are excluded.".into(),
+            "Confidence Brier score and 10-bin ECE are calculated only for accept/reject reviews with determinate adjudication consensus; abstentions and unresolved adjudication references are excluded.".into(),
         ],
         status: "MULTI_RATER_OUTCOMES_AUDITED",
         scope_note: "Evaluation-only measurement artifact. It must not be read by connectome-query-impact or used to tune candidate ranking on the held-out outcome corpus.",
