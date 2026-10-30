@@ -62,6 +62,28 @@ pub struct DerivedFactRecord {
     pub status: DerivedStatus,
 }
 
+
+/// One derived fact in a proof witness. Nodes are emitted in deterministic
+/// dependency-first order so callers can materialize premises before conclusions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DerivationWitnessNode {
+    pub fact: DerivedFactInput,
+}
+
+/// Minimal transitive witness for a currently valid derived fact.
+///
+/// Source event IDs are terminal premises that a retrieval layer must resolve
+/// to source-bound evidence. The DAG nodes expose intermediate states and the
+/// exact rule ID/version used at each step. The digest is a deterministic
+/// parity identifier, not an authentication signature.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DerivationWitness {
+    pub root_fact_id: String,
+    pub nodes_dependency_first: Vec<DerivationWitnessNode>,
+    pub source_event_ids: BTreeSet<String>,
+    pub witness_sha256: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct DerivationGraph {
     source_events: BTreeSet<String>,
@@ -425,6 +447,85 @@ impl DerivationGraph {
         Ok(())
     }
 
+
+    /// Extract the minimal transitive proof witness for a current derived fact.
+    ///
+    /// Every source event is returned once, and every intermediate derived
+    /// premise is emitted exactly once in dependency-first order. Invalidated
+    /// roots or inconsistent dependency state fail closed. Query planners can
+    /// use the source IDs to gather source-bound evidence and the nodes to
+    /// decompose the answer into explicit subgoals.
+    pub fn supporting_witness(&self, fact_id: &str) -> Result<DerivationWitness, String> {
+        self.verify_consistency()?;
+        let root = self
+            .facts
+            .get(fact_id)
+            .ok_or_else(|| format!("cannot build witness for unknown fact {fact_id:?}"))?;
+        if root.status != DerivedStatus::Current {
+            return Err(format!("cannot build witness for invalidated fact {fact_id:?}"));
+        }
+
+        let mut stack = vec![(fact_id.to_owned(), false)];
+        let mut discovered: BTreeSet<String> = [fact_id.to_owned()].into_iter().collect();
+        let mut nodes_dependency_first = Vec::new();
+        let mut source_event_ids = BTreeSet::new();
+
+        while let Some((current_id, expanded)) = stack.pop() {
+            let record = self
+                .facts
+                .get(&current_id)
+                .ok_or_else(|| format!("witness references missing derived fact {current_id:?}"))?;
+            if record.status != DerivedStatus::Current {
+                return Err(format!(
+                    "witness for {fact_id:?} reaches invalidated fact {current_id:?}"
+                ));
+            }
+
+            if expanded {
+                nodes_dependency_first.push(DerivationWitnessNode {
+                    fact: record.fact.clone(),
+                });
+                continue;
+            }
+
+            stack.push((current_id.clone(), true));
+            for dependency in record.fact.dependencies.iter().rev() {
+                match dependency {
+                    DependencyRef::SourceEvent(event_id) => {
+                        if !self.source_events.contains(event_id)
+                            || self.retracted_source_events.contains(event_id)
+                        {
+                            return Err(format!(
+                                "witness for {fact_id:?} contains unavailable source event {event_id:?}"
+                            ));
+                        }
+                        source_event_ids.insert(event_id.clone());
+                    }
+                    DependencyRef::DerivedFact(parent_id) => {
+                        if discovered.insert(parent_id.clone()) {
+                            stack.push((parent_id.clone(), false));
+                        }
+                    }
+                }
+            }
+        }
+
+        let canonical = serde_json::to_vec(&(
+            fact_id,
+            &nodes_dependency_first,
+            &source_event_ids,
+        ))
+        .map_err(|error| format!("cannot serialize derivation witness: {error}"))?;
+        let witness_sha256 = format!("{:x}", Sha256::digest(canonical));
+
+        Ok(DerivationWitness {
+            root_fact_id: fact_id.to_owned(),
+            nodes_dependency_first,
+            source_event_ids,
+            witness_sha256,
+        })
+    }
+
     /// Deterministic digest of logical state plus its materialized reverse
     /// index. The digest is for parity checks, not authentication or anti-rollback.
     pub fn state_sha256(&self) -> Result<String, String> {
@@ -756,4 +857,171 @@ mod tests {
         invalid.valid_from = "not-a-date".into();
         assert!(graph.derive(invalid).unwrap_err().contains("valid_from"));
     }
+    #[test]
+    fn supporting_witness_returns_minimal_dependency_first_dag_and_leaf_events() {
+        let mut graph = DerivationGraph::default();
+        for event in ["E1", "E2", "E3", "UNRELATED"] {
+            graph.register_source_event(event).unwrap();
+        }
+        graph
+            .derive(fact(
+                "D1",
+                [DependencyRef::SourceEvent("E1".into()), DependencyRef::SourceEvent("E2".into())],
+            ))
+            .unwrap();
+        graph
+            .derive(fact("D2", [DependencyRef::DerivedFact("D1".into())]))
+            .unwrap();
+        graph
+            .derive(fact(
+                "D3",
+                [DependencyRef::DerivedFact("D2".into()), DependencyRef::SourceEvent("E3".into())],
+            ))
+            .unwrap();
+        graph
+            .derive(fact("UNRELATED-D", [DependencyRef::SourceEvent("UNRELATED".into())]))
+            .unwrap();
+
+        let witness = graph.supporting_witness("D3").unwrap();
+        assert_eq!(
+            witness.nodes_dependency_first.iter().map(|node| node.fact.fact_id.as_str()).collect::<Vec<_>>(),
+            vec!["D1", "D2", "D3"]
+        );
+        assert_eq!(
+            witness.source_event_ids,
+            BTreeSet::from(["E1".to_string(), "E2".to_string(), "E3".to_string()])
+        );
+        assert!(!witness.source_event_ids.contains("UNRELATED"));
+        assert_eq!(witness.witness_sha256.len(), 64);
+        assert_eq!(witness.nodes_dependency_first[0].fact.rule_version, "v1");
+    }
+
+    #[test]
+    fn supporting_witness_deduplicates_shared_ancestors_and_is_deterministic() {
+        fn build(reverse: bool) -> DerivationGraph {
+            let mut graph = DerivationGraph::default();
+            graph.register_source_event("E1").unwrap();
+            graph.register_source_event("E2").unwrap();
+            graph.derive(fact("ROOT", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+            if reverse {
+                graph.derive(fact("LEFT", [DependencyRef::DerivedFact("ROOT".into())])).unwrap();
+                graph.derive(fact("RIGHT", [DependencyRef::DerivedFact("ROOT".into()), DependencyRef::SourceEvent("E2".into())])).unwrap();
+            } else {
+                graph.derive(fact("RIGHT", [DependencyRef::DerivedFact("ROOT".into()), DependencyRef::SourceEvent("E2".into())])).unwrap();
+                graph.derive(fact("LEFT", [DependencyRef::DerivedFact("ROOT".into())])).unwrap();
+            }
+            graph.derive(fact("JOIN", [DependencyRef::DerivedFact("LEFT".into()), DependencyRef::DerivedFact("RIGHT".into())])).unwrap();
+            graph
+        }
+
+        let left = build(false).supporting_witness("JOIN").unwrap();
+        let right = build(true).supporting_witness("JOIN").unwrap();
+        assert_eq!(left, right);
+        assert_eq!(
+            left.nodes_dependency_first.iter().map(|node| node.fact.fact_id.as_str()).collect::<Vec<_>>(),
+            vec!["ROOT", "LEFT", "RIGHT", "JOIN"]
+        );
+        assert_eq!(left.source_event_ids, BTreeSet::from(["E1".to_string(), "E2".to_string()]));
+    }
+
+    #[test]
+    fn supporting_witness_rejects_unknown_invalidated_and_stale_roots() {
+        let mut graph = DerivationGraph::default();
+        graph.register_source_event("E1").unwrap();
+        graph.derive(fact("D1", [DependencyRef::SourceEvent("E1".into())])).unwrap();
+        assert!(graph.supporting_witness("missing").unwrap_err().contains("unknown fact"));
+        assert!(graph.supporting_witness("D1").is_ok());
+
+        graph.invalidate_source_event("E1", "source withdrawn").unwrap();
+        assert!(graph
+            .supporting_witness("D1")
+            .unwrap_err()
+            .contains("invalidated fact"));
+    }
+
+
+    #[test]
+    fn generated_derivation_witnesses_match_independent_fixed_point_oracle() {
+        for seed in 1_u64..=12 {
+            let mut graph = DerivationGraph::default();
+            for event_index in 0..8 {
+                graph.register_source_event(format!("E{event_index}")).unwrap();
+            }
+            let mut state = seed;
+            let mut deps_by_fact: BTreeMap<String, BTreeSet<DependencyRef>> = BTreeMap::new();
+
+            for fact_index in 0..40 {
+                state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let event_index = ((state >> 32) % 8) as usize;
+                let mut dependencies =
+                    make_dependencies([DependencyRef::SourceEvent(format!("E{event_index}"))]);
+                for parent_index in 0..fact_index {
+                    state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                    if state % 19 == 0 {
+                        dependencies.insert(DependencyRef::DerivedFact(format!("D{parent_index:02}")));
+                    }
+                }
+                let id = format!("D{fact_index:02}");
+                graph.derive(fact(&id, dependencies.iter().cloned())).unwrap();
+                deps_by_fact.insert(id, dependencies);
+            }
+
+            let root = "D39";
+            let mut expected_facts = BTreeSet::from([root.to_string()]);
+            let mut expected_sources = BTreeSet::new();
+            loop {
+                let before_facts = expected_facts.len();
+                let current: Vec<String> = expected_facts.iter().cloned().collect();
+                for id in current {
+                    for dependency in deps_by_fact.get(&id).unwrap() {
+                        match dependency {
+                            DependencyRef::SourceEvent(event_id) => {
+                                expected_sources.insert(event_id.clone());
+                            }
+                            DependencyRef::DerivedFact(parent_id) => {
+                                expected_facts.insert(parent_id.clone());
+                            }
+                        }
+                    }
+                }
+                if expected_facts.len() == before_facts {
+                    break;
+                }
+            }
+
+            let witness = graph.supporting_witness(root).unwrap();
+            let actual_facts: BTreeSet<String> = witness
+                .nodes_dependency_first
+                .iter()
+                .map(|node| node.fact.fact_id.clone())
+                .collect();
+            assert_eq!(actual_facts, expected_facts, "fact closure, seed {seed}");
+            assert_eq!(witness.source_event_ids, expected_sources, "source closure, seed {seed}");
+
+            let positions: BTreeMap<String, usize> = witness
+                .nodes_dependency_first
+                .iter()
+                .enumerate()
+                .map(|(index, node)| (node.fact.fact_id.clone(), index))
+                .collect();
+            for node in &witness.nodes_dependency_first {
+                for dependency in &node.fact.dependencies {
+                    if let DependencyRef::DerivedFact(parent_id) = dependency {
+                        assert!(
+                            positions[parent_id] < positions[&node.fact.fact_id],
+                            "dependency order, seed {seed}, edge {parent_id} -> {}",
+                            node.fact.fact_id
+                        );
+                    }
+                }
+            }
+            assert_eq!(
+                graph.supporting_witness(root).unwrap().witness_sha256,
+                witness.witness_sha256,
+                "deterministic digest, seed {seed}"
+            );
+        }
+    }
+
+
 }
