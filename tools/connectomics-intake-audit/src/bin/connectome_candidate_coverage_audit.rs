@@ -373,15 +373,17 @@ fn validate_mask_attestation(report: &SpatialFrameReport) -> Result<(), String> 
         product.checked_mul(u128::from(*dimension))
             .ok_or_else(|| "spatial frame grid dimension product overflows u128".to_string())
     })?;
-    let expected_grid_dimensions = [
-        1 + (report.extent_voxels[0] - 1) / report.tile_shape_voxels[0].max(1),
-        1 + (report.extent_voxels[1] - 1) / report.tile_shape_voxels[1].max(1),
-        1 + (report.extent_voxels[2] - 1) / report.tile_shape_voxels[2].max(1),
-    ];
     if report.extent_voxels.iter().any(|value| *value == 0)
         || report.tile_shape_voxels.iter().any(|value| *value == 0)
-        || report.grid_dimensions != expected_grid_dimensions
     {
+        return Err("spatial frame extent and tile shape must be strictly positive".into());
+    }
+    let expected_grid_dimensions = [
+        1 + (report.extent_voxels[0] - 1) / report.tile_shape_voxels[0],
+        1 + (report.extent_voxels[1] - 1) / report.tile_shape_voxels[1],
+        1 + (report.extent_voxels[2] - 1) / report.tile_shape_voxels[2],
+    ];
+    if report.grid_dimensions != expected_grid_dimensions {
         return Err("spatial frame grid dimensions do not match its extent and tile shape".into());
     }
     if checked_voxel_product(report.extent_voxels, "declared spatial extent")? != declared_voxels {
@@ -1237,10 +1239,10 @@ mod tests {
         let protocol_hash = sha256(&protocol_bytes);
         let seed = "test-candidate-coverage-seed-2026".to_string();
         let population_frame = vec![
-            PopulationPsu { psu_id: "psu-a1".into(), stratum_id: "region-a".into() },
-            PopulationPsu { psu_id: "psu-a2".into(), stratum_id: "region-a".into() },
-            PopulationPsu { psu_id: "psu-b1".into(), stratum_id: "region-b".into() },
-            PopulationPsu { psu_id: "psu-b2".into(), stratum_id: "region-b".into() },
+            PopulationPsu { psu_id: "0:0:0".into(), stratum_id: "region-a".into() },
+            PopulationPsu { psu_id: "1:0:0".into(), stratum_id: "region-a".into() },
+            PopulationPsu { psu_id: "0:1:0".into(), stratum_id: "region-b".into() },
+            PopulationPsu { psu_id: "1:1:0".into(), stratum_id: "region-b".into() },
         ];
         let population_frame_digest = frame_sha256(&population_frame);
 
@@ -1271,7 +1273,7 @@ mod tests {
             population_frame,
             sampled_units: vec![
                 SampledPsuOutcome {
-                    psu_id: "psu-a1".into(),
+                    psu_id: "0:0:0".into(),
                     exhaustive_search_completed: true,
                     audit_panel_person_minutes: 10.0,
                     errors: vec![
@@ -1290,13 +1292,13 @@ mod tests {
                     ],
                 },
                 SampledPsuOutcome {
-                    psu_id: "psu-a2".into(),
+                    psu_id: "1:0:0".into(),
                     exhaustive_search_completed: true,
                     audit_panel_person_minutes: 9.0,
                     errors: vec![],
                 },
                 SampledPsuOutcome {
-                    psu_id: "psu-b1".into(),
+                    psu_id: "0:1:0".into(),
                     exhaustive_search_completed: true,
                     audit_panel_person_minutes: 11.0,
                     errors: vec![VerifiedError {
@@ -1307,7 +1309,7 @@ mod tests {
                     }],
                 },
                 SampledPsuOutcome {
-                    psu_id: "psu-b2".into(),
+                    psu_id: "1:1:0".into(),
                     exhaustive_search_completed: true,
                     audit_panel_person_minutes: 8.0,
                     errors: vec![VerifiedError {
@@ -1355,6 +1357,30 @@ mod tests {
             population_frame: audit.population_frame.clone(),
             status: status.into(),
         }
+    }
+
+    #[test]
+    fn tile_volume_is_recomputed_from_clipped_lattice_geometry() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.mask_tile_counts[0].tile_voxel_count = "15".into();
+        assert!(validate_mask_attestation(&report).unwrap_err().contains("does not match clipped lattice volume"));
+    }
+
+    #[test]
+    fn noncanonical_or_out_of_range_psu_coordinates_are_rejected() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.mask_tile_counts[0].psu_id = "00:0:0".into();
+        assert!(validate_mask_attestation(&report).unwrap_err().contains("not in canonical decimal form"));
+    }
+
+    #[test]
+    fn zero_extent_fails_closed_without_unsigned_underflow() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let mut report = spatial_report(&audit, "PASS");
+        report.extent_voxels[0] = 0;
+        assert!(validate_mask_attestation(&report).unwrap_err().contains("strictly positive"));
     }
 
     #[test]
@@ -1790,8 +1816,8 @@ mod tests {
         let (frame, _outcomes, selected) = validate(
             &proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol,
         ).unwrap();
-        assert_eq!(selected["region-a"], BTreeSet::from(["psu-a1".into(), "psu-a2".into()]));
-        assert_eq!(selected["region-b"], BTreeSet::from(["psu-b1".into(), "psu-b2".into()]));
+        assert_eq!(selected["region-a"], BTreeSet::from(["0:0:0".into(), "1:0:0".into()]));
+        assert_eq!(selected["region-b"], BTreeSet::from(["0:1:0".into(), "1:1:0".into()]));
         assert_eq!(frame["region-a"].len(), 2);
     }
 }
