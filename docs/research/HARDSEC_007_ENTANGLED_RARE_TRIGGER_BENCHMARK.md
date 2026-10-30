@@ -349,7 +349,23 @@ cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-au
 
 Expected mathematical result for the example: at p=10^-4, 1,000 independent trials have about 90.48% chance of zero activations; approximately 29,956 IID trials are required to reduce that miss probability to 5%.
 
-The test suite checks known-answer miss probabilities, the minimum trial count, stable small-probability arithmetic, edge cases p=0 and p=1, invalid inputs and unrepresentably large budgets. These tests are authored but have not been compiled or executed in this environment.
+The trigger-budget suite has **9 tests**. The evidence-packet auditor has **26 tests**, including the SeqCube witness-only fixture and negative controls for claim inflation. Both suites have now been compiled and passed in the focused GitHub Actions job described below.
+
+### Isolated focused Rust test harness
+
+The root Cargo workspace currently contains a globbed member path `crates/core/symthaea` whose `Cargo.toml` is absent. A direct root-workspace Cargo invocation fails before reading the examples. The project does not alter or weaken that production workspace declaration for this research task.
+
+Instead, `tools/hardsec-audit-harness/Cargo.toml` defines a small nested workspace that points directly at the two checked-in example files and pins their direct dependencies (`serde_json = 1.0.150`, optional `sha2 = 0.10.9`). The focused workflow runs:
+
+```bash
+cargo generate-lockfile --manifest-path tools/hardsec-audit-harness/Cargo.toml
+cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --example hardsec_trigger_budget
+cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+```
+
+On exact PR head `5922ab26bfb26a21e8afcbe9b3dfdba43d0ef322`, GitHub Actions run [41034832167](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41034832167) completed successfully with **9/9** trigger-budget tests and **26/26** evidence-packet tests. The generated harness lockfile SHA-256 was `004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82`; it was uploaded as artifact `hardsec-audit-harness-lock` (artifact ID `12966939156`, archive digest `sha256:c5e1e988798a888d966693a87ef1f3edb18f906a89f8db63ec3972de5b090d0d`). The source is the same tracked examples referenced in the repository; the lockfile is an exact-run artifact, not yet committed.
+
+The independent SeqCube package verifier remains **not run** here. The passing Rust test validates only the evidence packet's handling of publisher-listed digests and claim scopes; it does not fetch the package's files or reproduce Z3/Icarus outputs.
 
 Useful tool references:
 - SymbiYosys: https://symbiyosys.readthedocs.io/en/latest/ (bounded/unbounded safety, cover and liveness)
