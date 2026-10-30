@@ -37,9 +37,9 @@ The Evidence Sufficiency Benchmark uses five evidence levels from full support t
 
 ## Data contract
 
-The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at and exact unresolved claim set. It includes:
+The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at, exact EvidenceIndex state digest and unresolved claim set. A state change or newly ingested source invalidates the estimate and requires recalculation. It includes:
 
-- unresolved conclusion IDs and their deterministic digest;
+- exact evidence-index snapshot SHA-256, unresolved conclusion IDs and their deterministic digest;
 - estimator identity/version and estimator artifact digest;
 - held-out calibration-split digest, feature-schema digest and utility-schema digest;
 - correctness-gain lower confidence bound;
