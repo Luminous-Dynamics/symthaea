@@ -212,3 +212,40 @@ For a defensible offline comparison, the frozen candidate pool should be reviewe
 - `2`: command/input parsing or report-writing error.
 
 The tool deliberately does not auto-correct labels, task names, or file hashes. Fix the source or have the mapping reviewed, update the manifest, then rerun.
+
+
+## Candidate-generation coverage audit (SCI-CONNECTOMICS-006)
+
+The new `connectome-candidate-coverage-audit` binary addresses a distinct blind spot: ranking metrics only describe the candidate pool that was generated. They cannot identify eligible proofreading errors the generator never proposed.
+
+This evaluator binds the exact proposal bytes, ranking-report bytes, sampling protocol, and seed commitment. It draws a deterministic stratified simple random sample without replacement of primary sampling units (PSUs) from a complete declared search frame. Every selected PSU must attest to exhaustive expert search, including selected units with zero errors. Each independently verified error is mapped to zero or more IDs from the frozen proposal pool; an empty mapping is a candidate-generation miss.
+
+The report estimates:
+- finite-frame total, covered, and uncovered error counts using stratified Horvitz–Thompson totals;
+- candidate-generation recall as a ratio of covered to total estimated errors;
+- impact-weighted candidate-generation recall using predeclared scientific query impact weights;
+- missed error count/impact by observed error family;
+- separate independent audit-panel person-minutes;
+- first-order Taylor-linearized ratio design variance, with normal-approximation intervals withheld unless every non-census stratum has at least 30 sampled PSUs.
+
+Run sequence:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-query-impact -- \
+  --input proposals.json --output frozen-ranking.json
+
+sha256sum proposals.json frozen-ranking.json \
+  docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md
+
+# Populate the coverage file from a committed, complete PSU frame, then reveal
+# the preregistered seed and include every selected PSU, even if no errors were found.
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+  --bin connectome-candidate-coverage-audit -- \
+  --proposals proposals.json \
+  --ranking-report frozen-ranking.json \
+  --sampling-protocol docs/neuroscience/CONNECTOME_CANDIDATE_COVERAGE_AUDIT_PROTOCOL_V1.md \
+  --audit independent-volume-search-audit.json \
+  --output candidate-coverage-report.json
+```
+
+**Scope and information-flow limits:** estimates apply only to the complete declared finite search frame, not arbitrary unsampled tissue or the whole connectome. Exhaustive search and proposal-to-error mappings need independent protocol enforcement. The candidate generator/ranker must never receive sampled locations, seed, error identities, outcomes, or impact weights. This audit is not interchangeable with #9187, which samples the unreviewed tail *inside* the candidate pool. Neither audit establishes causal policy efficiency; that requires prospective randomized/block-randomized queue assignment. No biological sample or performance gain is claimed.
