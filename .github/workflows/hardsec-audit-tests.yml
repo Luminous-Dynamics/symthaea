@@ -83,6 +83,17 @@ jobs:
           assert receipt["generalization"]["held_out_group_count"] == 2
           assert receipt["generalization"]["macro_group_coverage"] == 0.5
           assert receipt["generalization"]["aggregate_constraints_met"] is True
+          family_risk = receipt["family_level_failure_bounds"]
+          assert family_risk["group_count"] == 2
+          assert family_risk["false_alert_failure_groups"] == 0
+          assert family_risk["false_clear_failure_groups"] == 0
+          assert family_risk["false_alert_group_failure_upper_bound"] > 0.8
+          assert family_risk["false_clear_group_failure_upper_bound"] > 0.8
+          assert family_risk["minimum_independent_groups_if_zero_failures"] == {
+              "one_percent": 368,
+              "half_percent": 736,
+              "zero_percent": None,
+          }
           assert receipt["security_verdict"] is None
           assert [item["group_count"] for item in receipt["split_summary"]] == [1, 1, 2]
           print("Selective-risk CLI receipt: PASS (2 held-out groups, 50% coverage, 50% abstention)")
