@@ -1594,5 +1594,4 @@ mod tests {
                 .contains("outside input directory")
         );
     }
-
 }
