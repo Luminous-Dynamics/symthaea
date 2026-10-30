@@ -292,7 +292,7 @@ fn slice_json(slice: &SliceSummary) -> String {
     }).collect::<Vec<_>>().join(",");
     format!(
         concat!("{{\"task_id\":{},\"capability\":{},\"split\":{},\"n_pairs\":{},",
-        "\"eligible\":{},\"eligibility_reason\":{},\"arms\":{{{}}},\"contrasts\":{{{}}}}}"),
+        "\"qualification_floor_met\":{},\"qualification_floor_reason\":{},\"arms\":{{{}}},\"contrasts\":{{{}}}}}"),
         json_string(&slice.task_id), json_string(&slice.capability), json_string(&slice.split),
         slice.n_pairs, slice.qualification_floor_met, json_string(&slice.reason), arms, contrasts
     )
@@ -368,80 +368,135 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn smoke_input() -> &'static str {
+        include_str!("../fixtures/smoke.tsv")
+    }
+
+    fn qualification_input() -> String {
+        smoke_input().replace("\tdevelopment\t", "\tqualification\t")
+    }
+
     #[test]
     fn sha256_matches_known_answer() {
-        assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
+
     #[test]
-    fn qualification_fixture_has_all_paired_arms_and_positive_aop() {
-        let input = include_str!("../fixtures/smoke.tsv");
-        let slices = parse_and_validate(input).unwrap();
+    fn development_fixture_has_all_paired_arms_and_positive_aop() {
+        let slices = parse_and_validate(smoke_input()).unwrap();
         assert_eq!(slices.len(), 1);
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert_eq!(slice.n_pairs, 20);
+        assert_eq!(slice.split, "development");
         assert!(!slice.qualification_floor_met);
         assert!(slice.reason.contains("development split"));
         assert!(slice.contrasts["aop_w1_minus_d1"].0.mean > 0.0);
         assert!(slice.contrasts["prediction_mediation_w1_minus_w2"].0.mean > 0.0);
     }
+
     #[test]
     fn duplicate_arm_is_rejected() {
-        let input = include_str!("../fixtures/qualification.tsv");
+        let input = smoke_input();
         let duplicate = input.lines().nth(1).unwrap();
         let mutated = format!("{input}{duplicate}\n");
         assert!(parse_and_validate(&mutated).unwrap_err().contains("duplicate"));
     }
+
     #[test]
     fn missing_arm_is_rejected() {
-        let input = include_str!("../fixtures/qualification.tsv");
+        let input = smoke_input();
         let mut lines: Vec<&str> = input.lines().collect();
         lines.remove(1);
         let mutated = format!("{}\n", lines.join("\n"));
         assert!(parse_and_validate(&mutated).unwrap_err().contains("missing D0 arm"));
     }
+
     #[test]
     fn mismatched_candidate_digest_is_rejected() {
-        let input = include_str!("../fixtures/qualification.tsv");
-        let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
+        let mut lines: Vec<String> = smoke_input().lines().map(str::to_string).collect();
         let mut fields: Vec<String> = lines[2].split('\t').map(str::to_string).collect();
         fields[10] = "f".repeat(64);
         lines[2] = fields.join("\t");
         assert!(parse_and_validate(&lines.join("\n")).unwrap_err().contains("mismatched pairing"));
     }
+
     #[test]
     fn failed_and_timed_out_rows_are_retained_in_the_denominator() {
-        let input = include_str!("../fixtures/qualification.tsv");
-        let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
+        let mut lines: Vec<String> = smoke_input().lines().map(str::to_string).collect();
         let mut fields: Vec<String> = lines[1].split('\t').map(str::to_string).collect();
-        fields[6] = "false".to_string(); fields[7] = "timeout".to_string(); fields[5] = "-1.0".to_string();
+        fields[6] = "false".to_string();
+        fields[7] = "timeout".to_string();
+        fields[5] = "-1.0".to_string();
         lines[1] = fields.join("\t");
         let slices = parse_and_validate(&lines.join("\n")).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert_eq!(slice.arms[&Arm::D0].timeout, 1);
         assert_eq!(slice.n_pairs, 20);
     }
+
     #[test]
     fn twenty_paired_rows_meet_only_the_mechanical_qualification_floor() {
-        let input = include_str!("../fixtures/smoke.tsv").replace("\\tdevelopment\\t", "\\tqualification\\t");
+        let input = qualification_input();
         let slices = parse_and_validate(&input).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert!(slice.qualification_floor_met);
         assert!(slice.reason.contains("subject to held-out"));
     }
+
     #[test]
-    fn below_minimum_qualification_count_is_smoke_only() {
-        let input = include_str!("../fixtures/smoke.tsv").replace("\\tdevelopment\\t", "\\tqualification\\t");
+    fn nineteen_pairs_do_not_meet_the_mechanical_qualification_floor() {
+        let input = qualification_input();
         let lines: Vec<&str> = input.lines().take(1 + 19 * 5).collect();
-        let mutated = format!("{}\\n", lines.join("\\n"));
+        let mutated = format!("{}\n", lines.join("\n"));
         let slices = parse_and_validate(&mutated).unwrap();
         let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
         assert!(!slice.qualification_floor_met);
         assert!(slice.reason.contains("below the minimum"));
     }
+
+    #[test]
+    fn shuffled_future_negative_control_can_be_worse_than_world_model() {
+        let mut lines: Vec<String> = smoke_input().lines().map(str::to_string).collect();
+        for line in lines.iter_mut().skip(1) {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            if fields[4] == "W2" {
+                let prior = fields[5].parse::<f64>().unwrap();
+                fields[5] = (prior - 0.25).to_string();
+            }
+            *line = fields.join("\t");
+        }
+        let slices = parse_and_validate(&lines.join("\n")).unwrap();
+        let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
+        assert!(slice.contrasts["prediction_mediation_w1_minus_w2"].0.mean > 0.20);
+    }
+
+    #[test]
+    fn negative_aop_is_reported_not_relabelled() {
+        let mut lines: Vec<String> = smoke_input().lines().map(str::to_string).collect();
+        for line in lines.iter_mut().skip(1) {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            if fields[4] == "W1" {
+                let prior = fields[5].parse::<f64>().unwrap();
+                fields[5] = (prior - 0.30).to_string();
+            }
+            *line = fields.join("\t");
+        }
+        let slices = parse_and_validate(&lines.join("\n")).unwrap();
+        let slice = summarize_slice(slices.keys().next().unwrap().clone(), slices.values().next().unwrap());
+        assert!(slice.contrasts["aop_w1_minus_d1"].0.mean < 0.0);
+        assert!(slice.contrasts["aop_w1_minus_d1"].0.high < 0.0);
+    }
+
     #[test]
     fn bootstrap_is_deterministic() {
-        let a = bootstrap_estimate(&[0.2,0.4,0.6,0.8], 42);
-        let b = bootstrap_estimate(&[0.2,0.4,0.6,0.8], 42);
-        assert_eq!(a.mean, b.mean); assert_eq!(a.low, b.low); assert_eq!(a.high, b.high);
+        let a = bootstrap_estimate(&[0.2, 0.4, 0.6, 0.8], 42);
+        let b = bootstrap_estimate(&[0.2, 0.4, 0.6, 0.8], 42);
+        assert_eq!(a.mean, b.mean);
+        assert_eq!(a.low, b.low);
+        assert_eq!(a.high, b.high);
     }
 }
