@@ -186,7 +186,7 @@ fn metadata_string_array(metadata: &Value, field: &str) -> Result<Vec<String>, S
 fn derive_sample_type(source_archive: &str, strategy: Option<&str>) -> Option<&'static str> {
     if source_archive.contains("edits_and_adj") {
         match strategy {
-            None | Some("") | Some("merge_correction") => Some("merge_edit"),
+            None | Some("merge_correction") => Some("merge_edit"),
             Some("inversion") | Some("split_correction") => Some("split_edit"),
             Some(value) if value.to_lowercase().contains("adj") => Some("adjacent_control"),
             _ => None,
@@ -889,6 +889,15 @@ mod tests {
         assert_eq!(report.status, "PASS", "{:?}", report.errors);
         assert_eq!(report.row_count, 5);
         assert_eq!(report.sample_type_counts.len(), 5);
+    }
+
+    #[test]
+    fn rejects_empty_strategy_for_edit_archive() {
+        let mut rows = valid_dataset();
+        rows[0].metadata["strategy"] = json!("");
+        rows[0].row.metadata = rows[0].metadata.to_string();
+        let report = report(&rows);
+        assert!(report.errors.iter().any(|finding| finding.code == "sample_type_derivation_mismatch"));
     }
 
 }
