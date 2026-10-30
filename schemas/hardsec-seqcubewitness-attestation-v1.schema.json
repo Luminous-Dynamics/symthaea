@@ -9,6 +9,7 @@
     "schema_version",
     "subject",
     "run",
+    "workflow_actions",
     "upstream",
     "tests",
     "replay",
@@ -347,6 +348,57 @@
         "type": "string"
       },
       "minItems": 1
+    },
+    "workflow_actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lock_path",
+        "lock_sha256",
+        "actions",
+        "verification"
+      ],
+      "properties": {
+        "lock_path": {
+          "type": "string"
+        },
+        "lock_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "repository",
+              "release",
+              "commit",
+              "role"
+            ],
+            "properties": {
+              "repository": {
+                "type": "string"
+              },
+              "release": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "verification": {
+          "const": "all_workflow_uses_refs_are_full_commit_shas_and_match_the_lock"
+        }
+      }
     }
   }
 }
