@@ -139,7 +139,7 @@ fn run() -> Result<(), String> {
         let receipt = cut_cause
             .receipt_sha256()
             .map_err(|error| format!("partitioned Eq4 receipt failed at n={n_units}: {error}"))?;
-        let validated = score_is_finite(&warmup_score)
+        let validated = score_is_finite(&warmup_score.score)
             && uncut_cause.forward_likelihood.iter().all(|value| value.is_finite())
             && cut_cause.forward_likelihood.iter().all(|value| value.is_finite())
             && receipt.len() == 64;
@@ -155,11 +155,11 @@ fn run() -> Result<(), String> {
             FACTOR_ENTRY_BUDGET,
             median_ns,
             min_ns,
-            warmup_score.phi,
-            warmup_score.signed_phi,
-            warmup_score.normalized_phi,
-            warmup_score.cause.signed_phi,
-            warmup_score.effect.signed_phi,
+            warmup_score.score.phi,
+            warmup_score.score.signed_phi,
+            warmup_score.score.normalized_phi,
+            warmup_score.score.cause.signed_phi,
+            warmup_score.score.effect.signed_phi,
             receipt,
             validated
         );
@@ -172,19 +172,19 @@ fn run() -> Result<(), String> {
 
 fn score_is_finite(score: &symthaea_iit::SystemPhiPartitionScore) -> bool {
     [
-        score.phi,
-        score.signed_phi,
+        score.score.phi,
+        score.score.signed_phi,
         score.normalization_factor,
         score.signed_normalized_phi,
-        score.normalized_phi,
+        score.score.normalized_phi,
         score.cause.selectivity,
         score.cause.forward_probability,
         score.cause.partitioned_forward_probability,
-        score.cause.signed_phi,
+        score.score.cause.signed_phi,
         score.effect.selectivity,
         score.effect.forward_probability,
         score.effect.partitioned_forward_probability,
-        score.effect.signed_phi,
+        score.score.effect.signed_phi,
     ]
     .iter()
     .all(|value| value.is_finite())
