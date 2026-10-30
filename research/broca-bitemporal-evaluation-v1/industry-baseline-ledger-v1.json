@@ -429,6 +429,30 @@
       "evidence_grade": "peer-reviewed-benchmark-primary-source",
       "comparison_notes": "This benchmark focuses on evidence sufficiency and answer-abstention calibration. The 65-91% range is over-answering under conflicting evidence for the evaluated models, not a single pooled accuracy score. Use it as a failure-mode comparator for Broca's conflict and abstention policy.",
       "source": "https://doi.org/10.32604/cmc.2026.086343"
+    },
+    {
+      "id": "cost-aware-additional-retrieval-qasper-2026-10-27",
+      "system": "Cost-aware additional retrieval router (Zhao, 2026)",
+      "category": "preprint-primary-study",
+      "benchmark": "QASPER",
+      "benchmark_revision": "60 held-out articles; 188 questions; 169 evidence-evaluable",
+      "metric": "evidence Hit@10 with adaptive hybrid-retrieval routing",
+      "value_percent": 78.7,
+      "answer_model": "4-bit Qwen3-4B for answer-level side analysis",
+      "judge": "Evidence Hit@10; paired paper-cluster bootstrap; answer assessments provisional/model-assisted and not independently human validated",
+      "reported_date": "2026-10-27",
+      "sample_size": 169,
+      "secondary_metrics": {
+        "always_keep_dense_rerank_hit_at10_percent": 76.92,
+        "adaptive_policy_hybrid_calls": 46,
+        "total_questions": 188,
+        "hybrid_call_rate_percent": 24.5,
+        "paired_bootstrap_reliable_utility_advantage": false,
+        "answer_correctness_or_faithfulness_gain_established": false
+      },
+      "evidence_grade": "preprint-with-explicit-held-out-study-and-bootstrap-limitations",
+      "comparison_notes": "The policy routes 46/188 questions to hybrid retrieval (24.5%) and reports evidence Hit@10 of 78.70% versus 76.92% for always-keep; paper-cluster paired bootstrap intervals do not establish a reliable utility advantage. Answer-level comparisons with quantized Qwen3-4B were provisional/model-assisted and lacked independent human validation. This is a cautionary comparator, not proof of answer-quality improvement or a headline SOTA result.",
+      "source": "https://arxiv.org/abs/2610.37358"
     }
   ],
   "broca_targets": {
