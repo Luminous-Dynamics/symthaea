@@ -25,7 +25,12 @@ pub struct TabularBenchmarkManifest {
     pub version: String,
     pub benchmark_id: String,
     pub metric_id: String,
+    /// Evaluation task/split whose target labels remain hidden until queried.
     pub split_id: String,
+    /// Separate task/split used to select or calibrate the proxy subset.
+    pub proxy_calibration_split_id: String,
+    /// Digest of the calibration data and frozen proxy-selection decision.
+    pub proxy_calibration_sha256: String,
     pub source_description: String,
     /// SHA-256 of the raw source artifact or canonical import artifact, as documented above.
     pub artifact_sha256: String,
@@ -336,10 +341,10 @@ impl TabularNasBenchmark {
                 ));
             }
             for (proxy_id, score) in &feature.proxy_scores {
-                if proxy_id.trim().is_empty() {
+                if proxy_id.trim().is_empty() || proxy_id == &manifest.metric_id {
                     return Err(TabularNasError::new(
                         format!("{field}.proxy_scores"),
-                        "proxy IDs must be non-empty",
+                        "proxy IDs must be non-empty and must not reuse the target metric ID",
                     ));
                 }
                 if !score.is_finite() {
@@ -540,22 +545,29 @@ fn validate_manifest(manifest: &TabularBenchmarkManifest) -> Result<(), TabularN
         ("benchmark_id", manifest.benchmark_id.as_str()),
         ("metric_id", manifest.metric_id.as_str()),
         ("split_id", manifest.split_id.as_str()),
+        ("proxy_calibration_split_id", manifest.proxy_calibration_split_id.as_str()),
         ("source_description", manifest.source_description.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(TabularNasError::new(field, "must be non-empty"));
         }
     }
-    if manifest.artifact_sha256.len() != 64
-        || !manifest
-            .artifact_sha256
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-    {
+    if manifest.proxy_calibration_split_id == manifest.split_id {
         return Err(TabularNasError::new(
-            "artifact_sha256",
-            "must contain exactly 64 hexadecimal characters",
+            "proxy_calibration_split_id",
+            "strict no-oracle mode requires a calibration split distinct from the evaluation split",
         ));
+    }
+    for (field, digest) in [
+        ("artifact_sha256", manifest.artifact_sha256.as_str()),
+        ("proxy_calibration_sha256", manifest.proxy_calibration_sha256.as_str()),
+    ] {
+        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(TabularNasError::new(
+                field,
+                "must contain exactly 64 hexadecimal characters",
+            ));
+        }
     }
     if manifest.max_unique_queries == 0 {
         return Err(TabularNasError::new(
@@ -696,6 +708,8 @@ mod tests {
             benchmark_id: "synthetic-nas-firewall-v0".into(),
             metric_id: "validation_accuracy".into(),
             split_id: "challenge-a".into(),
+            proxy_calibration_split_id: "development-b".into(),
+            proxy_calibration_sha256: "b".repeat(64),
             source_description: "synthetic fixture only".into(),
             artifact_sha256: "a".repeat(64),
             max_unique_queries: 4,
