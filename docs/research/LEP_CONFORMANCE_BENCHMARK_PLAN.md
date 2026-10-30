@@ -54,6 +54,20 @@ The 1,000-mutation target is an engineering gate, not a statistical proof of zer
 5. Keep synthetic fixtures explicitly synthetic. Do not describe placeholder digests or example run IDs as observed measurements.
 6. Report structural-validation speed separately from full semantic validation, signature verification, and artifact-byte verification.
 
+## Reproducible microbenchmark command
+
+The standalone harness creates a valid synthetic LEP statement, pads only its unique `limitations` text to approach the requested size, warms each path 20 times, and reports p50/p95/mean latency plus p50-derived throughput. It compares strict parsing + schema validation against strict parsing + schema + semantic validation. It does **not** measure signatures, network access, artifact I/O, or scientific workloads.
+
+From the repository root, collect the four input sizes with the same iteration count:
+
+```sh
+for size in 1024 10240 102400 1048576; do
+  cargo run --release --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- "$size" 1000
+done
+```
+
+Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This harness currently establishes a measurement method only; its first run must still pass compile and validity checks.
+
 ## Baseline to collect next
 
 The implementation now caches the compiled schema per process so repeated validation need not parse and compile the schema for every record. This is a design optimization, **not a measured speedup**. First collect the table above on the current implementation; use that result to set a realistic absolute latency/throughput budget and to determine whether further optimization is justified.
