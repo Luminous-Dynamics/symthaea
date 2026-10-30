@@ -1,0 +1,102 @@
+{
+  "schema": "symthaea-running-max-group-aggregators-v1",
+  "status": "LOCAL_SYNTHETIC_PILOT_NOT_A_SOTA_CLAIM",
+  "full_pilot_json_sha256": "ca3909476d7aa2549e539cc425a6352058e39d50e2f7246639a0a004421ee54f",
+  "local_tests": "11/11 passed",
+  "pilot": {
+    "all_null_K200_T500_n3000": {
+      "independent": {
+        "bonferroni_max": "0/3000",
+        "a1": "0/3000",
+        "a2": "0/3000",
+        "s1": "0/3000",
+        "s2": "0/3000",
+        "s4": "0/3000",
+        "portfolio": "0/3000",
+        "mixed_f": "0/3000"
+      },
+      "equicorrelation_0_3": {
+        "bonferroni_max": "1/3000",
+        "a1": "0/3000",
+        "a2": "0/3000",
+        "s1": "0/3000",
+        "s2": "0/3000",
+        "s4": "0/3000",
+        "portfolio": "0/3000",
+        "mixed_f": "0/3000"
+      }
+    },
+    "power_alpha_0_05_mu_0_1_T1000_rho_0_3_repetitions_500": {
+      "K20_q1": {
+        "bonferroni": 0.442,
+        "a1": 0.056,
+        "a2": 0.016,
+        "s1": 0.22,
+        "s2": 0.356,
+        "s4": 0.396,
+        "portfolio": 0.274,
+        "mixed": 0.396
+      },
+      "K20_q20": {
+        "bonferroni": 0.99,
+        "a1": 0.674,
+        "a2": 0.724,
+        "s1": 0.968,
+        "s2": 0.98,
+        "s4": 0.982,
+        "portfolio": 0.952,
+        "mixed": 0.982
+      },
+      "K100_q20": {
+        "bonferroni": 0.92,
+        "a1": 0.266,
+        "a2": 0.122,
+        "s1": 0.702,
+        "s2": 0.88,
+        "s4": 0.904,
+        "portfolio": 0.744,
+        "mixed": 0.904
+      },
+      "K100_q100": {
+        "bonferroni": 0.99,
+        "a1": 0.748,
+        "a2": 0.764,
+        "s1": 0.962,
+        "s2": 0.986,
+        "s4": 0.99,
+        "portfolio": 0.946,
+        "mixed": 0.99
+      },
+      "K200_q20": {
+        "bonferroni": 0.83,
+        "a1": 0.144,
+        "a2": 0.044,
+        "s1": 0.546,
+        "s2": 0.752,
+        "s4": 0.806,
+        "portfolio": 0.632,
+        "mixed": 0.806
+      },
+      "K200_q100": {
+        "bonferroni": 0.974,
+        "a1": 0.516,
+        "a2": 0.442,
+        "s1": 0.906,
+        "s2": 0.964,
+        "s4": 0.964,
+        "portfolio": 0.892,
+        "mixed": 0.964
+      }
+    }
+  },
+  "caveats": [
+    "SAVI 2026 poster; associated paper listed as in preparation",
+    "group intersection-null power, not individual FDR/FDR-sup",
+    "equicorrelation only; not arbitrary-dependence validation",
+    "direct s=4 did not beat Bonferroni max in these tested conditions",
+    "mixed f tied s=4; no measured adaptive gain"
+  ],
+  "source_git_blob_sha": "07cc96a507a218e403df06e6bc8daf8956f06d16",
+  "tests_git_blob_sha": "2b4f90ba55a9e796d543fab6acba25382ad2e4f2",
+  "pilot_summary_git_blob_sha": "8aaa8d4fb8d03d8e5671126f3515f4cda55d183c"
+}
