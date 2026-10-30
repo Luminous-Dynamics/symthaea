@@ -107,5 +107,5 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, reviewer outcome, multi-rater, spatial-frame, candidate-pool sampling, candidate-generation coverage, and query-certificate audits
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, reviewer outcome, multi-rater, spatial-frame/mask, candidate-pool sampling, candidate-generation coverage, query-certificate, correction-portfolio, and co-linear-boundary audits
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
