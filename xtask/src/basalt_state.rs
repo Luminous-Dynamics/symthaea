@@ -214,6 +214,7 @@ fn resource_change_digest(
 struct EvidenceState {
     assessment: EvidenceAssessment,
     pinned_resource_ids: Vec<String>,
+    parents: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -608,10 +609,50 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     EvidenceState {
                         assessment,
                         pinned_resource_ids: resource_pins.iter().map(|pin| pin.resource_id.clone()).collect(),
+                        parents: evidence_dependencies.clone(),
                     },
                 );
                 evidence_order.push(evidence_id.clone());
             }
+        }
+    }
+
+    // Recompute the full stale-ancestor and invalidation-event closure in
+    // topological order. Incremental invalidation marks currentness efficiently;
+    // this pass makes causal provenance independent of traversal order in DAGs
+    // where several independently stale parents converge on one descendant.
+    for evidence_id in &evidence_order {
+        let parent_ids = evidence
+            .get(evidence_id)
+            .map(|state| state.parents.clone())
+            .unwrap_or_default();
+        let mut stale_ancestors = BTreeSet::<String>::new();
+        let mut inherited_events = BTreeSet::<String>::new();
+
+        for parent_id in parent_ids {
+            let Some(parent) = evidence.get(&parent_id) else {
+                continue;
+            };
+            if parent.assessment.freshness != EvidenceFreshness::Fresh {
+                stale_ancestors.insert(parent_id);
+                stale_ancestors.extend(parent.assessment.stale_ancestor_evidence_ids.iter().cloned());
+                inherited_events.extend(parent.assessment.invalidation_event_ids.iter().cloned());
+            }
+        }
+
+        if let Some(state) = evidence.get_mut(evidence_id) {
+            for ancestor_id in stale_ancestors {
+                if !state.assessment.stale_ancestor_evidence_ids.contains(&ancestor_id) {
+                    state.assessment.stale_ancestor_evidence_ids.push(ancestor_id);
+                }
+            }
+            for event_id in inherited_events {
+                if !state.assessment.invalidation_event_ids.contains(&event_id) {
+                    state.assessment.invalidation_event_ids.push(event_id);
+                }
+            }
+            state.assessment.stale_ancestor_evidence_ids.sort();
+            state.assessment.invalidation_event_ids.sort();
         }
     }
 
@@ -780,6 +821,35 @@ mod tests {
         assert_eq!(freshness(&report, "build-after-change"), EvidenceFreshness::Fresh);
         assert_eq!(freshness(&report, "tests-after-change"), EvidenceFreshness::Fresh);
         assert!(report.evidence.iter().find(|item| item.evidence_id == "tests-after-change").unwrap().usable_for_success);
+    }
+
+    #[test]
+    fn diamond_dependencies_preserve_all_stale_ancestor_provenance() {
+        let mut value = parsed_example();
+        let entries = value["entries"].as_array_mut().unwrap();
+        entries.swap(2, 3);
+        entries[2]["sequence"] = Value::from(3);
+        entries[3]["sequence"] = Value::from(4);
+        entries[3]["evidence_dependencies"] = serde_json::json!([
+            "tests-before-change",
+            "lint-before-change"
+        ]);
+
+        let report = audit_value(&value);
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(freshness(&report, "report-before-change"), EvidenceFreshness::StaleTransitive);
+
+        let report_evidence = report.evidence.iter()
+            .find(|item| item.evidence_id == "report-before-change")
+            .unwrap();
+        for expected in ["build-before-change", "tests-before-change", "lint-before-change"] {
+            assert!(
+                report_evidence.stale_ancestor_evidence_ids.iter().any(|id| id == expected),
+                "missing ancestor {expected}: {:?}",
+                report_evidence.stale_ancestor_evidence_ids
+            );
+        }
+        assert!(report_evidence.invalidation_event_ids.iter().any(|id| id == "source-edit-001"));
     }
 
     #[test]
