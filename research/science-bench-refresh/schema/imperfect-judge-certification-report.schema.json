@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/imperfect-judge-certification-report.schema.json",
+  "title": "Symthaea Imperfect Judge Certification Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "analyzer_source_revision",
+    "analyzer_worktree_clean",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "rubric_sha256",
+    "human_reference_protocol_sha256",
+    "sampling_frame_sha256",
+    "plan_sha256",
+    "receipt_sha256",
+    "plan_commitment_sha256",
+    "report_commitment_sha256",
+    "overall_status",
+    "target_failure_rate_millionths",
+    "familywise_alpha_millionths",
+    "simultaneous_confidence_lower_millionths",
+    "stratum_count",
+    "familywise_bound_count",
+    "planned_calibration_item_count",
+    "observed_calibration_item_count",
+    "planned_test_item_count",
+    "observed_test_item_count",
+    "abstentions_count_as_failure_positive",
+    "bound_method",
+    "calibration_test_ids_disjoint",
+    "conditional_iid_within_stratum_assumption",
+    "calibration_test_exchangeability_assumption",
+    "assumptions_empirically_verified",
+    "human_reference_truth_proven",
+    "execution_authenticity_proven",
+    "population_representativeness_proven",
+    "causal_effect_identified",
+    "generalized_accuracy_estimated",
+    "external_anchor_required",
+    "scoring_eligible_declared",
+    "family_results",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_imperfect_judge_certification_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "analyzer_worktree_clean": {
+      "type": "boolean"
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "human_reference_protocol_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "sampling_frame_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "overall_status": {
+      "enum": [
+        "certified_below_threshold",
+        "threshold_exceeded",
+        "judge_uninformative"
+      ]
+    },
+    "target_failure_rate_millionths": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999
+    },
+    "familywise_alpha_millionths": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 499999
+    },
+    "simultaneous_confidence_lower_millionths": {
+      "type": "integer",
+      "minimum": 500001,
+      "maximum": 999999
+    },
+    "stratum_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "familywise_bound_count": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 384
+    },
+    "planned_calibration_item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_calibration_item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "planned_test_item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_test_item_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "abstentions_count_as_failure_positive": {
+      "const": true
+    },
+    "bound_method": {
+      "const": "one_sided_hoeffding_with_bonferroni"
+    },
+    "calibration_test_ids_disjoint": {
+      "const": true
+    },
+    "conditional_iid_within_stratum_assumption": {
+      "const": true
+    },
+    "calibration_test_exchangeability_assumption": {
+      "const": true
+    },
+    "assumptions_empirically_verified": {
+      "const": false
+    },
+    "human_reference_truth_proven": {
+      "const": false
+    },
+    "execution_authenticity_proven": {
+      "const": false
+    },
+    "population_representativeness_proven": {
+      "const": false
+    },
+    "causal_effect_identified": {
+      "const": false
+    },
+    "generalized_accuracy_estimated": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "family_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/family_result"
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "family_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_family",
+        "calibration_failure_count",
+        "calibration_nonfailure_count",
+        "test_item_count",
+        "true_positive_count",
+        "false_negative_count",
+        "false_positive_count",
+        "true_negative_count",
+        "calibration_failure_abstention_count",
+        "calibration_nonfailure_abstention_count",
+        "test_abstention_count",
+        "sensitivity_lower_millionths",
+        "false_positive_rate_lower_millionths",
+        "judge_positive_rate_upper_millionths",
+        "true_failure_rate_upper_millionths",
+        "alpha_per_bound_millionths",
+        "hoeffding_radius_failure_calibration_millionths",
+        "hoeffding_radius_nonfailure_calibration_millionths",
+        "hoeffding_radius_test_millionths",
+        "status"
+      ],
+      "properties": {
+        "task_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_failure_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "calibration_nonfailure_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "test_item_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "true_positive_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_negative_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_positive_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "true_negative_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_failure_abstention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_nonfailure_abstention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test_abstention_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sensitivity_lower_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "false_positive_rate_lower_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "judge_positive_rate_upper_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "true_failure_rate_upper_millionths": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "alpha_per_bound_millionths": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "hoeffding_radius_failure_calibration_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "hoeffding_radius_nonfailure_calibration_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "hoeffding_radius_test_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "status": {
+          "enum": [
+            "certified_below_threshold",
+            "threshold_exceeded",
+            "judge_uninformative"
+          ]
+        }
+      }
+    }
+  }
+}
