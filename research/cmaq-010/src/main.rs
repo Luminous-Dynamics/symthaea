@@ -72,7 +72,7 @@ impl Policy {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Report {
     claimed_source: usize,
     provenance_group: usize,
@@ -333,7 +333,7 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
                 alarm_now
             }
             Policy::RobustRootMajority => {
-                max_evidence_updates = max_evidence_updates.max(usize::from(!group_map.is_empty()));
+                max_evidence_updates = max_evidence_updates.max(if group_map.is_empty() { 0 } else { 1 });
                 if group_map.is_empty() { false }
                 else {
                     let positives = group_map.values().filter(|positive| **positive).count();
@@ -346,7 +346,7 @@ fn run_episode(scenario: Scenario, policy: Policy, tape: &[Vec<Report>]) -> Epis
                 rejected_stale += stale;
                 rejected_duplicate += duplicate;
                 let fresh_groups = first_per_provenance_group(&fresh);
-                max_evidence_updates = max_evidence_updates.max(usize::from(fresh_groups.len() >= MIN_INDEPENDENT_GROUPS));
+                max_evidence_updates = max_evidence_updates.max(if fresh_groups.len() >= MIN_INDEPENDENT_GROUPS { 1 } else { 0 });
                 if fresh_groups.len() < MIN_INDEPENDENT_GROUPS {
                     missing_run += 1;
                     if missing_run >= MISSING_STEPS_TO_FALLBACK {
