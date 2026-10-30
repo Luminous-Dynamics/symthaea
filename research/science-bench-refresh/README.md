@@ -38,7 +38,7 @@ The test-only generator emits a precommitted, non-scoring plan and a paired arti
 
 ```sh
 python3 research/science-bench-refresh/tools/rubric_attack_vectors.py /tmp/rubric-attacks
-python3 -m unittest research.science-bench-refresh.tools.test_rubric_attack_vectors
+python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_rubric_attack_vectors.py' -v
 ```
 
 The corpus does not call a judge or establish human preferences. Its expected relations are synthetic protocol controls; real scoring requires a blinded reference panel and frozen judge/rubric execution.
