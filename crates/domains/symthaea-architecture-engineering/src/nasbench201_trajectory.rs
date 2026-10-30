@@ -1492,6 +1492,21 @@ mod tests {
     }
 
     #[test]
+    fn partial_catalog_is_explicit_and_cannot_claim_full_space_optima() {
+        let features = binary_catalog();
+        let mut archive = build_trajectory_archive(&features, &config(17)).unwrap();
+        assert!(!archive.catalog_is_complete);
+        archive.catalog_is_complete = true;
+        let mix = PromotionMix {
+            promotion_count: 8,
+            proxy_elite_quota: 2,
+            trajectory_quota: 3,
+            topology_diversity_quota: 3,
+        };
+        assert!(plan_promotions(&features, &archive, &mix).is_err());
+    }
+
+    #[test]
     fn planner_rejects_quota_overcommit_and_unknown_archive_candidate() {
         let features = binary_catalog();
         let mut archive = build_trajectory_archive(&features, &config(17)).unwrap();
