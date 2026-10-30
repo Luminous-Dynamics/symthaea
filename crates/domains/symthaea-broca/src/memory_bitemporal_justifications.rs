@@ -130,82 +130,112 @@ impl BitemporalJustificationRuntime {
 
     /// Add one derived conclusion with an explicit transaction/knowledge time.
     ///
-    /// Every source leaf and derived parent must already have been recorded by
-    /// recorded_at. This prevents a later-ingested source or conclusion from
-    /// appearing in an earlier historical "as known" reconstruction.
+    /// A standalone derivation is one transaction. Use derive_batch_at when
+    /// multiple conclusions must share a timestamp and become visible atomically.
     pub fn derive_at(
         &mut self,
         conclusion: DerivedConclusionInput,
         recorded_at: DateTime<Utc>,
     ) -> Result<(), String> {
+        self.derive_batch_at([conclusion], recorded_at)
+    }
+
+    /// Atomically add a topologically ordered batch of derived conclusions at
+    /// one transaction/knowledge time.
+    ///
+    /// A child may depend on a parent earlier in this same batch. A parent that
+    /// appears later is rejected. The entire batch commits or none of it does.
+    /// Each standalone batch must have a strictly later timestamp than the
+    /// previous derived batch; source batches must be strictly later than all
+    /// previously committed derived batches.
+    pub fn derive_batch_at(
+        &mut self,
+        conclusions: impl IntoIterator<Item = DerivedConclusionInput>,
+        recorded_at: DateTime<Utc>,
+    ) -> Result<(), String> {
+        let conclusions: Vec<DerivedConclusionInput> = conclusions.into_iter().collect();
+        if conclusions.is_empty() {
+            return Err("a derived-fact batch must contain at least one conclusion".into());
+        }
         self.verify_consistency()?;
+
         if self.ledger.events().last().is_some_and(|event| event.recorded_at > recorded_at) {
             return Err(
                 "derived conclusion recorded_at cannot precede the latest committed source event"
                     .into(),
             );
         }
-        if self.derived_known_at.values().any(|known_at| *known_at > recorded_at) {
+        if self.derived_known_at.values().any(|known_at| *known_at >= recorded_at) {
             return Err(
-                "derived conclusion recorded_at cannot precede an existing derived conclusion"
+                "a new derived-fact batch must have a strictly later timestamp than prior derived batches"
                     .into(),
             );
         }
-        if self.derived_known_at.contains_key(&conclusion.fact_id) {
-            return Err(format!("duplicate derived fact ID {:?}", conclusion.fact_id));
-        }
 
-        for justification in &conclusion.justifications {
-            for dependency in &justification.dependencies {
-                match dependency {
-                    crate::memory_justifications::SupportRef::SourceEvent(source_id) => {
-                        let source_event = self.ledger.events().iter().find(|event| {
-                            event.revision_id == *source_id
-                                && matches!(
-                                    &event.operation,
-                                    SourceEventOperation::Assert { .. }
-                                        | SourceEventOperation::Supersede { .. }
-                                )
-                        }).ok_or_else(|| format!("unknown source revision {source_id:?}"))?;
-                        if source_event.recorded_at > recorded_at {
-                            return Err(format!(
-                                "source revision {source_id:?} was not known at derived-fact recorded_at"
-                            ));
+        let mut candidate_graph = self.justifications.clone();
+        let mut candidate_known_at = self.derived_known_at.clone();
+        let mut batch_fact_ids = BTreeSet::new();
+
+        for conclusion in conclusions {
+            if !batch_fact_ids.insert(conclusion.fact_id.clone()) {
+                return Err(format!("duplicate derived fact ID {:?} within batch", conclusion.fact_id));
+            }
+            if candidate_known_at.contains_key(&conclusion.fact_id) {
+                return Err(format!("duplicate derived fact ID {:?}", conclusion.fact_id));
+            }
+
+            // Validate each source/parent against the exact transaction-time
+            // state visible to this batch. Parents must precede children in the
+            // batch; this is the explicit topological insertion order.
+            for justification in &conclusion.justifications {
+                for dependency in &justification.dependencies {
+                    match dependency {
+                        crate::memory_justifications::SupportRef::SourceEvent(source_id) => {
+                            let source_event = self.ledger.events().iter().find(|event| {
+                                event.revision_id == *source_id
+                                    && matches!(
+                                        &event.operation,
+                                        SourceEventOperation::Assert { .. }
+                                            | SourceEventOperation::Supersede { .. }
+                                    )
+                            }).ok_or_else(|| format!("unknown source revision {source_id:?}"))?;
+                            if source_event.recorded_at > recorded_at {
+                                return Err(format!(
+                                    "source revision {source_id:?} was not known at derived-fact recorded_at"
+                                ));
+                            }
+                            if self.ledger.events().iter().any(|event| {
+                                event.recorded_at <= recorded_at
+                                    && matches!(
+                                        &event.operation,
+                                        SourceEventOperation::Supersede { target_revision_id, .. }
+                                            | SourceEventOperation::Retract { target_revision_id, .. }
+                                            if target_revision_id == source_id
+                                    )
+                            }) {
+                                return Err(format!(
+                                    "source revision {source_id:?} was already superseded or retracted at derived-fact recorded_at"
+                                ));
+                            }
                         }
-                        if self.ledger.events().iter().any(|event| {
-                            event.recorded_at <= recorded_at
-                                && matches!(
-                                    &event.operation,
-                                    SourceEventOperation::Supersede { target_revision_id, .. }
-                                        | SourceEventOperation::Retract { target_revision_id, .. }
-                                        if target_revision_id == source_id
-                                )
-                        }) {
-                            return Err(format!(
-                                "source revision {source_id:?} was already superseded or retracted at derived-fact recorded_at"
-                            ));
-                        }
-                    }
-                    crate::memory_justifications::SupportRef::DerivedFact(parent_id) => {
-                        let parent_known_at = self.derived_known_at.get(parent_id)
-                            .ok_or_else(|| format!("unknown derived parent {parent_id:?}"))?;
-                        if parent_known_at > &recorded_at {
-                            return Err(format!(
-                                "derived parent {parent_id:?} was not known at child recorded_at"
-                            ));
+                        crate::memory_justifications::SupportRef::DerivedFact(parent_id) => {
+                            let parent_known_at = candidate_known_at.get(parent_id)
+                                .ok_or_else(|| format!("unknown derived parent {parent_id:?} or parent follows child in batch"))?;
+                            if parent_known_at > &recorded_at {
+                                return Err(format!(
+                                    "derived parent {parent_id:?} was not known at child recorded_at"
+                                ));
+                            }
                         }
                     }
                 }
             }
+
+            let fact_id = conclusion.fact_id.clone();
+            candidate_graph.derive(conclusion)?;
+            candidate_known_at.insert(fact_id, recorded_at);
         }
 
-        let fact_id = conclusion.fact_id.clone();
-        let mut candidate_graph = self.justifications.clone();
-        candidate_graph.derive(conclusion)?;
-        candidate_graph.verify_consistency()?;
-
-        let mut candidate_known_at = self.derived_known_at.clone();
-        candidate_known_at.insert(fact_id, recorded_at);
         let mut candidate_runtime = self.clone();
         candidate_runtime.justifications = candidate_graph;
         candidate_runtime.derived_known_at = candidate_known_at;
