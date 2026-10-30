@@ -1568,6 +1568,96 @@ mod tests {
     }
 
     #[test]
+    fn fixed_state_system_partition_matches_iit4_2023_directional_gid() {
+        // Two mutually coupled binary units. At current state 00, the cause
+        // and effect selectivity of specified state 00 is 0.72. Cutting both
+        // cross-unit links makes both partitioned forward probabilities 0.25.
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2, // past 00
+                0.1, 0.8, // past 10
+                0.9, 0.2, // past 01
+                0.9, 0.8, // past 11
+            ],
+            vec![
+                false, true,
+                true, false,
+            ],
+        ).unwrap();
+        let partitions = enumerate_iit4_system_partitions(&[0, 1], 2, false, 3).unwrap();
+        let all_cross_edges_cut = partitions
+            .iter()
+            .find(|partition| partition.cut_matrix() == [false, true, true, false])
+            .expect("all-cross-edge cut is part of the n=2 family");
+
+        let score = model.score_iit4_system_partition(
+            all_cross_edges_cut,
+            &[false, false],
+            &[false, false],
+        ).unwrap();
+
+        let expected = 0.72 * (0.72_f64 / 0.25).log2();
+        assert!((score.cause.selectivity - 0.72).abs() < 1e-12);
+        assert!((score.cause.forward_probability - 0.72).abs() < 1e-12);
+        assert!((score.cause.partitioned_forward_probability - 0.25).abs() < 1e-12);
+        assert!((score.cause.signed_phi - expected).abs() < 1e-12);
+        assert!((score.effect.selectivity - 0.72).abs() < 1e-12);
+        assert!((score.effect.forward_probability - 0.72).abs() < 1e-12);
+        assert!((score.effect.partitioned_forward_probability - 0.25).abs() < 1e-12);
+        assert!((score.effect.signed_phi - expected).abs() < 1e-12);
+        assert!((score.signed_phi - expected).abs() < 1e-12);
+        assert!((score.phi - expected).abs() < 1e-12);
+        assert_eq!(score.severed_connections, 2);
+        assert_eq!(score.normalization_factor, 0.5);
+        assert!((score.normalized_phi - expected * 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn fixed_state_system_partition_preserves_preventative_signed_phi() {
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2,
+                0.1, 0.8,
+                0.9, 0.2,
+                0.9, 0.8,
+            ],
+            vec![false, true, true, false],
+        ).unwrap();
+        let partition = enumerate_iit4_system_partitions(&[0, 1], 2, false, 3)
+            .unwrap()
+            .into_iter()
+            .find(|partition| partition.cut_matrix() == [false, true, true, false])
+            .unwrap();
+
+        let score = model.score_iit4_system_partition(
+            &partition,
+            &[false, false],
+            &[true, true],
+        ).unwrap();
+
+        assert!(score.signed_phi < 0.0);
+        assert_eq!(score.phi, 0.0);
+        assert!(score.signed_normalized_phi < 0.0);
+        assert_eq!(score.normalized_phi, 0.0);
+    }
+
+    #[test]
+    fn fixed_state_system_partition_rejects_wrong_specified_state_length() {
+        let model = two_unit_model();
+        let partition = enumerate_iit4_system_partitions(&[0, 1], 2, false, 3)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        assert!(matches!(
+            model.score_iit4_system_partition(&partition, &[false, false], &[false]),
+            Err(SystemPhiError::SpecifiedStateLength { expected: 2, actual: 1 })
+        ));
+    }
+
+    #[test]
     fn negative_zero_is_canonicalized_for_model_identity() {
         let positive_zero = BinaryCausalModel::new(1, vec![0.0, 1.0], vec![true]).unwrap();
         let negative_zero = BinaryCausalModel::new(1, vec![-0.0, 1.0], vec![true]).unwrap();
