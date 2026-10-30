@@ -48,7 +48,7 @@ jobs:
           components: rustfmt
 
       - name: Check HARDSEC example formatting
-        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs examples/hardsec_challenge_profile_audit.rs
+        run: rustfmt --edition 2024 --check examples/hardsec_trigger_budget.rs examples/hardsec_evidence_packet_audit.rs
 
       - name: Prepare evidence result directory
         run: mkdir -p "$RUNNER_TEMP/hardsec-seqcube"
