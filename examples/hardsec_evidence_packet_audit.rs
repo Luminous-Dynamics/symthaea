@@ -5,6 +5,9 @@
 //! truth of the evidence, authenticate its producer, verify signatures, or
 //! certify a design.
 //!
+//! The `witness_validation` mode intentionally omits a detector/model record;
+//! use it for replay and formal fixtures without inventing a model prediction.
+//!
 //! Example:
 //!   cargo run --example hardsec_evidence_packet_audit --features hardsec-evidence-audit -- \
 //!     --packet /path/to/evidence-packet.json \
