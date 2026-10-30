@@ -532,7 +532,7 @@ fn evaluate_direction(
         .get_mut(direction_id)
         .ok_or_else(|| format!("selected unknown direction {direction_id:?}"))?;
     let evaluation_index = values.len();
-    let score = payoff(landscape, direction_id, evaluation_index, seed);
+    let score = payoff(landscape, direction_id, evaluation_index);
     let direction_sha = direction_digests
         .get(direction_id)
         .ok_or_else(|| format!("missing canonical digest for direction {direction_id:?}"))?
@@ -587,7 +587,7 @@ fn select_direction_board(
     match &selected[0].arm {
         AllocationArm::Direction(direction_sha) => direction_digests
             .iter()
-            .find(|(_, sha)| *sha == direction_sha)
+            .find(|(_, sha)| sha.as_str() == direction_sha.as_str())
             .map(|(direction_id, _)| direction_id.clone())
             .ok_or_else(|| "board recommended an unknown direction digest".to_owned()),
         AllocationArm::NewDirection => Ok("NEW".to_owned()),
@@ -773,19 +773,14 @@ fn payoff(
     landscape: DirectionLandscapeFamily,
     direction_id: &str,
     evaluation_index: usize,
-    seed: u64,
 ) -> f64 {
     let schedule = schedule(landscape, direction_id);
     if schedule.is_empty() {
         return 0.0;
     }
-    let base = schedule[evaluation_index.min(schedule.len() - 1)];
-    let mut key = seed ^ (evaluation_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-    for byte in direction_id.as_bytes() {
-        key = splitmix64(key ^ u64::from(*byte));
-    }
-    let unit = (splitmix64(key) >> 11) as f64 / ((1u64 << 53) as f64);
-    (base + (unit - 0.5) * 0.01).clamp(0.0, 1.0)
+    // Exact deterministic schedules make the oracle truly exact. Policy randomness is
+    // introduced only through arm selection, never by perturbing evaluator ground truth.
+    schedule[evaluation_index.min(schedule.len() - 1)]
 }
 
 fn schedule(
