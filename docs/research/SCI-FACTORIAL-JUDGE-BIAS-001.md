@@ -32,7 +32,7 @@ Each semantic task/candidate block receives all 32 combinations of five binary f
 | Provenance cue | Anonymous | Displayed | Score/choice shifts under system-identity cues |
 | Presentation format | Structured | Prose | Score/choice shifts under equivalent formatting |
 
-The v1 engineering fixture uses one block, 32 conditions per repeat and two repeats: 64 condition receipts. A real study should use many independently sampled semantic blocks and multiple judge systems.
+The v1 engineering fixture uses one block, 32 conditions per repeat and two repeats: 64 condition receipts. It plants a position/provenance choice interaction: candidate A retains the higher score, but the judge chooses candidate B when B is first and the provenance cue is hidden; showing provenance reverses that choice. This is an analyzer positive control, not an empirical behavior claim. A real study should use many independently sampled semantic blocks and multiple judge systems.
 
 ### Semantic identity must remain fixed
 
@@ -52,7 +52,7 @@ Files:
 - `tools/judge_factorial_fixture.py`
 
 The plan commits to:
-- judge source revision, prompt and rubric digests;
+- exact analyzer source revision, judge source revision, prompt and rubric digests;
 - semantic task-set digest and task-level semantic digests;
 - candidate and criterion identities;
 - canonical score-option IDs and numeric values;
@@ -60,6 +60,8 @@ The plan commits to:
 - a unique condition ID derived from block, repeat and factor assignment;
 - an input SHA-256 per condition;
 - a committed execution-order permutation for every block.
+
+The receipt echoes the exact scheduled ordinal for each condition. The analyzer rejects a receipt whose ordinal does not match the plan. This is schedule consistency, not proof of the runner's true execution sequence or randomization.
 
 The verifier requires exactly 32 cells per repeat, with no duplicated or missing combination. The execution-order list must be a permutation of the full planned condition set.
 
