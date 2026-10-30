@@ -45,6 +45,10 @@ pub const MAX_DENSE_UNITS: usize = 16;
 const MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-BINARY-TPM\0v0.1\0";
 const EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-EVALUATION\0v0.1\0";
 const ANALYSIS_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-ANALYSIS-REQUEST\0v0.1\0";
+/// Stable algorithm identity included in every IIT 4.0 (2023) system-search receipt.
+pub const IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
+    "symthaea-iit/iit4-2023-full-substrate-sia/0.1.0";
+const SYSTEM_PHI_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SYSTEM-PHI-RECEIPT\0v0.1\0";
 
 /// Errors caused by invalid model inputs or invalid state requests.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -288,6 +292,8 @@ pub struct Iit4SystemPhiAnalysis {
     pub formalism: FormalismProfile,
     pub candidate_system: Vec<usize>,
     pub request_sha256: String,
+    /// All caller-selected numeric and search-budget settings, bound by the receipt.
+    pub search_config: Iit4SystemPhiSearchConfig,
     pub status: Iit4SystemPhiStatus,
     pub phi_s: Option<f64>,
     pub selected_state_pair_index: Option<usize>,
@@ -299,6 +305,194 @@ pub struct Iit4SystemPhiAnalysis {
     /// True means the declared exact search completed; null/short-circuit
     /// results are complete under the documented PyPhi guard conditions.
     pub complete: bool,
+}
+
+impl Iit4SystemPhiAnalysis {
+    /// Canonical SHA-256 receipt for this computation and its selected result.
+    ///
+    /// The receipt binds the request, algorithm identifier, numeric/search
+    /// configuration, exact partition work counters, result status, state-pair
+    /// candidates, MIP cut matrices, directional GID terms, margins, and phi_s.
+    /// It is an integrity/provenance receipt, not a proof that the model or IIT
+    /// formalism is scientifically correct.
+    pub fn receipt_sha256(&self) -> Result<String, Iit4SystemPhiReceiptError> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SYSTEM_PHI_RECEIPT_MAGIC);
+        receipt_string(&mut bytes, IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID);
+        receipt_string(&mut bytes, self.formalism.id());
+        receipt_string(&mut bytes, &self.request_sha256);
+
+        receipt_usize(&mut bytes, self.candidate_system.len());
+        for unit in &self.candidate_system {
+            receipt_usize(&mut bytes, *unit);
+        }
+
+        receipt_u32(&mut bytes, self.search_config.decimal_precision);
+        receipt_usize(&mut bytes, self.search_config.max_partition_combinations);
+        receipt_usize(&mut bytes, self.search_config.max_state_pair_evaluations);
+        bytes.push(u8::from(self.search_config.include_total_cut));
+
+        bytes.push(match self.status {
+            Iit4SystemPhiStatus::ExactUniqueStatePair => 0,
+            Iit4SystemPhiStatus::UnresolvedCompositionTie => 1,
+            Iit4SystemPhiStatus::UnresolvedCanonicalTie => 2,
+            Iit4SystemPhiStatus::NullDisconnected => 3,
+            Iit4SystemPhiStatus::NullNoCause => 4,
+            Iit4SystemPhiStatus::NullNoEffect => 5,
+            Iit4SystemPhiStatus::NullSingleUnit => 6,
+        });
+        receipt_optional_f64(&mut bytes, self.phi_s, "phi_s")?;
+        receipt_optional_usize(&mut bytes, self.selected_state_pair_index);
+        receipt_usize(&mut bytes, self.tied_state_pair_indices.len());
+        for index in &self.tied_state_pair_indices {
+            receipt_usize(&mut bytes, *index);
+        }
+
+        receipt_usize(
+            &mut bytes,
+            self.partition_summary.raw_direction_labelings_equivalent,
+        );
+        receipt_usize(
+            &mut bytes,
+            self.partition_summary.canonical_direction_assignments_evaluated,
+        );
+        receipt_usize(
+            &mut bytes,
+            self.partition_summary.redundant_direction_assignments_pruned,
+        );
+        receipt_usize(&mut bytes, self.partition_summary.unique_non_total_cuts);
+        bytes.push(u8::from(self.partition_summary.total_cut_included));
+        receipt_usize(&mut bytes, self.partition_score_evaluations);
+        bytes.push(u8::from(self.complete));
+
+        receipt_usize(&mut bytes, self.state_pair_results.len());
+        for result in &self.state_pair_results {
+            receipt_bool_slice(&mut bytes, &result.system_state.cause_specified_state);
+            receipt_bool_slice(&mut bytes, &result.system_state.effect_specified_state);
+
+            let partition = &result.winning_partition;
+            receipt_bool_slice(&mut bytes, partition.cut_matrix());
+            bytes.push(u8::from(partition.is_total_cut()));
+            receipt_usize(&mut bytes, partition.parts().len());
+            for part in partition.parts() {
+                receipt_usize(&mut bytes, part.len());
+                for unit in part {
+                    receipt_usize(&mut bytes, *unit);
+                }
+            }
+            receipt_usize(&mut bytes, partition.directions().len());
+            for direction in partition.directions() {
+                bytes.push(match direction {
+                    PartitionDirection::Cause => 0,
+                    PartitionDirection::Effect => 1,
+                    PartitionDirection::Bidirectional => 2,
+                });
+            }
+
+            receipt_direction_score(&mut bytes, &result.score.cause, "cause")?;
+            receipt_direction_score(&mut bytes, &result.score.effect, "effect")?;
+            receipt_f64(&mut bytes, result.score.signed_phi, "signed_phi")?;
+            receipt_f64(&mut bytes, result.score.phi, "phi")?;
+            receipt_f64(
+                &mut bytes,
+                result.score.normalization_factor,
+                "normalization_factor",
+            )?;
+            receipt_f64(
+                &mut bytes,
+                result.score.signed_normalized_phi,
+                "signed_normalized_phi",
+            )?;
+            receipt_f64(
+                &mut bytes,
+                result.score.normalized_phi,
+                "normalized_phi",
+            )?;
+            receipt_usize(&mut bytes, result.score.severed_connections);
+            receipt_optional_f64(&mut bytes, result.partition_margin, "partition_margin")?;
+        }
+
+        Ok(hex_digest(&bytes))
+    }
+}
+
+/// Errors returned when an analysis cannot be encoded as a finite canonical receipt.
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum Iit4SystemPhiReceiptError {
+    #[error("cannot create result receipt: non-finite {field}")]
+    NonFiniteFloat { field: &'static str },
+}
+
+fn receipt_usize(bytes: &mut Vec<u8>, value: usize) {
+    bytes.extend_from_slice(&(value as u64).to_le_bytes());
+}
+
+fn receipt_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn receipt_string(bytes: &mut Vec<u8>, value: &str) {
+    receipt_usize(bytes, value.len());
+    bytes.extend_from_slice(value.as_bytes());
+}
+
+fn receipt_bool_slice(bytes: &mut Vec<u8>, values: &[bool]) {
+    receipt_usize(bytes, values.len());
+    bytes.extend(values.iter().map(|value| u8::from(*value)));
+}
+
+fn receipt_optional_usize(bytes: &mut Vec<u8>, value: Option<usize>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            receipt_usize(bytes, value);
+        }
+        None => bytes.push(0),
+    }
+}
+
+fn receipt_f64(
+    bytes: &mut Vec<u8>,
+    value: f64,
+    field: &'static str,
+) -> Result<(), Iit4SystemPhiReceiptError> {
+    if !value.is_finite() {
+        return Err(Iit4SystemPhiReceiptError::NonFiniteFloat { field });
+    }
+    let canonical = if value == 0.0 { 0.0 } else { value };
+    bytes.extend_from_slice(&canonical.to_bits().to_le_bytes());
+    Ok(())
+}
+
+fn receipt_optional_f64(
+    bytes: &mut Vec<u8>,
+    value: Option<f64>,
+    field: &'static str,
+) -> Result<(), Iit4SystemPhiReceiptError> {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            receipt_f64(bytes, value, field)?;
+        }
+        None => bytes.push(0),
+    }
+    Ok(())
+}
+
+fn receipt_direction_score(
+    bytes: &mut Vec<u8>,
+    score: &SystemPhiDirectionScore,
+    label: &'static str,
+) -> Result<(), Iit4SystemPhiReceiptError> {
+    receipt_string(bytes, label);
+    receipt_f64(bytes, score.selectivity, "selectivity")?;
+    receipt_f64(bytes, score.forward_probability, "forward_probability")?;
+    receipt_f64(
+        bytes,
+        score.partitioned_forward_probability,
+        "partitioned_forward_probability",
+    )?;
+    receipt_f64(bytes, score.signed_phi, "directional_signed_phi")
 }
 
 /// Errors while evaluating a fixed-state IIT 4.x system partition.
@@ -1547,6 +1741,7 @@ impl BinaryCausalModel {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
             request_sha256: request_sha256.clone(),
+            search_config: config,
             status,
             phi_s,
             selected_state_pair_index: None,
@@ -1697,6 +1892,7 @@ impl BinaryCausalModel {
             formalism: FormalismProfile::Iit4_0_2023,
             candidate_system: candidate_system.to_vec(),
             request_sha256,
+            search_config: config,
             status,
             phi_s,
             selected_state_pair_index,
@@ -2330,6 +2526,48 @@ mod tests {
                 },
             ),
             Err(SystemPhiError::UnsupportedSubsystemBackground)
+        ));
+    }
+
+    #[test]
+    fn system_phi_result_receipt_is_deterministic_and_binds_configuration_and_scores() {
+        let model = BinaryCausalModel::new(
+            2,
+            vec![
+                0.1, 0.2,
+                0.1, 0.8,
+                0.9, 0.2,
+                0.9, 0.8,
+            ],
+            vec![false, true, true, false],
+        ).unwrap();
+        let config = Iit4SystemPhiSearchConfig::default();
+        let result = model
+            .analyze_iit4_2023_system_phi_s(&[0, 1], &[true, false], config)
+            .unwrap();
+        let repeated = model
+            .analyze_iit4_2023_system_phi_s(&[0, 1], &[true, false], config)
+            .unwrap();
+        assert_eq!(result.receipt_sha256().unwrap(), repeated.receipt_sha256().unwrap());
+
+        let other_precision = model
+            .analyze_iit4_2023_system_phi_s(
+                &[0, 1],
+                &[true, false],
+                Iit4SystemPhiSearchConfig { decimal_precision: 5, ..config },
+            )
+            .unwrap();
+        assert_ne!(result.receipt_sha256().unwrap(), other_precision.receipt_sha256().unwrap());
+
+        let mut tampered_score = result.clone();
+        tampered_score.state_pair_results[0].score.phi += 0.001;
+        assert_ne!(result.receipt_sha256().unwrap(), tampered_score.receipt_sha256().unwrap());
+
+        let mut non_finite = result;
+        non_finite.phi_s = Some(f64::NAN);
+        assert!(matches!(
+            non_finite.receipt_sha256(),
+            Err(Iit4SystemPhiReceiptError::NonFiniteFloat { field: "phi_s" })
         ));
     }
 
