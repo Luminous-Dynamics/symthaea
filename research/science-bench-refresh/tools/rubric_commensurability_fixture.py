@@ -139,7 +139,7 @@ def main() -> int:
     constructs = build_constructs()
     constructs_path = output_dir / "construct-ontology.example.json"
     constructs_path.write_text(
-        json.dumps(constructs, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(constructs, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     ontology_command = [
