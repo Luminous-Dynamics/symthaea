@@ -506,6 +506,34 @@ mod tests {
     }
 
     #[test]
+    fn verified_reader_context_retains_exact_cross_session_proof_coverage() {
+        let mut req = request();
+        req.obligations[0].alternatives = vec![ProofJustification {
+            justification_id: "cross-session-proof".into(),
+            evidence_dependencies: vec!["A".into(), "B".into()],
+        }];
+        req.obligations[0].minimum_independent_families = 2;
+        req.obligations[0].minimum_distinct_sessions = 2;
+
+        let result = solve_proof_budget(req.clone()).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+
+        let context = build_verified_proof_reader_context(&req, &result).unwrap();
+        assert_eq!(
+            context.evidence
+                .iter()
+                .map(|evidence| evidence.source_session_id.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["session-A", "session-B"]
+        );
+        assert_eq!(
+            context.claim_proofs[0].evidence_dependencies,
+            vec!["A", "B"]
+        );
+        context.verify_internal_consistency().unwrap();
+    }
+
+    #[test]
     fn reader_context_requires_matching_request_identity_and_time() {
         let req = request();
         let result = solve_proof_budget(req.clone()).unwrap();
