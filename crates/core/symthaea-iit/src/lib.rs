@@ -1482,10 +1482,10 @@ impl BinaryCausalModel {
         let mut maximum_log_likelihood = f64::NEG_INFINITY;
         for past_index in 0..self.n_states() {
             let mut log_likelihood = 0.0;
-            for target_unit in 0..self.n_units {
+            for (target_unit, target_is_on) in current_state.iter().copied().enumerate() {
                 let p_on = self.transition_probabilities
                     [past_index * self.n_units + target_unit];
-                let observed_probability = if current_state[target_unit] {
+                let observed_probability = if target_is_on {
                     p_on
                 } else {
                     1.0 - p_on
@@ -1683,7 +1683,7 @@ impl BinaryCausalModel {
                 *value /= marginalized_count as f64;
             }
 
-            for past_state in 0..state_count {
+            for (past_state, forward_value) in forward.iter_mut().enumerate() {
                 let projected_index = retained_sources
                     .iter()
                     .enumerate()
@@ -1694,7 +1694,7 @@ impl BinaryCausalModel {
                             index
                         }
                     });
-                forward[past_state] *= projected[projected_index];
+                *forward_value *= projected[projected_index];
             }
         }
 
