@@ -416,10 +416,10 @@ pub fn audit_bytes(
         );
     }
     for selected_id in &selected_ids {
-        if !catalog_ids.contains(selected_id) {
+        if !catalog_ids.contains(*selected_id) {
             push_error(
                 &mut report,
-                Some(selected_id),
+                Some(*selected_id),
                 "E_ORACLE_SCOPE_UNKNOWN",
                 "oracle.selected_case_ids",
                 "selected case ID is absent from the challenge catalog",
