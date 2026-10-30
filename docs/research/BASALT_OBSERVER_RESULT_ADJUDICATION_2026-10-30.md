@@ -19,11 +19,12 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `xtask/src/basalt_observer_result.rs`: strict, bounded parsing and scenario-level adjudication.
 - `benchmarks/basalt/schema/observer-oracle.v1.schema.json`: strict Draft 2020-12 oracle-ledger schema.
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
+- `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json` plus its schema: machine-readable comparison arms, metric definitions, safety/selectivity/efficiency gates and sample-size protocol.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
 - Ten Rust tests cover a paired recall/selectivity success case, stale reuse, event-loss misreporting, false attribution of an unrelated resource, and cross-run receipt mismatch.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
-The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 34-case catalog is the fixture definition, not evidence that any observer has executed it.
+The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 34-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
 
 ## Command
 
@@ -50,6 +51,8 @@ The command prints a machine-readable report. It exits non-zero unless every cat
 Every preserve control must be paired with a capture control over the **same resource and exact before/after mutation digests**. In the capture arm, the resource must be observed. In the preserve arm, the same resource must be absent from the dependency set. This is stronger than merely checking that the observer emits an event: it measures both recall and selectivity against an independent fixture condition.
 
 ## Paradigm shift: benchmark the evidence-retention frontier
+
+The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and eight metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all four safety gates must pass before selectivity or cost can influence a promotion decision.
 
 A conventional cache benchmark tends to optimize cache hit rate and rebuild time. BASALT should instead optimize a constrained frontier:
 
