@@ -167,3 +167,27 @@ Among eligible candidates, the caller chooses one lexicographic resource priorit
 The next empirical stage is to populate a capability atlas from canonical Symthaea tasks and compatible NeuroBench/MLPerf/QOBLIB suites, then compare this transparent constrained selector against best-static, hand-coded, learned and empirical-oracle policies. Only then should we report routing regret, feasibility violations, switching cost, cold-start penalty and out-of-domain abstention. The first goal is **zero hard-constraint violations on the measured operating region**, not maximum average reward.
 
 All unit-test examples are synthetic logic checks. They do not represent hardware, measured energy, or architecture advantage.
+
+
+## Evidence-bound atlas admission (QARCH-020)
+
+Each normalized architecture observation can be paired with an evidence receipt that binds:
+
+- the observation ID, exact workload fingerprint and comparison-contract fingerprint;
+- the benchmark suite/version and upstream case ID;
+- source/document, runner (when available), fixture, run manifest, environment, raw output, interval analysis and summary digests;
+- evidence origin (direct measurement, published result, simulation execution or analytical reference);
+- executor/device/toolchain identities where disclosed;
+- attempted/failed run counts and declared aggregation and interval methods.
+
+The evidence-bound comparison and selection entry points validate every receipt before admitting observations. A single malformed receipt rejects the supplied atlas slice; candidate feasibility exclusions still appear in the ordinary routing report after receipt admission succeeds.
+
+### Origin is not evidence maturity
+
+The observation's `evidence_class` answers *what kind of evidence is represented* (simulation, hardware emulation, physical prototype, production system or algorithmic reference). The receipt's `origin` answers *where this particular record came from* (direct run, published result, executed simulation or analytical reference). These fields are both retained because a published paper can describe a physical prototype, a simulation or an analytical method; it is not a local reproduction merely because its result is cited.
+
+Direct measurement requires a device, toolchain and runner identity. Published physical/production results require the reported device identity, but undisclosed runner/toolchain values remain unknown. Simulations cannot be promoted to physical evidence. Analytical references cannot enter the system-level resource comparator.
+
+A SHA-256 digest is content identity only. It does not authenticate the submitter, certify the meter, prove chain of custody or prove that a publication's reported measurement is correct. Cryptographic attestation and trusted measurement capture are separate capabilities.
+
+All fixture hashes and identities are fabricated test values. They do not refer to actual devices, benchmark submissions or measurements.
