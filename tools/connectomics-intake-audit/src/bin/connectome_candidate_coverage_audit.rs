@@ -62,6 +62,7 @@ struct AuditInput {
     sampling_protocol_sha256: String,
     sample_seed: String,
     sample_seed_commitment_sha256: String,
+    error_families: Vec<String>,
     strata: Vec<StratumPlan>,
     population_frame: Vec<PopulationPsu>,
     sampled_units: Vec<SampledPsuOutcome>,
@@ -339,6 +340,14 @@ fn validate(
         return Err("frozen proposal candidate pool must be non-empty".into());
     }
 
+    let declared_families: BTreeSet<String> = audit.error_families.iter().cloned().collect();
+    if audit.error_families.is_empty()
+        || declared_families.len() != audit.error_families.len()
+        || audit.error_families.iter().any(|family| family.trim().is_empty())
+    {
+        return Err("error_families must be non-empty, non-empty-string, unique, and preregistered".into());
+    }
+
     let mut frame = BTreeMap::<String, Vec<String>>::new();
     let mut frame_ids = BTreeSet::new();
     for psu in &audit.population_frame {
@@ -404,6 +413,7 @@ fn validate(
                 ));
             }
             if error.error_family.trim().is_empty()
+                || !declared_families.contains(&error.error_family)
                 || !error.impact_weight.is_finite()
                 || error.impact_weight < 0.0
             {
@@ -718,10 +728,7 @@ fn evaluate(
         });
     }
 
-    let families: BTreeSet<String> = outcomes
-        .values()
-        .flat_map(|unit| unit.errors.iter().map(|error| error.error_family.clone()))
-        .collect();
+    let families: BTreeSet<String> = audit.error_families.iter().cloned().collect();
     let mut error_family_coverage = BTreeMap::new();
     for family in families {
         let family_count = |outcome: &SampledPsuOutcome| {
@@ -905,6 +912,7 @@ mod tests {
             source_ranking_report_sha256: ranking_hash.clone(),
             sampling_protocol_sha256: protocol_hash.clone(),
             sample_seed_commitment_sha256: sha256(seed.as_bytes()),
+            error_families: vec!["merge".into(), "synapse_missing".into(), "split".into(), "axon_fragment".into()],
             sample_seed: seed,
             strata: vec![
                 StratumPlan { stratum_id: "region-a".into(), sampled_psu_count: 2 },
@@ -1189,6 +1197,29 @@ mod tests {
         audit.strata.pop();
         assert!(validate(&proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol)
             .unwrap_err().contains("exactly match"));
+    }
+
+    #[test]
+    fn preregistered_error_family_absent_from_sample_is_retained_with_undefined_recall() {
+        let (proposals, ranking, audit, proposal, ranking_hash, protocol) = fixture();
+        let (frame, outcomes, selected) = validate(
+            &proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol,
+        ).unwrap();
+        let report = evaluate(
+            &proposals, &audit, &frame, &outcomes, &selected,
+            proposal, ranking_hash, protocol, "audit".into(),
+        ).unwrap();
+        let rare = &report.error_family_coverage["axon_fragment"];
+        assert_eq!(rare.estimated_total_errors.total, 0.0);
+        assert_eq!(rare.candidate_generation_recall.ratio, None);
+    }
+
+    #[test]
+    fn undeclared_error_family_is_rejected() {
+        let (proposals, ranking, mut audit, proposal, ranking_hash, protocol) = fixture();
+        audit.sampled_units[0].errors[0].error_family = "unregistered_family".into();
+        assert!(validate(&proposals, &ranking, &audit, &proposal, &ranking_hash, &protocol)
+            .unwrap_err().contains("invalid family"));
     }
 
     #[test]
