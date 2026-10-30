@@ -970,6 +970,7 @@ pub fn verify_counterfactual_influence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
     fn config() -> InfluenceAnalysisConfig {
         InfluenceAnalysisConfig {
@@ -989,37 +990,63 @@ mod tests {
         }
     }
 
+    // The tests exercise the measurement layer with already replay-verified
+    // tokens. A separate test below exercises the public token constructor.
+    fn test_binding(
+        audio: &AudioView<'_>,
+        receipt_tag: &[u8],
+    ) -> VerifiedRendererAudioBinding {
+        VerifiedRendererAudioBinding {
+            receipt_sha256: sha256_hex(receipt_tag),
+            audio_sha256: audio_sha256(audio),
+            renderer_identity_sha256: sha256_hex(b"renderer-fixture-v1"),
+            renderer_config_sha256: sha256_hex(b"config-seed-4-samplerate-48000"),
+        }
+    }
+
     fn calibration_for<'a>(
         anchor: &AudioView<'a>,
         repeats: &[AudioView<'a>],
-    ) -> VerifiedRepeatabilityCalibration {
+    ) -> (VerifiedRepeatabilityCalibration, VerifiedRendererAudioBinding) {
+        let anchor_evidence = test_binding(anchor, b"baseline-render-receipt");
+        let noop_evidence: Vec<VerifiedRendererAudioBinding> = repeats
+            .iter()
+            .enumerate()
+            .map(|(index, render)| {
+                let tag = format!("noop-render-receipt-{index}");
+                test_binding(render, tag.as_bytes())
+            })
+            .collect();
         let calibration = calibrate_repeatability(
             anchor,
             repeats,
             br#"{"score":"frozen"}"#,
             br#"{"map":"frozen"}"#,
             b"schedule-with-event-17",
-            b"renderer-fixture-v1",
-            b"config-seed-4-samplerate-48000",
+            &anchor_evidence,
+            &noop_evidence,
             &config(),
         )
         .unwrap();
-        verify_repeatability_calibration(
+        let verified = verify_repeatability_calibration(
             &calibration,
             anchor,
             repeats,
             br#"{"score":"frozen"}"#,
             br#"{"map":"frozen"}"#,
             b"schedule-with-event-17",
-            b"renderer-fixture-v1",
-            b"config-seed-4-samplerate-48000",
+            &anchor_evidence,
+            &noop_evidence,
         )
-        .unwrap()
+        .unwrap();
+        (verified, anchor_evidence)
     }
 
     fn input<'view, 'audio>(
         baseline: &'view AudioView<'audio>,
         candidate: &'view AudioView<'audio>,
+        baseline_evidence: &'view VerifiedRendererAudioBinding,
+        counterfactual_evidence: &'view VerifiedRendererAudioBinding,
     ) -> CounterfactualInfluenceInput<'view, 'audio> {
         CounterfactualInfluenceInput {
             source_event_id: "score-event-17",
@@ -1028,18 +1055,87 @@ mod tests {
             performed_event_map_bytes: br#"{"map":"frozen"}"#,
             baseline_schedule_bytes: b"schedule-with-event-17",
             counterfactual_schedule_bytes: b"schedule-without-event-17",
-            renderer_identity_bytes: b"renderer-fixture-v1",
-            renderer_config_bytes: b"config-seed-4-samplerate-48000",
+            baseline_renderer_evidence: baseline_evidence,
+            counterfactual_renderer_evidence: counterfactual_evidence,
             baseline_audio: baseline,
             counterfactual_audio: candidate,
         }
+    }
+
+    fn native_receipt_inputs<'a>(wav: &'a [u8]) -> RendererReceiptInputs<'a> {
+        RendererReceiptInputs {
+            render_id: "influence-native-test",
+            backend: crate::renderer_execution_receipt::RendererBackend::NativeMuse,
+            score_bytes: br#"{"score":"fixture"}"#,
+            render_config_bytes: br#"{"sample_rate_hz":48000}"#,
+            input_midi_bytes: None,
+            performed_schedule_bytes: Some(b"native-performed-schedule"),
+            renderer_executable_sha256: None,
+            soundfont_sha256: None,
+            process_exit_code: None,
+            process_observation: None,
+            performed_event_map_sha256: None,
+            output_wav_bytes: wav,
+        }
+    }
+
+    fn float_wav(samples: &[f32]) -> Vec<u8> {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 48_000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for sample in samples {
+                writer.write_sample(*sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    #[test]
+    fn renderer_receipt_must_replay_and_match_the_exact_decoded_pcm_view() {
+        let samples = [0.1f32, -0.2, 0.35, -0.4, 0.05, 0.0, 0.7, -0.1];
+        let wav = float_wav(&samples);
+        let audio = audio(&samples);
+        let receipt = RendererExecutionReceipt::from_successful_render(
+            native_receipt_inputs(&wav),
+        )
+        .unwrap();
+
+        let verified = verify_renderer_audio_binding(
+            &receipt,
+            native_receipt_inputs(&wav),
+            &audio,
+        )
+        .unwrap();
+        assert_eq!(verified.audio_sha256(), audio_sha256(&audio));
+        assert_eq!(verified.receipt_sha256(), receipt.receipt_sha256);
+
+        let substituted_samples = [0.1f32, -0.2, 0.35, -0.4, 0.05, 0.0, 0.6, -0.1];
+        let substituted_audio = audio(&substituted_samples);
+        assert_eq!(
+            verify_renderer_audio_binding(
+                &receipt,
+                native_receipt_inputs(&wav),
+                &substituted_audio,
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::RendererAudioMismatch
+        );
     }
 
     #[test]
     fn calibration_requires_three_noop_rerenders_and_replays() {
         let base = vec![0.0f32; 256];
         let anchor = audio(&base);
+        let anchor_evidence = test_binding(&anchor, b"baseline-render-receipt");
         let one = [audio(&base)];
+        let one_evidence = [test_binding(&one[0], b"noop-render-receipt-0")];
         assert_eq!(
             calibrate_repeatability(
                 &anchor,
@@ -1047,8 +1143,8 @@ mod tests {
                 br#"{"score":"frozen"}"#,
                 br#"{"map":"frozen"}"#,
                 b"schedule-with-event-17",
-                b"renderer-fixture-v1",
-                b"config-seed-4-samplerate-48000",
+                &anchor_evidence,
+                &one_evidence,
                 &config(),
             )
             .unwrap_err(),
@@ -1056,18 +1152,27 @@ mod tests {
         );
 
         let repeats = [audio(&base), audio(&base), audio(&base)];
+        let noop_evidence: Vec<VerifiedRendererAudioBinding> = repeats
+            .iter()
+            .enumerate()
+            .map(|(index, render)| {
+                let tag = format!("noop-render-receipt-{index}");
+                test_binding(render, tag.as_bytes())
+            })
+            .collect();
         let calibration = calibrate_repeatability(
             &anchor,
             &repeats,
             br#"{"score":"frozen"}"#,
             br#"{"map":"frozen"}"#,
             b"schedule-with-event-17",
-            b"renderer-fixture-v1",
-            b"config-seed-4-samplerate-48000",
+            &anchor_evidence,
+            &noop_evidence,
             &config(),
         )
         .unwrap();
         assert_eq!(calibration.noop_audio_sha256.len(), 3);
+        assert_eq!(calibration.noop_renderer_receipt_sha256.len(), 3);
         assert_eq!(
             calibration.cells.iter().map(|cell| cell.maximum_noop_rms_delta).fold(0.0f32, f32::max),
             0.0
@@ -1080,8 +1185,8 @@ mod tests {
                 br#"{"score":"frozen"}"#,
                 br#"{"map":"frozen"}"#,
                 b"schedule-with-event-17",
-                b"renderer-fixture-v1",
-                b"config-seed-4-samplerate-48000",
+                &anchor_evidence,
+                &noop_evidence,
             )
             .is_ok()
         );
@@ -1097,8 +1202,15 @@ mod tests {
         let anchor = audio(&base);
         let candidate = audio(&edited);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
-        let experiment = input(&anchor, &candidate);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
+        let counterfactual_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        let experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &counterfactual_evidence,
+        );
 
         let report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
         assert_eq!(report.source_event_id, "score-event-17");
@@ -1107,6 +1219,14 @@ mod tests {
         assert!(report.measured_influence_intervals.iter().any(|interval| {
             interval.start_frame <= 80 && interval.end_frame >= 112
         }));
+        assert_eq!(
+            report.baseline_renderer_receipt_sha256,
+            baseline_evidence.receipt_sha256()
+        );
+        assert_eq!(
+            report.counterfactual_renderer_receipt_sha256,
+            counterfactual_evidence.receipt_sha256()
+        );
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
     }
 
@@ -1127,9 +1247,16 @@ mod tests {
             audio(&noop_shift),
             audio(&noop_shift),
         ];
-        let calibration = calibration_for(&anchor, &repeats);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
         let candidate = audio(&smaller_candidate);
-        let experiment = input(&anchor, &candidate);
+        let candidate_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        let experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &candidate_evidence,
+        );
 
         let report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
         assert_eq!(
@@ -1144,14 +1271,21 @@ mod tests {
         let base = vec![0.0f32; 256];
         let anchor = audio(&base);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
         let candidate = audio(&base);
-        let mut experiment = input(&anchor, &candidate);
-        experiment.renderer_config_bytes = b"substituted-config";
+        let mut candidate_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        candidate_evidence.renderer_config_sha256 = sha256_hex(b"substituted-config");
+        let experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &candidate_evidence,
+        );
 
         assert_eq!(
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
-            CounterfactualInfluenceError::CalibrationConfigMismatch
+            CounterfactualInfluenceError::RendererIdentityMismatch
         );
     }
 
@@ -1160,9 +1294,16 @@ mod tests {
         let base = vec![0.0f32; 256];
         let anchor = audio(&base);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
         let candidate = audio(&base);
-        let mut experiment = input(&anchor, &candidate);
+        let candidate_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        let mut experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &candidate_evidence,
+        );
         experiment.baseline_schedule_bytes = b"different-baseline-schedule";
 
         assert_eq!(
@@ -1177,10 +1318,20 @@ mod tests {
         let changed = vec![0.1f32; 256];
         let anchor = audio(&base);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
         let wrong_baseline = audio(&changed);
         let counterfactual = audio(&base);
-        let experiment = input(&wrong_baseline, &counterfactual);
+        let wrong_baseline_evidence =
+            test_binding(&wrong_baseline, b"baseline-render-receipt");
+        let counterfactual_evidence =
+            test_binding(&counterfactual, b"counterfactual-render-receipt");
+        let experiment = input(
+            &wrong_baseline,
+            &counterfactual,
+            &wrong_baseline_evidence,
+            &counterfactual_evidence,
+        );
+        assert!(!baseline_evidence.receipt_sha256().is_empty());
 
         assert_eq!(
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
@@ -1193,9 +1344,16 @@ mod tests {
         let base = vec![0.0f32; 256];
         let anchor = audio(&base);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
         let candidate = audio(&base);
-        let mut experiment = input(&anchor, &candidate);
+        let candidate_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        let mut experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &candidate_evidence,
+        );
         experiment.counterfactual_schedule_bytes = experiment.baseline_schedule_bytes;
 
         assert_eq!(
@@ -1212,8 +1370,15 @@ mod tests {
         let anchor = audio(&base);
         let candidate = audio(&changed);
         let repeats = [audio(&base), audio(&base), audio(&base)];
-        let calibration = calibration_for(&anchor, &repeats);
-        let experiment = input(&anchor, &candidate);
+        let (calibration, baseline_evidence) = calibration_for(&anchor, &repeats);
+        let candidate_evidence =
+            test_binding(&candidate, b"counterfactual-render-receipt");
+        let experiment = input(
+            &anchor,
+            &candidate,
+            &baseline_evidence,
+            &candidate_evidence,
+        );
         let mut report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
 
         report.renderer_config_sha256 = sha256_hex(b"substituted-config");
