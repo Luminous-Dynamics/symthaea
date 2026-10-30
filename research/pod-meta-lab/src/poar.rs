@@ -206,7 +206,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             },
         ),
         schedule_case(
-            "low-salience-decisive-source",
+            "higher-consequence-open-obligation-selected",
             vec![
                 obligation("decoy", ObligationState::Open, 2),
                 obligation("decisive", ObligationState::Open, 9),
@@ -227,7 +227,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             },
         ),
         schedule_case(
-            "deceptive-candidate-derivation",
+            "candidate-derivation-routes-to-verification",
             vec![obligation("derivation", ObligationState::CandidateEvidenceAvailable, 8)],
             vec![
                 operation("verify-derivation", OperationKind::Verify, &["derivation"], SchedulingClass::Competitive, 1, "q3"),
@@ -254,7 +254,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             Selection::Stop(StopReason::AllObligationsDischarged),
         ),
         schedule_case(
-            "contradictory-evidence",
+            "contested-obligation-routes-to-independent-evidence",
             vec![obligation("claim", ObligationState::Contested, 8)],
             vec![operation("seek-independent-evidence", OperationKind::SeekIndependentEvidence, &["claim"], SchedulingClass::Competitive, 3, "q5")],
             BTreeSet::new(),
@@ -269,7 +269,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             },
         ),
         schedule_case(
-            "alternative-support-paths",
+            "candidate-evidence-routes-to-alternative-comparison",
             vec![obligation("claim", ObligationState::CandidateEvidenceAvailable, 7)],
             vec![
                 operation("verify-one-path", OperationKind::Verify, &["claim"], SchedulingClass::Competitive, 1, "q6"),
@@ -287,7 +287,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             },
         ),
         schedule_case(
-            "late-bitemporal-correction",
+            "stale-evidence-routes-to-refresh",
             vec![obligation("claim", ObligationState::StaleOrRetracted, 8)],
             vec![
                 operation("refresh-revision", OperationKind::RefreshEvidence, &["claim"], SchedulingClass::Competitive, 2, "q7"),
@@ -305,7 +305,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             },
         ),
         schedule_case(
-            "retraction-cascade-preserves-unrelated-claim",
+            "retracted-target-selected-over-supported-target",
             vec![
                 obligation("dependent", ObligationState::StaleOrRetracted, 9),
                 obligation("unrelated", ObligationState::SupportedUnderProfile, 4),
@@ -350,7 +350,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             Selection::Stop(StopReason::BudgetExhausted),
         ),
         schedule_case(
-            "shared-evidence-echo-needs-independent-source",
+            "contested-obligation-selects-independent-evidence",
             vec![obligation("claim", ObligationState::Contested, 8)],
             vec![operation("seek-independent-source", OperationKind::SeekIndependentEvidence, &["claim"], SchedulingClass::Mandatory, 2, "q11")],
             BTreeSet::new(),
@@ -374,7 +374,7 @@ pub fn poar_v1_fixtures() -> Vec<PoarFixture> {
             Selection::Stop(StopReason::NeedsExternalEvidence),
         ),
         schedule_case(
-            "long-dependency-chain",
+            "multi-obligation-targets-are-normalized",
             vec![
                 obligation("p1", ObligationState::Open, 7),
                 obligation("p2", ObligationState::Open, 7),
@@ -476,6 +476,11 @@ mod tests {
     fn poar_v1_public_conformance_fixtures_match_expected_outcomes() {
         let report = run_poar_v1();
         assert_eq!(report.case_count(), 16);
+        let fixture_ids = poar_v1_fixtures()
+            .iter()
+            .map(|fixture| fixture.id)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(fixture_ids.len(), report.case_count(), "fixture IDs must be unique");
         assert_eq!(
             report.passed_count(),
             16,
