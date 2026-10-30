@@ -384,6 +384,11 @@ class ReferenceAssuranceOracleTests(unittest.TestCase):
         value["sources"][0]["lifecycle"] = "retracted"
         self.assertTrue(any("withdrawn source" in issue for issue in validate_package(value)))
 
+    def test_temporally_stale_label_requires_stale_source(self) -> None:
+        value = copy.deepcopy(self.fixture)
+        value["initial_adjudications"][0]["decision"] = "temporally_stale"
+        self.assertTrue(any("lacks stale-source evidence" in issue for issue in validate_package(value)))
+
     def test_superseded_source_cannot_support_current_claim(self) -> None:
         value = copy.deepcopy(self.fixture)
         value["sources"][0]["lifecycle"] = "superseded"
