@@ -1103,3 +1103,12 @@ jobs:
           done
           jq -e '[.issues[] | select(test("at least three distinct"))] | length > 0' \
             /tmp/sbr-ref-missing-panel-report.json >/dev/null
+
+      - name: Python benchmark tooling unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq empty research/science-bench-refresh/schema/rubric-robustness-plan.schema.json
+          jq empty research/science-bench-refresh/schema/rubric-specification.schema.json
+          jq empty research/science-bench-refresh/schema/judge-score-geometry-input.schema.json
+          python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_*.py' -v
