@@ -54,6 +54,32 @@ S_{RID}=\sqrt[3]{R_i I_i D_i}.
 
 The geometric means ensure no component can be silently hidden by an arbitrary linear weight. They are an experimental design choice for this proxy, not a claim that the paper uses these exact equations.
 
+## Crosswalk to the actual AISTATS 2026 R-IDeA method
+
+The paper's de-amplification term is not a validation-error distribution gap. It defines a signed interaction between estimation error and misspecification error. Since the true data-generating function is unknown, the method trains a proxy predictor (g) to approximate the best-in-class predictor while maintaining disagreement from the current predictor.
+
+The paper's acquisition structure is:
+
+[
+\mathrm{R-I}(\xi_t)=\mathrm{EIG}(\xi_t)
+\left(1-\lambda\frac{\mathrm{MMD}(h_{t-1}\cup\{\xi_t\},d_{test})}
+{\mathrm{MMD}(h_{t-1},d_{test})}\right)
+]
+
+[
+\mathrm{DeA}(\xi_t)=\sigma\left(
+\frac{|\hat f^{(n)}(\xi_t)-g(\xi_t)|-\tau}{\kappa}
+\right),
+\qquad
+\mathrm{R\text{-}IDeA}(\xi_t)=\mathrm{R-I}(\xi_t)\,\mathrm{DeA}(\xi_t).
+]
+
+The proxy is trained with a data-fit term plus a disagreement hinge penalty. Its threshold is linked to the paper's bound through (\tau=\tau_1+\tau_2), (\tau_1=\tau_0/\mathbb{B}_\infty+c\mathbb{B}_\infty), (c\geq2), and a proxy error bound (\tau_2). The paper's experiments use squared MMD with a Gaussian/RBF kernel and fixed bandwidth 1. These equations are from the AISTATS 2026 camera-ready paper, not the proxy implemented in this PR. [PMLR paper](https://proceedings.mlr.press/v300/tang26d.html) · [arXiv HTML](https://arxiv.org/html/2506.07805v3).
+
+**Why this PR remains a proxy:** the current Rust API scores finite experiment candidates with QARCH-005 EVSI/cost, target-regime total variation, and a validation-error distribution gap. It does not fit (g), compute the paper's MMD robust ratio, or estimate the signed error-amplification interaction. The proxy is retained as a small independently auditable screening baseline; [QARCH-011 #9088](https://github.com/Luminous-Dynamics/symthaea/issues/9088) tracks the paper-faithful implementation and its separate validation gates.
+
+An important lesson from the paper is that lower covariate shift alone is not sufficient: its source-localization and pharmacokinetic experiments report cases in which R-IDeA has higher MMD/covariate shift yet lower generalization error, consistent with de-amplifying designs. Thus this proxy must never be judged by representativeness or MMD alone; downstream prediction error and decision regret are essential.
+
 ## Frozen analytical toy case
 
 The fixture uses a two-hypothesis decision task, three target operating regimes, four candidate sampling designs, and an independently identified synthetic validation artifact. The evaluator-only artifact has a different identifier and is not accepted by the policy API.
