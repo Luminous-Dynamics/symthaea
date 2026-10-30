@@ -72,11 +72,13 @@ The two winner's-curse metrics are intentionally separate: one measures optimism
 
 ## Registered scenarios
 
-- `distinct_policy_gap`: three policies with a materially separated true best;
+- `within_family_distinct_gap`: a separated policy family under within-model-family shared annotation error;
+- `shared_rubric_distinct_gap`: a separated policy family under mixed rubric/family dependence;
+- `common_mode_distinct_gap`: a separated policy family under broad common-mode annotation dependence;
 - `near_tie_policy_gap`: conservative and aggressive policies are moved close to the balanced policy, stressing low-power selection;
 - `exact_policy_tie`: all three policies are identical, so a unique-winner certificate must never be issued.
 
-All scenarios use the correlated-source world from VIS-DVPC-056 and the covariance-aware exact worst-policy allocation from VIS-DVPC-057. Inference uses 1,024 independent outer replicates in full mode and 48 in smoke mode; each outer replicate uses 128 logged evaluation observations.
+Each scenario uses the covariance-aware exact worst-policy annotation allocation from VIS-DVPC-057. Inference uses 1,024 independent outer replicates in full mode and 48 in smoke mode; each outer replicate uses 128 logged evaluation observations. The five scenarios emit 15 method/scenario rows in total.
 
 ## Acceptance targets
 
