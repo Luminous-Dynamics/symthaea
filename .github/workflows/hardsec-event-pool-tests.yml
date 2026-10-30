@@ -84,9 +84,13 @@ jobs:
           assert receipt["observed_event_count"] == 4, receipt
           assert abs(receipt["event_pool_recall"] - (4 / 6)) < 1e-12, receipt
           assert receipt["missed_event_ids"] == ["event_rare_completion", "event_rare_prefix"], receipt
+          assert receipt["reference_phase_edge_count"] == 7, receipt
+          assert receipt["observed_phase_edge_count"] == 4, receipt
+          assert abs(receipt["phase_edge_recall"] - (4 / 7)) < 1e-12, receipt
+          assert len(receipt["missed_phase_edges"]) == 3, receipt
           assert receipt["unreachable_event_ids_excluded_from_denominator"] == ["event_unreachable"], receipt
           assert receipt["security_verdict"] is None, receipt
-          print("Known-answer recall: PASS (4/6 reachable events; 2 reachable events missed; 1 unreachable event excluded)")
+          print("Known-answer recall: PASS (4/6 events; 4/7 adjacent phase edges; 2 rare events and 3 phase edges missed; unreachable edge excluded)")
           PY
 
       - name: Upload exact event-pool recall receipt
