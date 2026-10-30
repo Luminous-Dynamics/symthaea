@@ -33,7 +33,7 @@ It does **not** receive:
 - global best score or regret;
 - evaluator methods or a reference to the full benchmark object.
 
-One successful unique target query reveals one target value and consumes one unit of the fixed query budget. Duplicate, unknown-ID and over-budget attempts return typed errors, never return a target value, and remain in the query trace. The receipt contains query IDs, attempt statuses and hashes of revealed observations, but not raw target values or unqueried labels.
+One successful unique target query reveals one target value and consumes one unit of the fixed query budget. The manifest also freezes whether the target metric is maximize-is-better or minimize-is-better; top-K ranking and simple regret use that direction, and both direction and top-K definition are bound into the query receipt. Duplicate, unknown-ID and over-budget attempts return typed errors, never return a target value, and remain in the query trace. The receipt contains query IDs, attempt statuses and hashes of revealed observations, but not raw target values or unqueried labels.
 
 The evaluator retains the full target table privately. It runs the policy callback first; only after that callback returns does it calculate top-K capture and regret from the set of *distinct architectures actually queried*. A policy prediction or a recommended architecture that it never queried receives no P@K credit.
 
@@ -89,6 +89,20 @@ A second public source is NAS-Bench-Suite-Zero from the official [NASLib `zeroco
 
 The first importer should be a one-time, documented extraction if upstream artifacts require Python/PyTorch serialization. The production search primitive and query firewall remain Rust-first and must read a canonical, pinned open format rather than acquire a Python runtime dependency.
 
+
+### Current quantitative reference points
+
+At 200 NAS-Bench-201 queries, the ZAPS preprint reports:
+
+| Task | P@100 mean ± SD | Regret mean ± SD | Strongest P@100 baseline |
+|---|---:|---:|---:|
+| CIFAR-10 | 52.3% ± 6.1 pp | 0.05% ± 0.09 pp | TPE: 35.4% |
+| CIFAR-100 | 65.8% ± 11.0 pp | 0.02% ± 0.14 pp | TPE: 50.5% |
+
+At 300 queries, ZAPS reports 65.1% P@100 on CIFAR-10 and 76.1% on CIFAR-100; the gap to alternative methods narrows as the query budget rises, especially on CIFAR-100. The paper uses 200 independent seeds, a one-sided Mann–Whitney U test and Cliff's delta; it also notes that its P@100 advantage does not translate into a significant regret advantage over BANANAS on CIFAR-10 at B=200. We should therefore report P@K and regret jointly, plus effect sizes and variance—not headline P@100 alone.
+
+Reference: [ZAPS, arXiv:2609.14184v1, Table 4 and Sections 4.4/4.8](https://arxiv.org/abs/2609.14184).
+
 ## 6. Authored implementation
 
 The first Rust module provides:
@@ -100,10 +114,10 @@ The first Rust module provides:
 - traceable duplicate, unknown and exhausted-budget attempts;
 - per-observation digests without raw labels in the receipt;
 - deterministic query receipts;
-- evaluator-only P@1/P@10/P@100 and simple regret;
+- evaluator-only P@1/P@10/P@100 and direction-aware simple regret;
 - constructor validation of source, metric, split, calibration provenance, IDs and finite values.
 
-Seventeen unit tests are authored for budget enforcement, attempt logging, top-K capture, no credit for unqueried predictions, deterministic traces, regret, calibration/evaluation split separation, invalid proxy/target schemas and receipt provenance. They have not been compiled or executed.
+Eighteen unit tests are authored for budget enforcement, attempt logging, top-K capture, no credit for unqueried predictions, deterministic traces, regret, calibration/evaluation split separation, invalid proxy/target schemas and receipt provenance. They have not been compiled or executed.
 
 ## 7. Qualification plan
 
