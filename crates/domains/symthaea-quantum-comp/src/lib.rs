@@ -180,9 +180,9 @@ pub use active_experiment::{
 };
 
 pub use representative_experiment::{
-    ExperimentRegimeProfile, RepresentativeExperimentContext, RidaAblationError,
-    RidaAblationPolicy, RidaAblationReport, RidaExperimentComponentScore, RidaPolicyRanking,
-    RidaPolicyScore, rank_rida_ablations,
+    ExperimentEligibilityStatus, ExperimentRegimeProfile, RepresentativeExperimentContext,
+    RidaAblationError, RidaAblationPolicy, RidaAblationReport, RidaExperimentComponentScore,
+    RidaIneligibleCandidate, RidaPolicyRanking, RidaPolicyScore, rank_rida_ablations,
 };
 
 pub use robust_experiment::{
