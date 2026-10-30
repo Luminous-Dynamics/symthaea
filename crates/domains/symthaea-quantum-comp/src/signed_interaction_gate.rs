@@ -72,8 +72,12 @@ pub struct SignedInteractionGateInput {
     pub proxy_bound_coverage_lower: f64,
     /// Immutable artifact digest for proxy fitting/training.
     pub proxy_fit_artifact_digest: String,
+    /// Immutable split ID used to train proxy g.
+    pub proxy_fit_split_id: String,
     /// Immutable artifact digest for the proxy uniform-error certificate.
     pub proxy_bound_artifact_digest: String,
+    /// Immutable held-out split ID used to validate the proxy error bound.
+    pub proxy_bound_validation_split_id: String,
     /// Whether the upstream verifier validated the proxy bound for this domain.
     pub proxy_bound_evidence_verified: bool,
     /// Lower endpoint of the independent validation interval for f_star(x).
@@ -84,10 +88,14 @@ pub struct SignedInteractionGateInput {
     pub true_function_interval_coverage_lower: f64,
     /// Immutable artifact digest for the validation interval.
     pub true_function_validation_artifact_digest: String,
+    /// Immutable split ID used to construct the true-function validation interval.
+    pub true_function_validation_split_id: String,
     /// Whether the upstream verifier validated the interval construction.
     pub true_function_interval_evidence_verified: bool,
     /// Immutable evaluator artifact digest, reserved for downstream scoring.
     pub evaluator_artifact_digest: String,
+    /// Immutable evaluator-only split ID, never available to selection.
+    pub evaluator_split_id: String,
     /// Minimum joint coverage required before issuing a signed classification.
     pub minimum_joint_coverage: f64,
     /// Minimum absolute interaction magnitude required for sign certification.
@@ -124,6 +132,8 @@ pub struct SignedInteractionGateReport {
     pub status: SignedInteractionGateStatus,
     /// Evidence artifact digests used in the assessment.
     pub evidence_artifact_digests: Vec<String>,
+    /// Distinct data split IDs used by fit, certificates, validation and evaluation.
+    pub evidence_split_ids: Vec<String>,
     /// Claim ceiling for this assessment.
     pub claim_ceiling: Vec<String>,
 }
@@ -239,6 +249,12 @@ pub fn assess_signed_interaction(
             input.true_function_validation_artifact_digest.clone(),
             input.evaluator_artifact_digest.clone(),
         ],
+        evidence_split_ids: vec![
+            input.proxy_fit_split_id.clone(),
+            input.proxy_bound_validation_split_id.clone(),
+            input.true_function_validation_split_id.clone(),
+            input.evaluator_split_id.clone(),
+        ],
         claim_ceiling: vec![
             "Signed interaction assessment at the declared design point only".into(),
             "Valid only if proxy and validation coverage statements are true".into(),
@@ -255,14 +271,30 @@ fn validate_input(
         input.design_id.as_str(),
         input.domain_id.as_str(),
         input.proxy_fit_artifact_digest.as_str(),
+        input.proxy_fit_split_id.as_str(),
         input.proxy_bound_artifact_digest.as_str(),
+        input.proxy_bound_validation_split_id.as_str(),
         input.true_function_validation_artifact_digest.as_str(),
+        input.true_function_validation_split_id.as_str(),
         input.evaluator_artifact_digest.as_str(),
+        input.evaluator_split_id.as_str(),
     ];
     if metadata.iter().any(|value| value.trim().is_empty()) {
         return Err(SignedInteractionGateError::EmptyMetadata);
     }
-    if has_duplicate_artifacts(&metadata[2..]) {
+    let artifact_ids = [
+        input.proxy_fit_artifact_digest.as_str(),
+        input.proxy_bound_artifact_digest.as_str(),
+        input.true_function_validation_artifact_digest.as_str(),
+        input.evaluator_artifact_digest.as_str(),
+    ];
+    let split_ids = [
+        input.proxy_fit_split_id.as_str(),
+        input.proxy_bound_validation_split_id.as_str(),
+        input.true_function_validation_split_id.as_str(),
+        input.evaluator_split_id.as_str(),
+    ];
+    if has_duplicate_artifacts(&artifact_ids) || has_duplicate_artifacts(&split_ids) {
         return Err(SignedInteractionGateError::ArtifactDigestOverlap);
     }
     if [
@@ -352,7 +384,9 @@ mod tests {
             proxy_uniform_error_bound: proxy_error,
             proxy_bound_coverage_lower: 0.99,
             proxy_fit_artifact_digest: "proxy-fit-artifact".into(),
+            proxy_fit_split_id: "proxy-fit-split".into(),
             proxy_bound_artifact_digest: "proxy-bound-artifact".into(),
+            proxy_bound_validation_split_id: "proxy-bound-validation-split".into(),
             proxy_bound_evidence_verified: true,
             true_function_interval_lower: true_lower,
             true_function_interval_upper: true_upper,
@@ -419,6 +453,16 @@ mod tests {
     fn artifact_overlap_is_rejected() {
         let mut data = input(-1.0, 1.0, 0.0, 0.5, 0.5);
         data.evaluator_artifact_digest = data.true_function_validation_artifact_digest.clone();
+        assert_eq!(
+            assess_signed_interaction(&data),
+            Err(SignedInteractionGateError::ArtifactDigestOverlap)
+        );
+    }
+
+    #[test]
+    fn overlapping_split_ids_are_rejected() {
+        let mut data = input(-1.0, 1.0, 0.0, 0.5, 0.5);
+        data.evaluator_split_id = data.true_function_validation_split_id.clone();
         assert_eq!(
             assess_signed_interaction(&data),
             Err(SignedInteractionGateError::ArtifactDigestOverlap)
