@@ -1207,6 +1207,7 @@ mod tests {
             Args {
                 packet: self.packet.clone(),
                 receipt: self.receipt.clone(),
+                evidence_root: None,
             }
         }
     }
