@@ -41,6 +41,7 @@
       "required": [
         "harness_id",
         "binary_digest",
+        "worker_binary_digest",
         "fixture_digest"
       ],
       "properties": {
@@ -54,6 +55,10 @@
           "pattern": "^sha256:[a-f0-9]{64}$"
         },
         "fixture_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "worker_binary_digest": {
           "type": "string",
           "pattern": "^sha256:[a-f0-9]{64}$"
         }
