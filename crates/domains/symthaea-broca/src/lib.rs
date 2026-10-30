@@ -71,6 +71,7 @@ pub mod memory_attestation;
 pub mod memory_derivation;
 pub mod memory_justifications;
 pub mod memory_use_validity;
+pub mod memory_challenge_api;
 pub mod memory_bitemporal;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
