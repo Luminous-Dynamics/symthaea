@@ -329,6 +329,148 @@ mod tests {
         assert_eq!(value["data"][0]["id"], "memory-1");
     }
 
+    #[tokio::test]
+    async fn health_is_public_but_add_and_search_require_the_memory_system_key() {
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower::ServiceExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let app = router(AmlHttpServerConfig {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            database_path: directory.path().join("aml.sqlite3"),
+            payload_root: directory.path().join("payloads"),
+            api_key: "a".repeat(40),
+            max_body_bytes: DEFAULT_MAX_BODY_BYTES,
+            max_concurrency: 2,
+        }).unwrap();
+
+        let health = app.clone().oneshot(
+            Request::builder().method("GET").uri("/health")
+                .body(Body::empty()).unwrap()
+        ).await.unwrap();
+        assert_eq!(health.status(), StatusCode::OK);
+
+        let unauthenticated = app.oneshot(
+            Request::builder().method("POST").uri("/add")
+                .header("content-type", "application/json")
+                .body(Body::from("{}")).unwrap()
+        ).await.unwrap();
+        assert_eq!(unauthenticated.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn synchronous_http_add_is_immediately_searchable_with_user_scope() {
+        use axum::body::{to_bytes, Body};
+        use axum::http::Request;
+        use crate::memory_challenge_api::{AmlMessage, AmlMessageRole};
+        use tower::ServiceExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let key = "participant-memory-system-key-0123456789";
+        let app = router(AmlHttpServerConfig {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            database_path: directory.path().join("aml.sqlite3"),
+            payload_root: directory.path().join("payloads"),
+            api_key: key.into(),
+            max_body_bytes: DEFAULT_MAX_BODY_BYTES,
+            max_concurrency: 2,
+        }).unwrap();
+
+        let add = AmlAddRequest {
+            request_id: "request-1".into(),
+            messages: vec![
+                AmlMessage {
+                    role: AmlMessageRole::User,
+                    content: "The cache invalidation fix shipped after the schema migration.".into(),
+                    timestamp: Some(1_700_000_000_000),
+                },
+            ],
+            user_id: "eval-user-1".into(),
+            session_id: "eval-session-1".into(),
+        };
+        let add_response = app.clone().oneshot(
+            Request::builder().method("POST").uri("/add")
+                .header("content-type", "application/json")
+                .header("authorization", format!("Bearer {key}"))
+                .body(Body::from(serde_json::to_vec(&add).unwrap())).unwrap()
+        ).await.unwrap();
+        assert_eq!(add_response.status(), StatusCode::OK);
+        let add_bytes = to_bytes(add_response.into_body(), DEFAULT_MAX_BODY_BYTES).await.unwrap();
+        let add_json: serde_json::Value = serde_json::from_slice(&add_bytes).unwrap();
+        assert_eq!(add_json, serde_json::json!({
+            "success": true,
+            "request_id": "request-1",
+            "user_id": "eval-user-1",
+            "session_id": "eval-session-1"
+        }));
+
+        let search = AmlSearchRequest {
+            query: "cache invalidation schema migration".into(),
+            options: None,
+            user_id: "eval-user-1".into(),
+            top_k: 100,
+        };
+        let search_response = app.clone().oneshot(
+            Request::builder().method("POST").uri("/search")
+                .header("content-type", "application/json")
+                .header("x-api-key", key)
+                .body(Body::from(serde_json::to_vec(&search).unwrap())).unwrap()
+        ).await.unwrap();
+        assert_eq!(search_response.status(), StatusCode::OK);
+        let search_bytes = to_bytes(search_response.into_body(), DEFAULT_MAX_BODY_BYTES).await.unwrap();
+        let search_json: serde_json::Value = serde_json::from_slice(&search_bytes).unwrap();
+        assert_eq!(search_json["data"].as_array().unwrap().len(), 1);
+        assert!(search_json["data"][0]["content"].as_str().unwrap().contains("cache invalidation"));
+
+        let isolated = AmlSearchRequest {
+            query: "cache invalidation schema migration".into(),
+            options: None,
+            user_id: "different-eval-user".into(),
+            top_k: 100,
+        };
+        let isolated_response = app.oneshot(
+            Request::builder().method("POST").uri("/search")
+                .header("content-type", "application/json")
+                .header("authorization", format!("Token {key}"))
+                .body(Body::from(serde_json::to_vec(&isolated).unwrap())).unwrap()
+        ).await.unwrap();
+        assert_eq!(isolated_response.status(), StatusCode::OK);
+        let isolated_bytes = to_bytes(isolated_response.into_body(), DEFAULT_MAX_BODY_BYTES).await.unwrap();
+        let isolated_json: serde_json::Value = serde_json::from_slice(&isolated_bytes).unwrap();
+        assert_eq!(isolated_json["data"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn search_rejects_top_k_above_official_limit() {
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower::ServiceExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let key = "participant-memory-system-key-0123456789";
+        let app = router(AmlHttpServerConfig {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            database_path: directory.path().join("aml.sqlite3"),
+            payload_root: directory.path().join("payloads"),
+            api_key: key.into(),
+            max_body_bytes: DEFAULT_MAX_BODY_BYTES,
+            max_concurrency: 2,
+        }).unwrap();
+        let request = serde_json::json!({
+            "query": "evidence",
+            "user_id": "user-1",
+            "top_k": 101
+        });
+        let response = app.oneshot(
+            Request::builder().method("POST").uri("/search")
+                .header("content-type", "application/json")
+                .header("authorization", format!("Bearer {key}"))
+                .body(Body::from(serde_json::to_vec(&request).unwrap())).unwrap()
+        ).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
     #[test]
     fn constant_time_comparison_accepts_only_exact_key_bytes() {
         assert!(constant_time_eq(b"secret-key", b"secret-key"));
