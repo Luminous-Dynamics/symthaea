@@ -101,7 +101,7 @@ A deliberately wrong control substitutes an annotation from an unchosen action/s
 
 ## Output and reproducibility
 
-The executable emits 14 RESULT rows (two worlds × seven plans), two NEGATIVE_CONTROL rows, five LOCAL_REGIME rows, and eight BENCHMARK_CONFIG rows. The focused CI workflow compiles this standalone Rust 2024 source directly, avoiding Cargo workspace metadata; it checks deterministic smoke output, row counts and schemas, full output, and SHA-256 receipts.
+The executable emits 14 RESULT rows (two worlds × seven plans), two NEGATIVE_CONTROL rows, five LOCAL_REGIME rows, and eight BENCHMARK_CONFIG rows. The focused CI workflow compiles this standalone Rust 2024 source directly, avoiding Cargo workspace metadata; it checks deterministic smoke output, row counts and schemas, full output, and SHA-256 receipts. The source and output receipts bind the exact head, Rust compiler version, code/docs hashes, and deterministic smoke/full outputs.
 
 ## Benchmark targets
 
