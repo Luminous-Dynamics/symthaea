@@ -1,5 +1,8 @@
-use lep_conformance::{parse_json_unique_keys, validate_schema_only, verify_statement, PREDICATE_TYPE, SCHEMA_VERSION, STATEMENT_TYPE};
-use serde_json::{json, Value};
+use lep_conformance::{
+    PREDICATE_TYPE, SCHEMA_VERSION, STATEMENT_TYPE, parse_json_unique_keys, validate_schema_only,
+    verify_statement,
+};
+use serde_json::{Value, json};
 use std::env;
 use std::fs;
 use std::hint::black_box;
@@ -59,7 +62,7 @@ fn sized_input(target_bytes: usize) -> Result<Vec<u8>, String> {
     let initial = serde_json::to_vec(&statement).map_err(|error| error.to_string())?;
     if target_bytes > initial.len() + 2 {
         let padding_len = target_bytes - initial.len() - 2;
-        statement["predicate"]["limitations"] = json!([ "x".repeat(padding_len) ]);
+        statement["predicate"]["limitations"] = json!(["x".repeat(padding_len)]);
     }
 
     serde_json::to_vec(&statement).map_err(|error| error.to_string())
@@ -169,16 +172,16 @@ fn main() -> ExitCode {
 
     let schema_input = bytes.clone();
     let schema_samples = measure(iterations, || {
-        let statement = parse_json_unique_keys(&schema_input)
-            .expect("benchmark input must remain valid JSON");
+        let statement =
+            parse_json_unique_keys(&schema_input).expect("benchmark input must remain valid JSON");
         let predicate = statement.get("predicate").expect("predicate must exist");
         black_box(validate_schema_only(predicate));
     });
 
     let full_input = bytes.clone();
     let full_samples = measure(iterations, || {
-        let statement = parse_json_unique_keys(&full_input)
-            .expect("benchmark input must remain valid JSON");
+        let statement =
+            parse_json_unique_keys(&full_input).expect("benchmark input must remain valid JSON");
         black_box(verify_statement(&statement));
     });
 
