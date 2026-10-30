@@ -694,7 +694,7 @@ fn target_path_outside(
         let canonical = fs::canonicalize(input).map_err(|error| {
             format!("canonicalize input directory {}: {error}", input.display())
         })?;
-        if target.starts_with(canonical) {
+        if target.starts_with(&canonical) {
             return Err(format!(
                 "output {} must be outside input directory {}",
                 target.display(),
