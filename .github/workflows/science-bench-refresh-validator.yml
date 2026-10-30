@@ -1,6 +1,11 @@
 name: Science Benchmark Refresh Manifest Validator
 
 on:
+  push:
+    paths:
+      - "research/science-bench-refresh/**"
+      - "docs/research/SCI-BENCH-REFRESH-001.md"
+      - ".github/workflows/science-bench-refresh-validator.yml"
   pull_request:
     paths:
       - "research/science-bench-refresh/**"
