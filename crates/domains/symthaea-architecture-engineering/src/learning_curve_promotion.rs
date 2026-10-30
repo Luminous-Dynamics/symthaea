@@ -354,6 +354,16 @@ pub fn select_curve_promotions(
                 "predictions must share a valid rung and contain finite ordered bounds",
             ));
         }
+        let recomputed = calibrator.predict_final(
+            &prediction.architecture_id,
+            &prediction.observed_curve,
+        )?;
+        if recomputed != *prediction {
+            return Err(LearningCurvePromotionError::new(
+                format!("predictions[{index}]"),
+                "prediction fields do not match the frozen calibrator and observed curve",
+            ));
+        }
         let expected_conservative = match calibrator.config.metric_direction {
             ProxyDirection::Maximize => prediction.lower_bound,
             ProxyDirection::Minimize => prediction.upper_bound,
@@ -1040,6 +1050,14 @@ mod tests {
         let mut wrong_rung = prediction.clone();
         wrong_rung.fidelity_index = 9;
         assert!(select_curve_promotions(&predictor, &[wrong_rung], 1, 0).is_err());
+    }
+
+    #[test]
+    fn promotion_selector_rejects_tampered_prediction_bounds() {
+        let predictor = fitted();
+        let mut prediction = predictor.predict_final("candidate", &[20.0, 25.0]).unwrap();
+        prediction.lower_bound -= 1.0;
+        assert!(select_curve_promotions(&predictor, &[prediction], 1, 0).is_err());
     }
 
     #[test]
