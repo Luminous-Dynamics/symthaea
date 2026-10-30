@@ -272,7 +272,15 @@ fn parse_manifest(bytes: &[u8]) -> Result<Vec<Sample>, String> {
                 fields.len()
             ));
         }
-        let get = |index: usize| fields[index].trim().to_owned();
+        for (index, value) in fields.iter().enumerate() {
+            if value.trim() != *value {
+                return Err(format!(
+                    "line {line_number}: {} has leading or trailing whitespace",
+                    HEADER[index]
+                ));
+            }
+        }
+        let get = |index: usize| fields[index].to_owned();
         let row_dataset = get(0);
         let source_artifact_id = get(1);
         let source_path = get(2);
