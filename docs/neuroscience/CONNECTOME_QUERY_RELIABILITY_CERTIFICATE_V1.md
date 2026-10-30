@@ -1,6 +1,6 @@
 # Query-scoped proof-carrying connectome reliability certificate V1
 
-**Status:** design contract; no certificate implementation or biological certification exists.
+**Status:** machine-readable V1 contract plus an internal-consistency Rust verifier; biological certification and independently proven manifest completeness are not claimed.
 **Tracking:** [SCI-CONNECTOMICS-012 / #9255](https://github.com/Luminous-Dynamics/symthaea/issues/9255).
 
 ## 1. Why global cleanliness is the wrong release contract
@@ -79,7 +79,7 @@ Where a defensible joint uncertainty model is unavailable, report components sep
 
 ConnectomeBench2 measures task-specific local proofreading decisions. NEURD and RoboEM provide morphology / tracing and correction mechanisms. SynAnno provides structured human workflow. CAVE provides versioned reconstruction and derived annotation update infrastructure. A query-scoped certificate layer composes these capabilities while making the scientific scope, uncertainty, and invalidation semantics explicit.
 
-No certificate implementation or biological certification is claimed by this document.
+No biological certification or independent proof of dependency-manifest completeness is claimed by this document.
 
 ## Machine-readable contract
 
