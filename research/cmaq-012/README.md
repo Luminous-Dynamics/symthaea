@@ -30,6 +30,18 @@ The task is deliberately small and interpretable. Its role is to test the measur
 5. **Shuffled action labels:** deliberately swaps the action-value labels to test whether the apparent benefit depends on correct action conditioning.
 6. **Hidden-state oracle:** sees the latent hazard and selects the best action. This is an evaluator-only ceiling.
 
+## Relationship to CMAQ-011's matched estimand
+
+This v0.1 crate is a **synthetic mechanism test** for causal-attribution controls. It is not yet the complete D0/D1/W1/W2/W3 protocol.
+
+In particular:
+- The action-blind placebo matches the number of model queries, but does not equalize FLOPs or wall-clock time. It is not the compute-matched direct arm D1.
+- The shuffled-action-label arm permutes the two action-value labels. External adapters must implement CMAQ-011's stratified shuffled-future control across candidate sequences.
+- The direct controller is intentionally simple and frozen to make the synthetic mechanism legible; it is not evidence of competitiveness against a trained VLA or strong direct policy.
+- The calibration-oracle arm is supplied with current sensor likelihood parameters and is an upper bound, not an online calibration algorithm.
+
+Therefore the reported paired deltas are synthetic uplift against this direct controller, not the external benchmark's final Advantage-of-Prediction estimand. Any robot result must implement the full CMAQ-011 D0/D1/W1/W2/W3 design.
+
 ## Metrics
 
 - Mean cumulative return and success rate.
