@@ -13,6 +13,7 @@
     "upstream",
     "tests",
     "replay",
+    "challenge_profile",
     "evidence_packet",
     "negative_controls",
     "claim_ceiling"
@@ -147,7 +148,8 @@
       "required": [
         "trigger_budget",
         "evidence_packet",
-        "rustfmt"
+        "rustfmt",
+        "challenge_profile"
       ],
       "properties": {
         "trigger_budget": {
@@ -200,6 +202,30 @@
         },
         "rustfmt": {
           "const": "pass"
+        },
+        "challenge_profile": {
+          "type": "object",
+          "required": [
+            "passed",
+            "failed",
+            "result"
+          ],
+          "properties": {
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "result": {
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            }
+          }
         }
       }
     },
@@ -397,6 +423,54 @@
         },
         "verification": {
           "const": "all_workflow_uses_refs_are_full_commit_shas_and_match_the_lock"
+        }
+      }
+    },
+    "challenge_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_id",
+        "dataset_role",
+        "validity_status",
+        "profile_sha256",
+        "receipt_sha256",
+        "verified_local_file_count",
+        "security_verdict"
+      ],
+      "properties": {
+        "challenge_id": {
+          "type": "string"
+        },
+        "dataset_role": {
+          "enum": [
+            "evaluation_corpus_member",
+            "reference_fixture_only",
+            "exploratory_only"
+          ]
+        },
+        "validity_status": {
+          "enum": [
+            "witness_validated",
+            "partially_evidenced",
+            "benign_equivalent",
+            "unknown_invalid"
+          ]
+        },
+        "profile_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "receipt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "verified_local_file_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "security_verdict": {
+          "type": "null"
         }
       }
     }
