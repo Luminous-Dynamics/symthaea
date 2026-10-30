@@ -409,10 +409,16 @@ fn make_row(
     let true_positive_count = selected_set.intersection(truth).count();
     let false_positive_count = selected_set.len().saturating_sub(true_positive_count);
     let false_negative_count = truth.len().saturating_sub(true_positive_count);
-    let precision = (selected_set.len() > 0)
-        .then_some(true_positive_count as f64 / selected_set.len() as f64);
-    let recall = (truth.len() > 0)
-        .then_some(true_positive_count as f64 / truth.len() as f64);
+    let precision = if selected_set.is_empty() {
+        None
+    } else {
+        Some(true_positive_count as f64 / selected_set.len() as f64)
+    };
+    let recall = if truth.is_empty() {
+        None
+    } else {
+        Some(true_positive_count as f64 / truth.len() as f64)
+    };
     let exhaustive_render_count = 1u128
         .saturating_add(event_count as u128)
         .saturating_add(exhaustive_pair_count as u128);
@@ -489,11 +495,8 @@ fn build_comparison(
         return Err(ProbePolicyComparisonError::InvalidConfig("invalid seed set"));
     }
 
-    let mut pair_candidates: Vec<_> = contextual_truth(
-        factorial_report,
-        events.len(),
-        metric_config,
-    )?.0;
+    let (mut pair_candidates, global_order_two_count, higher_order_count) =
+        contextual_truth(factorial_report, events.len(), metric_config)?;
     for pair in &mut pair_candidates {
         pair.overlap_frames = support_overlap(
             &normalized[pair.left].intervals,
@@ -504,9 +507,6 @@ fn build_comparison(
         .filter(|pair| pair.contextual_norm > metric_config.minimum_contextual_pair_pcm_l2_norm)
         .map(|pair| (pair.left, pair.right))
         .collect();
-
-    let (_, global_order_two_count, higher_order_count) =
-        contextual_truth(factorial_report, events.len(), metric_config)?;
 
     // Validate renderer support metadata through the real EVAL-019 validator too.
     if canonical_budgets.iter().any(|budget| *budget > 0) {
