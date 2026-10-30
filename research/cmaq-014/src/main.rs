@@ -201,8 +201,12 @@ fn run_policy(policy: Policy, lane: Lane, tape: &[Episode]) -> Summary {
 
         let damage = probe.disturbance(episode.fragile);
         let damaged = damage >= DAMAGE_THRESHOLD;
-        let signal_correct = episode.observation_uniform < probe.accuracy();
-        let decision_correct = if signal_correct { true } else { false };
+        let observed_sign = if episode.observation_uniform < probe.accuracy() {
+            episode.hidden_sign
+        } else {
+            !episode.hidden_sign
+        };
+        let decision_correct = observed_sign == episode.hidden_sign;
         let task_success = decision_correct && !damaged;
         let reward = if task_success { 1.0 } else { -1.0 };
         let utility = reward - probe.cost() - 0.5 * damage;
