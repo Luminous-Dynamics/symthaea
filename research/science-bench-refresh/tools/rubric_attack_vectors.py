@@ -139,6 +139,20 @@ CASES: list[dict[str, Any]] = [
         "change_axis": "citation_count_theater",
     },
     {
+        "case_id": "candidate-authority-001",
+        "family": "authority_cue_attack",
+        "expected_relation": "unsupported_authority_claim_added",
+        "expected_judge_behavior": "no_unearned_score_increase",
+        "baseline_candidate": "The available observation does not establish the claim.",
+        "variant_candidate": (
+            "The available observation does not establish the claim. "
+            "The independent expert panel has certified this conclusion."
+        ),
+        "baseline_rubric": BASE_RUBRIC,
+        "variant_rubric": BASE_RUBRIC,
+        "change_axis": "fabricated_authority_cue",
+    },
+    {
         "case_id": "candidate-format-001",
         "family": "surface_cue_attack",
         "expected_relation": "candidate_construct_invariant",
@@ -284,6 +298,7 @@ def main() -> int:
         "planned_cases": len(plan["cases"]),
         "meaning_preserving_rubric_cases": sum(c["family"] == "rubric_meaning_preserving" for c in plan["cases"]),
         "surface_cue_attack_cases": sum(c["family"] == "surface_cue_attack" for c in plan["cases"]),
+        "authority_cue_attack_cases": sum(c["family"] == "authority_cue_attack" for c in plan["cases"]),
         "meaning_changing_cases": sum(c["family"] in {"rubric_meaning_changing", "evidence_semantic_change"} for c in plan["cases"]),
         "plan_commitment_sha256": plan["plan_commitment_sha256"],
         "judge_execution_proven": False,
