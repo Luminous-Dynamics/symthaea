@@ -1042,13 +1042,30 @@ jobs:
           set -euo pipefail
           fixture="research/science-bench-refresh/fixtures/reference-assurance-package.example.json"
           cargo_manifest="research/science-bench-refresh/Cargo.toml"
-          jq '.claims += [.claims[0]]' "$fixture" > /tmp/sbr-ref-duplicate-claim.json
-          jq '.spans[0].source_id = "unknown-source"' "$fixture" > /tmp/sbr-ref-orphan-span.json
-          jq '.spans[0].end_offset = 0' "$fixture" > /tmp/sbr-ref-invalid-range.json
-          jq '.sources[0].lifecycle = "retracted"' "$fixture" > /tmp/sbr-ref-retracted-support.json
-          jq '.adjudicators[0].blind_to_judge_output = false' "$fixture" > /tmp/sbr-ref-blinding-failure.json
-          jq '.initial_adjudications[0].decision = "abstain" | .initial_adjudications[0].abstention_reason = null' "$fixture" > /tmp/sbr-ref-invalid-abstention.json
-          for name in duplicate-claim orphan-span invalid-range retracted-support blinding-failure invalid-abstention; do
+          revision="$(git rev-parse HEAD)"
+          jq --arg revision "$revision" 'del(.package_commitment_sha256) | .purpose = "audit_candidate" | .validator_source_revision = $revision' \
+            "$fixture" > /tmp/sbr-ref-candidate-fields.json
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            commit-reference-assurance-package-fields /tmp/sbr-ref-candidate-fields.json \
+            > /tmp/sbr-ref-candidate-commitment.json
+          commitment="$(jq -r '.package_commitment_sha256' /tmp/sbr-ref-candidate-commitment.json)"
+          jq --arg commitment "$commitment" '. + {package_commitment_sha256: $commitment}' \
+            /tmp/sbr-ref-candidate-fields.json > /tmp/sbr-ref-candidate-package.json
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            verify-reference-assurance-package /tmp/sbr-ref-candidate-package.json \
+            > /tmp/sbr-ref-candidate-report.json
+          jq -e '.valid == true and .scoring_eligible_declared == false and .external_anchor_required == true' \
+            /tmp/sbr-ref-candidate-report.json >/dev/null
+
+          candidate="/tmp/sbr-ref-candidate-package.json"
+          jq '.claims += [.claims[0]]' "$candidate" > /tmp/sbr-ref-duplicate-claim.json
+          jq '.spans[0].source_id = "unknown-source"' "$candidate" > /tmp/sbr-ref-orphan-span.json
+          jq '.spans[0].end_offset = 0' "$candidate" > /tmp/sbr-ref-invalid-range.json
+          jq '.sources[0].lifecycle = "retracted"' "$candidate" > /tmp/sbr-ref-retracted-support.json
+          jq '.adjudicators[0].blind_to_judge_output = false' "$candidate" > /tmp/sbr-ref-blinding-failure.json
+          jq '.initial_adjudications[0].decision = "abstain" | .initial_adjudications[0].abstention_reason = null' "$candidate" > /tmp/sbr-ref-invalid-abstention.json
+          jq 'del(.initial_adjudications[2])' "$candidate" > /tmp/sbr-ref-missing-panel.json
+          for name in duplicate-claim orphan-span invalid-range retracted-support blinding-failure invalid-abstention missing-panel; do
             set +e
             cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
               verify-reference-assurance-package "/tmp/sbr-ref-$name.json" > "/tmp/sbr-ref-$name-report.json"
@@ -1058,4 +1075,5 @@ jobs:
             jq -e '.valid == false and .scoring_eligible_declared == false and .external_anchor_required == true' \
               "/tmp/sbr-ref-$name-report.json" >/dev/null
           done
-
+          jq -e '[.issues[] | select(test("at least three distinct"))] | length > 0' \
+            /tmp/sbr-ref-missing-panel-report.json >/dev/null
