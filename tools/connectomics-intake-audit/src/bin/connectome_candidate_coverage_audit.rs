@@ -1250,23 +1250,43 @@ mod tests {
         (proposals, ranking, audit, proposal_hash, ranking_hash, protocol_hash)
     }
 
-    #[test]
-    fn coverage_audit_requires_the_exact_audited_spatial_frame_export() {
-        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
-        let report = SpatialFrameReport {
+    fn spatial_report(audit: &AuditInput, status: &str) -> SpatialFrameReport {
+        SpatialFrameReport {
             schema_version: 1,
             input_sha256: audit.source_spatial_frame_input_sha256.clone(),
             canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
             population_frame_sha256: audit.source_population_frame_sha256.clone(),
             eligibility_mask_sha256: "3".repeat(64),
+            eligibility_mask_encoding: "packed_bitset_lsb0_x_fastest_v1".into(),
+            eligibility_mask_verified: true,
+            eligibility_mask_actual_sha256: "3".repeat(64),
+            eligibility_mask_artifact_byte_count: "5".into(),
+            eligibility_foreground_voxel_count: "4".into(),
+            eligibility_foreground_voxel_fraction: 0.1,
+            mask_tile_counts: audit.population_frame.iter().map(|psu| MaskTileCount {
+                psu_id: psu.psu_id.clone(),
+                tile_voxel_count: "10".into(),
+                eligible_voxel_count: "1".into(),
+            }).collect(),
             eligibility_selection_rule_sha256: "4".repeat(64),
             frame_protocol_sha256: "5".repeat(64),
             frame_generator_tool_id: "test-frame-auditor".into(),
             frame_generator_tool_version: "1.0.0".into(),
             frame_generator_binary_sha256: "6".repeat(64),
+            grid_dimensions: [2, 2, 1],
+            total_grid_cells: 4,
+            eligible_grid_cells: 4,
+            excluded_grid_cells: 0,
+            declared_voxel_count: "40".into(),
             population_frame: audit.population_frame.clone(),
-            status: "PASS".into(),
-        };
+            status: status.into(),
+        }
+    }
+
+    #[test]
+    fn coverage_audit_requires_the_exact_audited_spatial_frame_export() {
+        let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
+        let report = spatial_report(&audit, "PASS");
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
@@ -1278,20 +1298,7 @@ mod tests {
     #[test]
     fn spatial_frame_report_byte_digest_mismatch_is_rejected() {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
-        let report = SpatialFrameReport {
-            schema_version: 1,
-            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
-            canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
-            population_frame_sha256: audit.source_population_frame_sha256.clone(),
-            eligibility_mask_sha256: "3".repeat(64),
-            eligibility_selection_rule_sha256: "4".repeat(64),
-            frame_protocol_sha256: "5".repeat(64),
-            frame_generator_tool_id: "test-frame-auditor".into(),
-            frame_generator_tool_version: "1.0.0".into(),
-            frame_generator_binary_sha256: "6".repeat(64),
-            population_frame: audit.population_frame.clone(),
-            status: "PASS".into(),
-        };
+        let report = spatial_report(&audit, "PASS");
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
@@ -1303,20 +1310,7 @@ mod tests {
     #[test]
     fn spatial_frame_manifest_byte_digest_mismatch_is_rejected() {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
-        let report = SpatialFrameReport {
-            schema_version: 1,
-            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
-            canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
-            population_frame_sha256: audit.source_population_frame_sha256.clone(),
-            eligibility_mask_sha256: "3".repeat(64),
-            eligibility_selection_rule_sha256: "4".repeat(64),
-            frame_protocol_sha256: "5".repeat(64),
-            frame_generator_tool_id: "test-frame-auditor".into(),
-            frame_generator_tool_version: "1.0.0".into(),
-            frame_generator_binary_sha256: "6".repeat(64),
-            population_frame: audit.population_frame.clone(),
-            status: "PASS".into(),
-        };
+        let report = spatial_report(&audit, "PASS");
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
@@ -1330,20 +1324,8 @@ mod tests {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
         let mut population_frame = audit.population_frame.clone();
         population_frame[0].stratum_id = "tampered-stratum".into();
-        let report = SpatialFrameReport {
-            schema_version: 1,
-            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
-            canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
-            population_frame_sha256: audit.source_population_frame_sha256.clone(),
-            eligibility_mask_sha256: "3".repeat(64),
-            eligibility_selection_rule_sha256: "4".repeat(64),
-            frame_protocol_sha256: "5".repeat(64),
-            frame_generator_tool_id: "test-frame-auditor".into(),
-            frame_generator_tool_version: "1.0.0".into(),
-            frame_generator_binary_sha256: "6".repeat(64),
-            population_frame,
-            status: "PASS".into(),
-        };
+        let mut report = spatial_report(&audit, "PASS");
+        report.population_frame = population_frame;
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
@@ -1355,20 +1337,7 @@ mod tests {
     #[test]
     fn failed_spatial_frame_audit_cannot_feed_candidate_coverage() {
         let (_proposals, _ranking, audit, _proposal_hash, _ranking_hash, _protocol_hash) = fixture();
-        let report = SpatialFrameReport {
-            schema_version: 1,
-            input_sha256: audit.source_spatial_frame_input_sha256.clone(),
-            canonical_frame_sha256: audit.source_spatial_frame_sha256.clone(),
-            population_frame_sha256: audit.source_population_frame_sha256.clone(),
-            eligibility_mask_sha256: "3".repeat(64),
-            eligibility_selection_rule_sha256: "4".repeat(64),
-            frame_protocol_sha256: "5".repeat(64),
-            frame_generator_tool_id: "test-frame-auditor".into(),
-            frame_generator_tool_version: "1.0.0".into(),
-            frame_generator_binary_sha256: "6".repeat(64),
-            population_frame: audit.population_frame.clone(),
-            status: "FAIL".into(),
-        };
+        let report = spatial_report(&audit, "FAIL");
         assert!(validate_spatial_frame_binding(
             &audit,
             &report,
