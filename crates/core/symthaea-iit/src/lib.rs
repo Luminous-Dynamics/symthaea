@@ -878,6 +878,9 @@ pub enum RepertoireError {
     #[error(transparent)]
     Model(#[from] ModelError),
 
+    #[error(transparent)]
+    FactorGraph(#[from] FactorGraphError),
+
     #[error("subset {subset} contains duplicate unit {unit}")]
     DuplicateSubsetUnit { subset: &'static str, unit: usize },
 
@@ -1439,7 +1442,202 @@ impl BinaryCausalModel {
     /// purview. This dense exhaustive path is the reference implementation for
     /// correctness; a factor-graph variable-elimination kernel can replace its
     /// posterior contraction without changing the public contract.
+    /// Build one exact observation-likelihood factor from the dense TPM.
+    ///
+    /// `variable_map[global_unit]` gives the factor-graph variable representing
+    /// that unit's past state. Only declared incoming edges are included in the
+    /// scope; model construction guarantees the TPM has no omitted influence.
+    fn observation_factor_iit4(
+        &self,
+        target_unit: usize,
+        current_state: &[bool],
+        variable_map: &[usize],
+        scale_by_maximum: bool,
+    ) -> Result<BinaryFactor, RepertoireError> {
+        let mut parents = (0..self.n_units)
+            .filter(|source| self.connectivity[*source * self.n_units + target_unit])
+            .map(|source| (variable_map[source], source))
+            .collect::<Vec<_>>();
+        parents.sort_unstable_by_key(|(variable, _)| *variable);
+        let variables = parents.iter().map(|(variable, _)| *variable).collect::<Vec<_>>();
+        let entries = assignment_count(parents.len()).map_err(FactorGraphError::from)?;
+        let mut values = Vec::with_capacity(entries);
+
+        for assignment in 0..entries {
+            let past_index = parents.iter().enumerate().fold(
+                0usize,
+                |state_index, (slot, (_, source))| {
+                    if ((assignment >> slot) & 1) != 0 {
+                        state_index | (1usize << source)
+                    } else {
+                        state_index
+                    }
+                },
+            );
+            let probability_on = self.transition_probabilities
+                [past_index * self.n_units + target_unit];
+            values.push(if current_state[target_unit] {
+                probability_on
+            } else {
+                1.0 - probability_on
+            });
+        }
+
+        if scale_by_maximum {
+            let maximum = values.iter().copied().fold(0.0_f64, f64::max);
+            if !maximum.is_finite() || maximum <= 0.0 {
+                return Err(RepertoireError::UndefinedBackgroundPosterior);
+            }
+            for value in &mut values {
+                *value /= maximum;
+            }
+        }
+
+        Ok(BinaryFactor::new(variables, values)?)
+    }
+
+    /// Exact Eq. 4 system cause factors by sum-product elimination.
+    ///
+    /// Posterior factors represent the uncut system's observed-state likelihood
+    /// over candidate-past variables X and external-background variables B.
+    /// For each mechanism unit i, a second copy Y of candidate past states is
+    /// attached through i's uncut observation factor. Eliminating X and B while
+    /// retaining Y yields E_{B|observed}[P(s_i|Y,B)] over each candidate state.
+    ///
+    /// This avoids materializing the joint background posterior q(B), whose table
+    /// can be exponential in the number of external units. Work is controlled by
+    /// the induced width of the combined factor graph and a hard factor-entry cap.
+    fn forward_cause_likelihood_iit4_system_factors_min_fill(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+    ) -> Result<Vec<Vec<f64>>, RepertoireError> {
+        self.check_state(current_state)?;
+        self.validate_subset(candidate_system, "candidate_system")?;
+        if candidate_system.is_empty() {
+            return Err(ModelError::EmptyCandidateSystem.into());
+        }
+
+        let candidate_count = candidate_system.len();
+        let mut candidate_slot = vec![None; self.n_units];
+        for (slot, unit) in candidate_system.iter().copied().enumerate() {
+            candidate_slot[unit] = Some(slot);
+        }
+        let background = (0..self.n_units)
+            .filter(|unit| candidate_slot[*unit].is_none())
+            .collect::<Vec<_>>();
+        let mut background_slot = vec![None; self.n_units];
+        for (slot, unit) in background.iter().copied().enumerate() {
+            background_slot[unit] = Some(slot);
+        }
+
+        // Variable namespaces: X = candidate past, B = external past,
+        // Y = independent candidate-past copy used for one target factor.
+        let x_map = (0..self.n_units)
+            .map(|unit| {
+                candidate_slot[unit]
+                    .unwrap_or_else(|| candidate_count + background_slot[unit].unwrap())
+            })
+            .collect::<Vec<_>>();
+        let posterior_variable_count = candidate_count + background.len();
+        let y_base = posterior_variable_count;
+        let y_map = (0..self.n_units)
+            .map(|unit| {
+                candidate_slot[unit]
+                    .map(|slot| y_base + slot)
+                    .unwrap_or_else(|| candidate_count + background_slot[unit].unwrap())
+            })
+            .collect::<Vec<_>>();
+        let eliminate_posterior = (0..posterior_variable_count).collect::<Vec<_>>();
+
+        // Scaling each posterior likelihood factor by a positive scalar does
+        // not change q(B|observed), but prevents product underflow. The target
+        // factor added below remains unscaled because its absolute likelihood
+        // contributes to the Eq. 4 cause factor.
+        let posterior_factors = (0..self.n_units)
+            .map(|target| {
+                self.observation_factor_iit4(target, current_state, &x_map, true)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // The normalization is independent of the duplicated Y copy and shared
+        // by every target factor.
+        let factor_entry_budget = 1usize << MAX_DENSE_UNITS;
+        let normalizer_report = min_fill_sum_product(
+            &posterior_factors,
+            &eliminate_posterior,
+            factor_entry_budget,
+        )?;
+        if !normalizer_report.factor.variables().is_empty() {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+        let posterior_normalizer = normalizer_report.factor.values()[0];
+        if !posterior_normalizer.is_finite() || posterior_normalizer <= 0.0 {
+            return Err(RepertoireError::UndefinedBackgroundPosterior);
+        }
+
+        let purview_state_count = assignment_count(candidate_count)
+            .map_err(FactorGraphError::from)?;
+        let mut per_mechanism_unit = Vec::with_capacity(candidate_count);
+        for target in candidate_system.iter().copied() {
+            let target_factor =
+                self.observation_factor_iit4(target, current_state, &y_map, false)?;
+            let mut factors = posterior_factors.clone();
+            factors.push(target_factor);
+            let report = min_fill_sum_product(
+                &factors,
+                &eliminate_posterior,
+                factor_entry_budget,
+            )?;
+
+            let mut cause_factor = vec![0.0; purview_state_count];
+            for (candidate_state, value) in cause_factor.iter_mut().enumerate() {
+                let local_index = report.factor.variables().iter().enumerate().fold(
+                    0usize,
+                    |index, (factor_slot, variable)| {
+                        let candidate_slot = variable - y_base;
+                        if ((candidate_state >> candidate_slot) & 1) != 0 {
+                            index | (1usize << factor_slot)
+                        } else {
+                            index
+                        }
+                    },
+                );
+                *value = report.factor.values()[local_index] / posterior_normalizer;
+            }
+            if cause_factor.iter().any(|value| !value.is_finite()) {
+                return Err(RepertoireError::UndefinedBackgroundPosterior);
+            }
+            per_mechanism_unit.push(cause_factor);
+        }
+        Ok(per_mechanism_unit)
+    }
+
+    /// Select the sparse exact contraction only for the system-level Eq. 4
+    /// request. General mechanism/purview repertoire calls retain the dense oracle.
     fn forward_cause_likelihood_iit4_factors(
+        &self,
+        candidate_system: &[usize],
+        mechanism: &[usize],
+        current_state: &[bool],
+        purview: &[usize],
+    ) -> Result<Vec<Vec<f64>>, RepertoireError> {
+        if candidate_system == mechanism && mechanism == purview {
+            return self.forward_cause_likelihood_iit4_system_factors_min_fill(
+                candidate_system,
+                current_state,
+            );
+        }
+        self.forward_cause_likelihood_iit4_factors_dense(
+            candidate_system,
+            mechanism,
+            current_state,
+            purview,
+        )
+    }
+
+    /// Dense exhaustive reference implementation retained for differential tests.
+    fn forward_cause_likelihood_iit4_factors_dense(
         &self,
         candidate_system: &[usize],
         mechanism: &[usize],
