@@ -145,7 +145,30 @@ The initial module implements:
 - evaluator-only touched/final P@K and direction-aware final regret;
 - strict canonical JSON import with unknown-field rejection and order-invariant content digest.
 
-Fifteen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports and empty queries. They have not been compiled or executed.
+Seventeen Rust unit tests are authored for resumable versus restart costs, touched versus final capture, independent caps, monotonicity, malformed/incomplete target tables, fidelity ladder validity, receipts, metric direction, canonical imports, empty queries and the preflighted Successive Halving schedule. They have not been compiled or executed.
+
+### Runnable Successive Halving comparator
+
+The multi-fidelity evaluator now exposes `run_successive_halving(initial_candidate_ids, rung_populations)`. The caller supplies an initial candidate pool (for example, the trajectory planner's promotion plan) and one strictly decreasing population count for each fidelity rung. At each rung, the runner queries all candidates in the current pool, ranks them by the observed metric using the declared maximize/minimize direction, and advances only the top population to the next rung. Ties are broken by architecture ID.
+
+The schedule is preflighted *before any query is made*: initial IDs must be known and unique; the rung count must match the fidelity ladder; populations must be nonzero and strictly decrease; final confirmations must fit the hard query cap; and the exact resource cost must fit the hard resource budget. After execution, the receipt cost must reconcile exactly with the preflight estimate or the run is rejected.
+
+Worked example with the illustrative ladder F0=5, F1=15, F2=200 epoch-equivalent units and a population schedule 8 → 4 → 2:
+
+| Cost model | F0 | F1 promotion | F2 promotion | Total |
+|---|---:|---:|---:|---:|
+| Resumable prefix | 8 × 5 = 40 | 4 × (15−5) = 40 | 2 × (200−15) = 370 | **450** |
+| Independent restarts | 8 × 5 = 40 | 4 × 15 = 60 | 2 × 200 = 400 | **500** |
+
+This is a reproducible Successive Halving baseline, not Hyperband (multiple brackets), BOHB, DEHB or TPE. It selects on observed intermediate target metrics, and its query trace contains those observations' digests. It is not allowed to inspect unqueried fidelity labels.
+
+The complete synthetic search chain can now be compared directly:
+1. random or ranked initial candidate pool;
+2. target-free proxy consensus and/or trajectory-preserving promotion shortlist;
+3. the same preflighted Successive Halving schedule and resource budget;
+4. final-confirmed P@K and normalized regret from the same evaluator.
+
+This isolates whether the *initial pool construction* improves downstream multi-fidelity selection, rather than comparing different evaluators.
 
 ## 8. Trajectory-preserving promotion (R-MF-NAS-inspired)
 
@@ -184,7 +207,7 @@ The full target-free chain is now composable in the tests:
 
 `declared static proxy features -> leave-one-out consensus prior -> first-improvement/2-opt trajectory archive -> quota-controlled promotion plan -> multi-fidelity query firewall`
 
-The composite prior is still only a hypothesis for allocating training resources. The pipeline test verifies composition without target labels; it does not establish that consensus improves NAS performance. Fifteen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection in both value and runtime columns, malformed/duplicate topology, tamper detection and end-to-end composition. They have not been compiled or executed.
+The composite prior is still only a hypothesis for allocating training resources. The pipeline test verifies composition without target labels; it does not establish that consensus improves NAS performance. Seventeen Rust tests are authored for anti-correlation rejection, midranks, maximize/minimize direction, fallback diagnostics, undefined agreement, split/digest checks, target-leak rejection in both value and runtime columns, malformed/duplicate topology, tamper detection and end-to-end composition. They have not been compiled or executed.
 
 ## 10. External benchmark and data limitations
 
