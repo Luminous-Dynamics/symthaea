@@ -9,6 +9,7 @@ on:
     paths:
       - "src/dynamics/crate_world_model.rs"
       - "src/bin/cmaq-008-world-model-smoke.rs"
+      - "src/bin/cmaq-008-residual-ablation.rs"
       - ".github/workflows/world-model-seeded-initialization.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -17,6 +18,7 @@ on:
       - research/world-model-seeded-construction-2026-10-29
     paths:
       - "src/dynamics/crate_world_model.rs"
+      - "src/bin/cmaq-008-residual-ablation.rs"
       - ".github/workflows/world-model-seeded-initialization.yml"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -98,5 +100,85 @@ jobs:
                   "mse_ratio_to_persistence": metrics["model_to_persistence_mse_ratio"],
                   "mae": metrics["mae"],
               } for regime, metrics in regimes.items()
+          }, sort_keys=True))
+          PY
+- name: Test identity-residual world-model methods
+        run: cargo test --lib residual_
+
+      - name: Test the absolute-vs-residual CfC ablation
+        run: cargo test --bin cmaq-008-residual-ablation
+
+      - name: Run the absolute-vs-residual CfC ablation
+        run: cargo run --bin cmaq-008-residual-ablation > /tmp/cmaq-008-residual-report.json
+
+      - name: Validate residual ablation and paired baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-008-residual-report.json").read_text())
+          assert report["schema_version"] == "cmaq-008-residual-ablation-v0.1"
+          assert report["model"] == "HierarchicalCfCWorldModel"
+          assert report["dimensions"] == {"hdc": 16, "hidden": 24}
+          assert report["training"] == {
+              "samples": 128, "epochs": 12, "seeds": 5, "learning_rate": 0.001
+          }
+          assert report["evaluation_samples_per_regime_per_seed"] == 64
+          assert report["regimes"] == ["source_holdout", "action_effect_reversal"]
+
+          objectives = report["objectives"]
+          assert [item["objective"] for item in objectives] == [
+              "absolute_next_state", "identity_residual_delta"
+          ]
+          assert len(objectives) == 2
+          for item in objectives:
+              assert item["training_steps_per_seed"] == 128 * 12
+              assert len(item["per_seed"]) == 5
+              for row in item["per_seed"]:
+                  assert len(row["seed"]) == 16
+                  for key in ("final_epoch_train_mse", "source_mse", "reversal_mse"):
+                      assert math.isfinite(row[key]) and row[key] >= 0.0
+              for regime in ("source", "action_effect_reversal"):
+                  metrics = item[regime]
+                  for key in (
+                      "mse", "mae", "persistence_mse", "zero_mse",
+                      "mse_to_persistence_ratio", "mse_delta_vs_persistence",
+                      "mse_delta_vs_persistence_ci95_low",
+                      "mse_delta_vs_persistence_ci95_high",
+                      "paired_mse_delta_vs_absolute", "paired_mse_delta_ci95_low",
+                      "paired_mse_delta_ci95_high",
+                  ):
+                      assert math.isfinite(metrics[key]), (item["objective"], regime, key)
+                  assert metrics["mse"] >= 0.0
+                  assert metrics["persistence_mse"] > 0.0
+                  assert metrics["mse_delta_vs_persistence_ci95_low"] <= metrics["mse_delta_vs_persistence_ci95_high"]
+                  assert metrics["paired_mse_delta_ci95_low"] <= metrics["paired_mse_delta_ci95_high"]
+
+          for regime in ("source", "action_effect_reversal"):
+              absolute = objectives[0][regime]
+              residual = objectives[1][regime]
+              assert abs(absolute["paired_mse_delta_vs_absolute"]) <= 1e-10
+              assert abs(absolute["paired_mse_delta_ci95_low"]) <= 1e-10
+              assert abs(absolute["paired_mse_delta_ci95_high"]) <= 1e-10
+              assert residual["paired_mse_delta_ci95_low"] <= residual["paired_mse_delta_ci95_high"]
+
+          print("CMAQ-008 absolute-vs-residual CfC report, paired seeds, persistence baseline and confidence intervals validated")
+          print(json.dumps({
+              regime: {
+                  objective["objective"]: {
+                      "mse": objective[regime]["mse"],
+                      "persistence_mse": objective[regime]["persistence_mse"],
+                      "mse_ratio_to_persistence": objective[regime]["mse_to_persistence_ratio"],
+                      "paired_mse_delta_vs_absolute": objective[regime]["paired_mse_delta_vs_absolute"],
+                      "paired_ci95": [
+                          objective[regime]["paired_mse_delta_ci95_low"],
+                          objective[regime]["paired_mse_delta_ci95_high"],
+                      ],
+                  } for objective in objectives
+              } for regime in ("source", "action_effect_reversal")
           }, sort_keys=True))
           PY
