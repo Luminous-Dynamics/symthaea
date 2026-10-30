@@ -139,6 +139,7 @@ fn run(args: &[String]) -> ExitCode {
                             "valid": true,
                             "plan_sha256": plan_sha256,
                             "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
                             "study_id": plan.study_id,
                             "planned_block_count": plan.blocks.len(),
                             "planned_condition_count": plan.blocks.iter().map(|block| block.conditions.len()).sum::<usize>(),
