@@ -1,0 +1,104 @@
+name: CMAQ-013 causal advantage-of-prediction benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  advantage-of-prediction:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-013
+        run: cargo test --locked
+      - name: Generate report and validate causal controls
+        working-directory: research/cmaq-013
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-013-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-013-report.json").read_text())
+          assert report["schema_version"] == "cmaq-013-advantage-of-prediction-v0.1"
+          assert report["episode_count"] == 256
+          assert report["horizon"] == 3
+          assert report["discount"] == 0.95
+          assert report["error_levels"] == [0.0, 0.25, 0.5, 0.75]
+          assert report["scenarios"] == ["delayed_reward", "trap_avoidance", "action_coupling"]
+          assert report["policies"] == [
+              "direct_greedy_no_model", "one_step_model_negative_control",
+              "learned_model_planner", "sham_model_planner", "oracle_model_planner"
+          ]
+          rows = report["summary"]
+          assert len(rows) == 60
+          by_key = {(r["scenario"], r["model_error_rate"], r["policy"]): r for r in rows}
+          assert len(by_key) == len(rows)
+          for row in rows:
+              for key in [
+                  "mean_return", "return_delta_vs_direct", "paired_ci95_low", "paired_ci95_high",
+                  "mean_regret_vs_oracle", "cvar95_regret_vs_oracle", "max_regret_vs_oracle",
+                  "mean_root_action_regret", "mean_prediction_optimism_gap",
+                  "action_change_rate_vs_direct", "transition_queries_per_decision"
+              ]:
+                  assert isinstance(row[key], (int, float)) and abs(row[key]) < 1e6
+              assert row["mean_regret_vs_oracle"] >= -1e-8
+              assert row["cvar95_regret_vs_oracle"] + 1e-8 >= row["mean_regret_vs_oracle"]
+              assert row["max_regret_vs_oracle"] + 1e-8 >= row["cvar95_regret_vs_oracle"]
+
+          # The one-step arm cannot exploit transition prediction because its
+          # objective contains no future state term.
+          for scenario in report["scenarios"]:
+              for error in report["error_levels"]:
+                  direct = by_key[(scenario, error, "direct_greedy_no_model")]
+                  one_step = by_key[(scenario, error, "one_step_model_negative_control")]
+                  assert abs(direct["mean_return"] - one_step["mean_return"]) < 1e-10
+                  assert abs(direct["return_delta_vs_direct"]) < 1e-10
+          
+          # Perfect model planner must attain the oracle planner outcome.
+          for scenario in report["scenarios"]:
+              perfect = by_key[(scenario, 0.0, "learned_model_planner")]
+              oracle = by_key[(scenario, 0.0, "oracle_model_planner")]
+              assert abs(perfect["mean_return"] - oracle["mean_return"]) < 1e-10
+              assert perfect["mean_regret_vs_oracle"] < 1e-10
+          
+          delayed = "delayed_reward"
+          perfect = by_key[(delayed, 0.0, "learned_model_planner")]
+          direct = by_key[(delayed, 0.0, "direct_greedy_no_model")]
+          assert perfect["mean_return"] > direct["mean_return"]
+          print("CMAQ-013 paired report and causal negative/oracle controls validated")
+          print(json.dumps({
+              scenario: {
+                  str(error): {
+                      policy: {
+                          "mean_return": by_key[(scenario, error, policy)]["mean_return"],
+                          "delta_vs_direct": by_key[(scenario, error, policy)]["return_delta_vs_direct"],
+                          "ci95": [by_key[(scenario, error, policy)]["paired_ci95_low"], by_key[(scenario, error, policy)]["paired_ci95_high"]],
+                          "regret": by_key[(scenario, error, policy)]["mean_regret_vs_oracle"],
+                          "optimism": by_key[(scenario, error, policy)]["mean_prediction_optimism_gap"],
+                          "model_queries": by_key[(scenario, error, policy)]["transition_queries_per_decision"]
+                      }
+                      for policy in ["direct_greedy_no_model","learned_model_planner","sham_model_planner","oracle_model_planner"]
+                  }
+                  for error in report["error_levels"]
+              }
+              for scenario in report["scenarios"]
+          }, sort_keys=True))
+          PY
