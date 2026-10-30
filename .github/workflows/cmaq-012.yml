@@ -81,7 +81,6 @@ jobs:
           # Baseline and oracle contracts.
           for scenario in report["scenarios"]:
               for count in report["candidate_counts"]:
-                  assert by_key := True
                   fallback = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "direct_fallback")
                   oracle = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "oracle_action")
                   greedy = next(r for r in rows if r["scenario"] == scenario and r["candidate_count"] == count and r["policy"] == "greedy_predicted_mean")
