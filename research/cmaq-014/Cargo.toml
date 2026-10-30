@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-014-dual-control-disturbance"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Synthetic dual-control benchmark for probe information value under collateral state disturbance"
+
+[dependencies]
+
+[workspace]
