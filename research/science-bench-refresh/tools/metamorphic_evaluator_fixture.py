@@ -74,6 +74,13 @@ def build_example() -> tuple[dict[str, Any], dict[str, Any]]:
                 "evidence-withdrawal-001", "directional_sensitivity",
                 "support_non_increasing", affected=["evidence"],
                 unaffected=["accuracy", "clarity"],
+                expected_decision="insufficient_evidence",
+            ),
+            _pair(
+                "evidence-addition-001", "directional_sensitivity",
+                "support_non_decreasing", affected=["evidence"],
+                unaffected=["accuracy", "clarity"],
+                expected_decision="supported_within_scope",
             ),
             _pair(
                 "criterion-locality-001", "locality",
@@ -113,6 +120,11 @@ def build_example() -> tuple[dict[str, Any], dict[str, Any]]:
             "pair_id": "evidence-withdrawal-001",
             "baseline": _outcome("supported_within_scope", _scores(900_000, 900_000, 800_000)),
             "variant": _outcome("insufficient_evidence", _scores(550_000, 250_000, 800_000)),
+        },
+        {
+            "pair_id": "evidence-addition-001",
+            "baseline": _outcome("insufficient_evidence", _scores(550_000, 250_000, 800_000)),
+            "variant": _outcome("supported_within_scope", _scores(550_000, 900_000, 800_000)),
         },
         {
             "pair_id": "criterion-locality-001",
@@ -160,6 +172,12 @@ def build_example() -> tuple[dict[str, Any], dict[str, Any]]:
             "variant": _outcome("contradicted_within_scope", _scores(200_000, 200_000, 700_000)),
         },
     ]
+    pair_digests = {pair["pair_id"]: pair for pair in plan["pairs"]}
+    for observation in observations:
+        planned_pair = pair_digests[observation["pair_id"]]
+        observation["baseline_input_sha256"] = planned_pair["baseline_input_sha256"]
+        observation["variant_input_sha256"] = planned_pair["variant_input_sha256"]
+
     receipt = {
         "schema": RECEIPT_SCHEMA,
         "purpose": "example_only",
