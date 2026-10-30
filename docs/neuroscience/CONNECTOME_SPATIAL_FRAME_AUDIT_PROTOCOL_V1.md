@@ -75,3 +75,7 @@ A biological intake must additionally verify that source volume bytes, segmentat
 ## 6. Promotion gate
 
 No candidate-generation recall estimate is promoted unless its spatial PSU frame first passes this audit, the source/mask artifacts are independently verified, and the exact exported eligible population is used by #9204. The claimed population is always limited to the declared frame and eligibility rule.
+
+## Downstream binding
+
+The coverage auditor accepts this tool's exact report through `--spatial-frame-report`. Its report binds the complete canonical spatial-frame digest and an eligible population digest computed with the same length-prefixed SHA-256 encoding as #9204. The population frame in the coverage audit must be byte-semantically identical after sorting by PSU ID; no second hand-maintained frame is accepted.
