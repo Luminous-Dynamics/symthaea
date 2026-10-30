@@ -1027,7 +1027,7 @@ mod tests {
         let predictions = vec![
             predictor.predict_final("stable-a", &[20.0, 25.0]).unwrap(),
             predictor.predict_final("stable-b", &[21.0, 26.0]).unwrap(),
-            predictor.predict_final("uncertain-c", &[100.0, 180.0]).unwrap(),
+            predictor.predict_final("uncertain-c", &[45.0, 30.0]).unwrap(),
         ];
         let selection =
             select_curve_promotions(&predictor, &predictions, 2, 1).unwrap();
@@ -1041,7 +1041,9 @@ mod tests {
             .iter()
             .max_by(|left, right| left.conservative_bound.total_cmp(&right.conservative_bound))
             .unwrap();
+        assert_eq!(guard.architecture_id, "uncertain-c");
         assert_ne!(guard.architecture_id, conservative_top.architecture_id);
+        assert!(guard.interval_radius > predictions[1].interval_radius);
         assert_eq!(selection.selection_sha256.len(), 64);
     }
 
