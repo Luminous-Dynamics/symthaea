@@ -1566,6 +1566,13 @@ fn validate_segmentation_config(
     Ok(())
 }
 
+#[cfg(test)]
+pub(crate) fn segmented_report_digest_for_test(
+    report: &CounterfactualInfluenceSegmentedReport,
+) -> String {
+    segmented_report_digest(report).expect("test fixture report serializes")
+}
+
 fn segmented_report_digest(
     report: &CounterfactualInfluenceSegmentedReport,
 ) -> Result<String, CounterfactualInfluenceError> {
