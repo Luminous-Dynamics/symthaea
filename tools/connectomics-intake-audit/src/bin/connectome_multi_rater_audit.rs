@@ -29,6 +29,10 @@ struct Args {
     #[arg(long)]
     ranking_report: PathBuf,
 
+    /// Exact adjudication protocol artifact whose digest is pinned in the outcome file.
+    #[arg(long)]
+    adjudication_protocol: PathBuf,
+
     /// Separate evaluation-only multi-rater outcomes file.
     #[arg(long)]
     outcomes: PathBuf,
@@ -463,6 +467,7 @@ fn validate(
     outcomes: &OutcomeFile,
     proposal_hash: &str,
     ranking_hash: &str,
+    protocol_hash: &str,
 ) -> Result<BTreeMap<String, CandidateOutcome>, String> {
     if proposals.schema_version != 1 || ranking.schema_version != 1 || outcomes.schema_version != 1 {
         return Err("proposal, ranking, and outcome schema_version values must all be 1".into());
@@ -472,6 +477,9 @@ fn validate(
     }
     if outcomes.source_ranking_report_sha256 != ranking_hash {
         return Err("outcomes source_ranking_report_sha256 does not match exact ranking report bytes".into());
+    }
+    if outcomes.adjudication_protocol_sha256 != protocol_hash {
+        return Err("outcomes adjudication_protocol_sha256 does not match exact adjudication protocol bytes".into());
     }
     if !is_lower_hex(proposal_hash, 64)
         || !is_lower_hex(ranking_hash, 64)
@@ -679,11 +687,14 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("failed to read proposal input: {error}"))?;
     let ranking_bytes = fs::read(&args.ranking_report)
         .map_err(|error| format!("failed to read frozen ranking report: {error}"))?;
+    let protocol_bytes = fs::read(&args.adjudication_protocol)
+        .map_err(|error| format!("failed to read adjudication protocol: {error}"))?;
     let outcome_bytes = fs::read(&args.outcomes)
         .map_err(|error| format!("failed to read multi-rater outcomes: {error}"))?;
 
     let proposal_hash = sha256(&proposal_bytes);
     let ranking_hash = sha256(&ranking_bytes);
+    let protocol_hash = sha256(&protocol_bytes);
     let outcomes_hash = sha256(&outcome_bytes);
     let proposals: ProposalInput = serde_json::from_slice(&proposal_bytes)
         .map_err(|error| format!("invalid proposal JSON: {error}"))?;
@@ -691,7 +702,14 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("invalid ranking report JSON: {error}"))?;
     let outcomes: OutcomeFile = serde_json::from_slice(&outcome_bytes)
         .map_err(|error| format!("invalid multi-rater outcomes JSON: {error}"))?;
-    let by_candidate = validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)?;
+    let by_candidate = validate(
+        &proposals,
+        &ranking,
+        &outcomes,
+        &proposal_hash,
+        &ranking_hash,
+        &protocol_hash,
+    )?;
     let report = evaluate(
         &proposals,
         &outcomes,
@@ -798,7 +816,7 @@ mod tests {
 
     fn evaluate_fixture() -> AuditReport {
         let (proposals, _ranking, outcomes, proposal_hash, ranking_hash) = fixture();
-        let rows = validate(&proposals, &_ranking, &outcomes, &proposal_hash, &ranking_hash).unwrap();
+        let rows = validate(&proposals, &_ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256).unwrap();
         evaluate(&proposals, &outcomes, &rows, proposal_hash, ranking_hash, "8".repeat(64))
     }
 
@@ -884,21 +902,36 @@ mod tests {
     #[test]
     fn rejects_wrong_proposal_or_ranking_digest() {
         let (proposals, ranking, outcomes, proposal_hash, ranking_hash) = fixture();
-        assert!(validate(&proposals, &ranking, &outcomes, &"0".repeat(64), &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &"0".repeat(64), &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("proposal SHA-256"));
         assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &"0".repeat(64))
             .unwrap_err().contains("ranking_report_sha256"));
     }
 
     #[test]
+    fn rejects_outcome_file_bound_to_a_different_protocol_artifact() {
+        let (proposals, ranking, outcomes, proposal_hash, ranking_hash) = fixture();
+        assert!(validate(
+            &proposals,
+            &ranking,
+            &outcomes,
+            &proposal_hash,
+            &ranking_hash,
+            &"0".repeat(64),
+        )
+        .unwrap_err()
+        .contains("adjudication_protocol_sha256"));
+    }
+
+    #[test]
     fn rejects_missing_or_extra_candidate_outcomes() {
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes.pop();
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("complete frozen candidate pool"));
         outcomes.candidate_outcomes = fixture().2.candidate_outcomes;
         outcomes.candidate_outcomes[0].candidate_id = "not-in-pool".into();
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("absent from frozen proposals"));
     }
 
@@ -906,11 +939,11 @@ mod tests {
     fn rejects_duplicate_reviewer_and_adjudicator_ids_within_candidate() {
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[0].reviewer_reviews[1].reviewer_id = "r1".into();
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("duplicate reviewer ID"));
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[0].adjudicator_votes[1].adjudicator_id = "a1".into();
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("duplicate adjudicator ID"));
     }
 
@@ -918,7 +951,7 @@ mod tests {
     fn rejects_reviewer_adjudicator_role_overlap() {
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[0].reviewer_reviews[0].reviewer_id = "a1".into();
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("IDs must be disjoint"));
     }
 
@@ -926,11 +959,11 @@ mod tests {
     fn rejects_confidence_outside_unit_interval_and_confident_abstention() {
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[0].reviewer_reviews[0].decision_confidence = Some(1.01);
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("decision_confidence"));
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[1].reviewer_reviews[2].decision_confidence = Some(0.8);
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("abstention confidence"));
     }
 
@@ -938,7 +971,7 @@ mod tests {
     fn rejects_non_positive_or_non_finite_review_time() {
         let (proposals, ranking, mut outcomes, proposal_hash, ranking_hash) = fixture();
         outcomes.candidate_outcomes[0].reviewer_reviews[0].actual_review_minutes = 0.0;
-        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash)
+        assert!(validate(&proposals, &ranking, &outcomes, &proposal_hash, &ranking_hash, &outcomes.adjudication_protocol_sha256)
             .unwrap_err().contains("actual_review_minutes"));
     }
 
