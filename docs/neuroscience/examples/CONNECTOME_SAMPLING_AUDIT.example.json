@@ -19,11 +19,11 @@
     { "candidate_id": "c8", "stratum_id": "s2", "cluster_id": "k6" }
   ],
   "sampled_outcomes": [
-    { "candidate_id": "c1", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
-    { "candidate_id": "c2", "adjudication": "correct", "signed_query_error_reduction_if_applied": 0.2 },
-    { "candidate_id": "c3", "adjudication": "correct", "signed_query_error_reduction_if_applied": 0.2 },
-    { "candidate_id": "c5", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
-    { "candidate_id": "c7", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
-    { "candidate_id": "c8", "adjudication": "indeterminate", "signed_query_error_reduction_if_applied": null }
+    { "candidate_id": "c1", "adjudication": "incorrect", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c2", "adjudication": "correct", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": 0.2 },
+    { "candidate_id": "c3", "adjudication": "correct", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": 0.2 },
+    { "candidate_id": "c5", "adjudication": "incorrect", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c7", "adjudication": "incorrect", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c8", "adjudication": "indeterminate", "audit_panel_person_minutes": 4.0, "signed_query_error_reduction_if_applied": null }
   ]
 }
