@@ -464,7 +464,7 @@ pub fn validate_rubric_commensurability_plan_fields(
             issues.push(format!("anchor {} has invalid semantics digest", anchor.anchor_id));
         }
     }
-    Ok(if issues.is_empty() { Ok(()) } else { Err(issues) })
+    if issues.is_empty() { Ok(()) } else { Err(issues) }
 }
 
 fn canonical_anchor_map(criterion: &RubricCriterionV1) -> Vec<(String, u32)> {
@@ -531,8 +531,10 @@ fn construct_result(
     let exact_measurement_spec_match = !left_measurement.is_empty()
         && left_measurement == right_measurement
         && left.len() == right.len();
-    let left_scales: Vec<Vec<(String, u32)>> = left.iter().map(|criterion| canonical_anchor_map(criterion)).collect();
-    let right_scales: Vec<Vec<(String, u32)>> = right.iter().map(|criterion| canonical_anchor_map(criterion)).collect();
+    let mut left_scales: Vec<Vec<(String, u32)>> = left.iter().map(|criterion| canonical_anchor_map(criterion)).collect();
+    let mut right_scales: Vec<Vec<(String, u32)>> = right.iter().map(|criterion| canonical_anchor_map(criterion)).collect();
+    left_scales.sort();
+    right_scales.sort();
     let normalized_scale_anchor_match = !left_scales.is_empty()
         && left_scales == right_scales
         && left.len() == right.len();
@@ -546,7 +548,7 @@ fn construct_result(
         && right_relations.iter().all(|relation| *relation == ConstructRelationV1::Equivalent);
 
     let mut reasons = Vec::new();
-    let mut status = if left.is_empty() || right.is_empty() {
+    let status = if left.is_empty() || right.is_empty() {
         reasons.push("one rubric has no criterion mapped to this construct".to_owned());
         ConstructCommensurabilityV1::Unmapped
     } else if left_relations.iter().any(|relation| *relation == ConstructRelationV1::Incompatible)
@@ -582,7 +584,6 @@ fn construct_result(
     if status == ConstructCommensurabilityV1::DirectlyCommensurable && reasons.is_empty() {
         reasons.push("criterion definitions, measurement specifications, normalized scale anchors, weights and anchor coverage match".to_owned());
     }
-    reasons.shrink_to_fit();
     ConstructCommensurabilityResultV1 {
         construct_id: construct.construct_id.clone(),
         status,
