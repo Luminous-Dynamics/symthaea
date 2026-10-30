@@ -87,6 +87,31 @@ class MetamorphicEvaluatorAuditTests(unittest.TestCase):
         failed = next(row for row in report["pair_results"] if row["pair_id"] == "invariance-format-001")
         self.assertTrue(any("score drift exceeded tolerance" in issue for issue in failed["failures"]))
 
+    def test_invariance_covers_selected_position_and_pairwise_outputs(self) -> None:
+        receipt = copy.deepcopy(self.receipt)
+        target = next(row for row in receipt["observations"] if row["pair_id"] == "invariance-format-001")
+        target["variant"]["selected_position"] = 1
+        target["baseline"]["pointwise_candidate_scores"] = [
+            {"candidate_id": "candidate-A", "score_millionths": 800_000},
+            {"candidate_id": "candidate-B", "score_millionths": 700_000},
+        ]
+        target["variant"]["pointwise_candidate_scores"] = [
+            {"candidate_id": "candidate-A", "score_millionths": 850_000},
+            {"candidate_id": "candidate-B", "score_millionths": 700_000},
+        ]
+        report = self.run_audit(receipt=receipt)
+        failed = next(row for row in report["pair_results"] if row["pair_id"] == "invariance-format-001")
+        self.assertFalse(failed["passed"])
+        self.assertTrue(any("position changed" in issue for issue in failed["failures"]))
+        self.assertTrue(any("pointwise candidate scores changed" in issue for issue in failed["failures"]))
+
+    def test_directional_relation_requires_declared_variant_decision(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        pair = next(row for row in plan["pairs"] if row["pair_id"] == "evidence-withdrawal-001")
+        pair["expected_variant_decision"] = None
+        with self.assertRaisesRegex(MetamorphicAuditError, "requires expected_variant_decision"):
+            self.run_audit(plan=plan)
+
     def test_evidence_addition_must_increase_support_and_affected_score(self) -> None:
         target = next(row for row in self.receipt["observations"] if row["pair_id"] == "evidence-addition-001")
         self.assertEqual(target["variant"]["decision"], "supported_within_scope")
