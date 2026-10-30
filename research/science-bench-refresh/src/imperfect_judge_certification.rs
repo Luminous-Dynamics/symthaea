@@ -236,7 +236,6 @@ pub struct CertificationReportFieldsV1 {
     pub plan_sha256: String,
     pub receipt_sha256: String,
     pub plan_commitment_sha256: String,
-    pub report_commitment_sha256_placeholder: Option<String>,
     pub overall_status: OverallCertificationStatusV1,
     pub target_failure_rate_millionths: u32,
     pub familywise_alpha_millionths: u32,
@@ -376,7 +375,9 @@ fn validate_plan_fields(fields: &CertificationPlanFieldsV1) -> Result<(), Vec<St
     }
 
     let mut all_ids = BTreeSet::new();
-    let mut cal_counts: BTreeMap<&str, (u32, u32)> = BTreeMap::new();
+    let mut cal_counts: BTreeMap<&str, (u32, u32)> = fields.strata.iter()
+        .map(|stratum| (stratum.task_family.as_str(), (0, 0)))
+        .collect();
     for item in &fields.calibration_items {
         if !nonempty(&item.item_id, 128) || !all_ids.insert(item.item_id.as_str()) {
             issues.push("calibration item IDs must be unique across all plan samples".to_owned());
@@ -396,7 +397,9 @@ fn validate_plan_fields(fields: &CertificationPlanFieldsV1) -> Result<(), Vec<St
         }
     }
 
-    let mut test_counts: BTreeMap<&str, u32> = BTreeMap::new();
+    let mut test_counts: BTreeMap<&str, u32> = fields.strata.iter()
+        .map(|stratum| (stratum.task_family.as_str(), 0))
+        .collect();
     for item in &fields.test_items {
         if !nonempty(&item.item_id, 128) || !all_ids.insert(item.item_id.as_str()) {
             issues.push("calibration and test item IDs must be globally unique and disjoint".to_owned());
@@ -449,18 +452,18 @@ pub fn verify_certification_plan(plan_bytes: &[u8]) -> Result<(CertificationPlan
 
 fn hoeffding_radius_millionths(n: u64, alpha: f64) -> u32 {
     let radius = (alpha.recip().ln() / (2.0 * n as f64)).sqrt();
-    (radius.mul_add(1_000_000.0, 0.999_999)).floor().clamp(0.0, 1_000_000.0) as u32
+    (radius.mul_add(1_000_000.0, 0.0).ceil() + 1.0).clamp(0.0, 1_000_000.0) as u32
 }
 
 fn lower_bound_millionths(successes: u64, total: u64, radius: u32) -> u32 {
     let estimate = successes as f64 / total as f64;
-    ((estimate * 1_000_000.0 - f64::from(radius)).floor())
+    ((estimate * 1_000_000.0 - f64::from(radius)).floor() - 1.0)
         .clamp(0.0, 1_000_000.0) as u32
 }
 
 fn upper_bound_millionths(successes: u64, total: u64, radius: u32) -> u32 {
     let estimate = successes as f64 / total as f64;
-    ((estimate * 1_000_000.0 + f64::from(radius)).ceil())
+    ((estimate * 1_000_000.0 + f64::from(radius)).ceil() + 1.0)
         .clamp(0.0, 1_000_000.0) as u32
 }
 
@@ -549,7 +552,7 @@ pub fn analyze_imperfect_judge_certification(
 
     let alpha = f64::from(plan.familywise_alpha_millionths) / 1_000_000.0;
     let alpha_per_bound = alpha / (3.0 * plan.strata.len() as f64);
-    let alpha_per_bound_millionths = (alpha_per_bound * 1_000_000.0).floor().max(1.0) as u32;
+    let alpha_per_bound_millionths = (alpha_per_bound * 1_000_000.0).ceil().max(1.0) as u32;
     let mut family_results = Vec::new();
 
     for stratum in &plan.strata {
@@ -663,7 +666,6 @@ pub fn analyze_imperfect_judge_certification(
         plan_sha256,
         receipt_sha256: sha256_hex(receipt_bytes),
         plan_commitment_sha256: plan.plan_commitment_sha256,
-        report_commitment_sha256_placeholder: None,
         overall_status: overall,
         target_failure_rate_millionths: plan.target_failure_rate_millionths,
         familywise_alpha_millionths: plan.familywise_alpha_millionths,
