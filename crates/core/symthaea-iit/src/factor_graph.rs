@@ -880,6 +880,60 @@ mod tests {
     }
 
     #[test]
+    fn log_sum_product_matches_probability_domain_on_moderate_chain() {
+        let probabilities = [
+            BinaryFactor::new(vec![0, 1], vec![0.9, 0.1, 0.2, 0.8]).unwrap(),
+            BinaryFactor::new(vec![1, 2], vec![0.7, 0.3, 0.4, 0.6]).unwrap(),
+        ];
+        let log_factors = probabilities
+            .iter()
+            .map(|factor| {
+                BinaryLogFactor::new(
+                    factor.variables.clone(),
+                    factor.values.iter().map(|value| value.ln()).collect(),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let probability_report = min_fill_sum_product(&probabilities, &[0, 1], 8).unwrap();
+        let log_report = min_fill_log_sum_product(&log_factors, &[0, 1], 8).unwrap();
+        assert_eq!(probability_report.factor.variables, log_report.factor.variables);
+        for (probability, log_probability) in probability_report
+            .factor
+            .values
+            .iter()
+            .copied()
+            .zip(log_report.factor.log_values.iter().copied())
+        {
+            close(probability, log_probability.exp());
+        }
+        assert_eq!(probability_report.elimination_order, log_report.elimination_order);
+        assert_eq!(probability_report.induced_width, log_report.induced_width);
+    }
+
+    #[test]
+    fn log_sum_product_preserves_products_below_probability_underflow() {
+        let factors = vec![
+            BinaryLogFactor::scalar(-1_000.0).unwrap(),
+            BinaryLogFactor::scalar(-1_000.0).unwrap(),
+            BinaryLogFactor::scalar(-1_000.0).unwrap(),
+        ];
+        let report = min_fill_log_sum_product(&factors, &[], 1).unwrap();
+        assert!(report.factor.variables.is_empty());
+        assert_eq!(report.factor.log_values, vec![-3_000.0]);
+        assert_eq!(report.factor.log_values[0].exp(), 0.0);
+    }
+
+    #[test]
+    fn log_sum_out_uses_stable_logsumexp_for_tiny_weights() {
+        let factor = BinaryLogFactor::new(vec![0], vec![-1_000.0, -1_001.0]).unwrap();
+        let report = min_fill_log_sum_product(&[factor], &[0], 2).unwrap();
+        let expected = -1_000.0 + (1.0 + (-1.0_f64).exp()).ln();
+        assert_eq!(report.factor.variables, Vec::<usize>::new());
+        assert!((report.factor.log_values[0] - expected).abs() <= 1e-12);
+    }
+
+    #[test]
     fn absent_elimination_variable_contributes_binary_sum_factor() {
         let factor = BinaryFactor::new(vec![0], vec![0.25, 0.75]).unwrap();
         let report = min_fill_sum_product(&[factor], &[1], 2).unwrap();
