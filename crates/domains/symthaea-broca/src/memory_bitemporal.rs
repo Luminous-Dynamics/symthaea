@@ -257,6 +257,10 @@ impl BitemporalSourceLedger {
         valid_at: NaiveDate,
         known_at: DateTime<Utc>,
     ) -> Result<BitemporalQueryResult, String> {
+        // Deserialization can construct values without going through append_batch.
+        // Refuse to answer from a malformed history rather than trusting callers
+        // to remember to invoke verify_consistency themselves.
+        self.verify_consistency()?;
         for (field, value) in [("subject", subject), ("attribute", attribute), ("scope", scope)] {
             non_empty(value, field)?;
         }
@@ -587,6 +591,29 @@ mod tests {
             SourceEventOperation::Assert { assertion: bounded })).unwrap();
         assert_eq!(query(&populated, "2026-01-15", "2026-02-01T00:00:00Z").status,
             BitemporalEvidenceStatus::OutsideValidity);
+    }
+
+    #[test]
+    fn query_rejects_invalid_deserialized_history() {
+        // Public Deserialize can bypass append-time checks; query must still fail closed.
+        let malformed = BitemporalSourceLedger {
+            events: vec![event(
+                "bad-retraction",
+                "2026-01-02T10:00:00Z",
+                SourceEventOperation::Retract {
+                    target_revision_id: "missing".into(),
+                    reason: "invalid history".into(),
+                },
+            )],
+        };
+        let result = malformed.query(
+            "account-17",
+            "plan",
+            "tenant-1",
+            date("2026-01-15"),
+            instant("2026-01-03T00:00:00Z"),
+        );
+        assert!(result.unwrap_err().contains("must precede its mutation"));
     }
 
     #[test]
