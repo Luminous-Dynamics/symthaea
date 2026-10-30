@@ -55,7 +55,7 @@ Use at least two independent observation/replay methods during qualification. Ex
 
 ## Scenario families covered
 
-The 33 cases cover:
+The 34 cases cover:
 
 - filesystem bytes, metadata-only reads, directory enumeration, symlink retargeting, mmap, namespace changes, ignored/untracked files and root escapes;
 - generated source, build scripts, procedural macros and host-side inputs;
@@ -66,6 +66,13 @@ The 33 cases cover:
 - irrelevant docs/source mutations and unsupported-channel disclosure.
 
 The machine-readable catalog is `benchmarks/basalt/coverage/observer-challenges.v1.json`; its strict Draft 2020-12 schema is `benchmarks/basalt/schema/observer-challenges.schema.json`.
+
+
+### Corpus correction discovered during result-adjudicator work
+
+The original catalog had two `preserve_unrelated` controls, but only one was paired with a `capture_dependency` control over the same resource. The structural auditor correctly requires every preservation case to have a reciprocal recall pair. The result-adjudicator branch adds `docs-consumed-positive-control`, paired with `irrelevant-docs-change`, so both preservation controls now have matched capture/preserve experiments.
+
+The catalog now contains **34 scenarios**: 20 capture-dependency, 7 unresolved, 5 receipt-invalidation and 2 preservation controls. This is a correction to the earlier 33-case count, not a claimed execution result. The corpus remains unexecuted and the profile remains unqualified.
 
 ## Linux mechanism selection: containment is not observation
 
@@ -141,7 +148,7 @@ Recommended staged gates (targets, not achieved results or external standards):
 4. **Efficiency gate:** demonstrate at least 30% less re-verification work than global rerun only after the safety gates pass, with no stale-evidence false accept and a paired task-level interval.
 5. **Promotion gate:** pin observer binary, kernel/profile, challenge corpus, oracle, runner, receipt format and expiry policy. Any material change to these inputs requires requalification.
 
-The 33 authored cases are a starting conformance corpus, not enough independent samples to establish a 0.1% miss rate.
+The 34 authored cases are a starting conformance corpus, not enough independent samples to establish a 0.1% miss rate.
 
 ## Required comparisons
 
@@ -195,7 +202,7 @@ Proposed stretch targets—not measured results or external standards:
 - at least +3 percentage points in paired shifted-task success against a strong matched baseline, or a statistically supported non-inferior success rate with materially lower cost;
 - no more than 5% false invalidation on independently proven unrelated-change controls, with channel-specific intervals and no silent unresolved outcomes.
 
-The 33-case catalog is conformance coverage, not a sufficiently large efficacy study. Split by repository/task lineage, keep an untouched confirmatory holdout, preregister intervention positions and stopping rules, and report exact paired intervals. Never compare a BASALT percentage directly to a SWE-Shift, SWE-Bench Pro or Artificial Analysis score unless the task, harness, retry policy, budget and evaluator are matched.
+The 34-case catalog is conformance coverage, not a sufficiently large efficacy study. Split by repository/task lineage, keep an untouched confirmatory holdout, preregister intervention positions and stopping rules, and report exact paired intervals. Never compare a BASALT percentage directly to a SWE-Shift, SWE-Bench Pro or Artificial Analysis score unless the task, harness, retry policy, budget and evaluator are matched.
 
 ## Runner-independent catalog auditor
 
@@ -214,4 +221,4 @@ Ten unit tests are authored alongside the module, including the checked-in corpu
 
 ## Current execution status
 
-This commit authors the schema, 33 challenge definitions and the qualification protocol only. The corpus has not been executed; no observer is qualified; no Rust build or test result is claimed. The next runtime milestone belongs to the Linux runner implementation and independently instrumented challenge harness tracked by #9210/#9239.
+This commit authors the schema, 34 challenge definitions and the qualification protocol only. The corpus has not been executed; no observer is qualified; no Rust build or test result is claimed. The next runtime milestone belongs to the Linux runner implementation and independently instrumented challenge harness tracked by #9210/#9239.
