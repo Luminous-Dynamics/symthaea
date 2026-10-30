@@ -266,6 +266,7 @@ pub struct PartitionEnumerationReport {
     /// Redundant raw labelings avoided by quotienting equal cut matrices.
     pub redundant_direction_assignments_pruned: usize,
     /// Number of unique non-total cut matrices emitted; equals the canonical count.
+    pub unique_non_total_cuts: usize,
     /// Whether the returned partition list includes the special TotalCut.
     pub total_cut_included: bool,
 }
