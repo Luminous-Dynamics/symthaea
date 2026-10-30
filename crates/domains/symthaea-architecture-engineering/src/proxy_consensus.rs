@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use super::nasbench201_trajectory::ProxyDirection;
 use super::tabular_nas_firewall::ArchitectureFeatures;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProxyConsensusConfig {
     pub target_metric_id: String,
     pub proxy_directions: BTreeMap<String, ProxyDirection>,
@@ -30,6 +30,7 @@ pub enum ProxyGateReason {
     SingleProxyNoAgreementTest,
     PassedAgreementThreshold,
     RejectedAntiCorrelation,
+    UndefinedAgreement,
     RetainedByMinimumFallback,
 }
 
@@ -143,7 +144,7 @@ pub fn build_proxy_consensus(
     let mut selected: BTreeSet<String> = raw_agreements
         .iter()
         .filter_map(|(proxy_id, alpha)| {
-            if alpha.is_none_or(|value| value >= config.anti_correlation_threshold) {
+            if alpha.is_some_and(|value| value >= config.anti_correlation_threshold) {
                 Some(proxy_id.clone())
             } else {
                 None
@@ -155,8 +156,8 @@ pub fn build_proxy_consensus(
     if selected.len() < required_minimum {
         let mut ordered = raw_agreements.clone();
         ordered.sort_by(|(left_id, left_alpha), (right_id, right_alpha)| {
-            let left_value = left_alpha.unwrap_or(1.0);
-            let right_value = right_alpha.unwrap_or(1.0);
+            let left_value = left_alpha.unwrap_or(-1.0);
+            let right_value = right_alpha.unwrap_or(-1.0);
             right_value
                 .total_cmp(&left_value)
                 .then_with(|| left_id.cmp(right_id))
@@ -175,10 +176,12 @@ pub fn build_proxy_consensus(
             let retained = selected.contains(proxy_id);
             let reason = if proxy_ids.len() == 1 {
                 ProxyGateReason::SingleProxyNoAgreementTest
-            } else if retained && alpha.is_some_and(|value| value < config.anti_correlation_threshold) {
-                ProxyGateReason::RetainedByMinimumFallback
-            } else if retained {
+            } else if retained && alpha.is_some_and(|value| value >= config.anti_correlation_threshold) {
                 ProxyGateReason::PassedAgreementThreshold
+            } else if retained {
+                ProxyGateReason::RetainedByMinimumFallback
+            } else if alpha.is_none() {
+                ProxyGateReason::UndefinedAgreement
             } else {
                 ProxyGateReason::RejectedAntiCorrelation
             };
@@ -363,6 +366,18 @@ fn validate_inputs(
                     "proxy value must be finite",
                 ));
             }
+            let Some(runtime) = feature.proxy_times_seconds.get(proxy_id) else {
+                return Err(ProxyConsensusError::new(
+                    format!("features[{index}].proxy_times_seconds"),
+                    format!("missing runtime for proxy {proxy_id:?}"),
+                ));
+            };
+            if !runtime.is_finite() || *runtime < 0.0 {
+                return Err(ProxyConsensusError::new(
+                    format!("features[{index}].proxy_times_seconds.{proxy_id}"),
+                    "proxy runtime must be finite and non-negative",
+                ));
+            }
         }
     }
     Ok(())
@@ -448,10 +463,12 @@ fn digest_feature_catalog(
     hasher.update((ordered.len() as u64).to_be_bytes());
     for feature in ordered {
         update_string(&mut hasher, &feature.architecture_id);
+        hasher.update((feature.topology_encoding.len() as u64).to_be_bytes());
+        hasher.update(&feature.topology_encoding);
         for proxy_id in config.proxy_directions.keys() {
             update_string(&mut hasher, proxy_id);
             hasher.update(feature.proxy_scores[proxy_id].to_bits().to_be_bytes());
-            let runtime = feature.proxy_times_seconds.get(proxy_id).copied().unwrap_or(0.0);
+            let runtime = feature.proxy_times_seconds[proxy_id];
             hasher.update(runtime.to_bits().to_be_bytes());
         }
     }
@@ -519,7 +536,8 @@ fn gate_reason_byte(reason: ProxyGateReason) -> u8 {
         ProxyGateReason::SingleProxyNoAgreementTest => 0,
         ProxyGateReason::PassedAgreementThreshold => 1,
         ProxyGateReason::RejectedAntiCorrelation => 2,
-        ProxyGateReason::RetainedByMinimumFallback => 3,
+        ProxyGateReason::UndefinedAgreement => 3,
+        ProxyGateReason::RetainedByMinimumFallback => 4,
     }
 }
 
@@ -553,7 +571,12 @@ mod tests {
                 ArchitectureFeatures {
                     architecture_id: format!("arch-{index}"),
                     proxy_scores: scores,
-                    proxy_times_seconds: BTreeMap::new(),
+                    proxy_times_seconds: BTreeMap::from([
+                        ("proxy_a".into(), 0.01),
+                        ("proxy_b".into(), 0.02),
+                        ("proxy_c".into(), 0.03),
+                        ("proxy_flip".into(), 0.04),
+                    ]),
                     topology_encoding: vec![0, 0, 0, 0, 0, (index % 5) as u8],
                 }
             })
@@ -601,6 +624,8 @@ mod tests {
         for (index, row) in rows.iter_mut().enumerate() {
             row.proxy_scores.retain(|key, _| key == "proxy_a");
             row.proxy_scores.insert("proxy_a".into(), index as f64);
+            row.proxy_times_seconds.retain(|key, _| key == "proxy_a");
+            row.proxy_times_seconds.insert("proxy_a".into(), 0.01);
         }
         let cfg = ProxyConsensusConfig {
             target_metric_id: "latency".into(),
@@ -617,6 +642,7 @@ mod tests {
         let mut rows = features();
         for row in &mut rows {
             row.proxy_scores.insert("p".into(), 1.0);
+            row.proxy_times_seconds.insert("p".into(), 0.01);
         }
         let mut directions = BTreeMap::new();
         directions.insert("p".into(), ProxyDirection::Maximize);
@@ -636,6 +662,8 @@ mod tests {
         for (index, row) in rows.iter_mut().enumerate() {
             row.proxy_scores.insert("anti_a".into(), (5 - index) as f64);
             row.proxy_scores.insert("anti_b".into(), (5 - index) as f64);
+            row.proxy_times_seconds.insert("anti_a".into(), 0.05);
+            row.proxy_times_seconds.insert("anti_b".into(), 0.06);
         }
         let mut directions = BTreeMap::new();
         for proxy in ["proxy_a", "proxy_b", "anti_a", "anti_b"] {
@@ -665,6 +693,26 @@ mod tests {
         changed[0].proxy_scores.insert("proxy_a".into(), 99.0);
         let other = build_proxy_consensus(&changed, &config()).unwrap();
         assert_ne!(first.feature_catalog_sha256, other.feature_catalog_sha256);
+    }
+
+    #[test]
+    fn undefined_constant_proxy_is_not_treated_as_a_positive_agreement() {
+        let mut rows = features();
+        for row in &mut rows {
+            row.proxy_scores.insert("constant".into(), 1.0);
+            row.proxy_times_seconds.insert("constant".into(), 0.01);
+        }
+        let mut cfg = config();
+        cfg.proxy_directions.insert("constant".into(), ProxyDirection::Maximize);
+        cfg.minimum_retained_proxies = 3;
+        let result = build_proxy_consensus(&rows, &cfg).unwrap();
+        let constant = result
+            .agreements
+            .iter()
+            .find(|agreement| agreement.proxy_id == "constant")
+            .unwrap();
+        assert_eq!(constant.reason, ProxyGateReason::UndefinedAgreement);
+        assert!(!constant.retained);
     }
 
     #[test]
