@@ -258,6 +258,7 @@ pub fn run(
     // A deterministic, machine-readable fixture plan is itself content-addressed.
     let plan_bytes = serde_json::to_vec(&json!({
         "catalog_digest": sha256_tagged(&catalog_bytes),
+        "git_baseline_commit": git_baseline_commit,
         "selected_case_ids": ordered_ids,
         "plans": plans.iter().map(|plan| json!({
             "case_id": plan.case_id,
