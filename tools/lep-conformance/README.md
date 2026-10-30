@@ -2,6 +2,10 @@
 
 This isolated Rust workspace validates the LEP v0.1 predicate embedded in an in-toto Statement v1. It exists as a focused tool so it can be built without bypassing the repository's unrelated root-workspace member-discovery problem.
 
+## Safe library entry point
+
+For untrusted serialized statements, call `verify_statement_bytes(&[u8])`. It performs the bounded strict parse (including duplicate-key rejection), schema validation, and semantic checks as one ordered operation. Avoid parsing untrusted input into `serde_json::Value` first and then calling `verify_statement`: a permissive parser may already have discarded duplicate object members. The parsed-value function remains available for callers that have independently established the strict parse boundary.
+
 ## Run locally
 
 From the repository root:
@@ -26,7 +30,7 @@ Repeat on controlled hardware and record the actual input size and exact commit;
 
 ## Validation performed
 
-The CLI performs a bounded streaming read (16 MiB maximum), then parses JSON with duplicate object keys rejected at every nesting level and serde_json's default recursion limit, then validates the predicate against the bundled JSON Schema Draft 2020-12 schema, with format assertions enabled and unknown formats rejected, then performs semantic validation. The schema uses only in-document references; no remote schema retrieval is required.
+The CLI and recommended byte-oriented library API enforce the same ordered boundary: bounded read/parse (16 MiB maximum, duplicate object keys rejected at every nesting level, serde_json recursion limit), JSON Schema Draft 2020-12 validation with format assertions enabled and unknown formats rejected, then semantic validation. The schema uses only in-document references; no remote schema retrieval is required.
 
 Semantic checks include:
 
