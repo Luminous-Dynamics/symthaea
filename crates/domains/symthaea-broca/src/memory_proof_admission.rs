@@ -16,7 +16,9 @@
 //! usable evidence. A caller must bind the lexical index snapshot to the same
 //! known_at coordinate as the request or this adapter refuses the batch.
 
-use crate::memory_evidence::{EvidenceLifecycle, LexicalEvidenceHit, MemoryContextType};
+use crate::memory_evidence::{
+    EvidenceIndexSnapshotReceipt, EvidenceLifecycle, LexicalEvidenceHit, MemoryContextType,
+};
 use crate::memory_proof_budget::{
     ProofBudgetRequest, ProofEvidenceCandidate,
 };
@@ -36,8 +38,8 @@ pub struct ProofCandidateAdmission {
     pub source_revision_id: String,
     pub source_family_id: String,
     pub scope_id: String,
-    /// Transaction-time snapshot represented by the lexical index used for retrieval.
-    pub index_snapshot_known_at_unix_ms: u64,
+    /// Digest of the exact EvidenceIndex state that produced this hit.
+    pub index_state_sha256: String,
     /// Transaction time when this immutable source revision was admitted.
     pub recorded_at_unix_ms: u64,
     /// Transaction time when this revision was retracted, if any.
@@ -78,7 +80,7 @@ pub fn admit_lexical_hits_for_proof_budget(
     mut request: ProofBudgetRequest,
     hits: &[LexicalEvidenceHit],
     admissions: &[ProofCandidateAdmission],
-    index_snapshot_known_at_unix_ms: u64,
+    snapshot: &EvidenceIndexSnapshotReceipt,
 ) -> Result<ProofBudgetRequest, String> {
     if !request.candidates.is_empty() {
         return Err("proof request candidates must be empty before lexical admission".into());
@@ -86,11 +88,18 @@ pub fn admit_lexical_hits_for_proof_budget(
     if hits.is_empty() {
         return Err("lexical retrieval returned no evidence candidates".into());
     }
-    if index_snapshot_known_at_unix_ms != request.known_at_unix_ms {
+    if snapshot.known_at_unix_ms != request.known_at_unix_ms {
         return Err(format!(
             "lexical index snapshot known_at {} does not match proof request known_at {}",
-            index_snapshot_known_at_unix_ms, request.known_at_unix_ms
+            snapshot.known_at_unix_ms, request.known_at_unix_ms
         ));
+    }
+    if snapshot.index_state_sha256.len() != 64
+        || !snapshot.index_state_sha256.bytes().all(|byte| {
+            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+        })
+    {
+        return Err("lexical index snapshot has a malformed state digest".into());
     }
 
     let mut admission_by_id = BTreeMap::<&str, &ProofCandidateAdmission>::new();
@@ -107,9 +116,9 @@ pub fn admit_lexical_hits_for_proof_budget(
                 admission.evidence_id
             ));
         }
-        if admission.index_snapshot_known_at_unix_ms != index_snapshot_known_at_unix_ms {
+        if admission.index_state_sha256 != snapshot.index_state_sha256 {
             return Err(format!(
-                "admission {:?} is bound to a different lexical snapshot",
+                "admission {:?} is bound to a different lexical index state",
                 admission.evidence_id
             ));
         }
@@ -297,7 +306,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory_evidence::{EvidenceSource, LexicalEvidenceHit, MemoryContextItem};
+    use crate::memory_evidence::{
+        EvidenceIndex, EvidenceIndexSnapshotReceipt, EvidenceLifecycle, EvidencePayload,
+        EvidenceRecord, EvidenceSource, LexicalEvidenceHit, MemoryContextItem, Bm25Config,
+    };
+    use std::path::Path;
     use crate::memory_proof_budget::{
         ProofBudgetStatus, ProofCandidateRejection, ProofJustification, ProofObligation,
         solve_proof_budget,
@@ -337,7 +350,7 @@ mod tests {
             source_revision_id: format!("revision-{id}"),
             source_family_id: format!("family-{id}"),
             scope_id: "scope-1".into(),
-            index_snapshot_known_at_unix_ms: 200,
+            index_state_sha256: digest("index state"),
             recorded_at_unix_ms: 100,
             retracted_at_unix_ms: None,
             valid_from_unix_ms: Some(50),
@@ -347,6 +360,13 @@ mod tests {
             authorization_receipt_sha256: digest("authorization receipt"),
             conflicts_with: BTreeSet::new(),
             token_cost: 5,
+        }
+    }
+
+    fn snapshot_receipt() -> EvidenceIndexSnapshotReceipt {
+        EvidenceIndexSnapshotReceipt {
+            known_at_unix_ms: 200,
+            index_state_sha256: digest("index state"),
         }
     }
 
@@ -385,7 +405,7 @@ mod tests {
             request(),
             &[hit("A", "verified evidence excerpt", 1.0)],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap();
 
         assert_eq!(proof_request.candidates.len(), 1);
@@ -407,7 +427,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0)],
             &[admission("A")],
-            199,
+            &EvidenceIndexSnapshotReceipt { known_at_unix_ms: 199, index_state_sha256: digest("index state") },
         ).unwrap_err();
         assert!(error.contains("snapshot known_at"));
     }
@@ -418,7 +438,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0)],
             &[],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(missing.contains("no trusted admission"));
 
