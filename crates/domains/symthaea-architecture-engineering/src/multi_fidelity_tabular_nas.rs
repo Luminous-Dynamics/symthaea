@@ -398,10 +398,9 @@ impl MultiFidelityTabularBenchmark {
             return Err(MultiFidelityFirewallError::new("base.top_k", "must be in min(100, architecture_count)..=architecture_count"));
         }
 
+        // Empty proxy maps are valid for target-free random/metadata-only baselines.
+        // Proxy-guided policies still need to declare and meter the proxy evidence they use.
         let proxy_keys: BTreeSet<String> = features[0].proxy_scores.keys().cloned().collect();
-        if proxy_keys.is_empty() {
-            return Err(MultiFidelityFirewallError::new("features[0].proxy_scores", "at least one proxy is required"));
-        }
         let mut allowed_ids = HashSet::with_capacity(features.len());
         let mut proxy_time_total_seconds = 0.0;
         for (index, feature) in features.iter().enumerate() {
@@ -1249,6 +1248,40 @@ mod tests {
         assert_eq!(run.evaluation.unique_architectures_touched, 0);
         assert_eq!(run.evaluation.touched_top_100.capture_rate, 0.0);
         assert_eq!(run.evaluation.final_top_100.capture_rate, 0.0);
+    }
+
+    #[test]
+    fn metadata_only_random_baseline_runs_without_any_proxy_columns() {
+        let metadata_only: Vec<ArchitectureFeatures> = (0..12)
+            .map(|index| ArchitectureFeatures {
+                architecture_id: format!("arch-{index:03}"),
+                proxy_scores: BTreeMap::new(),
+                proxy_times_seconds: BTreeMap::new(),
+                topology_encoding: vec![
+                    (index / 5) as u8,
+                    (index % 5) as u8,
+                    ((index / 25) % 5) as u8,
+                    0,
+                    0,
+                    0,
+                ],
+            })
+            .collect();
+        let mut m = manifest(FidelityCostModel::ResumablePrefix, 500);
+        m.base.max_unique_queries = 2;
+        let benchmark =
+            MultiFidelityTabularBenchmark::new(m, metadata_only, labels(12)).unwrap();
+        let run = benchmark
+            .run_successive_halving(
+                vec![
+                    "arch-000".into(),
+                    "arch-001".into(),
+                    "arch-002".into(),
+                    "arch-003".into(),
+                ],
+                &[4, 2, 2],
+            );
+        assert!(run.is_err()); // the ladder has three levels; schedule validation rejects two rungs
     }
 
     #[test]
