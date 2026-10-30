@@ -1,0 +1,59 @@
+name: CMAQ-012 paired prediction-advantage auditor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-012/**"
+      - ".github/workflows/cmaq-012.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-audit:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-012
+        run: cargo test --locked
+      - name: Audit paired fixture and validate report
+        working-directory: research/cmaq-012
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked -- fixtures/qualification.tsv > /tmp/cmaq-012-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-012-report.json").read_text())
+          assert report["schema_version"] == "cmaq-012-prediction-advantage-report-v0.1"
+          assert len(report["input_sha256"]) == 64
+          assert report["minimum_qualification_pairs"] == 20
+          assert report["bootstrap_replicates"] == 2000
+          assert report["slice_count"] == 1
+          slice_ = report["slices"][0]
+          assert slice_["task_id"] == "halfcheetah-v4"
+          assert slice_["capability"] == "hidden-dynamics"
+          assert slice_["split"] == "qualification"
+          assert slice_["n_pairs"] == 20
+          assert slice_["eligible"] is True
+          assert slice_["arms"]["D0"]["timeout"] == 1
+          assert slice_["arms"]["D0"]["complete"] == 19
+          assert slice_["contrasts"]["aop_w1_minus_d1"]["return"]["mean"] > 0.0
+          assert slice_["contrasts"]["prediction_mediation_w1_minus_w2"]["return"]["mean"] > 0.0
+          assert slice_["contrasts"]["oracle_gap_w3_minus_w1"]["return"]["mean"] > 0.0
+          assert slice_["contrasts"]["compute_only_d1_minus_d0"]["return"]["mean"] > 0.0
+          print("CMAQ-012 paired audit fixture validated; synthetic fixture only, not an environment result")
+          print(json.dumps(slice_["contrasts"], sort_keys=True))
+          PY
