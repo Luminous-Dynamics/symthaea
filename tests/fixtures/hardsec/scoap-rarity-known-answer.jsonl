@@ -1,0 +1,8 @@
+{"schema_version":"hardsec-scoap-manifest-v1","record_order":"design_id_then_node_id_ascending","dataset_id":"hardsec-009-fixture-v1","split_protocol":"per_design","alpha_milli":1000,"analyzer":{"name":"fixture-scoap-known-answer","version":"1.0.0","config_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sequential_cut_policy":"register_cut"},"designs":[{"design_id":"design-a","base_design_family_id":"family-a","split":"train","netlist_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"design_id":"design-b","base_design_family_id":"family-b","split":"validation","netlist_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},{"design_id":"design-c","base_design_family_id":"family-c","split":"test","netlist_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}]}
+{"design_id":"design-a","node_id":1,"metric_status":"measured","cc0":1,"cc1":2,"co":10,"label":"trigger"}
+{"design_id":"design-a","node_id":2,"metric_status":"measured","cc0":1,"cc1":1,"co":1,"label":"benign"}
+{"design_id":"design-a","node_id":3,"metric_status":"measured","cc0":2,"cc1":2,"co":0,"label":"payload"}
+{"design_id":"design-b","node_id":1,"metric_status":"measured","cc0":4,"cc1":3,"co":2,"label":"benign"}
+{"design_id":"design-b","node_id":2,"metric_status":"measured","cc0":3,"cc1":4,"co":1,"label":"trigger"}
+{"design_id":"design-c","node_id":1,"metric_status":"unknown","label":"unknown"}
+{"design_id":"design-c","node_id":2,"metric_status":"measured","cc0":0,"cc1":0,"co":0,"label":"benign"}

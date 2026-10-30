@@ -1,0 +1,133 @@
+name: HARDSEC SCOAP Rarity Audit
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "examples/hardsec_scoap_rarity_audit.rs"
+      - "schemas/hardsec-scoap-*.schema.json"
+      - "tests/fixtures/hardsec/scoap-rarity-known-answer.jsonl"
+      - "tools/hardsec-scoap-harness/**"
+      - ".github/workflows/hardsec-scoap-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-scoap-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: SCOAP rarity audit tests and known answer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install Rust 1.96 and rustfmt
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check source formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_scoap_rarity_audit.rs
+
+      - name: Verify pinned harness lockfile
+        run: |
+          set -euo pipefail
+          test "$(sha256sum tools/hardsec-scoap-harness/Cargo.lock | cut -d' ' -f1)" = "004dbdd71ac12e7446763de65ef083eb6f0a7888ed64cbbe3c3e107d0ce01c82"
+
+      - name: Run isolated Rust unit tests
+        run: cargo test --locked --manifest-path tools/hardsec-scoap-harness/Cargo.toml --features hardsec-scoap-audit --example hardsec_scoap_rarity_audit
+
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --requirement tools/hardsec-scoap-harness/requirements-validation.txt
+
+      - name: Validate fixture records against JSON Schema
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("schemas/hardsec-scoap-manifest-v1.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          validator = Draft202012Validator(schema)
+          fixture = Path("tests/fixtures/hardsec/scoap-rarity-known-answer.jsonl")
+          records = [json.loads(line) for line in fixture.read_text().splitlines()]
+          assert records
+          for index, record in enumerate(records, 1):
+              errors = list(validator.iter_errors(record))
+              if errors:
+                  raise SystemExit(f"JSONL record {index} failed schema: " + "; ".join(e.message for e in errors))
+          print(f"JSON Schema PASS: {len(records)} JSONL records")
+          PY
+
+      - name: Execute deterministic known-answer SCOAP audit
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hardsec-scoap"
+          cargo run --locked --manifest-path tools/hardsec-scoap-harness/Cargo.toml --features hardsec-scoap-audit --example hardsec_scoap_rarity_audit -- \
+            --manifest tests/fixtures/hardsec/scoap-rarity-known-answer.jsonl \
+            --ranking-output "$RUNNER_TEMP/hardsec-scoap/ranking.tsv" \
+            --receipt "$RUNNER_TEMP/hardsec-scoap/receipt.json"
+
+      - name: Validate exact ranking and receipt known answers
+        run: |
+          python3 - "$RUNNER_TEMP/hardsec-scoap/ranking.tsv" "$RUNNER_TEMP/hardsec-scoap/receipt.json" <<'PY'
+          import csv
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          ranking_path = Path(sys.argv[1])
+          receipt_path = Path(sys.argv[2])
+          rows = list(csv.DictReader(ranking_path.open(), delimiter="\t"))
+          assert rows[0]["design_id"] == "design-a"
+          assert rows[0]["node_id"] == "1"
+          assert rows[0]["scoap_score_milli"] == "12000"
+          assert rows[0]["rarity_percentile_bps"] == "8333"
+          assert all("label" not in row for row in rows)
+          design_c_node_1 = next(row for row in rows if row["design_id"] == "design-c" and row["node_id"] == "1")
+          assert design_c_node_1["scoap_score_milli"] == "unknown"
+
+          receipt = json.loads(receipt_path.read_text())
+          schema = json.loads(Path("schemas/hardsec-scoap-rarity-audit-receipt-v2.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("receipt schema failure: " + "; ".join(error.message for error in errors))
+
+          assert receipt["result"] == "pass"
+          assert receipt["design_count"] == 3
+          assert receipt["total_node_count"] == 7
+          assert receipt["total_unknown_metric_count"] == 1
+          assert receipt["source_integrity"]["status"] == "not_requested"
+          assert receipt["ranking_output"]["contains_labels"] is False
+
+          design_a = next(item for item in receipt["designs"] if item["design_id"] == "design-a")
+          top_one_percent = next(tail for tail in design_a["tails"] if tail["rarity_percentile_threshold_bps"] == 8000)
+          assert top_one_percent["trigger_total"] == 1
+          assert top_one_percent["trigger_selected"] == 1
+          assert top_one_percent["trigger_recall"] == 1.0
+          assert top_one_percent["payload_selected"] == 0
+
+          design_c = next(item for item in receipt["designs"] if item["design_id"] == "design-c")
+          assert design_c["unknown_metric_count"] == 1
+          assert design_c["measured_metric_count"] == 1
+          print("Known-answer PASS: label-free ranking, per-design percentile, unknown metric, and post-rank metrics")
+          PY
+
+      - name: Upload known-answer outputs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: hardsec-scoap-known-answer
+          path: ${{ runner.temp }}/hardsec-scoap/
+          if-no-files-found: ignore

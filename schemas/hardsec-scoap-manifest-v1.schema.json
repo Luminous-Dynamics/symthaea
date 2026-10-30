@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hardsec-scoap-manifest-v1.schema.json",
+  "title": "HARDSEC SCOAP JSONL record v1",
+  "description": "Validate one JSONL record. The first line is a header; subsequent lines are node metrics. Ordering and cross-record constraints are enforced by the Rust auditor.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/header"
+    },
+    {
+      "$ref": "#/$defs/node"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_order",
+        "dataset_id",
+        "split_protocol",
+        "alpha_milli",
+        "analyzer",
+        "designs"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "hardsec-scoap-manifest-v1"
+        },
+        "record_order": {
+          "const": "design_id_then_node_id_ascending"
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_protocol": {
+          "enum": [
+            "per_design",
+            "leave_one_design_out",
+            "leave_one_base_family_out"
+          ]
+        },
+        "alpha_milli": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 1000
+        },
+        "analyzer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "config_sha256",
+            "sequential_cut_policy"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "sequential_cut_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "designs": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "design_id",
+              "base_design_family_id",
+              "split",
+              "netlist_sha256"
+            ],
+            "properties": {
+              "design_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "base_design_family_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "split": {
+                "enum": [
+                  "train",
+                  "validation",
+                  "test"
+                ]
+              },
+              "netlist_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "netlist_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "node_id",
+        "metric_status",
+        "label"
+      ],
+      "properties": {
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metric_status": {
+          "enum": [
+            "measured",
+            "unknown"
+          ]
+        },
+        "cc0": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cc1": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "co": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "label": {
+          "enum": [
+            "trigger",
+            "payload",
+            "benign",
+            "unknown"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "metric_status": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "metric_status"
+            ]
+          },
+          "then": {
+            "required": [
+              "cc0",
+              "cc1",
+              "co"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "cc0"
+                  ]
+                },
+                {
+                  "required": [
+                    "cc1"
+                  ]
+                },
+                {
+                  "required": [
+                    "co"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
