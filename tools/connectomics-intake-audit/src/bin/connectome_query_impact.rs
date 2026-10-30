@@ -213,6 +213,11 @@ fn validate_input(input: &Input) -> Result<(), String> {
     if input.graph.is_empty() {
         return Err("graph must contain at least one edge".into());
     }
+    if input.queries.iter().any(|query| matches!(&query.metric, QueryMetric::TriadMotifCount { .. }))
+        && input.graph.len() > 4096
+    {
+        return Err("triad motif queries are limited to frozen subgraphs with at most 4096 directed edges in schema v1".into());
+    }
     if input.queries.is_empty() {
         return Err("queries must contain at least one declared scientific query".into());
     }
@@ -953,6 +958,24 @@ mod tests {
         assert_eq!(query_value(&graph, &metric), 12.0);
         let after = apply_candidate(&graph, &input.candidates[0]).unwrap();
         assert_eq!(query_value(&after, &metric), 0.0);
+    }
+
+    #[test]
+    fn rejects_oversized_subgraphs_for_triad_motif_queries() {
+        let mut input = fixture();
+        input.queries.push(Query {
+            query_id: "motif".into(),
+            weight: 1.0,
+            normalization_scale: 1.0,
+            reference_value: None,
+            metric: QueryMetric::TriadMotifCount { motif: TriadMotif::FeedForwardLoop },
+        });
+        input.graph = (0..4097).map(|index| Edge {
+            source: index * 2,
+            target: index * 2 + 1,
+            weight: 1.0,
+        }).collect();
+        assert!(validate_input(&input).unwrap_err().contains("4096"));
     }
 
 }
