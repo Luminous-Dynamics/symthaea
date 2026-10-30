@@ -217,18 +217,18 @@ fn compiled_lep_schema() -> Result<&'static jsonschema::Validator, SchemaInitFai
     static VALIDATOR: OnceLock<Result<jsonschema::Validator, SchemaInitFailure>> = OnceLock::new();
 
     match VALIDATOR.get_or_init(|| {
-        let schema: Value = serde_json::from_str(LEP_SCHEMA_JSON).map_err(|error| {
-            SchemaInitFailure {
+        let schema: Value =
+            serde_json::from_str(LEP_SCHEMA_JSON).map_err(|error| SchemaInitFailure {
                 code: "EMBEDDED_SCHEMA_INVALID_JSON",
                 message: format!("Bundled LEP schema is invalid JSON: {error}"),
-            }
-        })?;
+            })?;
 
         if !jsonschema::draft202012::meta::is_valid(&schema) {
             return Err(SchemaInitFailure {
                 code: "EMBEDDED_SCHEMA_INVALID",
-                message: "Bundled LEP schema does not validate against the Draft 2020-12 meta-schema."
-                    .to_owned(),
+                message:
+                    "Bundled LEP schema does not validate against the Draft 2020-12 meta-schema."
+                        .to_owned(),
             });
         }
 
@@ -1111,7 +1111,10 @@ mod tests {
         let suite: ConformanceSuite = serde_json::from_value(manifest_json)
             .expect("manifest must conform to the conformance-suite contract");
 
-        assert!(!suite.cases.is_empty(), "suite must define at least one case");
+        assert!(
+            !suite.cases.is_empty(),
+            "suite must define at least one case"
+        );
         for case in suite.cases {
             let case_path = fixture_dir.join(&case.file);
             let bytes = std::fs::read(&case_path)
@@ -1145,7 +1148,10 @@ mod tests {
 
             if let Some(mutation) = &case.mutation {
                 let target = statement.pointer_mut(&mutation.path).unwrap_or_else(|| {
-                    panic!("{}: mutation pointer {} does not exist", case.id, mutation.path)
+                    panic!(
+                        "{}: mutation pointer {} does not exist",
+                        case.id, mutation.path
+                    )
                 });
                 *target = mutation.value.clone();
             }
