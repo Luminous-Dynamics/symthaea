@@ -510,3 +510,18 @@ The certificate must explicitly distinguish observed evidence, design-based samp
 
 
 - Machine-readable certificate contract: [schema](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json) and [synthetic fixture](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json). The fixture is explicitly conditional and synthetic; it is not a biological certification.
+
+
+## Proposed Symthaea integration architecture
+
+Do not force one model to replace image segmentation, mesh decomposition, skeleton tracing, graph editing, and reviewer workflow. Compose specialist components behind a common evidence contract:
+
+1. **Specialist perception and reconstruction:** task-matched EM/VLM classifiers, geometry models, NEURD-compatible decomposition, RoboEM-like continuation, and source-specific segmentation tools. Each contributes typed evidence and versioned hypotheses.
+2. **Event-sourced evidence graph:** immutable source objects, transforms, candidate hypotheses, detector outputs, adjudication events, correction branches, and derived query values. Store provenance and dependency edges, not only final scores.
+3. **Symthaea cognitive orchestration:** test HDC for compositional association/retrieval across typed evidence and prior reviewed cases; test CfC/liquid state for temporal change tracking across revisions and proofreading trajectories. These are candidate architectural roles, not assumed advantages. Compare against conventional indices, explicit event sourcing, calibrated ensembles, and simpler temporal models on latency, memory, retrieval accuracy, calibration, and cost. Do not use an HDC/CfC claim as a substitute for EM/mesh baseline performance.
+4. **Independent assurance services:** keep design-based sampling, multiple-list sensitivity, and blinded adjudication outside generator/ranker information flow.
+5. **Counterfactual portfolio engine:** evaluate correction dependencies, joint utility and order effects on immutable graph snapshots.
+6. **Query-certificate verifier:** compute dependency closure, uncertainty components, quality gates, and automatic invalidation after dependent changes.
+7. **Human review interface:** adopt useful neuron-centric navigation patterns and log real interaction time, decisions, reversals, and cognitive load.
+
+No stage receives production write credentials. Only an accepted, independently validated correction may enter a reversible annotation branch. Every stage must have an independently tested contract and a kill condition.
