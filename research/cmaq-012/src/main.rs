@@ -220,7 +220,7 @@ fn make_episode_tape(scenario: Scenario, episode: usize) -> EpisodeTape {
         } else {
             (FAST_ACTION_HAZARD_REWARD, FAST_ACTION_SAFE_REWARD)
         };
-        let reward_fast = if hazard { fast_hazard } else { fast_safe }
+        let reward_fast = (if hazard { fast_hazard } else { fast_safe })
             + rng.centered(REWARD_NOISE);
         let reward_safe = conditional_safe_value(scenario)
             + rng.centered(REWARD_NOISE);
@@ -258,7 +258,6 @@ fn run_episode(
         let p_true = posterior_hazard(item.warning, item.sensitivity, item.specificity);
         let true_fast = conditional_fast_value(scenario, p_true);
         let true_safe = conditional_safe_value(scenario);
-        let true_prefers_fast = true_fast >= true_safe;
 
         let (action_fast, evaluated, predicted_fast, predicted_safe) = match policy {
             Policy::DirectController => (true, false, 0.0, 0.0),
@@ -307,10 +306,6 @@ fn run_episode(
 
         let chosen_value = if action_fast { true_fast } else { true_safe };
         conditional_regret += (true_fast.max(true_safe) - chosen_value).max(0.0);
-        if action_fast != true_prefers_fast {
-            // Count decisions that disagree with the exact observation-conditional
-            // action ranking. This is distinct from knowing the hidden state.
-        }
         if !action_fast {
             action_disagreement += 1.0;
         }
