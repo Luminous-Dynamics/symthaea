@@ -19,6 +19,8 @@ Changing effect topology may reduce some cross-channel effects coupling and ther
 - `render_midi_to_wav_with_effects_groups` provides a non-evidence convenience wrapper.
 - The exact `synth.effects-groups=N` setting is included in ordered command arguments, which the renderer process observation commits.
 - `effects_group_for_midi_channel` exposes the documented zero-based modulo assignment for channels 0–15.
+- `build_effects_group_assignment` produces a typed, domain-separated SHA-256 receipt for the complete 16-channel assignment. The exact assignment is included in the returned `FluidSynthRenderObservation`.
+- `verify_effects_group_assignment` rebuilds the assignment and rejects a mutated mapping or digest.
 - Invalid group counts and zero sample rates are rejected before child process execution.
 
 The channel→effects-group mapping only characterizes the synth effects assignment. It must not be emitted as a complete route graph by itself.
