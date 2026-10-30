@@ -560,7 +560,9 @@ mod tests {
     fn canonical_voi_adapter_selects_retrieve_more_for_bound_unresolved_claims() {
         let unresolved = BTreeSet::from(["C1".to_string()]);
         let estimate = estimate_for_claims(unresolved.clone());
-        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let (_, calibration) = calibration_receipt();
+        let value_decision =
+            evaluate_calibrated_retrieval_value(estimate, &calibration).unwrap();
         let request = lifecycle_request_for_missing_claims(&unresolved);
 
         let action = decide_lifecycle_action_with_voi(
@@ -571,6 +573,7 @@ mod tests {
                 known_at_unix_ms: 300,
                 index_state_sha256: digest("evidence index state"),
             },
+            &calibration,
         ).unwrap();
         assert_eq!(action.action, LifecycleAction::RetrieveMore);
         assert_eq!(
@@ -585,8 +588,9 @@ mod tests {
         let unresolved = BTreeSet::from(["C1".to_string()]);
         let mut estimate = estimate_for_claims(unresolved.clone());
         estimate.correctness_gain_lcb_micro = 1;
+        let (_, calibration) = calibration_receipt();
         estimate.lifecycle_risk_reduction_lcb_micro = 0;
-        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let value_decision = evaluate_calibrated_retrieval_value(estimate, &calibration).unwrap();
         let request = lifecycle_request_for_missing_claims(&unresolved);
 
         let action = decide_lifecycle_action_with_voi(
@@ -597,6 +601,7 @@ mod tests {
                 known_at_unix_ms: 300,
                 index_state_sha256: digest("evidence index state"),
             },
+            &calibration,
         ).unwrap();
         assert_eq!(action.action, LifecycleAction::Abstain);
         assert!(!action.retrieval.complete);
@@ -609,7 +614,9 @@ mod tests {
     fn canonical_voi_adapter_rejects_snapshot_known_at_mismatch() {
         let unresolved = BTreeSet::from(["C1".to_string()]);
         let estimate = estimate_for_claims(unresolved.clone());
-        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let (_, calibration) = calibration_receipt();
+        let value_decision =
+            evaluate_calibrated_retrieval_value(estimate, &calibration).unwrap();
         let request = lifecycle_request_for_missing_claims(&unresolved);
 
         let error = decide_lifecycle_action_with_voi(
@@ -620,6 +627,7 @@ mod tests {
                 known_at_unix_ms: 301,
                 index_state_sha256: digest("evidence index state"),
             },
+            &calibration,
         ).unwrap_err();
         assert!(error.contains("snapshot known_at"));
     }
@@ -628,7 +636,9 @@ mod tests {
     fn canonical_voi_adapter_rejects_changed_evidence_index_snapshot() {
         let unresolved = BTreeSet::from(["C1".to_string()]);
         let estimate = estimate_for_claims(unresolved.clone());
-        let value_decision = evaluate_retrieval_value(estimate).unwrap();
+        let (_, calibration) = calibration_receipt();
+        let value_decision =
+            evaluate_calibrated_retrieval_value(estimate, &calibration).unwrap();
         let request = lifecycle_request_for_missing_claims(&unresolved);
 
         let error = decide_lifecycle_action_with_voi(
@@ -639,6 +649,7 @@ mod tests {
                 known_at_unix_ms: 300,
                 index_state_sha256: digest("different evidence index"),
             },
+            &calibration,
         ).unwrap_err();
         assert!(error.contains("evidence-index snapshot mismatch"));
     }
