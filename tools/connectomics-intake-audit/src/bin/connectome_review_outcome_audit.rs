@@ -871,7 +871,8 @@ mod tests {
 
     #[test]
     fn conflicting_accepted_proposal_is_recorded_as_stale_not_applied() {
-        let proposals = proposals();
+        let mut proposals = proposals();
+        proposals.review_budgets_minutes = vec![4.0];
         let proposal_hash = sha256(&serde_json::to_vec(&proposals).unwrap());
         let ranking = FrozenRankingReport {
             schema_version: 1,
@@ -956,6 +957,7 @@ mod tests {
     fn indeterminate_adjudications_are_excluded_from_precision_denominators() {
         let mut proposals=proposals();
         proposals.candidates.truncate(1);
+        proposals.review_budgets_minutes=vec![2.0];
         let input_hash=sha256(&serde_json::to_vec(&proposals).unwrap());
         let ranking = FrozenRankingReport {
             schema_version:1,
