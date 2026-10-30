@@ -59,6 +59,8 @@ pub enum SyntheticEffect {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FactorialReferenceConfig {
+    /// Sample rate for all synthetic source and rendered frames.
+    pub sample_rate_hz: u32,
     /// Number of initial frames used for a single Hann-windowed magnitude spectrum.
     pub spectral_window_frames: usize,
 }
@@ -66,6 +68,7 @@ pub struct FactorialReferenceConfig {
 impl Default for FactorialReferenceConfig {
     fn default() -> Self {
         Self {
+            sample_rate_hz: 48_000,
             spectral_window_frames: 64,
         }
     }
@@ -232,6 +235,11 @@ fn validate_inputs(
     let frames = events[0].samples.len();
     if frames < 16 || frames > MAX_INPUT_FRAMES {
         return Err(FactorialReferenceError::InvalidFrameCount);
+    }
+    if config.sample_rate_hz == 0 || config.sample_rate_hz > 768_000 {
+        return Err(FactorialReferenceError::InvalidConfig(
+            "sample_rate_hz must be in 1..=768_000",
+        ));
     }
     if config.spectral_window_frames < 16
         || !config.spectral_window_frames.is_power_of_two()
