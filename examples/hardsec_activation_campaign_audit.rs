@@ -1225,6 +1225,42 @@ mod tests {
     }
 
     #[test]
+    fn rejects_paired_campaign_without_explicit_pair_ids() {
+        let mut value = fixture();
+        for trial in value["trials"].as_array_mut().unwrap() {
+            trial.as_object_mut().unwrap().remove("pair_id");
+        }
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("pair_id is required when inactive controls are present"));
+    }
+
+    #[test]
+    fn rejects_duplicate_or_unmatched_pair_identifiers() {
+        let mut value = fixture();
+        value["trials"][1]["pair_id"] = json!("pair-1");
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("pair_id must map exactly one active trial and one inactive_control trial"));
+    }
+
+    #[test]
+    fn reports_pairwise_control_discordance_by_explicit_pair_id() {
+        let mut value = fixture();
+        value["trials"][3]["trigger_status"] = json!("observed");
+        value["trials"][3]["trigger_cycle"] = json!(2);
+        value["trials"][3]["outcome_trace_sha256"] = json!(TRACE);
+        value["trials"][3]["payload_status"] = json!("observed");
+        value["trials"][3]["payload_cycle"] = json!(4);
+        value["trials"][3]["payload_witness_sha256"] = json!(WITNESS);
+        let campaign = parse_campaign(&value).unwrap();
+        let receipt = summarize(&campaign, "0".repeat(64));
+        assert_eq!(receipt["paired_inactive_control"]["paired_trial_count"], 3);
+        assert_eq!(receipt["paired_inactive_control"]["trigger_status_discordant_pairs"], 1);
+        assert_eq!(receipt["paired_inactive_control"]["payload_status_discordant_pairs"], 1);
+    }
+
+    #[test]
     fn rejects_unpaired_active_and_inactive_counts() {
         let mut value = fixture();
         value["trials"].as_array_mut().unwrap().pop();
