@@ -145,15 +145,6 @@ def validate_input(data: Any) -> dict[str, Any]:
     return value
 
 
-def _flatten_panel(items: list[dict[str, Any]], panel_name: str) -> list[float]:
-    return [
-        float(score)
-        for item in items
-        for rating in item[panel_name]
-        for score in rating["scores_millionths"]
-    ]
-
-
 def _std(values: list[float]) -> float | None:
     if not values:
         return None
@@ -464,8 +455,6 @@ def analyze_score_geometry(input_bytes: bytes) -> dict[str, Any]:
     items = data["items"]
     judge_matrix = _panel_mean_matrix(items, "judge_ratings")
     human_matrix = _panel_mean_matrix(items, "human_ratings")
-    judge_pooled = _flatten_panel(items, "judge_ratings")
-    human_pooled = _flatten_panel(items, "human_ratings")
     judge_std = _pooled_within_criterion_std(items, "judge_ratings")
     human_std = _pooled_within_criterion_std(items, "human_ratings")
     judge_panel_std = _within_criterion_std(judge_matrix)
@@ -512,8 +501,8 @@ def analyze_score_geometry(input_bytes: bytes) -> dict[str, Any]:
         family_judges = _panel_mean_matrix(rows, "judge_ratings")
         family_humans = _panel_mean_matrix(rows, "human_ratings")
         family_s = _ratio(
-            _std([value for row in family_judges for value in row]),
-            _std([value for row in family_humans for value in row]),
+            _within_criterion_std(family_judges),
+            _within_criterion_std(family_humans),
         )
         family_geometry = _matrix_geometry(family_judges, family_humans, config["jacobi_tolerance"])
         family_summaries.append({
@@ -531,6 +520,11 @@ def analyze_score_geometry(input_bytes: bytes) -> dict[str, Any]:
         "input_sha256": input_digest,
         "valid": True,
         "item_count": len(items),
+        "matched_item_count": len(items),
+        "judge_rater_count": len(_rater_maps(items, "judge_ratings")),
+        "human_rater_count": len(_rater_maps(items, "human_ratings")),
+        "judge_rating_observation_count": sum(len(item["judge_ratings"]) for item in items),
+        "human_rating_observation_count": sum(len(item["human_ratings"]) for item in items),
         "criterion_count": len(data["criterion_ids"]),
         "criterion_ids": data["criterion_ids"],
         "pairwise_agreement": pairwise,
