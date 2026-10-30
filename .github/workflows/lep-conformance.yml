@@ -45,14 +45,14 @@ jobs:
         run: cargo clippy --locked --manifest-path tools/lep-conformance/Cargo.toml --all-targets -- -D warnings
 
       - name: Accept valid illustrative statement
-        run: cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json
+        run: cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/valid-passed.json
 
       - name: Reject queued-but-passed statement for the expected invariant
         shell: bash
         run: |
           set -euo pipefail
           report="$(mktemp)"
-          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json >"$report"; then
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/invalid-queued-but-passed.json >"$report"; then
             echo "queued-but-passed fixture unexpectedly conformed" >&2
             cat "$report" >&2
             exit 1
@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           report="$(mktemp)"
-          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/invalid-missing-target.json >"$report"; then
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/invalid-missing-target.json >"$report"; then
             echo "missing-target fixture unexpectedly conformed" >&2
             cat "$report" >&2
             exit 1
@@ -76,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           report="$(mktemp)"
-          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/semantic-stale-target.json >"$report"; then
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/semantic-stale-target.json >"$report"; then
             echo "stale-target fixture unexpectedly conformed" >&2
             cat "$report" >&2
             exit 1
@@ -88,7 +88,7 @@ jobs:
         run: |
           set -euo pipefail
           report="$(mktemp)"
-          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml -- docs/research/fixtures/luminous-evidence-v0.1/invalid-duplicate-key.json >"$report"; then
+          if cargo run --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-conformance -- docs/research/fixtures/luminous-evidence-v0.1/invalid-duplicate-key.json >"$report"; then
             echo "duplicate-key fixture unexpectedly conformed" >&2
             cat "$report" >&2
             exit 1
