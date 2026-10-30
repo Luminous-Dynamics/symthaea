@@ -178,7 +178,8 @@
             "scope"
           ]
         }
-      ]
+      ],
+      "spec_byte_length": 100
     }
   ],
   "seed_policy": "fixed_paired",
