@@ -36,7 +36,6 @@ struct Input {
     dataset_id: String,
     dataset_revision_commit_sha: String,
     source_graph_sha256: String,
-    baseline_graph_canonical_sha256: String,
     query_bundle_sha256: String,
     graph: Vec<Edge>,
     queries: Vec<Query>,
@@ -73,7 +72,6 @@ enum QueryMetric {
 #[serde(deny_unknown_fields)]
 struct Candidate {
     candidate_id: String,
-    evidence_sha256: String,
     estimated_error_probability: f64,
     review_minutes: f64,
     evidence_sha256: String,
@@ -110,6 +108,7 @@ struct Report {
     dataset_id: String,
     dataset_revision_commit_sha: String,
     source_graph_sha256: String,
+    baseline_graph_canonical_sha256: String,
     query_bundle_sha256: String,
     graph_edge_count: usize,
     query_count: usize,
@@ -125,6 +124,7 @@ struct Report {
 struct CandidateEvaluation {
     rank: usize,
     candidate_id: String,
+    evidence_sha256: String,
     estimated_error_probability: f64,
     review_minutes: f64,
     weighted_query_impact: f64,
