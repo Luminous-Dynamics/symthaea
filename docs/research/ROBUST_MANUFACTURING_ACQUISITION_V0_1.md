@@ -13,6 +13,12 @@ The eligibility check is external and hard. A candidate is scored only after it 
 
 This is a **finite-set maximin EIG** baseline. It is not the full R-IDeA criterion, it does not prove robustness outside the declared scenario set, and it can be conservative when a low-probability scenario collapses the information gain.
 
+## Prior weighting and hypothesis multiplicity
+
+The selector now exposes a prior-weighted EIG primitive and weighted candidate / weighted finite-scenario selector variants. Callers can pass non-negative prior masses; the kernel normalizes them internally and ignores zero-mass hypotheses. This makes the acquisition score invariant to a representation-only duplication when the duplicated hypothesis's original probability is split across identical predictive instances.
+
+The API does not discover equivalence classes or estimate calibrated priors. Those must be defined and versioned outside the selector, using only evidence available before the held-out campaign. A uniform prior over raw hypothesis instances remains available as the compatibility baseline. See [PWR-MFG-PRIOR-001 #9183](https://github.com/Luminous-Dynamics/symthaea/issues/9183).
+
 ## Implementation
 
 `select_experiment_by_worst_case_information_gain_per_cost` in `symthaea-core` accepts:
@@ -68,7 +74,7 @@ These are proposed pilot thresholds, not industry norms or claimed results.
 
 ## Limitations and next steps
 
-The current EIG implementation still uses a uniform prior over hypothesis instances and independent Gaussian observation noise. The robustness envelope is a finite set, not an adversarial continuous model class. It does not model correlated metrology errors, Bayesian posterior weights over equivalence classes, inferential error distributions, representativeness weighting, or explicit error de-amplification.
+The compatibility EIG selectors still use a uniform prior over hypothesis instances; weighted variants are available, but prior calibration and equivalence-class construction remain caller-owned. All variants still assume independent Gaussian observation noise. The robustness envelope is a finite set, not an adversarial continuous model class. It does not model correlated metrology errors, Bayesian posterior weights over equivalence classes, inferential error distributions, representativeness weighting, or explicit error de-amplification.
 
 Next research steps:
 
@@ -83,5 +89,6 @@ Next research steps:
 
 Callahan & Catanach (AISTATS 2026) show that nominal Bayesian experiment utility can become harmful under model or inferential misspecification, and develop robust experimental-utility axioms. Tang, Sloman & Kaski (AISTATS 2026) develop R-IDeA, combining representativeness, informativeness and error de-amplification. This implementation is a deliberately narrower finite-set maximin comparator and should be benchmarked against those methods rather than described as equivalent.
 
+- Symthaea prior/equivalence-class follow-up: [PWR-MFG-PRIOR-001 #9183](https://github.com/Luminous-Dynamics/symthaea/issues/9183)
 - Callahan & Catanach (2026): https://proceedings.mlr.press/v300/callahan26a.html
 - Tang, Sloman & Kaski (2026): https://proceedings.mlr.press/v300/tang26d.html
