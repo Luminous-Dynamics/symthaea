@@ -416,11 +416,146 @@ impl VerifierReceipt {
         }
         Ok(())
     }
+    /// Canonical receipt payload with the signature omitted, for signing and verification.
+    pub fn signing_payload_bytes(&self) -> Result<Vec<u8>, AdaptiveBenchmarkError> {
+        let payload = VerifierReceiptSigningPayload {
+            schema: &self.schema,
+            version: &self.version,
+            task_packet_sha256: &self.task_packet_sha256,
+            solver_artifact_sha256: &self.solver_artifact_sha256,
+            environment_sha256: &self.environment_sha256,
+            verifier_profile_sha256: &self.verifier_profile_sha256,
+            evidence_bundle_sha256: &self.evidence_bundle_sha256,
+            signer_key_id: &self.signer_key_id,
+            stages: &self.stages,
+            wall_time_ms: self.wall_time_ms,
+            cpu_time_ms: self.cpu_time_ms,
+            peak_memory_bytes: self.peak_memory_bytes,
+            tool_calls: self.tool_calls,
+            candidate_executions: self.candidate_executions,
+        };
+        serde_json::to_vec(&payload)
+            .map_err(|e| AdaptiveBenchmarkError::new("receipt.signing_payload", e.to_string()))
+    }
+
+    /// Verify an Ed25519 signature and key validity against an independently managed registry.
+    pub fn verify_signature_at(
+        &self,
+        packet: &PublicTaskPacket,
+        registry: &TrustedVerifierKeyRegistry,
+        now_unix_ms: u64,
+    ) -> Result<(), AdaptiveBenchmarkError> {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+        self.validate_shape(packet)?;
+        registry.validate()?;
+        let key = registry.keys.get(&self.signer_key_id).ok_or_else(|| {
+            AdaptiveBenchmarkError::new("receipt.signer_key_id", "signer is not in the trusted registry")
+        })?;
+        if now_unix_ms < key.not_before_unix_ms
+            || key.not_after_unix_ms.is_some_and(|end| now_unix_ms > end)
+            || key.revoked_at_unix_ms.is_some_and(|revoked| now_unix_ms >= revoked)
+        {
+            return Err(AdaptiveBenchmarkError::new(
+                "receipt.signer_key_id",
+                "signing key is not valid at the supplied verification time",
+            ));
+        }
+
+        let public_key_bytes = decode_hex::<32>("trusted_key.public_key_hex", &key.public_key_hex)?;
+        let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
+            .map_err(|e| AdaptiveBenchmarkError::new("trusted_key.public_key_hex", e.to_string()))?;
+        let signature_bytes = decode_hex::<64>("receipt.signature_hex", &self.signature_hex)?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        let payload = self.signing_payload_bytes()?;
+        verifying_key
+            .verify(&payload, &signature)
+            .map_err(|_| AdaptiveBenchmarkError::new("receipt.signature", "Ed25519 verification failed"))
+    }
+
     pub fn digest(&self) -> Result<String, AdaptiveBenchmarkError> {
         let bytes = serde_json::to_vec(self)
             .map_err(|e| AdaptiveBenchmarkError::new("receipt", e.to_string()))?;
         Ok(domain_digest(RECEIPT_DOMAIN, &bytes))
     }
+}
+
+/// Fields covered by a verifier signature; signature_hex is deliberately excluded.
+#[derive(Serialize)]
+struct VerifierReceiptSigningPayload<'a> {
+    schema: &'a str,
+    version: &'a str,
+    task_packet_sha256: &'a str,
+    solver_artifact_sha256: &'a str,
+    environment_sha256: &'a str,
+    verifier_profile_sha256: &'a str,
+    evidence_bundle_sha256: &'a str,
+    signer_key_id: &'a str,
+    stages: &'a [StageEvidence],
+    wall_time_ms: u64,
+    cpu_time_ms: u64,
+    peak_memory_bytes: u64,
+    tool_calls: u64,
+    candidate_executions: u64,
+}
+
+/// One trusted verifier public key with explicit validity and revocation times.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustedVerifierKey {
+    pub key_id: String,
+    pub public_key_hex: String,
+    pub not_before_unix_ms: u64,
+    pub not_after_unix_ms: Option<u64>,
+    pub revoked_at_unix_ms: Option<u64>,
+}
+
+/// Pinned verifier key registry. The registry itself must be distributed through a trusted channel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustedVerifierKeyRegistry {
+    pub schema: String,
+    pub version: String,
+    pub keys: std::collections::BTreeMap<String, TrustedVerifierKey>,
+}
+
+impl TrustedVerifierKeyRegistry {
+    pub fn validate(&self) -> Result<(), AdaptiveBenchmarkError> {
+        if self.schema != "symthaea.adaptive-benchmark.trusted-verifier-keys"
+            || self.version != VERSION
+        {
+            return Err(AdaptiveBenchmarkError::new("key_registry.schema", "unsupported schema or version"));
+        }
+        for (map_key, key) in &self.keys {
+            if key.key_id.trim().is_empty() || map_key != &key.key_id {
+                return Err(AdaptiveBenchmarkError::new("key_registry.keys", "map key and key ID must match"));
+            }
+            decode_hex::<32>("trusted_key.public_key_hex", &key.public_key_hex)?;
+            if key.not_after_unix_ms.is_some_and(|end| end < key.not_before_unix_ms) {
+                return Err(AdaptiveBenchmarkError::new("trusted_key.validity", "not-after precedes not-before"));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn decode_hex<const N: usize>(
+    field: &str,
+    value: &str,
+) -> Result<[u8; N], AdaptiveBenchmarkError> {
+    if value.len() != N * 2 {
+        return Err(AdaptiveBenchmarkError::new(field, format!("expected {} lowercase hex characters", N * 2)));
+    }
+    let mut output = [0u8; N];
+    for (index, byte) in output.iter_mut().enumerate() {
+        let start = index * 2;
+        *byte = u8::from_str_radix(&value[start..start + 2], 16)
+            .map_err(|_| AdaptiveBenchmarkError::new(field, "invalid lowercase hex"))?;
+    }
+    if value.bytes().any(|b| b.is_ascii_uppercase()) {
+        return Err(AdaptiveBenchmarkError::new(field, "uppercase hex is not canonical"));
+    }
+    Ok(output)
 }
 
 fn normalize(field: &str, value: &str) -> Result<String, AdaptiveBenchmarkError> {
