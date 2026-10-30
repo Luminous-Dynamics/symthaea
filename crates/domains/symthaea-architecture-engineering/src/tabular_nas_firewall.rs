@@ -113,6 +113,8 @@ pub struct QueryReceipt {
     pub benchmark_id: String,
     pub metric_id: String,
     pub split_id: String,
+    pub proxy_calibration_split_id: String,
+    pub proxy_calibration_sha256: String,
     pub source_artifact_sha256: String,
     pub max_unique_queries: usize,
     pub unique_queries: usize,
@@ -461,6 +463,8 @@ impl TabularNasBenchmark {
             benchmark_id: self.manifest.benchmark_id.clone(),
             metric_id: self.manifest.metric_id.clone(),
             split_id: self.manifest.split_id.clone(),
+            proxy_calibration_split_id: self.manifest.proxy_calibration_split_id.clone(),
+            proxy_calibration_sha256: self.manifest.proxy_calibration_sha256.clone(),
             source_artifact_sha256: self.manifest.artifact_sha256.clone(),
             max_unique_queries: self.manifest.max_unique_queries,
             unique_queries: parts.queried_order.len(),
@@ -623,6 +627,8 @@ fn digest_query_trace(
     update_string(&mut hasher, &manifest.benchmark_id);
     update_string(&mut hasher, &manifest.metric_id);
     update_string(&mut hasher, &manifest.split_id);
+    update_string(&mut hasher, &manifest.proxy_calibration_split_id);
+    update_string(&mut hasher, &manifest.proxy_calibration_sha256);
     update_string(&mut hasher, &manifest.artifact_sha256);
     hasher.update((manifest.max_unique_queries as u64).to_be_bytes());
     hasher.update((queried_order.len() as u64).to_be_bytes());
@@ -880,6 +886,22 @@ mod tests {
     }
 
     #[test]
+    fn strict_no_oracle_manifest_requires_separate_calibration_split() {
+        let mut invalid = manifest();
+        invalid.proxy_calibration_split_id = invalid.split_id.clone();
+        assert!(TabularNasBenchmark::new(invalid, features(12), targets(12)).is_err());
+    }
+
+    #[test]
+    fn target_metric_cannot_be_smuggled_in_as_a_proxy_feature() {
+        let mut rows = features(12);
+        for row in &mut rows {
+            row.proxy_scores.insert("validation_accuracy".into(), 999.0);
+        }
+        assert!(TabularNasBenchmark::new(manifest(), rows, targets(12)).is_err());
+    }
+
+    #[test]
     fn duplicate_architecture_ids_and_proxy_schema_mismatch_are_rejected() {
         let mut duplicate = features(12);
         duplicate[1].architecture_id = duplicate[0].architecture_id.clone();
@@ -942,6 +964,8 @@ mod tests {
         assert_eq!(run.receipt.benchmark_id, "synthetic-nas-firewall-v0");
         assert_eq!(run.receipt.metric_id, "validation_accuracy");
         assert_eq!(run.receipt.split_id, "challenge-a");
+        assert_eq!(run.receipt.proxy_calibration_split_id, "development-b");
+        assert_eq!(run.receipt.proxy_calibration_sha256, "b".repeat(64));
         assert_eq!(run.receipt.source_artifact_sha256, "a".repeat(64));
         assert_eq!(run.receipt.attempts.len(), 1);
         assert_eq!(run.receipt.attempts[0].status, QueryAttemptStatus::Revealed);
