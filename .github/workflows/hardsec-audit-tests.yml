@@ -34,8 +34,23 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Resolve isolated harness dependencies
+        run: cargo generate-lockfile --manifest-path tools/hardsec-audit-harness/Cargo.toml
+
       - name: Test random-trigger sampling budget
-        run: cargo test --locked -p symthaea --no-default-features --example hardsec_trigger_budget
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --example hardsec_trigger_budget
 
       - name: Test claim-scoped evidence packet auditor
-        run: cargo test --locked -p symthaea --no-default-features --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+        run: cargo test --locked --manifest-path tools/hardsec-audit-harness/Cargo.toml --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
+
+      - name: Record resolved harness dependency lock
+        if: always()
+        run: sha256sum tools/hardsec-audit-harness/Cargo.lock || true
+
+      - name: Upload exact harness lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardsec-audit-harness-lock
+          path: tools/hardsec-audit-harness/Cargo.lock
+          if-no-files-found: ignore
