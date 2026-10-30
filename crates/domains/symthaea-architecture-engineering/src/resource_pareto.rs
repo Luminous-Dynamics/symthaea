@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const SCHEMA: &str = "symthaea.architecture-engineering.resource-pareto";
 const VERSION: &str = "0.1.0";
@@ -232,7 +232,7 @@ pub struct ResourceBudgetState {
     pub version: String,
     pub limits: ResourceLimits,
     pub consumed: ResourceLedger,
-    pub receipt_ids: BTreeSet<String>,
+    pub receipts: BTreeMap<String, ResourceActionReceipt>,
 }
 impl ResourceBudgetState {
     pub fn new(limits: ResourceLimits) -> Result<Self, ResourceParetoError> {
@@ -242,7 +242,7 @@ impl ResourceBudgetState {
             version: VERSION.to_owned(),
             limits,
             consumed: ResourceLedger::default(),
-            receipt_ids: BTreeSet::new(),
+            receipts: BTreeMap::new(),
         })
     }
     pub fn digest(&self) -> Result<String, ResourceParetoError> {
@@ -255,6 +255,21 @@ impl ResourceBudgetState {
             return Err(ResourceParetoError::new("budget_state.schema", "unsupported schema or version"));
         }
         self.limits.validate()?;
+        let mut reconstructed = ResourceLedger::default();
+        let mut seen_actions = BTreeSet::new();
+        for (receipt_id, receipt) in &self.receipts {
+            if receipt_id != &receipt.receipt_id {
+                return Err(ResourceParetoError::new("receipts", "map key and receipt ID disagree"));
+            }
+            receipt.validate_integrity()?;
+            if !seen_actions.insert(receipt.action_id.as_str()) {
+                return Err(ResourceParetoError::new("receipts", "multiple receipts bind the same action ID"));
+            }
+            reconstructed = add_measurements(&reconstructed, &receipt.measured)?;
+        }
+        if reconstructed != self.consumed {
+            return Err(ResourceParetoError::new("consumed", "resource ledger does not reconcile with complete receipts"));
+        }
         for (name, limit, consumed) in self.limit_ledger_pairs() {
             if let Some(limit) = limit {
                 let used = consumed.ok_or_else(|| ResourceParetoError::new(
@@ -293,12 +308,15 @@ impl ResourceBudgetState {
     pub fn record_receipt(&mut self, receipt: ResourceActionReceipt) -> Result<(), ResourceParetoError> {
         self.validate()?;
         receipt.validate_integrity()?;
-        if self.receipt_ids.contains(&receipt.receipt_id) {
+        if self.receipts.contains_key(&receipt.receipt_id) {
             return Err(ResourceParetoError::new("receipt.receipt_id", "duplicate receipt ID"));
+        }
+        if self.receipts.values().any(|existing| existing.action_id == receipt.action_id) {
+            return Err(ResourceParetoError::new("receipt.action_id", "action already has a resource receipt"));
         }
         self.check_upper_bound(&receipt.measured)?;
         let next = add_measurements(&self.consumed, &receipt.measured)?;
-        self.receipt_ids.insert(receipt.receipt_id);
+        self.receipts.insert(receipt.receipt_id.clone(), receipt);
         self.consumed = next;
         self.validate()
     }
@@ -617,7 +635,7 @@ mod tests {
         let second = ResourceActionReceipt::new("r2", "a2", amounts(501, 100, 100, 1000, 800)).unwrap();
         assert!(state.record_receipt(second).is_err());
         assert_eq!(state.consumed.wall_time_ms, Some(500));
-        assert_eq!(state.receipt_ids.len(), 1);
+        assert_eq!(state.receipts.len(), 1);
     }
 
     #[test]
@@ -641,6 +659,14 @@ mod tests {
         measured.energy_millijoules = None;
         state.record_receipt(ResourceActionReceipt::new("r1", "a1", measured).unwrap()).unwrap();
         assert_eq!(state.consumed.energy_millijoules, None);
+    }
+
+    #[test]
+    fn resource_ledger_must_reconcile_with_complete_receipts() {
+        let mut state = ResourceBudgetState::new(limits()).unwrap();
+        state.record_receipt(ResourceActionReceipt::new("r1", "a1", amounts(10, 20, 30, 40, 50)).unwrap()).unwrap();
+        state.consumed.wall_time_ms = Some(11);
+        assert!(state.validate().is_err());
     }
 
     #[test]
