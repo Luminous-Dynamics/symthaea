@@ -221,6 +221,14 @@ Root/neuron identifiers appearing across partitions are emitted as a dependence-
 
 This gate is a material improvement over a manifest-only validator, but it still does not independently resolve the Hugging Face `v2` branch to an immutable Hub commit, verify image-byte/Parquet row correspondence, or provide the hidden test lockbox. The exact V2 commit SHA and sidecar digests must be captured in the run manifest before model benchmarking. A clean audit is necessary, not sufficient, for a leakage-safe performance claim.
 
+### Counterfactual query-impact benchmark (prototype added)
+
+A correction is not equally valuable for every downstream scientific question. The next evaluation layer therefore freezes a weighted directed baseline graph and a declared bundle of scientific queries, then measures how each proposed graph mutation changes those query outputs. The new `connectome-query-impact` binary currently supports edge-weight, weighted in-degree, weighted out-degree, and directed path-existence queries; candidate proposals can add or remove edge weight. For candidate (c) and query (q), it calculates the normalized query delta `min(abs(Q_q(G ⊕ c) - Q_q(G)) / scale_q, 1)`, combines those deltas using preregistered query weights, and reports probability-weighted impact per review minute.
+
+This is intentionally a **counterfactual sensitivity measure**, not a truth score. A high value means a declared scientific query would change substantially if the proposed mutation were applied; it does not show that the proposed edit is correct, that the supplied error probability is calibrated, or that the chosen query bundle captures scientific importance. The CLI does not write corrections. Every candidate is marked `HUMAN_REVIEW_ONLY`. Candidates that touch the same baseline edge are flagged, since independent scores cannot be added when proposals interact. The current implementation does not yet simulate joint candidate sets, query uncertainty, mesh/skeleton morphology, motifs, path multiplicity, or measured after-review outcomes.
+
+A synthetic fixture and regression tests include a meaningful negative control: removing a direct edge changes its edge-weight query but does **not** change reachability because an alternate path remains. Another control confirms that candidates sharing an edge are detected. Next research gate: replace the synthetic graph with frozen query-relevant subgraphs and independent adjudicated corrections, then compare impact-per-minute ranking against error-probability-only, uncertainty-only, graph-centrality-only, random, and active-learning queues at matched expert-minute budgets. Require prospective review outcomes and paired, cluster-aware confidence intervals before making an efficiency claim.
+
 ### Comparator matrix
 
 1. **Published ConnectomeBench2 ViT baseline**, reproducing the pinned `v2` dataset, modality, and split protocol where possible.
