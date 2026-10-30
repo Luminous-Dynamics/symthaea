@@ -511,6 +511,14 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
             }
         }
 
+        if (trigger != Observation::Unknown || payload != Observation::Unknown)
+            && outcome_trace_sha256.is_none()
+        {
+            return Err(format!(
+                "trial {trial_id}: known trigger/payload outcomes require outcome_trace_sha256"
+            ));
+        }
+
         match payload {
             Observation::Observed => {
                 let cycle = payload_cycle.ok_or_else(|| {
@@ -1076,6 +1084,8 @@ mod tests {
         });
         if trigger == "observed" {
             item["trigger_cycle"] = json!(2);
+        }
+        if trigger != "unknown" || payload != "unknown" {
             item["outcome_trace_sha256"] = json!(TRACE);
         }
         if payload == "observed" {
@@ -1134,7 +1144,6 @@ mod tests {
     struct TempCampaign {
         base: PathBuf,
         campaign: PathBuf,
-        receipt_dir: PathBuf,
         receipt: PathBuf,
     }
 
@@ -1155,7 +1164,6 @@ mod tests {
             Self {
                 base,
                 campaign,
-                receipt_dir,
                 receipt,
             }
         }
@@ -1385,6 +1393,15 @@ mod tests {
         assert!(parse_campaign(&value)
             .unwrap_err()
             .contains("non-observed trigger must not include trigger_witness_sha256"));
+    }
+
+    #[test]
+    fn rejects_known_negative_outcome_without_trace_digest() {
+        let mut value = fixture();
+        value["trials"][1].as_object_mut().unwrap().remove("outcome_trace_sha256");
+        assert!(parse_campaign(&value)
+            .unwrap_err()
+            .contains("known trigger/payload outcomes require outcome_trace_sha256"));
     }
 
     #[test]
