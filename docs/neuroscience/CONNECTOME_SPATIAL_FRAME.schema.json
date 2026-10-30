@@ -105,7 +105,8 @@
       "required": [
         "artifact_id",
         "artifact_sha256",
-        "selection_rule_sha256"
+        "selection_rule_sha256",
+        "encoding"
       ],
       "properties": {
         "artifact_id": {
@@ -119,6 +120,12 @@
         "selection_rule_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "encoding": {
+          "enum": [
+            "packed_bitset_lsb0_x_fastest_v1",
+            "hex_bitset_lsb0_x_fastest_v1"
+          ]
         }
       }
     },
