@@ -1,0 +1,549 @@
+{
+  "format_version": 1,
+  "suite_id": "basalt-observer-challenges-v1",
+  "profile_id": "linux-hermetic-candidate-v1",
+  "profile_status": "candidate_not_qualified",
+  "execution_status": "not_executed",
+  "scoped_claim": "Candidate profile for qualification only. No global dependency-completeness claim is permitted. Every unsupported, lossy, out-of-scope or nondeterministic input channel must be reported unresolved or invalidate the receipt.",
+  "oracle_policy": {
+    "ground_truth_source": "challenge_harness_injected_resources_and_independently_checked_mutation_pairs",
+    "observer_under_test_must_not_author_the_oracle": true,
+    "independent_replay_required_for_confirmatory_use": true,
+    "score_unit": "independent_task_scenario",
+    "repeated_events_are_not_independent_samples": true
+  },
+  "expected_dispositions": [
+    "capture_dependency",
+    "report_unresolved",
+    "invalidate_receipt",
+    "preserve_unrelated"
+  ],
+  "cases": [
+    {
+      "case_id": "fs-content-read",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "read_content",
+      "ground_truth_resource_id": "fixture:payload.bin",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "read_event"
+      ],
+      "paired_case_ids": [],
+      "description": "Read a fixture file whose bytes influence the verifier result; mutate the bytes between matched continuations.",
+      "safety_property": "A successful capture must bind the exact file identity and content digest."
+    },
+    {
+      "case_id": "fs-metadata-only",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "read_metadata",
+      "ground_truth_resource_id": "fixture:mode.txt",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "metadata_digest",
+        "metadata_read_event"
+      ],
+      "paired_case_ids": [],
+      "description": "The fixture reads only a mode/metadata value and branches on it; mutate that metadata without changing file contents.",
+      "safety_property": "Content-only tracing is insufficient for metadata-dependent behavior."
+    },
+    {
+      "case_id": "fs-directory-enumeration",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "directory_membership",
+      "ground_truth_resource_id": "fixture:plugins/",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "directory_identity",
+        "sorted_membership_digest",
+        "enumeration_event"
+      ],
+      "paired_case_ids": [],
+      "description": "The fixture enumerates a directory and its result changes when a new entry appears.",
+      "safety_property": "Directory membership is an input, not merely the contents of files previously known."
+    },
+    {
+      "case_id": "fs-symlink-retarget",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "symlink_target",
+      "ground_truth_resource_id": "fixture:current-config",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "link_identity",
+        "resolved_target_identity",
+        "target_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "The fixture follows a symlink; retarget it between matched continuations while preserving the old target bytes.",
+      "safety_property": "The receipt must bind link resolution, not only the previously resolved file."
+    },
+    {
+      "case_id": "fs-mmap-read",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "mmap_bytes",
+      "ground_truth_resource_id": "fixture:mapped-table.bin",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "mapping_observation"
+      ],
+      "paired_case_ids": [],
+      "description": "The fixture reads relevant bytes through a memory mapping rather than an ordinary read call.",
+      "safety_property": "A file-read-only hook cannot claim coverage when mmap is unsupported."
+    },
+    {
+      "case_id": "fs-namespace-mutation",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "rename_delete_create",
+      "ground_truth_resource_id": "fixture:generated-index/",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "path_identity",
+        "namespace_change",
+        "tree_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "Create, rename and delete entries that affect a later directory lookup.",
+      "safety_property": "Namespace transitions must be reflected in the dependency state."
+    },
+    {
+      "case_id": "fs-ignored-untracked-read",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "untracked_read",
+      "ground_truth_resource_id": "fixture:ignored/hidden-input.txt",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "untracked_classification"
+      ],
+      "paired_case_ids": [],
+      "description": "Read an ignored, untracked file that changes the program's output.",
+      "safety_property": "Git status and tracked-file manifests are not complete dependency observers."
+    },
+    {
+      "case_id": "fs-outside-root-read",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "root_escape",
+      "ground_truth_resource_id": "external:/tmp/hidden-input.txt",
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "access_path_classification"
+      ],
+      "paired_case_ids": [],
+      "description": "Attempt a read outside the declared workspace and admitted immutable toolchain roots.",
+      "safety_property": "The profile must deny the access or explicitly mark coverage incomplete; it must not claim complete."
+    },
+    {
+      "case_id": "generated-source-input",
+      "family": "generated_artifact",
+      "channel": "generated_artifact",
+      "mutation_kind": "generated_source",
+      "ground_truth_resource_id": "fixture:generated/schema.rs",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "generator_identity",
+        "generator_input_digest",
+        "generated_artifact_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "Generate source from a schema and then compile against the generated output.",
+      "safety_property": "Generated source must be linked to both generator inputs and output bytes."
+    },
+    {
+      "case_id": "cargo-build-script-input",
+      "family": "generated_artifact",
+      "channel": "process",
+      "mutation_kind": "build_script_input",
+      "ground_truth_resource_id": "fixture:build.rs-input.txt",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "process_lineage",
+        "argv_cwd",
+        "resource_identity",
+        "content_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "A Rust build script reads a file not referenced by the consuming crate's source modules.",
+      "safety_property": "Build-script dependency output must be reconciled with observed reads."
+    },
+    {
+      "case_id": "proc-macro-host-input",
+      "family": "toolchain",
+      "channel": "process",
+      "mutation_kind": "proc_macro_input",
+      "ground_truth_resource_id": "fixture:macro-host-config.json",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "process_lineage",
+        "toolchain_digest",
+        "resource_identity",
+        "content_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "A procedural macro reads a host-side configuration file while compiling a target crate.",
+      "safety_property": "Host-side execution is still part of the evidence-producing computation."
+    },
+    {
+      "case_id": "rustflags-environment",
+      "family": "environment",
+      "channel": "environment",
+      "mutation_kind": "env_value",
+      "ground_truth_resource_id": "env:RUSTFLAGS",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "environment_binding",
+        "value_commitment",
+        "toolchain_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "Change RUSTFLAGS between paired builds without changing repository files.",
+      "safety_property": "Sensitive values may be committed or classified without disclosing them."
+    },
+    {
+      "case_id": "child-process-environment",
+      "family": "process",
+      "channel": "process",
+      "mutation_kind": "child_env",
+      "ground_truth_resource_id": "env:CHILD_MODE",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "process_lineage",
+        "executable_identity",
+        "environment_binding"
+      ],
+      "paired_case_ids": [],
+      "description": "A child process receives an environment variable that changes its output.",
+      "safety_property": "Capturing only the parent process environment is insufficient."
+    },
+    {
+      "case_id": "inherited-file-descriptor",
+      "family": "process",
+      "channel": "process",
+      "mutation_kind": "inherited_fd",
+      "ground_truth_resource_id": "fd:preopened-fixture",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "inherited_fd_provenance",
+        "resource_identity",
+        "content_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "A process consumes a file descriptor opened before the observer begins recording.",
+      "safety_property": "If descriptor provenance cannot be recovered, coverage must become unresolved."
+    },
+    {
+      "case_id": "invocation-context",
+      "family": "process",
+      "channel": "process",
+      "mutation_kind": "invocation_metadata",
+      "ground_truth_resource_id": "invocation:argv-cwd-umask",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "argv_cwd",
+        "process_lineage",
+        "invocation_identity"
+      ],
+      "paired_case_ids": [],
+      "description": "Change argv, current working directory or umask where the verifier's behavior depends on it.",
+      "safety_property": "Execution identity is an input even when no repository file changes."
+    },
+    {
+      "case_id": "dynamic-library-load",
+      "family": "toolchain",
+      "channel": "process",
+      "mutation_kind": "dynamic_library",
+      "ground_truth_resource_id": "toolchain:libfixture.so",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "executable_identity",
+        "loaded_object_digest",
+        "process_lineage"
+      ],
+      "paired_case_ids": [],
+      "description": "Load a shared object dynamically after process startup and call behavior from it.",
+      "safety_property": "Startup-only executable pinning misses late-loaded code."
+    },
+    {
+      "case_id": "clock-and-randomness",
+      "family": "environment",
+      "channel": "environment",
+      "mutation_kind": "nondeterministic_source",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "virtualization_status"
+      ],
+      "paired_case_ids": [],
+      "description": "Read wall clock or uncontrolled randomness where it changes the evidence result.",
+      "safety_property": "The runner must virtualize and pin the source or declare the evidence non-reproducible."
+    },
+    {
+      "case_id": "procfs-sysfs-input",
+      "family": "environment",
+      "channel": "filesystem",
+      "mutation_kind": "pseudo_filesystem_read",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "mount_identity"
+      ],
+      "paired_case_ids": [],
+      "description": "Read a mutable procfs or sysfs value outside the admitted immutable closure.",
+      "safety_property": "Unsupported pseudo-filesystem channels cannot be silently folded into complete coverage."
+    },
+    {
+      "case_id": "toolchain-sysroot-change",
+      "family": "toolchain",
+      "channel": "toolchain",
+      "mutation_kind": "toolchain_closure",
+      "ground_truth_resource_id": "toolchain:rust-sysroot",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "toolchain_digest",
+        "closure_identity",
+        "target_configuration"
+      ],
+      "paired_case_ids": [],
+      "description": "Change a compiler, linker, sysroot or target configuration dependency.",
+      "safety_property": "The toolchain identity must cover the actual executable closure, not just a version string."
+    },
+    {
+      "case_id": "cargo-nix-resolution",
+      "family": "toolchain",
+      "channel": "toolchain",
+      "mutation_kind": "dependency_resolution",
+      "ground_truth_resource_id": "toolchain:dependency-closure",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "lockfile_digest",
+        "config_digest",
+        "closure_identity",
+        "feature_resolution"
+      ],
+      "paired_case_ids": [],
+      "description": "Change Cargo.lock, Cargo config, Nix derivation inputs or resolved feature set.",
+      "safety_property": "A package name/version label alone is not an immutable dependency identity."
+    },
+    {
+      "case_id": "build-cache-provenance",
+      "family": "cache",
+      "channel": "cache",
+      "mutation_kind": "cache_hit",
+      "ground_truth_resource_id": "cache:artifact-001",
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "cache_entry_identity",
+        "artifact_digest",
+        "cache_producer_provenance"
+      ],
+      "paired_case_ids": [],
+      "description": "Consume a build-cache hit whose producer and immutable content identity cannot be established.",
+      "safety_property": "An opaque cache hit cannot support a complete receipt."
+    },
+    {
+      "case_id": "dns-mutable-resolution",
+      "family": "network",
+      "channel": "network",
+      "mutation_kind": "network_dns",
+      "ground_truth_resource_id": "network:fixture.invalid",
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "network_policy",
+        "resolution_observation"
+      ],
+      "paired_case_ids": [],
+      "description": "Resolve a mutable hostname where the selected endpoint affects the evidence result.",
+      "safety_property": "A hostname alone does not identify a stable external dependency."
+    },
+    {
+      "case_id": "http-response-artifact",
+      "family": "network",
+      "channel": "network",
+      "mutation_kind": "network_artifact",
+      "ground_truth_resource_id": "network:response-fixture-001",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "network_policy",
+        "endpoint_identity",
+        "protocol",
+        "response_artifact_digest"
+      ],
+      "paired_case_ids": [],
+      "description": "Fetch a response, preserve its bytes as an immutable artifact, and consume that artifact offline.",
+      "safety_property": "The evidence must bind the captured response bytes, not merely a URL."
+    },
+    {
+      "case_id": "mutable-package-registry",
+      "family": "network",
+      "channel": "network",
+      "mutation_kind": "registry_artifact",
+      "ground_truth_resource_id": "network:registry-package",
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "registry_identity",
+        "resolution_observation"
+      ],
+      "paired_case_ids": [],
+      "description": "Resolve a package from a mutable registry without a digest-pinned archived artifact.",
+      "safety_property": "The same name and version can still resolve to changed bytes."
+    },
+    {
+      "case_id": "observer-buffer-overflow",
+      "family": "observer_integrity",
+      "channel": "observer_integrity",
+      "mutation_kind": "event_overflow",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "invalidate_receipt",
+      "required_receipt_facts": [
+        "drop_counter",
+        "overflow_status",
+        "receipt_integrity"
+      ],
+      "paired_case_ids": [],
+      "description": "Force the observer event buffer to overflow during a scored run.",
+      "safety_property": "Any dropped or unaccounted-for event invalidates completeness."
+    },
+    {
+      "case_id": "observer-restart",
+      "family": "observer_integrity",
+      "channel": "observer_integrity",
+      "mutation_kind": "observer_restart",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "invalidate_receipt",
+      "required_receipt_facts": [
+        "observer_lifecycle",
+        "capture_interval",
+        "receipt_integrity"
+      ],
+      "paired_case_ids": [],
+      "description": "Terminate and restart the observer during an evidence-producing process tree.",
+      "safety_property": "An unproven observation gap cannot be reported as complete."
+    },
+    {
+      "case_id": "unmonitored-child-process",
+      "family": "observer_integrity",
+      "channel": "process",
+      "mutation_kind": "unmonitored_child",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "invalidate_receipt",
+      "required_receipt_facts": [
+        "process_lineage",
+        "supervision_status",
+        "receipt_integrity"
+      ],
+      "paired_case_ids": [],
+      "description": "Spawn a child outside the monitored process boundary or process namespace.",
+      "safety_property": "Unobserved descendants must fail closed or force unresolved status."
+    },
+    {
+      "case_id": "concurrent-hash-mutation",
+      "family": "snapshot_consistency",
+      "channel": "filesystem",
+      "mutation_kind": "concurrent_hash_mutation",
+      "ground_truth_resource_id": "fixture:race-input.bin",
+      "expected_disposition": "invalidate_receipt",
+      "required_receipt_facts": [
+        "stable_handle_identity",
+        "snapshot_consistency",
+        "receipt_integrity"
+      ],
+      "paired_case_ids": [],
+      "description": "Mutate a file while the observer is hashing it, or between digesting and the check's read.",
+      "safety_property": "A TOCTOU race must not produce a falsely consistent snapshot."
+    },
+    {
+      "case_id": "workspace-symlink-escape",
+      "family": "observer_integrity",
+      "channel": "filesystem",
+      "mutation_kind": "root_escape",
+      "ground_truth_resource_id": "external:/etc/hosts",
+      "expected_disposition": "invalidate_receipt",
+      "required_receipt_facts": [
+        "root_boundary",
+        "resolved_target_identity",
+        "receipt_integrity"
+      ],
+      "paired_case_ids": [],
+      "description": "Replace a workspace symlink with one that escapes the admitted root during execution.",
+      "safety_property": "A path string beneath the root is not proof that its resolved target remains beneath the root."
+    },
+    {
+      "case_id": "hidden-untracked-read",
+      "family": "filesystem",
+      "channel": "filesystem",
+      "mutation_kind": "untracked_read",
+      "ground_truth_resource_id": "fixture:unlisted-secret.txt",
+      "expected_disposition": "capture_dependency",
+      "required_receipt_facts": [
+        "resource_identity",
+        "content_digest",
+        "untracked_classification"
+      ],
+      "paired_case_ids": [],
+      "description": "Inject a deliberately untracked but in-root file read that changes a matched task outcome.",
+      "safety_property": "This is a mandatory positive control against manifest-only dependency capture."
+    },
+    {
+      "case_id": "irrelevant-docs-change",
+      "family": "positive_control",
+      "channel": "filesystem",
+      "mutation_kind": "irrelevant_mutation",
+      "ground_truth_resource_id": "fixture:docs/unused.md",
+      "expected_disposition": "preserve_unrelated",
+      "required_receipt_facts": [
+        "mutation_identity",
+        "non_dependency_witness"
+      ],
+      "paired_case_ids": [],
+      "description": "Change a docs-only file that the check demonstrably never reads or depends on.",
+      "safety_property": "A selective observer should preserve independent evidence rather than globally invalidate everything."
+    },
+    {
+      "case_id": "unused-neighbor-change",
+      "family": "positive_control",
+      "channel": "filesystem",
+      "mutation_kind": "irrelevant_mutation",
+      "ground_truth_resource_id": "fixture:src/unused-neighbor.rs",
+      "expected_disposition": "preserve_unrelated",
+      "required_receipt_facts": [
+        "mutation_identity",
+        "non_dependency_witness"
+      ],
+      "paired_case_ids": [],
+      "description": "Change an adjacent source file that is neither read nor semantically used by this check.",
+      "safety_property": "This is a precision control; directory enumeration would change the classification if the check enumerates that directory."
+    },
+    {
+      "case_id": "unresolved-channel-not-hidden",
+      "family": "positive_control",
+      "channel": "observer_integrity",
+      "mutation_kind": "unsupported_channel",
+      "ground_truth_resource_id": null,
+      "expected_disposition": "report_unresolved",
+      "required_receipt_facts": [
+        "unresolved_channel",
+        "coverage_scope"
+      ],
+      "paired_case_ids": [],
+      "description": "Run the profile with one deliberately unsupported observation channel enabled.",
+      "safety_property": "The coverage receipt must name the unsupported channel instead of omitting it."
+    }
+  ]
+}
