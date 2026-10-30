@@ -37,7 +37,7 @@ The Evidence Sufficiency Benchmark uses five evidence levels from full support t
 
 ## Data contract
 
-The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at, exact EvidenceIndex state digest and unresolved claim set. A state change or newly ingested source invalidates the estimate and requires recalculation. It includes:
+The input is a RetrievalUtilityEstimate bound to one decision, principal, scope, valid_at, known_at, exact EvidenceIndex state digest and unresolved claim set. A state change or newly ingested source invalidates the estimate and requires recalculation. The canonical orchestrator API accepts an EvidenceIndexSnapshotReceipt produced by `EvidenceIndex::snapshot_receipt` / `search_bm25_at_snapshot`, and checks both its index digest and known_at coordinate. It includes:
 
 - exact evidence-index snapshot SHA-256, unresolved conclusion IDs and their deterministic digest;
 - estimator identity/version and estimator artifact digest;
@@ -57,6 +57,12 @@ The gate returns RetrieveMore or Stop plus a deterministic decision receipt. Its
 On RetrieveMore, the orchestrator must perform the next retrieval step, rebuild the evidence/claim ledger, rerun proof selection and produce a new value estimate. The previous estimate is bound to the old unresolved claim set and must not be reused.
 
 On Stop, the gate does not invent an answer. The lifecycle action controller still decides whether the correct terminal action is ANSWER (only with the opaque independently verified proof capability), WARN_STALE, EXPLAIN_CONFLICT or ABSTAIN.
+
+## Canonical orchestration API
+
+`decide_lifecycle_action_with_voi(request, verified_proof, value_decision, evidence_index_snapshot)` is the canonical adapter. It derives the unresolved conclusion set from the lifecycle claim ledger, verifies the VOI estimate against the exact principal/scope/time/claim set and the supplied typed EvidenceIndexSnapshotReceipt, replaces the request's retrieval-progress field with the VOI receipt, and only then calls the deterministic lifecycle action controller.
+
+This adapter avoids the unsafe pattern of copying `can_continue=true` or a naked decision boolean by hand. A RetrieveMore result still requires the orchestrator to perform another snapshot-bound retrieval, recompute claim coverage and re-run proof selection. A Stop result does not authorize an answer; the lifecycle action controller still requires its opaque independent proof token for ANSWER.
 
 ## Benchmark protocol
 
