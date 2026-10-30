@@ -719,7 +719,7 @@ fn run(args: Args) -> Result<(), String> {
     )?;
     let receipt_path = target_path_outside(
         &args.receipt,
-        &[&args.manifest, &args.ranking_output],
+        &[&args.manifest],
         &directory_inputs,
     )?;
     if ranking_path == receipt_path {
@@ -740,6 +740,22 @@ fn run(args: Args) -> Result<(), String> {
     let header_value = parse_jsonl_line(&mut reader, &mut manifest_hasher, &mut line_number)?
         .ok_or("manifest is empty")?;
     let header = parse_header(&header_value)?;
+
+    // Verify source design artifacts before creating output files.
+    let mut verified_netlists = Vec::new();
+    let source_integrity_status = if let Some(root) = args.evidence_root.as_deref() {
+        for metadata in header.designs.values() {
+            verify_source_file(root, metadata)?;
+            verified_netlists.push(json!({
+                "design_id": metadata.design_id,
+                "path": metadata.netlist_path,
+                "sha256": metadata.netlist_sha256
+            }));
+        }
+        "verified"
+    } else {
+        "not_requested"
+    };
 
     let mut ranking_file = OpenOptions::new()
         .write(true)
@@ -849,26 +865,14 @@ fn run(args: Args) -> Result<(), String> {
             return Err(error);
         }
     };
-    ranking_file
-        .sync_all()
-        .map_err(|error| format!("sync ranking output: {error}"))?;
+    if let Err(error) = ranking_file.sync_all() {
+        drop(ranking_file);
+        let _ = fs::remove_file(&ranking_path);
+        return Err(format!("sync ranking output: {error}"));
+    }
     drop(ranking_file);
 
     let manifest_sha256 = format!("{:x}", manifest_hasher.finalize());
-    let mut verified_netlists = Vec::new();
-    let source_integrity_status = if let Some(root) = args.evidence_root.as_deref() {
-        for metadata in header.designs.values() {
-            verify_source_file(root, metadata)?;
-            verified_netlists.push(json!({
-                "design_id": metadata.design_id,
-                "path": metadata.netlist_path,
-                "sha256": metadata.netlist_sha256
-            }));
-        }
-        "verified"
-    } else {
-        "not_requested"
-    };
 
     let ranking_sha256 = match sha256_file(&ranking_path) {
         Ok(value) => value,
@@ -1106,8 +1110,7 @@ mod tests {
     struct Fixture {
         base: PathBuf,
         manifest: PathBuf,
-        output_dir: PathBuf,
-        ranking: PathBuf,
+            ranking: PathBuf,
         receipt: PathBuf,
     }
 
@@ -1172,7 +1175,6 @@ mod tests {
             Self {
                 base,
                 manifest,
-                output_dir,
                 ranking,
                 receipt,
             }
