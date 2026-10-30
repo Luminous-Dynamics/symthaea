@@ -688,14 +688,29 @@ mod tests {
     }
 
     #[test]
-    fn dual_control_has_a_hard_episode_budget() {
+    fn dual_control_policies_have_a_hard_episode_budget() {
         for scenario in Scenario::all() {
-            for episode in 0..32 {
-                let tape = EpisodeTape::new(scenario, episode);
-                let outcome = run_episode(scenario, Policy::DualGatekeeper, &tape);
-                assert!(outcome.budget_spent <= MISSION_DEGRADATION_BUDGET + 1e-9);
-                assert_eq!(outcome.probe_count, 0);
+            for policy in [Policy::WeightedBudgetedDualControl, Policy::DualGatekeeper] {
+                for episode in 0..32 {
+                    let tape = EpisodeTape::new(scenario, episode);
+                    let outcome = run_episode(scenario, policy, &tape);
+                    assert!(outcome.budget_spent <= MISSION_DEGRADATION_BUDGET + 1e-9);
+                    assert_eq!(outcome.probe_count, 0);
+                }
             }
+        }
+    }
+
+    #[test]
+    fn zero_gatekeeper_budget_retains_safe_nominal_plan() {
+        let belief = [0.20; 5];
+        for state in [-0.4, -0.1, 0.0, 0.1, 0.4] {
+            let expected = safe_ce_action(state, &belief, 0.4);
+            let (actual, spend) = select_action(
+                Policy::DualGatekeeper, state, &belief, 0.4, 0.4, 1.0, 0.0,
+            );
+            assert!((actual - expected).abs() < 1e-12);
+            assert_eq!(spend, 0.0);
         }
     }
 
