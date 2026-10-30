@@ -1302,6 +1302,153 @@ mod tests {
         assert!(build_cross_task_forecast_evidence(&predictor, &[sample]).is_err());
     }
 
+    fn audit_transfer_gate() -> super::super::cross_task_transfer_gate::CrossTaskTransferGate {
+        use super::super::cross_task_transfer_gate::{
+            CrossTaskTransferGate, CurveForecastCalibrationConfig, TaskManifest, TaskRole,
+            TransferGateConfig,
+        };
+        use super::super::tabular_nas_firewall::MetricDirection;
+
+        let make_task = |task_id: &str, role: TaskRole, split_byte: char| {
+            let digest = |suffix: char| format!("{split_byte}{}{}", suffix, "0".repeat(62));
+            TaskManifest {
+                task_id: task_id.into(),
+                role,
+                search_space_id: "nasbench201".into(),
+                dataset_id: task_id.into(),
+                objective_semantics_id: "normalized_regret_percent".into(),
+                metric_direction: MetricDirection::Minimize,
+                artifact_sha256: "a".repeat(64),
+                split_sha256: format!("{split_byte}{}", "1".repeat(63)),
+                fidelity_ladder_sha256: format!("{split_byte}{}", "2".repeat(63)),
+                resource_profile_sha256: format!("{split_byte}{}", "3".repeat(63)),
+            }
+        };
+        let tasks = vec![
+            make_task("audit-task-a", TaskRole::TransferCalibration, 'b'),
+            make_task("audit-task-b", TaskRole::TransferCalibration, 'c'),
+            make_task("audit-task-c", TaskRole::TransferCalibration, 'd'),
+            make_task("target-task", TaskRole::EvaluationTarget, 'a'),
+        ];
+        let _ = CurveForecastCalibrationConfig {
+            minimum_calibration_tasks: 3,
+            minimum_forecasts_per_task: 2,
+            minimum_interval_coverage: 0.90,
+            maximum_interval_coverage: 1.0,
+            maximum_mean_absolute_error_pp: 0.1,
+            maximum_mean_interval_width_pp: 5.0,
+        };
+        CrossTaskTransferGate::new(
+            TransferGateConfig {
+                minimum_calibration_tasks: 3,
+                minimum_paired_seeds_per_task: 2,
+                maximum_task_regression_pp: 5.0,
+                confidence_z: 1.96,
+            },
+            tasks,
+        )
+        .unwrap()
+    }
+
+    fn audit_regret_samples() -> Vec<LearningCurveAuditSample> {
+        (0..3)
+            .flat_map(|task| {
+                (0..3).map(move |index| {
+                    let initial = 10.0 + ((index * 7) % 19) as f64;
+                    let slope = 0.2 + ((index * 11) % 13) as f64 * 0.1;
+                    let middle = initial + slope * 10.0;
+                    let final_value = 14.0 + 2.0 * middle + 4.0 * slope;
+                    LearningCurveAuditSample {
+                        task_id: format!("audit-task-{}", (b'a' + task) as char),
+                        architecture_id: format!("audit-{task}-{index}"),
+                        seed: index as u64,
+                        curve_values: vec![initial, middle, final_value],
+                        final_value,
+                    }
+                })
+            })
+            .collect()
+    }
+
+    #[test]
+    fn adapter_evidence_is_accepted_by_existing_cross_task_gate() {
+        use super::super::cross_task_transfer_gate::CurveForecastCalibrationConfig;
+
+        let mut cfg = config();
+        cfg.target_metric_id = "normalized_regret_percent".into();
+        cfg.metric_direction = ProxyDirection::Minimize;
+        let predictor = LearningCurveCalibrator::fit(
+            cfg,
+            &samples("fit", 60, 0.0),
+            &samples("cal", 60, 0.3),
+        )
+        .unwrap();
+        let evidence =
+            build_cross_task_forecast_evidence(&predictor, &audit_regret_samples()).unwrap();
+        let receipt = audit_transfer_gate()
+            .qualify_learning_curve_forecast(
+                "target-task",
+                &evidence,
+                &CurveForecastCalibrationConfig {
+                    minimum_calibration_tasks: 3,
+                    minimum_forecasts_per_task: 2,
+                    minimum_interval_coverage: 0.90,
+                    maximum_interval_coverage: 1.0,
+                    maximum_mean_absolute_error_pp: 0.1,
+                    maximum_mean_interval_width_pp: 5.0,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.decision,
+            super::super::cross_task_transfer_gate::CurveForecastCalibrationDecision::Calibrated
+        );
+        assert!(receipt.forecast_may_guide_fidelity());
+        assert!(receipt.verify_digest());
+        assert_eq!(receipt.task_statistics.len(), 3);
+    }
+
+    #[test]
+    fn cross_task_gate_abstains_when_adapter_forecasts_fail_task_coverage() {
+        use super::super::cross_task_transfer_gate::{
+            CurveForecastCalibrationConfig, CurveForecastCalibrationDecision,
+        };
+
+        let mut cfg = config();
+        cfg.target_metric_id = "normalized_regret_percent".into();
+        cfg.metric_direction = ProxyDirection::Minimize;
+        let predictor = LearningCurveCalibrator::fit(
+            cfg,
+            &samples("fit", 60, 0.0),
+            &samples("cal", 60, 0.3),
+        )
+        .unwrap();
+        let mut evidence =
+            build_cross_task_forecast_evidence(&predictor, &audit_regret_samples()).unwrap();
+        for observation in &mut evidence.observations {
+            observation.observed_final_regret_percent += 100.0;
+        }
+        let receipt = audit_transfer_gate()
+            .qualify_learning_curve_forecast(
+                "target-task",
+                &evidence,
+                &CurveForecastCalibrationConfig {
+                    minimum_calibration_tasks: 3,
+                    minimum_forecasts_per_task: 2,
+                    minimum_interval_coverage: 0.90,
+                    maximum_interval_coverage: 1.0,
+                    maximum_mean_absolute_error_pp: 1000.0,
+                    maximum_mean_interval_width_pp: 1000.0,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.decision,
+            CurveForecastCalibrationDecision::AbstainUndercoverage
+        );
+        assert!(!receipt.forecast_may_guide_fidelity());
+    }
+
     #[test]
     fn source_split_and_artifact_provenance_change_calibration_digest() {
         let first = fitted();
