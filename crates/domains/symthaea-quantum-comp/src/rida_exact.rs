@@ -765,29 +765,65 @@ mod tests {
 
     #[test]
     fn finite_model_class_observations_can_select_both_signs_as_erm() {
-        let model_predictions = [-1.0_f64, 1.0, 3.0];
-        let empirical_erm = |observed: f64| {
-            model_predictions
+        // Two-point domain. The tested point has misspecification 0.5, while
+        // the other point makes the global B_infinity bound 0.6, so the
+        // strict pointwise bound used in Appendix C is satisfied at x0.
+        let true_function = [0.5_f64, -0.1];
+        let best_in_class = [1.0_f64, 0.5];
+        let misspecification_bound = 0.6_f64;
+        let test_weights = [0.25_f64, 0.75];
+        let model_class = [
+            [-1.0_f64, 0.5],
+            [1.0_f64, 0.5],
+            [3.0_f64, 0.5],
+        ];
+
+        let test_risk = |prediction: &[f64; 2]| {
+            test_weights[0] * (prediction[0] - true_function[0]).powi(2)
+                + test_weights[1] * (prediction[1] - true_function[1]).powi(2)
+        };
+        let risks = model_class.map(|prediction| test_risk(&prediction));
+        assert!((risks[1] - 0.3325).abs() < 1.0e-12);
+        assert!(risks[1] < risks[0] && risks[1] < risks[2]);
+        assert!((misspecification_bound - 0.6).abs() < 1.0e-12);
+        assert!(
+            (best_in_class[0] - true_function[0]).abs() < misspecification_bound
+        );
+
+        let empirical_erm = |observed_at_x0: f64| {
+            model_class
                 .iter()
                 .enumerate()
                 .map(|(index, prediction)| {
-                    let residual = prediction - observed;
+                    let residual = prediction[0] - observed_at_x0;
                     (index, residual * residual)
                 })
                 .min_by(|left, right| left.1.total_cmp(&right.1))
                 .unwrap()
                 .0
         };
-
         assert_eq!(empirical_erm(-2.0), 0);
         assert_eq!(empirical_erm(3.0), 2);
 
+        // tau1 = tau0/B_infinity + c*B_infinity, with tau0=0 and c=2.
+        let threshold =
+            derive_de_amplification_threshold(0.0, misspecification_bound, 2.0, 0.0)
+                .unwrap();
+        assert_eq!(threshold, DeAmplificationThreshold::Finite(1.2));
         let offsetting =
-            evaluate_signed_interaction_oracle(-1.0, 1.0, 0.5).unwrap();
+            evaluate_signed_interaction_oracle(model_class[0][0], best_in_class[0], true_function[0])
+                .unwrap();
         let reinforcing =
-            evaluate_signed_interaction_oracle(3.0, 1.0, 0.5).unwrap();
+            evaluate_signed_interaction_oracle(model_class[2][0], best_in_class[0], true_function[0])
+                .unwrap();
         assert_eq!(offsetting.interaction, SignedErrorInteraction::Offsetting);
         assert_eq!(reinforcing.interaction, SignedErrorInteraction::Reinforcing);
+        assert!((offsetting.signed_interaction - (-1.0)).abs() < 1.0e-12);
+        assert!((reinforcing.signed_interaction - 1.0).abs() < 1.0e-12);
+        assert!((risks[0] - 0.8325).abs() < 1.0e-12);
+        assert!((risks[2] - 1.8325).abs() < 1.0e-12);
+        assert!((risks[0] - (risks[1] + test_weights[0] * (-2.0))).abs() < 1.0e-12);
+        assert!((risks[2] - (risks[1] + test_weights[0] * 2.0)).abs() < 1.0e-12);
     }
 
     #[test]
