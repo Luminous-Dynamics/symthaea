@@ -272,15 +272,13 @@ pub fn enumerate_iit4_system_partitions_with_stats(
     })
 }
 
-/// Mutable state shared by the two nested partition-recursion stages.
-///
-/// Keeping the enumeration state together makes the recursion signatures small
-/// and makes it explicit which buffers/counters form one bounded search.
+/// Mutable state shared by set-partition recursion and canonical cut emission.
 struct PartitionEnumerationContext<'a> {
     candidate_system: &'a [usize],
     output: &'a mut Vec<DirectedSystemPartition>,
-    seen_cuts: &'a mut std::collections::HashSet<Vec<bool>>,
-    visited_combinations: &'a mut usize,
+    canonical_assignments_evaluated: &'a mut usize,
+    raw_assignments_equivalent: &'a mut usize,
+    redundant_assignments_pruned: &'a mut usize,
     max_combinations: usize,
 }
 
@@ -301,14 +299,7 @@ fn enumerate_set_partitions_recursive(
                 block_by_local_unit[*local_unit] = block_index;
             }
         }
-        let mut directions = Vec::with_capacity(blocks.len());
-        return enumerate_block_directions_recursive(
-            0,
-            blocks,
-            &block_by_local_unit,
-            &mut directions,
-            context,
-        );
+        return enumerate_canonical_block_directions(blocks, &block_by_local_unit, context);
     }
 
     // Assign the next unit to each existing block, then to a new final block.
@@ -326,88 +317,134 @@ fn enumerate_set_partitions_recursive(
     Ok(())
 }
 
-fn enumerate_block_directions_recursive(
-    block_index: usize,
+/// Enumerate one canonical direction labeling for every distinct cut matrix.
+///
+/// An uncut cross-block edge can only run from a Cause block to an Effect block.
+/// Consequently a cut matrix is identified by two disjoint, nonempty block subsets
+/// C and E (the missing C -> E biclique), or by the all-cut cross-block matrix
+/// represented by all Bidirectional blocks. This quotient emits
+/// 1 + (3^k - 2*2^k + 1) = 3^k - 2*2^k + 2 candidates for k blocks.
+fn enumerate_canonical_block_directions(
     blocks: &[Vec<usize>],
     block_by_local_unit: &[usize],
-    directions: &mut Vec<PartitionDirection>,
     context: &mut PartitionEnumerationContext<'_>,
 ) -> Result<(), PartitionEnumerationError> {
-    if block_index == blocks.len() {
-        if *context.visited_combinations >= context.max_combinations {
-            return Err(PartitionEnumerationError::BudgetExceeded {
-                max_combinations: context.max_combinations,
-            });
-        }
-        *context.visited_combinations += 1;
+    let block_count = blocks.len();
+    let raw_for_partition = 3usize
+        .checked_pow(block_count as u32)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let two_to_k = 1usize
+        .checked_shl(block_count as u32)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let canonical_for_partition = raw_for_partition
+        .checked_sub(
+            two_to_k
+                .checked_mul(2)
+                .ok_or(PartitionEnumerationError::CounterOverflow)?,
+        )
+        .and_then(|count| count.checked_add(2))
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let pruned_for_partition = raw_for_partition - canonical_for_partition;
 
-        let n = context.candidate_system.len();
-        let mut cuts_outgoing = Vec::with_capacity(directions.len());
-        let mut cuts_incoming = Vec::with_capacity(directions.len());
-        for direction in directions.iter().copied() {
-            cuts_outgoing.push(matches!(
-                direction,
-                PartitionDirection::Effect | PartitionDirection::Bidirectional
-            ));
-            cuts_incoming.push(matches!(
-                direction,
-                PartitionDirection::Cause | PartitionDirection::Bidirectional
-            ));
-        }
+    let next_canonical = context
+        .canonical_assignments_evaluated
+        .checked_add(canonical_for_partition)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    if next_canonical > context.max_combinations {
+        return Err(PartitionEnumerationError::BudgetExceeded {
+            max_combinations: context.max_combinations,
+        });
+    }
+    let next_raw = context
+        .raw_assignments_equivalent
+        .checked_add(raw_for_partition)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
+    let next_pruned = context
+        .redundant_assignments_pruned
+        .checked_add(pruned_for_partition)
+        .ok_or(PartitionEnumerationError::CounterOverflow)?;
 
-        // For source block S and target block T, each block's direction determines
-        // whether outgoing/incoming links are cut. Two flag lookups replace repeated
-        // block membership scans during cut-matrix construction.
-        let mut cut_matrix = vec![false; n * n];
-        for source in 0..n {
-            let source_block = block_by_local_unit[source];
-            for target in 0..n {
-                let target_block = block_by_local_unit[target];
-                if source_block != target_block
-                    && (cuts_outgoing[source_block] || cuts_incoming[target_block])
-                {
-                    cut_matrix[source * n + target] = true;
-                }
+    *context.canonical_assignments_evaluated = next_canonical;
+    *context.raw_assignments_equivalent = next_raw;
+    *context.redundant_assignments_pruned = next_pruned;
+
+    let all_blocks = two_to_k - 1;
+    let mut directions = vec![PartitionDirection::Bidirectional; block_count];
+
+    // Canonical representative for the matrix that cuts every cross-block edge.
+    emit_canonical_partition(blocks, block_by_local_unit, &directions, 0, 0, context);
+
+    // Every other unique cut matrix is identified by nonempty disjoint subsets:
+    // C: source blocks whose outgoing edge to E remains uncut;
+    // E: target blocks whose incoming edge from C remains uncut.
+    for cause_mask in 1..two_to_k {
+        let eligible_effect_blocks = all_blocks ^ cause_mask;
+        let mut effect_mask = eligible_effect_blocks;
+        while effect_mask != 0 {
+            for (block_index, direction) in directions.iter_mut().enumerate() {
+                *direction = if (cause_mask & (1usize << block_index)) != 0 {
+                    PartitionDirection::Cause
+                } else if (effect_mask & (1usize << block_index)) != 0 {
+                    PartitionDirection::Effect
+                } else {
+                    PartitionDirection::Bidirectional
+                };
+            }
+            emit_canonical_partition(
+                blocks,
+                block_by_local_unit,
+                &directions,
+                cause_mask,
+                effect_mask,
+                context,
+            );
+            effect_mask = (effect_mask - 1) & eligible_effect_blocks;
+        }
+    }
+
+    Ok(())
+}
+
+/// Build a cut matrix directly from its canonical Cause/Effect block masks.
+fn emit_canonical_partition(
+    blocks: &[Vec<usize>],
+    block_by_local_unit: &[usize],
+    directions: &[PartitionDirection],
+    cause_mask: usize,
+    effect_mask: usize,
+    context: &mut PartitionEnumerationContext<'_>,
+) {
+    let n = context.candidate_system.len();
+    let mut cut_matrix = vec![false; n * n];
+    for source in 0..n {
+        let source_block = block_by_local_unit[source];
+        for target in 0..n {
+            let target_block = block_by_local_unit[target];
+            let is_unchanged_cause_to_effect_edge =
+                (cause_mask & (1usize << source_block)) != 0
+                    && (effect_mask & (1usize << target_block)) != 0;
+            if source_block != target_block && !is_unchanged_cause_to_effect_edge {
+                cut_matrix[source * n + target] = true;
             }
         }
+    }
 
-        if context.seen_cuts.insert(cut_matrix.clone()) {
-            let parts = blocks
+    let parts = blocks
+        .iter()
+        .map(|block| {
+            block
                 .iter()
-                .map(|block| {
-                    block
-                        .iter()
-                        .map(|local| context.candidate_system[*local])
-                        .collect()
-                })
-                .collect();
-            context.output.push(DirectedSystemPartition {
-                candidate_system: context.candidate_system.to_vec(),
-                parts,
-                directions: directions.clone(),
-                cut_matrix,
-                total_cut: false,
-            });
-        }
-        return Ok(());
-    }
-
-    for direction in [
-        PartitionDirection::Cause,
-        PartitionDirection::Effect,
-        PartitionDirection::Bidirectional,
-    ] {
-        directions.push(direction);
-        enumerate_block_directions_recursive(
-            block_index + 1,
-            blocks,
-            block_by_local_unit,
-            directions,
-            context,
-        )?;
-        directions.pop();
-    }
-    Ok(())
+                .map(|local| context.candidate_system[*local])
+                .collect()
+        })
+        .collect();
+    context.output.push(DirectedSystemPartition {
+        candidate_system: context.candidate_system.to_vec(),
+        parts,
+        directions: directions.to_vec(),
+        cut_matrix,
+        total_cut: false,
+    });
 }
 
 /// Errors in probability-repertoire construction.
