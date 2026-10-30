@@ -250,10 +250,18 @@ fn compare_candidates(
     };
 
     let resource_order = match priority {
-        ArchitectureRoutingPriority::LowestWallTime => time().then_with(energy).then_with(cost).then_with(memory),
-        ArchitectureRoutingPriority::LowestEnergy => energy().then_with(time).then_with(cost).then_with(memory),
-        ArchitectureRoutingPriority::LowestMonetaryCost => cost().then_with(time).then_with(energy).then_with(memory),
-        ArchitectureRoutingPriority::LowestPeakMemory => memory().then_with(time).then_with(energy).then_with(cost),
+        ArchitectureRoutingPriority::LowestWallTime => {
+            time().then_with(energy).then_with(cost).then_with(memory)
+        },
+        ArchitectureRoutingPriority::LowestEnergy => {
+            energy().then_with(time).then_with(cost).then_with(memory)
+        },
+        ArchitectureRoutingPriority::LowestMonetaryCost => {
+            cost().then_with(time).then_with(energy).then_with(memory)
+        },
+        ArchitectureRoutingPriority::LowestPeakMemory => {
+            memory().then_with(time).then_with(energy).then_with(cost)
+        },
     };
 
     resource_order
@@ -315,7 +323,9 @@ pub fn select_architecture_candidate(
         }
 
         match observation.resources {
-            Some(resources) => append_interval_exclusions(observation, request, resources, &mut exclusions),
+            Some(resources) => {
+                append_interval_exclusions(observation, request, resources, &mut exclusions)
+            },
             None => exclusions.push(ArchitectureRoutingExclusion::MissingResourceEnvelope),
         }
 
@@ -410,14 +420,24 @@ mod tests {
         vec![
             observation("slow-low-energy", "fpga-a", ComputeArchitectureFamily::Fpga,
                 (0.70, 0.80), (2.0, 3.0), (0.94, 0.96)),
-            observation("fast-high-energy", "neuromorphic-b", ComputeArchitectureFamily::NeuromorphicDigital,
-                (0.30, 0.40), (5.0, 6.0), (0.93, 0.95)),
+            observation(
+                "fast-high-energy",
+                "neuromorphic-b",
+                ComputeArchitectureFamily::NeuromorphicDigital,
+                (0.30, 0.40),
+                (5.0, 6.0),
+                (0.93, 0.95),
+            ),
         ]
     }
 
     #[test]
     fn selects_lowest_wall_time_when_all_constraints_are_proven() {
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &two_candidates()).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &two_candidates(),
+        )
+        .unwrap();
         assert_eq!(report.selected_record_id.as_deref(), Some("fast-high-energy"));
         assert_eq!(report.eligible_record_ids, vec!["fast-high-energy", "slow-low-energy"]);
         assert_eq!(report.abstention, None);
@@ -425,7 +445,11 @@ mod tests {
 
     #[test]
     fn explicit_energy_priority_can_choose_a_different_architecture() {
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestEnergy), &two_candidates()).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestEnergy),
+            &two_candidates(),
+        )
+        .unwrap();
         assert_eq!(report.selected_record_id.as_deref(), Some("slow-low-energy"));
     }
 
@@ -433,41 +457,75 @@ mod tests {
     fn quality_interval_must_prove_the_minimum() {
         let mut candidate = two_candidates().remove(0);
         candidate.quality = interval(0.89, 0.92);
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
         assert_eq!(report.selected_record_id, None);
-        assert_eq!(report.candidates[0].exclusions, vec![ArchitectureRoutingExclusion::QualityNotProven]);
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::QualityNotProven]
+        );
     }
 
     #[test]
     fn quality_entirely_below_minimum_is_a_definite_exclusion() {
         let mut candidate = two_candidates().remove(0);
         candidate.quality = interval(0.80, 0.89);
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert_eq!(report.candidates[0].exclusions, vec![ArchitectureRoutingExclusion::QualityBelowThreshold]);
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::QualityBelowThreshold]
+        );
     }
 
     #[test]
     fn resource_interval_must_fit_entirely_below_ceiling() {
         let mut candidate = two_candidates().remove(0);
         candidate.resources.as_mut().unwrap().wall_time_seconds = interval(0.80, 1.10);
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert_eq!(report.candidates[0].exclusions, vec![ArchitectureRoutingExclusion::WallTimeNotProven]);
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::WallTimeNotProven]
+        );
     }
 
     #[test]
     fn definite_resource_violation_is_distinguished_from_uncertainty() {
         let mut candidate = two_candidates().remove(0);
         candidate.resources.as_mut().unwrap().wall_time_seconds = interval(1.10, 1.20);
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert_eq!(report.candidates[0].exclusions, vec![ArchitectureRoutingExclusion::WallTimeLimitExceeded]);
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert_eq!(
+            report.candidates[0].exclusions,
+            vec![ArchitectureRoutingExclusion::WallTimeLimitExceeded]
+        );
     }
 
     #[test]
     fn workload_mismatch_is_never_routed() {
         let mut candidate = two_candidates().remove(0);
         candidate.workload_fingerprint = "different-event-stream".to_owned();
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert!(report.candidates[0].exclusions.contains(&ArchitectureRoutingExclusion::WorkloadMismatch));
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert!(report.candidates[0]
+            .exclusions
+            .contains(&ArchitectureRoutingExclusion::WorkloadMismatch));
         assert_eq!(report.selected_record_id, None);
     }
 
@@ -476,17 +534,31 @@ mod tests {
         let mut candidate = two_candidates().remove(0);
         candidate.comparison_contract_fingerprint = "different-contract".to_owned();
         candidate.evidence_class = ArchitectureEvidenceClass::Simulation;
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert!(report.candidates[0].exclusions.contains(&ArchitectureRoutingExclusion::ContractMismatch));
-        assert!(report.candidates[0].exclusions.contains(&ArchitectureRoutingExclusion::EvidenceClassMismatch));
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert!(report.candidates[0]
+            .exclusions
+            .contains(&ArchitectureRoutingExclusion::ContractMismatch));
+        assert!(report.candidates[0]
+            .exclusions
+            .contains(&ArchitectureRoutingExclusion::EvidenceClassMismatch));
     }
 
     #[test]
     fn measurement_boundary_mismatch_is_excluded() {
         let mut candidate = two_candidates().remove(0);
         candidate.measurement_boundary = ArchitectureMeasurementBoundary::RuntimeEndToEnd;
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert!(report.candidates[0].exclusions.contains(&ArchitectureRoutingExclusion::MeasurementBoundaryMismatch));
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert!(report.candidates[0]
+            .exclusions
+            .contains(&ArchitectureRoutingExclusion::MeasurementBoundaryMismatch));
     }
 
     #[test]
@@ -503,9 +575,17 @@ mod tests {
     fn malformed_candidate_is_reported_not_selected() {
         let mut candidate = two_candidates().remove(0);
         candidate.quality = interval(f64::NAN, 0.95);
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
-        assert!(matches!(report.candidates[0].exclusions.as_slice(),
-            [ArchitectureRoutingExclusion::InvalidObservation(ArchitectureComparisonError::InvalidInterval)]));
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
+        assert!(matches!(
+            report.candidates[0].exclusions.as_slice(),
+            [ArchitectureRoutingExclusion::InvalidObservation(
+                ArchitectureComparisonError::InvalidInterval
+            )]
+        ));
         assert_eq!(report.selected_record_id, None);
     }
 
@@ -514,14 +594,21 @@ mod tests {
         let mut candidates = two_candidates();
         candidates[1].record_id = candidates[0].record_id.clone();
         assert_eq!(
-            select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &candidates),
+            select_architecture_candidate(
+                &request(ArchitectureRoutingPriority::LowestWallTime),
+                &candidates
+            ),
             Err(ArchitectureRoutingError::DuplicateRecordId)
         );
     }
 
     #[test]
     fn empty_or_ineligible_portfolio_abstains() {
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[]).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[],
+        )
+        .unwrap();
         assert_eq!(report.selected_record_id, None);
         assert_eq!(report.abstention, Some(ArchitectureRoutingAbstention::NoEligibleCandidate));
     }
@@ -533,7 +620,11 @@ mod tests {
         candidates[1].quality = candidates[0].quality;
         candidates[0].architecture_id = "same-family-a".to_owned();
         candidates[1].architecture_id = "same-family-b".to_owned();
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &candidates).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &candidates,
+        )
+        .unwrap();
         assert_eq!(report.selected_record_id.as_deref(), Some("slow-low-energy"));
     }
 
@@ -541,9 +632,15 @@ mod tests {
     fn missing_system_resources_exclude_candidate() {
         let mut candidate = two_candidates().remove(0);
         candidate.resources = None;
-        let report = select_architecture_candidate(&request(ArchitectureRoutingPriority::LowestWallTime), &[candidate]).unwrap();
+        let report = select_architecture_candidate(
+            &request(ArchitectureRoutingPriority::LowestWallTime),
+            &[candidate],
+        )
+        .unwrap();
         assert_eq!(report.candidates[0].exclusions, vec![
-            ArchitectureRoutingExclusion::InvalidObservation(ArchitectureComparisonError::MissingResourceEnvelope)
+            ArchitectureRoutingExclusion::InvalidObservation(
+                ArchitectureComparisonError::MissingResourceEnvelope
+            )
         ]);
     }
 
