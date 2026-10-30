@@ -160,6 +160,48 @@ The replay is a **retrospective policy simulation**, not a model of human accept
 
 The synthetic fixture deliberately includes an alternate-path control, candidates that conflict on a shared edge, and oracle values that distinguish beneficial from harmful changes. It is executable negative-control data, not a biological result.
 
+## Post-hoc reviewer outcome audit
+
+The `connectome-review-outcome-audit` binary is intentionally separate from the query-impact ranker. It consumes three files: the exact original proposal JSON, the frozen ranking report emitted by `connectome-query-impact`, and a separate evaluation-only reviewer-outcome file. It verifies the SHA-256 of the proposal bytes against the ranking report, verifies the canonical baseline graph digest, and checks that the outcome file is bound to both exact artifacts. The outcomes file also pins the adjudication protocol by SHA-256.
+
+The outcome file must contain exactly one record for every candidate in the frozen proposal pool:
+- `adjudication`: `correct`, `incorrect`, or `indeterminate`, from an independent adjudicator judging whether the proposed graph mutation is actually the correct correction;
+- `reviewer_decision`: the recorded expert decision `accept`, `reject`, or `abstain`;
+- `actual_review_minutes`: measured reviewer time, not a model estimate.
+
+Run sequence:
+
+```sh
+# 1. Freeze proposal inputs and produce the ranking report.
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-query-impact -- \\
+  --input proposals.json --output frozen-ranking.json
+
+# 2. Bind the separate outcome file to the exact frozen artifacts.
+sha256sum proposals.json frozen-ranking.json adjudication-protocol.md
+
+# 3. Populate docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json
+#    with those digests and one independently adjudicated/reviewed record per candidate.
+
+# 4. Evaluate the frozen policies using measured review time and human decisions.
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-review-outcome-audit -- \\
+  --proposals proposals.json \\
+  --ranking-report frozen-ranking.json \\
+  --outcomes reviewer-outcomes.json \\
+  --output post-hoc-review-evaluation.json
+```
+
+For each frozen policy/minute budget, the evaluator selects candidates in the saved ranking order using `actual_review_minutes`. It applies only proposals the reviewer accepted, in sequence on the evolving graph. An accepted but incorrect proposal is deliberately applied so its query harm is counted. An accepted proposal that has become stale/invalid due to an earlier edit is counted as a stale conflict and is not applied. Rejected and abstained correct proposals are counted as missed correction opportunities.
+
+The report exposes:
+- reviewer accept/reject/abstain outcomes crossed with independent correct/incorrect/indeterminate adjudication;
+- accepted-decision precision and applied-correction precision, each excluding indeterminate adjudications from its denominator;
+- candidate-pool correct-proposal review recall and acceptance recall (these are **not whole-connectome recall**);
+- incorrect-proposal acceptance rate, actual review minutes, stale conflicts, and before/after oracle query error.
+
+This is still a retrospective replay, not a randomized prospective causal estimate. All candidates in the frozen pool must be independently adjudicated and have review outcomes/time records; the same pool is then replayed under every frozen policy. Reviewer learning/order effects are not modeled. The evaluator does not modify authoritative graph or annotation files.
+
+**Information-flow boundary:** never provide the reviewer-outcome file to `connectome-query-impact` or candidate generation. The ranker is a separate binary that does not define or parse this outcome schema. The post-hoc evaluator is the only tool that consumes adjudication/reviewer labels. The synthetic outcome template contains zero placeholders for the two artifact hashes; replace them with SHA-256 digests from the exact files before running it.
+
 ## Exit codes
 
 - `0`: all declared checks pass.
