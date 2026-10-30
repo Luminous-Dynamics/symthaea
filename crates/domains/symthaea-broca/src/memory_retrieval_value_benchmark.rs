@@ -500,6 +500,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_mixed_reader_evaluator_split_or_utility_artifacts() {
+        let mut outcomes: Vec<_> = (0..20)
+            .map(|index| outcome(index, index, 10))
+            .collect();
+        outcomes[7].reader_sha256 = digest("different reader");
+        assert!(summarize_paired_retrieval_outcomes(&outcomes, 8)
+            .unwrap_err()
+            .contains("mix experiment, utility, reader, evaluator or split"));
+
+        outcomes[7].reader_sha256 = outcomes[0].reader_sha256.clone();
+        outcomes[7].evaluation_split_sha256 = digest("different split");
+        assert!(summarize_paired_retrieval_outcomes(&outcomes, 8)
+            .unwrap_err()
+            .contains("mix experiment, utility, reader, evaluator or split"));
+    }
+
+    #[test]
     fn rejects_zero_bootstrap_seed_and_is_reproducible() {
         let outcomes: Vec<_> = (0..20)
             .map(|index| outcome(index, index, index as i64 - 10))
