@@ -159,8 +159,8 @@ def run_dependent_normal_benchmark(
         adjusted_a1 = log_adjuster_a1_from_log_m(log_m)
         adjusted_a2 = log_adjuster_a2_from_log_m(log_m)
         method_values = {
-            # The linked simulation script feeds one-step likelihood ratios
-            # E[:, t] here. It is not the current cumulative e-process.
+            # This row reproduces the linked script's use of one-step likelihood
+            # ratios E[:, t] here. It is not the current cumulative e-process.
             "reference_script_single_step_ebh": log_increment,
             "current_cumulative_ebh": log_e,
             "naive_running_max_ebh": log_m,
