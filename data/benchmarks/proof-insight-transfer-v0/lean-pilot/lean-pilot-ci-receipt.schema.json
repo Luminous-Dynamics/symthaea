@@ -385,7 +385,8 @@
           "evidence_declarations",
           "contract_precondition",
           "state_intervention",
-          "model_outcomes"
+          "model_outcomes",
+          "proof_term_support"
         ],
         "properties": {
           "case_id": {
@@ -440,6 +441,16 @@
           },
           "model_outcomes": {
             "const": "not_run"
+          },
+          "proof_term_support": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/proof_term_support_contract"
+              }
+            ]
           }
         }
       }
@@ -582,6 +593,44 @@
           "items": {
             "$ref": "#/$defs/support_declaration"
           }
+        }
+      }
+    },
+    "proof_term_support_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_label",
+        "must_include_direct_declarations",
+        "must_exclude_direct_declarations",
+        "interpretation"
+      ],
+      "properties": {
+        "receipt_label": {
+          "enum": [
+            "alternate-route-after-required-hypothesis-withdrawal",
+            "original-route-after-irrelevant-context-removal"
+          ]
+        },
+        "must_include_direct_declarations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "must_exclude_direct_declarations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
