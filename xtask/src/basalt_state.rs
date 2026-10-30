@@ -341,6 +341,9 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
     if timeline.initial_resources.len() > MAX_INITIAL_RESOURCES {
         return Err(failure("E_INITIAL_RESOURCES_LIMIT", "initial_resources", "initial resource count exceeds 100000"));
     }
+    if timeline.entries.is_empty() {
+        return Err(failure("E_TIMELINE_EMPTY", "entries", "at least one event or evidence record is required"));
+    }
     if timeline.entries.len() > MAX_TIMELINE_ENTRIES {
         return Err(failure("E_TIMELINE_ENTRIES_LIMIT", "entries", "timeline exceeds 20000 entries"));
     }
