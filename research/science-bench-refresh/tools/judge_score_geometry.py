@@ -160,6 +160,41 @@ def _std(values: list[float]) -> float | None:
     return statistics.pstdev(values)
 
 
+def _within_criterion_std(matrix: list[list[float]]) -> float | None:
+    if not matrix or not matrix[0]:
+        return None
+    row_count = len(matrix)
+    dimensions = len(matrix[0])
+    means = [statistics.fmean(row[column] for row in matrix) for column in range(dimensions)]
+    squared = sum(
+        (row[column] - means[column]) ** 2
+        for row in matrix
+        for column in range(dimensions)
+    )
+    return math.sqrt(squared / (row_count * dimensions))
+
+
+def _pooled_within_criterion_std(items: list[dict[str, Any]], panel_name: str) -> float | None:
+    values_by_criterion: list[list[float]] = []
+    if not items:
+        return None
+    criterion_count = len(items[0][panel_name][0]["scores_millionths"])
+    values_by_criterion = [[] for _ in range(criterion_count)]
+    for item in items:
+        for rating in item[panel_name]:
+            for index, score in enumerate(rating["scores_millionths"]):
+                values_by_criterion[index].append(float(score))
+    squared = 0.0
+    total = 0
+    for values in values_by_criterion:
+        if not values:
+            continue
+        mean = statistics.fmean(values)
+        squared += sum((value - mean) ** 2 for value in values)
+        total += len(values)
+    return math.sqrt(squared / total) if total else None
+
+
 def _ratio(numerator: float | None, denominator: float | None) -> float | None:
     if numerator is None or denominator is None or denominator == 0.0:
         return None
@@ -199,35 +234,48 @@ def _pairwise_summary(
     same_panel = left_name == right_name
     correlations: list[float] = []
     pair_count = 0
-    undefined = 0
+    undefined_pairs = 0
+    criterion_comparisons = 0
+    undefined_criterion_comparisons = 0
     left_ids = sorted(left)
     right_ids = sorted(right)
     for i, left_id in enumerate(left_ids):
-        start = i + 1 if same_panel else 0
-        for right_id in right_ids[start:]:
+        start_index = i + 1 if same_panel else 0
+        for right_id in right_ids[start_index:]:
             pair_count += 1
             shared_items = sorted(set(left[left_id]) & set(right[right_id]))
-            xs: list[float] = []
-            ys: list[float] = []
-            for item_id in shared_items:
-                xs.extend(left[left_id][item_id])
-                ys.extend(right[right_id][item_id])
-            corr = _correlation(xs, ys)
-            if corr is None:
-                undefined += 1
+            if not shared_items:
+                undefined_pairs += 1
+                continue
+            criterion_correlations: list[float] = []
+            criterion_count = len(left[left_id][shared_items[0]])
+            for criterion_index in range(criterion_count):
+                xs = [left[left_id][item_id][criterion_index] for item_id in shared_items]
+                ys = [right[right_id][item_id][criterion_index] for item_id in shared_items]
+                criterion_comparisons += 1
+                corr = _correlation(xs, ys)
+                if corr is None:
+                    undefined_criterion_comparisons += 1
+                else:
+                    criterion_correlations.append(corr)
+            if criterion_correlations:
+                # Equal weight per criterion prevents between-criterion score
+                # offsets from masquerading as within-criterion rater agreement.
+                correlations.append(statistics.fmean(criterion_correlations))
             else:
-                correlations.append(corr)
+                undefined_pairs += 1
     return {
         "pair_count": pair_count,
         "defined_pair_count": len(correlations),
-        "undefined_pair_count": undefined,
-        "mean_correlation": statistics.fmean(correlations) if correlations else None,
-        "median_correlation": statistics.median(correlations) if correlations else None,
-        "minimum_correlation": min(correlations) if correlations else None,
-        "maximum_correlation": max(correlations) if correlations else None,
-        "correlations": correlations,
+        "undefined_pair_count": undefined_pairs,
+        "criterion_comparison_count": criterion_comparisons,
+        "undefined_criterion_comparison_count": undefined_criterion_comparisons,
+        "mean_pairwise_correlation": statistics.fmean(correlations) if correlations else None,
+        "median_pairwise_correlation": statistics.median(correlations) if correlations else None,
+        "minimum_pairwise_correlation": min(correlations) if correlations else None,
+        "maximum_pairwise_correlation": max(correlations) if correlations else None,
+        "pair_correlations": correlations,
     }
-
 
 def _panel_mean_matrix(items: list[dict[str, Any]], panel_name: str) -> list[list[float]]:
     matrix: list[list[float]] = []
@@ -384,8 +432,8 @@ def _bootstrap(
         judges = [judge_matrix[index] for index in indices]
         humans = [human_matrix[index] for index in indices]
         ratio = _ratio(
-            _std([value for row in judges for value in row]),
-            _std([value for row in humans for value in row]),
+            _within_criterion_std(judges),
+            _within_criterion_std(humans),
         )
         if ratio is not None:
             spread.append(ratio)
@@ -418,10 +466,10 @@ def analyze_score_geometry(input_bytes: bytes) -> dict[str, Any]:
     human_matrix = _panel_mean_matrix(items, "human_ratings")
     judge_pooled = _flatten_panel(items, "judge_ratings")
     human_pooled = _flatten_panel(items, "human_ratings")
-    judge_std = _std(judge_pooled)
-    human_std = _std(human_pooled)
-    judge_panel_std = _std([value for row in judge_matrix for value in row])
-    human_panel_std = _std([value for row in human_matrix for value in row])
+    judge_std = _pooled_within_criterion_std(items, "judge_ratings")
+    human_std = _pooled_within_criterion_std(items, "human_ratings")
+    judge_panel_std = _within_criterion_std(judge_matrix)
+    human_panel_std = _within_criterion_std(human_matrix)
     config = data["analysis_config"]
     input_digest = hashlib.sha256(input_bytes).hexdigest()
     seed = int.from_bytes(hashlib.sha256(input_bytes + b"\0judge-score-geometry-bootstrap-v1").digest()[:8], "big")
