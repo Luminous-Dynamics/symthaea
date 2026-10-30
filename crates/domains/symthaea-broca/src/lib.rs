@@ -75,6 +75,7 @@ pub mod memory_proof_budget;
 pub mod memory_verified_reader_context;
 pub mod memory_proof_admission;
 pub mod memory_lifecycle_policy;
+pub mod memory_retrieval_value;
 pub mod memory_proof_optimality;
 pub mod memory_challenge_api;
 pub mod memory_challenge_sled;
