@@ -595,6 +595,21 @@ jobs:
           false_irrelevant_retention["proof_state_intervention_trace"]["irrelevant_context_intervention"]["irrelevant_declaration_absent_after"] = False
           negative_controls.append(("irrelevant context retained after declared removal", false_irrelevant_retention))
 
+          altered_proof_support = copy.deepcopy(receipt)
+          altered_proof_support["proof_state_intervention_trace"]["proof_term_support_receipts"][0]["receipt"]["direct_free_variable_support"][0]["user_name"] = "forged"
+          negative_controls.append(("proof-term support content/digest mismatch", altered_proof_support))
+
+          omitted_required_support = copy.deepcopy(receipt)
+          alt_support = next(
+              row["receipt"] for row in omitted_required_support["proof_state_intervention_trace"]["proof_term_support_receipts"]
+              if row["receipt"]["label"] == "alternate-route-after-required-hypothesis-withdrawal"
+          )
+          alt_support["direct_free_variable_support"] = [
+              row for row in alt_support["direct_free_variable_support"]
+              if row["user_name"] != "hEq"
+          ]
+          negative_controls.append(("proof term omits required alternate-route support", omitted_required_support))
+
           for name, invalid_receipt in negative_controls:
               if not receipt_errors(invalid_receipt):
                   raise SystemExit(f"receipt negative control unexpectedly accepted: {name}")
