@@ -122,6 +122,7 @@ pub fn admit_lexical_hits_for_proof_budget(
     }
 
     let mut seen_hits = BTreeSet::new();
+    let mut seen_hdc_ids = BTreeSet::new();
     let mut candidates = Vec::with_capacity(hits.len());
     for (index, hit) in hits.iter().enumerate() {
         if hit.context.kind != MemoryContextType::Text {
@@ -133,6 +134,12 @@ pub fn admit_lexical_hits_for_proof_budget(
         if !seen_hits.insert(hit.evidence_id.as_str()) {
             return Err(format!("duplicate lexical hit {:?}", hit.evidence_id));
         }
+        if !seen_hdc_ids.insert(hit.hdc_id) {
+            return Err(format!("duplicate HDC candidate ID {}", hit.hdc_id));
+        }
+        if !hit.bm25_score.is_finite() || hit.bm25_score <= 0.0 {
+            return Err(format!("lexical hit {:?} has an invalid BM25 score", hit.evidence_id));
+        }
         let admission = admission_by_id
             .get(hit.evidence_id.as_str())
             .ok_or_else(|| format!(
@@ -141,7 +148,8 @@ pub fn admit_lexical_hits_for_proof_budget(
             ))?;
 
         if hit.source.trajectory_id.trim().is_empty()
-            || hit.source.source_pointer.trim().is_empty()
+            || !hit.source.source_pointer.starts_with('/')
+            || hit.source.source_pointer.trim() == "/"
             || hit.source.source_sha256.len() != 64
             || !hit.source.source_sha256.bytes().all(|byte| {
                 byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
@@ -280,7 +288,7 @@ mod tests {
 
     fn hit(id: &str, text: &str, rank_score: f64) -> LexicalEvidenceHit {
         LexicalEvidenceHit {
-            hdc_id: 10,
+            hdc_id: id.as_bytes().first().copied().map(u64::from).unwrap_or(0),
             evidence_id: id.into(),
             source: EvidenceSource {
                 trajectory_id: "trajectory-1".into(),
@@ -446,6 +454,77 @@ mod tests {
             200,
         ).unwrap_err();
         assert!(error.contains("scope does not match"));
+    }
+
+    #[test]
+    fn solver_reports_future_revoked_and_expired_candidates_without_promoting_them() {
+        let mut future = admission("A");
+        future.recorded_at_unix_ms = 201;
+
+        let mut revoked = admission("B");
+        revoked.retracted_at_unix_ms = Some(200);
+
+        let mut expired = admission("C");
+        expired.valid_until_unix_ms = Some(250);
+
+        let mut proof_request = request();
+        proof_request.obligations[0].alternatives = vec![
+            ProofJustification {
+                justification_id: "future".into(),
+                evidence_dependencies: vec!["A".into()],
+            },
+            ProofJustification {
+                justification_id: "revoked".into(),
+                evidence_dependencies: vec!["B".into()],
+            },
+            ProofJustification {
+                justification_id: "expired".into(),
+                evidence_dependencies: vec!["C".into()],
+            },
+        ];
+
+        let proof_request = admit_lexical_hits_for_proof_budget(
+            proof_request,
+            &[
+                hit("A", "future evidence", 3.0),
+                hit("B", "revoked evidence", 2.0),
+                hit("C", "expired evidence", 1.0),
+            ],
+            &[future, revoked, expired],
+            200,
+        ).unwrap();
+
+        let result = solve_proof_budget(proof_request).unwrap();
+        assert_eq!(result.status, ProofBudgetStatus::NoEligibleProof);
+        assert!(result.candidate_rejections["A"]
+            .contains(&ProofCandidateRejection::NotKnownAtQueryTime));
+        assert!(result.candidate_rejections["B"]
+            .contains(&ProofCandidateRejection::RetractedAtQueryTime));
+        assert!(result.candidate_rejections["C"]
+            .contains(&ProofCandidateRejection::OutsideValidTime));
+    }
+
+    #[test]
+    fn rejects_non_finite_scores_and_duplicate_hdc_ids() {
+        let mut non_finite = hit("A", "evidence", 1.0);
+        non_finite.bm25_score = f64::NAN;
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[non_finite],
+            &[admission("A")],
+            200,
+        ).unwrap_err();
+        assert!(error.contains("invalid BM25 score"));
+
+        let mut aliased = hit("B", "other evidence", 0.9);
+        aliased.hdc_id = hit("A", "evidence", 1.0).hdc_id;
+        let error = admit_lexical_hits_for_proof_budget(
+            request(),
+            &[hit("A", "evidence", 1.0), aliased],
+            &[admission("A"), admission("B")],
+            200,
+        ).unwrap_err();
+        assert!(error.contains("duplicate HDC candidate ID"));
     }
 
     #[test]
