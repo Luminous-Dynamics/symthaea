@@ -123,6 +123,25 @@ pub enum CausalDirection {
     Effect,
 }
 
+/// Result of maximizing one direction's IIT 4.0 system intrinsic specification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Iit4IntrinsicSpecificationResult {
+    pub direction: CausalDirection,
+    /// Every maximum state within the requested PyPhi-compatible tolerance.
+    /// The first state is the stable enumeration-order winner.
+    pub specified_states: Vec<Vec<bool>>,
+    pub intrinsic_specification: f64,
+    /// Highest-scoring state other than the first winner (may itself be tied).
+    pub runner_up_state: Option<Vec<bool>>,
+    pub runner_up_intrinsic_specification: Option<f64>,
+    /// Maximum minus runner-up; zero if another state ties the winner.
+    pub selection_margin: Option<f64>,
+    /// Unconstrained forward reference repertoire used in the GID vector.
+    pub unconstrained_forward_repertoire: Vec<f64>,
+    /// Decimal precision used for relative/absolute tie equality.
+    pub decimal_precision: u32,
+}
+
 /// IIT 4.0 system intrinsic states: cause and effect specifications are distinct.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Iit4SystemState {
@@ -183,6 +202,12 @@ pub enum SystemPhiError {
     },
     #[error("system partition cuts no connections and therefore has no EdgeCut normalization")]
     ZeroSeveredConnections,
+    #[error("candidate system must be in strictly ascending unit-index order")]
+    CandidateSystemNotCanonical,
+    #[error("numeric decimal precision {precision} is outside the supported range 0..=15")]
+    InvalidNumericalPrecision { precision: u32 },
+    #[error("intrinsic-specification GID became non-finite at state index {state_index}")]
+    NonFiniteIntrinsicSpecification { state_index: usize },
 }
 
 /// Errors while applying a directed partition to a causal model.
@@ -1059,6 +1084,151 @@ impl BinaryCausalModel {
         }
 
         Self::new(self.n_units, tpm, connectivity).map_err(PartitionApplyError::from)
+    }
+
+    /// Select the system's intrinsically specified past/future state in one direction.
+    ///
+    /// This implements PyPhi IIT 4.0's composite intrinsic-specification path:
+    /// pointwise GID(forward, unconstrained-forward) weighted by the current
+    /// cause/effect selectivity repertoire, maximized over all candidate states.
+    /// Cause uses the unnormalized forward cause likelihood and a constant
+    /// mean-likelihood baseline; effect uses the effect repertoire averaged over
+    /// all candidate mechanism states as its unconstrained baseline.
+    ///
+    /// Ties use symmetric relative/absolute equality with epsilon 10^-precision,
+    /// matching PyPhi's numerics.eq/eq_mask policy. Every tied state is returned
+    /// in deterministic little-endian state order; callers must preserve that tie
+    /// family for the later cause/effect-state-pair SIA cascade.
+    pub fn intrinsic_specification_iit4(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        direction: CausalDirection,
+        decimal_precision: u32,
+    ) -> Result<Iit4IntrinsicSpecificationResult, SystemPhiError> {
+        self.check_state(current_state)?;
+        if decimal_precision > 15 {
+            return Err(SystemPhiError::InvalidNumericalPrecision {
+                precision: decimal_precision,
+            });
+        }
+        self.validate_subset(candidate_system, "candidate_system")?;
+        if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(SystemPhiError::CandidateSystemNotCanonical);
+        }
+
+        let state_count = 1usize << candidate_system.len();
+        let (selectivity, forward, unconstrained_forward) = match direction {
+            CausalDirection::Cause => {
+                let selectivity =
+                    self.cause_repertoire(candidate_system, current_state, candidate_system)?;
+                let forward =
+                    self.forward_cause_likelihood(candidate_system, current_state, candidate_system)?;
+                let mean = forward.iter().sum::<f64>() / state_count as f64;
+                (selectivity, forward, vec![mean; state_count])
+            }
+            CausalDirection::Effect => {
+                let selectivity =
+                    self.effect_repertoire(candidate_system, current_state, candidate_system)?;
+                let forward = selectivity.clone();
+                let mut unconstrained = vec![0.0; state_count];
+                for mechanism_state_index in 0..state_count {
+                    let mut mechanism_state = current_state.to_vec();
+                    for (slot, unit) in candidate_system.iter().copied().enumerate() {
+                        mechanism_state[unit] = ((mechanism_state_index >> slot) & 1) != 0;
+                    }
+                    let repertoire = self.effect_repertoire(
+                        candidate_system,
+                        &mechanism_state,
+                        candidate_system,
+                    )?;
+                    for (sum, probability) in unconstrained.iter_mut().zip(repertoire) {
+                        *sum += probability / state_count as f64;
+                    }
+                }
+                (selectivity, forward, unconstrained)
+            }
+        };
+
+        let mut information = Vec::with_capacity(state_count);
+        for state_index in 0..state_count {
+            let f = forward[state_index];
+            let u = unconstrained_forward[state_index];
+            let pointwise = if f == 0.0 || u == 0.0 {
+                0.0
+            } else {
+                let ratio = f / u;
+                if ratio == 0.0 || !ratio.is_finite() {
+                    0.0
+                } else {
+                    selectivity[state_index] * ratio.log2()
+                }
+            };
+            if !pointwise.is_finite() {
+                return Err(SystemPhiError::NonFiniteIntrinsicSpecification { state_index });
+            }
+            information.push(pointwise);
+        }
+
+        let mut winner_index = 0usize;
+        for index in 1..state_count {
+            if information[index] > information[winner_index] {
+                winner_index = index;
+            }
+        }
+        let maximum = information[winner_index];
+        let epsilon = 10.0_f64.powi(-(decimal_precision as i32));
+        let tied_states = information
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, value)| {
+                (value - maximum).abs()
+                    <= (epsilon * value.abs().max(maximum.abs())).max(epsilon)
+            })
+            .map(|(index, _)| {
+                candidate_system
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, _)| ((index >> slot) & 1) != 0)
+                    .collect::<Vec<bool>>()
+            })
+            .collect::<Vec<_>>();
+
+        let mut runner_up_index: Option<usize> = None;
+        for index in 0..state_count {
+            if index == winner_index {
+                continue;
+            }
+            if runner_up_index
+                .map(|best| information[index] > information[best])
+                .unwrap_or(true)
+            {
+                runner_up_index = Some(index);
+            }
+        }
+        let runner_up_state = runner_up_index.map(|index| {
+            candidate_system
+                .iter()
+                .enumerate()
+                .map(|(slot, _)| ((index >> slot) & 1) != 0)
+                .collect::<Vec<_>>()
+        });
+        let runner_up_intrinsic_specification =
+            runner_up_index.map(|index| information[index]);
+        let selection_margin = runner_up_intrinsic_specification
+            .map(|runner_up| (maximum - runner_up).max(0.0));
+
+        Ok(Iit4IntrinsicSpecificationResult {
+            direction,
+            specified_states: tied_states,
+            intrinsic_specification: maximum,
+            runner_up_state,
+            runner_up_intrinsic_specification,
+            selection_margin,
+            unconstrained_forward_repertoire: unconstrained_forward,
+            decimal_precision,
+        })
     }
 
     /// Evaluate both IIT 4.0 system-level directional GID contributions for a cut.
