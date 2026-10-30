@@ -12,7 +12,7 @@ The next boundary after the challenge catalog is a three-artifact protocol:
 
 The result adjudicator joins these exact artifacts and checks their byte digests, run/profile identity, scenario coverage, resource attribution, required facts, explicit unresolved channels, integrity signals and evidence-reuse decision. It does not let the observer author the expected result.
 
-**Important trust boundary:** the current adjudicator verifies consistency against the supplied oracle ledger. It does not prove that the oracle was independently produced, that the claimed replay actually ran, or that the harness binary is trustworthy. SHA-256 binds bytes; it does not authenticate an author. Both `oracle_authenticity_established` and `qualification_eligible` are hard-coded false. A passing report means only that one observer receipt set conforms to the supplied oracle assertions. It is not a confirmatory result and cannot qualify the Linux profile.
+**Important trust boundary:** the current adjudicator verifies consistency against the supplied oracle ledger. It does not prove that the oracle was independently produced, that the claimed replay actually ran, or that the harness binary is trustworthy. SHA-256 binds bytes; it does not authenticate an author. `oracle_authenticity_established`, `oracle_replay_executed_by_adjudicator`, `observer_receipt_authenticity_established`, and `qualification_eligible` are all hard-coded false. A passing report means only that one observer receipt set conforms to the supplied oracle assertions. It is not a confirmatory result and cannot qualify the Linux profile.
 
 ## Added implementation
 
