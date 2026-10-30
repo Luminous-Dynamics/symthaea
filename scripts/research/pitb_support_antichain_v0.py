@@ -225,6 +225,9 @@ def score_predictions(predictions, groups):
             if not set(necessary) <= universe or not set(route) <= universe:
                 raise ContractError("prediction contains declarations outside the lattice")
         pred_by_id[gid] = p
+    if set(pred_by_id) != set(by_id):
+        missing = sorted(set(by_id) - set(pred_by_id))
+        raise ContractError(f"prediction ledger must cover every analyzed group exactly once; missing={missing[:8]}")
 
     tp = fp = fn = tn = valid = exact = evaluated = 0
     brier_values = []
