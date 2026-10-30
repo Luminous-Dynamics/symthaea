@@ -1035,6 +1035,53 @@ mod tests {
     }
 
     #[test]
+    fn accepts_payload_effect_observed_only_with_separate_effect_trace() {
+        let mut packet = base_packet();
+        let mut effect = evidence("payload_effect_trace", "pass");
+        effect["stimuli_count"] = json!(100);
+        effect["payload_effects_observed"] = json!(1);
+        effect["witness_sha256"] = json!(WITNESS);
+        add_evidence(&mut packet, effect);
+        set_claim(
+            &mut packet,
+            "payload_effect_observed",
+            "supported",
+            vec!["payload_effect_trace-1"],
+        );
+        validate_packet(&packet, "0".repeat(64)).unwrap();
+    }
+
+    #[test]
+    fn accepts_no_payload_effect_only_as_budget_limited_observation() {
+        let mut packet = base_packet();
+        let mut effect = evidence("payload_effect_trace", "pass");
+        effect["stimuli_count"] = json!(100);
+        effect["payload_effects_observed"] = json!(0);
+        add_evidence(&mut packet, effect);
+        set_claim(
+            &mut packet,
+            "payload_effect_not_observed_under_budget",
+            "supported",
+            vec!["payload_effect_trace-1"],
+        );
+        validate_packet(&packet, "0".repeat(64)).unwrap();
+    }
+
+    #[test]
+    fn does_not_infer_payload_effect_from_trigger_activation() {
+        let mut packet = base_packet();
+        set_claim(
+            &mut packet,
+            "payload_effect_observed",
+            "supported",
+            vec!["stim-1"],
+        );
+        assert!(validate_packet(&packet, "0".repeat(64))
+            .unwrap_err()
+            .contains("payload_effect_trace"));
+    }
+
+    #[test]
     fn accepts_trigger_not_observed_under_finite_budget() {
         let mut packet = base_packet();
         packet["evidence"][0]["activation_count"] = json!(0);
