@@ -43,6 +43,8 @@ pub mod analyst;
 pub mod audio_analyzer;
 pub mod audio_preservation;
 pub mod counterfactual_influence;
+#[cfg(all(feature = "theory", not(target_arch = "wasm32")))]
+pub mod counterfactual_support_adapter;
 pub mod counterfactual_interaction;
 pub mod factorial_ground_truth;
 pub mod interaction_probe_benchmark;

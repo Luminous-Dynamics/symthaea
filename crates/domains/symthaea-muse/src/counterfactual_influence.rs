@@ -36,6 +36,7 @@ const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RECORDED_EFFECTS_GROUPS: u8 = 128;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceAnalysisConfig {
@@ -154,6 +155,43 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_map_artifact_sha256: String,
     expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
+    /// Explicit FluidSynth effects-group count parsed from the exact, receipt-
+    /// bound child argv. None means the historical/unknown topology did not
+    /// explicitly record the setting; downstream routing adapters must abstain.
+    fluid_synth_effects_groups: Option<u8>,
+}
+
+/// Test-only constructor for a verified FluidSynth token carrying an
+/// explicitly recorded effects-group count. Production must obtain this value
+/// only through the receipt-replaying verifier above.
+#[cfg(test)]
+pub(crate) fn test_verified_renderer_audio_binding_with_effects_groups(
+    audio: &AudioView<'_>,
+    receipt_sha256: String,
+    renderer_identity_sha256: String,
+    renderer_config_sha256: String,
+    source_score_sha256: String,
+    input_artifact_sha256: String,
+    performed_event_map_sha256: String,
+    performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
+    performed_event_lineage: Vec<PerformedEventLineage>,
+    effects_groups: u8,
+) -> VerifiedRendererAudioBinding {
+    let mut binding = test_verified_renderer_audio_binding(
+        audio,
+        receipt_sha256,
+        renderer_identity_sha256,
+        renderer_config_sha256,
+        source_score_sha256,
+        input_artifact_sha256,
+        performed_event_map_sha256,
+        performed_event_map_artifact_sha256,
+        expected_primary_pitches_sha256,
+        performed_event_lineage,
+    );
+    binding.fluid_synth_effects_groups = Some(effects_groups);
+    binding
 }
 
 /// Test-only constructor for exercising downstream coalition validators.
@@ -183,6 +221,7 @@ pub(crate) fn test_verified_renderer_audio_binding(
         performed_event_map_artifact_sha256,
         expected_primary_pitches_sha256,
         performed_event_lineage,
+        fluid_synth_effects_groups: None,
     }
 }
 
@@ -225,6 +264,12 @@ impl VerifiedRendererAudioBinding {
 
     pub fn performed_event_lineage(&self) -> &[PerformedEventLineage] {
         &self.performed_event_lineage
+    }
+
+    /// Explicit FluidSynth FX group count from the verified receipt argv.
+    /// None must be treated as incomplete routing, not as the default group.
+    pub fn fluid_synth_effects_groups(&self) -> Option<u8> {
+        self.fluid_synth_effects_groups
     }
 }
 
@@ -288,6 +333,30 @@ fn renderer_execution_profile_sha256(
     .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
 
     Ok((sha256_hex(&identity_bytes), sha256_hex(&config_bytes)))
+}
+
+
+fn receipt_fluidsynth_effects_groups(
+    receipt: &RendererExecutionReceipt,
+) -> Option<u8> {
+    let process = receipt.process_observation.as_ref()?;
+    let mut matches = Vec::new();
+    for pair in process.arguments.windows(2) {
+        if pair[0] == "-o" {
+            if let Some(value) = pair[1].strip_prefix("synth.effects-groups=") {
+                let groups = value.parse::<u8>().ok()?;
+                if !(1..=MAX_RECORDED_EFFECTS_GROUPS).contains(&groups) {
+                    return None;
+                }
+                matches.push(groups);
+            }
+        }
+    }
+    if matches.len() == 1 {
+        matches.first().copied()
+    } else {
+        None
+    }
 }
 
 /// Verify the receipt against its exact serialized Score/config/MIDI-or-schedule,
@@ -417,6 +486,7 @@ pub(crate) fn verify_renderer_audio_binding_excluding_set(
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
+        fluid_synth_effects_groups: receipt_fluidsynth_effects_groups(receipt),
     })
 }
 
@@ -1554,6 +1624,8 @@ mod tests {
                 format!("/tmp/{render_id}.wav"),
                 "-r".into(),
                 "48000".into(),
+                "-o".into(),
+                "synth.effects-groups=1".into(),
                 "-ni".into(),
                 "/fixture/soundfont.sf2".into(),
                 format!("/tmp/{render_id}.mid"),
@@ -1684,6 +1756,7 @@ mod tests {
         assert_eq!(verified.audio_sha256(), audio_sha256(&audio(&samples)));
         assert_eq!(verified.receipt_sha256(), render.receipt.receipt_sha256);
         assert_eq!(verified.performed_event_lineage().len(), 2);
+        assert_eq!(verified.fluid_synth_effects_groups(), Some(1));
 
         let mut altered = samples.clone();
         altered[10] = 0.25;
