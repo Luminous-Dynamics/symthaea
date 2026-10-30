@@ -2178,7 +2178,7 @@ mod tests {
                 utility_rows
                     .iter()
                     .find(|(candidate_outcome, candidate_action, _)| {
-                        candidate_outcome == outcome && candidate_action == *action
+                        candidate_outcome.as_str() == outcome && candidate_action.as_str() == *action
                     })
                     .map(|(_, _, utility)| *utility)
                     .unwrap_or(f64::NAN)
