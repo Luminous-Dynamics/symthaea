@@ -71,6 +71,46 @@ The fixture command intentionally rejects every catalog case it does not impleme
 
 The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. Its execution records identify the separate worker binary, relative resource path, process IDs and before/after output witnesses. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**; `scope_is_full_catalog` independently reports whether every catalog case was selected. Neither field implies that the observer profile is qualified.
 
+## Next paradigm shift: access is not semantic influence
+
+The first fixture runner currently distinguishes a task that reads a resource from a task that never opens it. That is a necessary baseline, but it is not the full evidence-retention problem.
+
+A task can read bytes and deliberately discard them. A filesystem observer should still report the access. Yet an access event alone does not prove that a change to those bytes affected the task's observable output. Conversely, one unchanged output under one mutation is not proof that the resource is irrelevant under every input, branch, runtime state or future execution.
+
+BASALT should eventually separate three claims:
+
+| Claim | Evidence | What it does *not* establish |
+|---|---|---|
+| Access observed | File/metadata/mapping event with stable resource identity | That the resource affected the task result |
+| Influence demonstrated in this execution | Controlled perturbation changes a deterministic output or declared effect witness | That all possible values/paths have been explored |
+| Non-influence bounded to a declared domain | Multiple controlled perturbations, same task/environment, complete output/effect comparison, and a stated equivalence domain | Universal irrelevance outside that domain |
+
+### A read-but-discard challenge
+
+Add a separate semantic-impact fixture in which the task reads and hashes the resource into an internal value, deliberately discards that value, and emits a deterministic output independent of the resource. The observer's access receipt must include the resource; the counterfactual lane should show that the task output is unchanged for the tested mutation. This case must **not** be classified as `not_consumed`. It is `accessed_no_output_effect_in_tested_domain`.
+
+Then add a matched influence-positive fixture where the same resource is used in the emitted output. The same mutation should alter the output witness. Both tasks must run from identical snapshots and the test matrix must record all output and side-effect channels included in the equivalence claim.
+
+### Safe interpretation
+
+Do not let a single unchanged output erase a dependency. The report should retain separate sets:
+
+- `accessed_resources`: resources observed by the OS/build adapter.
+- `influence_demonstrated_resources`: resources whose controlled perturbation changed a declared output/effect witness.
+- `non_influence_tested_resources`: resources that were accessed but produced no observable difference within a preregistered mutation and execution domain.
+- `unresolved_influence_resources`: resources for which the task is nondeterministic, effects are not fully observable, or the tested domain is insufficient.
+
+Only the last two are allowed to constrain a bounded reuse claim, and only under a separately qualified influence profile. Outside that profile, the current conservative rule remains: a changed accessed resource is a dependency or makes evidence unresolved.
+
+### Research techniques to compare
+
+1. **Dynamic taint / information-flow tracking** can trace whether input-derived values reach declared outputs or side effects, but requires explicit coverage of system calls, native code, GPU/device activity, shared memory and language/runtime boundaries.
+2. **Differential replay** can perturb one input at a time and compare output/effect manifests, but only supports claims about tested executions and mutations.
+3. **Program slicing / dependency graphs** can explain data and control paths, but static approximations may over- or under-approximate dynamic behavior.
+4. **Metamorphic and property-based perturbation** can broaden the tested input domain, while preserving a clear distinction between sampled robustness and universal guarantees.
+
+This yields a second, non-compensatory benchmark axis: first measure access-observation soundness; only then measure influence-classification precision and safe retention. A system must never improve its retention score by silently failing to observe a read. No production evidence should be reused solely because one counterfactual output happened to remain unchanged.
+
 ## Do not collapse freshness, coverage and integrity into one status
 
 The next receipt revision should model four orthogonal dimensions rather than a single boolean called `complete`:
