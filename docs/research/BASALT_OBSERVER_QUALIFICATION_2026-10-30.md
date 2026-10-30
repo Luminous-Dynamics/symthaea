@@ -170,6 +170,21 @@ Proposed stretch targets—not measured results or external standards:
 
 The 33-case catalog is conformance coverage, not a sufficiently large efficacy study. Split by repository/task lineage, keep an untouched confirmatory holdout, preregister intervention positions and stopping rules, and report exact paired intervals. Never compare a BASALT percentage directly to a SWE-Shift, SWE-Bench Pro or Artificial Analysis score unless the task, harness, retry policy, budget and evaluator are matched.
 
+## Runner-independent catalog auditor
+
+A Rust-side catalog structural auditor is available through xtask:
+
+```sh
+cargo run -p xtask -- basalt-observer-catalog-audit \
+  --input benchmarks/basalt/coverage/observer-challenges.v1.json
+```
+
+The command validates strict deserialization, format/profile status, the required-but-nullable ground-truth resource field, supported family/channel/mutation/disposition/fact enums, unique case IDs and receipt facts, reciprocal pair links, and the special recall/precision pairing invariant: a `preserve_unrelated` case must pair with exactly one `capture_dependency` case for the same injected resource. It bounds input size, case count, text size, fact count and pair count, and emits a deterministic JSON report with counts by family, channel and expected disposition.
+
+The catalog-audit report's `structurally_valid` field means only that the challenge definition is internally consistent. `qualification_eligible` is hard-coded false. This command does not execute fixtures, inspect a Linux observer, authenticate receipts, estimate capture recall, or promote a coverage profile. Its purpose is to reject malformed/ambiguous challenge definitions before the actual runner exists.
+
+Ten unit tests are authored alongside the module, including the checked-in corpus and mutation controls for duplicate IDs, missing nullable fields, unknown fields/facts, unresolved resources, mismatched precision/recall pairs, non-reciprocal pair links, false qualification declarations and input limits. These tests have not been executed in this environment.
+
 ## Current execution status
 
 This commit authors the schema, 33 challenge definitions and the qualification protocol only. The corpus has not been executed; no observer is qualified; no Rust build or test result is claimed. The next runtime milestone belongs to the Linux runner implementation and independently instrumented challenge harness tracked by #9210/#9239.
