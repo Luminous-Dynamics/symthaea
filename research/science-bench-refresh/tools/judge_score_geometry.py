@@ -207,6 +207,27 @@ def _correlation(xs: list[float], ys: list[float]) -> float | None:
     return max(-1.0, min(1.0, result))
 
 
+def _average_ranks(values: list[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda index: values[index])
+    ranks = [0.0] * len(values)
+    position = 0
+    while position < len(order):
+        end = position + 1
+        while end < len(order) and values[order[end]] == values[order[position]]:
+            end += 1
+        average_rank = ((position + 1) + end) / 2.0
+        for offset in range(position, end):
+            ranks[order[offset]] = average_rank
+        position = end
+    return ranks
+
+
+def _spearman(xs: list[float], ys: list[float]) -> float | None:
+    if len(xs) != len(ys) or len(xs) < 3:
+        return None
+    return _correlation(_average_ranks(xs), _average_ranks(ys))
+
+
 def _rater_maps(items: list[dict[str, Any]], panel_name: str) -> dict[str, dict[str, list[float]]]:
     result: dict[str, dict[str, list[float]]] = {}
     for item in items:
@@ -223,11 +244,14 @@ def _pairwise_summary(
     left = _rater_maps(items, left_name)
     right = _rater_maps(items, right_name)
     same_panel = left_name == right_name
-    correlations: list[float] = []
+    pearson_by_pair: list[float] = []
+    spearman_by_pair: list[float] = []
     pair_count = 0
-    undefined_pairs = 0
+    undefined_pearson_pairs = 0
+    undefined_spearman_pairs = 0
     criterion_comparisons = 0
-    undefined_criterion_comparisons = 0
+    undefined_pearson_criterion_comparisons = 0
+    undefined_spearman_criterion_comparisons = 0
     left_ids = sorted(left)
     right_ids = sorted(right)
     for i, left_id in enumerate(left_ids):
@@ -236,36 +260,53 @@ def _pairwise_summary(
             pair_count += 1
             shared_items = sorted(set(left[left_id]) & set(right[right_id]))
             if not shared_items:
-                undefined_pairs += 1
+                undefined_pearson_pairs += 1
+                undefined_spearman_pairs += 1
                 continue
-            criterion_correlations: list[float] = []
+            criterion_pearson: list[float] = []
+            criterion_spearman: list[float] = []
             criterion_count = len(left[left_id][shared_items[0]])
             for criterion_index in range(criterion_count):
                 xs = [left[left_id][item_id][criterion_index] for item_id in shared_items]
                 ys = [right[right_id][item_id][criterion_index] for item_id in shared_items]
                 criterion_comparisons += 1
-                corr = _correlation(xs, ys)
-                if corr is None:
-                    undefined_criterion_comparisons += 1
+                pearson = _correlation(xs, ys)
+                spearman = _spearman(xs, ys)
+                if pearson is None:
+                    undefined_pearson_criterion_comparisons += 1
                 else:
-                    criterion_correlations.append(corr)
-            if criterion_correlations:
+                    criterion_pearson.append(pearson)
+                if spearman is None:
+                    undefined_spearman_criterion_comparisons += 1
+                else:
+                    criterion_spearman.append(spearman)
+            if criterion_pearson:
                 # Equal weight per criterion prevents between-criterion score
                 # offsets from masquerading as within-criterion rater agreement.
-                correlations.append(statistics.fmean(criterion_correlations))
+                pearson_by_pair.append(statistics.fmean(criterion_pearson))
             else:
-                undefined_pairs += 1
+                undefined_pearson_pairs += 1
+            if criterion_spearman:
+                spearman_by_pair.append(statistics.fmean(criterion_spearman))
+            else:
+                undefined_spearman_pairs += 1
     return {
         "pair_count": pair_count,
-        "defined_pair_count": len(correlations),
-        "undefined_pair_count": undefined_pairs,
+        "defined_pair_count": len(pearson_by_pair),
+        "undefined_pair_count": undefined_pearson_pairs,
         "criterion_comparison_count": criterion_comparisons,
-        "undefined_criterion_comparison_count": undefined_criterion_comparisons,
-        "mean_pairwise_correlation": statistics.fmean(correlations) if correlations else None,
-        "median_pairwise_correlation": statistics.median(correlations) if correlations else None,
-        "minimum_pairwise_correlation": min(correlations) if correlations else None,
-        "maximum_pairwise_correlation": max(correlations) if correlations else None,
-        "pair_correlations": correlations,
+        "undefined_criterion_comparison_count": undefined_pearson_criterion_comparisons,
+        "mean_pairwise_pearson": statistics.fmean(pearson_by_pair) if pearson_by_pair else None,
+        "median_pairwise_pearson": statistics.median(pearson_by_pair) if pearson_by_pair else None,
+        "minimum_pairwise_pearson": min(pearson_by_pair) if pearson_by_pair else None,
+        "maximum_pairwise_pearson": max(pearson_by_pair) if pearson_by_pair else None,
+        "mean_pairwise_spearman": statistics.fmean(spearman_by_pair) if spearman_by_pair else None,
+        "median_pairwise_spearman": statistics.median(spearman_by_pair) if spearman_by_pair else None,
+        "spearman_defined_pair_count": len(spearman_by_pair),
+        "spearman_undefined_pair_count": undefined_spearman_pairs,
+        "undefined_spearman_criterion_comparison_count": undefined_spearman_criterion_comparisons,
+        "pearson_pair_correlations": pearson_by_pair,
+        "spearman_pair_correlations": spearman_by_pair,
     }
 
 def _panel_mean_matrix(items: list[dict[str, Any]], panel_name: str) -> list[list[float]]:
