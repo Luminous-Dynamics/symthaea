@@ -180,7 +180,7 @@ The new Rust primitive is `nasbench201_trajectory.rs` and its tracking issue is 
 - seeded first-improvement 1-opt local search driven by one declared proxy;
 - local-optimum recording and bounded random 2-opt escapes;
 - preservation of starts, first-improvement candidates, local optima, escape candidates and all visited IDs;
-- feature-catalog digest over architecture IDs, six-op topology and selected proxy values;
+- feature-catalog digest over architecture IDs, six-op topology, selected proxy values and measured runtime;
 - archive digest over the frozen config, catalog digest, all candidate lists, ordered event trace and catalog-completeness flag;
 - explicit `catalog_is_complete`: true only when all 5^6 = 15,625 distinct NAS-Bench-201 topologies are present; otherwise a local optimum is only relative to the supplied catalog;
 - promotion planner with explicit proxy-elite, trajectory and topology-diversity quotas; remaining slots are labelled fallback;
@@ -188,7 +188,7 @@ The new Rust primitive is `nasbench201_trajectory.rs` and its tracking issue is 
 
 The archive's target-metric ID is explicit and must differ from the proxy ID. The planner verifies that it receives the same feature catalog and archive content that generated the trajectory, rejects unknown candidates and rejects quota overcommit. The resulting IDs feed the same multi-fidelity Successive Halving runner. Random search can now run with an empty proxy feature map, so the evaluator no longer requires a fake proxy column for a genuine no-proxy baseline.
 
-This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. Thirteen Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, archive binding, partial-catalog honesty, deterministic random pools, single-proxy ranking and invalid inputs. They have not been compiled or executed.
+This is **not an R-MF-NAS reproduction**: it does not implement the paper's complete Search Trajectory Network diagnostics, candidate injection details or exact benchmark protocol. Fourteen Rust tests are authored for deterministic replay, first-improvement behavior, exact 2-opt escape distance, visit budgets, fixed-size promotion, archive/runtime binding, partial-catalog honesty, deterministic random pools, single-proxy ranking, trajectory-pool conversion and invalid inputs. They have not been compiled or executed.
 
 ## 9. Target-free multi-proxy consensus prior (CoRA-inspired)
 
@@ -240,6 +240,8 @@ The outer execution harness must later add process startup, optimizer CPU/GPU ti
 
 For equal-budget experiments, run random, single-best-proxy, consensus, trajectory and combined policies through the same proxy acquisition ledger and the same multi-fidelity query oracle. Compare (a) equal proxy seconds, (b) equal training resource and (c) equal combined declared resource as separate tracks. This prevents proxy-heavy methods from receiving free evidence and prevents target-query count from being mistaken for compute cost.
 
+The comparison runner now has common candidate-pool selectors for public-catalog random sampling, single-proxy ranking and trajectory-promotion plans. The multi-fidelity constructor permits an empty proxy schema, so random search is a real no-proxy baseline rather than a synthetic "random proxy" column. All pool strategies can feed the same preflighted Successive Halving schedule.
+
 ## 11. External benchmark and data limitations
 
 The initial Rust test fixture is synthetic; it does not reproduce NAS-Bench-201, CoRA-NAS or R-MF-NAS. A one-time curve importer has now been authored at `scripts/research/import_naslib_nb201_learning_curves.py`. It merges a pinned SuiteZero canonical feature import with the official NASLib NAS-Bench-201 per-task learning-curve pickle.
@@ -253,6 +255,8 @@ The observed NASLib API structure is:
 The SuiteZero importer uses six-integer tuple-string architecture IDs, while the NASLib learning-curve pickle uses graph-string keys. The curve importer now reproduces the official NASLib `convert_op_indices_to_str` mapping exactly (edge order `(1,2),(1,3),(1,4),(2,3),(2,4),(3,4)`; op IDs 0..4 map to `skip_connect, none, nor_conv_3x3, nor_conv_1x1, avg_pool_3x3`). A pinned unit test checks the conversion against a concrete NASLib example. Directly comparing the two key formats would have rejected valid data; this mismatch is fixed in the importer. The CIFAR-10 pickle is documented upstream as `nb201_cifar10_full_training.pickle`, Google Drive ID `1sh8pEhdrgZ97-VFBVL94rI36gedExVgJ`; NASLib's Colab artifact log reports 117 MB. The importer requires a caller-supplied expected raw SHA-256 and checks it **before** unpickling. Pickle deserialization can execute code: only use the official artifact after verifying the expected digest from a trusted, independent source. The importer validates exact architecture-set equality against SuiteZero, validates complete curves, checks the final curve point against SuiteZero `val_accuracy` within a declared tolerance, and emits the multi-fidelity canonical schema. It records the raw curve digest and SuiteZero canonical-import digest in a composite source provenance digest.
 
 Nine standard-library Python tests are authored in `scripts/research/test_import_naslib_nb201_learning_curves.py` for epoch mapping, endpoint agreement, missing/extra architectures, missing/short curves, non-finite values, schedule/budget guards and pre-unpickle SHA verification. They have not been executed. The real 117 MB artifact has not been downloaded or hash-pinned, so importer validation remains synthetic until that step is completed. The 4.7 GB checkpoint or 226 GB trained-weight archive is not a prerequisite for this initial curve table.
+
+HiP-BO (Cai, Xian & Huang, *Neurocomputing*, available online 16 October 2026, DOI 10.1016/j.neucom.2026.135404) is added as the next transfer/curve baseline. It combines relevance-weighted historical-task GP priors with a pretrained learning-curve predictor to estimate saturation-level performance and allocate fidelity. It reports competitive/improved anytime performance on NAS-Bench-201, FCNet and LCBench; exact implementation, checkpoint, data splits and cost accounting must be pinned before reproduction. Tracking issue: [#9225](https://github.com/Luminous-Dynamics/symthaea/issues/9225).
 
 ZAPS and CoRA published values are reference targets from their papers, not results from this branch. No real NAS artifact has been loaded and no reproduction has been run.
 
