@@ -569,3 +569,10 @@ The combined target is an auditable chain from a declared tissue sampling frame 
 
 
 - [Hidden co-linear merge executable baseline](CONNECTOME_COLINEAR_MERGE_AUDIT_PROTOCOL_V1.md): separate evaluator-only truth, a no-proposal control, radius-only versus multifeature change-point proposals, and negative controls for taper, bouton pulses, imaging artifacts, and compartment transitions. The synthetic fixture intentionally shows recall improving from 1/2 to 2/2 while false proposals rise from 1 to 7. Synthetic only; not a biological detector.
+
+
+### Query-specific dependency closure hardening (2026-10-30)
+
+The query-certificate contract now carries explicit `query.dependency_roots` and typed `dependency_closure[].depends_on` edges. The Rust verifier rejects unresolved references, duplicate roots/edges/nodes, directed cycles, and unreachable extra dependency nodes. The synthetic path query roots at its exact edge record and traverses to both endpoint neurons.
+
+This is a graph-closure consistency proof relative to the supplied query roots and edges. It does **not** prove that the root manifest includes every scientifically relevant object; the query-specific extractor and source mapping still need independent validation. The verifier now has 21 authored tests, not yet compiled or run on this head.
