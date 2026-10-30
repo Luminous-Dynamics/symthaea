@@ -14,7 +14,7 @@ The evaluator is not allowed to treat an unprobed pair as a negative. That disti
 
 Move from self-reported heuristic quality to **oracle-audited experimental design**. Every candidate policy is evaluated against exact small-N truth, with the cost of acquiring that truth retained. The evaluator reports candidate-policy metrics separately from the planner's independent audit sample.
 
-Pairwise effects are not a complete model of interaction. Higher-order Harsanyi terms are reported on their own axis, so a planner cannot obtain a high pair-recall score while silently ignoring a pure three-way interaction.
+Pairwise probe effects are contextual, not an unconditional decomposition by interaction order. A pure three-way interaction can produce nonzero contextual four-coalition differences when the third event remains present, even though every unconditional order-2 Harsanyi dividend is zero. The evaluator reports both the contextual probe target and the global Harsanyi order decomposition.
 
 ## Implementation contract
 
@@ -23,10 +23,10 @@ The new src/interaction_probe_benchmark.rs module:
 - Replays and verifies the EVAL-020 factorial report from exact source-isolated fixture events, effect and configuration.
 - Replays and verifies the EVAL-019 probe plan from score/renderer digests, frame count, support/topology evidence, and explicit planner configuration.
 - Requires the support frame domain to match the EVAL-020 source frame count.
-- Derives pairwise PCM ground truth from order-2 Harsanyi dividends and an explicit positive L2 threshold.
+- Derives the probe target from EVAL-018's *contextual four-coalition finite difference*: for each pair A/B, retain all other events and compare full, without A, without B, and without both. This makes the evaluator measure the same contextual effect that a real EVAL-018 probe measures.
 - Computes candidate-only precision/recall and false-positive/false-negative counts.
 - Reports audit-only discoveries separately; measured recall includes candidates plus audit pairs.
-- Reports nonzero order-3+ interaction count, aggregate pairwise/higher-order PCM L2 norms, and their ratio when defined.
+- Separately reports contextual pair-effect magnitude, unconditional global order-2 Harsanyi structure, and order-3+ Harsanyi structure. These are not interchangeable: a three-way effect can induce nonzero contextual pair probes while its global order-2 Harsanyi terms remain exactly zero.
 - Checks selected-pair and render accounting against the exhaustive all-pairs cost.
 - Seals the result in a domain-separated SHA-256 receipt and supports full replay/tamper verification.
 
@@ -49,7 +49,7 @@ The cost ratio is planned renders divided by exhaustive renders. Pair counts des
 ## Known-answer fixtures authored
 
 1. **Sparse pair case:** eight events; only events 0 and 1 interact through a quadratic shared processor. Their nonzero source samples exactly match their overlapping synthetic acoustic supports; all other event supports are disjoint. The expected result is one true pair found, no candidate false positives, candidate precision/recall 1.0, and 10 planned renders versus 37 exhaustive pairwise renders (10/37 ≈ 27.0%). These are asserted source-level expectations, not executed results.
-2. **Higher-order blind spot:** three co-supported events with a pure third-order product. Every pair overlaps in time, but no order-2 PCM dividend exists; the three-way dividend is nonzero. The planner therefore proposes pair probes that do not reveal the true third-order effect. The report exposes this structural limitation rather than awarding pairwise recall or hiding it.
+2. **Context versus order:** three co-supported events with a pure third-order product. Every contextual pair finite difference is nonzero while all unconditional order-2 Harsanyi dividends are zero and the order-3 dividend is nonzero. The planner should select all three pair probes; the report must show contextual recall separately from the global interaction-order decomposition.
 3. **Receipt hard negative:** changing a report count without recomputing the receipt must be rejected.
 
 ## Proposed benchmark targets — not achieved results
@@ -66,4 +66,4 @@ Thresholds must be frozen per fixture family before comparing policies. Confiden
 
 ## Validation boundary
 
-Three Rust tests are authored for sparse pair recall/cost, pure higher-order visibility, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
+Three Rust tests are authored for sparse pair recall/cost, the distinction between contextual pair effects and a pure third-order Harsanyi term, and receipt tamper rejection. They have not been compiled or run in this environment. No Rust test, clippy, formatting, CI, FluidSynth or listening result is claimed. The expected 10/37 cost ratio follows from the fixture and accounting formula but still needs execution of the Rust tests.
