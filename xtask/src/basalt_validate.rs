@@ -7,6 +7,7 @@ use std::path::Path;
 
 const MAX_RUN_RECORD_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_SUITE_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_TASK_SPEC_BYTES: u64 = 4 * 1024 * 1024;
 
 /// A deterministic report about record validity. It is not a benchmark score.
 #[derive(Debug, Serialize)]
@@ -481,10 +482,40 @@ enum Outcome {
     NotRun,
 }
 
-pub fn validate_file(input_path: &Path, manifest_path: &Path) -> anyhow::Result<ValidationReport> {
+pub fn validate_file(
+    input_path: &Path,
+    manifest_path: &Path,
+    spec_root: &Path,
+) -> anyhow::Result<ValidationReport> {
     let input_bytes = read_bounded(input_path, MAX_RUN_RECORD_BYTES)?;
     let manifest_bytes = read_bounded(manifest_path, MAX_SUITE_MANIFEST_BYTES)?;
-    Ok(validate_bytes(&input_bytes, &manifest_bytes))
+    let spec_artifacts = load_spec_artifacts(&manifest_bytes, spec_root)?;
+    Ok(validate_bytes(&input_bytes, &manifest_bytes, &spec_artifacts))
+}
+
+fn load_spec_artifacts(
+    manifest_bytes: &[u8],
+    spec_root: &Path,
+) -> anyhow::Result<BTreeMap<String, Vec<u8>>> {
+    let manifest: SuiteManifest = serde_json::from_slice(manifest_bytes)
+        .map_err(|error| anyhow::anyhow!("cannot resolve task specifications from an invalid manifest: {error}"))?;
+    let mut artifacts = BTreeMap::new();
+    for task in manifest.tasks {
+        let Some(hex_digest) = task.spec_digest.strip_prefix("sha256:") else {
+            continue;
+        };
+        if hex_digest.len() != 64
+            || !hex_digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            continue;
+        }
+        let path = spec_root.join(format!("{hex_digest}.txt"));
+        if path.is_file() {
+            let bytes = read_bounded(&path, MAX_TASK_SPEC_BYTES)?;
+            artifacts.insert(task.task_id, bytes);
+        }
+    }
+    Ok(artifacts)
 }
 
 fn read_bounded(path: &Path, max_bytes: u64) -> anyhow::Result<Vec<u8>> {
@@ -501,7 +532,7 @@ fn read_bounded(path: &Path, max_bytes: u64) -> anyhow::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn validate_bytes(bytes: &[u8], manifest_bytes: &[u8]) -> ValidationReport {
+fn validate_bytes(bytes: &[u8], manifest_bytes: &[u8], spec_artifacts: &BTreeMap<String, Vec<u8>>) -> ValidationReport {
     let input_digest = format!("sha256:{}", sha256_hex(bytes));
     let manifest_digest = format!("sha256:{}", sha256_hex(manifest_bytes));
     let mut report = ValidationReport {
@@ -538,12 +569,12 @@ fn validate_bytes(bytes: &[u8], manifest_bytes: &[u8]) -> ValidationReport {
         }
     };
 
-    validate_run(&run, &manifest, manifest_bytes, &mut report);
+    validate_run(&run, &manifest, manifest_bytes, spec_artifacts, &mut report);
     report.valid = report.errors.is_empty();
     report
 }
 
-fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], report: &mut ValidationReport) {
+fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8], spec_artifacts: &BTreeMap<String, Vec<u8>>, report: &mut ValidationReport) {
     validate_manifest_binding(run, manifest, manifest_bytes, report);
     if run.schema_version != 1 {
         error(report, "E_SCHEMA_VERSION", "schema_version", "only schema_version=1 is supported");
@@ -907,6 +938,7 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
             report,
             &task_path,
             task,
+            spec_artifacts.get(&task.task_id).map(Vec::as_slice),
         );
     }
 
@@ -937,8 +969,35 @@ fn validate_manifest_binding(run: &RunRecord, manifest: &SuiteManifest, manifest
     }
 }
 
-fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, task: &ManifestTask) {
+fn validate_task_requirements(
+    report: &mut ValidationReport,
+    task_path: &str,
+    task: &ManifestTask,
+    spec_bytes: Option<&[u8]>,
+) {
     let path = format!("{task_path}.requirements");
+    let spec_text = match spec_bytes {
+        None => {
+            error(report, "E_SPEC_ARTIFACT_MISSING", &path, "the exact task specification artifact must be supplied from the offline --spec-root");
+            None
+        }
+        Some(bytes) => {
+            if bytes.len() as u64 != task.spec_byte_length {
+                error(report, "E_SPEC_BYTE_LENGTH_MISMATCH", format!("{task_path}.spec_byte_length"), "actual specification artifact length differs from the frozen byte length");
+            }
+            let actual_digest = format!("sha256:{}", sha256_hex(bytes));
+            if actual_digest != task.spec_digest {
+                error(report, "E_SPEC_ARTIFACT_DIGEST", format!("{task_path}.spec_digest"), "actual specification artifact digest differs from the frozen specification digest");
+            }
+            match std::str::from_utf8(bytes) {
+                Ok(text) => Some(text),
+                Err(_) => {
+                    error(report, "E_SPEC_ARTIFACT_UTF8", &path, "task specification artifact must be valid UTF-8");
+                    None
+                }
+            }
+        }
+    };
     if task.requirements.is_empty() {
         error(report, "E_REQUIREMENTS_EMPTY", &path, "every task must freeze at least one atomic requirement");
     }
@@ -990,6 +1049,38 @@ fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, ta
                 format!("{requirement_path}.source_span.end_byte"),
                 "source span end_byte must not exceed the frozen specification byte length",
             );
+        }
+        if let Some(spec_text) = spec_text {
+            match (
+                usize::try_from(requirement.source_span.start_byte),
+                usize::try_from(requirement.source_span.end_byte),
+            ) {
+                (Ok(start), Ok(end)) => match spec_text.get(start..end) {
+                    Some(source_span) => {
+                        let actual_span_digest = format!("sha256:{}", sha256_hex(source_span.as_bytes()));
+                        if actual_span_digest != requirement.statement_digest {
+                            error(
+                                report,
+                                "E_REQUIREMENT_STATEMENT_MISMATCH",
+                                format!("{requirement_path}.statement_digest"),
+                                "statement_digest must hash the exact UTF-8 bytes selected by source_span",
+                            );
+                        }
+                    }
+                    None => error(
+                        report,
+                        "E_REQUIREMENT_SPAN_UTF8_BOUNDARY",
+                        format!("{requirement_path}.source_span"),
+                        "source span must select valid UTF-8 character boundaries in the actual specification",
+                    ),
+                },
+                _ => error(
+                    report,
+                    "E_REQUIREMENT_SPAN_PLATFORM_RANGE",
+                    format!("{requirement_path}.source_span"),
+                    "source span offsets cannot be represented on this platform",
+                ),
+            }
         }
         validate_digest(
             report,
@@ -1521,12 +1612,17 @@ mod tests {
 
     const EXAMPLE: &str = include_str!("../../benchmarks/basalt/examples/run-record.example.json");
     const MANIFEST: &str = include_str!("../../benchmarks/basalt/examples/suite-manifest.example.json");
+    const EXAMPLE_SPEC: &str = include_str!("../../benchmarks/basalt/specifications/ae9535fc0aab3f958effde1a4b0a6f821740af7f999e012e37cd747023d8b2ac.txt");
+
+    fn synthetic_specs() -> BTreeMap<String, Vec<u8>> {
+        BTreeMap::from([("rust-repair-0001".to_string(), EXAMPLE_SPEC.as_bytes().to_vec())])
+    }
 
     fn validate_value(mutator: impl FnOnce(&mut Value)) -> ValidationReport {
         let mut value: Value = serde_json::from_str(EXAMPLE).expect("synthetic fixture parses");
         mutator(&mut value);
         let bytes = serde_json::to_vec(&value).expect("fixture serializes");
-        validate_bytes(&bytes, MANIFEST.as_bytes())
+        validate_bytes(&bytes, MANIFEST.as_bytes(), &synthetic_specs())
     }
 
     fn validate_value_and_manifest(
@@ -1540,7 +1636,7 @@ mod tests {
         value["source"]["manifest_digest"] =
             Value::String(format!("sha256:{}", sha256_hex(&manifest_bytes)));
         let bytes = serde_json::to_vec_pretty(&value).expect("record serializes");
-        validate_bytes(&bytes, &manifest_bytes)
+        validate_bytes(&bytes, &manifest_bytes, &synthetic_specs())
     }
 
     fn has_code(report: &ValidationReport, code: &str) -> bool {
@@ -1549,7 +1645,7 @@ mod tests {
 
     #[test]
     fn synthetic_paired_fixture_passes_structure_and_invariants() {
-        let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes());
+        let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &synthetic_specs());
         assert!(report.valid, "{:?}", report.errors);
         assert_eq!(report.counts.tasks_total, 1);
         assert_eq!(report.counts.trials_expected, 2);
@@ -1698,8 +1794,8 @@ mod tests {
 
     #[test]
     fn report_is_deterministic_for_identical_input_bytes() {
-        let first = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes())).unwrap();
-        let second = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes())).unwrap();
+        let first = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &synthetic_specs())).unwrap();
+        let second = serde_json::to_vec(&validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &synthetic_specs())).unwrap();
         assert_eq!(first, second);
     }
 
@@ -1744,7 +1840,7 @@ mod tests {
         let mut value: Value = serde_json::from_str(EXAMPLE).unwrap();
         value["unexpected_top_level_field"] = Value::Bool(true);
         let bytes = serde_json::to_vec(&value).unwrap();
-        let report = validate_bytes(&bytes, MANIFEST.as_bytes());
+        let report = validate_bytes(&bytes, MANIFEST.as_bytes(), &synthetic_specs());
         assert!(!report.valid);
         assert!(has_code(&report, "E_JSON_OR_SHAPE"));
     }
@@ -1756,7 +1852,7 @@ mod tests {
             "\"schema_version\": 1,\n  \"schema_version\": 1,",
             1,
         );
-        let report = validate_bytes(duplicate.as_bytes(), MANIFEST.as_bytes());
+        let report = validate_bytes(duplicate.as_bytes(), MANIFEST.as_bytes(), &synthetic_specs());
         assert!(!report.valid);
         assert!(has_code(&report, "E_JSON_OR_SHAPE"));
     }
@@ -1849,7 +1945,7 @@ mod tests {
         manifest["tasks"][0]["family"] = Value::String("different_family".into());
         let mut bytes = serde_json::to_vec_pretty(&manifest).unwrap();
         bytes.push(b'\n');
-        let report = validate_bytes(EXAMPLE.as_bytes(), &bytes);
+        let report = validate_bytes(EXAMPLE.as_bytes(), &bytes, &synthetic_specs());
         assert!(!report.valid);
         assert!(has_code(&report, "E_MANIFEST_DIGEST_MISMATCH"));
     }
@@ -2063,6 +2159,49 @@ mod tests {
         });
         assert!(!report.valid);
         assert!(has_code(&report, "E_REQUIREMENT_CHECKS_EMPTY"));
+    }
+
+    #[test]
+    fn requirement_span_is_hashed_against_actual_specification_bytes() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["statement_digest"] =
+                Value::String(format!("sha256:{}", "f".repeat(64)));
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_STATEMENT_MISMATCH"));
+    }
+
+    #[test]
+    fn actual_specification_bytes_must_match_frozen_digest() {
+        let mut specs = synthetic_specs();
+        specs.insert("rust-repair-0001".to_string(), b"tampered specification bytes".to_vec());
+        let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &specs);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_SPEC_BYTE_LENGTH_MISMATCH"));
+        assert!(has_code(&report, "E_SPEC_ARTIFACT_DIGEST"));
+    }
+
+    #[test]
+    fn missing_specification_artifact_is_rejected() {
+        let report = validate_bytes(EXAMPLE.as_bytes(), MANIFEST.as_bytes(), &BTreeMap::new());
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_SPEC_ARTIFACT_MISSING"));
+    }
+
+    #[test]
+    fn spec_span_must_land_on_utf8_character_boundaries() {
+        let mut manifest: Value = serde_json::from_str(MANIFEST).unwrap();
+        manifest["tasks"][0]["requirements"][1]["source_span"]["start_byte"] = Value::from(87);
+        manifest["tasks"][0]["requirements"][1]["source_span"]["end_byte"] = Value::from(88);
+        let mut manifest_bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        manifest_bytes.push(b'\n');
+        let mut run: Value = serde_json::from_str(EXAMPLE).unwrap();
+        run["source"]["manifest_digest"] =
+            Value::String(format!("sha256:{}", sha256_hex(&manifest_bytes)));
+        let run_bytes = serde_json::to_vec_pretty(&run).unwrap();
+        let report = validate_bytes(&run_bytes, &manifest_bytes, &synthetic_specs());
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_SPAN_UTF8_BOUNDARY"));
     }
 
     #[test]
