@@ -142,7 +142,9 @@ PYTHONPATH=validation python validation/multistream_group_aggregators.py \
   --output /tmp/multistream-group-aggregators.json
 ```
 
-SHA-256:
-- source: `425f4ac336cbd65c7e2bab5be00e7c92533797c0b89197024239a8a9a5c9cdc6`
-- tests: `6a38149574212eea7672c87fb4a1b11688b19d11fdfbcf0504792cbdeda7c636`
-- pilot JSON: `ca3909476d7aa2549e539cc425a6352058e39d50e2f7246639a0a004421ee54f`
+Committed Git blob IDs:
+- source: `07cc96a507a218e403df06e6bc8daf8956f06d16`
+- tests: `2b4f90ba55a9e796d543fab6acba25382ad2e4f2`
+- pilot summary: `8aaa8d4fb8d03d8e5671126f3515f4cda55d183c`
+
+The full local pilot output SHA-256 is `ca3909476d7aa2549e539cc425a6352058e39d50e2f7246639a0a004421ee54f`; the committed JSON is a compact version of that output.
