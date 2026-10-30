@@ -36,6 +36,12 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct ProofCandidateAdmission {
     pub evidence_id: String,
     pub source_revision_id: String,
+    /// Exact source identity fields copied from the immutable EvidenceIndex hit.
+    pub source_trajectory_id: String,
+    pub source_step_id: Option<String>,
+    pub source_step_index: Option<u64>,
+    pub source_sha256: String,
+    pub source_pointer: String,
     pub source_family_id: String,
     pub scope_id: String,
     /// Digest of the exact EvidenceIndex state that produced this hit.
@@ -218,6 +224,17 @@ pub fn admit_lexical_hits_for_proof_budget(
                 admission.evidence_id
             ));
         }
+        if admission.source_trajectory_id != hit.source.trajectory_id
+            || admission.source_step_id != hit.source.step_id
+            || admission.source_step_index != hit.source.step_index
+            || admission.source_sha256 != hit.source.source_sha256
+            || admission.source_pointer != hit.source.source_pointer
+        {
+            return Err(format!(
+                "admission {:?} source identity does not match the immutable lexical hit",
+                admission.evidence_id
+            ));
+        }
         if admission.token_cost == 0 {
             return Err(format!(
                 "admission {:?} has no exact rendered token cost",
@@ -348,6 +365,11 @@ mod tests {
         ProofCandidateAdmission {
             evidence_id: id.into(),
             source_revision_id: format!("revision-{id}"),
+            source_trajectory_id: "trajectory-1".into(),
+            source_step_id: Some("step-2".into()),
+            source_step_index: Some(2),
+            source_sha256: digest("canonical source"),
+            source_pointer: "/messages/2/content".into(),
             source_family_id: format!("family-{id}"),
             scope_id: "scope-1".into(),
             index_state_sha256: digest("index state"),
@@ -399,6 +421,37 @@ mod tests {
         }
     }
 
+    fn indexed_record(text: &str) -> (EvidenceRecord, Vec<u8>) {
+        let source_bytes = serde_json::to_vec(&serde_json::json!({
+            "messages": [{"content": text}]
+        })).unwrap();
+        let record = EvidenceRecord {
+            schema_version: crate::memory_evidence::EVIDENCE_SCHEMA_VERSION.to_string(),
+            evidence_id: "A".into(),
+            hdc_id: 65,
+            scope_id: "scope-1".into(),
+            source: EvidenceSource {
+                trajectory_id: "trajectory-1".into(),
+                step_id: Some("step-2".into()),
+                step_index: Some(2),
+                source_sha256: digest_bytes(&source_bytes),
+                source_pointer: "/messages/0/content".into(),
+            },
+            payload: EvidencePayload::Text { value: text.into() },
+            content_sha256: digest(text),
+            lifecycle: EvidenceLifecycle::Active,
+            occurred_at_unix_ms: Some(100),
+            valid_from_unix_ms: Some(50),
+            valid_until_unix_ms: Some(500),
+            superseded_by: None,
+        };
+        (record, source_bytes)
+    }
+
+    fn digest_bytes(bytes: &[u8]) -> String {
+        format!("{:x}", Sha256::digest(bytes))
+    }
+
     #[test]
     fn lexical_hits_join_only_with_exact_snapshot_admissions() {
         let proof_request = admit_lexical_hits_for_proof_budget(
@@ -419,6 +472,38 @@ mod tests {
         let result = solve_proof_budget(proof_request).unwrap();
         assert_eq!(result.status, ProofBudgetStatus::Supported);
         assert_eq!(result.total_token_cost, 10);
+    }
+
+    #[test]
+    fn actual_bm25_index_hits_join_to_a_state_bound_proof_request() {
+        let text = "verified evidence excerpt about project funding";
+        let (record, source_bytes) = indexed_record(text);
+        let mut index = EvidenceIndex::new();
+        index.insert(record, &source_bytes).unwrap();
+
+        let snapshot = index.snapshot_receipt(200).unwrap();
+        let hits = index.search_bm25(
+            "verified evidence",
+            "scope-1",
+            250,
+            Path::new("."),
+            Bm25Config::default(),
+        ).unwrap();
+        assert_eq!(hits.len(), 1);
+
+        let mut admission = admission("A");
+        admission.source_pointer = "/messages/0/content".into();
+        admission.index_state_sha256 = snapshot.index_state_sha256.clone();
+        let proof_request = admit_lexical_hits_for_proof_budget(
+            request(),
+            &hits,
+            &[admission],
+            &snapshot,
+        ).unwrap();
+        let result = solve_proof_budget(proof_request).unwrap();
+
+        assert_eq!(result.status, ProofBudgetStatus::Supported);
+        assert_eq!(result.evidence[0].source_span_text, text);
     }
 
     #[test]
@@ -446,7 +531,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0)],
             &[admission("A"), admission("B")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(unused.contains("unused admission"));
     }
@@ -457,7 +542,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0), hit("A", "evidence", 0.9)],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(duplicate.contains("duplicate lexical hit"));
 
@@ -467,7 +552,7 @@ mod tests {
             request(),
             &[corrupt],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(mismatch.contains("payload digest"));
     }
@@ -480,7 +565,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0)],
             &[denied],
-            200,
+            &snapshot_receipt(),
         ).unwrap();
 
         let result = solve_proof_budget(proof_request).unwrap();
@@ -496,7 +581,7 @@ mod tests {
             request(),
             &[wrong_scope],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("scope does not match"));
 
@@ -506,7 +591,7 @@ mod tests {
             request(),
             &[wrong_validity],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("validity interval does not match"));
     }
@@ -519,7 +604,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0)],
             &[wrong_scope],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("scope does not match"));
     }
@@ -559,7 +644,7 @@ mod tests {
                 hit("C", "expired evidence", 1.0),
             ],
             &[future, revoked, expired],
-            200,
+            &snapshot_receipt(),
         ).unwrap();
 
         let result = solve_proof_budget(proof_request).unwrap();
@@ -580,7 +665,7 @@ mod tests {
             request(),
             &[non_finite],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("invalid BM25 score"));
 
@@ -590,7 +675,7 @@ mod tests {
             request(),
             &[hit("A", "evidence", 1.0), aliased],
             &[admission("A"), admission("B")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("duplicate HDC candidate ID"));
     }
@@ -625,7 +710,7 @@ mod tests {
             proof_request,
             &[hit("A", "evidence", 1.0)],
             &[admission("A")],
-            200,
+            &snapshot_receipt(),
         ).unwrap_err();
         assert!(error.contains("candidates must be empty"));
     }
