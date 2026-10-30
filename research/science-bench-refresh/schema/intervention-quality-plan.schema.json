@@ -81,18 +81,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "minimum_reviewers",
+        "reviewers_per_candidate",
         "consensus_threshold_permille",
         "require_blind_to_generator_identity",
+        "require_blind_to_intended_relation",
         "require_blind_to_pipeline_disposition",
         "require_blind_to_evaluator_outcome"
       ],
       "properties": {
-        "minimum_reviewers": {
-          "type": "integer",
-          "minimum": 3,
-          "maximum": 7
-        },
         "consensus_threshold_permille": {
           "type": "integer",
           "minimum": 501,
@@ -105,6 +101,14 @@
           "const": true
         },
         "require_blind_to_evaluator_outcome": {
+          "const": true
+        },
+        "reviewers_per_candidate": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 7
+        },
+        "require_blind_to_intended_relation": {
           "const": true
         }
       }
