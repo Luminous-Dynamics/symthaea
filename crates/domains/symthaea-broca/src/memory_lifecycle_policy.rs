@@ -893,6 +893,7 @@ mod tests {
             scope_id: "scope-1".into(),
             valid_at_unix_ms: 200,
             known_at_unix_ms: 300,
+            evidence_index_state_sha256: digest("evidence index state"),
             unresolved_claims_sha256: RetrievalUtilityEstimate::unresolved_claims_digest(&unresolved).unwrap(),
             unresolved_required_claim_ids: unresolved,
             estimator_id: "test-estimator".into(),
