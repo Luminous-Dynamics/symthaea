@@ -1,6 +1,6 @@
 # LEP Conformance Benchmark Plan
 
-**Status:** Proposed benchmark gates; no performance/SOTA result is claimed  
+**Status:** First hosted synthetic smoke baseline recorded; no SOTA or production-performance result is claimed  
 **Version under test:** LEP predicate v0.1.0 over in-toto Statement v1  
 **Implementation:** \`tools/lep-conformance\`
 
@@ -29,7 +29,7 @@ The standards do not establish a single SOTA score for general evidence profiles
 | Authentication | DSSE payload/signature tampering, unknown signer, wrong identity, and wrong trust root | 100% rejection when required verification fails; no "unsigned pass" fallback | Signature/key/identity test fixtures; separate from LEP-only status |
 | Reproducibility | Repeated verification of the same bytes, schema, and tool build | Byte-identical normalized report and stable failure codes | Frozen test vector; deterministic ordering of diagnostics |
 | Offline safety | Validate local records while network access is disabled | Zero network attempts or remote-reference retrieval | Schema has only local references; test with network sandbox or socket-denial harness |
-| Performance | Warm validation latency and throughput at 1 KiB, 10 KiB, 100 KiB, and 1 MiB | Establish a measured baseline before setting absolute budgets; semantic path should remain within 2× the same-version structural-only baseline on 10 KiB records | 5 warm-up runs, at least 30 timed repetitions per size, p50/p95, bytes/s, CPU/toolchain metadata |
+| Performance | Warm validation latency and throughput at 1 KiB, 10 KiB, 100 KiB, and 1 MiB | First smoke p50 ratio: 1.139× at 10 KiB; provisional target remains ≤2× structural-only p50. Full gate requires five independent process samples per size | 20 warm-up iterations per path and 100 timed iterations per process, five process repeats, p50/p95, bytes/s, CPU/toolchain metadata |
 | Memory / DoS | Deep nesting, oversized arrays, huge strings, extreme nesting, repeated malformed inputs | CLI and library reject serialized statements above 16 MiB; serde_json's default recursion limit rejects deeply nested structures; no unbounded resource claims | Parser tests, boundary cases, reject/limit results and peak RSS measurements |
 | Operational safety | Queued or failed jobs cannot be promoted to passed; inconclusive results cannot hide failed checks | 100% of transition invariants covered by tests | Decision table plus negative controls |
 
@@ -62,11 +62,13 @@ From the repository root, collect the four input sizes with the same iteration c
 
 ```sh
 for size in 1024 10240 102400 1048576; do
-  cargo run --release --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- "$size" 1000
+  for repeat in 1 2 3 4 5; do
+    cargo run --release --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- "$size" 100
+  done
 done
 ```
 
-Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This harness currently establishes a measurement method only; its first run must still pass compile and validity checks.
+Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This is the first one-process-per-size smoke result; the repeated-process gate is now defined in CI and still needs a fresh exact-head run. The raw JSON and reproducibility record for the first run are preserved under `docs/research/benchmarks/LEP-PERF-2026-10-30/`.
 
 ## Deterministic adversarial suite now authored
 
@@ -84,9 +86,34 @@ all 1,000 cases on the exact commit. The suite is deterministic and is intended
 as a minimum adversarial regression layer; later suites should add parser
 differential tests, compound attacks, fuzzing, and resource-exhaustion bounds.
 
-## Baseline to collect next
+## First hosted smoke baseline
 
-The implementation now caches the compiled schema per process so repeated validation need not parse and compile the schema for every record. This is a design optimization, **not a measured speedup**. First collect the table above on the current implementation; use that result to set a realistic absolute latency/throughput budget and to determine whether further optimization is justified.
+The first successful hosted LEP workflow ran on PR source head
+`9f120920153c78374fb782c493046d38d8f2c2b6` (workflow merge commit
+`3d89fe67866905474fb782c493046d38d8f2c2b6`), using Rust
+`1.96.0 (ac68faa20 2026-05-25)`, 20 warm-up iterations per path, and 100
+timed iterations. The semantic path was measured against strict parse + schema:
+
+| Actual input | Structural p50 | Full p50 | p50 overhead | Full p95 |
+|---:|---:|---:|---:|---:|
+| 1,247 B (requested 1 KiB) | 5.709 µs | 6.590 µs | 15.4% | 7.071 µs |
+| 10 KiB | 6.870 µs | 7.822 µs | 13.9% | 8.012 µs |
+| 100 KiB | 19.169 µs | 20.021 µs | 4.4% | 21.662 µs |
+| 1 MiB | 157.547 µs | 160.511 µs | 1.9% | 181.343 µs |
+
+These figures are **single-process synthetic smoke results**, not a statistically
+stable cross-machine comparison and not a comparison to Cedar, OPA, or an
+industry validator. They cover LEP strict JSON parsing + local schema and
+semantic checks only; no signature, artifact, execution, or network costs are
+included. Raw per-size JSON, Cargo.lock digest, runner metadata, PR head, and
+workflow merge SHA are preserved under
+`docs/research/benchmarks/LEP-PERF-2026-10-30/`.
+
+The implementation caches the compiled schema per process. These measurements
+are the first quantitative baseline for the parser/schema/semantic split; they
+do not establish a measured speedup over an uncached validator. The next CI run
+collects five independent process samples per size to quantify run-to-run
+variance before setting any absolute latency budget.
 
 ## Out of scope for the current prototype
 
@@ -94,7 +121,7 @@ The implementation now caches the compiled schema per process so repeated valida
 - Resolving subject/input URIs and re-hashing artifact bytes.
 - Attesting that a runner or command actually executed.
 - Cross-language implementation parity.
-- Performance and resource-exhaustion measurements.
+- Full cross-machine performance characterization and memory/DoS profiling.
 - Any claim that a conforming statement's claim is true.
 
 These remain explicit follow-up gates rather than implied capabilities.
