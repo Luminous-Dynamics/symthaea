@@ -68,7 +68,7 @@ for size in 1024 10240 102400 1048576; do
 done
 ```
 
-Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This is the first one-process-per-size smoke result; the repeated-process gate is now defined in CI and still needs a fresh exact-head run. The raw JSON and reproducibility record for the first run are preserved under `docs/research/benchmarks/LEP-PERF-2026-10-30/`.
+Use the emitted `actual_input_bytes` (not just the requested size) in reports. Do not compare numbers from different hardware/toolchains as if they were controlled measurements; record OS, CPU, rustc version, dependency-lock digest, and commit SHA alongside the JSON output. This was the initial one-process-per-size smoke result. The later repeated-process run is recorded in [LEP_CONFORMANCE_BENCHMARK_RESULTS_2026-10-30.md](LEP_CONFORMANCE_BENCHMARK_RESULTS_2026-10-30.md). The original raw JSON and reproducibility record remain preserved under `docs/research/benchmarks/LEP-PERF-2026-10-30/`.
 
 ## Deterministic adversarial suite now authored
 
@@ -114,6 +114,21 @@ are the first quantitative baseline for the parser/schema/semantic split; they
 do not establish a measured speedup over an uncached validator. The next CI run
 collects five independent process samples per size to quantify run-to-run
 variance before setting any absolute latency budget.
+
+## Repeated-process hosted baseline (2026-10-30)
+
+A subsequent successful LEP workflow run (run number 45, run ID 41035270018) collected five independent benchmark-command batches per requested size on the PR source revision `b7378d6641d23ac0f803ac737eb47493cedfaa31`. Each batch used 20 warm-ups and 100 timed iterations per path on ubuntu-latest Linux x86_64 with Rust 1.96.0. The table reports medians across the five batch-level p50 and p95 values, not pooled raw-sample quantiles.
+
+| Requested size | Actual bytes | Structural p50 | Full p50 | Structural p95 | Full p95 | p50 overhead |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 KiB | 1,247 | 9.819 µs | 11.572 µs | 10.710 µs | 12.233 µs | +17.9% |
+| 10 KiB | 10,240 | 11.872 µs | 13.555 µs | 12.744 µs | 14.117 µs | +14.2% |
+| 100 KiB | 102,400 | 31.379 µs | 33.281 µs | 33.282 µs | 36.548 µs | +6.1% |
+| 1 MiB | 1,048,576 | 236.190 µs | 235.548 µs | 253.562 µs | 256.658 µs | -0.3% |
+
+The 1 KiB request generated 1,247 actual bytes because the valid synthetic statement exceeds the requested size. The observed p50 overhead remained below the provisional 2x internal budget, but these are parser/schema/semantic microbenchmarks only. The small negative delta at 1 MiB is measurement noise, not proof that semantic checks are free.
+
+The exact run also passed formatting, locked Rust tests, Clippy with warnings denied, positive/negative CLI fixtures, 16 MiB oversize rejection, benchmark collection, and artifact upload. The machine-readable report and scope limitations are in [LEP_CONFORMANCE_BENCHMARK_RESULTS_2026-10-30.md](LEP_CONFORMANCE_BENCHMARK_RESULTS_2026-10-30.md); the uploaded artifact is named `lep-perf-cf431ab85f5791bef11431910e05af425ea70ec4`.
 
 ## Out of scope for the current prototype
 
