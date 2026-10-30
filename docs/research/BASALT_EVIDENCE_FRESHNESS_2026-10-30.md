@@ -47,7 +47,7 @@ The auditor establishes consistency of the supplied timeline and derives freshne
 - that a verifier is semantically adequate for the task;
 - that a final tree or runner identity is authentic.
 
-The `event_digest` and `evidence_digest` fields are format-checked content commitments in this slice; their referenced bytes and issuer signatures are not resolved here. Confirmatory scoring therefore remains gated on authenticated receipts (#9034), isolated runner delivery, exact source/environment identity, and qualified oracles (#9115). No claim of execution or SOTA superiority follows from the example fixture.
+The `event_digest` is recomputed as SHA-256 over compact canonical JSON containing the run ID, sequence, event ID, change kind, resource ID, and before/after digests. This detects payload edits but is not an issuer signature: an actor able to rewrite the timeline can also recompute the hash. The `evidence_digest` is currently format-checked but its referenced evidence bytes are not resolved here. No issuer signatures are verified in this slice. Confirmatory scoring therefore remains gated on authenticated receipts (#9034), isolated runner delivery, exact source/environment identity, and qualified oracles (#9115). No claim of execution or SOTA superiority follows from the example fixture.
 
 ## Research hypothesis
 
