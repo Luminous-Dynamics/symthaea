@@ -3314,7 +3314,7 @@ mod tests {
                 .lines()
                 .filter(|line| line.starts_with("INFERENCE_RESULT\t"))
                 .count(),
-            9
+            15
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
