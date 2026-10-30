@@ -1894,6 +1894,44 @@ mod tests {
         let too_short = parse_utc("2026-01-02T00:00:00.000900Z", "expiry").unwrap();
         assert!(unix_millis_floor(&too_short, "expiry").unwrap()
             <= unix_millis_ceil(&accepted, "accepted").unwrap());
+
+        let (trust_store, policy_key, _, ingestion_key) = store();
+        let representable = sign_role_policy(
+            role_policy(
+                10,
+                "2026-01-02T00:00:00.000100Z",
+                "2026-01-02T00:00:00.050500Z",
+            ),
+            &policy_key,
+            "2026-01-02T00:00:00.000500Z",
+            &ingestion_key,
+        );
+        let token = trust_store
+            .verify_role_scope_policy(&representable, 9)
+            .unwrap();
+        assert_eq!(
+            token.not_before_unix_ms(),
+            accepted.timestamp_millis() as u64 + 1
+        );
+        assert_eq!(
+            token.valid_until_unix_ms(),
+            token.not_before_unix_ms() + 49
+        );
+
+        let unrepresentable = sign_role_policy(
+            role_policy(
+                11,
+                "2026-01-02T00:00:00.000100Z",
+                "2026-01-02T00:00:00.000900Z",
+            ),
+            &policy_key,
+            "2026-01-02T00:00:00.000500Z",
+            &ingestion_key,
+        );
+        assert!(trust_store
+            .verify_role_scope_policy(&unrepresentable, 10)
+            .unwrap_err()
+            .contains("shorter than millisecond precision"));
     }
 
     #[test]
