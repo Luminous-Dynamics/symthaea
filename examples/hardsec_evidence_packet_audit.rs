@@ -63,10 +63,11 @@ struct ClaimSummary {
 #[derive(Debug, Clone)]
 struct AuditSummary {
     packet_id: String,
+    evaluation_mode: String,
     packet_sha256: String,
     design_id: String,
     netlist_sha256: String,
-    model_sha256: String,
+    model_sha256: Option<String>,
     evidence_count: usize,
     evidence: Vec<Evidence>,
     claims: Vec<ClaimSummary>,
@@ -373,9 +374,10 @@ fn require_kind_status(
 fn validate_supported_claim(
     claim_type: &str,
     selected: &[&Evidence],
-    detector_decision: &str,
-    detector_score: f64,
-    detector_threshold: f64,
+    evaluation_mode: &str,
+    detector_decision: Option<&str>,
+    detector_score: Option<f64>,
+    detector_threshold: Option<f64>,
 ) -> Result<(), String> {
     if selected.iter().any(|item| item.status != "pass") {
         return Err(format!(
@@ -385,8 +387,9 @@ fn validate_supported_claim(
 
     match claim_type {
         "model_suspects_trojan" => {
-            if detector_decision != "trojan_suspected"
-                || detector_score < detector_threshold
+            if evaluation_mode != "detector_alert"
+                || detector_decision != Some("trojan_suspected")
+                || !matches!((detector_score, detector_threshold), (Some(score), Some(threshold)) if score >= threshold)
             {
                 return Err(
                     "model_suspects_trojan requires decision=trojan_suspected and score >= threshold"
@@ -526,22 +529,36 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
         return Err("subject.netlist_sha256 must be a valid SHA-256 digest".to_owned());
     }
 
-    let detector = object(value, "detector")?;
-    let detector_value = Value::Object(detector.clone());
-    let model_sha256 =
-        required_string(&detector_value, "model_sha256")?.to_ascii_lowercase();
-    let config_sha256 =
-        required_string(&detector_value, "config_sha256")?.to_ascii_lowercase();
-    if !valid_sha256(&model_sha256) || !valid_sha256(&config_sha256) {
-        return Err("detector model/config SHA-256 is invalid".to_owned());
-    }
-    let _method = required_string(&detector_value, "method")?;
-    let detector_score = required_probability(&detector_value, "score")?;
-    let detector_threshold = required_probability(&detector_value, "threshold")?;
-    let detector_decision = required_string(&detector_value, "decision")?;
-    if !["trojan_suspected", "no_alert", "abstain"].contains(&detector_decision.as_str()) {
-        return Err("detector.decision must be trojan_suspected, no_alert, or abstain".to_owned());
-    }
+    let evaluation_mode = required_string(value, "evaluation_mode")?;
+    let (model_sha256, detector_score, detector_threshold, detector_decision) =
+        match evaluation_mode.as_str() {
+            "detector_alert" => {
+                let detector = object(value, "detector")?;
+                let detector_value = Value::Object(detector.clone());
+                let model_sha256 =
+                    required_string(&detector_value, "model_sha256")?.to_ascii_lowercase();
+                let config_sha256 =
+                    required_string(&detector_value, "config_sha256")?.to_ascii_lowercase();
+                if !valid_sha256(&model_sha256) || !valid_sha256(&config_sha256) {
+                    return Err("detector model/config SHA-256 is invalid".to_owned());
+                }
+                let _method = required_string(&detector_value, "method")?;
+                let score = required_probability(&detector_value, "score")?;
+                let threshold = required_probability(&detector_value, "threshold")?;
+                let decision = required_string(&detector_value, "decision")?;
+                if !["trojan_suspected", "no_alert", "abstain"].contains(&decision.as_str()) {
+                    return Err("detector.decision must be trojan_suspected, no_alert, or abstain".to_owned());
+                }
+                (Some(model_sha256), Some(score), Some(threshold), Some(decision))
+            }
+            "witness_validation" => {
+                if value.get("detector").is_some_and(|item| !item.is_null()) {
+                    return Err("witness_validation mode must not include a detector object".to_owned());
+                }
+                (None, None, None, None)
+            }
+            _ => return Err("evaluation_mode must be detector_alert or witness_validation".to_owned()),
+        };
 
     let evidence_values = value
         .get("evidence")
@@ -618,7 +635,8 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
                 validate_supported_claim(
                     &claim_type,
                     &selected,
-                    &detector_decision,
+                    &evaluation_mode,
+                    detector_decision.as_deref(),
                     detector_score,
                     detector_threshold,
                 )?;
@@ -652,6 +670,7 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
     let evidence_items = evidence.values().cloned().collect::<Vec<_>>();
     Ok(AuditSummary {
         packet_id,
+        evaluation_mode,
         packet_sha256,
         design_id,
         netlist_sha256,
@@ -716,6 +735,7 @@ fn run(args: Args) -> Result<(), String> {
         "result": "pass",
         "claim_scope": CLAIM_SCOPE,
         "packet_id": summary.packet_id,
+        "evaluation_mode": summary.evaluation_mode,
         "packet_sha256": summary.packet_sha256,
         "design_id": summary.design_id,
         "netlist_sha256": summary.netlist_sha256,
@@ -824,6 +844,7 @@ mod tests {
         json!({
             "schema_version": "hardsec-evidence-packet-v1",
             "packet_id": "packet-001",
+            "evaluation_mode": "detector_alert",
             "dataset_id": "fixture-dataset",
             "subject": {
                 "design_id": "design-001",
