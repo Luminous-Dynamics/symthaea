@@ -231,7 +231,7 @@ fn digest_ids(domain: &[u8], ids: &[String]) -> String {
     let digest = hasher.finalize();
     let alphabet = b"0123456789abcdef";
     let mut encoded = String::with_capacity(digest.len() * 2);
-    for byte in digest {
+    for byte in digest.iter().copied() {
         encoded.push(alphabet[(byte >> 4) as usize] as char);
         encoded.push(alphabet[(byte & 0x0f) as usize] as char);
     }
