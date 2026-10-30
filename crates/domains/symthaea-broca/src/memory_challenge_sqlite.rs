@@ -1324,6 +1324,128 @@ mod tests {
     }
 
     #[test]
+    fn late_arriving_memory_is_hidden_before_ingestion_and_visible_after() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        let mut request = add_request(
+            "late-source",
+            "user-1",
+            "session-1",
+            &["A historical schema migration fixed the parser."],
+        );
+        request.messages[0].timestamp = Some(1_700_000_000_000);
+        execute_aml_add(&mut backend, request).unwrap();
+        let batch = backend.lookup_existing("late-source").unwrap().unwrap();
+        let stored_at = batch.stored_at_unix_ms;
+        let valid_at = 1_750_000_000_000;
+
+        let before_ingestion = backend.search_as_known_at(
+            &AmlSearchRequest {
+                query: "historical schema migration parser".into(),
+                options: None,
+                user_id: "user-1".into(),
+                top_k: 10,
+            },
+            valid_at,
+            stored_at.saturating_sub(1),
+        ).unwrap();
+        assert!(before_ingestion.data.is_empty());
+
+        let after_ingestion = backend.search_as_known_at(
+            &AmlSearchRequest {
+                query: "historical schema migration parser".into(),
+                options: None,
+                user_id: "user-1".into(),
+                top_k: 10,
+            },
+            valid_at,
+            stored_at,
+        ).unwrap();
+        assert_eq!(after_ingestion.data.len(), 1);
+    }
+
+    #[test]
+    fn retraction_changes_as_known_view_only_after_recorded_time() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        let mut request = add_request(
+            "revoked-source",
+            "user-1",
+            "session-1",
+            &["legacy deployment procedure uses unsafe token"],
+        );
+        request.messages[0].timestamp = Some(1_700_000_000_000);
+        execute_aml_add(&mut backend, request).unwrap();
+        let evidence_id = backend.lookup_existing("revoked-source").unwrap().unwrap()
+            .records[0].evidence_id.clone();
+        std::thread::sleep(Duration::from_millis(3));
+        backend.revoke_evidence("revoke-at-t2", &evidence_id).unwrap();
+        let retracted_at: i64 = backend.connection.query_row(
+            "SELECT recorded_at_unix_ms FROM aml_evidence_lifecycle_events WHERE event_id = ?1",
+            params!["revoke-at-t2"],
+            |row| row.get(0),
+        ).unwrap();
+        let retracted_at = u64::try_from(retracted_at).unwrap();
+
+        let query = AmlSearchRequest {
+            query: "legacy deployment unsafe token".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        };
+        let before_retraction_was_known = backend.search_as_known_at(
+            &query,
+            1_780_000_000_000,
+            retracted_at.saturating_sub(1),
+        ).unwrap();
+        assert_eq!(before_retraction_was_known.data.len(), 1);
+
+        let after_retraction_was_known = backend.search_as_known_at(
+            &query,
+            1_780_000_000_000,
+            retracted_at,
+        ).unwrap();
+        assert!(after_retraction_was_known.data.is_empty());
+    }
+
+    #[test]
+    fn world_valid_time_and_system_known_time_are_independent() {
+        let root = tempdir().unwrap();
+        let mut backend = open_backend(root.path());
+        let valid_from = 1_700_000_000_000u64;
+        let mut request = add_request(
+            "future-valid-source",
+            "user-1",
+            "session-1",
+            &["New policy becomes valid on the announced date."],
+        );
+        request.messages[0].timestamp = Some(valid_from as i64);
+        execute_aml_add(&mut backend, request).unwrap();
+        let stored_at = backend.lookup_existing("future-valid-source").unwrap().unwrap()
+            .stored_at_unix_ms;
+        let query = AmlSearchRequest {
+            query: "policy announced date".into(),
+            options: None,
+            user_id: "user-1".into(),
+            top_k: 10,
+        };
+
+        let before_world_validity = backend.search_as_known_at(
+            &query,
+            valid_from - 1,
+            stored_at,
+        ).unwrap();
+        assert!(before_world_validity.data.is_empty());
+
+        let once_world_valid = backend.search_as_known_at(
+            &query,
+            valid_from,
+            stored_at,
+        ).unwrap();
+        assert_eq!(once_world_valid.data.len(), 1);
+    }
+
+    #[test]
     fn malformed_persisted_batch_fails_rebuild_closed() {
         let root = tempdir().unwrap();
         let path = root.path().join("broken.sqlite3");
