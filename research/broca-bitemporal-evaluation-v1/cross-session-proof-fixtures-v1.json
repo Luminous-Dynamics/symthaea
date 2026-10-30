@@ -1,0 +1,139 @@
+{
+  "schema_version": "broca-cross-session-proof-fixtures-v1",
+  "protocol_version": "BROCA-CROSS-SESSION-PROOF-V1",
+  "created_at": "2026-10-30",
+  "case_count": 4,
+  "semantics": {
+    "source_families": "independence axis; count distinct source_family_id values",
+    "sessions": "conversation axis; count distinct trusted source_session_id values",
+    "non_substitution": true,
+    "missing_provenance": "cannot satisfy a positive minimum_distinct_sessions constraint"
+  },
+  "source": "Synthetic deterministic proof-selection conformance cases; not BEAM benchmark results.",
+  "cases": [
+    {
+      "case_id": "valid-two-families-two-sessions",
+      "minimum_independent_families": 2,
+      "minimum_distinct_sessions": 2,
+      "candidates": [
+        {
+          "evidence_id": "A",
+          "source_family_id": "family-A",
+          "source_session_id": "session-1",
+          "token_cost": 2
+        },
+        {
+          "evidence_id": "B",
+          "source_family_id": "family-B",
+          "source_session_id": "session-2",
+          "token_cost": 4
+        }
+      ],
+      "alternatives": [
+        {
+          "justification_id": "cross-session-valid",
+          "evidence_dependencies": [
+            "A",
+            "B"
+          ]
+        }
+      ],
+      "expected_status": "supported",
+      "expected_selected_justification_id": "cross-session-valid",
+      "expected_rejection": null
+    },
+    {
+      "case_id": "two-independent-families-one-session",
+      "minimum_independent_families": 2,
+      "minimum_distinct_sessions": 2,
+      "candidates": [
+        {
+          "evidence_id": "A",
+          "source_family_id": "family-A",
+          "source_session_id": "session-1",
+          "token_cost": 2
+        },
+        {
+          "evidence_id": "B",
+          "source_family_id": "family-B",
+          "source_session_id": "session-1",
+          "token_cost": 2
+        }
+      ],
+      "alternatives": [
+        {
+          "justification_id": "same-session",
+          "evidence_dependencies": [
+            "A",
+            "B"
+          ]
+        }
+      ],
+      "expected_status": "no_eligible_proof",
+      "expected_selected_justification_id": null,
+      "expected_rejection": "distinct_session_count_insufficient"
+    },
+    {
+      "case_id": "two-sessions-one-independent-family",
+      "minimum_independent_families": 2,
+      "minimum_distinct_sessions": 2,
+      "candidates": [
+        {
+          "evidence_id": "A",
+          "source_family_id": "family-A",
+          "source_session_id": "session-1",
+          "token_cost": 2
+        },
+        {
+          "evidence_id": "B",
+          "source_family_id": "family-A",
+          "source_session_id": "session-2",
+          "token_cost": 2
+        }
+      ],
+      "alternatives": [
+        {
+          "justification_id": "same-family",
+          "evidence_dependencies": [
+            "A",
+            "B"
+          ]
+        }
+      ],
+      "expected_status": "no_eligible_proof",
+      "expected_selected_justification_id": null,
+      "expected_rejection": "independent_family_count_insufficient"
+    },
+    {
+      "case_id": "missing-trusted-session-provenance",
+      "minimum_independent_families": 1,
+      "minimum_distinct_sessions": 2,
+      "candidates": [
+        {
+          "evidence_id": "A",
+          "source_family_id": "family-A",
+          "source_session_id": "session-1",
+          "token_cost": 2
+        },
+        {
+          "evidence_id": "B",
+          "source_family_id": "family-B",
+          "source_session_id": null,
+          "token_cost": 2
+        }
+      ],
+      "alternatives": [
+        {
+          "justification_id": "missing-session",
+          "evidence_dependencies": [
+            "A",
+            "B"
+          ]
+        }
+      ],
+      "expected_status": "no_eligible_proof",
+      "expected_selected_justification_id": null,
+      "expected_rejection": "session_provenance_missing"
+    }
+  ]
+}
