@@ -143,7 +143,7 @@ struct AuditReport {
     certificate_id: Option<String>,
     certificate_sha256: String,
     status: &'static str,
-    checks_passed: usize,
+    certificate_consistency_check_passed: bool,
     checks_failed: usize,
     errors: Vec<String>,
     scope_note: &'static str,
@@ -364,6 +364,7 @@ fn validate(certificate: &Certificate) -> Vec<String> {
     let mut all_gates_pass = true;
     for gate in &certificate.quality_gates {
         push_if_invalid(&mut errors, !nonempty(&gate.gate_id), "gate_id must be non-empty");
+        push_if_invalid(&mut errors, !nonempty(&gate.scope_note), format!("gate {} must have a scope_note", gate.gate_id));
         push_if_invalid(
             &mut errors,
             !allowed(&gate.status, &["PASS", "FAIL", "NOT_ESTIMABLE", "NOT_APPLICABLE"]),
@@ -409,6 +410,12 @@ fn validate(certificate: &Certificate) -> Vec<String> {
         );
         if component.status != "ESTIMATED" {
             all_uncertainty_estimated = false;
+        }
+        if component.status == "ESTIMATED" && component.estimate.is_none() {
+            errors.push(format!("estimated component {} must include a point estimate", component.component_type));
+        }
+        if let Some(note) = &component.scope_note {
+            push_if_invalid(&mut errors, !nonempty(note), format!("uncertainty component {} has an empty scope_note", component.component_type));
         }
         if let Some(estimate) = component.estimate {
             push_if_invalid(
@@ -528,7 +535,7 @@ fn run(args: Args) -> Result<i32, String> {
         certificate_id: Some(certificate.certificate_id.clone()),
         certificate_sha256: sha256(&bytes),
         status,
-        checks_passed: if checks_failed == 0 { 1 } else { 0 },
+        certificate_consistency_check_passed: checks_failed == 0,
         checks_failed,
         errors,
         scope_note: "Internal certificate consistency only; source bytes, external digests, scientific truth, and biological correctness are not independently verified.",
