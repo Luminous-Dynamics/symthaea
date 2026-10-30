@@ -33,7 +33,7 @@ pub struct VerifiedReaderEvidence {
     pub source_span_start: u64,
     pub source_span_end: u64,
     pub source_family_id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_session_id: Option<String>,
     pub payload_sha256: String,
     pub source_span_sha256: String,
