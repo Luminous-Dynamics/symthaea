@@ -593,9 +593,18 @@ mod tests {
     }
 
     fn lineage(source_index: usize, channel: u8, midi_note: u8) -> crate::performed_event_map::PerformedEventLineage {
+        lineage_descendant(source_index, 0, channel, midi_note)
+    }
+
+    fn lineage_descendant(
+        source_index: usize,
+        descendant_ordinal: u32,
+        channel: u8,
+        midi_note: u8,
+    ) -> crate::performed_event_map::PerformedEventLineage {
         crate::performed_event_map::PerformedEventLineage {
             source_event_id: format!("score_event_index:{source_index}"),
-            descendant_ordinal: 0,
+            descendant_ordinal,
             midi_track_index: 0,
             note_on_ordinal: source_index as u32,
             midi_channel: channel,
@@ -630,7 +639,7 @@ mod tests {
         let baseline_lineage = vec![
             lineage(0, 0, 60),
             lineage(1, 4, 64),
-            lineage(1, 7, 64),
+            lineage_descendant(1, 1, 7, 64),
         ];
         let counterfactual_lineage = vec![lineage(0, 0, 60)];
         let baseline_binding = crate::counterfactual_influence::test_verified_renderer_audio_binding_with_effects_groups(
