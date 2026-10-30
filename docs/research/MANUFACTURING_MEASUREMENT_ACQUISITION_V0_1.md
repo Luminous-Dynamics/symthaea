@@ -181,3 +181,14 @@ Suggested pilot advancement gates:
 - 95% paired cluster-bootstrap intervals exclude zero for any claimed improvement.
 
 These are internal research targets, not published industry averages or certification thresholds.
+
+
+## Cross-repository adapter contract
+
+Symtropy's PWR-MFG-RID-001 evidence-envelope validator emits the nine-column candidate adapter used by the manufacturing workflow: candidate ID, representativeness, amplification risk, measurement standard uncertainty, acquisition cost/unit, hard eligibility, eligibility state, and eligibility receipt digest.
+
+Symthaea pins a synthetic sample of that exact output at:
+`crates/core/symthaea-core/src/hdc/conjecture_engine/fixtures/manufacturing-robustness-adapter-synthetic.csv`.
+The unit test parses that fixture, checks the shared cost unit and evidence fields, and executes the robust selector over the two candidate records. This verifies schema compatibility, not a live connection between repositories. The producer's envelope validator requires a manufacturing acceptance report for each product and blocks an `ELIGIBLE` claim when the independent route/test/calibration screen blocks the product.
+
+The producer still validates metadata and declared lineage only. It does not recompute the representativeness/risk scores or authenticate source artifacts. Those facts must be established independently before these values are fit for real industrial decisions.
