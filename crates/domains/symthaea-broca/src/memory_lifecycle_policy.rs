@@ -900,6 +900,7 @@ mod tests {
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator"),
             calibration_split_sha256: digest("heldout split"),
+            calibration_report_sha256: digest("calibration report"),
             feature_schema_sha256: digest("feature schema"),
             utility_schema_sha256: digest("utility schema"),
             correctness_gain_lcb_micro: 900,
