@@ -934,6 +934,189 @@ mod tests {
     }
 
     #[test]
+    fn randomized_sparse_graphs_match_independent_full_joint_enumeration() {
+        // Exercise arbitrary overlapping scopes, retained variables, disconnected
+        // eliminated variables, and exact zero-support entries. The oracle enumerates
+        // the full joint assignment directly and does not use the production
+        // projection, multiplication, or elimination helpers.
+        fn next_random(state: &mut u64) -> u64 {
+            *state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            *state
+        }
+
+        fn project(full_assignment: usize, scope: &[usize]) -> usize {
+            let mut local = 0usize;
+            for (slot, variable) in scope.iter().copied().enumerate() {
+                if ((full_assignment >> variable) & 1) != 0 {
+                    local |= 1usize << slot;
+                }
+            }
+            local
+        }
+
+        for variable_count in 2..=7 {
+            for seed in 0..16u64 {
+                let eliminate = (0..variable_count)
+                    .filter(|variable| (variable as u64 + seed) % 3 != 0)
+                    .collect::<Vec<_>>();
+                let retained = (0..variable_count)
+                    .filter(|variable| !eliminate.contains(variable))
+                    .collect::<Vec<_>>();
+                let mut random = seed ^ ((variable_count as u64) << 32);
+                let mut factors = Vec::<BinaryFactor>::new();
+
+                // Ensure every retained variable appears in the output scope.
+                for variable in &retained {
+                    let values = (0..2)
+                        .map(|_| 0.15 + (next_random(&mut random) % 8) as f64 * 0.1)
+                        .collect();
+                    factors.push(BinaryFactor::new(vec![*variable], values).unwrap());
+                }
+
+                // Generate overlapping pair and triple factors. Some cells are
+                // exact zeros, which become -infinity in the log-domain copy.
+                for left in 0..variable_count {
+                    for right in left + 1..variable_count {
+                        if next_random(&mut random) % 5 < 2 {
+                            let values = (0..4)
+                                .map(|entry| {
+                                    if (entry as u64 + next_random(&mut random)) % 13 == 0 {
+                                        0.0
+                                    } else {
+                                        0.1 + (next_random(&mut random) % 9) as f64 * 0.1
+                                    }
+                                })
+                                .collect();
+                            factors.push(
+                                BinaryFactor::new(vec![left, right], values).unwrap(),
+                            );
+                        }
+                    }
+                }
+                if variable_count >= 3 {
+                    for first in 0..variable_count {
+                        for second in first + 1..variable_count {
+                            for third in second + 1..variable_count {
+                                if next_random(&mut random) % 19 == 0 {
+                                    let values = (0..8)
+                                        .map(|entry| {
+                                            if (entry as u64 + next_random(&mut random)) % 17 == 0 {
+                                                0.0
+                                            } else {
+                                                0.1 + (next_random(&mut random) % 9) as f64 * 0.1
+                                            }
+                                        })
+                                        .collect();
+                                    factors.push(
+                                        BinaryFactor::new(
+                                            vec![first, second, third],
+                                            values,
+                                        )
+                                        .unwrap(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Disconnected eliminated variables are intentionally left out
+                // for some seeds; summing one must contribute an exact factor 2.
+                let mut expected = vec![0.0; 1usize << retained.len()];
+                for full_assignment in 0..(1usize << variable_count) {
+                    let mut joint_weight = 1.0;
+                    for factor in &factors {
+                        let local_index = project(full_assignment, factor.variables());
+                        joint_weight *= factor.value_at(local_index).unwrap();
+                    }
+                    let retained_index = project(full_assignment, &retained);
+                    expected[retained_index] += joint_weight;
+                }
+
+                let probability_report = min_fill_sum_product(
+                    &factors,
+                    &eliminate,
+                    1usize << variable_count,
+                )
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "probability contraction failed: n={variable_count}, seed={seed}: {error}"
+                    )
+                });
+                assert_eq!(
+                    probability_report.factor.variables(),
+                    retained,
+                    "probability scope mismatch: n={variable_count}, seed={seed}"
+                );
+                assert_eq!(probability_report.factor.values().len(), expected.len());
+                for (index, (actual, expected)) in probability_report
+                    .factor
+                    .values()
+                    .iter()
+                    .copied()
+                    .zip(expected.iter().copied())
+                    .enumerate()
+                {
+                    close(actual, expected);
+                    assert!(actual.is_finite() && actual >= 0.0,
+                        "invalid probability output: n={variable_count}, seed={seed}, index={index}");
+                }
+
+                let log_factors = factors
+                    .iter()
+                    .map(|factor| {
+                        BinaryLogFactor::new(
+                            factor.variables().to_vec(),
+                            factor.values().iter().map(|value| {
+                                if *value == 0.0 { f64::NEG_INFINITY } else { value.ln() }
+                            }).collect(),
+                        ).unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                let log_report = min_fill_log_sum_product(
+                    &log_factors,
+                    &eliminate,
+                    1usize << variable_count,
+                )
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "log contraction failed: n={variable_count}, seed={seed}: {error}"
+                    )
+                });
+                assert_eq!(
+                    log_report.factor.variables(),
+                    retained,
+                    "log scope mismatch: n={variable_count}, seed={seed}"
+                );
+                assert_eq!(log_report.factor.log_values().len(), expected.len());
+                for (index, (actual_log, expected)) in log_report
+                    .factor
+                    .log_values()
+                    .iter()
+                    .copied()
+                    .zip(expected.iter().copied())
+                    .enumerate()
+                {
+                    if expected == 0.0 {
+                        assert_eq!(
+                            actual_log,
+                            f64::NEG_INFINITY,
+                            "zero-support mismatch: n={variable_count}, seed={seed}, index={index}"
+                        );
+                    } else {
+                        close(actual_log.exp(), expected);
+                    }
+                }
+                assert_eq!(probability_report.elimination_order, log_report.elimination_order);
+                assert_eq!(probability_report.induced_width, log_report.induced_width);
+                assert_eq!(probability_report.peak_factor_entries, log_report.peak_factor_entries);
+            }
+        }
+    }
+
+    #[test]
     fn absent_elimination_variable_contributes_binary_sum_factor() {
         let factor = BinaryFactor::new(vec![0], vec![0.25, 0.75]).unwrap();
         let report = min_fill_sum_product(&[factor], &[1], 2).unwrap();
