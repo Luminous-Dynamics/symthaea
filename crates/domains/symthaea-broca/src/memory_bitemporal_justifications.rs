@@ -740,6 +740,91 @@ mod tests {
     }
 
     #[test]
+    fn same_time_parent_and_child_commit_atomically_in_topological_order() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 1, "gold")])
+            .unwrap();
+
+        let parent = conclusion("P", [justification("via-A", [source("A")])]);
+        let child = conclusion(
+            "C",
+            [justification(
+                "via-P",
+                [SupportRef::DerivedFact("P".into())],
+            )],
+        );
+        runtime.derive_batch_at([parent, child], instant(1)).unwrap();
+
+        for fact_id in ["P", "C"] {
+            assert!(matches!(
+                runtime
+                    .support_status_at(fact_id, date("2026-01-15"), instant(1), "tenant-1")
+                    .unwrap(),
+                AsOfSupportStatus::Supported { .. }
+            ));
+        }
+        runtime.verify_consistency().unwrap();
+    }
+
+    #[test]
+    fn derived_batch_requires_topological_parent_order_and_rolls_back_on_failure() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 1, "gold")])
+            .unwrap();
+        let before = runtime.state_sha256().unwrap();
+
+        let child_first = conclusion(
+            "C",
+            [justification(
+                "via-P",
+                [SupportRef::DerivedFact("P".into())],
+            )],
+        );
+        let parent_second = conclusion("P", [justification("via-A", [source("A")])]);
+        let error = runtime
+            .derive_batch_at([child_first, parent_second], instant(1))
+            .unwrap_err();
+        assert!(error.contains("unknown derived parent"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
+
+        let valid_parent = conclusion("P", [justification("via-A", [source("A")])]);
+        let invalid_child = conclusion(
+            "C",
+            [justification("via-missing", [source("MISSING")])],
+        );
+        let error = runtime
+            .derive_batch_at([valid_parent, invalid_child], instant(1))
+            .unwrap_err();
+        assert!(error.contains("unknown source revision"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
+    }
+
+    #[test]
+    fn separate_derived_batches_require_strictly_later_transaction_times() {
+        let mut runtime = BitemporalJustificationRuntime::default();
+        runtime
+            .append_source_events([assert_event("A", 1, "gold")])
+            .unwrap();
+        runtime
+            .derive_at(
+                conclusion("P", [justification("via-A", [source("A")])]),
+                instant(1),
+            )
+            .unwrap();
+        let before = runtime.state_sha256().unwrap();
+        let error = runtime
+            .derive_at(
+                conclusion("C", [justification("via-A", [source("A")])]),
+                instant(1),
+            )
+            .unwrap_err();
+        assert!(error.contains("strictly later timestamp"));
+        assert_eq!(runtime.state_sha256().unwrap(), before);
+    }
+
+    #[test]
     fn sixty_four_seed_alternative_support_retraction_sweep_matches_oracle() {
         for seed in 0u64..64 {
             let source_count = 2 + (seed as usize % 6);
