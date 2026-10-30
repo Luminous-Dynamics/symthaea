@@ -186,11 +186,22 @@ pub fn min_fill_sum_product(
         }
     }
 
-    let mut work = factors.to_vec();
+    // Variable-to-factor incidence buckets avoid rescanning every factor for
+    // every elimination step. A consumed factor is removed from each of its
+    // remaining variable buckets before the reduced factor is inserted.
+    let mut work = Vec::<Option<BinaryFactor>>::with_capacity(
+        factors.len().saturating_add(eliminate.len()),
+    );
+    let mut buckets = BTreeMap::<usize, BTreeSet<usize>>::new();
     let mut peak_factor_entries = 1usize;
-    for factor in &work {
+    for factor in factors {
         check_budget(factor.values.len(), max_factor_entries)?;
         peak_factor_entries = peak_factor_entries.max(factor.values.len());
+        let factor_id = work.len();
+        for variable in factor.variables.iter().copied() {
+            buckets.entry(variable).or_default().insert(factor_id);
+        }
+        work.push(Some(factor.clone()));
     }
 
     let (elimination_order, induced_width) = min_fill_order(factors, eliminate)?;
@@ -198,38 +209,51 @@ pub fn min_fill_sum_product(
     let mut variables_summed_out = 0usize;
 
     for variable in elimination_order.iter().copied() {
-        let mut involved = Vec::new();
-        let mut remaining = Vec::with_capacity(work.len());
-        for factor in work.drain(..) {
-            if factor.variables.binary_search(&variable).is_ok() {
-                involved.push(factor);
-            } else {
-                remaining.push(factor);
-            }
-        }
-
-        if involved.is_empty() {
+        let incident = buckets.remove(&variable).unwrap_or_default();
+        if incident.is_empty() {
             // An unrepresented binary variable has a unit prior and sums to 2.
-            remaining.push(BinaryFactor::scalar(2.0)?);
-            work = remaining;
+            work.push(Some(BinaryFactor::scalar(2.0)?));
             variables_summed_out += 1;
             continue;
         }
 
-        let mut product = involved.remove(0);
-        for factor in involved {
-            product = product.multiply(&factor, max_factor_entries)?;
-            factor_multiplications += 1;
-            peak_factor_entries = peak_factor_entries.max(product.values.len());
+        let mut product: Option<BinaryFactor> = None;
+        for factor_id in incident {
+            let Some(factor) = work.get_mut(factor_id).and_then(Option::take) else {
+                continue;
+            };
+            for other_variable in factor.variables.iter().copied() {
+                if other_variable != variable {
+                    if let Some(bucket) = buckets.get_mut(&other_variable) {
+                        bucket.remove(&factor_id);
+                    }
+                }
+            }
+
+            product = Some(match product {
+                None => factor,
+                Some(previous) => {
+                    factor_multiplications += 1;
+                    previous.multiply(&factor, max_factor_entries)?
+                }
+            });
+            if let Some(current) = &product {
+                peak_factor_entries = peak_factor_entries.max(current.values.len());
+            }
         }
+
+        let product = product.ok_or(FactorGraphError::VariableNotInFactor { variable })?;
         let reduced = product.sum_out(variable, max_factor_entries)?;
         peak_factor_entries = peak_factor_entries.max(reduced.values.len());
-        remaining.push(reduced);
-        work = remaining;
+        let factor_id = work.len();
+        for remaining_variable in reduced.variables.iter().copied() {
+            buckets.entry(remaining_variable).or_default().insert(factor_id);
+        }
+        work.push(Some(reduced));
         variables_summed_out += 1;
     }
 
-    let mut remaining = work.into_iter();
+    let mut remaining = work.into_iter().flatten();
     let mut result = remaining.next().ok_or(FactorGraphError::EmptyFactorGraph)?;
     for factor in remaining {
         result = result.multiply(&factor, max_factor_entries)?;
