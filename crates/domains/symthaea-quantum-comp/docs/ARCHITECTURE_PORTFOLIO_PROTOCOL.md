@@ -16,6 +16,7 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 | Analog compute-in-memory | RRAM/memristor, PCM, flash/NOR arrays | Data-local matrix/vector operations where conversion and correction costs do not erase array gains |
 | Classical photonic linear | Interferometric, diffractive or wavelength-multiplexed optics | High-throughput linear transforms and low-latency optical paths |
 | Photonic / physical reservoir | Physical dynamical substrate | Temporal feature expansion and reservoir tasks with cheap readout |
+| Superconducting digital | Cryogenic classical logic: SFQ, RQL and AQFP families | High-speed logic or specialised low-switching-energy computation, only when cryogenic, memory, I/O and cooling costs are measured |
 | Gate quantum | Superconducting, trapped-ion, neutral-atom and photonic systems | Specific quantum algorithms/sampling tasks under explicit logical/physical resource accounting |
 | Quantum annealing | Annealing / Ising architecture | Formulations that map faithfully to its native optimization model |
 | Spintronic / probabilistic | Spin devices and p-bits | Stochastic sampling or specialized low-energy probabilistic inference |
@@ -25,6 +26,8 @@ This protocol lets QARCH compare unlike compute paradigms without pretending the
 Memory-centric designs require separate labels for where computation occurs (in-array, in-module/stack, or adjacent to memory), how it is computed (digital or analog), and the memory substrate (SRAM, DRAM, flash, RRAM, PCM, etc.). Digital HBM/DRAM processing-in-memory is not analog memristor compute-in-memory; near-memory logic is not in-array compute.
 
 For these workloads, report bytes moved at each hierarchy boundary, bank bandwidth/parallelism, precision, host/device transfers, and end-to-end energy/latency. For analog arrays, include ADC/DAC, sensing, calibration, programming, correction and readout. Do not compare an array-only peak with a full-system PIM or GPU result.
+
+Superconducting digital logic is a classical computing substrate, not a quantum processor. SFQ, RQL and AQFP have different clocking, bias, memory and latency/energy trade-offs. System claims must include refrigeration wall power, cryogenic memory, warm/cold I/O, control electronics, packaging and usable throughput. Chip-only switching energy or a modelled accelerator efficiency is not a full-system result. Keep this family distinct from superconducting gate-model quantum systems.
 
 An event camera is a sensor modality, not a neuromorphic compute family. Classical photonic matrix multiplication is not quantum photonics. Quantum-inspired software on CPU/GPU remains a classical implementation. A CfC or continuous-time model must not be forced into a spiking-network representation merely to qualify as neuromorphic.
 
