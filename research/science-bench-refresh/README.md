@@ -48,7 +48,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 
 ## Audit quality of generated evaluator interventions
 
-This audit evaluates the mutation generator and semantic-verification pipeline, not the judge under test. V1 requires a full census of generated candidates and a fixed-size blinded human panel. It reports accepted-valid precision (with ambiguous accepts retained in the denominator), confirmed-invalid acceptance, ambiguity, valid-candidate recall, relation-stratified accepted/rejected/abstained outcomes, reviewer pairwise agreement, Fleiss' kappa, diversity and unique valid test yield per resource.
+This audit evaluates the mutation generator and semantic-verification pipeline, not the judge under test. V1 requires a full census of generated candidates and a fixed-size blinded human panel, blind to the declared intended relation as well as generator identity, pipeline disposition and evaluator outcome. It reports accepted-valid precision (with ambiguous accepts retained in the denominator), confirmed-invalid acceptance, ambiguity, valid-candidate recall, relation-stratified accepted/rejected/abstained outcomes, reviewer pairwise agreement, Fleiss' kappa, diversity and unique valid test yield per resource.
 
 ```sh
 python3 research/science-bench-refresh/tools/intervention_quality_fixture.py /tmp/intervention-quality
