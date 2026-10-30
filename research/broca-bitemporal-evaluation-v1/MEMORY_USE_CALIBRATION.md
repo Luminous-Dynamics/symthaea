@@ -45,18 +45,20 @@ These benchmarks address complementary questions. Do not pool their scores or cl
 
 For each evaluation task, the benchmark oracle labels each candidate memory atom with one intended influence role:
 
-| Role | State requirement | Intended reader behavior |
-|---|---|---|
-| Required constraint | Supported and eligible | Must change the decision when the atom is removed or contradicted |
-| Required fact | Supported and eligible | Must be reflected accurately in the answer |
-| Helpful context | Supported and eligible | May improve specificity; must not override required constraints |
-| Optional preference | Supported and eligible | Use only when relevant and not conflicting with stronger constraints |
-| Irrelevant | May be valid, but task-irrelevant | Output should be invariant to its presence or absence |
-| Unsupported | No valid justification | Must not be asserted as fact |
-| Invalidated / out of cutoff | Not eligible for this query | Must have no decision influence |
-| Conflict set | Multiple incompatible propositions are supported | Must preserve conflict or abstain; no arbitrary winner |
+MemCalib's three target levels provide the reader-influence axis: **Ignore** (no answer-specific footprint), **Bound** (bounded local support), and **Control** (controls a material conclusion or constraint). Broca adds a separate, hard eligibility gate before a memory atom reaches that axis.
 
-The role is a benchmark label, not an unconstrained confidence number. The benchmark must not ask the language model to decide its own ground-truth influence target.
+| Broca evidence role | Eligibility | Target influence | Intended reader behavior |
+|---|---|---|---|
+| Required constraint / required fact | Supported and eligible | Control | Must govern the relevant conclusion or action |
+| Helpful context / optional preference | Supported and eligible | Bound | May shape local details but not override Control atoms |
+| Irrelevant | May be valid, but task-irrelevant | Ignore | No answer-specific footprint; output should be invariant |
+| Unsupported | Fails support verification | Blocked; Ignore in bypass tests | Must not be asserted as a fact |
+| Invalidated / out of cutoff / unauthorized | Fails eligibility gate | Blocked; Ignore in bypass tests | Must not reach the reader; bypass must have zero influence |
+| Conflict set | Multiple incompatible propositions supported | Control | Preserve the conflict or abstain; never choose arbitrarily |
+
+Eligibility and influence must not be conflated. A signed but unauthorized or out-of-cutoff atom is not a low-confidence memory; it is ineligible. Conversely, a valid proposition can still have a target influence of Ignore for a particular task. The target label is benchmark ground truth, not an unconstrained confidence number that the reader is asked to assign itself.
+
+MemCalib's published dataset contains 15,000 examples across health, general assistance, and coding, with 234,220 atomic propositions and a 13,500/1,500 train/test split. It labels each proposition's target as Ignore, Bound, or Control and uses atom-specific rubrics to assess actual use. Broca's 12-case fixture is only an initial systems diagnostic; it is not a substitute for this scale or for the official MemCalib test split.
 
 ## 4. Counterfactual experiment design
 
