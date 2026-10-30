@@ -772,7 +772,7 @@ fn evaluate(
             &plans, frame, outcomes, selected, family_covered_impact, family_impact,
         )?;
 
-        error_family_coverage.insert(family, FamilyCoverage {
+        error_family_coverage.insert(family.clone(), FamilyCoverage {
             estimated_total_errors: family_total,
             estimated_covered_errors: family_covered_total,
             estimated_uncovered_errors: family_uncovered_total,
@@ -968,7 +968,7 @@ mod tests {
                     errors: vec![VerifiedError {
                         verified_error_id: "error-4".into(),
                         error_family: "merge".into(),
-                        impact_weight: 4.0,
+                        impact_weight: 8.0,
                         proposal_candidate_ids: vec![],
                     }],
                 },
@@ -1249,9 +1249,9 @@ mod tests {
             proposal, ranking_hash, protocol, "audit".into(),
         ).unwrap();
         assert!((report.candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
-        assert!((report.impact_weighted_candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
+        assert!((report.impact_weighted_candidate_generation_recall.ratio.unwrap() - (5.0 / 14.0)).abs() < 1e-12);
         assert_eq!(report.error_family_coverage["merge"].estimated_total_errors.total, 2.0);
-        assert!((report.error_family_coverage["merge"].candidate_generation_recall.ratio.unwrap() - 0.5).abs() < 1e-12);
+        assert!((report.error_family_coverage["merge"].candidate_generation_recall.ratio.unwrap() - 0.2).abs() < 1e-12);
     }
 
     #[test]
