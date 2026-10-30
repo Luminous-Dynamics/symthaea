@@ -348,6 +348,169 @@ impl Metrics {
     }
 }
 
+const ACTION_MENU_SIZE: usize = 9;
+const TASK_GOAL_SEED: u64 = 0xC0A8_7A5C_2026_1030;
+
+#[derive(Clone, Debug, PartialEq)]
+struct DecisionTask {
+    state: Vec<f32>,
+    goal: Vec<f32>,
+    actions: Vec<Vec<f32>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct DecisionMetrics {
+    model_utility: f64,
+    arx_utility: f64,
+    direct_utility: f64,
+    oracle_utility: f64,
+    model_regret: f64,
+    arx_regret: f64,
+    model_oracle_action_agreement: f64,
+    arx_oracle_action_agreement: f64,
+}
+
+fn candidate_action_menu() -> Vec<Vec<f32>> {
+    let mut rng = SplitMix64::new(0xA671_0A11_2026_1030);
+    let mut actions = Vec::with_capacity(ACTION_MENU_SIZE);
+    actions.push(vec![0.0; DIM]);
+    for _ in 0..4 {
+        let action = (0..DIM).map(|_| 0.6 * rng.signed()).collect::<Vec<_>>();
+        actions.push(action.clone());
+        actions.push(action.iter().map(|value| -*value).collect());
+    }
+    actions
+}
+
+fn make_decision_tasks(data: &[Experience], goal_seed: u64) -> Vec<DecisionTask> {
+    let actions = candidate_action_menu();
+    let mut rng = SplitMix64::new(goal_seed);
+    data.iter()
+        .map(|row| DecisionTask {
+            state: row.state.clone(),
+            goal: (0..DIM).map(|_| 0.45 * rng.signed()).collect(),
+            actions: actions.clone(),
+        })
+        .collect()
+}
+
+fn vector_mse(left: &[f32], right: &[f32]) -> f64 {
+    if left.is_empty() || left.len() != right.len() {
+        return f64::INFINITY;
+    }
+    left.iter()
+        .zip(right)
+        .map(|(a, b)| {
+            let delta = *a as f64 - *b as f64;
+            delta * delta
+        })
+        .sum::<f64>()
+        / left.len() as f64
+}
+
+fn argmin_by_score<F>(actions: &[Vec<f32>], mut score: F) -> usize
+where
+    F: FnMut(&[f32]) -> f64,
+{
+    actions
+        .iter()
+        .enumerate()
+        .min_by(|(_, left), (_, right)| score(left).total_cmp(&score(right)))
+        .map(|(index, _)| index)
+        .unwrap_or(0)
+}
+
+/// Candidate sees state, public goal and candidate action vectors. The transition law
+/// is not an argument to the candidate's scoring path.
+fn select_model_action(
+    model: &HierarchicalCfCWorldModel,
+    objective: Objective,
+    task: &DecisionTask,
+) -> Result<usize, String> {
+    let predictions = task.actions.iter()
+        .map(|action| match objective {
+            Objective::AbsoluteNextState => model.predict(&task.state, action, 1.0),
+            Objective::ResidualDelta => model.predict_next_state_residual(&task.state, action, 1.0),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("CfC candidate-action prediction failed: {error}"))?;
+    Ok(argmin_by_score(&task.actions, |action| {
+        let index = task.actions.iter().position(|candidate| candidate == action).unwrap_or(0);
+        vector_mse(&predictions[index], &task.goal)
+    }))
+}
+
+fn select_arx_action(
+    model: &LinearArxBaseline,
+    task: &DecisionTask,
+) -> Result<usize, String> {
+    let predictions = task.actions.iter()
+        .map(|action| model.predict(&task.state, action))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(argmin_by_score(&task.actions, |action| {
+        let index = task.actions.iter().position(|candidate| candidate == action).unwrap_or(0);
+        vector_mse(&predictions[index], &task.goal)
+    }))
+}
+
+fn task_utility(task: &DecisionTask, action_index: usize, law: Law) -> f64 {
+    let predicted_truth = transition(&task.state, &task.actions[action_index], law);
+    -vector_mse(&predicted_truth, &task.goal)
+}
+
+fn evaluate_decision_tasks(
+    model: &HierarchicalCfCWorldModel,
+    linear: &LinearArxBaseline,
+    objective: Objective,
+    data: &[Experience],
+    law: Law,
+    goal_seed: u64,
+) -> Result<DecisionMetrics, String> {
+    let tasks = make_decision_tasks(data, goal_seed);
+    if tasks.is_empty() {
+        return Err("decision tasks must not be empty".to_owned());
+    }
+    let mut model_utility = 0.0;
+    let mut arx_utility = 0.0;
+    let mut direct_utility = 0.0;
+    let mut oracle_utility = 0.0;
+    let mut model_agreement = 0_usize;
+    let mut arx_agreement = 0_usize;
+
+    for task in &tasks {
+        let model_choice = select_model_action(model, objective, task)?;
+        let arx_choice = select_arx_action(linear, task)?;
+        let direct_choice = 0; // Public no-op/direct baseline.
+        let oracle_choice = argmin_by_score(&task.actions, |action| {
+            let next_state = transition(&task.state, action, law);
+            vector_mse(&next_state, &task.goal)
+        });
+
+        model_utility += task_utility(task, model_choice, law);
+        arx_utility += task_utility(task, arx_choice, law);
+        direct_utility += task_utility(task, direct_choice, law);
+        oracle_utility += task_utility(task, oracle_choice, law);
+        model_agreement += (model_choice == oracle_choice) as usize;
+        arx_agreement += (arx_choice == oracle_choice) as usize;
+    }
+
+    let denominator = tasks.len() as f64;
+    let model_utility = model_utility / denominator;
+    let arx_utility = arx_utility / denominator;
+    let direct_utility = direct_utility / denominator;
+    let oracle_utility = oracle_utility / denominator;
+    Ok(DecisionMetrics {
+        model_utility,
+        arx_utility,
+        direct_utility,
+        oracle_utility,
+        model_regret: (oracle_utility - model_utility).max(0.0),
+        arx_regret: (oracle_utility - arx_utility).max(0.0),
+        model_oracle_action_agreement: model_agreement as f64 / denominator,
+        arx_oracle_action_agreement: arx_agreement as f64 / denominator,
+    })
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct SeedResult {
     seed: u64,
