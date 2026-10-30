@@ -192,7 +192,10 @@ pub fn analyze_paired_advantage(
     for observation in observations {
         if observation.independent_block_id.trim().is_empty()
             || observation.workload_fingerprint.trim().is_empty()
-            || observation.comparison_contract_fingerprint.trim().is_empty()
+            || observation
+                .comparison_contract_fingerprint
+                .trim()
+                .is_empty()
         {
             return Err(PairedAdvantageError::EmptyIdentifier);
         }
@@ -215,9 +218,7 @@ pub fn analyze_paired_advantage(
         {
             return Err(PairedAdvantageError::InvalidResource);
         }
-        if !observation.quantum_quality.is_finite()
-            || !observation.classical_quality.is_finite()
-        {
+        if !observation.quantum_quality.is_finite() || !observation.classical_quality.is_finite() {
             return Err(PairedAdvantageError::InvalidQuality);
         }
 
@@ -260,7 +261,9 @@ pub fn analyze_paired_advantage(
         independent_blocks: observations.len(),
         median_quality_difference,
         median_log_classical_over_quantum_resource,
-        median_classical_over_quantum_resource_ratio: exponentiated.is_finite().then_some(exponentiated),
+        median_classical_over_quantum_resource_ratio: exponentiated
+            .is_finite()
+            .then_some(exponentiated),
         quality_non_inferiority,
         resource_superiority,
         composite_claim_p_value,
@@ -301,7 +304,11 @@ pub fn holm_adjust(
         hypotheses[left]
             .p_value
             .total_cmp(&hypotheses[right].p_value)
-            .then_with(|| hypotheses[left].hypothesis_id.cmp(&hypotheses[right].hypothesis_id))
+            .then_with(|| {
+                hypotheses[left]
+                    .hypothesis_id
+                    .cmp(&hypotheses[right].hypothesis_id)
+            })
     });
 
     let mut previous_adjusted: f64 = 0.0;
@@ -469,9 +476,13 @@ mod tests {
         assert_eq!(report.quality_non_inferiority.wins, 14);
         assert_eq!(report.quality_non_inferiority.losses, 2);
         assert!((report.composite_claim_p_value - 697.0 / 65_536.0).abs() < 1e-12);
-        assert!((report.median_classical_over_quantum_resource_ratio.unwrap() - 1.25).abs() < 1e-12);
+        assert!(
+            (report.median_classical_over_quantum_resource_ratio.unwrap() - 1.25).abs() < 1e-12
+        );
         assert!((report.resource_superiority.p_value_one_sided - 697.0 / 65_536.0).abs() < 1e-12);
-        assert!((report.quality_non_inferiority.p_value_one_sided - 106.0 / 16_384.0).abs() < 1e-12);
+        assert!(
+            (report.quality_non_inferiority.p_value_one_sided - 106.0 / 16_384.0).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -575,14 +586,29 @@ mod tests {
     #[test]
     fn holm_adjustment_matches_hand_computed_family() {
         let hypotheses = [
-            RawHypothesis { hypothesis_id: "h3".to_owned(), p_value: 0.04 },
-            RawHypothesis { hypothesis_id: "h1".to_owned(), p_value: 0.003 },
-            RawHypothesis { hypothesis_id: "h4".to_owned(), p_value: 0.20 },
-            RawHypothesis { hypothesis_id: "h2".to_owned(), p_value: 0.01 },
+            RawHypothesis {
+                hypothesis_id: "h3".to_owned(),
+                p_value: 0.04,
+            },
+            RawHypothesis {
+                hypothesis_id: "h1".to_owned(),
+                p_value: 0.003,
+            },
+            RawHypothesis {
+                hypothesis_id: "h4".to_owned(),
+                p_value: 0.20,
+            },
+            RawHypothesis {
+                hypothesis_id: "h2".to_owned(),
+                p_value: 0.01,
+            },
         ];
         let adjusted = holm_adjust(&hypotheses, 0.05).unwrap();
         assert_eq!(
-            adjusted.iter().map(|item| item.hypothesis_id.as_str()).collect::<Vec<_>>(),
+            adjusted
+                .iter()
+                .map(|item| item.hypothesis_id.as_str())
+                .collect::<Vec<_>>(),
             ["h1", "h2", "h3", "h4"]
         );
         let expected = [0.012, 0.03, 0.08, 0.20];
@@ -595,8 +621,14 @@ mod tests {
     #[test]
     fn holm_rejects_duplicate_ids_and_invalid_p_values() {
         let duplicate = [
-            RawHypothesis { hypothesis_id: "same".to_owned(), p_value: 0.01 },
-            RawHypothesis { hypothesis_id: "same".to_owned(), p_value: 0.02 },
+            RawHypothesis {
+                hypothesis_id: "same".to_owned(),
+                p_value: 0.01,
+            },
+            RawHypothesis {
+                hypothesis_id: "same".to_owned(),
+                p_value: 0.02,
+            },
         ];
         assert_eq!(holm_adjust(&duplicate, 0.05).unwrap_err(), PairedAdvantageError::InvalidHypothesisId);
         let invalid = [RawHypothesis { hypothesis_id: "h".to_owned(), p_value: f64::NAN }];
