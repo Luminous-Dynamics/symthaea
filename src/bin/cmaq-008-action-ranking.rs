@@ -473,7 +473,7 @@ fn main() {
         return;
     }
     if !args.is_empty() {
-        eprintln!("unexpected argument {}; use --help");
+        eprintln!("unexpected argument {}; use --help", args[0]);
         process::exit(2);
     }
     match run() {
