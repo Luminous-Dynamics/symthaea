@@ -3394,6 +3394,76 @@ mod tests {
     }
 
     #[test]
+    fn global_entropy_saturation_can_false_stop_before_rare_target_cell_annotation() {
+        let world = entropy_saturation_counterexample_world();
+        world.validate().unwrap();
+        let portfolio = policy_portfolio(&world);
+        let profiles = coherent_profile_scenarios(&world).unwrap();
+        let allocation = Allocation::default();
+        let entropy = global_action_entropy(&world, &allocation);
+        let max_entropy = (ACTIONS as f64).ln();
+        let context_entropy = context_weighted_action_entropy(&world, &allocation);
+        assert!(entropy >= max_entropy - APRIL_ENTROPY_STOP_EPSILON);
+        assert!(context_entropy < max_entropy - APRIL_ENTROPY_STOP_EPSILON);
+
+        let current = robust_portfolio_objective(
+            &allocation,
+            &profiles,
+            &portfolio,
+            RobustPortfolioObjective::WorstProfileWorstPolicy,
+        )
+        .unwrap();
+        let next = best_next_robust_annotation(&world, &allocation, &profiles, &portfolio)
+            .unwrap()
+            .unwrap();
+        let next_value = robust_portfolio_objective(
+            &next.allocation,
+            &profiles,
+            &portfolio,
+            RobustPortfolioObjective::WorstProfileWorstPolicy,
+        )
+        .unwrap();
+        assert_eq!(next.context, 1);
+        assert_eq!(next.action, 2);
+        assert!(next.gain > ROBUST_VALUE_STOP_EPSILON);
+        assert!(next_value < current);
+        assert!(
+            global_action_entropy(&world, &next.allocation)
+                >= max_entropy - APRIL_ENTROPY_STOP_EPSILON
+        );
+    }
+
+    #[test]
+    fn target_weighted_evidence_is_more_sensitive_to_rare_critical_cell_than_global_entropy() {
+        let world = entropy_saturation_counterexample_world();
+        let portfolio = policy_portfolio(&world);
+        let allocation = Allocation::default();
+        let entropy = global_action_entropy(&world, &allocation);
+        let context_entropy = context_weighted_action_entropy(&world, &allocation);
+        let coverage = target_weighted_evidence_coverage(&world, &allocation, &portfolio);
+        assert!(entropy >= (ACTIONS as f64).ln() - APRIL_ENTROPY_STOP_EPSILON);
+        assert!(context_entropy < entropy);
+        assert!(coverage < 0.995);
+    }
+
+    #[test]
+    fn entropy_stop_benchmark_outputs_deterministic_stepwise_risk_diagnostics() {
+        let first = entropy_stopping_benchmark_rows().unwrap();
+        let second = entropy_stopping_benchmark_rows().unwrap();
+        assert_eq!(first, second);
+        let rows: Vec<_> = first
+            .lines()
+            .filter(|line| line.starts_with("ENTROPY_STOP\t"))
+            .collect();
+        assert_eq!(rows.len(), 3);
+        for row in &rows {
+            assert_eq!(row.split('\t').count(), 18);
+        }
+        assert_eq!(rows[0].split('\t').nth(7), Some("true"));
+        assert!(rows[0].split('\t').nth(10).unwrap().parse::<f64>().unwrap() > 0.0);
+    }
+
+    #[test]
     fn robust_portfolio_outputs_are_deterministic_and_have_exact_schemas() {
         let first = robust_portfolio_benchmark_rows(2, 0x0580_01).unwrap();
         let second = robust_portfolio_benchmark_rows(2, 0x0580_01).unwrap();
@@ -3518,6 +3588,13 @@ mod tests {
                 .filter(|line| line.starts_with("ROBUST_PROFILE_RESULT\t"))
                 .count(),
             72
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("ENTROPY_STOP\t"))
+                .count(),
+            3
         );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
