@@ -163,19 +163,20 @@ pub enum PartitionEnumerationError {
 
 /// Enumerate the IIT 4.x DIRECTED_SET_PARTITION cut family.
 ///
-/// For every non-trivial set partition, each block independently receives a
-/// cause, effect, or bidirectional direction. Cause cuts complement -> block;
-/// Effect cuts block -> complement; Bidirectional cuts both. Outputs are
-/// deduplicated by the local cut matrix, as PyPhi's unique_everseen does for
-/// its directed-set-partition candidates.
+/// For every non-trivial set partition, emit one canonical representative for
+/// each unique cut matrix under the Cause/Effect/Bidirectional block-direction rule.
+/// The exact quotient avoids generating direction labelings that produce an
+/// already represented severance matrix, matching PyPhi's matrix-based EdgeCut
+/// equality semantics.
 ///
 /// TotalCut severs every connection, including self-loops. It is always included
 /// for a one-unit system and optional for larger systems. Ordinary directional
 /// partitions preserve self-loops.
 ///
-/// max_combinations limits canonical direction representatives evaluated, not the raw
-/// labelings represented by those candidates. Exceeding the budget returns an error and no partial list, so an
-/// incomplete list cannot be mistaken for exact enumeration.
+/// max_combinations limits canonical direction representatives evaluated. The raw
+/// equivalent labelings and the number pruned are reported separately. Exceeding
+/// the budget returns an error and no partial list, so an incomplete list cannot
+/// be mistaken for exact enumeration.
 ///
 /// This is a candidate generator, not an IIT phi_s calculator.
 pub fn enumerate_iit4_system_partitions(
@@ -191,10 +192,10 @@ pub fn enumerate_iit4_system_partitions(
 
 /// Enumerate directed set partitions and return exact counters for the completed run.
 ///
-/// The counter contract is stable for this enumerator version: total-cut insertion is
-/// not counted as a block-direction assignment; every fully materialized directional
-/// assignment increments the work counter; a duplicate matrix increments the
-/// duplicate counter and is not returned twice.
+/// Raw-equivalent counts cover the full 3^k labeling space. Canonical counts cover
+/// only representatives materialized by the exact matrix-equivalence quotient.
+/// Redundant counts are raw minus canonical; all emitted non-total matrices are
+/// unique by construction. TotalCut insertion is not counted in these counters.
 pub fn enumerate_iit4_system_partitions_with_stats(
     candidate_system: &[usize],
     unit_count: usize,
