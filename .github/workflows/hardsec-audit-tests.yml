@@ -171,6 +171,7 @@ jobs:
               "canonical_files_transformed": receipt["canonical_copy"]["transformed_file_count"],
               "mismatches": len(failures),
           }, indent=2))
+          PY
           echo "SEQCUBE_ARCHIVE_ROOT=$package_root" >> "$GITHUB_ENV"
           echo "SEQCUBE_PACKAGE_ROOT=$canonical_root" >> "$GITHUB_ENV"
 
