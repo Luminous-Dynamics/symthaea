@@ -66,10 +66,10 @@ pub struct InteractionProbeBenchmarkReport {
     pub audit_pair_count: usize,
     pub audit_true_positive_count: usize,
     pub audit_positive_rate: Option<f64>,
-    pub measured_pair_count: usize,
-    pub measured_true_positive_count: usize,
-    pub measured_pair_recall: Option<f64>,
-    pub unmeasured_ground_truth_pair_count: usize,
+    pub selected_pair_count: usize,
+    pub selected_true_positive_count: usize,
+    pub selected_pair_recall: Option<f64>,
+    pub unselected_ground_truth_pair_count: usize,
 
     /// Higher-order PCM terms are deliberately not credited to pairwise recall.
     pub nonzero_higher_order_interaction_count: usize,
@@ -82,7 +82,7 @@ pub struct InteractionProbeBenchmarkReport {
     pub planned_render_count: u128,
     pub exhaustive_pairwise_render_count: u128,
     pub render_cost_fraction_of_exhaustive: f64,
-    pub measured_pair_fraction: f64,
+    pub selected_pair_fraction: f64,
     pub receipt_sha256: String,
 }
 
@@ -140,7 +140,7 @@ fn collect_pairs(
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
-    (denominator > 0).then_some(numerator as f64 / denominator as f64)
+    if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) }
 }
 
 fn report_digest_valid(
@@ -294,8 +294,11 @@ pub fn evaluate_interaction_probe_plan(
 
     let pairwise_total_pcm_l2_norm = pairwise_l2_squared.sqrt();
     let higher_order_total_pcm_l2_norm = higher_order_l2_squared.sqrt();
-    let higher_order_to_pairwise_l2_ratio = (pairwise_total_pcm_l2_norm > 0.0)
-        .then_some(higher_order_total_pcm_l2_norm / pairwise_total_pcm_l2_norm);
+    let higher_order_to_pairwise_l2_ratio = if pairwise_total_pcm_l2_norm > 0.0 {
+        Some(higher_order_total_pcm_l2_norm / pairwise_total_pcm_l2_norm)
+    } else {
+        None
+    };
 
     let mut report = InteractionProbeBenchmarkReport {
         version: INTERACTION_PROBE_BENCHMARK_VERSION.to_owned(),
@@ -314,10 +317,10 @@ pub fn evaluate_interaction_probe_plan(
         audit_pair_count: audit_pairs.len(),
         audit_true_positive_count,
         audit_positive_rate: ratio(audit_true_positive_count, audit_pairs.len()),
-        measured_pair_count: selected_pair_count,
-        measured_true_positive_count,
-        measured_pair_recall: ratio(measured_true_positive_count, ground_truth_pairs.len()),
-        unmeasured_ground_truth_pair_count,
+        selected_pair_count,
+        selected_true_positive_count: measured_true_positive_count,
+        selected_pair_recall: ratio(measured_true_positive_count, ground_truth_pairs.len()),
+        unselected_ground_truth_pair_count: unmeasured_ground_truth_pair_count,
         nonzero_higher_order_interaction_count,
         pairwise_total_pcm_l2_norm,
         higher_order_total_pcm_l2_norm,
@@ -326,7 +329,7 @@ pub fn evaluate_interaction_probe_plan(
         exhaustive_pairwise_render_count,
         render_cost_fraction_of_exhaustive:
             planned_render_count as f64 / exhaustive_pairwise_render_count as f64,
-        measured_pair_fraction: selected_pair_count as f64 / possible_pair_count as f64,
+        selected_pair_fraction: selected_pair_count as f64 / possible_pair_count as f64,
         receipt_sha256: String::new(),
     };
     report.receipt_sha256 = canonical_digest(&report)?;
@@ -496,8 +499,8 @@ mod tests {
         assert_eq!(result.candidate_false_negative_count, 0);
         assert_eq!(result.candidate_precision, Some(1.0));
         assert_eq!(result.candidate_recall, Some(1.0));
-        assert_eq!(result.measured_pair_recall, Some(1.0));
-        assert_eq!(result.unmeasured_ground_truth_pair_count, 0);
+        assert_eq!(result.selected_pair_recall, Some(1.0));
+        assert_eq!(result.unselected_ground_truth_pair_count, 0);
         assert_eq!(result.planned_render_count, 10);
         assert_eq!(result.exhaustive_pairwise_render_count, 37);
         assert!((result.render_cost_fraction_of_exhaustive - 10.0 / 37.0).abs() < 1.0e-12);
