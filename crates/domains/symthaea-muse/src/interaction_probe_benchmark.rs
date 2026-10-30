@@ -220,7 +220,7 @@ pub fn evaluate_interaction_probe_plan(
     benchmark_config: &InteractionProbeBenchmarkConfig,
 ) -> Result<InteractionProbeBenchmarkReport, InteractionProbeBenchmarkError> {
     if !benchmark_config.minimum_contextual_pair_pcm_l2_norm.is_finite()
-        || benchmark_config.minimum_pair_pcm_l2_norm <= 0.0
+        || benchmark_config.minimum_contextual_pair_pcm_l2_norm <= 0.0
         || !benchmark_config.minimum_global_order_two_harsanyi_pcm_l2_norm.is_finite()
         || benchmark_config.minimum_global_order_two_harsanyi_pcm_l2_norm <= 0.0
         || !benchmark_config.minimum_higher_order_pcm_l2_norm.is_finite()
@@ -294,7 +294,7 @@ pub fn evaluate_interaction_probe_plan(
             let interaction_norm =
                 contextual_pair_interaction_l2_norm(factorial_report, left, right)?;
             conditional_pair_l2_squared += interaction_norm * interaction_norm;
-            if interaction_norm > benchmark_config.minimum_pair_pcm_l2_norm {
+            if interaction_norm > benchmark_config.minimum_contextual_pair_pcm_l2_norm {
                 ground_truth_pairs.insert((left, right));
             }
         }
@@ -307,7 +307,7 @@ pub fn evaluate_interaction_probe_plan(
     for dividend in &factorial_report.dividends {
         if dividend.order == 2 {
             global_order_two_l2_squared += dividend.pcm_l2_norm * dividend.pcm_l2_norm;
-            if dividend.pcm_l2_norm > benchmark_config.minimum_pair_pcm_l2_norm {
+            if dividend.pcm_l2_norm > benchmark_config.minimum_global_order_two_harsanyi_pcm_l2_norm {
                 global_order_two_harsanyi_interaction_count += 1;
             }
         } else if dividend.order >= 3 {
