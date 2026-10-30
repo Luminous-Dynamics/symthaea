@@ -2703,6 +2703,20 @@ mod tests {
                 .count(),
             18
         );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("PORTFOLIO_RESULT\t"))
+                .count(),
+            12
+        );
+        assert_eq!(
+            first
+                .lines()
+                .filter(|line| line.starts_with("PORTFOLIO_CONFIG\t"))
+                .count(),
+            9
+        );
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
         }
