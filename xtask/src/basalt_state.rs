@@ -487,12 +487,18 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
                     .unwrap_or_default();
                 let unknown_coverage_dependents = incomplete_coverage_evidence.clone();
                 direct_dependents.extend(unknown_coverage_dependents.iter().cloned());
-                if !resources_with_evidence.contains(resource_id) {
+                if !resources_with_evidence.contains(resource_id)
+                    && unknown_coverage_dependents.is_empty()
+                {
                     counts.unrelated_resource_changes += 1;
                 }
                 counts.resource_changes += 1;
                 invalidate_dependents(
                     &direct_dependents,
+                    &reverse_resources
+                        .get(resource_id)
+                        .cloned()
+                        .unwrap_or_default(),
                     resource_id,
                     event_id,
                     &mut reverse_resources,
@@ -755,6 +761,7 @@ fn audit_timeline(timeline: &Timeline) -> Result<AuditResult, AuditFailure> {
 
 fn invalidate_dependents(
     direct_dependents: &BTreeSet<String>,
+    direct_resource_dependents: &BTreeSet<String>,
     resource_id: &str,
     event_id: &str,
     reverse_resources: &mut BTreeMap<String, BTreeSet<String>>,
@@ -771,7 +778,8 @@ fn invalidate_dependents(
             } else {
                 if unknown_coverage_dependents.contains(evidence_id) {
                     state.assessment.invalidated_by_unknown_dependency_change = true;
-                } else {
+                }
+                if direct_resource_dependents.contains(evidence_id) {
                     state.assessment.stale_resources.push(resource_id.to_string());
                 }
                 state.assessment.invalidation_event_ids.push(event_id.to_string());
@@ -1087,6 +1095,66 @@ mod tests {
         let report = audit_value(&value);
         assert!(!report.valid);
         assert!(has_code(&report, "E_RESOURCE_DUPLICATE"));
+    }
+
+    #[test]
+    fn incomplete_dependency_coverage_is_not_usable_even_before_a_change() {
+        let mut value = parsed_example();
+        value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
+        value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:CARGO_HOME"]);
+
+        let entries = value["entries"].as_array_mut().unwrap();
+        entries.truncate(4);
+        for (index, entry) in entries.iter_mut().enumerate() {
+            entry["sequence"] = Value::from(index + 1);
+        }
+
+        let report = audit_value(&value);
+        assert!(report.valid, "{:?}", report.errors);
+        let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
+        assert_eq!(build.freshness, EvidenceFreshness::Fresh);
+        assert_eq!(build.dependency_coverage, DependencyCoverage::Incomplete);
+        assert!(!build.usable_for_success);
+        assert!(build.requires_reverification);
+        assert_eq!(report.counts.evidence_incomplete_dependency_coverage, 1);
+        assert!(report.reverification_plan.iter().any(|id| id == "build-before-change"));
+        assert!(report.reverification_plan.iter().any(|id| id == "tests-before-change"));
+        assert!(report.reverification_plan.iter().any(|id| id == "report-before-change"));
+    }
+
+    #[test]
+    fn any_resource_change_invalidates_incomplete_coverage_even_when_unrelated_to_known_pins() {
+        let mut value = parsed_example();
+        value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
+        value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:CARGO_HOME"]);
+        let report = audit_value(&value);
+        assert!(report.valid, "{:?}", report.errors);
+
+        let build = report.evidence.iter().find(|item| item.evidence_id == "build-before-change").unwrap();
+        assert_eq!(build.freshness, EvidenceFreshness::StaleDirect);
+        assert!(build.invalidated_by_unknown_dependency_change);
+        assert!(build.invalidation_event_ids.iter().any(|id| id == "readme-edit-001"));
+        assert!(build.stale_resources.is_empty());
+        assert_eq!(report.counts.evidence_invalidated_by_unknown_dependency_change, 1);
+        assert_eq!(report.counts.unrelated_resource_changes, 0);
+    }
+
+    #[test]
+    fn complete_coverage_cannot_claim_unresolved_inputs() {
+        let mut value = parsed_example();
+        value["entries"][0]["unresolved_inputs"] = serde_json::json!(["env:HOME"]);
+        let report = audit_value(&value);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_DEPENDENCY_COVERAGE_CONTRADICTION"));
+    }
+
+    #[test]
+    fn incomplete_coverage_requires_a_named_unresolved_input() {
+        let mut value = parsed_example();
+        value["entries"][0]["dependency_coverage"] = Value::String("incomplete".into());
+        let report = audit_value(&value);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_DEPENDENCY_COVERAGE_EMPTY"));
     }
 
     #[test]
