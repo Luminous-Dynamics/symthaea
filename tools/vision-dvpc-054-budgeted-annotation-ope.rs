@@ -238,7 +238,6 @@ enum GreedyRule {
 #[derive(Clone, Copy, Debug)]
 struct LocalMixOption {
     counts: [u8; SOURCES],
-    cost: u32,
     score: f64,
     remaining_swap_gain: f64,
 }
@@ -957,12 +956,8 @@ fn local_mix_option(
             remaining_swap_gain = remaining_swap_gain.max((score - candidate_score).max(0.0));
         }
     }
-    let cost = (0..SOURCES)
-        .map(|k| counts[k] as u32 * world.source_cost[k])
-        .sum();
     LocalMixOption {
         counts,
-        cost,
         score,
         remaining_swap_gain,
     }
@@ -1045,8 +1040,13 @@ fn mm_candidate_for_lambda(
             cursor = previous;
         }
     }
-    if !allocation.feasible(world) {
-        return Err("MM candidate violates global budget or context cap".into());
+    // The fixed-lambda subproblem may intentionally return a globally
+    // over-budget candidate. The outer lambda bracket/bisection observes its
+    // cost and raises the multiplier; only the outer loop may admit candidates.
+    if (0..CONTEXTS)
+        .any(|x| allocation.context_count(x) > world.context_annotation_cap[x] as u32)
+    {
+        return Err("MM context DP violated a context annotation cap".into());
     }
     Ok(MmCandidate {
         allocation,
