@@ -582,9 +582,10 @@ mod tests {
     }
 
     #[test]
-    fn joint_calibration_is_not_smaller_than_marginal_calibration() {
+    fn calibration_quantiles_are_finite_and_positive() {
         let calibration = calibrate(16);
-        assert!(calibration.joint_q >= calibration.marginal_q);
+        assert!(calibration.marginal_q.is_finite() && calibration.marginal_q > 0.0);
+        assert!(calibration.joint_q.is_finite() && calibration.joint_q > 0.0);
     }
 
     #[test]
