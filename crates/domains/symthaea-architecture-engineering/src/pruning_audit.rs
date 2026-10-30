@@ -343,10 +343,10 @@ fn validate_config(config: &PruningAuditConfig) -> Result<(), PruningAuditError>
     Ok(())
 }
 
-fn validate_score_cohort(
-    observations: &[AuditScore],
+fn validate_score_cohort<'a>(
+    observations: &'a [AuditScore],
     field: &str,
-) -> Result<(usize, f64, HashSet<&str>), PruningAuditError> {
+) -> Result<(usize, f64, HashSet<&'a str>), PruningAuditError> {
     let first = observations.first().ok_or_else(|| {
         PruningAuditError::new(field, "must not be empty")
     })?;
@@ -420,7 +420,8 @@ fn finite_population_upper_bound(
     let mut low = observed_successes;
     let mut high = population_size;
     while low < high {
-        let middle = low + (high - low + 1) / 2;
+        let difference = high - low;
+        let middle = low + difference / 2 + difference % 2;
         let log_cdf = hypergeometric_log_cdf(
             population_size,
             middle,
