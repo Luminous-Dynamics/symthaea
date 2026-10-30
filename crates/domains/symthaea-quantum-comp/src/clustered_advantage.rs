@@ -636,7 +636,7 @@ mod tests {
         for family in 0..family_count {
             let quantum_wins = family < positive_families;
             let (q_resource, c_resource) = if quantum_wins {
-                (9.0, 10.0)
+                (8.0, 10.0)
             } else {
                 (11.0, 10.0)
             };
@@ -680,8 +680,8 @@ mod tests {
     #[test]
     fn target_family_imbalance_does_not_change_equal_cluster_weighting() {
         let mut observations = Vec::new();
-        observations.push(row(0, 0, 9.0, 10.0, 0.995, 0.99));
-        observations.push(row(1, 0, 9.0, 10.0, 0.995, 0.99));
+        observations.push(row(0, 0, 8.0, 10.0, 0.995, 0.99));
+        observations.push(row(1, 0, 8.0, 10.0, 0.995, 0.99));
         for instance in 0..20 {
             observations.push(row(2, instance, 11.0, 10.0, 0.995, 0.99));
         }
@@ -692,14 +692,14 @@ mod tests {
         assert_eq!(report.maximum_cluster_size, 20);
         assert_eq!(report.resource_superiority.wins, 2);
         assert_eq!(report.resource_superiority.losses, 1);
-        assert!((report.cluster_balanced_median_log_resource_ratio - (10.0f64 / 9.0).ln()).abs() < 1e-12);
+        assert!((report.cluster_balanced_median_log_resource_ratio - (10.0f64 / 8.0).ln()).abs() < 1e-12);
     }
 
     #[test]
     fn leave_one_cluster_out_diagnostic_detects_effect_instability() {
         let mut observations = Vec::new();
         for cluster in 0..3 {
-            let (q, c) = if cluster < 2 { (9.0, 10.0) } else { (11.0, 10.0) };
+            let (q, c) = if cluster < 2 { (8.0, 10.0) } else { (11.0, 10.0) };
             observations.push(row(cluster, 0, q, c, 0.995, 0.99));
         }
         let report = analyze_clustered_advantage(&observations, config(3)).unwrap();
