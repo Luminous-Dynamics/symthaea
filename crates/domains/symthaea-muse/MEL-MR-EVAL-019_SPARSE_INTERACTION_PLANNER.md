@@ -40,7 +40,7 @@ The Rust planner commits source-score and renderer-profile digests, normalized s
 - Temporal-overlap candidates are generated with an interval sweep and a hard materialization cap. Dense cases that exceed the cap fail closed rather than truncating silently.
 - Shared routing domains are represented as factored groups. The planner samples pair probes within each group rather than materializing every clique edge (a global compressor/master bus can otherwise create \(O(N^2)\) pair objects).
 - Unknown routing creates a global candidate group, explicitly marked in every sampled pair.
-- A deterministic seeded sampler chooses group probes; selected candidate pairs are ranked reproducibly, and the hard pair budget is recorded.
+- A deterministic seeded sampler chooses group probes; final pair selection round-robins unknown-topology, acoustic-overlap and remote-routing strata so a dense overlap cluster cannot consume the entire budget. The hard pair budget and omitted remainder are recorded.
 - A separate audit sample draws pairs outside the known temporal/shared-domain candidate policy. Audit results can estimate miss risk in that sampled stratum; they cannot establish global candidate recall.
 - Every plan reports possible-pair denominators, temporal candidate count, routing-group pair incidences, per-group sampling attempts/underfill, materialized candidates omitted by budget, audit pairs/underfill, selected probes and unprobed pairs.
 
