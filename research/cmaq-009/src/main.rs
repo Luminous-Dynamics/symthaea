@@ -222,7 +222,43 @@ fn probe_requested(policy: Policy, step: usize, adaptive_armed: bool, used: usiz
     }
 }
 
+#[derive(Clone, Debug)]
+struct SafetyEnvelope {
+    // This authorization tape is supplied independently of the candidate policy,
+    // shift label and probe result. The current smoke scenario authorizes all probes;
+    // tests also exercise a deny-all envelope to prove no bypass exists.
+    probe_allowed: [bool; HORIZON],
+}
+
+impl SafetyEnvelope {
+    fn all_probes_authorized() -> Self {
+        Self { probe_allowed: [true; HORIZON] }
+    }
+
+    fn deny_all_probes() -> Self {
+        Self { probe_allowed: [false; HORIZON] }
+    }
+
+    fn allows_probe(&self, step: usize) -> bool {
+        self.probe_allowed.get(step).copied().unwrap_or(false)
+    }
+}
+
 fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOutcome {
+    simulate_episode_with_envelope(
+        scenario,
+        policy,
+        seed,
+        &SafetyEnvelope::all_probes_authorized(),
+    )
+}
+
+fn simulate_episode_with_envelope(
+    scenario: Scenario,
+    policy: Policy,
+    seed: u64,
+    safety_envelope: &SafetyEnvelope,
+) -> EpisodeOutcome {
     // Separate exogenous tapes ensure every policy sees paired action outcomes,
     // probe signals, and passive-sensor corruption/drop events.
     let mut action_rng = SplitMix64::new(seed);
@@ -284,7 +320,8 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
         }
 
         let wants_probe = probe_requested(policy, step, adaptive_armed, outcome.probe_count);
-        if wants_probe {
+        // The candidate can request a probe but cannot self-authorize it.
+        if wants_probe && safety_envelope.allows_probe(step) {
             outcome.probe_count += 1;
             outcome.cumulative_utility -= PROBE_COST;
             if policy != Policy::ZeroInformationProbeEvery4 {
@@ -564,6 +601,26 @@ mod tests {
                 .count();
             assert_eq!(scheduled, expected);
             assert_eq!(period * scheduled, HORIZON);
+        }
+    }
+
+    #[test]
+    fn probe_policy_cannot_override_independent_safety_denial() {
+        let denied = SafetyEnvelope::deny_all_probes();
+        for policy in [
+            Policy::PeriodicProbe8,
+            Policy::PeriodicProbe16,
+            Policy::PeriodicProbe32,
+            Policy::AdaptiveProbe,
+            Policy::ZeroInformationProbeEvery4,
+        ] {
+            let result = simulate_episode_with_envelope(
+                Scenario::AbruptSupportShift,
+                policy,
+                0x5AFE,
+                &denied,
+            );
+            assert_eq!(result.probe_count, 0, "policy {} bypassed safety denial", policy.name());
         }
     }
 
