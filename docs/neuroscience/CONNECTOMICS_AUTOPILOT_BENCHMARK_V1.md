@@ -576,3 +576,8 @@ The combined target is an auditable chain from a declared tissue sampling frame 
 The query-certificate contract now carries explicit `query.dependency_roots` and typed `dependency_closure[].depends_on` edges. The Rust verifier rejects unresolved references, duplicate roots/edges/nodes, directed cycles, and unreachable extra dependency nodes. The synthetic path query roots at its exact edge record and traverses to both endpoint neurons.
 
 This is a graph-closure consistency proof relative to the supplied query roots and edges. It does **not** prove that the root manifest includes every scientifically relevant object; the query-specific extractor and source mapping still need independent validation. The verifier now has 21 authored tests, not yet compiled or run on this head.
+
+
+### Acquisition–proofreading co-design research track
+
+Issue [SCI-CONNECTOMICS-017 / #9282](https://github.com/Luminous-Dynamics/symthaea/issues/9282) extends the decision space upstream into adaptive EM acquisition. It proposes query-value-of-information comparisons between targeted re-imaging, specialist retracing, morphology evidence review, human proofreading, and abstention, with independent spatial sampling of untouched regions to prevent active-selection bias. This is a research track only; it does not authorize autonomous microscope control.
