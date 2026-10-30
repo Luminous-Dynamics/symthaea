@@ -459,12 +459,59 @@ fn is_candidate_pair(left: &NormalizedEvent, right: &NormalizedEvent, global_unk
     false
 }
 
-fn pair_priority(pair: &InteractionProbePair) -> (u8, u64, usize, usize, usize) {
-    let unknown = pair.reasons.iter().any(|reason| matches!(reason, PairProbeReason::IncompleteRoutingScope));
-    let temporal = pair.reasons.iter().any(|reason| matches!(reason, PairProbeReason::AcousticSupportOverlap));
-    let shared = pair.reasons.iter().filter(|reason| matches!(reason, PairProbeReason::SharedRoutingDomain(_))).count();
-    let class = if unknown { 0 } else if temporal && shared > 0 { 1 } else if temporal { 2 } else { 3 };
-    (class, u64::MAX - pair.max_support_overlap_frames, usize::MAX - shared, pair.event_a, pair.event_b)
+fn pair_tiebreak(seed: u64, pair: &InteractionProbePair) -> u64 {
+    mix_seed(seed, &format!("pair:{}:{}", pair.event_a, pair.event_b))
+}
+
+fn select_candidate_pairs(
+    candidate_pairs: Vec<InteractionProbePair>,
+    budget: usize,
+    seed: u64,
+) -> Vec<InteractionProbePair> {
+    let mut buckets: [Vec<InteractionProbePair>; 3] = std::array::from_fn(|_| Vec::new());
+    for pair in candidate_pairs {
+        let unknown = pair.reasons.iter().any(|reason| {
+            matches!(reason, PairProbeReason::IncompleteRoutingScope)
+        });
+        let temporal = pair.reasons.iter().any(|reason| {
+            matches!(reason, PairProbeReason::AcousticSupportOverlap)
+        });
+        let bucket = if unknown { 0 } else if temporal { 1 } else { 2 };
+        buckets[bucket].push(pair);
+    }
+    for bucket in &mut buckets {
+        bucket.sort_by_key(|pair| {
+            let overlap_priority = if pair.reasons.iter().any(|reason| {
+                matches!(reason, PairProbeReason::AcousticSupportOverlap)
+            }) {
+                u64::MAX - pair.max_support_overlap_frames
+            } else {
+                0
+            };
+            (overlap_priority, pair_tiebreak(seed, pair))
+        });
+    }
+
+    let available = buckets.iter().map(Vec::len).sum();
+    let mut selected = Vec::with_capacity(budget.min(available));
+    let mut cursors = [0usize; 3];
+    while selected.len() < budget {
+        let mut progressed = false;
+        for bucket_index in 0..buckets.len() {
+            if let Some(pair) = buckets[bucket_index].get(cursors[bucket_index]) {
+                selected.push(pair.clone());
+                cursors[bucket_index] += 1;
+                progressed = true;
+                if selected.len() == budget {
+                    break;
+                }
+            }
+        }
+        if !progressed {
+            break;
+        }
+    }
+    selected
 }
 
 fn plan_digest_valid(plan: &InteractionProbePlan) -> Result<bool, InteractionProbePlanError> {
@@ -491,6 +538,11 @@ pub fn build_interaction_probe_plan(
 
     let incomplete_routing_event_count = events.iter().filter(|event| !event.routing_complete).count();
     let incomplete_routing_expands_to_global_scope = incomplete_routing_event_count > 0;
+    if incomplete_routing_expands_to_global_scope {
+        for candidate in candidates.values_mut() {
+            candidate.reasons.insert(PairProbeReason::IncompleteRoutingScope);
+        }
+    }
     let mut group_members: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     if incomplete_routing_expands_to_global_scope {
         group_members.insert("__incomplete_routing_global_scope__".to_owned(), events.iter().map(|event| event.index).collect());
@@ -556,11 +608,11 @@ pub fn build_interaction_probe_plan(
             max_support_overlap_frames: accumulator.max_support_overlap_frames,
         }
     }).collect();
-    candidate_pairs.sort_by_key(pair_priority);
-    let candidate_pairs_selected: Vec<_> = candidate_pairs.iter()
-        .take(config.pair_probe_budget)
-        .cloned()
-        .collect();
+    let candidate_pairs_selected = select_candidate_pairs(
+        candidate_pairs,
+        config.pair_probe_budget,
+        config.seed,
+    );
     let materialized_candidates_omitted_by_budget = materialized_candidate_pair_count
         .saturating_sub(candidate_pairs_selected.len());
 
@@ -703,6 +755,27 @@ mod tests {
         let result = plan(&events, &config());
         assert!(result.candidate_pairs_selected[0].reasons.contains(&PairProbeReason::SharedRoutingDomain("bus:compressor".into())));
         assert_eq!(result.temporal_candidate_pair_count, 0);
+    }
+
+    #[test]
+    fn selection_round_robins_temporal_and_remote_routing_candidates() {
+        let mut events: Vec<_> = (0..9)
+            .map(|index| event(index, &[(10, 100)], &[], true))
+            .collect();
+        events.push(event(9, &[(500, 600)], &["bus:master"], true));
+        events.push(event(10, &[(700, 800)], &["bus:master"], true));
+        let mut cfg = config();
+        cfg.pair_probe_budget = 4;
+        cfg.routing_group_sample_budget = 1;
+        let result = plan(&events, &cfg);
+        assert!(result.candidate_pairs_selected.iter().any(|pair| {
+            pair.reasons.iter().any(|reason| {
+                matches!(reason, PairProbeReason::SharedRoutingDomain(domain) if domain == "bus:master")
+            })
+        }));
+        assert!(result.candidate_pairs_selected.iter().any(|pair| {
+            pair.reasons.contains(&PairProbeReason::AcousticSupportOverlap)
+        }));
     }
 
     #[test]
