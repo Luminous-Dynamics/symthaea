@@ -145,9 +145,9 @@ jobs:
               target = canonical_root / item["path"]
               raw = target.read_bytes()
               if item["reconciliation"] == "lf_archive_matches_published_crlf_digest":
-                  if b"\\r" in raw:
+                  if b"\r" in raw:
                       raise SystemExit(f"unexpected existing CR byte in {item['path']}")
-                  raw = raw.replace(b"\\n", b"\\r\\n")
+                  raw = raw.replace(b"\n", b"\r\n")
                   target.write_bytes(raw)
                   transformed.append(item["path"])
               canonical_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
@@ -162,7 +162,7 @@ jobs:
               "source_archive_preserved": True,
               "rule": "Only the copied files whose LF-to-CRLF digest matched the publisher checksum are converted; original extracted archive files remain untouched.",
           }
-          output.write_text(json.dumps(receipt, indent=2) + "\\n", encoding="utf-8")
+          output.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
           print(json.dumps({
               "manifest_entries": receipt["manifest_entries"],
               "exact_byte_matches": receipt["exact_byte_matches"],
