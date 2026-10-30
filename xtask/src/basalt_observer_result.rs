@@ -818,6 +818,7 @@ fn adjudicate_case(
             "independent fixture replay must confirm the injected ground-truth condition",
         );
     }
+    validate_execution_witness(case, oracle, report);
 
     let needs_mutation = matches!(
         case.expected_disposition.as_str(),
@@ -1168,6 +1169,61 @@ fn adjudicate_case(
     }
 }
 
+fn validate_execution_witness(
+    case: &ChallengeCase,
+    oracle: &OracleRecord,
+    report: &mut ResultAuditReport,
+) {
+    let case_id = case.case_id.as_str();
+    let witness = &oracle.execution_witness;
+    let path = format!("cases[{case_id}].oracle.execution_witness");
+
+    if !valid_digest(&witness.worker_binary_digest)
+        || !valid_digest(&witness.baseline_output_digest)
+        || !valid_digest(&witness.mutated_output_digest)
+    {
+        push_error(
+            report,
+            Some(case_id),
+            "E_EXECUTION_WITNESS_DIGEST",
+            &path,
+            "worker binary and both task-output digests must be valid SHA-256 values",
+        );
+    }
+
+    match case.expected_disposition.as_str() {
+        "capture_dependency" => {
+            if witness.baseline_bytes_read == 0
+                || witness.mutated_bytes_read == 0
+                || witness.baseline_output_digest == witness.mutated_output_digest
+            {
+                push_error(
+                    report,
+                    Some(case_id),
+                    "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED",
+                    &path,
+                    "consumed-input control requires bytes read in both runs and a changed task-output digest",
+                );
+            }
+        }
+        "preserve_unrelated" => {
+            if witness.baseline_bytes_read != 0
+                || witness.mutated_bytes_read != 0
+                || witness.baseline_output_digest != witness.mutated_output_digest
+            {
+                push_error(
+                    report,
+                    Some(case_id),
+                    "E_COUNTERFACTUAL_NON_INFLUENCE_NOT_ESTABLISHED",
+                    &path,
+                    "unconsumed-input control requires zero bytes read and identical task-output digests",
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
 fn validate_pairs(
     cases: &[ChallengeCase],
     selected_ids: &BTreeSet<&str>,
@@ -1454,6 +1510,10 @@ mod tests {
             "run_id": "test-run-001",
             "catalog_digest": catalog_digest,
             "profile_id": "linux-hermetic-candidate-v1",
+            "selected_case_ids": [
+                "hidden-input-read", "unused-neighbor",
+                "unresolved-env-channel", "event-loss"
+            ],
             "harness": {
                 "harness_id": "basalt-fixture-harness-v1",
                 "binary_digest": format!("sha256:{}", "c".repeat(64)),
@@ -1470,7 +1530,14 @@ mod tests {
                         "after_digest": after
                     },
                     "witness_kind": "controlled_read",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": before,
+                        "mutated_output_digest": after,
+                        "baseline_bytes_read": 8,
+                        "mutated_bytes_read": 9
+                    }
                 },
                 {
                     "case_id": "unused-neighbor",
@@ -1482,7 +1549,14 @@ mod tests {
                         "after_digest": after
                     },
                     "witness_kind": "controlled_non_read",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 },
                 {
                     "case_id": "unresolved-env-channel",
@@ -1494,7 +1568,14 @@ mod tests {
                         "after_digest": null
                     },
                     "witness_kind": "unsupported_channel",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 },
                 {
                     "case_id": "event-loss",
@@ -1506,7 +1587,14 @@ mod tests {
                         "after_digest": null
                     },
                     "witness_kind": "integrity_fault",
-                    "independent_replay": "confirmed"
+                    "independent_replay": "confirmed",
+                    "execution_witness": {
+                        "worker_binary_digest": format!("sha256:{}", "c".repeat(64)),
+                        "baseline_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "mutated_output_digest": format!("sha256:{}", "d".repeat(64)),
+                        "baseline_bytes_read": 0,
+                        "mutated_bytes_read": 0
+                    }
                 }
             ]
         });
@@ -1519,6 +1607,10 @@ mod tests {
             "catalog_digest": catalog_digest,
             "observer_profile_id": "linux-hermetic-candidate-v1",
             "observer_binary_digest": format!("sha256:{}", "e".repeat(64)),
+            "selected_case_ids": [
+                "hidden-input-read", "unused-neighbor",
+                "unresolved-env-channel", "event-loss"
+            ],
             "records": [
                 {
                     "case_id": "hidden-input-read",
@@ -1728,6 +1820,35 @@ mod tests {
         assert!(!report.adjudication_passed);
         assert_eq!(report.metrics.false_invalidations, 1);
         assert_eq!(report.metrics.unrelated_evidence_not_retained, 1);
+    }
+
+    #[test]
+    fn rejects_consumed_control_without_counterfactual_output_change() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][0]["execution_witness"]["mutated_output_digest"] =
+            oracle_value["records"][0]["execution_witness"]["baseline_output_digest"].clone();
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED"
+        }));
+    }
+
+    #[test]
+    fn rejects_preserve_control_that_reads_or_changes_the_output() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut oracle_value: Value =
+            serde_json::from_slice(&oracle).expect("oracle fixture parses");
+        oracle_value["records"][1]["execution_witness"]["mutated_bytes_read"] = json!(1);
+        let oracle = serde_json::to_vec(&oracle_value).expect("mutated oracle serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_COUNTERFACTUAL_NON_INFLUENCE_NOT_ESTABLISHED"
+        }));
     }
 
     #[test]
