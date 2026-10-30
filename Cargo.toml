@@ -609,6 +609,7 @@ wait-timeout = "0.2"
 
 [features]
 default = ["default-mind"]
+hardsec-activation-audit = ["dep:sha2"] # HARDSEC-009: hash empirical activation campaigns
 hardsec-activation-audit = ["dep:sha2"] # HARDSEC-009: hash and audit empirical activation campaigns
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
@@ -2546,6 +2547,11 @@ name = "recurrent_mask_recovery"
 name = "action_semantics_probe"
 
 # HARDSEC-009: empirical trigger/payload coverage curve auditor.
+[[example]]
+name = "hardsec_activation_campaign_audit"
+required-features = ["hardsec-activation-audit"]
+
+# HARDSEC-009: empirical trigger and payload activation coverage curve auditor.
 [[example]]
 name = "hardsec_activation_campaign_audit"
 required-features = ["hardsec-activation-audit"]
