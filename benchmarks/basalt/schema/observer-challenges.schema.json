@@ -242,7 +242,8 @@
                 "root_boundary",
                 "mutation_identity",
                 "non_dependency_witness",
-                "coverage_scope"
+                "coverage_scope",
+                "registry_identity"
               ]
             }
           },
