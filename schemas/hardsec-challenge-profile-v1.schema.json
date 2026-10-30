@@ -920,6 +920,9 @@
         },
         "assumptions_sha256": {
           "$ref": "#/$defs/sha256"
+        },
+        "assumptions_local_path": {
+          "$ref": "#/$defs/relativePath"
         }
       }
     }
