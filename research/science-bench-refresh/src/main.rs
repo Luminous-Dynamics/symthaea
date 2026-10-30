@@ -13,12 +13,12 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
+use science_bench_refresh_validator::judge_factorial::{
+    analyze_judge_factorial, compute_judge_factorial_plan_commitment, verify_judge_factorial_plan,
+};
 use science_bench_refresh_validator::judge_robustness::{
     compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
     verify_judge_robustness_plan, verify_judge_robustness_report,
-};
-use science_bench_refresh_validator::judge_factorial::{
-    analyze_judge_factorial, compute_judge_factorial_plan_commitment, verify_judge_factorial_plan,
 };
 use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
