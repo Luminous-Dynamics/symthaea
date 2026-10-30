@@ -20,7 +20,7 @@ The unit of comparison is the same query under paired retrieval policies. Do not
 | D | Confidence-only trigger (CONFRAG-like) | Whether reader confidence reduces calls without lifecycle awareness |
 | E | Claim–evidence coverage stopping (HALT-like) | Whether all expected claims have sufficient admissible evidence |
 | F | Lifecycle/proof coverage plus calibrated VOI | Whether lifecycle admissibility and conservative marginal utility improve the frontier |
-| G | Always hybrid lexical+dense+rerrank (where available) | Upper-effort retrieval baseline, with the full incremental cost counted |
+| G | Always hybrid lexical+dense+rerank (where available) | Upper-effort retrieval baseline, with the full incremental cost counted |
 
 For each query, all arms receive the same immutable corpus and EvidenceIndex snapshot digest, principal/scope, valid_at, known_at, source revisions, reader model/version, system and query prompts, tokenizer, packet renderer, proof verifier and final evaluator. Policies may differ only in retrieval/stopping behavior.
 
@@ -77,6 +77,10 @@ These are prospective targets, not current results:
 ## Known limitations
 
 The current implementation supplies a deterministic VOI gate and grouped calibration procedure. It does not yet train the point estimator, orchestrate all treatment arms, run the paired benchmark, calculate statistical intervals, or measure the targets above. The conformal guarantee relies on exchangeable independent calibration groups; distribution shift, split leakage or correlated groups weaken the guarantee. The utility schema must define correctness gain and lifecycle-risk reduction as disjoint components to prevent double counting.
+
+## Versioned calibration artifact
+
+The calibration fixture [retrieval-value-calibration-fixtures-v1.json](retrieval-value-calibration-fixtures-v1.json) contains 29 synthetic independent groups with paired predicted/observed utility components and expected conformal residual offsets. The Rust calibration test reads this artifact directly. It is a deterministic conformance fixture, not an empirical calibration dataset and not evidence that real-world coverage has been achieved.
 
 ## Relevant external comparisons
 
