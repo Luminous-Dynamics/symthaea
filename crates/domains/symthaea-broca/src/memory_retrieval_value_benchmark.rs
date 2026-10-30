@@ -61,23 +61,32 @@ impl PairedRetrievalOutcome {
         validate_sha256(&self.query_fingerprint_sha256, "query_fingerprint_sha256")
     }
 
-    pub fn correctness_gain_micro(&self) -> i64 {
-        self.retrieval_correctness_micro - self.no_retrieval_correctness_micro
+    pub fn correctness_gain_micro(&self) -> Result<i64, String> {
+        self.retrieval_correctness_micro
+            .checked_sub(self.no_retrieval_correctness_micro)
+            .ok_or_else(|| "correctness gain delta exceeds i64 range".into())
     }
 
-    pub fn lifecycle_risk_reduction_micro(&self) -> i64 {
-        self.no_retrieval_lifecycle_loss_micro - self.retrieval_lifecycle_loss_micro
+    pub fn lifecycle_risk_reduction_micro(&self) -> Result<i64, String> {
+        self.no_retrieval_lifecycle_loss_micro
+            .checked_sub(self.retrieval_lifecycle_loss_micro)
+            .ok_or_else(|| "lifecycle risk-reduction delta exceeds i64 range".into())
     }
 
-    pub fn retrieval_harm_delta_micro(&self) -> i64 {
-        self.retrieval_harm_micro - self.no_retrieval_harm_micro
+    pub fn retrieval_harm_delta_micro(&self) -> Result<i64, String> {
+        self.retrieval_harm_micro
+            .checked_sub(self.no_retrieval_harm_micro)
+            .ok_or_else(|| "retrieval harm delta exceeds i64 range".into())
     }
 
     pub fn net_utility_delta_micro(&self) -> i128 {
-        i128::from(self.correctness_gain_micro())
-            + i128::from(self.lifecycle_risk_reduction_micro())
-            - i128::from(self.retrieval_harm_delta_micro())
-            - i128::from(self.retrieval_cost_micro)
+        let correctness = i128::from(self.retrieval_correctness_micro)
+            - i128::from(self.no_retrieval_correctness_micro);
+        let lifecycle_reduction = i128::from(self.no_retrieval_lifecycle_loss_micro)
+            - i128::from(self.retrieval_lifecycle_loss_micro);
+        let harm = i128::from(self.retrieval_harm_micro)
+            - i128::from(self.no_retrieval_harm_micro);
+        correctness + lifecycle_reduction - harm - i128::from(self.retrieval_cost_micro)
     }
 
     /// Convert an outcome into one held-out calibration observation for a
@@ -86,18 +95,18 @@ impl PairedRetrievalOutcome {
     pub fn to_calibration_observation(
         &self,
         prediction: &RetrievalUtilityPointPrediction,
-    ) -> RetrievalUtilityCalibrationObservation {
-        RetrievalUtilityCalibrationObservation {
+    ) -> Result<RetrievalUtilityCalibrationObservation, String> {
+        Ok(RetrievalUtilityCalibrationObservation {
             observation_id: self.observation_id.clone(),
             calibration_group_id: self.calibration_group_id.clone(),
             query_fingerprint_sha256: self.query_fingerprint_sha256.clone(),
             predicted_correctness_gain_micro: prediction.correctness_gain_micro,
-            observed_correctness_gain_micro: self.correctness_gain_micro(),
+            observed_correctness_gain_micro: self.correctness_gain_micro()?,
             predicted_lifecycle_risk_reduction_micro: prediction.lifecycle_risk_reduction_micro,
-            observed_lifecycle_risk_reduction_micro: self.lifecycle_risk_reduction_micro(),
+            observed_lifecycle_risk_reduction_micro: self.lifecycle_risk_reduction_micro()?,
             predicted_retrieval_harm_micro: prediction.retrieval_harm_micro,
-            observed_retrieval_harm_micro: self.retrieval_harm_delta_micro(),
-        }
+            observed_retrieval_harm_micro: self.retrieval_harm_delta_micro()?,
+        })
     }
 }
 
@@ -186,9 +195,9 @@ pub fn summarize_paired_retrieval_outcomes(
             ));
         }
 
-        let correctness_delta = outcome.correctness_gain_micro();
-        let lifecycle_delta = outcome.lifecycle_risk_reduction_micro();
-        let harm_delta = outcome.retrieval_harm_delta_micro();
+        let correctness_delta = outcome.correctness_gain_micro()?;
+        let lifecycle_delta = outcome.lifecycle_risk_reduction_micro()?;
+        let harm_delta = outcome.retrieval_harm_delta_micro()?;
         let net_delta = outcome.net_utility_delta_micro();
 
         correctness.push(i128::from(correctness_delta));
@@ -364,9 +373,9 @@ mod tests {
     #[test]
     fn paired_outcome_derives_disjoint_utility_deltas_and_calibration_row() {
         let result = outcome(0, 0, 100);
-        assert_eq!(result.correctness_gain_micro(), 100);
-        assert_eq!(result.lifecycle_risk_reduction_micro(), 0);
-        assert_eq!(result.retrieval_harm_delta_micro(), 0);
+        assert_eq!(result.correctness_gain_micro().unwrap(), 100);
+        assert_eq!(result.lifecycle_risk_reduction_micro().unwrap(), 0);
+        assert_eq!(result.retrieval_harm_delta_micro().unwrap(), 0);
         assert_eq!(result.net_utility_delta_micro(), 80);
 
         let observation = result.to_calibration_observation(
@@ -375,7 +384,7 @@ mod tests {
                 lifecycle_risk_reduction_micro: 0,
                 retrieval_harm_micro: 0,
             },
-        );
+        ).unwrap();
         assert_eq!(observation.observed_correctness_gain_micro, 100);
         assert_eq!(observation.predicted_correctness_gain_micro, 90);
     }
