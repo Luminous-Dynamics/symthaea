@@ -996,6 +996,13 @@ mod tests {
         let ranking_hash = sha256(&ranking_bytes);
         let protocol_hash = sha256(&protocol_bytes);
         let seed = "test-candidate-coverage-seed-2026".to_string();
+        let population_frame = vec![
+            PopulationPsu { psu_id: "psu-a1".into(), stratum_id: "region-a".into() },
+            PopulationPsu { psu_id: "psu-a2".into(), stratum_id: "region-a".into() },
+            PopulationPsu { psu_id: "psu-b1".into(), stratum_id: "region-b".into() },
+            PopulationPsu { psu_id: "psu-b2".into(), stratum_id: "region-b".into() },
+        ];
+        let population_frame_digest = frame_sha256(&population_frame);
 
         let proposals = ProposalInput {
             schema_version: 1,
@@ -1010,6 +1017,9 @@ mod tests {
             source_input_sha256: proposal_hash.clone(),
             source_ranking_report_sha256: ranking_hash.clone(),
             sampling_protocol_sha256: protocol_hash.clone(),
+            source_spatial_frame_report_sha256: "1".repeat(64),
+            source_spatial_frame_sha256: "2".repeat(64),
+            source_population_frame_sha256: population_frame_digest,
             sample_seed_commitment_sha256: sha256(seed.as_bytes()),
             error_families: vec!["merge".into(), "synapse_missing".into(), "split".into(), "axon_fragment".into()],
             sample_seed: seed,
@@ -1017,12 +1027,7 @@ mod tests {
                 StratumPlan { stratum_id: "region-a".into(), sampled_psu_count: 2 },
                 StratumPlan { stratum_id: "region-b".into(), sampled_psu_count: 2 },
             ],
-            population_frame: vec![
-                PopulationPsu { psu_id: "psu-a1".into(), stratum_id: "region-a".into() },
-                PopulationPsu { psu_id: "psu-a2".into(), stratum_id: "region-a".into() },
-                PopulationPsu { psu_id: "psu-b1".into(), stratum_id: "region-b".into() },
-                PopulationPsu { psu_id: "psu-b2".into(), stratum_id: "region-b".into() },
-            ],
+            population_frame,
             sampled_units: vec![
                 SampledPsuOutcome {
                     psu_id: "psu-a1".into(),
