@@ -2820,7 +2820,7 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
     let portfolio = policy_portfolio(&world);
     let profiles = coherent_profile_scenarios(&world)?;
     let saa_seed = 0x0600_5aa0_2026_1030;
-    let holdout_seed = 0x0600_h01d_2026_1030_u64;
+    let holdout_seed = 0x0600_001d_2026_1030_u64;
 
     let balanced_world = world_with_target(&world, portfolio.targets[1]);
     let balanced_single =
@@ -2909,7 +2909,7 @@ fn selection_regret_benchmark_rows() -> Result<String, String> {
     use std::fmt::Write;
     let _ = writeln!(
         output,
-        "REGRET_CONFIG\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
+        "REGRET_CONFIG\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
         world.name,
         profiles.len(),
         REGRET_SAA_REPLICATES,
