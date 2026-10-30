@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json",
+  "title": "Connectome multi-rater outcomes",
+  "description": "Evaluation-only multi-rater records. This file must be withheld from all proposal generation and ranking components and supplied only to connectome-multi-rater-audit after proposal and ranking artifacts are frozen.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_input_sha256",
+    "source_ranking_report_sha256",
+    "adjudication_protocol_sha256",
+    "candidate_outcomes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_ranking_report_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "adjudication_protocol_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "candidate_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/candidateOutcome" }
+    }
+  },
+  "$defs": {
+    "adjudication": {
+      "type": "string",
+      "enum": ["correct", "incorrect", "indeterminate"]
+    },
+    "reviewerDecision": {
+      "type": "string",
+      "enum": ["accept", "reject", "abstain"]
+    },
+    "adjudicatorVote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adjudicator_id", "adjudication"],
+      "properties": {
+        "adjudicator_id": { "type": "string", "minLength": 1 },
+        "adjudication": { "$ref": "#/$defs/adjudication" }
+      }
+    },
+    "reviewerReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_id",
+        "reviewer_decision",
+        "decision_confidence",
+        "actual_review_minutes"
+      ],
+      "properties": {
+        "reviewer_id": { "type": "string", "minLength": 1 },
+        "reviewer_decision": { "$ref": "#/$defs/reviewerDecision" },
+        "decision_confidence": {
+          "description": "Confidence that the recorded accept/reject decision is the correct action; null for abstention.",
+          "anyOf": [
+            { "type": "number", "minimum": 0, "maximum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "actual_review_minutes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Measured elapsed reviewer time attributed to this candidate."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "reviewer_decision": { "const": "abstain" } }, "required": ["reviewer_decision"] },
+          "then": { "properties": { "decision_confidence": { "type": "null" } } },
+          "else": { "properties": { "decision_confidence": { "type": "number", "minimum": 0, "maximum": 1 } } }
+        }
+      ]
+    },
+    "candidateOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "adjudicator_votes", "reviewer_reviews"],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "adjudicator_votes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/adjudicatorVote" },
+          "description": "Independent adjudicator votes on proposal correctness; minimum two. Strict majority only; ties stay unresolved."
+        },
+        "reviewer_reviews": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/reviewerReview" },
+          "description": "Blinded reviewer decisions; minimum two. Abstention is an explicit category."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json",
+  "title": "ConnectomeBench2 V2 intake manifest",
+  "description": "Machine-readable contract for a leakage-aware ConnectomeBench2 intake run. Schema validation checks declared intent; it does not independently verify that the operator's task/label mapping agrees with the pinned upstream implementation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_revision_commit_sha",
+    "upstream_repo",
+    "upstream_commit",
+    "task",
+    "task_route_value",
+    "label_column",
+    "label_true_semantics",
+    "label_mapping_reference",
+    "split",
+    "input_mode",
+    "model_input_columns",
+    "input_files",
+    "mapping_reviewed",
+    "reviewed_by"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "dataset_id": {
+      "const": "jeffbbrown2/ConnectomeBench2"
+    },
+    "dataset_revision": {
+      "const": "v2"
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "upstream_repo": {
+      "const": "https://github.com/timfarkas/ConnectomeBench2"
+    },
+    "upstream_commit": {
+      "const": "5679b39aa2641d8d0afeed88b441e696f87a66df",
+      "description": "Exact ConnectomeBench2 source commit whose route_row and derive_task_routing semantics were reviewed. Change this pin only alongside a new source audit and corresponding tool contract update."
+    },
+    "task": {
+      "enum": [
+        "merge_correction_false_split",
+        "split_correction_false_merge"
+      ]
+    },
+    "task_route_value": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact route token verified against the pinned upstream training/evaluation code; do not guess from filenames."
+    },
+    "label_column": {
+      "enum": [
+        "false_split_correction_label",
+        "false_merge_identification_label"
+      ],
+      "description": "Column selected after checking task routing and label semantics against the pinned upstream revision; this schema intentionally does not assume the mapping is unchanged from V1."
+    },
+    "label_true_semantics": {
+      "enum": [
+        "same_neuron",
+        "different_neuron"
+      ],
+      "description": "Human-reviewed meaning of boolean true for the chosen task and label column. Do not infer this from filenames; verify against the pinned V2 code and record the mapping reference."
+    },
+    "label_mapping_reference": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path or URL to the exact upstream code/line or annotation specification that was reviewed."
+    },
+    "split": {
+      "enum": [
+        "train",
+        "validation",
+        "test",
+        "all"
+      ]
+    },
+    "input_mode": {
+      "enum": [
+        "single_segment",
+        "dual_segment"
+      ]
+    },
+    "model_input_columns": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "geometry",
+          "geometry_single",
+          "em_xy",
+          "em_xz",
+          "em_yz"
+        ]
+      },
+      "description": "Allowlist by construction: labels, task routing, metadata, identifiers, and em_best cannot be model inputs."
+    },
+    "input_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "split"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "split": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          }
+        }
+      }
+    },
+    "reviewed_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human responsible for reviewing the task/label mapping and upstream licensing."
+    },
+    "notes": {
+      "type": "string"
+    },
+    "mapping_reviewed": {
+      "const": true,
+      "description": "Explicit operator attestation that task routing, label column, and true/false semantics were checked against the exact pinned upstream revision. This is not independent proof; retain the evidence path."
+    },
+    "em_preprocessing_profile": {
+      "enum": [
+        "not_applicable",
+        "single_segment_fuse_ab_zero_b",
+        "dual_segment_native"
+      ],
+      "description": "Required by the executable auditor whenever an EM input column is selected. Single-segment tasks merge A/B channels and zero B; dual-segment tasks retain both masks."
+    },
+    "geometry_preprocessing_profile": {
+      "enum": [
+        "not_applicable",
+        "single_segment_zero_mask_channels",
+        "dual_segment_native"
+      ],
+      "description": "Required by the executable auditor whenever a geometry input is selected. Official single-segment input must zero both mask channels, even if the renderer already appears to have done so."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "single_segment"
+          }
+        },
+        "required": [
+          "input_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model_input_columns": {
+            "not": {
+              "contains": {
+                "const": "geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "dual_segment"
+          }
+        },
+        "required": [
+          "input_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model_input_columns": {
+            "not": {
+              "contains": {
+                "const": "geometry_single"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "merge_correction_false_split"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_route_value": {
+            "const": "false_split_correction"
+          },
+          "label_column": {
+            "const": "false_split_correction_label"
+          },
+          "label_true_semantics": {
+            "const": "same_neuron"
+          },
+          "input_mode": {
+            "const": "dual_segment"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "task": {
+            "const": "split_correction_false_merge"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "then": {
+        "properties": {
+          "task_route_value": {
+            "const": "false_merge_identification"
+          },
+          "label_column": {
+            "const": "false_merge_identification_label"
+          },
+          "label_true_semantics": {
+            "const": "different_neuron"
+          },
+          "input_mode": {
+            "const": "single_segment"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "single_segment"
+          },
+          "model_input_columns": {
+            "contains": {
+              "enum": [
+                "em_xy",
+                "em_xz",
+                "em_yz"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input_mode",
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "em_preprocessing_profile"
+        ],
+        "properties": {
+          "em_preprocessing_profile": {
+            "const": "single_segment_fuse_ab_zero_b"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input_mode": {
+            "const": "dual_segment"
+          },
+          "model_input_columns": {
+            "contains": {
+              "enum": [
+                "em_xy",
+                "em_xz",
+                "em_yz"
+              ]
+            }
+          }
+        },
+        "required": [
+          "input_mode",
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "em_preprocessing_profile"
+        ],
+        "properties": {
+          "em_preprocessing_profile": {
+            "const": "dual_segment_native"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_input_columns": {
+            "contains": {
+              "const": "geometry_single"
+            }
+          }
+        },
+        "required": [
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "geometry_preprocessing_profile"
+        ],
+        "properties": {
+          "geometry_preprocessing_profile": {
+            "const": "single_segment_zero_mask_channels"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_input_columns": {
+            "contains": {
+              "const": "geometry"
+            }
+          }
+        },
+        "required": [
+          "model_input_columns"
+        ]
+      },
+      "then": {
+        "required": [
+          "geometry_preprocessing_profile"
+        ],
+        "properties": {
+          "geometry_preprocessing_profile": {
+            "const": "dual_segment_native"
+          }
+        }
+      }
+    }
+  ]
+}

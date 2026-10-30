@@ -1,0 +1,214 @@
+# Connectomics Intake Audit
+
+Small, standalone Rust gate for the ConnectomeBench2 V2 intake process described in the Symthaea neuroscience research plan.
+
+## Scope
+
+This tool validates the declared manifest, checks task/label/input-mode consistency, rejects known EM-view leakage fields, requires the correct single-/dual-segment geometry preprocessing profile, hashes every declared local artifact with SHA-256, checks byte sizes and split declarations, and writes a deterministic JSON report.
+
+It does **not** parse Parquet schemas, prove label correctness, validate the upstream commit contents, prove samples are independent, or measure model accuracy. A passing report only means the manifest and local bytes satisfy these checks.
+
+## Build
+
+This directory is a standalone Cargo workspace and is intentionally not a member of the main Symthaea workspace.
+
+```sh
+cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
+cargo build --release --manifest-path tools/connectomics-intake-audit/Cargo.toml
+```
+
+For reproducible CI, generate and commit this crate's `Cargo.lock`, then add `--locked` to both commands.
+
+## Query-specific stopping snapshot audit
+
+The `connectome-stopping-audit` binary validates a JSONL series against the initial versioned snapshot contract in `docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json`. It checks immutable dataset/query/profile identity, strictly increasing snapshot sequence, parent graph digest continuity, nondecreasing edit counts, operation-class totals, invariant names, query metric names/units, and digest formatting. It also emits a descriptive tail-range stability signal and walk-forward predictions for declared graph invariants and scientific-query metrics, comparing a fitted asymptotic curve with persistence and linear-trend baselines.
+
+```sh
+cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit -- \
+  --input snapshot-series.jsonl \
+  --tail-window 3 \
+  --relative-tolerance 0.01 \
+  --absolute-tolerance 1e-9 \
+  --forecast-min-training-snapshots 4 \
+  --output stopping-audit.json
+```
+
+Each JSONL record is one snapshot object conforming to `CONNECTOME_STOPPING_SNAPSHOT.schema.json`. Order records from oldest to newest. The first snapshot has sequence index 0 and no previous graph digest; each later snapshot names the immediately preceding snapshot's graph digest. Cumulative operation-class counts must sum to `cumulative_committed`. An illustrative three-snapshot fixture is at `docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl`; it intentionally shows graph invariants looking stable while a query metric changes, and uses fake data/digests only.
+
+**Important:** the tool emits report schema version 2 and always recommends `CONTINUE_REVIEW`; its status is `VALIDATED_NOT_STOPPED` only when consistency checks pass. It now adds one-step-ahead walk-forward metric forecasts after at least four training snapshots. The asymptotic curve is fitted using prior snapshots only and compared with last-value persistence and a linear-trend baseline; summaries report held-out MAE for all baselines and relative improvement on the exact same target snapshots where the asymptotic fit was estimable, avoiding a misleading comparison across different subsets. This comparison conditions on the target snapshot's cumulative edit count, available only retrospectively, so it does not yet forecast elapsed time or edits required to reach a quality threshold. No calibrated forecast intervals are implemented. Tail stability is descriptive, and neither stability nor curve fit proves biological correctness. The schema contains no independently calibrated residual high-impact-error risk, and global graph invariants can stabilize while local scientific errors persist. A valid automatic stopping gate requires separate risk evidence and held-out evaluation; this binary does not make that decision. The six-snapshot synthetic forecast fixture is `docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl`; the three-snapshot counterexample remains `docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl`.
+
+
+## Run
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml -- \
+  --manifest path/to/intake-manifest.json \
+  --root path/to/local-dataset-artifacts \
+  --output intake-audit-report.json
+```
+
+Every `input_files[].path` is relative to `--root`. Absolute paths, parent-directory traversal, symlink escapes, missing files, byte-count mismatches, and SHA-256 mismatches fail closed. Keep dataset license/source metadata with the manifest.
+
+## Manifest contract
+
+- Dataset ID is `jeffbbrown2/ConnectomeBench2`; dataset revision must be `v2` (not `main`). Record the exact dataset-revision commit SHA in the manifest.
+- The upstream code commit is pinned to `5679b39aa2641d8d0afeed88b441e696f87a66df`. This pin was reviewed against `src/neurips_training/data.py::route_row` and `scripts/data_generation/neurips/postprocess_giga_parquet.py::derive_task_routing`. Change the pin only after auditing the replacement source commit and updating the code/schema contracts together.
+- `false_split_correction` uses `false_split_correction_label = same_neuron` and dual-segment `geometry` for merge correction.
+- `false_merge_identification` uses `false_merge_identification_label = !same_neuron` and single-segment `geometry_single` for split correction.
+- Allowed model inputs are `geometry`, `geometry_single`, `em_xy`, `em_xz`, and `em_yz`. `em_best`, labels, IDs, routing, and metadata are not accepted as model inputs.
+- Single-segment geometry declares `geometry_preprocessing_profile=single_segment_zero_mask_channels` to mirror the reference loader's defensive mask-zeroing step. Dual geometry declares `dual_segment_native`.
+- If EM slices are inputs, the preprocessing profile must declare A/B fusion and zeroing B for single-segment input, or native dual masks for dual-segment input.
+
+## ConnectomeBench2 V2 metadata lineage and split audit
+
+The `connectome-dataset-audit` binary audits the metadata-only sidecars before training or scoring. It consumes JSONL exported from the three V2 Parquet sidecars, so no image payloads are read and no Python runtime is added to the Rust toolchain.
+
+From the ConnectomeBench2 V2 dataset root, export only the identity, labels, route, mask, modality, and metadata columns with DuckDB:
+
+```sh
+duckdb -c ".read /path/to/symthaea/tools/connectomics-intake-audit/export_connectomebench2_metadata.sql"
+```
+
+Then run the Rust auditor from the Symthaea checkout:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-dataset-audit -- \\
+  --input /path/to/connectomebench2_metadata.jsonl \\
+  --dataset-revision-commit-sha <resolved-v2-commit-sha> \\
+  --cube-edge-nm 50000 \\
+  --output connectomebench2-lineage-audit.json
+```
+
+The `--dataset-revision-commit-sha` argument is required and must be the exact 40-character commit SHA resolved from the Hugging Face `v2` revision used to download the dataset; do not pass the literal string `v2`. The report records both this dataset commit and the pinned upstream code commit. The SHA is operator-supplied provenance: the offline auditor does not contact Hugging Face or independently prove that the local files came from that commit.
+
+The export SQL reads `metadata/train.parquet`, `metadata/val.parquet`, and `metadata/test.parquet`, and deliberately excludes geometry and EM bytes. The auditor fails closed on malformed/unknown sidecar fields, bad sample-hash composition, duplicate combined IDs, sample-type/strategy mismatches, incorrect `same_neuron` or derived label values, mask-flag drift, task-routing drift, missing source split-group keys, operation-group reuse across splits, and reuse of a physical 50 µm cube across partitions even when its rows originate from different sample banks. It reconstructs the upstream grouping key by archive bank: `operation_id` for edit/adjacent-control rows, `source_operation_id` for junction controls, and the pre/post root plus synapse coordinate for synapse controls. It normalizes the source-side `val` spelling to `validation`.
+
+Cross-split root identity is reported as a warning, not a hard failure. A neuron may span multiple 50 µm cubes; such overlap creates a dependence and possible leakage risk that needs a neuron-grouped sensitivity evaluation, but the overlap alone does not prove that train/test samples are duplicates. Missing spatial coordinates are reported and never assigned fabricated cube IDs; a present but malformed/non-finite coordinate fails closed instead of bypassing the spatial check. A PASS is limited to the checks above; it does not prove biological independence, ground-truth correctness, or model performance.
+
+The synthetic fixture `docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl` has one fake row per sample type. It is not a substitute for running the audit on the exact downloaded V2 revision. The V2 revision commit SHA still must be recorded in the intake manifest; this offline binary does not resolve the Hugging Face branch to a commit or prove that the downloaded bytes came from that branch.
+
+## Frozen prediction scorer
+
+A second binary, `proofreading-score`, evaluates **frozen** predictions and independently adjudicated labels. It is deliberately separate from the runtime model/ranker. It currently consumes JSONL so metrics can be unit-tested without downloading raw EM or decoding Parquet.
+
+Build and test:
+```sh
+cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin proofreading-score -- \
+  --input predictions.jsonl \
+  --mapping-reference https://example.org/reviewed-label-map \
+  --dataset-revision-commit-sha <40-character-hub-commit-sha> \
+  --policy-id specialist-v1 \
+  --prediction-profile-sha256 <64-character-config-sha256> \
+  --evaluation-partition development \
+  --review-time-basis synthetic-proxy \
+  --bootstrap-replicates 500 \
+  --output score-report.json
+```
+
+The input JSONL contains one row per unique source operation:
+```json
+{"sample_id":"source-op-001","group":"mouse:merge","cluster_id":"mouse-cube-017","label_is_error":true,"p_error":0.93,"review_priority_score":0.94,"review_minutes":2.0,"impact_weight":4.0}
+{"sample_id":"source-op-002","group":"fly:split","cluster_id":"fly-cube-204","label_is_error":false,"p_error":0.12,"review_priority_score":0.07,"review_minutes":1.5,"impact_weight":0.0}
+```
+
+- `cluster_id` is the declared dependency unit for uncertainty estimation (e.g. source volume/spatial cube/neuron); choose the unit that matches the sampling and intended generalization claim. Multiple rows from one cluster are resampled together. A cluster ID is not proof that clusters are independent.
+- `label_is_error` is an **evaluation-only** adjudicated label, normalized so `true` means a genuine reconstruction error requiring correction. `mapping_reference` must point to the reviewed task/label contract.
+- `p_error` is the model's error probability; the scorer reports balanced accuracy at 0.5, AUROC, tie-aware average precision, Brier score, log loss, and group-level metrics.
+- `review_priority_score` is the frozen policy ranking for which candidate an expert should review next. The evaluator measures error yield and impact-weight capture at fixed item and review-minute budgets.
+- `impact_weight` is ground-truth evaluator metadata. It must never be a runtime input to the ranker or the candidate model.
+- `review_minutes` may be prospectively measured or a synthetic proxy. The required `--review-time-basis` makes that distinction explicit; synthetic proxies cannot support a real-world time-saving claim.
+- The schema-version-4 report includes dataset revision commit SHA, pinned upstream code commit, policy ID, frozen profile digest, evaluation partition, input SHA-256, deterministic cluster-bootstrap 95% intervals for balanced accuracy, review-budget yield, and risk–coverage checkpoints. Review-budget yield and risk–coverage are reported overall and per `group`, at the same item/minute budgets and coverage targets. Three matched-budget control policies are also scored on the same frozen rows: `uncertainty_only` (least confident first), `probability_only` (highest predicted error probability first), and `deterministic_random` (SHA-256 keyed order from the frozen input digest, group ID, and sample ID). Control metrics are computed overall and per group, and the random baseline is deterministic for replay.
+
+For every control and budget, the report also estimates the paired difference **submitted priority minus control** using a deterministic cluster bootstrap over the same resampled clusters for both policies. It reports 95% intervals separately for impact-weighted error recall, ordinary error recall, and precision. Item budgets are recalculated at the same requested fraction in each bootstrap replicate; minute budgets use the fixed supplied minute cap. Each metric reports its valid replicate count and is marked not estimable unless at least 80% of requested replicates are valid and at least two dependency clusters exist. Intervals are conditional on the submitted frozen rankings and the deterministic-random seed; they do not account for re-training, policy selection on the lockbox, or incorrect cluster assignments.
+
+Per-group deltas help stop strong pooled scores from hiding a weak species × error-family or a queue policy that fails to beat simple alternatives. Duplicate sample IDs fail closed before scoring; aggregate multiple image views at the source-operation level. Balanced-accuracy intervals and paired review-budget delta intervals are provided; AUROC, average precision, Brier score, and log loss currently have point estimates only. The scorer does not validate Parquet labels or certify cluster independence. It always emits `SCORED_NOT_PROMOTED`; model promotion still requires the locked split protocol and independent grouped statistical analysis.
+
+## Counterfactual query-impact review prioritization
+
+The `connectome-query-impact` binary evaluates proposed weighted-edge mutations independently against one immutable directed weighted graph and a preregistered set of scientific queries. It reports each query's baseline value, counterfactual value, delta, normalized absolute delta, and weighted contribution. The candidate score is
+
+```text
+weighted_query_sensitivity =
+    sum(query_weight * min(abs(query_delta) / normalization_scale, 1))
+    / sum(query_weight)
+
+probability_weighted_query_sensitivity_per_review_minute =
+    estimated_error_probability * weighted_query_sensitivity / review_minutes
+```
+
+Supported query metrics in schema v1 are directed edge weight, weighted in-degree, weighted out-degree, directed path existence, weighted feed-forward-loop counts, and weighted directed three-cycle counts. Motif counts sum products of the three directed edge weights; directed cycles are divided by three to remove rotation duplicates. Motif queries are limited to frozen subgraphs containing at most 4,096 directed edges. Supported candidate mutations are adding/removing positive edge weight. Duplicate graph edges must be aggregated by the producer. The query bundle's weights and scales are scientific-policy choices and must be frozen before evaluation. Candidate error probabilities must come from an independently calibrated model/policy; this tool does not train or calibrate them.
+
+Run the checked-in synthetic example:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-query-impact -- \\
+  --input docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json \\
+  --output query-impact-report.json
+```
+
+The report includes canonical SHA-256 digests of the baseline and each counterfactual graph. The digest encodes sorted directed edge triples as big-endian source ID, target ID, and IEEE-754 weight bits, making it independent of input edge order. The caller-supplied `source_graph_sha256` remains separately recorded and is not silently substituted for the canonical graph digest. Each candidate's evidence SHA-256 is retained in its result.
+
+A query may optionally include `reference_value`, an evaluation-only oracle result from an independently corrected/validated graph. The report then records baseline and counterfactual absolute query error and signed normalized error reduction (positive means closer to the reference; negative means worse). Oracle values do **not** enter the candidate priority formula; they must be withheld from proposal generation, model input, and queue ranking. When no query reference values exist, the reduction is explicitly not estimable. This is the first metric that can distinguish a large but harmful graph perturbation from a correction that improves a held-out scientific answer.
+
+The input also requires a preregistered `review_budgets_minutes` array. For each budget, the report replays six deterministic policies on the same candidate pool: query-sensitivity × error probability per minute, error probability per minute, uncertainty per minute, local weighted-degree change per minute, query sensitivity alone per minute, and deterministic random. The local-degree baseline sums absolute changes in weighted in-/out-degree across affected nodes; it is a simple structural comparator, not a global centrality method.
+
+For each policy/budget pair, candidates are visited in policy order. A candidate consumes its declared review minutes when selected; its mutation is applied to an in-memory graph only if it is valid on the evolving graph. A conflicting/incompatible candidate is still counted as reviewed but is not applied. The final weighted query error is compared with the starting graph only for queries with evaluation-only oracle values. This sequential replay avoids pretending conflicting candidates are additive.
+
+The replay is a **retrospective policy simulation**, not a model of human acceptance: it assumes every selected candidate whose mutation remains valid is accepted, and it does not model reviewer rejection, deliberation, variable review time, or new evidence acquired during review. Actual expert-minute savings require prospective review records. No annotation file or authoritative graph is changed; every candidate remains `HUMAN_REVIEW_ONLY`. If no positive-weight oracle values exist, query-error reduction is explicitly not estimable.
+
+The synthetic fixture deliberately includes an alternate-path control, candidates that conflict on a shared edge, and oracle values that distinguish beneficial from harmful changes. It is executable negative-control data, not a biological result.
+
+## Post-hoc reviewer outcome audit
+
+The `connectome-review-outcome-audit` binary is intentionally separate from the query-impact ranker. It consumes three files: the exact original proposal JSON, the frozen ranking report emitted by `connectome-query-impact`, and a separate evaluation-only reviewer-outcome file. It verifies the SHA-256 of the proposal bytes against the ranking report, verifies the canonical baseline graph digest, and checks that the outcome file is bound to both exact artifacts. The outcomes file also pins the adjudication protocol by SHA-256.
+
+The outcome file must contain exactly one record for every candidate in the frozen proposal pool:
+- `adjudication`: `correct`, `incorrect`, or `indeterminate`, from an independent adjudicator judging whether the proposed graph mutation is actually the correct correction;
+- `reviewer_decision`: the recorded expert decision `accept`, `reject`, or `abstain`;
+- `actual_review_minutes`: measured reviewer time, not a model estimate.
+
+Run sequence:
+
+```sh
+# 1. Freeze proposal inputs and produce the ranking report.
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-query-impact -- \\
+  --input proposals.json --output frozen-ranking.json
+
+# 2. Bind the separate outcome file to the exact frozen artifacts.
+sha256sum proposals.json frozen-ranking.json adjudication-protocol.md
+
+# 3. Populate docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json
+#    with those digests and one independently adjudicated/reviewed record per candidate.
+
+# 4. Evaluate the frozen policies using measured review time and human decisions.
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-review-outcome-audit -- \\
+  --proposals proposals.json \\
+  --ranking-report frozen-ranking.json \\
+  --outcomes reviewer-outcomes.json \\
+  --output post-hoc-review-evaluation.json
+```
+
+For each frozen policy/minute budget, the evaluator selects candidates in the saved ranking order using `actual_review_minutes`. It applies only proposals the reviewer accepted, in sequence on the evolving graph. An accepted but incorrect proposal is deliberately applied so its query harm is counted. An accepted proposal that has become stale/invalid due to an earlier edit is counted as a stale conflict and is not applied. Rejected and abstained correct proposals are counted as missed correction opportunities.
+
+The report exposes:
+- reviewer accept/reject/abstain outcomes crossed with independent correct/incorrect/indeterminate adjudication;
+- accepted-decision precision and applied-correction precision, each excluding indeterminate adjudications from its denominator;
+- candidate-pool correct-proposal review, acceptance, and actual-application recall (these are **not whole-connectome recall**);
+- incorrect-proposal acceptance rate, actual review minutes, stale conflicts, and before/after oracle query error.
+
+This is still a retrospective replay, not a randomized prospective causal estimate. All candidates in the frozen pool must be independently adjudicated and have review outcomes/time records; the same pool is then replayed under every frozen policy. Reviewer learning/order effects are not modeled. The evaluator does not modify authoritative graph or annotation files.
+
+
+For a defensible offline comparison, the frozen candidate pool should be reviewed in a blinded shadow-evaluation process: reviewers should not see which policy ranked a candidate, and an independent adjudication protocol should determine proposal correctness. This incurs annotation effort to create the outcome corpus; that corpus-construction cost must be reported separately and must not be presented as policy review savings. Policy budgets then replay subsets of the fully adjudicated pool using each candidate's measured review time.
+
+**Information-flow boundary:** never provide the reviewer-outcome file to `connectome-query-impact` or candidate generation. The ranker is a separate binary that does not define or parse this outcome schema. The post-hoc evaluator is the only tool that consumes adjudication/reviewer labels. The synthetic outcome template contains zero placeholders for the two artifact hashes; replace them with SHA-256 digests from the exact files before running it.
+
+## Exit codes
+
+- `0`: all declared checks pass.
+- `1`: manifest/data integrity gate failed; a JSON report is written when possible.
+- `2`: command/input parsing or report-writing error.
+
+The tool deliberately does not auto-correct labels, task names, or file hashes. Fix the source or have the mapping reviewed, update the manifest, then rerun.

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json",
+  "title": "Connectome post-hoc reviewer outcomes",
+  "description": "Evaluation-only records. This file must be withheld from the proposal ranker and supplied only to connectome-review-outcome-audit after the ranking report is frozen.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_input_sha256",
+    "source_ranking_report_sha256",
+    "adjudication_protocol_sha256",
+    "candidate_outcomes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_input_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_ranking_report_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "adjudication_protocol_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "candidate_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/candidateOutcome" }
+    }
+  },
+  "$defs": {
+    "candidateOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "adjudication",
+        "reviewer_decision",
+        "actual_review_minutes"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "adjudication": {
+          "enum": ["correct", "incorrect", "indeterminate"],
+          "description": "Independent expert adjudication of whether the proposed graph mutation is the correct correction."
+        },
+        "reviewer_decision": {
+          "enum": ["accept", "reject", "abstain"],
+          "description": "Recorded human decision made after reviewing the candidate."
+        },
+        "actual_review_minutes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Measured elapsed reviewer time attributed to this candidate, not model-estimated time."
+        }
+      }
+    }
+  }
+}

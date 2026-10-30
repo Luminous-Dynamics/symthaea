@@ -1,0 +1,63 @@
+name: Connectomics intake audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/**"
+      - "docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json"
+      - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_IMPACT_INPUT.schema.json"
+      - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MULTI_RATER_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_SAMPLING_AUDIT.example.json"
+      - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
+      - ".github/workflows/connectomics-intake-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/connectomics-intake-audit/**"
+      - "docs/neuroscience/CONNECTOMEBENCH2_V2_INTAKE_MANIFEST.schema.json"
+      - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_IMPACT_INPUT.schema.json"
+      - "docs/neuroscience/CONNECTOME_REVIEW_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_OUTCOMES.schema.json"
+      - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_SAMPLING_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/CONNECTOME_MULTI_RATER_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_REVIEW_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MULTI_RATER_OUTCOMES.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_SAMPLING_AUDIT.example.json"
+      - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_STOPPING_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_WALK_FORWARD_SNAPSHOTS.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json"
+      - ".github/workflows/connectomics-intake-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-audit:
+    name: Test standalone connectomics tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test intake, dataset lineage, frozen-prediction scoring, query-impact, stopping, and multi-rater audits
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml

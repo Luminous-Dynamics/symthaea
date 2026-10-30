@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_QUERY_IMPACT_INPUT.schema.json",
+  "title": "Connectome counterfactual query-impact input",
+  "description": "Frozen graph, scientific query bundle, and candidate graph mutations for human-review prioritization. This schema validates structure only; it does not establish truth, probability calibration, or scientific importance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_revision_commit_sha",
+    "source_graph_sha256",
+    "query_bundle_sha256",
+    "graph",
+    "queries",
+    "candidates",
+    "review_budgets_minutes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_graph_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "graph": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/query"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "review_budgets_minutes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "description": "Prerecorded fixed expert-minute budgets for the matched-policy replay."
+    }
+  },
+  "$defs": {
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "target",
+        "weight"
+      ],
+      "properties": {
+        "source": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "weight": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "weight",
+        "normalization_scale",
+        "metric"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "normalization_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reference_value": {
+          "type": "number",
+          "description": "Optional evaluation-only oracle value for measuring signed query-error reduction. Must be withheld from candidate generation and ranking policy."
+        },
+        "metric": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "target"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "edge_weight"
+                },
+                "source": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "target": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "node"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "in_degree"
+                },
+                "node": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "node"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "out_degree"
+                },
+                "node": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "target"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "path_exists"
+                },
+                "source": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "target": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "motif"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "triad_motif_count"
+                },
+                "motif": {
+                  "enum": [
+                    "feed_forward_loop",
+                    "directed_three_cycle"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "estimated_error_probability",
+        "review_minutes",
+        "evidence_sha256",
+        "changes"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimated_error_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "review_minutes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operation",
+                  "source",
+                  "target",
+                  "weight"
+                ],
+                "properties": {
+                  "operation": {
+                    "const": "add_weight"
+                  },
+                  "source": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "weight": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operation",
+                  "source",
+                  "target",
+                  "weight"
+                ],
+                "properties": {
+                  "operation": {
+                    "const": "remove_weight"
+                  },
+                  "source": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "weight": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

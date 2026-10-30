@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_ranking_report_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "adjudication_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "candidate_outcomes": [
+    {
+      "candidate_id": "candidate-0001",
+      "adjudication": "correct",
+      "reviewer_decision": "accept",
+      "actual_review_minutes": 2.4
+    },
+    {
+      "candidate_id": "candidate-0002",
+      "adjudication": "incorrect",
+      "reviewer_decision": "reject",
+      "actual_review_minutes": 1.7
+    },
+    {
+      "candidate_id": "candidate-0003",
+      "adjudication": "indeterminate",
+      "reviewer_decision": "abstain",
+      "actual_review_minutes": 4.1
+    }
+  ]
+}
