@@ -251,16 +251,14 @@ fn eie_weighted_increment(reports: &[Report], cap_raw_batch: bool) -> f64 {
     if reports.is_empty() { return 0.0; }
     let independent_groups = first_per_provenance_group(reports).len() as f64;
     let gamma = (independent_groups / EIE_K).min(1.0);
-    let mut raw = reports.iter()
+    // The source method's per-window raw-increment bound is operationalized here
+    // as a maximum of K report increments per step. This is a bounded analogue,
+    // not a claim to reproduce the paper's full graph-based CONFPROP system.
+    let selected = if cap_raw_batch { reports.iter().take(EIE_K as usize).collect::<Vec<_>>() }
+        else { reports.iter().collect::<Vec<_>>() };
+    let raw = selected.iter()
         .map(|report| llr(report.positive, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE))
         .sum::<f64>();
-    if cap_raw_batch {
-        let max_single = llr(true, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE)
-            .abs()
-            .max(llr(false, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE).abs());
-        let raw_cap = EIE_K * max_single;
-        raw = raw.clamp(-raw_cap, raw_cap);
-    }
     gamma * raw
 }
 
@@ -630,11 +628,13 @@ mod tests {
 
     #[test]
     fn eie_discount_without_batch_cap_allows_sybil_amplification() {
-        let tape = make_tape(Scenario::SybilFanout, 0);
-        let six_reports = &tape[64];
-        let one_increment = llr(six_reports[0].positive, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE);
-        let discounted = eie_weighted_increment(six_reports, false);
-        let bounded = eie_weighted_increment(six_reports, true);
+        let six_reports = (0..6).map(|claim| Report {
+            claimed_source: claim, provenance_group: 0, epoch: 64, context: 64,
+            nonce: 1024, positive: true,
+        }).collect::<Vec<_>>();
+        let one_increment = llr(true, NULL_SIGNAL_RATE, SHIFT_SIGNAL_RATE);
+        let discounted = eie_weighted_increment(&six_reports, false);
+        let bounded = eie_weighted_increment(&six_reports, true);
         assert!((discounted - 2.0 * one_increment).abs() < 1e-10);
         assert!((bounded - one_increment).abs() < 1e-10);
     }
