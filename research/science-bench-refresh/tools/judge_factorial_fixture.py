@@ -24,6 +24,14 @@ def digest(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+def git_revision() -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        capture_output=True, text=True,
+    )
+    return result.stdout.strip()
+
+
 def condition_id(block_id: str, repeat_index: int, factors: dict[str, str]) -> str:
     identity = {
         "block_id": block_id,
@@ -92,6 +100,7 @@ def generate(output_dir: Path) -> dict[str, Any]:
     }
     plan_fields = {
         "schema": PLAN_SCHEMA,
+        "analyzer_source_revision": git_revision(),
         "purpose": "example_only",
         "study_id": "synthetic-factorial-judge-bias-001",
         "judge_source_revision": "a" * 40,
@@ -154,6 +163,7 @@ def generate(output_dir: Path) -> dict[str, Any]:
 
     receipt = {
         "schema": RECEIPT_SCHEMA,
+        "analyzer_source_revision": plan_fields["analyzer_source_revision"],
         "purpose": "example_only",
         "run_id": "synthetic-run-not-authenticated-001",
         "plan_sha256": digest(plan_bytes),
