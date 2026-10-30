@@ -1,0 +1,41 @@
+name: HARDSEC Audit Examples
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "examples/hardsec_trigger_budget.rs"
+      - "examples/hardsec_evidence_packet_audit.rs"
+      - ".github/workflows/hardsec-audit-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-audit-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test:
+    name: Focused HARDSEC Rust examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test random-trigger sampling budget
+        run: cargo test --locked -p symthaea --no-default-features --example hardsec_trigger_budget
+
+      - name: Test claim-scoped evidence packet auditor
+        run: cargo test --locked -p symthaea --no-default-features --features hardsec-evidence-audit --example hardsec_evidence_packet_audit
