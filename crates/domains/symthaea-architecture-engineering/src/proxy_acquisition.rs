@@ -316,6 +316,22 @@ impl ProxyAcquisitionRun {
                 topology_encoding: candidate.topology_encoding.clone(),
             });
         }
+        let reconstructed_source_catalog_sha256 =
+            digest_source_catalog(&self.manifest, &output);
+        if reconstructed_source_catalog_sha256 != self.receipt.source_proxy_catalog_sha256 {
+            return Err(ProxyAcquisitionError::new(
+                "receipt.source_proxy_catalog_sha256",
+                "fully acquired feature table does not match the exact evaluator-held source catalog",
+            ));
+        }
+        if self.receipt.unique_proxy_queries > self.manifest.max_unique_proxy_queries
+            || self.receipt.total_proxy_seconds > self.manifest.max_total_proxy_seconds
+        {
+            return Err(ProxyAcquisitionError::new(
+                "receipt",
+                "recorded proxy acquisition exceeds its declared query or compute budget",
+            ));
+        }
         Ok(output)
     }
 }
@@ -1075,6 +1091,20 @@ mod tests {
             }
         });
         run.receipt.total_proxy_seconds += 1.0;
+        assert!(run.to_complete_feature_table().is_err());
+    }
+
+    #[test]
+    fn fully_queried_table_must_reconcile_with_exact_source_catalog_digest() {
+        let benchmark = benchmark(12, 10.0);
+        let mut run = benchmark.run_policy(|candidates, oracle| {
+            for candidate in candidates {
+                oracle.query(&candidate.architecture_id, "proxy_a").unwrap();
+                oracle.query(&candidate.architecture_id, "proxy_b").unwrap();
+            }
+        });
+        run.candidates[0].topology_encoding[0] =
+            (run.candidates[0].topology_encoding[0] + 1) % 5;
         assert!(run.to_complete_feature_table().is_err());
     }
 
