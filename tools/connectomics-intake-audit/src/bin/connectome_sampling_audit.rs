@@ -871,6 +871,7 @@ mod tests {
         audit.sampled_outcomes.push(SampledOutcome {
             candidate_id: "unselected".into(),
             adjudication: Adjudication::Correct,
+            audit_panel_person_minutes: 1.0,
             signed_query_error_reduction_if_applied: Some(0.1),
         });
         assert!(validate(&proposal,&audit,&proposal_hash,&"9".repeat(64)).unwrap_err().contains("outside the reproducibly"));
@@ -909,7 +910,7 @@ mod tests {
         let (proposal,audit,frame,outcomes,selected,proposal_hash,protocol_hash)=validated_fixture();
         let report=evaluate(
             &proposal,&audit,&frame,&outcomes,&selected,proposal_hash,protocol_hash,
-            frame_sha256(&audit.population_frame),sha256(b"synthetic outcomes")
+            frame_sha256(&audit.population_frame),sha256(b"synthetic audit input"),sha256(b"synthetic outcomes")
         );
         assert_eq!(report.candidate_count,8);
         assert_eq!(report.sampled_cluster_count,4);
@@ -947,7 +948,7 @@ mod tests {
             }
         }
         let (checked_frame,outcomes,checked_selected)=validate(&proposal,&audit,&proposal_hash,&"9".repeat(64)).unwrap();
-        let report=evaluate(&proposal,&audit,&checked_frame,&outcomes,&checked_selected,proposal_hash,"9".repeat(64),frame_sha256(&audit.population_frame),sha256(b"census outcomes"));
+        let report=evaluate(&proposal,&audit,&checked_frame,&outcomes,&checked_selected,proposal_hash,"9".repeat(64),frame_sha256(&audit.population_frame),sha256(b"census audit input"),sha256(b"census outcomes"));
         assert!(report.strata.iter().all(|s|s.estimated_incorrect_proposal_count.design_variance==0.0));
     }
 
