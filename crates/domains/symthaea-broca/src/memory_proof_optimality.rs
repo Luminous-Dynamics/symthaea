@@ -179,11 +179,6 @@ impl Enumeration<'_> {
                 .complete_combinations
                 .checked_add(1)
                 .ok_or_else(|| "independent verifier combination counter overflow".to_string())?;
-            self.feasible_combinations = self
-                .feasible_combinations
-                .checked_add(1)
-                .ok_or_else(|| "independent verifier feasible counter overflow".to_string())?;
-
             let evidence_ids: Vec<String> = selected_ids.iter().cloned().collect();
             let total_token_cost = checked_plan_cost(
                 self.request,
@@ -191,6 +186,12 @@ impl Enumeration<'_> {
                 selected_proofs,
                 self.candidates,
             )?;
+            if total_token_cost <= self.request.token_budget {
+                self.feasible_combinations = self
+                    .feasible_combinations
+                    .checked_add(1)
+                    .ok_or_else(|| "independent verifier feasible counter overflow".to_string())?;
+            }
             let choice_key = selected_proofs
                 .iter()
                 .map(|proof| (proof.conclusion_id.clone(), proof.justification_id.clone()))
@@ -433,6 +434,104 @@ mod tests {
         let mut result = solve_proof_budget(req.clone()).unwrap();
         result.packet_sha256 = Some(digest("tampered packet"));
         assert!(verify_minimum_cost_optimality(&req, &result).is_err());
+    }
+
+    #[derive(Serialize)]
+    struct PacketPayloadForTest<'a> {
+        decision_id: &'a str,
+        principal_id: &'a str,
+        scope_id: &'a str,
+        valid_at_unix_ms: u64,
+        known_at_unix_ms: u64,
+        request_sha256: &'a str,
+        policy_id: &'a str,
+        policy_sha256: &'a str,
+        tokenizer_id: &'a str,
+        tokenizer_version: &'a str,
+        tokenizer_sha256: &'a str,
+        packet_renderer_sha256: &'a str,
+        fixed_packet_overhead_tokens: u64,
+        token_budget: u64,
+        selected_proofs: &'a [SelectedProof],
+        evidence: &'a [crate::memory_proof_budget::ProofPacketEvidenceRef],
+        total_token_cost: u64,
+    }
+
+    fn valid_but_nonminimal_packet(request: &ProofBudgetRequest) -> ProofBudgetResult {
+        let mut expensive_only = request.clone();
+        expensive_only.candidates.retain(|candidate| candidate.evidence_id == "expensive");
+        expensive_only.obligations[0]
+            .alternatives
+            .retain(|alternative| alternative.justification_id == "proof-expensive");
+        let mut result = solve_proof_budget(expensive_only).unwrap();
+
+        let canonical = canonicalize_request(request.clone());
+        let request_bytes = serde_json::to_vec(&canonical).unwrap();
+        result.request_sha256 = format!("{:x}", Sha256::digest(request_bytes));
+
+        let candidate = canonical
+            .candidates
+            .iter()
+            .find(|candidate| candidate.evidence_id == "expensive")
+            .unwrap();
+        result.selected_proofs = vec![SelectedProof {
+            conclusion_id: "claim-1".into(),
+            justification_id: "proof-expensive".into(),
+            evidence_dependencies: vec!["expensive".into()],
+            selection_overhead_tokens: 2,
+        }];
+        result.evidence = vec![crate::memory_proof_budget::ProofPacketEvidenceRef {
+            evidence_id: candidate.evidence_id.clone(),
+            source_revision_id: candidate.source_revision_id.clone(),
+            source_pointer: candidate.source_pointer.clone(),
+            source_span_text: candidate.source_span_text.clone(),
+            source_span_start: candidate.source_span_start,
+            source_span_end: candidate.source_span_end,
+            source_family_id: candidate.source_family_id.clone(),
+            payload_sha256: candidate.payload_sha256.clone(),
+            source_span_sha256: candidate.source_span_sha256.clone(),
+            authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
+            retrieval_rank: candidate.retrieval_rank,
+            token_cost: candidate.token_cost,
+        }];
+        result.total_token_cost = canonical.fixed_packet_overhead_tokens
+            + u64::from(candidate.token_cost)
+            + u64::from(canonical.obligations[0].selection_overhead_tokens);
+
+        let payload = PacketPayloadForTest {
+            decision_id: &canonical.decision_id,
+            principal_id: &canonical.principal_id,
+            scope_id: &canonical.scope_id,
+            valid_at_unix_ms: canonical.valid_at_unix_ms,
+            known_at_unix_ms: canonical.known_at_unix_ms,
+            request_sha256: &result.request_sha256,
+            policy_id: &canonical.policy_id,
+            policy_sha256: &canonical.policy_sha256,
+            tokenizer_id: &canonical.tokenizer_id,
+            tokenizer_version: &canonical.tokenizer_version,
+            tokenizer_sha256: &canonical.tokenizer_sha256,
+            packet_renderer_sha256: &canonical.packet_renderer_sha256,
+            fixed_packet_overhead_tokens: canonical.fixed_packet_overhead_tokens,
+            token_budget: canonical.token_budget,
+            selected_proofs: &result.selected_proofs,
+            evidence: &result.evidence,
+            total_token_cost: result.total_token_cost,
+        };
+        let packet_bytes = serde_json::to_vec(&payload).unwrap();
+        result.packet_sha256 = Some(format!("{:x}", Sha256::digest(packet_bytes)));
+        result
+    }
+
+    #[test]
+    fn independent_verifier_rejects_a_sufficient_but_nonminimal_packet() {
+        let req = request();
+        let result = valid_but_nonminimal_packet(&req);
+
+        // Prove this is not merely a malformed-packet rejection.
+        verify_proof_packet(&req, &result).unwrap();
+        assert_eq!(result.total_token_cost, 15);
+        let error = verify_minimum_cost_optimality(&req, &result).unwrap_err();
+        assert!(error.contains("not the independently verified canonical optimum"));
     }
 
     #[test]
