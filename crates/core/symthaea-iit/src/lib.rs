@@ -1,13 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! A small, explicit causal-model substrate for a future Rust-native IIT engine.
+//! A small, explicit causal-model substrate and bounded IIT 4.0 (2023) system-search core.
 //!
 //! # Scope
 //!
-//! Version 0.1 defines and validates a dense, binary, factored transition-probability
-//! model. It deliberately does not calculate IIT phi, system phi_s, structure Phi,
-//! a cause-effect structure, or consciousness. These are separate algorithms and
-//! must not be inferred from a valid TPM.
+//! The crate validates a dense, binary, factored transition-probability model,
+//! implements repertoire/GID primitives, exact-quotiented directed system cuts,
+//! specified-state selection, and an exhaustive Integration-level system phi_s
+//! search for the full substrate under IIT 4.0 (2023). Proper-subsystem Eq. 3/Eq. 4
+//! background marginalization, Composition-level big-Phi tie resolution, the
+//! complete cause-effect structure, and the IIT 4.0 (2026) intrinsic-information
+//! cap remain unimplemented. Unsupported proper-subsystem system scoring fails
+//! closed. No output is a consciousness determination.
 //!
 //! # Model contract
 //!
@@ -324,8 +328,6 @@ pub enum SystemPhiError {
     NonFiniteIntrinsicSpecification { state_index: usize },
     #[error("system partition enumeration failed: {0}")]
     PartitionEnumeration(#[from] PartitionEnumerationError),
-    #[error("system partition enumeration exceeded its budget of {max_combinations} canonical representatives")]
-    PartitionBudgetExceeded { max_combinations: usize },
     #[error("partition GID score became non-finite")]
     NonFinitePartitionScore,
     #[error("specified-state pair count {candidate_pairs} exceeds the configured budget of {max_state_pairs}")]
@@ -1522,6 +1524,9 @@ impl BinaryCausalModel {
         if candidate_system.windows(2).any(|pair| pair[0] >= pair[1]) {
             return Err(SystemPhiError::CandidateSystemNotCanonical);
         }
+        if !candidate_system.iter().copied().eq(0..self.n_units) {
+            return Err(SystemPhiError::UnsupportedSubsystemBackground);
+        }
         if config.decimal_precision > 15 {
             return Err(SystemPhiError::InvalidNumericalPrecision {
                 precision: config.decimal_precision,
@@ -2287,6 +2292,44 @@ mod tests {
         assert!(matches!(
             model.intrinsic_specification_iit4(&[0, 1], &[false, false], CausalDirection::Cause, 16),
             Err(SystemPhiError::InvalidNumericalPrecision { precision: 16 })
+        ));
+    }
+
+    #[test]
+    fn system_iit4_scoring_rejects_unimplemented_proper_subsystem_background() {
+        let model = two_unit_model();
+        assert!(matches!(
+            model.intrinsic_specification_iit4(
+                &[0],
+                &[true, false],
+                CausalDirection::Cause,
+                6,
+            ),
+            Err(SystemPhiError::UnsupportedSubsystemBackground)
+        ));
+        assert!(matches!(
+            model.analyze_iit4_2023_system_phi_s(
+                &[0],
+                &[true, false],
+                Iit4SystemPhiSearchConfig::default(),
+            ),
+            Err(SystemPhiError::UnsupportedSubsystemBackground)
+        ));
+        let partition = enumerate_iit4_system_partitions(&[0], 2, false, 1)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        assert!(matches!(
+            model.score_iit4_system_partition(
+                &partition,
+                &[true, false],
+                &Iit4SystemState {
+                    cause_specified_state: vec![true],
+                    effect_specified_state: vec![false],
+                },
+            ),
+            Err(SystemPhiError::UnsupportedSubsystemBackground)
         ));
     }
 
