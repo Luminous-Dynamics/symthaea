@@ -324,6 +324,59 @@ mod tests {
             .collect()
     }
 
+    #[derive(Deserialize)]
+    struct CalibrationFixture {
+        schema_version: String,
+        calibration_method_version: String,
+        joint_coverage_percent: u8,
+        independent_group_count: usize,
+        observation_count: usize,
+        observations: Vec<RetrievalUtilityCalibrationObservation>,
+        expected_residual_offsets: ExpectedResidualOffsets,
+    }
+
+    #[derive(Deserialize)]
+    struct ExpectedResidualOffsets {
+        correctness_gain_lcb_residual_micro: i64,
+        lifecycle_risk_reduction_lcb_residual_micro: i64,
+        retrieval_harm_ucb_residual_micro: i64,
+    }
+
+    #[test]
+    fn versioned_group_conformal_fixture_matches_calibration_algorithm() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/retrieval-value-calibration-fixtures-v1.json"
+        );
+        let fixture: CalibrationFixture = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            fixture.schema_version,
+            "broca-retrieval-value-calibration-fixtures-v1"
+        );
+        assert_eq!(
+            fixture.calibration_method_version,
+            RETRIEVAL_UTILITY_CALIBRATION_VERSION
+        );
+        assert_eq!(fixture.joint_coverage_percent, JOINT_COVERAGE_PERCENT);
+        assert_eq!(fixture.independent_group_count, 29);
+        assert_eq!(fixture.observation_count, fixture.observations.len());
+
+        let bounds = calibrate_retrieval_utility_bounds(&fixture.observations).unwrap();
+        assert_eq!(bounds.independent_group_count, fixture.independent_group_count);
+        assert_eq!(bounds.observation_count, fixture.observation_count);
+        assert_eq!(
+            bounds.correctness_gain_lcb_residual_micro,
+            fixture.expected_residual_offsets.correctness_gain_lcb_residual_micro
+        );
+        assert_eq!(
+            bounds.lifecycle_risk_reduction_lcb_residual_micro,
+            fixture.expected_residual_offsets.lifecycle_risk_reduction_lcb_residual_micro
+        );
+        assert_eq!(
+            bounds.retrieval_harm_ucb_residual_micro,
+            fixture.expected_residual_offsets.retrieval_harm_ucb_residual_micro
+        );
+    }
+
     #[test]
     fn uses_group_conformal_lower_bounds_for_benefits_and_upper_bound_for_harm() {
         let rows = calibration_rows();
