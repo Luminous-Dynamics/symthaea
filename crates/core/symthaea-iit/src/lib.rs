@@ -1460,7 +1460,11 @@ impl BinaryCausalModel {
             .collect::<Vec<_>>();
         parents.sort_unstable_by_key(|(variable, _)| *variable);
         let variables = parents.iter().map(|(variable, _)| *variable).collect::<Vec<_>>();
-        let entries = assignment_count(parents.len()).map_err(FactorGraphError::from)?;
+        let entries = 1usize.checked_shl(parents.len() as u32).ok_or(
+            FactorGraphError::ScopeTooWide {
+                variables: parents.len(),
+            },
+        )?;
         let mut values = Vec::with_capacity(entries);
 
         for assignment in 0..entries {
@@ -1576,8 +1580,11 @@ impl BinaryCausalModel {
             return Err(RepertoireError::UndefinedBackgroundPosterior);
         }
 
-        let purview_state_count = assignment_count(candidate_count)
-            .map_err(FactorGraphError::from)?;
+        let purview_state_count = 1usize.checked_shl(candidate_count as u32).ok_or(
+            FactorGraphError::ScopeTooWide {
+                variables: candidate_count,
+            },
+        )?;
         let mut per_mechanism_unit = Vec::with_capacity(candidate_count);
         for target in candidate_system.iter().copied() {
             let target_factor =
