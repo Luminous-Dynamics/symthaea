@@ -1439,7 +1439,7 @@ mod tests {
         cursor.into_inner()
     }
 
-    fn process_observation(render_id: &str) -> RendererProcessObservation {
+    fn process_observation(render_id: &str, gain: f32) -> RendererProcessObservation {
         let executable = sha256_hex(b"fixture-fluidsynth-binary");
         let soundfont = sha256_hex(b"fixture-soundfont");
         RendererProcessObservation {
@@ -1451,7 +1451,7 @@ mod tests {
             soundfont_sha256_after: soundfont,
             arguments: vec![
                 "-g".into(),
-                "0.8".into(),
+                format!("{gain:.1}"),
                 "-T".into(),
                 "wav".into(),
                 "-F".into(),
@@ -1490,6 +1490,15 @@ mod tests {
         midi: &[u8],
         samples: &[f32],
     ) -> BoundRender {
+        build_render_with_gain(render_id, midi, samples, 0.8)
+    }
+
+    fn build_render_with_gain(
+        render_id: &str,
+        midi: &[u8],
+        samples: &[f32],
+        gain: f32,
+    ) -> BoundRender {
         let wav = float_wav(samples);
         let view = audio(samples);
         let score_sha256 = sha256_hex(SCORE_BYTES);
@@ -1501,7 +1510,7 @@ mod tests {
         )
         .unwrap();
         let map_bytes = serde_json::to_vec(&map).unwrap();
-        let process = process_observation(render_id);
+        let process = process_observation(render_id, gain);
         let executable = process.executable_sha256_after.clone();
         let soundfont = process.soundfont_sha256_after.clone();
         // Studio only includes this receipt field after full-score coverage
@@ -1648,13 +1657,15 @@ mod tests {
     }
 
     #[test]
-    fn renderer_profile_normalizes_only_temporary_input_and_output_paths() {
+    fn renderer_profile_normalizes_temporary_paths_but_binds_actual_options() {
         let samples = vec![0.0f32; 128];
         let midi = baseline_midi();
         let first = build_render("first-temp-path", &midi, &samples);
         let second = build_render("second-temp-path", &midi, &samples);
+        let changed_gain = build_render_with_gain("changed-gain", &midi, &samples, 0.9);
         let first_evidence = verify_bound_render(&first, &samples, None);
         let second_evidence = verify_bound_render(&second, &samples, None);
+        let changed_gain_evidence = verify_bound_render(&changed_gain, &samples, None);
 
         assert_ne!(
             first_evidence.receipt_sha256(),
@@ -1667,6 +1678,10 @@ mod tests {
         assert_eq!(
             first_evidence.renderer_config_sha256(),
             second_evidence.renderer_config_sha256()
+        );
+        assert_ne!(
+            first_evidence.renderer_config_sha256(),
+            changed_gain_evidence.renderer_config_sha256()
         );
     }
 
