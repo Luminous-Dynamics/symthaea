@@ -13,7 +13,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/judge_robustness.rs: typed judge-audit plan/report commitments, complete repeated-observation accounting, per-family stability/consistency/gold-agreement metrics, and four CLI commands.
 - schema/judge-robustness-plan.schema.json and schema/judge-robustness-report.schema.json plus non-scoring fixtures.
 - tools/judge_robustness_test_vectors.py: synthetic CLI positive controls and hostile mutations; not empirical judge evidence.
-- docs/research/SCI-REFERENCE-ASSURANCE-001.md: proposal for evidence-backed reference labels, independent adjudication, uncertainty preservation, source ancestry and external custody; not yet implemented or scoring eligible.
+- docs/research/SCI-REFERENCE-ASSURANCE-001.md: protocol for evidence-backed reference labels, independent adjudication, uncertainty preservation, source ancestry and external custody.
+- src/reference_assurance.rs: strict typed reference-package commitment/verification, cross-record validation, disagreement accounting and explicit claim-boundary report.
+- schema/reference-assurance-package.schema.json and fixtures/reference-assurance-package.example.json: strict v1 package schema and non-scoring example with intentionally preserved rater disagreement.
+- tools/test_reference_assurance.py: independent standard-library Python commitment/structure oracle and adversarial unit tests; test-only, not a production validator.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -24,6 +27,25 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Validate an evaluator-side reference package
+
+The reference-assurance package validates atomic claims, declared temporal/scope metadata, source snapshots, byte-offset evidence spans, adjudicator declarations, initial votes, and separate resolution events. It preserves disagreement; no majority label is generated.
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-reference-assurance-package \
+  research/science-bench-refresh/fixtures/reference-assurance-package.example.json
+```
+
+To compute a package commitment before attaching `package_commitment_sha256`, provide the package fields without that field:
+
+```sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-reference-assurance-package-fields package-fields.json
+```
+
+A valid report is deliberately not a scoring qualification: adjudicator independence, source authenticity, source-span byte correspondence and runner execution remain unproven, and an external anchor is required. See [SCI-REFERENCE-ASSURANCE-001](../../docs/research/SCI-REFERENCE-ASSURANCE-001.md).
 
 ## Validate a manifest
 
