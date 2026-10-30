@@ -455,7 +455,7 @@ impl HierarchicalCfCWorldModel {
 
     /// Train the prediction head on the change in state rather than the full
     /// next state. Pair this with `predict_next_state_residual`; the default
-    /// `train_step` objective and behavior remain unchanged.
+    /// `train_step` continues to use the absolute next-state target.
     pub fn train_step_residual(
         &mut self,
         state: &[f32],
