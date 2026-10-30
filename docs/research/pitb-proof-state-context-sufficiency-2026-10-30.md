@@ -60,6 +60,30 @@ The Lean workflow cross-checks JSON snapshots against the readable trace, then e
 
 The receipt schema is strict. Negative controls cover changed snapshot content, missing snapshots, incorrect context-removal claims, target drift, and orphaned case bindings. The full readable trace remains an uploaded artifact so an external reviewer can reproduce the canonical snapshot digests.
 
+
+## New evidence layer — actual proof-term support (2026-10-30)
+
+The pilot now also inspects the assigned proof expression after two checked solutions. A Lean-side expression traversal extracts the free-variable identifiers occurring in the proof term itself. It records:
+
+- **Direct proof-term support:** the local declarations referenced syntactically by the assigned proof expression.
+- **Transitive local dependency closure:** the direct declarations plus free variables occurring in their types and available local values.
+- **The proof term:** the elaborator's pretty-printed representation, retained in the receipt alongside the support rows.
+
+The two intervention cases now have explicit, case-manifest-bound expectations:
+- After required hypothesis h is cleared, the alternate-route proof must reference hEq and must not reference h.
+- After irrelevant declaration hIrrelevant is cleared, the original proof must reference h and must not reference hIrrelevant.
+
+The CI workflow requires exactly these two proof-support receipts, validates their labels and case joins, checks unique FVar IDs, required/forbidden direct declarations and closure inclusion, and hashes the canonical receipt content. The strict receipt schema retains the direct and transitive support rows.
+
+**Interpretation boundary:** free-variable occurrence establishes what the particular checked proof term uses. It does not prove that each used declaration is logically necessary, that no alternative proof exists without it, or that the declared support set is minimal. A redundant hypothesis can occur in a valid proof term. Minimal logical support requires separate ablation/reproof or formal independence evidence. The direct/transitive distinction is therefore an auditable proof-construction trace, not a minimality certificate.
+
+This creates a useful three-way evidence model:
+1. **Available context** — what the prover could use.
+2. **Actual proof support** — what the accepted proof term did use.
+3. **Minimal sufficient support** — what must remain for the declared strategy or theorem under a specified proof/replanning policy.
+
+PITB can now compare model-predicted support against the second category while its intervention cohort tests the third. None of these results has been run against a model yet.
+
 ## General benchmark design
 
 The calibration is intentionally small. A proper context-sufficiency cohort should contain independently reviewed examples across unrelated mathematical families and at least these intervention classes:
