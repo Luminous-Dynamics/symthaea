@@ -622,7 +622,6 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     let input_sha = sha256(input_bytes);
     let baseline_graph = graph_from_edges(&input.graph);
     let baseline_error = weighted_query_error(input, &baseline_graph)?;
-    let input_sha_str = input_sha.as_str();
 
     let policy_names = [
         "probability_weighted_query_sensitivity_per_minute",
