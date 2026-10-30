@@ -48,6 +48,8 @@ pub struct RetrievalCalibrationAuditRequest {
     pub estimator_id: String,
     pub estimator_version: String,
     pub estimator_sha256: String,
+    pub feature_schema_sha256: String,
+    pub utility_schema_sha256: String,
     pub training_split_sha256: String,
     pub calibration_split_sha256: String,
     /// Must be a separate, untouched split not used for training/calibration.
@@ -72,6 +74,8 @@ impl RetrievalCalibrationAuditRequest {
         }
         for (field, value) in [
             ("estimator_sha256", self.estimator_sha256.as_str()),
+            ("feature_schema_sha256", self.feature_schema_sha256.as_str()),
+            ("utility_schema_sha256", self.utility_schema_sha256.as_str()),
             ("training_split_sha256", self.training_split_sha256.as_str()),
             ("calibration_split_sha256", self.calibration_split_sha256.as_str()),
             ("audit_split_sha256", self.audit_split_sha256.as_str()),
@@ -181,6 +185,8 @@ struct RetrievalCalibrationReportPayload<'a> {
     estimator_id: &'a str,
     estimator_version: &'a str,
     estimator_sha256: &'a str,
+    feature_schema_sha256: &'a str,
+    utility_schema_sha256: &'a str,
     training_split_sha256: &'a str,
     calibration_split_sha256: &'a str,
     audit_split_sha256: &'a str,
@@ -205,6 +211,8 @@ struct RetrievalCalibrationReportPayload<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedRetrievalCalibration {
     estimator_sha256: String,
+    feature_schema_sha256: String,
+    utility_schema_sha256: String,
     calibration_split_sha256: String,
     report_sha256: String,
     target_lower_bound_coverage_ppm: u32,
@@ -217,6 +225,8 @@ impl ValidatedRetrievalCalibration {
         &self,
         estimator_sha256: &str,
         calibration_split_sha256: &str,
+        feature_schema_sha256: &str,
+        utility_schema_sha256: &str,
         calibration_report_sha256: &str,
     ) -> Result<(), String> {
         if self.estimator_sha256 != estimator_sha256 {
@@ -224,6 +234,12 @@ impl ValidatedRetrievalCalibration {
         }
         if self.calibration_split_sha256 != calibration_split_sha256 {
             return Err("VOI calibration split does not match the passing audit".into());
+        }
+        if self.feature_schema_sha256 != feature_schema_sha256 {
+            return Err("VOI feature schema does not match the passing audit".into());
+        }
+        if self.utility_schema_sha256 != utility_schema_sha256 {
+            return Err("VOI utility schema does not match the passing audit".into());
         }
         if self.report_sha256 != calibration_report_sha256 {
             return Err("VOI calibration report digest does not match the passing audit".into());
@@ -349,6 +365,8 @@ pub fn audit_retrieval_value_estimator(
     let capability = if passed {
         Some(ValidatedRetrievalCalibration {
             estimator_sha256: report.estimator_sha256.clone(),
+            feature_schema_sha256: report.feature_schema_sha256.clone(),
+            utility_schema_sha256: report.utility_schema_sha256.clone(),
             calibration_split_sha256: report.calibration_split_sha256.clone(),
             report_sha256: report.report_sha256.clone(),
             target_lower_bound_coverage_ppm: target_coverage_ppm,
@@ -387,6 +405,8 @@ fn retrieval_calibration_report_digest(
         estimator_id: &report.estimator_id,
         estimator_version: &report.estimator_version,
         estimator_sha256: &report.estimator_sha256,
+        feature_schema_sha256: &report.feature_schema_sha256,
+        utility_schema_sha256: &report.utility_schema_sha256,
         training_split_sha256: &report.training_split_sha256,
         calibration_split_sha256: &report.calibration_split_sha256,
         audit_split_sha256: &report.audit_split_sha256,
@@ -442,6 +462,8 @@ mod tests {
             estimator_id: "voi-estimator".into(),
             estimator_version: "v1".into(),
             estimator_sha256: digest("estimator artifact"),
+            feature_schema_sha256: digest("feature schema"),
+            utility_schema_sha256: digest("utility schema"),
             training_split_sha256: digest("training split"),
             calibration_split_sha256: digest("calibration split"),
             audit_split_sha256: digest("audit split"),
@@ -479,6 +501,8 @@ mod tests {
         capability.verify_estimate_binding(
             &digest("estimator artifact"),
             &digest("calibration split"),
+            &digest("feature schema"),
+            &digest("utility schema"),
             &report.report_sha256,
         ).unwrap();
     }
@@ -561,6 +585,8 @@ mod tests {
         assert!(capability.verify_estimate_binding(
             &report.estimator_sha256,
             &digest("different calibration split"),
+            &digest("feature schema"),
+            &digest("utility schema"),
             &report.report_sha256,
         ).unwrap_err().contains("calibration split"));
     }
