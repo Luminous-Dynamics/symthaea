@@ -42,6 +42,8 @@ struct Evidence {
     tool_version: String,
     scope: String,
     proof_scope: Option<String>,
+    formal_result: Option<String>,
+    property_id: Option<String>,
     assumptions_sha256: Option<String>,
     witness_sha256: Option<String>,
     stimuli_count: Option<u64>,
@@ -190,6 +192,8 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
     let tool_version = required_string(value, "tool_version")?;
     let scope = required_string(value, "scope")?;
     let proof_scope = optional_string(value, "proof_scope")?;
+    let formal_result = optional_string(value, "formal_result")?;
+    let property_id = optional_string(value, "property_id")?;
     let assumptions_sha256 = optional_string(value, "assumptions_sha256")?;
     let witness_sha256 = optional_string(value, "witness_sha256")?;
     let stimuli_count = optional_u64(value, "stimuli_count")?;
@@ -205,6 +209,66 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
                 return Err(format!("evidence {id}: {name} must be a SHA-256 digest"));
             }
         }
+    }
+
+    match kind.as_str() {
+        "formal_proof" => {
+            let result = formal_result.as_deref().ok_or_else(|| {
+                format!("evidence {id}: formal_proof requires formal_result")
+            })?;
+            if property_id.is_none() {
+                return Err(format!("evidence {id}: formal_proof requires property_id"));
+            }
+            let expected_status = match result {
+                "assertion_proved" | "bounded_no_counterexample" => "pass",
+                "counterexample_found" => "fail",
+                "timeout" | "unknown" => "unknown",
+                _ => return Err(format!("evidence {id}: unsupported formal_result {result}")),
+            };
+            if status != expected_status {
+                return Err(format!(
+                    "evidence {id}: formal_result {result} requires status {expected_status}"
+                ));
+            }
+        }
+        "cover_witness" => {
+            if formal_result.as_deref() != Some("cover_reached")
+                || witness_sha256.is_none()
+                || status != "pass"
+            {
+                return Err(format!(
+                    "evidence {id}: cover_witness requires formal_result=cover_reached, witness_sha256 and status=pass"
+                ));
+            }
+            if property_id.is_none() {
+                return Err(format!("evidence {id}: cover_witness requires property_id"));
+            }
+        }
+        "equivalence_report" => {
+            let result = formal_result.as_deref().ok_or_else(|| {
+                format!("evidence {id}: equivalence_report requires formal_result")
+            })?;
+            if property_id.is_none() {
+                return Err(format!("evidence {id}: equivalence_report requires property_id"));
+            }
+            let expected_status = match result {
+                "equivalence_proved" => "pass",
+                "counterexample_found" => "fail",
+                "timeout" | "unknown" => "unknown",
+                _ => return Err(format!("evidence {id}: unsupported equivalence formal_result {result}")),
+            };
+            if status != expected_status {
+                return Err(format!(
+                    "evidence {id}: formal_result {result} requires status {expected_status}"
+                ));
+            }
+        }
+        _ if formal_result.is_some() || property_id.is_some() => {
+            return Err(format!(
+                "evidence {id}: formal_result/property_id are only valid for formal evidence kinds"
+            ));
+        }
+        _ => {}
     }
 
     if let Some(count) = activation_count {
@@ -231,6 +295,8 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         tool_version,
         scope,
         proof_scope,
+        formal_result,
+        property_id,
         assumptions_sha256,
         witness_sha256,
         stimuli_count,
@@ -332,6 +398,7 @@ fn validate_supported_claim(
                 item.kind == "formal_proof"
                     && item.status == "pass"
                     && item.proof_scope.as_deref() == Some("bounded")
+                    && item.formal_result.as_deref() == Some("bounded_no_counterexample")
                     && item.bound_cycles.unwrap_or(0) > 0
             });
             if !bounded {
@@ -345,6 +412,7 @@ fn validate_supported_claim(
                 item.kind == "formal_proof"
                     && item.status == "pass"
                     && item.proof_scope.as_deref() == Some("unbounded")
+                    && item.formal_result.as_deref() == Some("assertion_proved")
                     && item.assumptions_sha256.is_some()
             });
             if !proof {
@@ -590,6 +658,8 @@ fn run(args: Args) -> Result<(), String> {
             "tool_version": item.tool_version,
             "scope": item.scope,
             "proof_scope": item.proof_scope,
+            "formal_result": item.formal_result,
+            "property_id": item.property_id,
             "assumptions_sha256": item.assumptions_sha256,
             "witness_sha256": item.witness_sha256,
             "stimuli_count": item.stimuli_count,
