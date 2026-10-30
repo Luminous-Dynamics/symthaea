@@ -394,7 +394,7 @@ mod tests {
             evidence_class: ArchitectureEvidenceClass::PhysicalPrototype,
             measurement_boundary: ArchitectureMeasurementBoundary::ApplicationEndToEnd,
             quality,
-            resources,
+            resources: Some(resources),
         }
     }
 
@@ -415,6 +415,21 @@ mod tests {
         }
     }
 
+    fn algorithm_reference() -> ArchitectureBenchmarkObservation {
+        ArchitectureBenchmarkObservation {
+            record_id: "algorithm-reference".to_owned(),
+            architecture_id: "algorithm-only-reference".to_owned(),
+            architecture_family: ComputeArchitectureFamily::ClassicalCpu,
+            workload_kind: ArchitectureWorkloadKind::HdcAlgebra,
+            workload_fingerprint: "workload-sha256".to_owned(),
+            comparison_contract_fingerprint: "contract-sha256".to_owned(),
+            evidence_class: ArchitectureEvidenceClass::AlgorithmicReference,
+            measurement_boundary: ArchitectureMeasurementBoundary::AlgorithmOnly,
+            quality: interval(0.94, 0.95),
+            resources: None,
+        }
+    }
+
     fn cpu() -> ArchitectureBenchmarkObservation {
         observation(
             "cpu",
@@ -431,6 +446,41 @@ mod tests {
             interval(0.96, 0.97),
             resource_envelope((0.8, 0.9), (3.0, 4.0), (0.03, 0.04), (4_000, 5_000)),
         )
+    }
+
+    #[test]
+    fn algorithm_only_reference_is_valid_but_not_a_system_pareto_point() {
+        let reference = algorithm_reference();
+        assert_eq!(validate_architecture_observation(&reference), Ok(()));
+        assert_eq!(
+            compare_architecture_pareto(&reference, &reference),
+            Err(ArchitectureComparisonError::AlgorithmOnlyNotComparable)
+        );
+    }
+
+    #[test]
+    fn system_level_observation_requires_complete_resource_envelope() {
+        let mut invalid = cpu();
+        invalid.resources = None;
+        assert_eq!(
+            validate_architecture_observation(&invalid),
+            Err(ArchitectureComparisonError::MissingResourceEnvelope)
+        );
+    }
+
+    #[test]
+    fn algorithm_only_reference_cannot_claim_physical_resources() {
+        let mut invalid = algorithm_reference();
+        invalid.resources = Some(resource_envelope(
+            (1.0, 1.0),
+            (1.0, 1.0),
+            (0.1, 0.1),
+            (1024, 1024),
+        ));
+        assert_eq!(
+            validate_architecture_observation(&invalid),
+            Err(ArchitectureComparisonError::UnexpectedResourceEnvelope)
+        );
     }
 
     #[test]
