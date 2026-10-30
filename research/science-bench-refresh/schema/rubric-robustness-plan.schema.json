@@ -97,7 +97,8 @@
         "rubric_meaning_preserving",
         "surface_cue_attack",
         "rubric_meaning_changing",
-        "evidence_semantic_change"
+        "evidence_semantic_change",
+        "authority_cue_attack"
       ]
     },
     "relation": {
