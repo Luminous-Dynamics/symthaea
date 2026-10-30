@@ -129,9 +129,12 @@ impl CounterfactualSupportAdapterReport {
         self.events.len() == self.event_count
             && self.event_count >= 2
             && !self.routing_complete
+            && self.tail_guard_was_clipped
+                == self.events.iter().any(|event| event.tail_guard_was_clipped)
             && self.events.iter().enumerate().all(|(index, event)| {
                 event.source_event_index == index
                     && event.support.source_event_index == index
+                    && event.support.acoustic_support == event.conservative_support_intervals
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
