@@ -15,6 +15,9 @@ use crate::{min_fill_log_sum_product, BinaryCausalModel, BinaryLogFactor, Factor
 
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
+const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
+const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.1\0";
+pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.1.0";
 
 pub const MAX_SPARSE_UNITS: usize = 1_000_000;
 pub const MAX_LOCAL_PARENTS: usize = 20;
@@ -112,6 +115,8 @@ pub enum SparseCausalError {
     DuplicateCandidateUnit { unit: usize },
     #[error("candidate-system posterior is undefined for the observed whole-system state")]
     UndefinedBackgroundPosterior,
+    #[error("sparse Eq4 report entry {index} is not finite and nonnegative: {value}")]
+    InvalidReportValue { index: usize, value: f64 },
     #[error("dense model target {target} is not a function of its declared parent scope at full state {state}")]
     DenseModelNotLocal { target: usize, state: usize },
     #[error(transparent)]
@@ -128,12 +133,48 @@ pub struct SparseBinaryCausalModel {
 /// Eq. 4 likelihood output and exact variable-elimination cost telemetry.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SparseEq4Report {
+    /// Identity of model, state, candidate, algorithm, and resource budget.
+    pub request_sha256: String,
+    pub max_factor_entries: usize,
     /// Unnormalized forward cause likelihood. First candidate unit is the low bit.
     pub forward_likelihood: Vec<f64>,
     pub posterior_induced_width: usize,
     pub maximum_target_induced_width: usize,
     pub peak_factor_entries: usize,
     pub factor_multiplications: usize,
+}
+
+impl SparseEq4Report {
+    /// Canonical receipt binding the request, resource budget, result vector, and work counters.
+    pub fn receipt_sha256(&self) -> Result<String, SparseCausalError> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SPARSE_EQ4_RECEIPT_MAGIC);
+        sparse_receipt_string(&mut bytes, SPARSE_IIT4_EQ4_ALGORITHM_ID);
+        sparse_receipt_string(&mut bytes, &self.request_sha256);
+        sparse_receipt_u64(&mut bytes, self.max_factor_entries as u64);
+        sparse_receipt_u64(&mut bytes, self.forward_likelihood.len() as u64);
+        for (index, value) in self.forward_likelihood.iter().copied().enumerate() {
+            if !value.is_finite() || value < 0.0 {
+                return Err(SparseCausalError::InvalidReportValue { index, value });
+            }
+            let canonical = if value == 0.0 { 0.0 } else { value };
+            bytes.extend_from_slice(&canonical.to_bits().to_le_bytes());
+        }
+        sparse_receipt_u64(&mut bytes, self.posterior_induced_width as u64);
+        sparse_receipt_u64(&mut bytes, self.maximum_target_induced_width as u64);
+        sparse_receipt_u64(&mut bytes, self.peak_factor_entries as u64);
+        sparse_receipt_u64(&mut bytes, self.factor_multiplications as u64);
+        Ok(sparse_hex_digest(&bytes))
+    }
+}
+
+fn sparse_receipt_u64(bytes: &mut Vec<u8>, value: u64) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn sparse_receipt_string(bytes: &mut Vec<u8>, value: &str) {
+    sparse_receipt_u64(bytes, value.len() as u64);
+    bytes.extend_from_slice(value.as_bytes());
 }
 
 impl SparseBinaryCausalModel {
@@ -432,13 +473,40 @@ impl SparseBinaryCausalModel {
         if forward.iter().any(|value| !value.is_finite()) {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
         }
+        let request_sha256 = self.eq4_request_sha256(
+            candidate_system,
+            current_state,
+            max_factor_entries,
+        );
         Ok(SparseEq4Report {
+            request_sha256,
+            max_factor_entries,
             forward_likelihood: forward,
             posterior_induced_width: normalizer.induced_width,
             maximum_target_induced_width,
             peak_factor_entries,
             factor_multiplications,
         })
+    }
+
+    fn eq4_request_sha256(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        max_factor_entries: usize,
+    ) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(SPARSE_EQ4_REQUEST_MAGIC);
+        sparse_receipt_string(&mut bytes, SPARSE_IIT4_EQ4_ALGORITHM_ID);
+        bytes.extend_from_slice(self.model_sha256().as_bytes());
+        sparse_receipt_u64(&mut bytes, current_state.len() as u64);
+        bytes.extend(current_state.iter().map(|on| u8::from(*on)));
+        sparse_receipt_u64(&mut bytes, candidate_system.len() as u64);
+        for unit in candidate_system {
+            sparse_receipt_u64(&mut bytes, *unit as u64);
+        }
+        sparse_receipt_u64(&mut bytes, max_factor_entries as u64);
+        sparse_hex_digest(&bytes)
     }
 
     fn observation_log_factor(
@@ -702,6 +770,29 @@ mod tests {
             repeated.evaluation_sha256(&[true, false, true, false, true]).unwrap()
         );
         assert_eq!(sparse.model_sha256().len(), 64);
+    }
+
+    #[test]
+    fn sparse_eq4_receipt_binds_request_budget_and_result_values() {
+        let sparse = sparse_ring_model(5);
+        let state = [true, false, true, false, true];
+        let report = sparse.forward_cause_likelihood_iit4(&[0, 1], &state, 1 << 16).unwrap();
+        let repeated = sparse.forward_cause_likelihood_iit4(&[0, 1], &state, 1 << 16).unwrap();
+        assert_eq!(report.receipt_sha256().unwrap(), repeated.receipt_sha256().unwrap());
+
+        let other_budget = sparse.forward_cause_likelihood_iit4(&[0, 1], &state, 1 << 17).unwrap();
+        assert_ne!(report.receipt_sha256().unwrap(), other_budget.receipt_sha256().unwrap());
+
+        let mut tampered = report.clone();
+        tampered.forward_likelihood[0] += 0.001;
+        assert_ne!(report.receipt_sha256().unwrap(), tampered.receipt_sha256().unwrap());
+
+        let mut non_finite = report;
+        non_finite.forward_likelihood[0] = f64::NAN;
+        assert!(matches!(
+            non_finite.receipt_sha256(),
+            Err(SparseCausalError::InvalidReportValue { index: 0, value }) if value.is_nan()
+        ));
     }
 
     #[test]
