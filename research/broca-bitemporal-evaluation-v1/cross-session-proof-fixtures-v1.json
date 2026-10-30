@@ -71,7 +71,7 @@
       ],
       "expected_status": "no_eligible_proof",
       "expected_selected_justification_id": null,
-      "expected_rejection": "distinct_session_count_insufficient"
+      "expected_rejection": "DistinctSessionCountInsufficient"
     },
     {
       "case_id": "two-sessions-one-independent-family",
@@ -102,7 +102,7 @@
       ],
       "expected_status": "no_eligible_proof",
       "expected_selected_justification_id": null,
-      "expected_rejection": "independent_family_count_insufficient"
+      "expected_rejection": "IndependentFamilyCountInsufficient"
     },
     {
       "case_id": "missing-trusted-session-provenance",
@@ -133,7 +133,7 @@
       ],
       "expected_status": "no_eligible_proof",
       "expected_selected_justification_id": null,
-      "expected_rejection": "session_provenance_missing"
+      "expected_rejection": "SessionProvenanceMissing"
     }
   ]
 }
