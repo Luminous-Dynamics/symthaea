@@ -17,8 +17,7 @@ use sha2::{Digest, Sha256};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
-use std::fs::{self, File, OpenOptions};
-use std::io::Read;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -87,21 +86,6 @@ fn parse_args() -> Result<Option<Args>, String> {
         packet: packet.ok_or("--packet is required")?,
         receipt: receipt.ok_or("--receipt is required")?,
     }))
-}
-
-fn sha256_reader(mut reader: impl Read) -> Result<String, String> {
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = reader
-            .read(&mut buffer)
-            .map_err(|error| format!("read while hashing: {error}"))?;
-        if count == 0 {
-            break;
-        }
-        hasher.update(&buffer[..count]);
-    }
-    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
