@@ -357,16 +357,32 @@ fn render(reports: &[ModeResults]) -> String {
     for (mode_index, mode) in reports.iter().enumerate() {
         let source = aggregate(&mode.seeds, 0);
         let reversal = aggregate(&mode.seeds, 1);
+        let paired_delta = |regime_index: usize| {
+            if mode.objective == Objective::AbsoluteNextState {
+                (0.0, 0.0, 0.0)
+            } else {
+                let deltas = mode.seeds.iter().zip(&reports[0].seeds)
+                    .map(|(candidate, absolute)| {
+                        candidate.regimes[regime_index].mse - absolute.regimes[regime_index].mse
+                    })
+                    .collect::<Vec<_>>();
+                mean_ci95(&deltas)
+            }
+        };
+        let source_pair = paired_delta(0);
+        let reversal_pair = paired_delta(1);
         out.push_str(&format!(
             concat!(
                 "    {{\"objective\":\"{}\",",
                 "\"training_steps_per_seed\":{},",
                 "\"source\":{{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8},",
                 "\"mse_to_persistence_ratio\":{:.8},\"mse_delta_vs_persistence\":{:.8},",
-                "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8}}},",
+                "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8},",
+                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8}}},",
                 "\"action_effect_reversal\":{{\"mse\":{:.8},\"mae\":{:.8},\"persistence_mse\":{:.8},\"zero_mse\":{:.8},",
                 "\"mse_to_persistence_ratio\":{:.8},\"mse_delta_vs_persistence\":{:.8},",
-                "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8}}},",
+                "\"mse_delta_vs_persistence_ci95_low\":{:.8},\"mse_delta_vs_persistence_ci95_high\":{:.8},",
+                "\"paired_mse_delta_vs_absolute\":{:.8},\"paired_mse_delta_ci95_low\":{:.8},\"paired_mse_delta_ci95_high\":{:.8}}},",
                 "\"per_seed\":["
             ),
             mode.objective.name(),
@@ -374,9 +390,11 @@ fn render(reports: &[ModeResults]) -> String {
             source.mse, source.mae, source.persistence_mse, source.zero_mse,
             source.mse_to_persistence_ratio, source.mse_delta_vs_persistence,
             source.mse_delta_vs_persistence_ci95_low, source.mse_delta_vs_persistence_ci95_high,
+            source_pair.0, source_pair.1, source_pair.2,
             reversal.mse, reversal.mae, reversal.persistence_mse, reversal.zero_mse,
             reversal.mse_to_persistence_ratio, reversal.mse_delta_vs_persistence,
-            reversal.mse_delta_vs_persistence_ci95_low, reversal.mse_delta_vs_persistence_ci95_high
+            reversal.mse_delta_vs_persistence_ci95_low, reversal.mse_delta_vs_persistence_ci95_high,
+            reversal_pair.0, reversal_pair.1, reversal_pair.2
         ));
         for (seed_index, row) in mode.seeds.iter().enumerate() {
             out.push_str(&format!(
