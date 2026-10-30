@@ -8,6 +8,14 @@ const NULL_ACTION_UNSUPPORTED_RATE: f64 = 0.01;
 const SHIFTED_ACTION_UNSUPPORTED_RATE: f64 = 0.25;
 const NULL_PROBE_FAILURE_RATE: f64 = 0.01;
 const SHIFTED_PROBE_FAILURE_RATE: f64 = 0.60;
+const FEEDBACK_DELAY_STEPS: usize = 4;
+const FEEDBACK_DROP_RATE: f64 = 0.05;
+const FEEDBACK_SENSITIVITY: f64 = 0.85;
+const FEEDBACK_SPECIFICITY: f64 = 0.98;
+const NULL_FEEDBACK_SIGNAL_RATE: f64 = NULL_ACTION_UNSUPPORTED_RATE * FEEDBACK_SENSITIVITY
+    + (1.0 - NULL_ACTION_UNSUPPORTED_RATE) * (1.0 - FEEDBACK_SPECIFICITY);
+const SHIFTED_FEEDBACK_SIGNAL_RATE: f64 = SHIFTED_ACTION_UNSUPPORTED_RATE * FEEDBACK_SENSITIVITY
+    + (1.0 - SHIFTED_ACTION_UNSUPPORTED_RATE) * (1.0 - FEEDBACK_SPECIFICITY);
 const SUPPORTED_UTILITY: f64 = 0.03;
 const UNSUPPORTED_UTILITY: f64 = -0.20;
 const PROBE_COST: f64 = 0.003;
@@ -115,10 +123,11 @@ enum Policy {
     DirectFallback,
     FixedGate,
     PassiveCusum,
-    ProbeEvery2,
-    ProbeEvery4,
+    PeriodicProbe8,
+    PeriodicProbe16,
+    PeriodicProbe32,
     AdaptiveProbe,
-    ZeroInformationProbeEvery2,
+    ZeroInformationProbeEvery4,
     OracleChangepoint,
 }
 
@@ -128,10 +137,11 @@ impl Policy {
             Self::DirectFallback,
             Self::FixedGate,
             Self::PassiveCusum,
-            Self::ProbeEvery2,
-            Self::ProbeEvery4,
+            Self::PeriodicProbe8,
+            Self::PeriodicProbe16,
+            Self::PeriodicProbe32,
             Self::AdaptiveProbe,
-            Self::ZeroInformationProbeEvery2,
+            Self::ZeroInformationProbeEvery4,
             Self::OracleChangepoint,
         ]
     }
@@ -141,18 +151,20 @@ impl Policy {
             Self::DirectFallback => "direct_fallback",
             Self::FixedGate => "fixed_gate",
             Self::PassiveCusum => "passive_cusum",
-            Self::ProbeEvery2 => "probe_every_2",
-            Self::ProbeEvery4 => "probe_every_4",
-            Self::AdaptiveProbe => "adaptive_probe",
-            Self::ZeroInformationProbeEvery2 => "zero_info_probe_every_2",
+            Self::PeriodicProbe8 => "periodic_probe_8",
+            Self::PeriodicProbe16 => "periodic_probe_16",
+            Self::PeriodicProbe32 => "periodic_probe_32",
+            Self::AdaptiveProbe => "adaptive_probe_32",
+            Self::ZeroInformationProbeEvery4 => "zero_info_probe_32",
             Self::OracleChangepoint => "oracle_changepoint",
         }
     }
 
     fn probe_cap(self) -> usize {
         match self {
-            Self::ProbeEvery2 | Self::ZeroInformationProbeEvery2 => HORIZON.div_ceil(2),
-            Self::ProbeEvery4 => HORIZON.div_ceil(4),
+            Self::PeriodicProbe8 => 8,
+            Self::PeriodicProbe16 => 16,
+            Self::PeriodicProbe32 | Self::AdaptiveProbe | Self::ZeroInformationProbeEvery4 => 32,
             Self::AdaptiveProbe => ADAPTIVE_PROBE_CAP,
             _ => 0,
         }
@@ -162,10 +174,11 @@ impl Policy {
         matches!(
             self,
             Self::PassiveCusum
-                | Self::ProbeEvery2
-                | Self::ProbeEvery4
+                | Self::PeriodicProbe8
+                | Self::PeriodicProbe16
+                | Self::PeriodicProbe32
                 | Self::AdaptiveProbe
-                | Self::ZeroInformationProbeEvery2
+                | Self::ZeroInformationProbeEvery4
         )
     }
 }
@@ -187,6 +200,14 @@ fn action_likelihood_increment(unsupported: bool) -> f64 {
     }
 }
 
+fn feedback_likelihood_increment(signal: bool) -> f64 {
+    if signal {
+        (SHIFTED_FEEDBACK_SIGNAL_RATE / NULL_FEEDBACK_SIGNAL_RATE).ln()
+    } else {
+        ((1.0 - SHIFTED_FEEDBACK_SIGNAL_RATE) / (1.0 - NULL_FEEDBACK_SIGNAL_RATE)).ln()
+    }
+}
+
 fn probe_likelihood_increment(failure: bool) -> f64 {
     if failure {
         (SHIFTED_PROBE_FAILURE_RATE / NULL_PROBE_FAILURE_RATE).ln()
@@ -200,17 +221,27 @@ fn probe_requested(policy: Policy, step: usize, adaptive_armed: bool, used: usiz
         return false;
     }
     match policy {
-        Policy::ProbeEvery2 => step % 2 == 0,
-        Policy::ProbeEvery4 => step % 4 == 0,
+        Policy::PeriodicProbe8 => step % 16 == 0,
+        Policy::PeriodicProbe16 => step % 8 == 0,
+        Policy::PeriodicProbe32 => step % 4 == 0,
         Policy::AdaptiveProbe => adaptive_armed,
-        Policy::ZeroInformationProbeEvery2 => step % 2 == 0,
+        Policy::ZeroInformationProbeEvery4 => step % 4 == 0,
         _ => false,
     }
 }
 
 fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOutcome {
+    // Separate exogenous tapes ensure every policy sees paired action outcomes,
+    // probe signals, and passive-sensor corruption/drop events.
     let mut action_rng = SplitMix64::new(seed);
     let mut probe_rng = SplitMix64::new(seed ^ 0xA8A8_0099_2026_1030);
+    let mut feedback_rng = SplitMix64::new(seed ^ 0xF33D_BACC_2026_1030);
+    let action_draws: [f64; HORIZON] = std::array::from_fn(|_| action_rng.unit());
+    let probe_draws: [f64; HORIZON] = std::array::from_fn(|_| probe_rng.unit());
+    let feedback_noise: [f64; HORIZON] = std::array::from_fn(|_| feedback_rng.unit());
+    let feedback_drop: [f64; HORIZON] = std::array::from_fn(|_| feedback_rng.unit());
+    let mut action_taken = [false; HORIZON];
+    let mut action_unsupported = [false; HORIZON];
     let onset = scenario.shift_onset();
     let mut outcome = EpisodeOutcome::default();
     let mut evidence_score = 0.0_f64;
@@ -218,10 +249,21 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
     let mut revoked = false;
 
     for step in 0..HORIZON {
-        // Consume both tapes on every step, even after revocation, so policy
-        // interventions don't change exogenous randomness on paired episodes.
-        let action_draw = action_rng.unit();
-        let probe_draw = probe_rng.unit();
+        // Passive feedback from an action arrives four steps later, with a
+        // declared drop rate and sensitivity/specificity. The current candidate
+        // never receives the hidden shift label or true unsupported outcome.
+        if step >= FEEDBACK_DELAY_STEPS {
+            let source_step = step - FEEDBACK_DELAY_STEPS;
+            if action_taken[source_step] && feedback_drop[source_step] >= FEEDBACK_DROP_RATE {
+                let true_unsupported = action_unsupported[source_step];
+                let observed_signal = if true_unsupported {
+                    feedback_noise[source_step] < FEEDBACK_SENSITIVITY
+                } else {
+                    feedback_noise[source_step] < (1.0 - FEEDBACK_SPECIFICITY)
+                };
+                evidence_score = (evidence_score + feedback_likelihood_increment(observed_signal)).max(0.0);
+            }
+        }
 
         if policy == Policy::OracleChangepoint && onset == Some(step) {
             revoked = true;
@@ -239,7 +281,9 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
         }
 
         outcome.model_action_count += 1;
-        let unsupported = action_draw < scenario.action_unsupported_probability(step);
+        let unsupported = action_draws[step] < scenario.action_unsupported_probability(step);
+        action_taken[step] = true;
+        action_unsupported[step] = unsupported;
         if unsupported {
             outcome.unsupported_count += 1;
             outcome.cumulative_utility += UNSUPPORTED_UTILITY;
@@ -247,16 +291,12 @@ fn simulate_episode(scenario: Scenario, policy: Policy, seed: u64) -> EpisodeOut
             outcome.cumulative_utility += SUPPORTED_UTILITY;
         }
 
-        if policy.has_detector() {
-            evidence_score = (evidence_score + action_likelihood_increment(unsupported)).max(0.0);
-        }
-
         let wants_probe = probe_requested(policy, step, adaptive_armed, outcome.probe_count);
         if wants_probe {
             outcome.probe_count += 1;
             outcome.cumulative_utility -= PROBE_COST;
-            if policy != Policy::ZeroInformationProbeEvery2 {
-                let probe_failure = probe_draw < scenario.probe_failure_probability(step);
+            if policy != Policy::ZeroInformationProbeEvery4 {
+                let probe_failure = probe_draws[step] < scenario.probe_failure_probability(step);
                 // Action and probe evidence are independent under the declared
                 // synthetic mechanism, so their log-likelihood increments add.
                 evidence_score = (evidence_score + probe_likelihood_increment(probe_failure)).max(0.0);
@@ -479,8 +519,8 @@ mod tests {
 
     #[test]
     fn likelihood_increments_have_the_expected_sign() {
-        assert!(action_likelihood_increment(true) > 0.0);
-        assert!(action_likelihood_increment(false) < 0.0);
+        assert!(feedback_likelihood_increment(true) > 0.0);
+        assert!(feedback_likelihood_increment(false) < 0.0);
         assert!(probe_likelihood_increment(true) > 0.0);
         assert!(probe_likelihood_increment(false) < 0.0);
     }
@@ -505,11 +545,28 @@ mod tests {
     #[test]
     fn zero_information_probe_does_not_change_the_passive_decisions() {
         let passive = simulate_episode(Scenario::AbruptSupportShift, Policy::PassiveCusum, 999);
-        let control = simulate_episode(Scenario::AbruptSupportShift, Policy::ZeroInformationProbeEvery2, 999);
+        let control = simulate_episode(Scenario::AbruptSupportShift, Policy::ZeroInformationProbeEvery4, 999);
         assert_eq!(passive.model_action_count, control.model_action_count);
         assert_eq!(passive.unsupported_count, control.unsupported_count);
         assert_eq!(passive.revocation_step, control.revocation_step);
         assert!(control.cumulative_utility < passive.cumulative_utility);
+    }
+
+    #[test]
+    fn periodic_probe_ladder_has_exact_preregistered_caps() {
+        assert_eq!(Policy::PeriodicProbe8.probe_cap(), 8);
+        assert_eq!(Policy::PeriodicProbe16.probe_cap(), 16);
+        assert_eq!(Policy::PeriodicProbe32.probe_cap(), 32);
+        assert_eq!(Policy::AdaptiveProbe.probe_cap(), 32);
+        for (policy, period) in [
+            (Policy::PeriodicProbe8, 16),
+            (Policy::PeriodicProbe16, 8),
+            (Policy::PeriodicProbe32, 4),
+        ] {
+            let result = simulate_episode(Scenario::Stationary, policy, 123);
+            assert_eq!(result.probe_count, policy.probe_cap());
+            assert_eq!(period * result.probe_count, HORIZON);
+        }
     }
 
     #[test]
@@ -537,7 +594,8 @@ mod tests {
     #[test]
     fn benchmark_report_has_one_row_per_scenario_policy_pair() {
         let rows = run_benchmark();
-        assert_eq!(rows.len(), Scenario::all().len() * Policy::all().len());
+        assert_eq!(rows.len(), 3 * 9);
+        assert!(rows.iter().all(|row| row.episode_count == EPISODES));
         let rendered = render_report(&rows);
         assert!(rendered.contains("\"schema_version\": \"cmaq-009-active-diagnostic-probes-v0.1\""));
         assert!(rendered.contains("\"episode_count\": 512"));
