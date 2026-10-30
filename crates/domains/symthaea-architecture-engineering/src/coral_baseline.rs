@@ -94,6 +94,8 @@ pub struct CoralEvaluation {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoralDirectionState {
     pub direction_id: String,
+    /// Number of global evaluations completed at the instant this direction was opened.
+    pub registered_after_evaluations: usize,
     pub global_best_at_open: Option<f64>,
     pub evaluations: Vec<CoralEvaluation>,
 }
@@ -139,6 +141,9 @@ pub struct CoralDirectionBoard {
     pub evaluations: Vec<CoralEvaluation>,
     pub attempt_ids: BTreeSet<String>,
     pub global_best_score: Option<f64>,
+    /// Historical maximum of the windowed direction yield, used by c = kappa * y_plus.
+    /// Unlike current direction yields, this value never decays during a run.
+    pub max_yield_seen: f64,
 }
 
 impl CoralDirectionBoard {
@@ -152,6 +157,7 @@ impl CoralDirectionBoard {
             evaluations: Vec::new(),
             attempt_ids: BTreeSet::new(),
             global_best_score: None,
+            max_yield_seen: 0.0,
         })
     }
 
@@ -164,6 +170,7 @@ impl CoralDirectionBoard {
         }
         self.directions.insert(id.clone(), CoralDirectionState {
             direction_id: id,
+            registered_after_evaluations: self.evaluations.len(),
             global_best_at_open: self.global_best_score,
             evaluations: Vec::new(),
         });
@@ -236,7 +243,35 @@ impl CoralDirectionBoard {
         self.evaluations.push(event);
         self.attempt_ids.insert(attempt_id);
         self.global_best_score = global_best_after;
+        let current_yield_peak = self.max_window_yield_at(self.evaluations.len());
+        self.max_yield_seen = self.max_yield_seen.max(current_yield_peak);
         Ok(credit)
+    }
+
+    /// Maximum direction yield for the suffix window ending at the supplied event count.
+    /// This helper intentionally does not call validate_integrity so it can be used while
+    /// appending an event and while reconstructing historical peaks during validation.
+    fn max_window_yield_at(&self, end: usize) -> f64 {
+        let end = end.min(self.evaluations.len());
+        let start = end.saturating_sub(self.config.window_size);
+        let window = &self.evaluations[start..end];
+        let n = window.len();
+        let mean_credit = if n == 0 {
+            0.0
+        } else {
+            window.iter().map(|event| event.credit).sum::<f64>() / n as f64
+        };
+        self.directions.values()
+            .filter(|state| state.registered_after_evaluations <= end)
+            .map(|state| {
+                let recent: Vec<&CoralEvaluation> = window.iter()
+                    .filter(|event| event.direction_id == state.direction_id)
+                    .collect();
+                let recent_credit = recent.iter().map(|event| event.credit).sum::<f64>();
+                (recent_credit + self.config.prior_n as f64 * mean_credit)
+                    / (recent.len() + self.config.prior_n) as f64
+            })
+            .fold(0.0, f64::max)
     }
 
     /// Windowed shrunk yield and lifetime-count exploration potential for each direction.
@@ -267,8 +302,9 @@ impl CoralDirectionBoard {
             partial.push((state.direction_id.clone(), recent_count, lifetime_count, window_credit,
                 shrunk_yield, infancy_count, infancy_gain));
         }
-        let y_plus = partial.iter().map(|item| item.4).fold(0.0, f64::max);
-        let c = self.config.kappa * y_plus;
+        // Coral's y+ is the highest yield seen over the entire run. Per-direction
+        // yield is windowed, but the exploration scale must not decay with the window.
+        let c = self.config.kappa * self.max_yield_seen;
         let log_n = (n.max(1) as f64).ln();
         Ok(partial.into_iter().map(|(direction_id, recent_count, lifetime_count, window_credit,
             shrunk_yield, infancy_count, infancy_gain)| {
@@ -290,8 +326,8 @@ impl CoralDirectionBoard {
     /// Paper's NEW estimator: first-k improvement after opening, shrunk to k pseudo-evals at y+.
     pub fn new_direction_potential(&self) -> Result<(f64, f64, f64), CoralBaselineError> {
         self.validate_integrity()?;
-        let metrics = self.direction_metrics()?;
-        let y_plus = metrics.iter().map(|metric| metric.shrunk_yield).fold(0.0, f64::max);
+        let _metrics = self.direction_metrics()?;
+        let y_plus = self.max_yield_seen;
         let mut total_gain = 0.0;
         let mut total_infancy_evals = 0usize;
         for state in self.directions.values() {
@@ -396,9 +432,32 @@ impl CoralDirectionBoard {
             return Err(CoralBaselineError::new("schema", "unsupported baseline schema or version"));
         }
         self.config.validate()?;
+        if !self.max_yield_seen.is_finite() || self.max_yield_seen < 0.0 {
+            return Err(CoralBaselineError::new("max_yield_seen", "must be finite and non-negative"));
+        }
         let mut expected_ids = BTreeSet::new();
         let mut expected_by_direction: BTreeMap<String, Vec<CoralEvaluation>> = BTreeMap::new();
         let mut reconstructed_best: Option<f64> = None;
+
+        for (map_id, state) in &self.directions {
+            if map_id != &state.direction_id || canonical_id("direction_id", map_id)? != *map_id {
+                return Err(CoralBaselineError::new("directions", "map key and canonical direction ID disagree"));
+            }
+            if state.registered_after_evaluations > self.evaluations.len() {
+                return Err(CoralBaselineError::new(
+                    format!("directions[{map_id}].registered_after_evaluations"),
+                    "opening position exceeds the evaluation stream length",
+                ));
+            }
+            let opening_best = self.evaluations[..state.registered_after_evaluations]
+                .iter().filter_map(|event| event.score).max_by(f64::total_cmp);
+            if !same_optional_score(opening_best, state.global_best_at_open) {
+                return Err(CoralBaselineError::new(
+                    format!("directions[{map_id}].global_best_at_open"),
+                    "opening global best does not match the prefix at direction admission",
+                ));
+            }
+        }
 
         for (index, event) in self.evaluations.iter().enumerate() {
             if canonical_id("attempt_id", &event.attempt_id)? != event.attempt_id
@@ -425,10 +484,16 @@ impl CoralDirectionBoard {
                     "score inputs and cost are invalid",
                 ));
             }
-            if !self.directions.contains_key(&event.direction_id) {
-                return Err(CoralBaselineError::new(
+            let state = self.directions.get(&event.direction_id).ok_or_else(|| {
+                CoralBaselineError::new(
                     format!("evaluations[{index}].direction_id"),
                     "unregistered direction",
+                )
+            })?;
+            if index < state.registered_after_evaluations {
+                return Err(CoralBaselineError::new(
+                    format!("evaluations[{index}].direction_id"),
+                    "evaluation precedes direction registration",
                 ));
             }
 
@@ -484,12 +549,6 @@ impl CoralDirectionBoard {
             ));
         }
         for (map_id, state) in &self.directions {
-            if map_id != &state.direction_id || canonical_id("direction_id", map_id)? != *map_id {
-                return Err(CoralBaselineError::new(
-                    "directions",
-                    "map key and canonical direction ID disagree",
-                ));
-            }
             let expected = expected_by_direction.get(map_id).cloned().unwrap_or_default();
             if state.evaluations != expected {
                 return Err(CoralBaselineError::new(
@@ -497,6 +556,15 @@ impl CoralDirectionBoard {
                     "direction history does not reconcile with ordered global evaluation stream",
                 ));
             }
+        }
+        let reconstructed_peak = (1..=self.evaluations.len())
+            .map(|end| self.max_window_yield_at(end))
+            .fold(0.0, f64::max);
+        if (reconstructed_peak - self.max_yield_seen).abs() > 1e-12 {
+            return Err(CoralBaselineError::new(
+                "max_yield_seen",
+                "historical exploration scale does not reconcile with every evaluation prefix",
+            ));
         }
         Ok(())
     }
@@ -670,6 +738,46 @@ mod tests {
 
         b.directions.get_mut("A").unwrap().evaluations.clear();
         assert!(b.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn exploration_scale_preserves_historical_yield_after_window_stalls() {
+        let mut config = CoralBaselineConfig::default();
+        config.window_size = 2;
+        config.prior_n = 1;
+        let mut b = CoralDirectionBoard::new(config).unwrap();
+        b.register_direction("A").unwrap();
+
+        b.record_evaluation("a1", "A", Some(100.0), Some(0.0), vec![], 1).unwrap();
+        let historical_peak = b.max_yield_seen;
+        assert!(historical_peak > 0.0);
+
+        b.record_evaluation("a2", "A", None, None, vec![], 1).unwrap();
+        b.record_evaluation("a3", "A", None, None, vec![], 1).unwrap();
+
+        let current = b.direction_metrics().unwrap();
+        assert_eq!(current[0].window_credit, 0.0);
+        assert_eq!(current[0].shrunk_yield, 0.0);
+        assert_eq!(b.max_yield_seen, historical_peak);
+        assert!(current[0].exploration_bonus > 0.0);
+    }
+
+    #[test]
+    fn integrity_rejects_tampered_historical_yield_peak_and_direction_opening() {
+        let mut b = board();
+        b.register_direction("A").unwrap();
+        b.record_evaluation("a1", "A", Some(100.0), Some(0.0), vec![], 1).unwrap();
+        b.register_direction("B").unwrap();
+        b.record_evaluation("b1", "B", Some(110.0), Some(90.0), vec![], 1).unwrap();
+        b.validate_integrity().unwrap();
+
+        let mut altered_peak = b.clone();
+        altered_peak.max_yield_seen = 0.0;
+        assert!(altered_peak.validate_integrity().is_err());
+
+        let mut altered_open = b;
+        altered_open.directions.get_mut("B").unwrap().global_best_at_open = Some(50.0);
+        assert!(altered_open.validate_integrity().is_err());
     }
 
     #[test]
