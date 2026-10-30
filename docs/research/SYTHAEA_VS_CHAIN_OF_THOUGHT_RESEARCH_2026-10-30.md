@@ -10,7 +10,7 @@ Symthaea is not currently a general-purpose replacement for a frontier reasoning
 2. the separate typed `ConsciousReasoningEngine` for epistemic assessment, action planning, tool gating and counterfactual analysis;
 3. optional external LLM backends in the wider repository.
 
-These should not be collapsed into a single model comparison. Broca's native decoder is not initialized from a pretrained frontier language model. It starts from Genesis-seeded HDC token embeddings and network parameters, with a minimal or 4K tokenizer and task-specific training pairs. Its current training path does not perform temporal backpropagation through time. The broader reasoning engine does not receive an arbitrary natural-language problem and produce a general proof transcript; it consumes a typed `ReasoningContext` containing theory metrics, available actions, tool descriptors, code context and simulation inputs.
+These should not be collapsed into a single model comparison. Broca's native decoder is not initialized from a pretrained frontier language model. It starts from Genesis-seeded HDC token embeddings and network parameters, with a minimal or 4K tokenizer and task-specific training pairs. Neither the current CPU path nor the optional Candle GPU path performs temporal backpropagation through time. The broader reasoning engine does not receive an arbitrary natural-language problem and produce a general proof transcript; it consumes a typed `ReasoningContext` containing theory metrics, available actions, tool descriptors, code context and simulation inputs.
 
 The defensible claim today is **architectural differentiation**, not superior general reasoning.
 
@@ -59,7 +59,7 @@ Important differences from frontier LLMs:
 
 An audit of `LanguageController::backward_step` found that it reads the current network state, reconstructs the current input, and forms local targets. It does not retain the activation history or propagate gradients from token position t back to t−1. The approximate error signal does propagate across layers; what is absent is temporal credit assignment.
 
-Therefore Broca's current CPU trainer uses teacher-forced token losses plus a local per-step recurrent update. Its `bptt_window` bounds how many token positions are updated per training pair; it is not a BPTT unroll window. This is now stated explicitly in the module documentation.
+Therefore Broca's current CPU and optional GPU trainers use teacher-forced token losses plus a local per-step recurrent update. The GPU path batches operations on the selected device and propagates an approximate signal through layers, but `GpuCfcNetwork::backward_and_update` still constructs local targets from the current state; it does not retain prior token states or propagate gradients back across time. Its cell backward path also uses a simplified local evolution derivative rather than the full gated forward transition. The `bptt_window` field is a legacy name for the maximum teacher-forced positions processed per pair, not a BPTT unroll window. The module, configuration, GPU implementation and training-test labels have now been corrected.
 
 The repository already contains the recommended next experiment:
 - `docs/TEMPORAL_CREDIT_ASSIGNMENT_STEP4_DESIGN_2026-07-31.md`
@@ -70,7 +70,7 @@ The repository already contains the recommended next experiment:
 
 The frozen pre-registration requires a validated task, a mechanically guaranteed Static negative control, a tuned EMA baseline and explicit compute accounting. It sets a +0.10 absolute ambiguous-point-accuracy gate over the best non-Static baseline, paired bootstrap 95% CI excluding zero, at least eight disjoint seeds, and a 3× EMA-compute ceiling per correct ambiguous prediction. It also records that the previous HDC-LTC coupling showed no demonstrated predictive superiority to EMA at a 4–5× compute premium. This prior must be tested, not explained away.
 
-The first action should be to run the existing `NORMAL` versus `RESET` Broca state ablation on the canonical held-out suite. If accumulated recurrent state does not help, adding BPTT or eligibility traces before fixing the dynamics/representation is not justified. If it helps, the already designed eligibility-trace/e-prop intervention is the lower-blast-radius first step; true BPTT remains a possible later alternative.
+The first action should be to run the existing `NORMAL` versus `RESET` Broca state ablation on the canonical held-out suite. If accumulated recurrent state does not help, adding temporal-credit machinery before fixing the dynamics/representation is not justified. If it helps, the already designed eligibility-trace/e-prop intervention is the lower-blast-radius first step; a genuine activation-tape BPTT implementation remains a possible later alternative.
 
 ### B. ConsciousReasoningEngine
 
