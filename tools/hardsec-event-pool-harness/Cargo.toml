@@ -1,0 +1,23 @@
+[package]
+name = "hardsec-event-pool-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+autotests = false
+autoexamples = false
+
+[workspace]
+
+[features]
+default = []
+event-pool-audit = ["dep:sha2"]
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = { version = "=0.10.9", optional = true }
+
+[[example]]
+name = "hardsec_event_pool_recall"
+path = "../../examples/hardsec_event_pool_recall.rs"
+required-features = ["event-pool-audit"]
