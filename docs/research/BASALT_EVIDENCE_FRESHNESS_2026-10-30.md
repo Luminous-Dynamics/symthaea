@@ -33,7 +33,7 @@ The fixture illustrates four directly invalidated evidence records, one transiti
 7. Evidence whose resource inputs remain unchanged is preserved. Irrelevant file changes do not cause blanket invalidation.
 8. Returning a resource to its earlier digest does not resurrect old evidence: generation is monotonic across every declared change. Re-verification creates a new evidence record against the current generation.
 9. A result is `usable_for_success` only when it is fresh, its outcome is `pass`, and every declared evidence dependency is itself usable. A fresh failure is still a fresh failure; a stale pass is not usable.
-10. The emitted re-verification plan lists stale evidence IDs in original topological/creation order. It is a deterministic candidate queue, not proof that a runner has executed the checks.
+10. The emitted re-verification plan lists stale evidence IDs in original topological/creation order. It is a deterministic candidate queue, not proof that a runner has executed the checks. A structurally valid audit may still contain stale evidence: command success means the timeline was internally consistent, not that every check is current or that the task has passed. Consumers must inspect freshness and `usable_for_success` fields.
 
 The implementation maintains reverse resource and evidence indexes. Evidence leaves those indexes when first invalidated, so later workspace changes do not repeatedly rescan already-stale nodes. Bounds are explicit: 64 MiB input, 20,000 timeline entries, 100,000 initial resources, 4,096 resource pins or evidence parents per record, and 250,000 total dependency edges.
 
