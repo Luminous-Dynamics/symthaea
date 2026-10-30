@@ -101,15 +101,20 @@ jobs:
           set -euo pipefail
           mkdir -p target/lep-benchmark-results
           for size in 1024 10240 102400 1048576; do
-            cargo run --release --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- "$size" 100 >"target/lep-benchmark-results/$size.json"
-            cat "target/lep-benchmark-results/$size.json"
+            for repeat in 1 2 3 4 5; do
+              output="target/lep-benchmark-results/${size}-${repeat}.json"
+              cargo run --release --quiet --locked --manifest-path tools/lep-conformance/Cargo.toml --bin lep-benchmark -- "$size" 100 > "$output"
+              cat "$output"
+            done
           done
           {
-            printf 'commit_sha=%s\n' "$(git rev-parse HEAD)"
-            printf 'cargo_lock_sha256=%s\n' "$(sha256sum tools/lep-conformance/Cargo.lock | cut -d' ' -f1)"
-            printf 'rustc=%s\n' "$(rustc --version)"
+            printf 'commit_sha=%s\\n' "$(git rev-parse HEAD)"
+            printf 'cargo_lock_sha256=%s\\n' "$(sha256sum tools/lep-conformance/Cargo.lock | cut -d' ' -f1)"
+            printf 'rustc=%s\\n' "$(rustc --version)"
+            printf 'process_repeats_per_size=5\\n'
+            printf 'warmup_iterations_per_path=20\\n'
+            printf 'measured_iterations_per_path=100\\n'
           } > target/lep-benchmark-results/reproducibility.txt
-
       - name: Upload advisory benchmark results
         uses: actions/upload-artifact@v7.0.2
         with:
