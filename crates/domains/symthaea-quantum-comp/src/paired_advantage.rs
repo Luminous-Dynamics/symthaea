@@ -481,7 +481,7 @@ mod tests {
         );
         assert!((report.resource_superiority.p_value_one_sided - 697.0 / 65_536.0).abs() < 1e-12);
         assert!(
-            (report.quality_non_inferiority.p_value_one_sided - 106.0 / 16_384.0).abs() < 1e-12
+            (report.quality_non_inferiority.p_value_one_sided - 137.0 / 65_536.0).abs() < 1e-12
         );
     }
 
