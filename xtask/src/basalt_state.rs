@@ -941,6 +941,15 @@ mod tests {
     }
 
     #[test]
+    fn empty_timeline_is_rejected() {
+        let mut value = parsed_example();
+        value["entries"] = Value::Array(Vec::new());
+        let report = audit_value(&value);
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_TIMELINE_EMPTY"));
+    }
+
+    #[test]
     fn malformed_sha256_is_rejected() {
         let mut value = parsed_example();
         value["initial_resources"][0]["digest"] = Value::String("sha256:ABC".into());
