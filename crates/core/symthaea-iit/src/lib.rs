@@ -135,12 +135,13 @@ pub enum PartitionApplyError {
 pub struct PartitionEnumerationReport {
     /// All unique cuts, including TotalCut when requested/required.
     pub partitions: Vec<DirectedSystemPartition>,
-    /// Number of block-direction assignments fully materialized and evaluated.
-    pub block_direction_assignments_evaluated: usize,
-    /// Number of unique non-total cut matrices retained.
-    pub unique_non_total_cuts: usize,
-    /// Number of assignments whose matrix was already seen and was discarded.
-    pub duplicate_cut_matrices_suppressed: usize,
+    /// Number of canonical direction representatives actually materialized.
+    pub canonical_direction_assignments_evaluated: usize,
+    /// Number of raw 3^k direction labelings represented by the search.
+    pub raw_direction_assignments_equivalent: usize,
+    /// Redundant raw labelings avoided by quotienting equal cut matrices.
+    pub redundant_direction_assignments_pruned: usize,
+    /// Number of unique non-total cut matrices emitted; equals the canonical count.
     /// Whether the returned partition list includes the special TotalCut.
     pub total_cut_included: bool,
 }
@@ -154,8 +155,10 @@ pub enum PartitionEnumerationError {
     UnitOutOfRange { unit: usize, unit_count: usize },
     #[error("candidate system contains duplicate unit {unit}")]
     DuplicateUnit { unit: usize },
-    #[error("directed partition enumeration exceeded its budget of {max_combinations} block-direction assignments")]
+    #[error("directed partition enumeration exceeded its budget of {max_combinations} canonical direction representatives")]
     BudgetExceeded { max_combinations: usize },
+    #[error("directed partition work counter overflow")]
+    CounterOverflow,
 }
 
 /// Enumerate the IIT 4.x DIRECTED_SET_PARTITION cut family.
@@ -170,8 +173,8 @@ pub enum PartitionEnumerationError {
 /// for a one-unit system and optional for larger systems. Ordinary directional
 /// partitions preserve self-loops.
 ///
-/// max_combinations limits block-direction assignments visited, not just unique
-/// output cuts. Exceeding the budget returns an error and no partial list, so an
+/// max_combinations limits canonical direction representatives evaluated, not the raw
+/// labelings represented by those candidates. Exceeding the budget returns an error and no partial list, so an
 /// incomplete list cannot be mistaken for exact enumeration.
 ///
 /// This is a candidate generator, not an IIT phi_s calculator.
@@ -215,17 +218,13 @@ pub fn enumerate_iit4_system_partitions_with_stats(
 
     let n = canonical_system.len();
     let mut output = Vec::new();
-    let mut seen_cuts: std::collections::HashSet<Vec<bool>> =
-        std::collections::HashSet::new();
 
     if n == 1 || include_total_cut {
-        let matrix = vec![true; n * n];
-        seen_cuts.insert(matrix.clone());
         output.push(DirectedSystemPartition {
             candidate_system: canonical_system.clone(),
             parts: vec![canonical_system.clone()],
             directions: vec![PartitionDirection::Bidirectional],
-            cut_matrix: matrix,
+            cut_matrix: vec![true; n * n],
             total_cut: true,
         });
     }
@@ -233,32 +232,42 @@ pub fn enumerate_iit4_system_partitions_with_stats(
     if n == 1 {
         return Ok(PartitionEnumerationReport {
             partitions: output,
-            block_direction_assignments_evaluated: 0,
+            canonical_direction_assignments_evaluated: 0,
+            raw_direction_assignments_equivalent: 0,
+            redundant_direction_assignments_pruned: 0,
             unique_non_total_cuts: 0,
-            duplicate_cut_matrices_suppressed: 0,
             total_cut_included: true,
         });
     }
 
     let mut blocks = Vec::<Vec<usize>>::new();
-    let mut visited_combinations = 0usize;
+    let mut canonical_assignments_evaluated = 0usize;
+    let mut raw_assignments_equivalent = 0usize;
+    let mut redundant_assignments_pruned = 0usize;
     {
         let mut context = PartitionEnumerationContext {
             candidate_system: &canonical_system,
             output: &mut output,
-            seen_cuts: &mut seen_cuts,
-            visited_combinations: &mut visited_combinations,
+            canonical_assignments_evaluated: &mut canonical_assignments_evaluated,
+            raw_assignments_equivalent: &mut raw_assignments_equivalent,
+            redundant_assignments_pruned: &mut redundant_assignments_pruned,
             max_combinations,
         };
         enumerate_set_partitions_recursive(0, n, &mut blocks, &mut context)?;
     }
     let unique_non_total_cuts = output.iter().filter(|partition| !partition.is_total_cut()).count();
     let total_cut_included = output.iter().any(DirectedSystemPartition::is_total_cut);
+    debug_assert_eq!(canonical_assignments_evaluated, unique_non_total_cuts);
+    debug_assert_eq!(
+        raw_assignments_equivalent,
+        canonical_assignments_evaluated + redundant_assignments_pruned
+    );
     Ok(PartitionEnumerationReport {
         partitions: output,
-        block_direction_assignments_evaluated: visited_combinations,
+        canonical_direction_assignments_evaluated: canonical_assignments_evaluated,
+        raw_direction_assignments_equivalent: raw_assignments_equivalent,
+        redundant_direction_assignments_pruned: redundant_assignments_pruned,
         unique_non_total_cuts,
-        duplicate_cut_matrices_suppressed: visited_combinations - unique_non_total_cuts,
         total_cut_included,
     })
 }
