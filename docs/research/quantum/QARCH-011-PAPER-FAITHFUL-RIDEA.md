@@ -114,4 +114,4 @@ These are analytic/synthetic software fixtures, not paper experiment reproductio
 
 ## Validation boundary
 
-Fourteen Rust unit tests are authored in this module. The module is registered and publicly exported from the quantum-computation crate. The JSON fixture was parsed and its scalar values were independently recomputed. Rust compilation/tests have not been run in this environment because cargo and rustc are unavailable. No exact-head CI result is claimed here.
+Fifteen Rust unit tests are authored in this module. The module is registered and publicly exported from the quantum-computation crate. The JSON fixture was parsed and its scalar values were independently recomputed. Rust compilation/tests have not been run in this environment because cargo and rustc are unavailable. No exact-head CI result is claimed here.
