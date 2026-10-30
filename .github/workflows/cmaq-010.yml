@@ -46,6 +46,7 @@ jobs:
           assert report["shift_signal_rate"] == 0.80
           assert report["robust_null_upper"] == 0.02
           assert report["robust_shift_lower"] == 0.70
+          assert report["eie_k"] == 3.0
           assert report["min_independent_groups"] == 2
           assert report["missing_steps_to_fallback"] == 4
           assert report["scenarios"] == [
@@ -59,7 +60,7 @@ jobs:
           ]
 
           rows = report["summary"]
-          assert len(rows) == 35
+          assert len(rows) == 45
           by_key = {(row["scenario"], row["policy"]): row for row in rows}
           assert len(by_key) == len(rows)
 
@@ -87,6 +88,8 @@ jobs:
           # Adversarial controls: identity fan-out must not manufacture independent roots.
           assert by_key[("sybil_fanout", "naive_claim_sum")]["max_evidence_updates"] == 6
           assert by_key[("sybil_fanout", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
+          assert by_key[("sybil_fanout", "eie_gamma_discount_only")]["max_evidence_updates"] == 6
+          assert by_key[("sybil_fanout", "eie_gamma_bounded_batch")]["max_evidence_updates"] == 6
           assert by_key[("common_mode_duplicates", "naive_claim_sum")]["max_evidence_updates"] == 3
           assert by_key[("common_mode_duplicates", "provenance_root_dedup_sum")]["max_evidence_updates"] == 1
 
@@ -116,7 +119,8 @@ jobs:
                       "max_evidence_updates": by_key[(scenario, policy)]["max_evidence_updates"]
                   }
                   for policy in [
-                      "naive_claim_sum", "provenance_root_dedup_sum",
+                      "naive_claim_sum", "eie_gamma_discount_only", "eie_gamma_bounded_batch",
+                      "provenance_root_dedup_sum",
                       "robust_root_majority", "freshness_provenance_fail_closed",
                       "oracle_changepoint"
                   ]
