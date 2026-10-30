@@ -186,9 +186,11 @@ def validate_plan(plan: Any) -> dict[str, Any]:
         ):
             raise MetamorphicAuditError(f"pair {pair_id} has unsupported expected_variant_decision")
         expected_candidate = row["expected_selected_candidate_id"]
-        if expected_candidate is not None and (not isinstance(expected_candidate, str) or not expected_candidate.strip()):
+        if expected_candidate is not None and (
+            not isinstance(expected_candidate, str) or not expected_candidate.strip()
+        ):
             raise MetamorphicAuditError(f"pair {pair_id} expected_selected_candidate_id must be null or non-empty")
-            if rule == "variant_decision_equals_declared" and expected_decision is None:
+        if rule == "variant_decision_equals_declared" and expected_decision is None:
             raise MetamorphicAuditError(f"counterfactual pair {pair_id} requires expected_variant_decision")
         if rule == "candidate_identity_invariant_position_changes" and expected_candidate is None:
             raise MetamorphicAuditError(f"order-equivariance pair {pair_id} requires expected_selected_candidate_id")
