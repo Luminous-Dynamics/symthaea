@@ -340,6 +340,7 @@ struct BoardDigestPayload<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DirectionBoard {
     pub schema: String,
     pub version: String,
@@ -540,6 +541,16 @@ impl DirectionBoard {
 
     pub fn new_direction_stats(&self) -> &NewDirectionStats {
         &self.new_direction
+    }
+
+    /// Full attempt receipts in stable attempt-ID order for external audit/export.
+    pub fn attempt_records(&self) -> Vec<DirectionAttempt> {
+        self.attempts.values().cloned().collect()
+    }
+
+    /// Full new-direction proposal receipts in stable proposal-ID order.
+    pub fn proposal_records(&self) -> Vec<NewDirectionProposal> {
+        self.proposals.values().cloned().collect()
     }
 
     /// Return a deterministic UCB-style recommendation over registered directions + NEW.
@@ -1239,6 +1250,39 @@ mod tests {
             1,
         );
         assert!(board.record_attempt(rejected_with_score).is_err());
+    }
+
+    #[test]
+    fn board_digest_binds_candidate_delta_and_verifier_receipt() {
+        let (mut board_a, direction_a, _) = admitted_board();
+        let mut attempt_a = attempt(
+            "same-attempt",
+            &direction_a,
+            Some(0.6),
+            AttemptDisposition::Verified,
+            2,
+        );
+        attempt_a.semantic_delta_sha256 = DELTA.to_owned();
+        board_a.record_attempt(attempt_a).unwrap();
+
+        let (mut board_b, direction_b, _) = admitted_board();
+        let mut attempt_b = attempt(
+            "same-attempt",
+            &direction_b,
+            Some(0.6),
+            AttemptDisposition::Verified,
+            2,
+        );
+        attempt_b.semantic_delta_sha256 = CANDIDATE_A.to_owned();
+        board_b.record_attempt(attempt_b).unwrap();
+
+        assert_ne!(
+            board_a.digest().unwrap(),
+            board_b.digest().unwrap(),
+            "the board digest must bind the full semantic-delta receipt, not only aggregates"
+        );
+        assert_eq!(board_a.attempt_records().len(), 1);
+        assert_eq!(board_b.attempt_records().len(), 1);
     }
 
     #[test]
