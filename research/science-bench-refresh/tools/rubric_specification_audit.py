@@ -210,6 +210,7 @@ def audit_rubric_specification(spec: dict[str, Any]) -> dict[str, Any]:
             continue
         for test_id in planned:
             if not isinstance(test_id, str):
+                issues.append(f"criterion {criterion_id} planned_test_ids must be strings")
                 continue
             test = tests_by_id.get(test_id)
             if test is None:
