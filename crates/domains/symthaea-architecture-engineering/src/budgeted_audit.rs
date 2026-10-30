@@ -376,7 +376,7 @@ mod tests {
         }
     }
 
-    fn allocation(plan: &BudgetedAuditPlan, id: &str) -> &AuditStageAllocation {
+    fn allocation<'a>(plan: &'a BudgetedAuditPlan, id: &str) -> &'a AuditStageAllocation {
         plan.stages.iter().find(|stage| stage.stage_id == id).unwrap()
     }
 
@@ -537,7 +537,7 @@ mod tests {
                     * zero_miss_upper_bound_false_pruned_count(5, a, 0.95).unwrap() as u128
                     + zero_miss_upper_bound_false_pruned_count(4, b, 0.95).unwrap() as u128;
                 let candidate = (risk, cost, vec![a, b]);
-                if best.as_ref().map_or(true, |current| candidate < *current) {
+                if best.as_ref().map_or(true, |current| &candidate < current) {
                     best = Some(candidate);
                 }
             }
