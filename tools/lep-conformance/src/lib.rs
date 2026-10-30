@@ -15,6 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::BTreeSet;
 use std::fmt;
+use std::sync::OnceLock;
 
 pub const STATEMENT_TYPE: &str = "https://in-toto.io/Statement/v1";
 pub const PREDICATE_TYPE: &str = "https://luminousdynamics.io/attestations/evidence/v0.1";
@@ -194,43 +195,53 @@ impl ValidationReport {
     }
 }
 
-fn validate_predicate_schema(value: &Value, out: &mut Vec<Violation>) {
-    let schema: Value = match serde_json::from_str(LEP_SCHEMA_JSON) {
-        Ok(schema) => schema,
-        Err(error) => {
-            push(
-                out,
-                "EMBEDDED_SCHEMA_INVALID_JSON",
-                "$",
-                format!("Bundled LEP schema is invalid JSON: {error}"),
-            );
-            return;
+#[derive(Clone)]
+struct SchemaInitFailure {
+    code: &'static str,
+    message: String,
+}
+
+/// Compile the bundled schema exactly once per process. Re-validating the
+/// meta-schema and recompiling on every record would make the validator's
+/// cost scale with document count rather than schema complexity.
+fn compiled_lep_schema() -> Result<&'static jsonschema::Validator, SchemaInitFailure> {
+    static VALIDATOR: OnceLock<Result<jsonschema::Validator, SchemaInitFailure>> = OnceLock::new();
+
+    match VALIDATOR.get_or_init(|| {
+        let schema: Value = serde_json::from_str(LEP_SCHEMA_JSON).map_err(|error| {
+            SchemaInitFailure {
+                code: "EMBEDDED_SCHEMA_INVALID_JSON",
+                message: format!("Bundled LEP schema is invalid JSON: {error}"),
+            }
+        })?;
+
+        if !jsonschema::draft202012::meta::is_valid(&schema) {
+            return Err(SchemaInitFailure {
+                code: "EMBEDDED_SCHEMA_INVALID",
+                message: "Bundled LEP schema does not validate against the Draft 2020-12 meta-schema."
+                    .to_owned(),
+            });
         }
-    };
 
-    if !jsonschema::draft202012::meta::is_valid(&schema) {
-        push(
-            out,
-            "EMBEDDED_SCHEMA_INVALID",
-            "$",
-            "Bundled LEP schema does not validate against the Draft 2020-12 meta-schema.",
-        );
-        return;
+        jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .should_ignore_unknown_formats(false)
+            .build(&schema)
+            .map_err(|error| SchemaInitFailure {
+                code: "EMBEDDED_SCHEMA_COMPILATION_FAILED",
+                message: format!("Unable to compile bundled LEP schema: {error}"),
+            })
+    }) {
+        Ok(validator) => Ok(validator),
+        Err(error) => Err(error.clone()),
     }
+}
 
-    let validator = match jsonschema::draft202012::options()
-        .should_validate_formats(true)
-        .should_ignore_unknown_formats(false)
-        .build(&schema)
-    {
+fn validate_predicate_schema(value: &Value, out: &mut Vec<Violation>) {
+    let validator = match compiled_lep_schema() {
         Ok(validator) => validator,
         Err(error) => {
-            push(
-                out,
-                "EMBEDDED_SCHEMA_COMPILATION_FAILED",
-                "$",
-                format!("Unable to compile bundled LEP schema: {error}"),
-            );
+            push(out, error.code, "$", error.message);
             return;
         }
     };
