@@ -595,7 +595,7 @@ mod tests {
         let truth_bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_COLINEAR_BOUNDARY_TRUTH.example.json");
         let input: Input = serde_json::from_slice(input_bytes).expect("profile fixture should parse");
         let report = run(&input, input_bytes, Some(truth_bytes), 500.0).expect("boundaries should evaluate");
-        assert_eq!(report.input_sha256, "fa9accfe25bf7b9b10b36322d5782635db775396ade619623ecc3f6e535338d8");
+        assert_eq!(report.input_sha256, "e1cef74eb7d37866320e6d8ad93d1d030c4c6d99fd411e3dc8cc277ad83b82fb");
         let radius = report.method_reports[0].evaluation.as_ref().unwrap();
         let multi = report.method_reports[1].evaluation.as_ref().unwrap();
         assert_eq!(radius.true_positive_count, 1);
