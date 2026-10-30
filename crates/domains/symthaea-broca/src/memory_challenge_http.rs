@@ -17,7 +17,6 @@ use crate::memory_challenge_api::{
     execute_aml_search,
 };
 use crate::memory_challenge_sqlite::SqliteAmlMemoryBackend;
-use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::header::AUTHORIZATION;
@@ -290,6 +289,45 @@ pub async fn serve_from_env() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn add_success_serialization_matches_official_echo_shape() {
+        use crate::memory_challenge_api::{AmlMessage, AmlMessageRole};
+        let request = AmlAddRequest {
+            request_id: "request-1".into(),
+            messages: vec![AmlMessage {
+                role: AmlMessageRole::User,
+                content: "known test evidence".into(),
+                timestamp: Some(1_700_000_000_000),
+            }],
+            user_id: "user-1".into(),
+            session_id: "session-1".into(),
+        };
+        let response = request.success_response();
+        let value = serde_json::to_value(response).unwrap();
+        assert_eq!(value, serde_json::json!({
+            "success": true,
+            "request_id": "request-1",
+            "user_id": "user-1",
+            "session_id": "session-1"
+        }));
+    }
+
+    #[test]
+    fn search_response_serialization_is_top_level_data_array() {
+        let response = AmlSearchResponse {
+            data: vec![crate::memory_challenge_api::AmlSearchResult {
+                id: "memory-1".into(),
+                content: "source evidence".into(),
+                score: Some(0.75),
+                created_at: None,
+            }],
+        };
+        let value = serde_json::to_value(response).unwrap();
+        assert!(value.get("data").is_some_and(serde_json::Value::is_array));
+        assert!(value.get("items").is_none());
+        assert_eq!(value["data"][0]["id"], "memory-1");
+    }
 
     #[test]
     fn constant_time_comparison_accepts_only_exact_key_bytes() {
