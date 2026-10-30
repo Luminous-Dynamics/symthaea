@@ -227,7 +227,11 @@ impl DirectionStats {
                 })?;
                 let previous = self.local_best_score.unwrap_or(0.0);
                 if self.local_best_score.is_none() || score > previous {
-                    self.total_record_improvement += score - previous;
+                    // Scores are normalized to [0,1] against a zero baseline. The sum of
+                    // positive local-record increments telescopes to the current best;
+                    // storing the best directly makes reconciliation independent of
+                    // attempt insertion order and floating-point addition order.
+                    self.total_record_improvement = score;
                     self.local_best_score = Some(score);
                 }
             }
@@ -332,299 +336,6 @@ impl DirectionAllocationPlan {
     pub fn validate_integrity(&self) -> Result<(), DirectionBoardError> {
         if self.schema != BOARD_SCHEMA || self.version != BOARD_VERSION {
             return Err(DirectionBoardError::new(
-                "plan.schema",
-                "unsupported direction allocation plan schema/version",
-            ));
-        }
-        validate_sha256("plan.comparison_profile_sha256", &self.comparison_profile_sha256)?;
-        validate_sha256("plan.source_board_sha256", &self.source_board_sha256)?;
-        validate_sha256("plan.plan_sha256", &self.plan_sha256)?;
-        if self.metric_id.trim().is_empty() || self.evaluation_budget == 0 {
-            return Err(DirectionBoardError::new(
-                "plan",
-                "metric_id and evaluation_budget must be non-empty/non-zero",
-            ));
-        }
-        let mut arm_ids = BTreeSet::new();
-        let mut total = 0usize;
-        for (index, allocation) in self.allocations.iter().enumerate() {
-            let arm_id = arm_key(&allocation.arm).to_owned();
-            if !arm_ids.insert(arm_id) {
-                return Err(DirectionBoardError::new(
-                    format!("plan.allocations[{index}].arm"),
-                    "duplicate allocation arm",
-                ));
-            }
-            if let AllocationArm::Direction(digest) = &allocation.arm {
-                validate_sha256("plan.direction_sha256", digest)?;
-            }
-            if !allocation.estimated_yield_per_cost.is_finite()
-                || allocation.estimated_yield_per_cost < 0.0
-                || !allocation.exploration_bonus.is_finite()
-                || allocation.exploration_bonus < 0.0
-                || !allocation.potential.is_finite()
-                || allocation.potential < 0.0
-            {
-                return Err(DirectionBoardError::new(
-                    format!("plan.allocations[{index}]"),
-                    "yield, exploration bonus and potential must be finite/non-negative",
-                ));
-            }
-            total = total
-                .checked_add(allocation.recommended_evaluations)
-                .ok_or_else(|| DirectionBoardError::new("plan.evaluation_budget", "sum overflow"))?;
-        }
-        if total != self.evaluation_budget {
-            return Err(DirectionBoardError::new(
-                "plan.allocations",
-                format!("allocations sum to {total}, expected {}", self.evaluation_budget),
-            ));
-        }
-        let mut unsigned = self.clone();
-        unsigned.plan_sha256.clear();
-        let bytes = serde_json::to_vec(&unsigned)
-            .map_err(|error| DirectionBoardError::new("plan", error.to_string()))?;
-        let expected = domain_digest(PLAN_DOMAIN, &bytes);
-        if expected != self.plan_sha256 {
-            return Err(DirectionBoardError::new(
-                "plan.plan_sha256",
-                "does not match the allocation plan content",
-            ));
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct BoardDigestPayload<'a> {
-    schema: &'static str,
-    version: &'static str,
-    config: &'a DirectionBoardConfig,
-    directions: &'a BTreeMap<String, DirectionStats>,
-    new_direction: &'a NewDirectionStats,
-    attempt_ids: &'a BTreeSet<String>,
-    proposal_ids: &'a BTreeSet<String>,
-    attempts: &'a BTreeMap<String, DirectionAttempt>,
-    proposals: &'a BTreeMap<String, NewDirectionProposal>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DirectionBoard {
-    schema: String,
-    version: String,
-    config: DirectionBoardConfig,
-    directions: BTreeMap<String, DirectionStats>,
-    new_direction: NewDirectionStats,
-    attempt_ids: BTreeSet<String>,
-    proposal_ids: BTreeSet<String>,
-    attempts: BTreeMap<String, DirectionAttempt>,
-    proposals: BTreeMap<String, NewDirectionProposal>,
-}
-
-impl DirectionBoard {
-    pub fn new(config: DirectionBoardConfig) -> Result<Self, DirectionBoardError> {
-        config.validate()?;
-        Ok(Self {
-            schema: BOARD_SCHEMA.to_owned(),
-            version: BOARD_VERSION.to_owned(),
-            config,
-            directions: BTreeMap::new(),
-            new_direction: NewDirectionStats::default(),
-            attempt_ids: BTreeSet::new(),
-            proposal_ids: BTreeSet::new(),
-            attempts: BTreeMap::new(),
-            proposals: BTreeMap::new(),
-        })
-    }
-
-    /// Register a direction only after the independent verifier has canonicalized it.
-    pub fn register_verified_direction(
-        &mut self,
-        descriptor: DirectionDescriptor,
-        verifier_receipt_sha256: &str,
-    ) -> Result<String, DirectionBoardError> {
-        self.validate_integrity()?;
-        validate_sha256("verifier_receipt_sha256", verifier_receipt_sha256)?;
-        let canonical = descriptor.canonicalized()?;
-        let digest = canonical.digest()?;
-        if self.directions.contains_key(&digest) {
-            return Err(DirectionBoardError::new(
-                "direction",
-                format!("duplicate canonical direction {digest}"),
-            ));
-        }
-        self.directions.insert(
-            digest.clone(),
-            DirectionStats::new(
-                digest.clone(),
-                canonical,
-                verifier_receipt_sha256.to_owned(),
-            ),
-        );
-        Ok(digest)
-    }
-
-    /// Record a paid proposal to create a new direction.
-    pub fn record_new_direction_proposal(
-        &mut self,
-        proposal: NewDirectionProposal,
-    ) -> Result<Option<String>, DirectionBoardError> {
-        self.validate_integrity()?;
-        self.validate_proposal(&proposal)?;
-        if self.proposal_ids.contains(&proposal.proposal_id) {
-            return Err(DirectionBoardError::new(
-                "proposal_id",
-                format!("duplicate proposal ID {:?}", proposal.proposal_id),
-            ));
-        }
-
-        let canonical = proposal.descriptor.canonicalized()?;
-        let direction_sha256 = canonical.digest()?;
-        let known = self.directions.contains_key(&direction_sha256);
-
-        match proposal.disposition {
-            NewDirectionDisposition::Admitted if known => {
-                return Err(DirectionBoardError::new(
-                    "disposition",
-                    "verifier marked a known direction as newly admitted",
-                ));
-            }
-            NewDirectionDisposition::Duplicate if !known => {
-                return Err(DirectionBoardError::new(
-                    "disposition",
-                    "verifier marked an unknown direction as a duplicate",
-                ));
-            }
-            _ => {}
-        }
-
-        let mut next_stats = self.new_direction.clone();
-        next_stats.attempted_proposals = checked_add(
-            "new_direction.attempted_proposals",
-            next_stats.attempted_proposals,
-            1,
-        )?;
-        next_stats.total_cost_units = checked_add(
-            "new_direction.total_cost_units",
-            next_stats.total_cost_units,
-            proposal.evaluation_cost_units,
-        )?;
-
-        let admitted = match proposal.disposition {
-            NewDirectionDisposition::Admitted => {
-                next_stats.admitted_directions = checked_add(
-                    "new_direction.admitted_directions",
-                    next_stats.admitted_directions,
-                    1,
-                )?;
-                next_stats.total_admission_credit +=
-                    self.config.new_direction_admission_credit;
-                true
-            }
-            NewDirectionDisposition::Duplicate => {
-                next_stats.duplicate_proposals = checked_add(
-                    "new_direction.duplicate_proposals",
-                    next_stats.duplicate_proposals,
-                    1,
-                )?;
-                false
-            }
-            NewDirectionDisposition::Rejected => {
-                next_stats.rejected_proposals = checked_add(
-                    "new_direction.rejected_proposals",
-                    next_stats.rejected_proposals,
-                    1,
-                )?;
-                false
-            }
-            NewDirectionDisposition::Inconclusive => {
-                next_stats.inconclusive_proposals = checked_add(
-                    "new_direction.inconclusive_proposals",
-                    next_stats.inconclusive_proposals,
-                    1,
-                )?;
-                false
-            }
-        };
-
-        next_stats.admissions_per_cost = if next_stats.total_cost_units == 0 {
-            0.0
-        } else {
-            next_stats.total_admission_credit / next_stats.total_cost_units as f64
-        };
-        if !next_stats.admissions_per_cost.is_finite() {
-            return Err(DirectionBoardError::new(
-                "new_direction.admissions_per_cost",
-                "non-finite result",
-            ));
-        }
-
-        if admitted {
-            self.directions.insert(
-                direction_sha256.clone(),
-                DirectionStats::new(
-                    direction_sha256.clone(),
-                    canonical,
-                    proposal.verifier_receipt_sha256.clone(),
-                ),
-            );
-        }
-        self.proposal_ids.insert(proposal.proposal_id.clone());
-        self.proposals.insert(proposal.proposal_id.clone(), proposal);
-        self.new_direction = next_stats;
-
-        Ok(if admitted {
-            Some(direction_sha256)
-        } else {
-            None
-        })
-    }
-
-    pub fn record_attempt(
-        &mut self,
-        attempt: DirectionAttempt,
-    ) -> Result<(), DirectionBoardError> {
-        self.validate_integrity()?;
-        self.validate_attempt(&attempt)?;
-        if self.attempt_ids.contains(&attempt.attempt_id) {
-            return Err(DirectionBoardError::new(
-                "attempt_id",
-                format!("duplicate attempt ID {:?}", attempt.attempt_id),
-            ));
-        }
-        let direction = self.directions.get(&attempt.direction_sha256).ok_or_else(|| {
-            DirectionBoardError::new(
-                "direction_sha256",
-                format!("unknown direction {:?}", attempt.direction_sha256),
-            )
-        })?;
-        let mut updated = direction.clone();
-        updated.record_attempt(&attempt)?;
-        self.directions.insert(attempt.direction_sha256.clone(), updated);
-        self.attempt_ids.insert(attempt.attempt_id.clone());
-        self.attempts.insert(attempt.attempt_id.clone(), attempt);
-        Ok(())
-    }
-
-    pub fn schema(&self) -> &str {
-        &self.schema
-    }
-
-    pub fn version(&self) -> &str {
-        &self.version
-    }
-
-    pub fn config(&self) -> &DirectionBoardConfig {
-        &self.config
-    }
-
-    /// Validate a deserialized board before it is used to allocate or export evidence.
-    /// This checks map identity, profile consistency, canonical direction digests and
-    /// the presence/shape of every referenced verifier receipt.
-    pub fn validate_integrity(&self) -> Result<(), DirectionBoardError> {
-        if self.schema != BOARD_SCHEMA || self.version != BOARD_VERSION {
-            return Err(DirectionBoardError::new(
                 "board.schema",
                 "unsupported direction board schema/version",
             ));
@@ -646,32 +357,73 @@ impl DirectionBoard {
                 "proposal ID index does not match full proposal records",
             ));
         }
+
+        // Rebuild every derived direction statistic from the immutable attempt records.
+        // A deserialized board is not trusted merely because its receipt references have
+        // valid shapes: counts, local records, cost and yield must agree with the evidence.
+        let mut expected_directions = BTreeMap::new();
         for (direction_id, stats) in &self.directions {
             validate_sha256("board.direction_id", direction_id)?;
             validate_sha256(
                 "board.direction.verifier_receipt_sha256",
                 &stats.verifier_receipt_sha256,
             )?;
-            if stats.direction_sha256 != *direction_id
-                || stats.descriptor.digest()? != *direction_id
+            let canonical = stats.descriptor.canonicalized()?;
+            if canonical != stats.descriptor
+                || stats.direction_sha256 != *direction_id
+                || canonical.digest()? != *direction_id
             {
                 return Err(DirectionBoardError::new(
                     "board.directions",
-                    "direction map key, descriptor and stored digest disagree",
+                    "direction map key, canonical descriptor and stored digest disagree",
                 ));
             }
+            expected_directions.insert(
+                direction_id.clone(),
+                DirectionStats::new(
+                    direction_id.clone(),
+                    canonical,
+                    stats.verifier_receipt_sha256.clone(),
+                ),
+            );
         }
+
         for (attempt_id, attempt) in &self.attempts {
-            if attempt_id != &attempt.attempt_id
-                || !self.directions.contains_key(&attempt.direction_sha256)
-            {
+            if attempt_id != &attempt.attempt_id {
                 return Err(DirectionBoardError::new(
                     "board.attempts",
-                    "attempt map key or direction reference is invalid",
+                    "attempt map key does not match attempt_id",
                 ));
             }
             self.validate_attempt(attempt)?;
+            let expected = expected_directions
+                .get_mut(&attempt.direction_sha256)
+                .ok_or_else(|| {
+                    DirectionBoardError::new(
+                        "board.attempts",
+                        "attempt references an unknown direction",
+                    )
+                })?;
+            expected.record_attempt(attempt)?;
         }
+
+        for (direction_id, expected) in &expected_directions {
+            let actual = self.directions.get(direction_id).ok_or_else(|| {
+                DirectionBoardError::new("board.directions", "direction disappeared during validation")
+            })?;
+            if expected != actual {
+                return Err(DirectionBoardError::new(
+                    format!("board.directions[{direction_id}]"),
+                    "stored counters, local record, cost or yield do not reconcile with attempt records",
+                ));
+            }
+        }
+
+        // Reconstruct the NEW-arm counters from every paid proposal, including rejected,
+        // duplicate and inconclusive proposals. Also reject duplicate admissions of one
+        // canonical direction, which could otherwise inflate novelty credit.
+        let mut expected_new_direction = NewDirectionStats::default();
+        let mut admitted_direction_ids = BTreeSet::new();
         for (proposal_id, proposal) in &self.proposals {
             if proposal_id != &proposal.proposal_id {
                 return Err(DirectionBoardError::new(
@@ -680,32 +432,100 @@ impl DirectionBoard {
                 ));
             }
             self.validate_proposal(proposal)?;
-            let direction_id = proposal.descriptor.digest()?;
+            let canonical = proposal.descriptor.canonicalized()?;
+            let direction_id = canonical.digest()?;
+            let known = self.directions.contains_key(&direction_id);
+
+            expected_new_direction.attempted_proposals = checked_add(
+                "new_direction.attempted_proposals",
+                expected_new_direction.attempted_proposals,
+                1,
+            )?;
+            expected_new_direction.total_cost_units = checked_add(
+                "new_direction.total_cost_units",
+                expected_new_direction.total_cost_units,
+                proposal.evaluation_cost_units,
+            )?;
+
             match proposal.disposition {
                 NewDirectionDisposition::Admitted => {
+                    if !admitted_direction_ids.insert(direction_id.clone()) {
+                        return Err(DirectionBoardError::new(
+                            "board.proposals",
+                            "multiple admitted proposals reference the same canonical direction",
+                        ));
+                    }
                     let direction = self.directions.get(&direction_id).ok_or_else(|| {
                         DirectionBoardError::new(
                             "board.proposals",
                             "admitted proposal has no registered direction",
                         )
                     })?;
-                    if direction.verifier_receipt_sha256 != proposal.verifier_receipt_sha256 {
+                    if direction.descriptor != canonical
+                        || direction.verifier_receipt_sha256 != proposal.verifier_receipt_sha256
+                    {
                         return Err(DirectionBoardError::new(
                             "board.proposals",
-                            "admission receipt differs from direction registration receipt",
+                            "admission descriptor or receipt differs from direction registration",
                         ));
                     }
+                    expected_new_direction.admitted_directions = checked_add(
+                        "new_direction.admitted_directions",
+                        expected_new_direction.admitted_directions,
+                        1,
+                    )?;
+                    expected_new_direction.total_admission_credit +=
+                        self.config.new_direction_admission_credit;
                 }
                 NewDirectionDisposition::Duplicate => {
-                    if !self.directions.contains_key(&direction_id) {
+                    if !known {
                         return Err(DirectionBoardError::new(
                             "board.proposals",
                             "duplicate proposal does not reference a known direction",
                         ));
                     }
+                    expected_new_direction.duplicate_proposals = checked_add(
+                        "new_direction.duplicate_proposals",
+                        expected_new_direction.duplicate_proposals,
+                        1,
+                    )?;
                 }
-                NewDirectionDisposition::Rejected | NewDirectionDisposition::Inconclusive => {}
+                NewDirectionDisposition::Rejected => {
+                    expected_new_direction.rejected_proposals = checked_add(
+                        "new_direction.rejected_proposals",
+                        expected_new_direction.rejected_proposals,
+                        1,
+                    )?;
+                }
+                NewDirectionDisposition::Inconclusive => {
+                    expected_new_direction.inconclusive_proposals = checked_add(
+                        "new_direction.inconclusive_proposals",
+                        expected_new_direction.inconclusive_proposals,
+                        1,
+                    )?;
+                }
             }
+        }
+        expected_new_direction.admissions_per_cost =
+            if expected_new_direction.total_cost_units == 0 {
+                0.0
+            } else {
+                expected_new_direction.total_admission_credit
+                    / expected_new_direction.total_cost_units as f64
+            };
+        if !expected_new_direction.total_admission_credit.is_finite()
+            || !expected_new_direction.admissions_per_cost.is_finite()
+        {
+            return Err(DirectionBoardError::new(
+                "board.new_direction",
+                "reconstructed admission credit or yield is non-finite",
+            ));
+        }
+        if expected_new_direction != self.new_direction {
+            return Err(DirectionBoardError::new(
+                "board.new_direction",
+                "stored NEW-arm counters, cost or yield do not reconcile with proposal records",
+            ));
         }
         Ok(())
     }
@@ -1592,6 +1412,124 @@ mod tests {
         );
         assert_eq!(board_a.attempt_records().len(), 1);
         assert_eq!(board_b.attempt_records().len(), 1);
+    }
+
+    #[test]
+    fn integrity_rejects_tampered_direction_aggregates() {
+        let (mut board, direction, _) = admitted_board();
+        board
+            .record_attempt(attempt(
+                "integrity-a1",
+                &direction,
+                Some(0.41),
+                AttemptDisposition::Verified,
+                2,
+            ))
+            .unwrap();
+        board
+            .record_attempt(attempt(
+                "integrity-a2",
+                &direction,
+                Some(0.72),
+                AttemptDisposition::Verified,
+                3,
+            ))
+            .unwrap();
+        board.validate_integrity().unwrap();
+
+        let mut serialized = serde_json::to_value(&board).unwrap();
+        let stats = serialized["directions"]
+            .get_mut(&direction)
+            .expect("serialized direction stats");
+        stats["attempted_evaluations"] = serde_json::json!(99);
+        stats["improvement_yield_per_cost"] = serde_json::json!(0.99);
+        let tampered: DirectionBoard = serde_json::from_value(serialized).unwrap();
+
+        assert!(
+            tampered.validate_integrity().is_err(),
+            "derived direction aggregates must be recomputed from attempt records"
+        );
+    }
+
+    #[test]
+    fn integrity_rejects_tampered_new_direction_aggregates() {
+        let (mut board, _, _) = admitted_board();
+        let proposal = NewDirectionProposal {
+            proposal_id: "integrity-rejected-proposal".to_owned(),
+            descriptor: descriptor("novel capability", "new memory object", "symbolic synthesis"),
+            proposal_sha256: PROPOSAL.to_owned(),
+            comparison_profile_sha256: PROFILE.to_owned(),
+            metric_id: "held_out_task_quality".to_owned(),
+            evaluation_cost_units: 7,
+            disposition: NewDirectionDisposition::Rejected,
+            verifier_receipt_sha256: RECEIPT.to_owned(),
+        };
+        board.record_new_direction_proposal(proposal).unwrap();
+        board.validate_integrity().unwrap();
+
+        let mut serialized = serde_json::to_value(&board).unwrap();
+        serialized["new_direction"]["total_cost_units"] = serde_json::json!(700);
+        let tampered: DirectionBoard = serde_json::from_value(serialized).unwrap();
+
+        assert!(
+            tampered.validate_integrity().is_err(),
+            "NEW-arm aggregates must reconcile with all proposal records"
+        );
+    }
+
+    #[test]
+    fn integrity_rejects_duplicate_admission_of_one_direction() {
+        let mut board = DirectionBoard::new(config()).unwrap();
+        let proposal = NewDirectionProposal {
+            proposal_id: "admitted-once".to_owned(),
+            descriptor: descriptor("novel capability", "new memory object", "symbolic synthesis"),
+            proposal_sha256: PROPOSAL.to_owned(),
+            comparison_profile_sha256: PROFILE.to_owned(),
+            metric_id: "held_out_task_quality".to_owned(),
+            evaluation_cost_units: 2,
+            disposition: NewDirectionDisposition::Admitted,
+            verifier_receipt_sha256: RECEIPT.to_owned(),
+        };
+        board.record_new_direction_proposal(proposal).unwrap();
+        board.validate_integrity().unwrap();
+
+        let mut serialized = serde_json::to_value(&board).unwrap();
+        let mut duplicate = serialized["proposals"]["admitted-once"].clone();
+        duplicate["proposal_id"] = serde_json::json!("admitted-twice");
+        serialized["proposals"]["admitted-twice"] = duplicate;
+        serialized["proposal_ids"]
+            .as_array_mut()
+            .expect("serialized proposal id set")
+            .push(serde_json::json!("admitted-twice"));
+        serialized["new_direction"]["attempted_proposals"] = serde_json::json!(2);
+        serialized["new_direction"]["admitted_directions"] = serde_json::json!(2);
+        serialized["new_direction"]["total_cost_units"] = serde_json::json!(4);
+        serialized["new_direction"]["total_admission_credit"] =
+            serde_json::json!(config().new_direction_admission_credit * 2.0);
+        serialized["new_direction"]["admissions_per_cost"] =
+            serde_json::json!(config().new_direction_admission_credit / 2.0);
+        let tampered: DirectionBoard = serde_json::from_value(serialized).unwrap();
+
+        assert!(
+            tampered.validate_integrity().is_err(),
+            "one canonical direction cannot earn admission credit more than once"
+        );
+    }
+
+    #[test]
+    fn integrity_rejects_noncanonical_registered_descriptors() {
+        let (board, direction, _) = admitted_board();
+        let mut serialized = serde_json::to_value(&board).unwrap();
+        serialized["directions"]
+            .get_mut(&direction)
+            .expect("serialized direction")
+            ["descriptor"]["target_capability"] = serde_json::json!("TRANSFER");
+        let tampered: DirectionBoard = serde_json::from_value(serialized).unwrap();
+
+        assert!(
+            tampered.validate_integrity().is_err(),
+            "registered direction descriptors must be stored in canonical form"
+        );
     }
 
     #[test]
