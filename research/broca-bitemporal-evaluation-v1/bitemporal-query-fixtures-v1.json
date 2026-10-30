@@ -1,0 +1,408 @@
+{
+  "schema_version": "broca-bitemporal-query-fixtures/v1",
+  "status": "synthetic_seed_fixtures_not_official_dataset",
+  "note": "D38-D40 specify the temporal semantics tested by SQLiteAmlMemoryBackend::search_as_known_at. They are deterministic synthetic counterfactuals, not TimlMemBench samples.",
+  "query_contract": {
+    "coordinates": [
+      "valid_at",
+      "known_at"
+    ],
+    "valid_at": "World-time coordinate evaluated against evidence valid_from/valid_until.",
+    "known_at": "Knowledge/transaction-time coordinate: only Add batches and lifecycle events recorded no later than this time may affect the reconstructed view."
+  },
+  "cases": [
+    {
+      "case_id": "D38",
+      "name": "late_arriving_evidence_is_hidden_from_earlier_knowledge_state",
+      "decision": "bitemporal_memory_query",
+      "intervention_contract": {
+        "decisive_path": "query.known_at",
+        "invariant_path": "presentation.label",
+        "valid_at_and_known_at_are_independent": true
+      },
+      "variants": [
+        {
+          "variant_id": "D38-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T11:59:59.999Z"
+            },
+            "source": {
+              "revision_id": "r-late",
+              "stored_at": "2026-10-30T12:00:00.000Z",
+              "occurred_at": "2026-10-01T00:00:00.000Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "not_known_at_query_time",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D38-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-late",
+              "stored_at": "2026-10-30T12:00:00.000Z",
+              "occurred_at": "2026-10-01T00:00:00.000Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "known_and_valid",
+            "action": "allow_revision"
+          }
+        },
+        {
+          "variant_id": "D38-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T11:59:59.999Z"
+            },
+            "source": {
+              "revision_id": "r-late",
+              "stored_at": "2026-10-30T12:00:00.000Z",
+              "occurred_at": "2026-10-01T00:00:00.000Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "late-data"
+            }
+          },
+          "oracle": {
+            "status": "not_known_at_query_time",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D38-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T11:59:59.999Z"
+            },
+            "source": {
+              "revision_id": "r-late",
+              "stored_at": "2026-10-30T12:00:00.000Z",
+              "occurred_at": "2026-10-01T00:00:00.000Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "not_known_at_query_time",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D38-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-late",
+              "stored_at": "2026-10-30T12:00:00.000Z",
+              "occurred_at": "2026-10-01T00:00:00.000Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "late-data"
+            }
+          },
+          "oracle": {
+            "status": "known_and_valid",
+            "action": "allow_revision"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D39",
+      "name": "later_retraction_does_not_rewrite_prior_as_known_view",
+      "decision": "bitemporal_memory_query",
+      "intervention_contract": {
+        "decisive_path": "query.known_at",
+        "invariant_path": "presentation.label",
+        "valid_at_and_known_at_are_independent": true
+      },
+      "variants": [
+        {
+          "variant_id": "D39-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-revoked",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "retracted_at": "2026-10-30T12:00:00.001Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "action": "allow_revision"
+          }
+        },
+        {
+          "variant_id": "D39-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.001Z"
+            },
+            "source": {
+              "revision_id": "r-revoked",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "retracted_at": "2026-10-30T12:00:00.001Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "retracted_as_known",
+            "action": "suppress_revision"
+          }
+        },
+        {
+          "variant_id": "D39-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-revoked",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "retracted_at": "2026-10-30T12:00:00.001Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "retraction"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "action": "allow_revision"
+          }
+        },
+        {
+          "variant_id": "D39-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-revoked",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "retracted_at": "2026-10-30T12:00:00.001Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "supported_as_known",
+            "action": "allow_revision"
+          }
+        },
+        {
+          "variant_id": "D39-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.001Z"
+            },
+            "source": {
+              "revision_id": "r-revoked",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "retracted_at": "2026-10-30T12:00:00.001Z",
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "retraction"
+            }
+          },
+          "oracle": {
+            "status": "retracted_as_known",
+            "action": "suppress_revision"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D40",
+      "name": "world_valid_time_is_independent_of_system_knowledge_time",
+      "decision": "bitemporal_memory_query",
+      "intervention_contract": {
+        "decisive_path": "query.valid_at",
+        "invariant_path": "presentation.label",
+        "valid_at_and_known_at_are_independent": true
+      },
+      "variants": [
+        {
+          "variant_id": "D40-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-09-30T23:59:59.999Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-future-valid",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "valid_from": "2026-10-01T00:00:00.000Z",
+              "valid_until": null,
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "outside_validity",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D40-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-future-valid",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "valid_from": "2026-10-01T00:00:00.000Z",
+              "valid_until": null,
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "known_and_valid",
+            "action": "allow_revision"
+          }
+        },
+        {
+          "variant_id": "D40-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-09-30T23:59:59.999Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-future-valid",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "valid_from": "2026-10-01T00:00:00.000Z",
+              "valid_until": null,
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "validity"
+            }
+          },
+          "oracle": {
+            "status": "outside_validity",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D40-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-09-30T23:59:59.999Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-future-valid",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "valid_from": "2026-10-01T00:00:00.000Z",
+              "valid_until": null,
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "normal"
+            }
+          },
+          "oracle": {
+            "status": "outside_validity",
+            "action": "exclude_revision"
+          }
+        },
+        {
+          "variant_id": "D40-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "query": {
+              "valid_at": "2026-10-01T00:00:00.000Z",
+              "known_at": "2026-10-30T12:00:00.000Z"
+            },
+            "source": {
+              "revision_id": "r-future-valid",
+              "stored_at": "2026-10-01T00:00:00.000Z",
+              "valid_from": "2026-10-01T00:00:00.000Z",
+              "valid_until": null,
+              "scope": "user-1"
+            },
+            "presentation": {
+              "label": "validity"
+            }
+          },
+          "oracle": {
+            "status": "known_and_valid",
+            "action": "allow_revision"
+          }
+        }
+      ]
+    }
+  ],
+  "invariants": [
+    "A late-arriving source cannot appear in a query whose known_at precedes its persisted ingestion time.",
+    "A retraction cannot alter an earlier as-known view; it suppresses evidence only when known_at includes its transaction time.",
+    "A source may be known but not yet valid; valid_at is independent from known_at.",
+    "Source-order and presentation-only changes cannot alter the oracle decision.",
+    "Current-state queries are not substitutes for historical as-known queries."
+  ]
+}

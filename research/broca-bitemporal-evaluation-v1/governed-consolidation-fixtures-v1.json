@@ -1,0 +1,1148 @@
+{
+  "schema_version": "broca-governed-consolidation-fixtures/v1",
+  "status": "research_seed_corpus",
+  "note": "Evaluator-only oracle is excluded from reader_input. These fixtures define task-local decision rules, not universal retention or privacy policy.",
+  "invariants": [
+    "Consolidation actions are auditable state transitions, not opaque rewrites.",
+    "Source-family identity is distinct from revision count.",
+    "Promotion must be justified by held-out task utility, not retention or reconstruction alone.",
+    "Privacy erasure is distinct from reversible active-index forgetting and must not be undone by rollback.",
+    "The runtime reader receives only reader_input and legal_actions; oracle labels remain evaluator-only."
+  ],
+  "cases": [
+    {
+      "case_id": "D24",
+      "name": "independent_repeated_success_supports_procedure",
+      "decision": "choose_consolidation_level",
+      "legal_actions": [
+        "retain_raw_episodes",
+        "promote_to_procedure",
+        "promote_to_rule",
+        "quarantine"
+      ],
+      "intervention_contract": {
+        "decisive_path": "governance.independent_family_count",
+        "invariant_path": "presentation.description_style",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D24-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "held_out_transfer_verified": true
+            },
+            "episodes": {
+              "success_count": 6,
+              "failed_count": 1
+            },
+            "budget": {
+              "raw_tokens": 900,
+              "procedure_tokens": 120
+            },
+            "presentation": {
+              "description_style": "plain"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_procedure",
+            "target_level": "procedural",
+            "reason": "independent_success_families_and_held_out_transfer"
+          }
+        },
+        {
+          "variant_id": "D24-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 2,
+              "minimum_independent_families": 3,
+              "held_out_transfer_verified": true
+            },
+            "episodes": {
+              "success_count": 6,
+              "failed_count": 1
+            },
+            "budget": {
+              "raw_tokens": 900,
+              "procedure_tokens": 120
+            },
+            "presentation": {
+              "description_style": "plain"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_raw_episodes",
+            "target_level": "episodic",
+            "reason": "independent_family_threshold_not_met"
+          }
+        },
+        {
+          "variant_id": "D24-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "held_out_transfer_verified": true
+            },
+            "episodes": {
+              "success_count": 6,
+              "failed_count": 1
+            },
+            "budget": {
+              "raw_tokens": 900,
+              "procedure_tokens": 120
+            },
+            "presentation": {
+              "description_style": "terse"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_procedure",
+            "target_level": "procedural",
+            "reason": "independent_success_families_and_held_out_transfer"
+          }
+        },
+        {
+          "variant_id": "D24-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "held_out_transfer_verified": true
+            },
+            "episodes": {
+              "success_count": 6,
+              "failed_count": 1
+            },
+            "budget": {
+              "raw_tokens": 900,
+              "procedure_tokens": 120
+            },
+            "presentation": {
+              "description_style": "plain"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_procedure",
+            "target_level": "procedural",
+            "reason": "independent_success_families_and_held_out_transfer"
+          }
+        },
+        {
+          "variant_id": "D24-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 2,
+              "minimum_independent_families": 3,
+              "held_out_transfer_verified": true
+            },
+            "episodes": {
+              "success_count": 6,
+              "failed_count": 1
+            },
+            "budget": {
+              "raw_tokens": 900,
+              "procedure_tokens": 120
+            },
+            "presentation": {
+              "description_style": "terse"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_raw_episodes",
+            "target_level": "episodic",
+            "reason": "independent_family_threshold_not_met"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D25",
+      "name": "correlated_duplicates_do_not_inflate_support",
+      "decision": "choose_consolidation_level",
+      "legal_actions": [
+        "retain_raw_episodes",
+        "compress_with_source_links",
+        "promote_to_procedure",
+        "promote_to_rule"
+      ],
+      "intervention_contract": {
+        "decisive_path": "governance.independent_family_count",
+        "invariant_path": "episodes.duplicate_revision_count",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D25-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "lineage_verified": true
+            },
+            "episodes": {
+              "revision_count": 8,
+              "duplicate_revision_count": 8
+            },
+            "budget": {
+              "raw_tokens": 1200,
+              "procedure_tokens": 140
+            },
+            "presentation": {
+              "ordering": "source"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_raw_episodes",
+            "target_level": "episodic",
+            "reason": "one_source_family_not_independent_corroboration"
+          }
+        },
+        {
+          "variant_id": "D25-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "lineage_verified": true
+            },
+            "episodes": {
+              "revision_count": 8,
+              "duplicate_revision_count": 8
+            },
+            "budget": {
+              "raw_tokens": 1200,
+              "procedure_tokens": 140
+            },
+            "presentation": {
+              "ordering": "source"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_procedure",
+            "target_level": "procedural",
+            "reason": "three_independent_families_support_transferable_procedure"
+          }
+        },
+        {
+          "variant_id": "D25-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "lineage_verified": true
+            },
+            "episodes": {
+              "revision_count": 8,
+              "duplicate_revision_count": 80
+            },
+            "budget": {
+              "raw_tokens": 1200,
+              "procedure_tokens": 140
+            },
+            "presentation": {
+              "ordering": "source"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_raw_episodes",
+            "target_level": "episodic",
+            "reason": "one_source_family_not_independent_corroboration"
+          }
+        },
+        {
+          "variant_id": "D25-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 1,
+              "minimum_independent_families": 3,
+              "lineage_verified": true
+            },
+            "episodes": {
+              "revision_count": 8,
+              "duplicate_revision_count": 8
+            },
+            "budget": {
+              "raw_tokens": 1200,
+              "procedure_tokens": 140
+            },
+            "presentation": {
+              "ordering": "source"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_raw_episodes",
+            "target_level": "episodic",
+            "reason": "one_source_family_not_independent_corroboration"
+          }
+        },
+        {
+          "variant_id": "D25-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "governance": {
+              "independent_family_count": 3,
+              "minimum_independent_families": 3,
+              "lineage_verified": true
+            },
+            "episodes": {
+              "revision_count": 8,
+              "duplicate_revision_count": 80
+            },
+            "budget": {
+              "raw_tokens": 1200,
+              "procedure_tokens": 140
+            },
+            "presentation": {
+              "ordering": "source"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_procedure",
+            "target_level": "procedural",
+            "reason": "three_independent_families_support_transferable_procedure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D26",
+      "name": "unverified_poisoned_episode_is_quarantined",
+      "decision": "handle_contradictory_episode",
+      "legal_actions": [
+        "quarantine_episode",
+        "retain_as_non_supporting_audit_event",
+        "promote_to_rule",
+        "erase_for_privacy"
+      ],
+      "intervention_contract": {
+        "decisive_path": "poison.validation_state",
+        "invariant_path": "presentation.note_label",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D26-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "poison": {
+              "validation_state": "unverified_contradiction",
+              "trusted_source_count": 0,
+              "affected_rule_id": "safe-retry-v1"
+            },
+            "history": {
+              "independent_supporting_families": 4,
+              "downstream_dependents": 3
+            },
+            "presentation": {
+              "note_label": "normal"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "quarantine_episode",
+            "target_level": "quarantine",
+            "reason": "unverified_contradictory_source_must_not_modify_durable_rule"
+          }
+        },
+        {
+          "variant_id": "D26-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "poison": {
+              "validation_state": "independently_refuted",
+              "trusted_source_count": 0,
+              "affected_rule_id": "safe-retry-v1"
+            },
+            "history": {
+              "independent_supporting_families": 4,
+              "downstream_dependents": 3
+            },
+            "presentation": {
+              "note_label": "normal"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_as_non_supporting_audit_event",
+            "target_level": "episodic",
+            "reason": "independent_refutation_preserves_audit_but_not_promotion"
+          }
+        },
+        {
+          "variant_id": "D26-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "poison": {
+              "validation_state": "unverified_contradiction",
+              "trusted_source_count": 0,
+              "affected_rule_id": "safe-retry-v1"
+            },
+            "history": {
+              "independent_supporting_families": 4,
+              "downstream_dependents": 3
+            },
+            "presentation": {
+              "note_label": "review-copy"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "quarantine_episode",
+            "target_level": "quarantine",
+            "reason": "unverified_contradictory_source_must_not_modify_durable_rule"
+          }
+        },
+        {
+          "variant_id": "D26-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "poison": {
+              "validation_state": "unverified_contradiction",
+              "trusted_source_count": 0,
+              "affected_rule_id": "safe-retry-v1"
+            },
+            "history": {
+              "independent_supporting_families": 4,
+              "downstream_dependents": 3
+            },
+            "presentation": {
+              "note_label": "normal"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "quarantine_episode",
+            "target_level": "quarantine",
+            "reason": "unverified_contradictory_source_must_not_modify_durable_rule"
+          }
+        },
+        {
+          "variant_id": "D26-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "poison": {
+              "validation_state": "independently_refuted",
+              "trusted_source_count": 0,
+              "affected_rule_id": "safe-retry-v1"
+            },
+            "history": {
+              "independent_supporting_families": 4,
+              "downstream_dependents": 3
+            },
+            "presentation": {
+              "note_label": "review-copy"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_as_non_supporting_audit_event",
+            "target_level": "episodic",
+            "reason": "independent_refutation_preserves_audit_but_not_promotion"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D27",
+      "name": "distribution_shift_requires_scoped_rule",
+      "decision": "choose_rule_scope",
+      "legal_actions": [
+        "retain_as_procedure",
+        "promote_scoped_rule",
+        "promote_global_rule",
+        "retain_raw_episodes"
+      ],
+      "intervention_contract": {
+        "decisive_path": "transfer.held_out_domain_coverage",
+        "invariant_path": "presentation.title_case",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D27-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "transfer": {
+              "source_domain": "domain-A",
+              "target_domain": "domain-B",
+              "held_out_domain_coverage": "source_domain_only",
+              "target_prevalence_shift_bps": 3500
+            },
+            "governance": {
+              "policy_version": "scope-policy-v1"
+            },
+            "presentation": {
+              "title_case": "upper"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_scoped_rule",
+            "target_level": "rule",
+            "scope": "domain-A",
+            "reason": "evidence_does_not_support_global_transfer_under_distribution_shift"
+          }
+        },
+        {
+          "variant_id": "D27-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "transfer": {
+              "source_domain": "domain-A",
+              "target_domain": "domain-B",
+              "held_out_domain_coverage": "stable_across_domains",
+              "target_prevalence_shift_bps": 3500
+            },
+            "governance": {
+              "policy_version": "scope-policy-v1"
+            },
+            "presentation": {
+              "title_case": "upper"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_global_rule",
+            "target_level": "rule",
+            "scope": "all_qualified_domains",
+            "reason": "held_out_domain_transfer_is_stable"
+          }
+        },
+        {
+          "variant_id": "D27-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "transfer": {
+              "source_domain": "domain-A",
+              "target_domain": "domain-B",
+              "held_out_domain_coverage": "source_domain_only",
+              "target_prevalence_shift_bps": 3500
+            },
+            "governance": {
+              "policy_version": "scope-policy-v1"
+            },
+            "presentation": {
+              "title_case": "sentence"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_scoped_rule",
+            "target_level": "rule",
+            "scope": "domain-A",
+            "reason": "evidence_does_not_support_global_transfer_under_distribution_shift"
+          }
+        },
+        {
+          "variant_id": "D27-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "transfer": {
+              "source_domain": "domain-A",
+              "target_domain": "domain-B",
+              "held_out_domain_coverage": "source_domain_only",
+              "target_prevalence_shift_bps": 3500
+            },
+            "governance": {
+              "policy_version": "scope-policy-v1"
+            },
+            "presentation": {
+              "title_case": "upper"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_scoped_rule",
+            "target_level": "rule",
+            "scope": "domain-A",
+            "reason": "evidence_does_not_support_global_transfer_under_distribution_shift"
+          }
+        },
+        {
+          "variant_id": "D27-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "transfer": {
+              "source_domain": "domain-A",
+              "target_domain": "domain-B",
+              "held_out_domain_coverage": "stable_across_domains",
+              "target_prevalence_shift_bps": 3500
+            },
+            "governance": {
+              "policy_version": "scope-policy-v1"
+            },
+            "presentation": {
+              "title_case": "sentence"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_global_rule",
+            "target_level": "rule",
+            "scope": "all_qualified_domains",
+            "reason": "held_out_domain_transfer_is_stable"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D28",
+      "name": "rare_safety_gotcha_survives_compression",
+      "decision": "choose_compression",
+      "legal_actions": [
+        "retain_raw_episodes",
+        "compress_but_preserve_gotcha",
+        "compress_without_duplicate_gotcha",
+        "forget_from_active_index"
+      ],
+      "intervention_contract": {
+        "decisive_path": "compression.gotcha_independently_covered",
+        "invariant_path": "presentation.summary_heading",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D28-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "compression": {
+              "candidate_token_savings": 700,
+              "rare_gotcha_present": true,
+              "gotcha_independently_covered": false,
+              "omitted_gotcha_severity": "critical"
+            },
+            "tasks": {
+              "rare_safety_task_probability_bps": 10
+            },
+            "presentation": {
+              "summary_heading": "summary"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "compress_but_preserve_gotcha",
+            "target_level": "compressed_episodic",
+            "reason": "rare_critical_case_has_no_independent_coverage"
+          }
+        },
+        {
+          "variant_id": "D28-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "compression": {
+              "candidate_token_savings": 700,
+              "rare_gotcha_present": true,
+              "gotcha_independently_covered": true,
+              "omitted_gotcha_severity": "critical"
+            },
+            "tasks": {
+              "rare_safety_task_probability_bps": 10
+            },
+            "presentation": {
+              "summary_heading": "summary"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "compress_without_duplicate_gotcha",
+            "target_level": "compressed_episodic",
+            "reason": "critical_gotcha_is_preserved_by_another_valid_source"
+          }
+        },
+        {
+          "variant_id": "D28-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "compression": {
+              "candidate_token_savings": 700,
+              "rare_gotcha_present": true,
+              "gotcha_independently_covered": false,
+              "omitted_gotcha_severity": "critical"
+            },
+            "tasks": {
+              "rare_safety_task_probability_bps": 10
+            },
+            "presentation": {
+              "summary_heading": "compact-summary"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "compress_but_preserve_gotcha",
+            "target_level": "compressed_episodic",
+            "reason": "rare_critical_case_has_no_independent_coverage"
+          }
+        },
+        {
+          "variant_id": "D28-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "compression": {
+              "candidate_token_savings": 700,
+              "rare_gotcha_present": true,
+              "gotcha_independently_covered": false,
+              "omitted_gotcha_severity": "critical"
+            },
+            "tasks": {
+              "rare_safety_task_probability_bps": 10
+            },
+            "presentation": {
+              "summary_heading": "summary"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "compress_but_preserve_gotcha",
+            "target_level": "compressed_episodic",
+            "reason": "rare_critical_case_has_no_independent_coverage"
+          }
+        },
+        {
+          "variant_id": "D28-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "compression": {
+              "candidate_token_savings": 700,
+              "rare_gotcha_present": true,
+              "gotcha_independently_covered": true,
+              "omitted_gotcha_severity": "critical"
+            },
+            "tasks": {
+              "rare_safety_task_probability_bps": 10
+            },
+            "presentation": {
+              "summary_heading": "compact-summary"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "compress_without_duplicate_gotcha",
+            "target_level": "compressed_episodic",
+            "reason": "critical_gotcha_is_preserved_by_another_valid_source"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D29",
+      "name": "retracted_source_invalidates_dependent_procedure",
+      "decision": "maintain_promoted_procedure",
+      "legal_actions": [
+        "retain_procedure",
+        "invalidate_procedure_and_descendants",
+        "quarantine_procedure",
+        "rebuild_from_alternative_proof"
+      ],
+      "intervention_contract": {
+        "decisive_path": "lineage.source_retracted_by_known_at",
+        "invariant_path": "presentation.procedure_label",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D29-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "lineage": {
+              "source_revision_id": "rev-17",
+              "source_retracted_by_known_at": true,
+              "dependent_procedure_id": "proc-17",
+              "descendant_count": 4
+            },
+            "governance": {
+              "rollback_receipt_available": true
+            },
+            "presentation": {
+              "procedure_label": "retry"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "invalidate_procedure_and_descendants",
+            "target_level": "unsupported",
+            "reason": "required_source_revision_is_retracted_at_known_time"
+          }
+        },
+        {
+          "variant_id": "D29-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "lineage": {
+              "source_revision_id": "rev-17",
+              "source_retracted_by_known_at": false,
+              "dependent_procedure_id": "proc-17",
+              "descendant_count": 4
+            },
+            "governance": {
+              "rollback_receipt_available": true
+            },
+            "presentation": {
+              "procedure_label": "retry"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_procedure",
+            "target_level": "procedural",
+            "reason": "all_required_source_revisions_remain_eligible"
+          }
+        },
+        {
+          "variant_id": "D29-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "lineage": {
+              "source_revision_id": "rev-17",
+              "source_retracted_by_known_at": true,
+              "dependent_procedure_id": "proc-17",
+              "descendant_count": 4
+            },
+            "governance": {
+              "rollback_receipt_available": true
+            },
+            "presentation": {
+              "procedure_label": "recovery-procedure"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "invalidate_procedure_and_descendants",
+            "target_level": "unsupported",
+            "reason": "required_source_revision_is_retracted_at_known_time"
+          }
+        },
+        {
+          "variant_id": "D29-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "lineage": {
+              "source_revision_id": "rev-17",
+              "source_retracted_by_known_at": true,
+              "dependent_procedure_id": "proc-17",
+              "descendant_count": 4
+            },
+            "governance": {
+              "rollback_receipt_available": true
+            },
+            "presentation": {
+              "procedure_label": "retry"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "invalidate_procedure_and_descendants",
+            "target_level": "unsupported",
+            "reason": "required_source_revision_is_retracted_at_known_time"
+          }
+        },
+        {
+          "variant_id": "D29-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "lineage": {
+              "source_revision_id": "rev-17",
+              "source_retracted_by_known_at": false,
+              "dependent_procedure_id": "proc-17",
+              "descendant_count": 4
+            },
+            "governance": {
+              "rollback_receipt_available": true
+            },
+            "presentation": {
+              "procedure_label": "recovery-procedure"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_procedure",
+            "target_level": "procedural",
+            "reason": "all_required_source_revisions_remain_eligible"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D30",
+      "name": "privacy_erasure_is_distinct_from_reversible_active_forgetting",
+      "decision": "apply_retention_action",
+      "legal_actions": [
+        "retain_active",
+        "forget_from_active_index",
+        "erase_source_and_all_descendants",
+        "quarantine"
+      ],
+      "intervention_contract": {
+        "decisive_path": "request.erase_for_privacy",
+        "invariant_path": "presentation.request_label",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D30-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "request": {
+              "erase_for_privacy": true,
+              "remove_from_active_index": true,
+              "principal_verified": true
+            },
+            "lineage": {
+              "source_revision_count": 1,
+              "derived_descendant_count": 5
+            },
+            "governance": {
+              "reversible_snapshot_allowed": false
+            },
+            "presentation": {
+              "request_label": "erase"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "erase_source_and_all_descendants",
+            "target_level": "erased",
+            "rollback_allowed": false,
+            "reason": "verified_privacy_erasure_is_irreversible_and_must_not_be_resurrected"
+          }
+        },
+        {
+          "variant_id": "D30-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "request": {
+              "erase_for_privacy": false,
+              "remove_from_active_index": true,
+              "principal_verified": true
+            },
+            "lineage": {
+              "source_revision_count": 1,
+              "derived_descendant_count": 5
+            },
+            "governance": {
+              "reversible_snapshot_allowed": false
+            },
+            "presentation": {
+              "request_label": "erase"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "forget_from_active_index",
+            "target_level": "inactive_but_auditable",
+            "rollback_allowed": true,
+            "reason": "ordinary_active_index_forgetting_is_reversible_and_is_not_privacy_erasure"
+          }
+        },
+        {
+          "variant_id": "D30-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "request": {
+              "erase_for_privacy": true,
+              "remove_from_active_index": true,
+              "principal_verified": true
+            },
+            "lineage": {
+              "source_revision_count": 1,
+              "derived_descendant_count": 5
+            },
+            "governance": {
+              "reversible_snapshot_allowed": false
+            },
+            "presentation": {
+              "request_label": "privacy-review"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "erase_source_and_all_descendants",
+            "target_level": "erased",
+            "rollback_allowed": false,
+            "reason": "verified_privacy_erasure_is_irreversible_and_must_not_be_resurrected"
+          }
+        },
+        {
+          "variant_id": "D30-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "request": {
+              "erase_for_privacy": true,
+              "remove_from_active_index": true,
+              "principal_verified": true
+            },
+            "lineage": {
+              "source_revision_count": 1,
+              "derived_descendant_count": 5
+            },
+            "governance": {
+              "reversible_snapshot_allowed": false
+            },
+            "presentation": {
+              "request_label": "erase"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "erase_source_and_all_descendants",
+            "target_level": "erased",
+            "rollback_allowed": false,
+            "reason": "verified_privacy_erasure_is_irreversible_and_must_not_be_resurrected"
+          }
+        },
+        {
+          "variant_id": "D30-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "request": {
+              "erase_for_privacy": false,
+              "remove_from_active_index": true,
+              "principal_verified": true
+            },
+            "lineage": {
+              "source_revision_count": 1,
+              "derived_descendant_count": 5
+            },
+            "governance": {
+              "reversible_snapshot_allowed": false
+            },
+            "presentation": {
+              "request_label": "privacy-review"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "forget_from_active_index",
+            "target_level": "inactive_but_auditable",
+            "rollback_allowed": true,
+            "reason": "ordinary_active_index_forgetting_is_reversible_and_is_not_privacy_erasure"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "D31",
+      "name": "promotion_requires_held_out_transfer_utility",
+      "decision": "choose_promotion_action",
+      "legal_actions": [
+        "retain_episodic",
+        "compress_with_source_links",
+        "promote_to_skill",
+        "promote_to_rule"
+      ],
+      "intervention_contract": {
+        "decisive_path": "metrics.held_out_transfer_gain_bps",
+        "invariant_path": "presentation.experiment_alias",
+        "source_order_invariant": true
+      },
+      "variants": [
+        {
+          "variant_id": "D31-base",
+          "intervention": "baseline",
+          "reader_input": {
+            "metrics": {
+              "held_out_transfer_gain_bps": -20,
+              "minimum_required_gain_bps": 50,
+              "held_out_tasks": 40,
+              "paired_interval_lower_bound_bps": -60
+            },
+            "governance": {
+              "independent_evaluator": true,
+              "oracle_leakage": false
+            },
+            "presentation": {
+              "experiment_alias": "trial-A"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_episodic",
+            "target_level": "episodic",
+            "reason": "no_positive_held_out_transfer_gain"
+          }
+        },
+        {
+          "variant_id": "D31-flip",
+          "intervention": "decisive_flip",
+          "reader_input": {
+            "metrics": {
+              "held_out_transfer_gain_bps": 80,
+              "minimum_required_gain_bps": 50,
+              "held_out_tasks": 40,
+              "paired_interval_lower_bound_bps": -60
+            },
+            "governance": {
+              "independent_evaluator": true,
+              "oracle_leakage": false
+            },
+            "presentation": {
+              "experiment_alias": "trial-A"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_skill",
+            "target_level": "procedural",
+            "reason": "held_out_gain_exceeds_preregistered_threshold"
+          }
+        },
+        {
+          "variant_id": "D31-invariant",
+          "intervention": "irrelevant_change",
+          "reader_input": {
+            "metrics": {
+              "held_out_transfer_gain_bps": -20,
+              "minimum_required_gain_bps": 50,
+              "held_out_tasks": 40,
+              "paired_interval_lower_bound_bps": -60
+            },
+            "governance": {
+              "independent_evaluator": true,
+              "oracle_leakage": false
+            },
+            "presentation": {
+              "experiment_alias": "trial-renamed"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_episodic",
+            "target_level": "episodic",
+            "reason": "no_positive_held_out_transfer_gain"
+          }
+        },
+        {
+          "variant_id": "D31-repair",
+          "intervention": "exact_repair",
+          "reader_input": {
+            "metrics": {
+              "held_out_transfer_gain_bps": -20,
+              "minimum_required_gain_bps": 50,
+              "held_out_tasks": 40,
+              "paired_interval_lower_bound_bps": -60
+            },
+            "governance": {
+              "independent_evaluator": true,
+              "oracle_leakage": false
+            },
+            "presentation": {
+              "experiment_alias": "trial-A"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "retain_episodic",
+            "target_level": "episodic",
+            "reason": "no_positive_held_out_transfer_gain"
+          }
+        },
+        {
+          "variant_id": "D31-false-repair",
+          "intervention": "matched_irrelevant_repair",
+          "reader_input": {
+            "metrics": {
+              "held_out_transfer_gain_bps": 80,
+              "minimum_required_gain_bps": 50,
+              "held_out_tasks": 40,
+              "paired_interval_lower_bound_bps": -60
+            },
+            "governance": {
+              "independent_evaluator": true,
+              "oracle_leakage": false
+            },
+            "presentation": {
+              "experiment_alias": "trial-renamed"
+            }
+          },
+          "oracle": {
+            "consolidation_action": "promote_to_skill",
+            "target_level": "procedural",
+            "reason": "held_out_gain_exceeds_preregistered_threshold"
+          }
+        }
+      ]
+    }
+  ]
+}
