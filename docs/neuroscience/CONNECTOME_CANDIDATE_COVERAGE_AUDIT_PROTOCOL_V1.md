@@ -131,7 +131,7 @@ Before collecting or estimating candidate-generation recall, run [the spatial PS
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome-spatial-frame-audit -- \
-  --frame spatial-frame.json --output spatial-frame-report.json
+  --frame spatial-frame.json \\\n  --eligibility-mask eligibility-mask.bitset --output spatial-frame-report.json
 
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --bin connectome-candidate-coverage-audit -- \
@@ -142,4 +142,4 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --audit independent-volume-search-audit.json --output candidate-coverage-report.json
 ```
 
-This proves no gaps/overlaps in the declared integer voxel bounding box; it does not prove the box or eligibility mask covers all biologically eligible tissue.
+The frame report only carries PASS after it verifies the exact eligibility-mask artifact digest, packed bit order, byte length, final padding, and consistency between mask foreground voxels and every PSU disposition. This proves no gaps/overlaps and mask-to-PSU consistency inside the declared integer box; it does not prove the box or mask selection rule covers all biologically eligible tissue.
