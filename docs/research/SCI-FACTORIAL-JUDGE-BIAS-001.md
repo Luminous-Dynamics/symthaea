@@ -115,6 +115,8 @@ These targets qualify the analyzer, not an LLM judge.
 
 ### Empirical comparison
 
+Each plan pins one judge source revision, prompt and rubric. Therefore each judge model/version should receive its own plan and receipt; do not mix distinct judge revisions inside a single plan. A comparative study should use the same semantic task-set digest, task blocks, candidate identities, rubric semantics, factor assignments and repeat budget across those plans. Compare the resulting bias surfaces by judge, and preserve model/version as a top-level comparison stratum rather than pooling their observations as if they were one evaluator.
+
 Compare under identical semantic tasks, judge prompt, rubric, model revision, repeat count and total token/inference budget:
 
 1. one-pass baseline judge;
