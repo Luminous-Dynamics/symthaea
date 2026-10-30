@@ -7,7 +7,7 @@
 use std::process;
 use symthaea::dynamics::crate_world_model::{HierarchicalCfCWorldModel, WorldModelConfig};
 
-const REPORT_SCHEMA: &str = "cmaq-008-residual-ablation-v0.1";
+const REPORT_SCHEMA: &str = "cmaq-008-residual-ablation-v0.2";
 const DIM: usize = 16;
 const HIDDEN: usize = 24;
 const TRAIN_SAMPLES: usize = 128;
@@ -633,7 +633,7 @@ fn main() {
         process::exit(2);
     }
     match run() {
-        Ok(reports) => print!("{}", render(&reports)),
+        Ok(report) => print!("{}", render(&report)),
         Err(error) => {
             eprintln!("{error}");
             process::exit(1);
@@ -656,6 +656,21 @@ mod tests {
     }
 
     #[test]
+    fn ridge_arx_learns_source_dynamics_better_than_persistence() {
+        let training = dataset(DATA_SEED, TRAIN_SAMPLES, Law::Source);
+        let model = LinearArxBaseline::fit(&training, LINEAR_RIDGE).unwrap();
+        let evaluation = dataset(DATA_SEED ^ 0x1111_2222_3333_4444, EVAL_SAMPLES, Law::Source);
+        let metrics = model.evaluate(&evaluation).unwrap();
+        assert!(metrics.mse.is_finite() && metrics.persistence_mse.is_finite());
+        assert!(
+            metrics.mse < metrics.persistence_mse,
+            "ridge ARX MSE {} should beat persistence {} on source holdout",
+            metrics.mse,
+            metrics.persistence_mse
+        );
+    }
+
+    #[test]
     fn both_objectives_replay_same_seed() {
         for objective in Objective::ALL {
             let first = run_seed(MODEL_SEEDS[0], objective).unwrap();
@@ -668,12 +683,11 @@ mod tests {
     fn report_contains_paired_objectives_and_finite_metrics() {
         let report = run().unwrap();
         assert_eq!(report.modes.len(), 2);
-        let report = run_report_for_test();
         let output = render(&report);
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(
             parsed["schema_version"],
-            "cmaq-008-residual-ablation-v0.1"
+            "cmaq-008-residual-ablation-v0.2"
         );
         assert_eq!(parsed["objectives"].as_array().unwrap().len(), 2);
         assert!(parsed["linear_arx_baseline"]["source"]["mse"].is_finite());
