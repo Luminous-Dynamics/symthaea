@@ -26,7 +26,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - docs/research/SCI-METAMORPHIC-EVALUATOR-001.md: intervention-based evaluator consistency benchmark across invariance, directional sensitivity, locality, order equivariance, provenance non-duplication, cross-mode consistency and counterfactual relations.
 - schema/metamorphic-evaluator-plan.schema.json and schema/metamorphic-evaluator-receipt.schema.json: strict preregistered pair-plan and observed-outcome receipt contracts.
 - tools/metamorphic_evaluator_audit.py: deterministic paired-outcome relation checker; no judge execution or causal identification claim.
-- tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: seven-family synthetic fixture generator and hostile relation/receipt controls.
+- tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: eight-pair/seven-family synthetic fixture generator and hostile relation/receipt controls.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -40,7 +40,7 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 
 ## Audit intervention-based evaluator consistency
 
-The metamorphic auditor checks whether paired evaluator outcomes obey predeclared invariance, directional sensitivity, locality, order-swap, provenance non-duplication, cross-mode and counterfactual relations.
+The metamorphic auditor checks whether paired evaluator outcomes obey predeclared invariance, directional sensitivity, locality, order-swap, provenance non-duplication, cross-mode and counterfactual relations. Receipts must echo the baseline/variant input digests committed by each plan pair; directional evidence pairs declare their exact expected variant decisions.
 
 ```sh
 python3 research/science-bench-refresh/tools/metamorphic_evaluator_fixture.py /tmp/metamorphic-example
