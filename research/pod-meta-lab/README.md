@@ -21,9 +21,11 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
 - Duplicate obligation/operation/target identity rejection before scheduling.
 - Mandatory reserve and fail-closed mandatory-work exhaustion.
 - Separate operation and verifier receipts, bound to the exact operation, obligation set, and pre-operation state key.
+- Per-obligation current-state identity checks; a promoting receipt must match the active evidence/proof state and advance to a distinct result-state identity.
+- Anti-replay behavior: a later revocation/correction advances the state identity, so an earlier valid receipt cannot resurrect a superseded conclusion.
 - A declared producer/verifier identity distinction (not cryptographic proof of independence).
-- Receipt validation is transactional: duplicate state IDs or mismatched receipt bindings leave the obligation state unchanged.
-- 21 authored unit tests covering routing, budget boundaries, no-progress stopping, changed-state retry, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
+- Receipt validation is transactional: duplicate state IDs, missing/mismatched current-state identities, or stale receipt bindings leave the obligation state unchanged.
+- 23 authored unit tests covering routing, budget boundaries, no-progress stopping, current-state binding, stale-receipt replay, exact receipt binding, source revocation, invalid proof, deterministic selection, and non-promotion on failed/unverified work.
 
 ## Deliberate limits
 
