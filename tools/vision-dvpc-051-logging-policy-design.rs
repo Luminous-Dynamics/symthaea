@@ -1051,7 +1051,7 @@ mod tests {
                 .count(),
             45
         );
-        assert!(a.contains("oracle_reward_aware_variance and reward_greedy_with_floor use known synthetic reward means"));
+        assert!(a.contains("Prop3 worst-case, Prop6 pseudo-target, oracle reward-aware variance, and reward-greedy use known synthetic reward means"));
         assert!(a.contains("reward_envelope_minimax_ips_second_moment_grid"));
         assert!(a.contains("minimax_weight_second_moment_grid"));
         assert!(a.contains("prop3_unconstrained_target_worst_case_known_reward"));
