@@ -77,6 +77,7 @@ struct ManifestTask {
     languages: Vec<String>,
     base_tree_digest: String,
     spec_digest: String,
+    spec_byte_length: u64,
     #[serde(default)]
     paired_transform_id: RequiredNullable<String>,
     quality_audit: QualityAudit,
@@ -111,8 +112,8 @@ struct TaskRequirement {
 #[serde(deny_unknown_fields)]
 struct RequirementSourceSpan {
     source_digest: String,
-    start_byte: usize,
-    end_byte: usize,
+    start_byte: u64,
+    end_byte: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -679,6 +680,9 @@ fn validate_run(run: &RunRecord, manifest: &SuiteManifest, manifest_bytes: &[u8]
         }
         validate_digest(report, &format!("{task_path}.base_tree_digest"), &task.base_tree_digest);
         validate_digest(report, &format!("{task_path}.spec_digest"), &task.spec_digest);
+        if task.spec_byte_length == 0 {
+            error(report, "E_SPEC_BYTE_LENGTH", format!("{task_path}.spec_byte_length"), "task specification byte length must be non-zero");
+        }
         validate_digest(report, &format!("{task_path}.quality_audit.audit_digest"), &task.quality_audit.audit_digest);
         if task.quality_audit.notes.trim().is_empty() {
             error(report, "E_AUDIT_NOTES_EMPTY", format!("{task_path}.quality_audit.notes"), "audit notes must explain the disposition");
@@ -945,6 +949,7 @@ fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, ta
         .map(|check| check.check_id.as_str())
         .collect();
     let mut requirement_ids = BTreeSet::new();
+    let mut mapped_check_ids = BTreeSet::new();
     for (index, requirement) in task.requirements.iter().enumerate() {
         let requirement_path = format!("{path}[{index}]");
         if requirement.requirement_id.trim().is_empty()
@@ -976,6 +981,14 @@ fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, ta
                 "E_REQUIREMENT_SPAN_RANGE",
                 format!("{requirement_path}.source_span"),
                 "source span must be a non-empty half-open UTF-8 byte range [start_byte, end_byte)",
+            );
+        }
+        if requirement.source_span.end_byte > task.spec_byte_length {
+            error(
+                report,
+                "E_REQUIREMENT_SPAN_BOUNDS",
+                format!("{requirement_path}.source_span.end_byte"),
+                "source span end_byte must not exceed the frozen specification byte length",
             );
         }
         validate_digest(
@@ -1059,6 +1072,17 @@ fn validate_task_requirements(report: &mut ValidationReport, task_path: &str, ta
                     "requirement mapping references a check not declared as required and blocking in this task manifest",
                 );
             }
+            mapped_check_ids.insert(check_id.as_str());
+        }
+    }
+    for required_check in &task.required_checks {
+        if !mapped_check_ids.contains(required_check.check_id.as_str()) {
+            error(
+                report,
+                "E_REQUIRED_CHECK_UNMAPPED",
+                format!("{task_path}.required_checks"),
+                "every required blocking check must cover at least one frozen task requirement",
+            );
         }
     }
 }
@@ -2039,6 +2063,34 @@ mod tests {
         });
         assert!(!report.valid);
         assert!(has_code(&report, "E_REQUIREMENT_CHECKS_EMPTY"));
+    }
+
+    #[test]
+    fn task_requirement_span_cannot_exceed_frozen_spec_length() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][0]["source_span"]["end_byte"] = Value::from(101);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIREMENT_SPAN_BOUNDS"));
+    }
+
+    #[test]
+    fn every_required_check_must_cover_a_frozen_requirement() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["requirements"][1]["blocking_check_ids"] =
+                Value::Array(vec![Value::String("cargo-test".into())]);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_REQUIRED_CHECK_UNMAPPED"));
+    }
+
+    #[test]
+    fn zero_length_specification_is_rejected() {
+        let report = validate_value_and_manifest(|_run, manifest| {
+            manifest["tasks"][0]["spec_byte_length"] = Value::from(0);
+        });
+        assert!(!report.valid);
+        assert!(has_code(&report, "E_SPEC_BYTE_LENGTH"));
     }
 
 
