@@ -250,6 +250,14 @@ def validate_package(package: dict[str, Any]) -> list[str]:
                     issues.append(f"adjudication {record['record_id']} uses withdrawn source")
                 if source and target and source["publication_date"] and source["publication_date"] > target:
                     issues.append(f"adjudication {record['record_id']} uses future source")
+        if record["decision"] == "temporally_stale":
+            stale = any(
+                span_by_id.get(span_id)
+                and source_by_id.get(span_by_id[span_id]["source_id"], {}).get("lifecycle") != "active"
+                for span_id in record["evidence_span_ids"]
+            )
+            if not stale:
+                issues.append(f"adjudication {record['record_id']} lacks stale-source evidence")
         if record["decision"] != "abstain":
             decisions.setdefault(claim_id, set()).add(record["decision"])
 
@@ -261,6 +269,9 @@ def validate_package(package: dict[str, Any]) -> list[str]:
                 if len(per_claim_groups.get(claim["claim_id"], set())) < 3:
                     issues.append(f"material claim {claim['claim_id']} lacks three declared independence groups")
 
+    resolution_ids = [event.get("resolution_id") for event in resolutions]
+    if len(resolution_ids) != len(set(resolution_ids)):
+        issues.append("duplicate resolution_id")
     for event in resolutions:
         event_id = event["resolution_id"]
         if event["claim_id"] not in known_claims:
