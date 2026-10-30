@@ -74,6 +74,7 @@ These are synthetic analytic inputs for the interval arithmetic and gate logic. 
 
 - Zero false signed certifications against exhaustive interval endpoint oracles.
 - 100% agreement with known interval-product and union-bound fixtures.
+- A deterministic grid verifies that every sampled signed product lies inside the reported interval and no certified status contradicts any sampled point.
 - A wider interval may reduce certification rate but must not increase false-certification rate.
 - Report certified-offsetting, certified-reinforcing, neutral, ambiguous, insufficient-coverage and evidence-unverified rates separately.
 - Compare against magnitude-only DeA and measure the abstention/decision-regret cost using QARCH-009.
@@ -81,4 +82,4 @@ These are synthetic analytic inputs for the interval arithmetic and gate logic. 
 
 ## Current implementation boundary
 
-The module implements conservative interval arithmetic, distinct-artifact checks, evidence-verification gating, union-bound coverage composition and nine unit tests. It does not build the proxy model, estimate the true-function interval, prove the proxy sup-norm bound, or guarantee lower global test risk. Rust compilation/tests have not been run in this environment because the Rust toolchain is unavailable.
+The module implements conservative interval arithmetic, distinct-artifact checks, evidence-verification gating, union-bound coverage composition and ten unit tests. It does not build the proxy model, estimate the true-function interval, prove the proxy sup-norm bound, or guarantee lower global test risk. Rust compilation/tests have not been run in this environment because the Rust toolchain is unavailable.
