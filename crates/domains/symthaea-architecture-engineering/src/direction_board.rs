@@ -96,11 +96,11 @@ impl DirectionBoardConfig {
             ));
         }
         if !self.new_direction_admission_credit.is_finite()
-            || self.new_direction_admission_credit < 0.0
+            || !(0.0..=1.0).contains(&self.new_direction_admission_credit)
         {
             return Err(DirectionBoardError::new(
                 "new_direction_admission_credit",
-                "must be finite and non-negative",
+                "must be finite and within [0,1]",
             ));
         }
         Ok(())
@@ -439,8 +439,7 @@ impl DirectionBoard {
             proposal.evaluation_cost_units,
         )?;
 
-        let admitted = proposal.disposition == NewDirectionDisposition::Admitted;
-        match proposal.disposition {
+        let admitted = match proposal.disposition {
             NewDirectionDisposition::Admitted => {
                 next_stats.admitted_directions = checked_add(
                     "new_direction.admitted_directions",
@@ -449,15 +448,7 @@ impl DirectionBoard {
                 )?;
                 next_stats.total_admission_credit +=
                     self.config.new_direction_admission_credit;
-                self.directions.insert(
-                    direction_sha256.clone(),
-                    DirectionStats::new(
-                        direction_sha256.clone(),
-                        canonical,
-                        proposal.verifier_receipt_sha256.clone(),
-                    ),
-                );
-                Ok(Some(direction_sha256))
+                true
             }
             NewDirectionDisposition::Duplicate => {
                 next_stats.duplicate_proposals = checked_add(
@@ -465,7 +456,7 @@ impl DirectionBoard {
                     next_stats.duplicate_proposals,
                     1,
                 )?;
-                Ok(None)
+                false
             }
             NewDirectionDisposition::Rejected => {
                 next_stats.rejected_proposals = checked_add(
@@ -473,7 +464,7 @@ impl DirectionBoard {
                     next_stats.rejected_proposals,
                     1,
                 )?;
-                Ok(None)
+                false
             }
             NewDirectionDisposition::Inconclusive => {
                 next_stats.inconclusive_proposals = checked_add(
@@ -481,9 +472,10 @@ impl DirectionBoard {
                     next_stats.inconclusive_proposals,
                     1,
                 )?;
-                Ok(None)
+                false
             }
-        }
+        };
+
         next_stats.admissions_per_cost = if next_stats.total_cost_units == 0 {
             0.0
         } else {
@@ -495,10 +487,26 @@ impl DirectionBoard {
                 "non-finite result",
             ));
         }
+
+        if admitted {
+            self.directions.insert(
+                direction_sha256.clone(),
+                DirectionStats::new(
+                    direction_sha256.clone(),
+                    canonical,
+                    proposal.verifier_receipt_sha256.clone(),
+                ),
+            );
+        }
         self.proposal_ids.insert(proposal.proposal_id.clone());
         self.proposals.insert(proposal.proposal_id.clone(), proposal);
         self.new_direction = next_stats;
-        Ok(if admitted { Some(direction_sha256) } else { None })
+
+        Ok(if admitted {
+            Some(direction_sha256)
+        } else {
+            None
+        })
     }
 
     pub fn record_attempt(
@@ -1085,10 +1093,26 @@ mod tests {
             .is_none());
 
         let stats = board.new_direction_stats();
-        assert_eq!(stats.attempted_proposals, 2);
+        assert!(board
+            .record_new_direction_proposal(NewDirectionProposal {
+                proposal_id: "new-3".to_owned(),
+                descriptor: descriptor("other target", "new object", "new construction"),
+                proposal_sha256: PROPOSAL.to_owned(),
+                comparison_profile_sha256: PROFILE.to_owned(),
+                metric_id: "held_out_task_quality".to_owned(),
+                evaluation_cost_units: 4,
+                disposition: NewDirectionDisposition::Rejected,
+                verifier_receipt_sha256: RECEIPT.to_owned(),
+            })
+            .unwrap()
+            .is_none());
+
+        let stats = board.new_direction_stats();
+        assert_eq!(stats.attempted_proposals, 3);
         assert_eq!(stats.admitted_directions, 1);
         assert_eq!(stats.duplicate_proposals, 1);
-        assert!((stats.admissions_per_cost - (0.10 / 8.0)).abs() < 1e-12);
+        assert_eq!(stats.rejected_proposals, 1);
+        assert!((stats.admissions_per_cost - (0.10 / 12.0)).abs() < 1e-12);
     }
 
     #[test]
