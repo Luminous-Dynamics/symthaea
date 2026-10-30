@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "source_input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "sampling_protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "sample_seed": "fixed-seed-2026-10-30",
+  "sample_seed_commitment_sha256": "9c9be568681ed54793cb5947a4eb132e300f01009b2ce23e39d37d856793458f",
+  "strata": [
+    { "stratum_id": "s1", "sampled_cluster_count": 2 },
+    { "stratum_id": "s2", "sampled_cluster_count": 2 }
+  ],
+  "population_frame": [
+    { "candidate_id": "c1", "stratum_id": "s1", "cluster_id": "k1" },
+    { "candidate_id": "c2", "stratum_id": "s1", "cluster_id": "k1" },
+    { "candidate_id": "c3", "stratum_id": "s1", "cluster_id": "k2" },
+    { "candidate_id": "c4", "stratum_id": "s1", "cluster_id": "k3" },
+    { "candidate_id": "c5", "stratum_id": "s2", "cluster_id": "k4" },
+    { "candidate_id": "c6", "stratum_id": "s2", "cluster_id": "k5" },
+    { "candidate_id": "c7", "stratum_id": "s2", "cluster_id": "k6" },
+    { "candidate_id": "c8", "stratum_id": "s2", "cluster_id": "k6" }
+  ],
+  "sampled_outcomes": [
+    { "candidate_id": "c1", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c2", "adjudication": "correct", "signed_query_error_reduction_if_applied": 0.2 },
+    { "candidate_id": "c3", "adjudication": "correct", "signed_query_error_reduction_if_applied": 0.2 },
+    { "candidate_id": "c5", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c7", "adjudication": "incorrect", "signed_query_error_reduction_if_applied": -0.3 },
+    { "candidate_id": "c8", "adjudication": "indeterminate", "signed_query_error_reduction_if_applied": null }
+  ]
+}
