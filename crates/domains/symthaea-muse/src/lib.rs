@@ -147,6 +147,8 @@ pub mod participant_schedule;
 #[cfg(feature = "theory")]
 pub mod piece_recipe;
 #[cfg(feature = "theory")]
+pub mod realization_equivalence;
+#[cfg(feature = "theory")]
 pub mod pilot_collection;
 #[cfg(feature = "theory")]
 pub mod pilot_monitoring;
