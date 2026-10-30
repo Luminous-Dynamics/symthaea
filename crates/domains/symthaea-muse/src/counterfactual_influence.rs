@@ -108,6 +108,7 @@ pub struct RepeatabilityCalibration {
     pub performed_event_map_sha256: String,
     /// Parser-reconstructed receipt digest from the baseline MIDI bytes.
     pub performed_event_map_receipt_sha256: String,
+    pub expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
@@ -151,6 +152,7 @@ pub struct VerifiedRendererAudioBinding {
     input_artifact_sha256: String,
     performed_event_map_sha256: String,
     performed_event_map_artifact_sha256: String,
+    expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
 }
 
@@ -211,6 +213,7 @@ pub fn verify_renderer_audio_binding(
     inputs: RendererReceiptInputs<'_>,
     performed_event_map_bytes: &[u8],
     expected_score_event_count: usize,
+    expected_primary_midi_by_score_index: &[u8],
     excluded_source_event_index: Option<usize>,
     audio: &AudioView<'_>,
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
@@ -231,21 +234,26 @@ pub fn verify_renderer_audio_binding(
     )
     .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
 
+    if expected_primary_midi_by_score_index.len() != expected_score_event_count {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
     match excluded_source_event_index {
-        None => parsed_map.verify_for_score(
+        None => parsed_map.verify_for_score_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
+            expected_primary_midi_by_score_index,
         ),
-        Some(excluded_index) => parsed_map.verify_for_score_excluding(
+        Some(excluded_index) => parsed_map.verify_for_score_excluding_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
             excluded_index,
+            expected_primary_midi_by_score_index,
         ),
     }
     .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
@@ -298,6 +306,7 @@ pub fn verify_renderer_audio_binding(
         input_artifact_sha256,
         performed_event_map_sha256: parsed_map.receipt_sha256,
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
+        expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
     })
 }
@@ -326,6 +335,7 @@ pub struct CounterfactualInfluenceReport {
     pub performed_event_map_receipt_sha256: String,
     pub counterfactual_event_map_sha256: String,
     pub counterfactual_event_map_receipt_sha256: String,
+    pub expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub counterfactual_schedule_sha256: String,
     pub renderer_identity_sha256: String,
@@ -358,6 +368,8 @@ pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub performed_event_map_bytes: &'view [u8],
     pub counterfactual_performed_event_map_bytes: &'view [u8],
     pub expected_score_event_count: usize,
+    /// Expected MIDI pitch indexed by canonical source Score event index.
+    pub expected_primary_midi_by_score_index: &'view [u8],
     pub baseline_schedule_bytes: &'view [u8],
     pub counterfactual_schedule_bytes: &'view [u8],
     pub baseline_renderer_evidence: &'view VerifiedRendererAudioBinding,
@@ -796,6 +808,8 @@ pub fn calibrate_repeatability(
             || evidence.performed_event_map_artifact_sha256 != event_map_sha256
             || evidence.performed_event_map_sha256
                 != anchor_renderer_evidence.performed_event_map_sha256
+            || evidence.expected_primary_pitches_sha256
+                != anchor_renderer_evidence.expected_primary_pitches_sha256
         {
             return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
         }
@@ -849,6 +863,9 @@ pub fn calibrate_repeatability(
         performed_event_map_sha256: event_map_sha256,
         performed_event_map_receipt_sha256: anchor_renderer_evidence
             .performed_event_map_sha256
+            .clone(),
+        expected_primary_pitches_sha256: anchor_renderer_evidence
+            .expected_primary_pitches_sha256
             .clone(),
         baseline_schedule_sha256: sha256_hex(baseline_schedule_bytes),
         renderer_identity_sha256: anchor_renderer_evidence.renderer_identity_sha256.clone(),
@@ -920,6 +937,7 @@ fn validate_input(
         .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
     if input.expected_score_event_count == 0
         || input.expected_score_event_count > 100_000
+        || input.expected_primary_midi_by_score_index.len() != input.expected_score_event_count
         || excluded_index >= input.expected_score_event_count
     {
         return Err(CounterfactualInfluenceError::InvalidEventId);
@@ -965,10 +983,15 @@ fn validate_input(
     {
         return Err(CounterfactualInfluenceError::RendererAudioMismatch);
     }
+    let expected_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
     if input.baseline_renderer_evidence.source_score_sha256
         != sha256_hex(input.source_score_bytes)
         || input.counterfactual_renderer_evidence.source_score_sha256
             != sha256_hex(input.source_score_bytes)
+        || input.baseline_renderer_evidence.expected_primary_pitches_sha256
+            != expected_pitch_sha256
+        || input.counterfactual_renderer_evidence.expected_primary_pitches_sha256
+            != expected_pitch_sha256
         || input.baseline_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
@@ -1165,6 +1188,9 @@ pub fn measure_counterfactual_influence(
         counterfactual_event_map_receipt_sha256: input
             .counterfactual_renderer_evidence
             .performed_event_map_sha256
+            .clone(),
+        expected_primary_pitches_sha256: calibration
+            .expected_primary_pitches_sha256
             .clone(),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
