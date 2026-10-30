@@ -461,6 +461,11 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
                 }
             }
             Observation::NotObserved | Observation::Unknown => {
+                if trigger_witness_sha256.is_some() {
+                    return Err(format!(
+                        "trial {trial_id}: non-observed trigger must not include trigger_witness_sha256"
+                    ));
+                }
                 if trigger_cycle.is_some() {
                     return Err(format!(
                         "trial {trial_id}: non-observed trigger must not include trigger_cycle"
@@ -516,16 +521,33 @@ fn parse_campaign(value: &Value) -> Result<Campaign, String> {
                     "trial {trial_id}: formal_bound_cycles must be within 1..={window_cycles}"
                 ));
             }
-            if status == "cover_reached" {
-                if trigger != Observation::Observed || trigger_witness_sha256.is_none() {
+            match status {
+                "cover_reached" => {
+                    if trigger != Observation::Observed || trigger_witness_sha256.is_none() {
+                        return Err(format!(
+                            "trial {trial_id}: cover_reached requires observed trigger and trigger_witness_sha256"
+                        ));
+                    }
+                }
+                "bounded_no_counterexample" => {
+                    if trigger != Observation::NotObserved {
+                        return Err(format!(
+                            "trial {trial_id}: bounded_no_counterexample requires trigger_status=not_observed"
+                        ));
+                    }
+                }
+                "timeout" | "unknown" => {
+                    if trigger != Observation::Unknown {
+                        return Err(format!(
+                            "trial {trial_id}: {status} requires trigger_status=unknown"
+                        ));
+                    }
+                }
+                _ => {
                     return Err(format!(
-                        "trial {trial_id}: cover_reached requires observed trigger and trigger_witness_sha256"
+                        "trial {trial_id}: unsupported formal_result {status}"
                     ));
                 }
-            } else if !["bounded_no_counterexample", "timeout", "unknown"].contains(&status) {
-                return Err(format!(
-                    "trial {trial_id}: unsupported formal_result {status}"
-                ));
             }
         } else if formal_result.is_some() || formal_bound_cycles.is_some() {
             return Err(format!(
@@ -715,7 +737,10 @@ fn summarize_condition(campaign: &Campaign, condition: Condition, budget: u64) -
         None
     } else {
         Some(
-            trigger_to_payload_cycles.iter().sum::<u64>() as f64
+            trigger_to_payload_cycles
+                .iter()
+                .map(|value| *value as f64)
+                .sum::<f64>()
                 / trigger_to_payload_cycles.len() as f64,
         )
     };
@@ -841,6 +866,29 @@ fn summarize(campaign: &Campaign, campaign_sha256: String) -> Value {
             "kind": campaign.observation_boundary_kind
         },
         "trial_count": campaign.trials.len(),
+        "trials": campaign.trials.iter().map(|trial| json!({
+            "trial_id": trial.trial_id,
+            "trial_index": trial.trial_index,
+            "condition": trial.condition.as_str(),
+            "sequence_sha256": trial.sequence_sha256,
+            "trigger_status": match trial.trigger {
+                Observation::Observed => "observed",
+                Observation::NotObserved => "not_observed",
+                Observation::Unknown => "unknown",
+            },
+            "trigger_cycle": trial.trigger_cycle,
+            "trigger_witness_sha256": trial.trigger_witness_sha256,
+            "payload_status": match trial.payload {
+                Observation::Observed => "observed",
+                Observation::NotObserved => "not_observed",
+                Observation::Unknown => "unknown",
+            },
+            "payload_cycle": trial.payload_cycle,
+            "payload_witness_sha256": trial.payload_witness_sha256,
+            "outcome_trace_sha256": trial.outcome_trace_sha256,
+            "formal_result": trial.formal_result,
+            "formal_bound_cycles": trial.formal_bound_cycles
+        })).collect::<Vec<_>>(),
         "unique_sequence_count": campaign.unique_sequence_count,
         "duplicate_sequence_count": campaign.duplicate_sequence_count,
         "budget_curve": budget_curves,
