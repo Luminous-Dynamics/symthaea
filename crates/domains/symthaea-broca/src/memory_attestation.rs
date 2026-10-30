@@ -938,10 +938,14 @@ impl EvidenceTrustStore {
         if expiry <= accepted_time {
             return Err("role-scope policy was expired before trusted acceptance".into());
         }
-        let not_before_unix_ms = u64::try_from(accepted_time.timestamp_millis())
-            .map_err(|_| "role-scope policy acceptance predates Unix epoch".to_string())?;
-        let valid_until_unix_ms = u64::try_from(expiry.timestamp_millis())
-            .map_err(|_| "role-scope policy expiry predates Unix epoch".to_string())?;
+        // Evidence access checks operate at millisecond precision. Round
+        // activation upward and expiry downward so precision loss can only
+        // shorten the authorization interval, never start it early or extend it.
+        let not_before_unix_ms = unix_millis_ceil(&accepted_time, "role-scope policy acceptance")?;
+        let valid_until_unix_ms = unix_millis_floor(&expiry, "role-scope policy expiry")?;
+        if valid_until_unix_ms <= not_before_unix_ms {
+            return Err("role-scope policy validity window is shorter than millisecond precision".into());
+        }
 
         // Digest covers the complete signed envelope, including the independent
         // ingress receipt, while canonicalizing order and RFC3339 timestamps.
@@ -1078,6 +1082,21 @@ impl EvidenceTrustStore {
             policies_sha256: format!("{:x}", Sha256::digest(policy_bytes)),
             events_sha256: format!("{:x}", Sha256::digest(event_bytes)),
         })
+    }
+}
+
+fn unix_millis_floor(value: &DateTime<Utc>, field: &str) -> Result<u64, String> {
+    u64::try_from(value.timestamp_millis())
+        .map_err(|_| format!("{field} predates Unix epoch"))
+}
+
+/// Earliest millisecond boundary that is not earlier than the trusted instant.
+fn unix_millis_ceil(value: &DateTime<Utc>, field: &str) -> Result<u64, String> {
+    let floor = unix_millis_floor(value, field)?;
+    if value.timestamp_subsec_nanos() % 1_000_000 == 0 {
+        Ok(floor)
+    } else {
+        floor.checked_add(1).ok_or_else(|| format!("{field} overflows Unix milliseconds"))
     }
 }
 
@@ -1857,6 +1876,43 @@ mod tests {
             )
             .unwrap_err()
             .contains("not authorized"));
+    }
+
+
+    #[test]
+    fn sub_millisecond_window_rounding_fails_closed() {
+        let accepted = parse_utc("2026-01-02T00:00:00.000500Z", "accepted").unwrap();
+        let expiry = parse_utc("2026-02-01T00:00:00.000500Z", "expiry").unwrap();
+        assert_eq!(
+            unix_millis_ceil(&accepted, "accepted").unwrap(),
+            accepted.timestamp_millis() as u64 + 1
+        );
+        assert_eq!(
+            unix_millis_floor(&expiry, "expiry").unwrap(),
+            expiry.timestamp_millis() as u64
+        );
+        let too_short = parse_utc("2026-01-02T00:00:00.000900Z", "expiry").unwrap();
+        assert!(unix_millis_floor(&too_short, "expiry").unwrap()
+            <= unix_millis_ceil(&accepted, "accepted").unwrap());
+    }
+
+    #[test]
+    fn role_scope_authorization_fixture_has_stable_unique_cases() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../fixtures/broca_role_scope_authorization_cases.json"
+        )).unwrap();
+        assert_eq!(
+            fixture["schema_version"].as_str(),
+            Some("BROCA-ROLE-ACCESS-CASESET-V1")
+        );
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 20);
+        let ids: BTreeSet<&str> = cases
+            .iter()
+            .map(|case| case["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 20);
+        assert!(cases.iter().all(|case| case["expected"].is_string()));
     }
 
 
