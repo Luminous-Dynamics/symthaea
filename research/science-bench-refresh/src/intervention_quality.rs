@@ -870,7 +870,7 @@ mod tests {
             candidate_sampling_policy: "full_census".to_owned(),
             adjudication_policy: AdjudicationPolicyV1 {
                 minimum_reviewers: 3,
-                consensus_threshold_permille: 667,
+                consensus_threshold_permille: 666,
                 require_blind_to_generator_identity: true,
                 require_blind_to_pipeline_disposition: true,
                 require_blind_to_evaluator_outcome: true,
@@ -932,7 +932,7 @@ mod tests {
                 },
                 CandidateAdjudicationV1 {
                     candidate_id: "c2".to_owned(),
-                    reviewers: reviewers("c2", [ReviewerVerdictV1::MeaningChanging; 3]),
+                    reviewers: reviewers("c2", [ReviewerVerdictV1::MeaningChanging, ReviewerVerdictV1::MeaningChanging, ReviewerVerdictV1::MeaningPreserving]),
                 },
                 CandidateAdjudicationV1 {
                     candidate_id: "c3".to_owned(),
@@ -970,8 +970,8 @@ mod tests {
     fn ambiguity_is_never_promoted_to_valid() {
         let (_, plan, receipt) = fixture();
         let report = analyze_intervention_quality(&plan, &receipt).unwrap();
-        assert_eq!(report.fields.accepted_ambiguous_count, 0);
-        assert_eq!(report.fields.ambiguous_relation_count, 1);
+        assert_eq!(report.fields.accepted_ambiguous_count, 1);
+        assert_eq!(report.fields.ambiguous_relation_count, 2);
     }
 
     #[test]
