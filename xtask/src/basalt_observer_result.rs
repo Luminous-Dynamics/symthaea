@@ -939,14 +939,17 @@ fn adjudicate_case(
         || receipt.integrity.root_escape;
     let mut integrity_failure_not_invalidated = false;
 
-    if integrity_fault && receipt.disposition != "invalidated" {
+    if integrity_fault
+        && (receipt.disposition != "invalidated"
+            || receipt.reuse_decision != "invalidated")
+    {
         integrity_failure_not_invalidated = true;
         push_error(
             report,
             Some(case_id),
             "E_INTEGRITY_FAILURE_NOT_INVALIDATED",
             &format!("{path}.receipt.integrity"),
-            "event loss, restart, unmonitored process, snapshot race, or root escape must invalidate the receipt",
+            "event loss, restart, unmonitored process, snapshot race, or root escape must invalidate both the receipt and its reuse decision",
         );
     }
 
@@ -1574,6 +1577,23 @@ mod tests {
         assert_eq!(report.metrics.unresolved_channel_misses, 1);
         assert!(report.errors.iter().any(|error| {
             error.code == "E_UNRESOLVED_CHANNEL_NOT_DISCLOSED"
+        }));
+    }
+
+    #[test]
+    fn rejects_integrity_loss_on_a_capture_case_even_when_receipt_is_invalidated() {
+        let (catalog, oracle, receipts) = fixture_inputs();
+        let mut receipt_value: Value =
+            serde_json::from_slice(&receipts).expect("receipt fixture parses");
+        receipt_value["records"][0]["integrity"]["event_loss"] = json!(true);
+        receipt_value["records"][0]["disposition"] = json!("invalidated");
+        receipt_value["records"][0]["reuse_decision"] = json!("reverified");
+        let receipts = serde_json::to_vec(&receipt_value).expect("mutated receipt serializes");
+        let report = audit_bytes(&catalog, &oracle, &receipts);
+        assert!(!report.adjudication_passed);
+        assert_eq!(report.metrics.integrity_failures_not_invalidated, 1);
+        assert!(report.errors.iter().any(|error| {
+            error.code == "E_INTEGRITY_FAILURE_NOT_INVALIDATED"
         }));
     }
 
