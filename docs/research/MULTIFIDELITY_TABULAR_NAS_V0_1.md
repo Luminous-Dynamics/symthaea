@@ -230,6 +230,8 @@ Fourteen Rust tests are authored for candidate metadata isolation, runtime charg
 
 This capability boundary is still for trusted in-process policy code; a closure could capture the original feature table externally. For adversarial policy evaluation, the proxy oracle must run in a separate process/container and be the only process able to access source proxy values. The receipt makes the intended capability interface testable; it is not a security sandbox by itself.
 
+The current ledger charges the per-architecture proxy runtimes carried by the source feature table; it does not execute the proxy kernels. These source timings are only directly comparable when their measurement hardware/software profile is pinned and compatible. NAS-Bench-Suite-Zero's real raw timing records and environment provenance have not yet been imported in this branch. Until those are verified or all proxies are rerun on common pinned hardware, report them as source-reported proxy seconds—not portable wall-clock performance, accelerator seconds or energy.
+
 ### Correct total-cost comparison
 
 Every method must now report at least two separate ledgers:
