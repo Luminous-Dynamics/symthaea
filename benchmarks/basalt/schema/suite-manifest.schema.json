@@ -55,7 +55,8 @@
           "quality_audit",
           "required_checks",
           "quality_rubric",
-          "requirements"
+          "requirements",
+          "spec_byte_length"
         ],
         "properties": {
           "task_id": {
@@ -369,6 +370,11 @@
                 }
               }
             }
+          },
+          "spec_byte_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Exact byte length of the frozen UTF-8 task specification used for half-open requirement source spans."
           }
         }
       }
