@@ -623,7 +623,7 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
     out.push_str("BENCHMARK_CONFIG\tinterpretation\tanalytic_expected_values_no_monte_carlo_sampling\n");
     out.push_str("BENCHMARK_CONFIG\treward_envelope\tregistered upper means: 0.20,0.95;0.98,0.20\n");
     out.push_str("BENCHMARK_CONFIG\treward_envelope_sensitivity_scales\t1.0,1.1,1.25,1.5,2.0\n");
-    out.push_str("BENCHMARK_CONFIG\toracle_only\tProp6 pseudo-target, oracle reward-aware variance, and reward-greedy use known synthetic reward means\n");
+    out.push_str("BENCHMARK_CONFIG\toracle_only\tProp3 worst-case, Prop6 pseudo-target, oracle reward-aware variance, and reward-greedy use known synthetic reward means\n");
     out.push_str("BENCHMARK_CONFIG\tfrontier\timmediate_reward_vs_worst_policy_IPS_variance_weight_moment_and_envelope_bound\n");
     for regime in PortfolioRegime::ALL {
         for m in POLICY_COUNTS {
@@ -1054,6 +1054,8 @@ mod tests {
         assert!(a.contains("oracle_reward_aware_variance and reward_greedy_with_floor use known synthetic reward means"));
         assert!(a.contains("reward_envelope_minimax_ips_second_moment_grid"));
         assert!(a.contains("minimax_weight_second_moment_grid"));
+        assert!(a.contains("prop3_unconstrained_target_worst_case_known_reward"));
+        assert!(a.contains("prop6_second_moment_pseudotarget_known_reward"));
         assert!(a.contains("oracle_reward_aware_minimax_ope_variance_grid"));
     }
 }
