@@ -447,8 +447,8 @@ fn validate(certificate: &Certificate) -> Vec<String> {
         }
         push_if_invalid(
             &mut errors,
-            component.assumptions.iter().any(|assumption| !nonempty(assumption)),
-            format!("uncertainty component {} has an empty assumption", component.component_type),
+            component.assumptions.is_empty() || component.assumptions.iter().any(|assumption| !nonempty(assumption)),
+            format!("uncertainty component {} must declare non-empty assumptions", component.component_type),
         );
     }
 
@@ -508,6 +508,27 @@ fn validate(certificate: &Certificate) -> Vec<String> {
                     ),
                     "invalidation changed_object_kind is not recognized",
                 );
+                if invalidation.changed_object_kind == "source_revision" {
+                    push_if_invalid(
+                        &mut errors,
+                        !certificate.source_revisions.iter().any(|source| {
+                            source.source_id == invalidation.changed_object_id
+                                && source.content_sha256 == invalidation.previous_revision_sha256
+                        }),
+                        "invalidation previous revision does not match the bound source revision",
+                    );
+                } else {
+                    push_if_invalid(
+                        &mut errors,
+                        !certificate.dependency_closure.iter().any(|dependency| {
+                            dependency.object_kind == invalidation.changed_object_kind
+                                && dependency.object_id == invalidation.changed_object_id
+                                && (dependency.evidence_sha256 == invalidation.previous_revision_sha256
+                                    || dependency.source_revision_sha256 == invalidation.previous_revision_sha256)
+                        }),
+                        "invalidation event does not identify a bound dependency at the previous revision",
+                    );
+                }
             }
         }
     } else {
@@ -679,11 +700,45 @@ mod tests {
             event_sha256: "6".repeat(64),
             changed_object_kind: "source_revision".into(),
             changed_object_id: "synthetic-volume".into(),
-            previous_revision_sha256: "7".repeat(64),
+            previous_revision_sha256: certificate.source_revisions[0].content_sha256.clone(),
             current_revision_sha256: "8".repeat(64),
             reason: "synthetic source revision changed".into(),
         });
         assert!(validate(&certificate).is_empty(), "{:?}", validate(&certificate));
+    }
+
+    #[test]
+    fn invalidation_must_reference_a_bound_dependency() {
+        let mut certificate = fixture();
+        certificate.state = "INVALIDATED_BY_REVISION".into();
+        certificate.invalidation = Some(Invalidation {
+            event_sha256: "6".repeat(64),
+            changed_object_kind: "segment".into(),
+            changed_object_id: "segment-not-in-dependency-closure".into(),
+            previous_revision_sha256: "7".repeat(64),
+            current_revision_sha256: "8".repeat(64),
+            reason: "unrelated synthetic change".into(),
+        });
+        assert!(validate(&certificate).iter().any(|error| error.contains("does not identify a bound dependency")));
+    }
+
+    #[test]
+    fn aggregate_confidence_field_is_not_part_of_the_contract() {
+        let bytes = include_bytes!("../../../../docs/neuroscience/examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json");
+        let mut value: serde_json::Value = serde_json::from_slice(bytes).expect("fixture JSON");
+        value["aggregate_confidence"] = serde_json::json!(0.99);
+        assert!(serde_json::from_value::<Certificate>(value).is_err());
+    }
+
+    #[test]
+    fn sensitivity_only_component_prevents_full_certification() {
+        let mut certificate = fixture();
+        certificate.state = "CERTIFIED_WITHIN_DECLARED_SCOPE".into();
+        certificate.quality_gates[1].status = "PASS".into();
+        certificate.uncertainty_components[0].status = "ESTIMATED".into();
+        certificate.uncertainty_components[0].estimate = Some(0.8);
+        certificate.uncertainty_components[0].interval_95 = Some([0.7, 0.9]);
+        assert!(validate(&certificate).iter().any(|error| error.contains("certified state requires")));
     }
 
     #[test]
