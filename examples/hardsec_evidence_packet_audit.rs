@@ -48,6 +48,7 @@ struct Evidence {
     witness_sha256: Option<String>,
     stimuli_count: Option<u64>,
     activation_count: Option<u64>,
+    payload_effects_observed: Option<u64>,
     bound_cycles: Option<u64>,
 }
 
@@ -165,6 +166,7 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
     const KINDS: &[&str] = &[
         "stimulus_trace",
         "cover_witness",
+        "payload_effect_trace",
         "formal_proof",
         "equivalence_report",
         "localization_map",
@@ -198,6 +200,7 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
     let witness_sha256 = optional_string(value, "witness_sha256")?;
     let stimuli_count = optional_u64(value, "stimuli_count")?;
     let activation_count = optional_u64(value, "activation_count")?;
+    let payload_effects_observed = optional_u64(value, "payload_effects_observed")?;
     let bound_cycles = optional_u64(value, "bound_cycles")?;
 
     for (name, digest) in [
@@ -242,6 +245,21 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
             }
             if property_id.is_none() {
                 return Err(format!("evidence {id}: cover_witness requires property_id"));
+            }
+        }
+        "payload_effect_trace" => {
+            if status == "pass"
+                && payload_effects_observed.unwrap_or(0) > 0
+                && witness_sha256.is_none()
+            {
+                return Err(format!(
+                    "evidence {id}: observed payload effects require witness_sha256"
+                ));
+            }
+            if formal_result.is_some() || property_id.is_some() {
+                return Err(format!(
+                    "evidence {id}: payload effect traces do not accept formal proof metadata"
+                ));
             }
         }
         "equivalence_report" => {
@@ -377,6 +395,19 @@ fn validate_supported_claim(
             if !witness {
                 return Err(format!(
                     "claim {claim_type}: requires passing stimulus/cover evidence with activation_count > 0 and witness_sha256"
+                ));
+            }
+        }
+        "payload_effect_observed" => {
+            let observed = selected.iter().any(|item| {
+                item.kind == "payload_effect_trace"
+                    && item.status == "pass"
+                    && item.payload_effects_observed.unwrap_or(0) > 0
+                    && item.witness_sha256.is_some()
+            });
+            if !observed {
+                return Err(format!(
+                    "claim {claim_type}: requires a passing payload_effect_trace with observed effect count and witness_sha256"
                 ));
             }
         }
@@ -519,6 +550,7 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
             "model_suspects_trojan",
             "localization_provided",
             "trigger_activated",
+            "payload_effect_observed",
             "trigger_not_observed_under_budget",
             "bounded_reachability_not_found",
             "trigger_unreachable_under_assumptions",
