@@ -1150,7 +1150,9 @@ fn mm_allocate(
     Ok(MmRun { allocation: current, iterations, objective_trace, remaining_swap_gain: last_residual })
 }
 
-fn build_plans(world: &World) -> Result<Vec<(&'static str, Allocation)>, String> {
+type Plan = (&'static str, Allocation, usize, f64);
+
+fn build_plans(world: &World) -> Result<Vec<Plan>, String> {
     let none = Allocation::default();
     let greedy_max = greedy_allocate(world, GreedyRule::MaxGain)?;
     let greedy_cost = greedy_allocate(world, GreedyRule::GainPerCost)?;
@@ -1159,15 +1161,19 @@ fn build_plans(world: &World) -> Result<Vec<(&'static str, Allocation)>, String>
     let exact = exact_dynamic_program(world, [true; SOURCES])?.allocation;
     let estimated_world = world.estimated_profiles();
     let plugin_profile = exact_dynamic_program(&estimated_world, [true; SOURCES])?.allocation;
+    let mm_zero = mm_allocate(world, none, 24, 128)?;
+    let mm_greedy = mm_allocate(world, greedy_max, 24, 128)?;
 
     Ok(vec![
-        ("no_annotations", none),
-        ("greedy_max_gain", greedy_max),
-        ("greedy_cost_aware", greedy_cost),
-        ("best_single_source_exact", single_source),
-        ("pairwise_exchange", exchange),
-        ("exact_dp_oracle", exact),
-        ("plugin_profile_exact", plugin_profile),
+        ("no_annotations", none, 0, 0.0),
+        ("greedy_max_gain", greedy_max, 0, 0.0),
+        ("greedy_cost_aware", greedy_cost, 0, 0.0),
+        ("best_single_source_exact", single_source, 0, 0.0),
+        ("pairwise_exchange", exchange, 0, 0.0),
+        ("exact_dp_oracle", exact, 0, 0.0),
+        ("plugin_profile_exact", plugin_profile, 0, 0.0),
+        ("mm_from_zero", mm_zero.allocation, mm_zero.iterations, mm_zero.remaining_swap_gain),
+        ("mm_from_greedy", mm_greedy.allocation, mm_greedy.iterations, mm_greedy.remaining_swap_gain),
     ])
 }
 
@@ -1326,7 +1332,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         World::heterogeneous_source_quality(),
     ];
     let mut output = String::from(
-        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\trelative_gap_to_exact\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\n",
+        "record_type\tscenario\tmethod\tevaluation_n\treplicates\tbudget\tspent\tannotation_count\tanalytic_mse\tempirical_bias\tempirical_variance\tempirical_mse\trelative_reduction_vs_none\trelative_gap_to_exact\ttarget_weighted_abs_model_bias\tsource0_count\tsource1_count\tsource2_count\tmm_iterations\tremaining_swap_gain\n",
     );
     output.push_str("BENCHMARK_CONFIG\tVIS-DVPC-054\tversion\t0\n");
     output.push_str(&format!("BENCHMARK_CONFIG\treplicates\t{replicates}\n"));
@@ -1348,11 +1354,13 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
         let no_annotation = analytic_mse(world, &Allocation::default(), EVAL_N)?;
         let exact_mse = plans
             .iter()
-            .find(|(method, _)| *method == "exact_dp_oracle")
-            .map(|(_, allocation)| analytic_mse(world, allocation, EVAL_N))
+            .find(|(method, _, _, _)| *method == "exact_dp_oracle")
+            .map(|(_, allocation, _, _)| analytic_mse(world, allocation, EVAL_N))
             .transpose()?
             .ok_or_else(|| "missing exact-DP oracle plan".to_string())?;
-        for (method_index, (method, allocation)) in plans.iter().enumerate() {
+        for (method_index, (method, allocation, mm_iterations, mm_residual)) in
+            plans.iter().enumerate()
+        {
             if !allocation.feasible(world) {
                 return Err(format!("infeasible plan: {method}"));
             }
@@ -1376,7 +1384,7 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
             use std::fmt::Write;
             let _ = writeln!(
                 output,
-                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}",
+                "RESULT\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.10}\t{:.10}\t{:.10}\t{:.10}\t{:.8}\t{:.8}\t{:.8}\t{}\t{}\t{}\t{}\t{:.10}",
                 world.name,
                 method,
                 EVAL_N,
@@ -1394,6 +1402,8 @@ fn benchmark(replicates: usize, seed: u64) -> Result<String, String> {
                 sources[0],
                 sources[1],
                 sources[2],
+                mm_iterations,
+                mm_residual,
             );
         }
 
@@ -1664,7 +1674,7 @@ mod tests {
                 .lines()
                 .filter(|line| line.starts_with("RESULT\t"))
                 .count(),
-            14
+            18
         );
         assert_eq!(
             first
