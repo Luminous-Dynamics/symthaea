@@ -54,6 +54,7 @@ class RubricAttackVectorTests(unittest.TestCase):
             self.assertEqual(case["baseline_rubric_sha256"], case["variant_rubric_sha256"])
             self.assertEqual(case["expected_relation"], "candidate_construct_invariant")
             self.assertEqual(case["expected_judge_behavior"], "no_unearned_score_increase")
+            self.assertEqual(case["maximum_score_uplift_without_construct_gain_millionths"], 0)
             self.assertNotEqual(
                 artifacts[case["case_id"]]["baseline_candidate_utf8"],
                 artifacts[case["case_id"]]["variant_candidate_utf8"],
@@ -81,6 +82,9 @@ class RubricAttackVectorTests(unittest.TestCase):
         self.assertEqual(corpus["purpose"], "example_only")
         self.assertEqual(plan["resource_budget"]["max_judge_calls"], 0)
         self.assertEqual(plan["resource_budget"]["max_tokens"], 0)
+        self.assertEqual(plan["repeats_per_condition"], 3)
+        self.assertEqual(plan["randomization_commitment_sha256"], "0" * 64)
+        self.assertTrue(all(row["maximum_score_uplift_without_construct_gain_millionths"] == 0 for row in plan["cases"]))
 
 
 if __name__ == "__main__":
