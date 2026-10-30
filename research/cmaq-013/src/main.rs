@@ -165,7 +165,7 @@ fn generate_evaluation(scenario: Scenario, width: usize, horizon: usize) -> Epis
                     best = Some(candidate);
                 }
             }
-            let random_action = draw_action(&mut rng, drift);
+            let random_action = draw_action(&mut rng, drift, horizon);
             let feedback_available = rng.unit() >= FEEDBACK_DROP_RATE;
             tape.push(Observation { selected: best.unwrap(), random_action, feedback_available });
         }
