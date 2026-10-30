@@ -66,8 +66,12 @@ def suitezero_fixture() -> dict:
 def curve_fixture() -> dict:
     return {
         "nb201_data": {
-            IDS[0]: {"cifar10-valid": {"eval_acc1es": [float(epoch) for epoch in range(1, 20)] + [90.0]}},
-            IDS[1]: {"cifar10-valid": {"eval_acc1es": [float(epoch + 1) for epoch in range(1, 20)] + [91.0]}},
+            IMPORTER.suitezero_id_to_naslib_curve_key(IDS[0]): {
+                "cifar10-valid": {"eval_acc1es": [float(epoch) for epoch in range(1, 20)] + [90.0]}
+            },
+            IMPORTER.suitezero_id_to_naslib_curve_key(IDS[1]): {
+                "cifar10-valid": {"eval_acc1es": [float(epoch + 1) for epoch in range(1, 20)] + [91.0]}
+            },
         }
     }
 
@@ -90,6 +94,16 @@ def build(suitezero=None, curves=None, **overrides):
 
 
 class NasBench201CurveImporterTests(unittest.TestCase):
+    def test_suitezero_tuple_ids_convert_to_exact_naslib_curve_keys(self):
+        self.assertEqual(
+            IMPORTER.suitezero_id_to_naslib_curve_key("(4, 3, 0, 3, 0, 0)"),
+            "|avg_pool_3x3~0|+|nor_conv_1x1~0|skip_connect~1|+|nor_conv_1x1~0|skip_connect~1|skip_connect~2|",
+        )
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            IMPORTER.suitezero_id_to_naslib_curve_key("(4, 3, 0, 3, 0)")
+        with self.assertRaises(IMPORTER.ImportErrorDetail):
+            IMPORTER.suitezero_id_to_naslib_curve_key("(4, 3, 0, 3, 9, 0)")
+
     def test_emits_canonical_multifidelity_import_and_expected_rungs(self):
         canonical, report = build()
         self.assertEqual(canonical["schema"], IMPORTER.CANONICAL_SCHEMA)
