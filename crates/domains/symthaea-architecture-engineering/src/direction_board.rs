@@ -326,6 +326,75 @@ pub struct DirectionAllocationPlan {
     pub plan_sha256: String,
 }
 
+impl DirectionAllocationPlan {
+    /// Validate exact budget conservation and the content digest. The digest is computed
+    /// over the canonical serialized plan with plan_sha256 blank, avoiding self-reference.
+    pub fn validate_integrity(&self) -> Result<(), DirectionBoardError> {
+        if self.schema != BOARD_SCHEMA || self.version != BOARD_VERSION {
+            return Err(DirectionBoardError::new(
+                "plan.schema",
+                "unsupported direction allocation plan schema/version",
+            ));
+        }
+        validate_sha256("plan.comparison_profile_sha256", &self.comparison_profile_sha256)?;
+        validate_sha256("plan.source_board_sha256", &self.source_board_sha256)?;
+        validate_sha256("plan.plan_sha256", &self.plan_sha256)?;
+        if self.metric_id.trim().is_empty() || self.evaluation_budget == 0 {
+            return Err(DirectionBoardError::new(
+                "plan",
+                "metric_id and evaluation_budget must be non-empty/non-zero",
+            ));
+        }
+        let mut arm_ids = BTreeSet::new();
+        let mut total = 0usize;
+        for (index, allocation) in self.allocations.iter().enumerate() {
+            let arm_id = arm_key(&allocation.arm).to_owned();
+            if !arm_ids.insert(arm_id) {
+                return Err(DirectionBoardError::new(
+                    format!("plan.allocations[{index}].arm"),
+                    "duplicate allocation arm",
+                ));
+            }
+            if let AllocationArm::Direction(digest) = &allocation.arm {
+                validate_sha256("plan.direction_sha256", digest)?;
+            }
+            if !allocation.estimated_yield_per_cost.is_finite()
+                || allocation.estimated_yield_per_cost < 0.0
+                || !allocation.exploration_bonus.is_finite()
+                || allocation.exploration_bonus < 0.0
+                || !allocation.potential.is_finite()
+                || allocation.potential < 0.0
+            {
+                return Err(DirectionBoardError::new(
+                    format!("plan.allocations[{index}]"),
+                    "yield, exploration bonus and potential must be finite/non-negative",
+                ));
+            }
+            total = total
+                .checked_add(allocation.recommended_evaluations)
+                .ok_or_else(|| DirectionBoardError::new("plan.evaluation_budget", "sum overflow"))?;
+        }
+        if total != self.evaluation_budget {
+            return Err(DirectionBoardError::new(
+                "plan.allocations",
+                format!("allocations sum to {total}, expected {}", self.evaluation_budget),
+            ));
+        }
+        let mut unsigned = self.clone();
+        unsigned.plan_sha256.clear();
+        let bytes = serde_json::to_vec(&unsigned)
+            .map_err(|error| DirectionBoardError::new("plan", error.to_string()))?;
+        let expected = domain_digest(PLAN_DOMAIN, &bytes);
+        if expected != self.plan_sha256 {
+            return Err(DirectionBoardError::new(
+                "plan.plan_sha256",
+                "does not match the allocation plan content",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct BoardDigestPayload<'a> {
     schema: &'static str,
@@ -342,9 +411,9 @@ struct BoardDigestPayload<'a> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DirectionBoard {
-    pub schema: String,
-    pub version: String,
-    pub config: DirectionBoardConfig,
+    schema: String,
+    version: String,
+    config: DirectionBoardConfig,
     directions: BTreeMap<String, DirectionStats>,
     new_direction: NewDirectionStats,
     attempt_ids: BTreeSet<String>,
@@ -535,6 +604,18 @@ impl DirectionBoard {
         Ok(())
     }
 
+    pub fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn config(&self) -> &DirectionBoardConfig {
+        &self.config
+    }
+
     pub fn direction_stats(&self) -> Vec<DirectionStats> {
         self.directions.values().cloned().collect()
     }
@@ -671,6 +752,7 @@ impl DirectionBoard {
         let bytes = serde_json::to_vec(&plan)
             .map_err(|error| DirectionBoardError::new("plan", error.to_string()))?;
         plan.plan_sha256 = domain_digest(PLAN_DOMAIN, &bytes);
+        plan.validate_integrity()?;
         Ok(plan)
     }
 
@@ -1123,6 +1205,17 @@ mod tests {
         assert_eq!(stats.duplicate_proposals, 1);
         assert_eq!(stats.rejected_proposals, 1);
         assert!((stats.admissions_per_cost - (0.10 / 12.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn allocation_plan_digest_detects_budget_or_arm_tampering() {
+        let (board, _, _) = admitted_board();
+        let plan = board.recommend(9).unwrap();
+        plan.validate_integrity().unwrap();
+
+        let mut altered = plan.clone();
+        altered.allocations[0].recommended_evaluations += 1;
+        assert!(altered.validate_integrity().is_err());
     }
 
     #[test]
