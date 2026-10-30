@@ -326,7 +326,7 @@ pub fn verify_renderer_audio_binding_for_score(
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
     let serialized_score = serde_json::to_vec(score)
         .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
-    if inputs.score_bytes != serialized_score
+    if inputs.score_bytes != serialized_score.as_slice()
         || receipt.score_sha256 != sha256_hex(&serialized_score)
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
