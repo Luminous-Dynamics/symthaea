@@ -11,7 +11,8 @@
 //! Variable indices are global model-unit indices. Within a factor's table,
 //! variables[0] is the least-significant assignment bit.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use thiserror::Error;
 
@@ -247,6 +248,11 @@ pub fn min_fill_sum_product(
 }
 
 /// Compute the deterministic min-fill order and its induced width.
+///
+/// A lazy min-priority queue keeps the planner from rescanning every active
+/// variable on every elimination step. Eliminating v only changes adjacency
+/// among v's current neighbours, so only those neighbours need fresh scores.
+/// Stale heap entries are discarded by per-variable generation counters.
 fn min_fill_order(
     factors: &[BinaryFactor],
     eliminate: &[usize],
@@ -268,34 +274,29 @@ fn min_fill_order(
     }
 
     let mut active: BTreeSet<usize> = eliminate.iter().copied().collect();
+    let mut versions = BTreeMap::<usize, u64>::new();
+    let mut queue = BinaryHeap::<Reverse<(usize, usize, usize, u64)>>::new();
+    for variable in active.iter().copied() {
+        versions.insert(variable, 0);
+        let (fill_edges, degree) = fill_score(variable, &adjacency);
+        queue.push(Reverse((fill_edges, degree, variable, 0)));
+    }
+
     let mut order = Vec::with_capacity(active.len());
     let mut induced_width = 0usize;
 
     while !active.is_empty() {
-        let mut best: Option<(usize, usize, usize)> = None;
-        for variable in active.iter().copied() {
-            let neighbours = adjacency
-                .get(&variable)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|neighbour| adjacency.contains_key(neighbour))
-                .collect::<Vec<_>>();
-            let mut fill_edges = 0usize;
-            for (left_index, left) in neighbours.iter().copied().enumerate() {
-                for right in neighbours.iter().copied().skip(left_index + 1) {
-                    if !adjacency[&left].contains(&right) {
-                        fill_edges += 1;
-                    }
-                }
+        let variable = loop {
+            let Reverse((_, degree, variable, version)) =
+                queue.pop().ok_or(FactorGraphError::EmptyFactorGraph)?;
+            if active.contains(&variable)
+                && versions.get(&variable).copied() == Some(version)
+            {
+                induced_width = induced_width.max(degree);
+                break variable;
             }
-            let candidate = (fill_edges, neighbours.len(), variable);
-            if best.map(|current| candidate < current).unwrap_or(true) {
-                best = Some(candidate);
-            }
-        }
+        };
 
-        let (_, degree, variable) = best.ok_or(FactorGraphError::EmptyFactorGraph)?;
         let neighbours = adjacency
             .get(&variable)
             .cloned()
@@ -303,7 +304,6 @@ fn min_fill_order(
             .into_iter()
             .filter(|neighbour| adjacency.contains_key(neighbour))
             .collect::<Vec<_>>();
-        induced_width = induced_width.max(degree);
 
         // Elimination makes the active neighbours a clique.
         for (left_index, a) in neighbours.iter().copied().enumerate() {
@@ -320,11 +320,49 @@ fn min_fill_order(
         adjacency.remove(&variable);
         active.remove(&variable);
         order.push(variable);
+
+        // Only the eliminated variable's neighbours have changed adjacency.
+        // Refresh those still scheduled for elimination.
+        for neighbour in neighbours {
+            if !active.contains(&neighbour) {
+                continue;
+            }
+            let version = versions
+                .get(&neighbour)
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or(FactorGraphError::IndexOverflow)?;
+            versions.insert(neighbour, version);
+            let (fill_edges, degree) = fill_score(neighbour, &adjacency);
+            queue.push(Reverse((fill_edges, degree, neighbour, version)));
+        }
     }
 
     Ok((order, induced_width))
 }
 
+fn fill_score(
+    variable: usize,
+    adjacency: &BTreeMap<usize, BTreeSet<usize>>,
+) -> (usize, usize) {
+    let neighbours = adjacency
+        .get(&variable)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|neighbour| adjacency.contains_key(neighbour))
+        .collect::<Vec<_>>();
+    let mut fill_edges = 0usize;
+    for (left_index, left) in neighbours.iter().copied().enumerate() {
+        for right in neighbours.iter().copied().skip(left_index + 1) {
+            if !adjacency[&left].contains(&right) {
+                fill_edges += 1;
+            }
+        }
+    }
+    (fill_edges, neighbours.len())
+}
 fn sorted_union(left: &[usize], right: &[usize]) -> Vec<usize> {
     let mut output = Vec::with_capacity(left.len() + right.len());
     let mut left_index = 0usize;
