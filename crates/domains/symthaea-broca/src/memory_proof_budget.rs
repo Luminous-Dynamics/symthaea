@@ -254,9 +254,10 @@ impl ProofBudgetRequest {
                 if !candidate_ids.contains(conflicting_id.as_str()) {
                     return Err(format!("conflict edge references unknown evidence ID {conflicting_id:?}"));
                 }
-                let conflicting = self.candidates.iter()
-                    .find(|item| item.evidence_id == *conflicting_id)
-                    .expect("candidate ID set was built from this vector");
+                let Some(conflicting) = self.candidates.iter()
+                    .find(|item| item.evidence_id == *conflicting_id) else {
+                    return Err(format!("conflict edge references unknown evidence ID {conflicting_id:?}"));
+                };
                 if !conflicting.conflicts_with.contains(&candidate.evidence_id) {
                     return Err(format!(
                         "conflict relation between {:?} and {:?} must be symmetric",
@@ -391,6 +392,7 @@ struct ProofPacketPayload<'a> {
     scope_id: &'a str,
     valid_at_unix_ms: u64,
     known_at_unix_ms: u64,
+    request_sha256: &'a str,
     policy_id: &'a str,
     policy_sha256: &'a str,
     tokenizer_id: &'a str,
@@ -677,8 +679,10 @@ pub fn solve_proof_budget(
     let evidence: Vec<_> = plan.evidence_ids
         .iter()
         .map(|evidence_id| {
-            let candidate = candidate_map[evidence_id.as_str()];
-            ProofPacketEvidenceRef {
+            let candidate = candidate_map
+                .get(evidence_id.as_str())
+                .ok_or_else(|| format!("selected evidence {evidence_id:?} is absent from candidate map"))?;
+            Ok(ProofPacketEvidenceRef {
                 evidence_id: candidate.evidence_id.clone(),
                 source_revision_id: candidate.source_revision_id.clone(),
                 source_pointer: candidate.source_pointer.clone(),
@@ -690,10 +694,11 @@ pub fn solve_proof_budget(
                 authorization_receipt_sha256: candidate.authorization_receipt_sha256.clone(),
                 retrieval_rank: candidate.retrieval_rank,
                 token_cost: candidate.token_cost,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     let payload = ProofPacketPayload {
+        request_sha256: &request_sha256,
         decision_id: &request.decision_id,
         principal_id: &request.principal_id,
         scope_id: &request.scope_id,
@@ -804,7 +809,9 @@ pub fn verify_proof_packet(
         return Err("proof packet omits one or more required conclusions".into());
     }
     for evidence_id in &selected_evidence_ids {
-        let candidate = candidate_by_id[evidence_id.as_str()];
+        let candidate = candidate_by_id
+            .get(evidence_id.as_str())
+            .ok_or_else(|| format!("selected evidence {evidence_id:?} is absent from candidate map"))?;
         if candidate.conflicts_with.iter().any(|other| selected_evidence_ids.contains(other)) {
             return Err(format!("proof packet combines contradictory evidence at {:?}", evidence_id));
         }
@@ -813,7 +820,9 @@ pub fn verify_proof_packet(
     let mut expected_evidence = Vec::new();
     let mut total_token_cost = 0u64;
     for evidence_id in &selected_evidence_ids {
-        let candidate = candidate_by_id[evidence_id.as_str()];
+        let candidate = candidate_by_id
+            .get(evidence_id.as_str())
+            .ok_or_else(|| format!("selected evidence {evidence_id:?} is absent from candidate map"))?;
         total_token_cost = total_token_cost
             .checked_add(candidate.token_cost as u64)
             .ok_or_else(|| "proof packet token cost overflow".to_string())?;
@@ -843,6 +852,7 @@ pub fn verify_proof_packet(
     }
 
     let payload = ProofPacketPayload {
+        request_sha256: &request_sha256,
         decision_id: &request.decision_id,
         principal_id: &request.principal_id,
         scope_id: &request.scope_id,
@@ -1279,7 +1289,10 @@ mod tests {
             token_cost: candidate.token_cost,
         }];
         non_minimal.total_token_cost = candidate.token_cost as u64;
+        let canonical_request_sha256 = sha256_json(&canonical, "canonical proof budget request").unwrap();
+        non_minimal.request_sha256 = canonical_request_sha256.clone();
         let payload = ProofPacketPayload {
+            request_sha256: &canonical_request_sha256,
             decision_id: &canonical.decision_id,
             principal_id: &canonical.principal_id,
             scope_id: &canonical.scope_id,
