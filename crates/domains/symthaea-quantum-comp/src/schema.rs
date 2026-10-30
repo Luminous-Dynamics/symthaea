@@ -46,6 +46,10 @@ pub const ARCHITECTURE_PORTFOLIO_SCHEMA: &str =
 pub const ARCHITECTURE_EVIDENCE_RECEIPT_SCHEMA: &str =
     "symthaea.quantum_comp.architecture_evidence_receipt.v1";
 
+/// Schema label for source-bound architecture workload-regime profiles.
+pub const ARCHITECTURE_WORKLOAD_REGIME_SCHEMA: &str =
+    "symthaea.quantum_comp.architecture_workload_regime.v1";
+
 /// Returns all known alpha.10 schema labels.
 pub fn known_schema_labels() -> &'static [&'static str] {
     &[
