@@ -305,4 +305,4 @@ ZAPS and CoRA published values are reference targets from their papers, not resu
 
 ## 13. Claim ceiling
 
-This module makes multi-fidelity resource use auditable. It does not implement ZAPS, CoRA, Hyperband, BOHB, DEHB or an optimizer. Passing its synthetic tests would qualify only the evaluator contract, not NAS search quality, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
+This research branch makes proxy/multi-fidelity resource use and promotion decisions auditable, and adds a transparent calibrated curve baseline. It does not implement or reproduce ZAPS, CoRA, R-MF-NAS, HiP-BO/LCPFN, Hyperband, BOHB or DEHB. Passing its synthetic tests would qualify only the evaluator/promotion contracts, not NAS search quality, interval coverage on real held-out tasks, transfer or SOTA. Exact-head Rust tests and pinned real benchmark imports are required before making any performance claim.
