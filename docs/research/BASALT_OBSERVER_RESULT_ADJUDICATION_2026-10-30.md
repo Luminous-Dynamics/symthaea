@@ -39,6 +39,37 @@ cargo run -p xtask -- basalt-observer-result-audit \
 
 The command prints a machine-readable report. It exits non-zero unless every catalog case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
 
+
+## Executable counterfactual fixture runner
+
+The follow-on harness command currently implements four filesystem cases as two reciprocal recall/selectivity pairs:
+
+- `hidden-untracked-read` ↔ `unused-neighbor-change` on `fixture:unlisted-secret.txt`.
+- `irrelevant-docs-change` ↔ `docs-consumed-positive-control` on `fixture:docs/unused.md`.
+
+Run it with:
+
+```sh
+cargo run -p xtask -- basalt-observer-fixture-run \
+  --catalog benchmarks/basalt/coverage/observer-challenges.v1.json \
+  --out-dir reports/basalt-fixtures \
+  --case-id hidden-untracked-read
+```
+
+The harness automatically closes the requested selection over reciprocal pairs. It creates a unique run directory containing:
+
+- `oracle-ledger.v1.json`: selected case IDs, exact catalog digest, harness/worker binary digest, before/after resource digests, expected ground truth, and child-task counterfactual output/read witnesses.
+- `fixture-evidence.v1.json`: child process IDs, output digests, bytes-read values, workspace-relative paths, and the fixture evidence digest inputs.
+- `workspace/`: the materialized test fixture, including an ignored `unlisted-secret.txt` resource and the docs resource.
+
+The child worker runs twice per case, once against baseline bytes and once after mutation. For `consume`, it reads the resource and emits a digest of the bytes; the parent independently computes the expected digest and requires the output digest to change. For `ignore`, the worker's code path does not open or stat the path, emits a constant output digest, and reports zero bytes read; the parent independently checks that result. The worker runs in a separate process and its executable digest and PIDs are recorded.
+
+**Trust boundary:** this is an independently controlled fixture relative to a future observer adapter, not a cryptographically independent oracle root. The harness and worker are the same pinned `xtask` binary, and the parent-side counterfactual check is code in that binary. The ledger is not signed, and the result adjudicator does not independently execute the replay. The report therefore keeps oracle authenticity, replay execution by the adjudicator, receipt authenticity and profile qualification false.
+
+The fixture command intentionally rejects every catalog case it does not implement. It does not create fake records for environment, procfs, toolchain, cache, network, observer overflow or other unimplemented channels. The run scope in the oracle and observer receipt ledgers must match exactly. A selected paired case requires its reciprocal partner in the same run; a full-corpus qualification still requires a later run covering all 34 cases and all required independent challenge strata.
+
+The fixture evidence schema is `benchmarks/basalt/schema/observer-fixture-evidence.v1.schema.json`. The oracle and receipt schemas now require `selected_case_ids`; oracle records also carry the worker binary digest, before/after task-output digests and byte counts. The result adjudicator checks that the selected scope is non-empty, unique, known to the catalog, identical across both ledgers, and complete for every selected pair. Its `adjudication_complete` field means complete **for that declared run scope**, never complete for the entire profile.
+
 ## Do not collapse freshness, coverage and integrity into one status
 
 The next receipt revision should model four orthogonal dimensions rather than a single boolean called `complete`:
