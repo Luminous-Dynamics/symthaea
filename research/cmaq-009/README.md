@@ -47,6 +47,7 @@ The unit of analysis is the episode. CVaR95 is the mean of the worst ceil(5% of 
 
 - Every policy obeys its hard probe cap; no probe is free.
 - On abrupt shift, the adaptive probe policy should improve net utility over passive CUSUM after probe cost and achieve a shorter conditional p90 delay.
+- The current fixed synthetic tape **does not meet the p90 <=16-step target**. The focused workflow preserves this as an explicit observed miss rather than failing report validation or weakening the target. Further tuning must use a development split, then a fresh hidden qualification family; this panel cannot be reused for qualification.
 - Stationary false-revocation is measured for every policy; periodic probing may increase false revocations and must not be hidden by pooling it with the adaptive strategy.
 - The zero-information probe control must match passive decisions exactly and lose utility only to the probe cost.
 - Gradual-shift results are reported separately; an abrupt-shift win does not qualify gradual drift.
