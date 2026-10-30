@@ -122,6 +122,12 @@ pub fn effects_group_for_midi_channel(midi_channel: u8, effects_groups: u8) -> O
     Some(midi_channel % effects_groups)
 }
 
+fn effects_groups_setting(effects_groups: u8) -> Option<OsString> {
+    (1..=MAX_EFFECTS_GROUPS)
+        .contains(&effects_groups)
+        .then(|| OsString::from(format!("synth.effects-groups={effects_groups}")))
+}
+
 /// Captured local observation of one FluidSynth child-process invocation.
 ///
 /// The complete stdout/stderr streams are committed by digest; only bounded
@@ -311,10 +317,8 @@ pub fn render_midi_to_wav_observed_with_effects_groups(
         nonce
     ));
 
-    let mut arguments = vec![
-        OsString::from("-o"),
-        OsString::from(format!("synth.effects-groups={effects_groups}")),
-    ];
+    let effects_setting = effects_groups_setting(effects_groups)?;
+    let mut arguments = vec![OsString::from("-o"), effects_setting];
     if let Some(c) = color {
         arguments.push(OsString::from("-o"));
         arguments.push(OsString::from(format!(
@@ -439,7 +443,8 @@ pub fn render_midi_to_wav_observed_with_effects_groups(
 }
 
 /// Backward-compatible convenience wrapper. Evidence-bearing callers should
-/// use render_midi_to_wav_observed and retain its process observation.
+/// use render_midi_to_wav_observed and retain its process observation. This
+/// wrapper explicitly retains the historical single effects-group default.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
@@ -447,6 +452,23 @@ pub fn render_midi_to_wav(
 ) -> Option<Vec<u8>> {
     render_midi_to_wav_observed(midi_path, sample_rate, color)
         .and_then(|observation| observation.mastered_wav_bytes)
+}
+
+/// Render with a caller-selected effects-group count. Use the observed variant
+/// when the exact process receipt and ordered argv must be retained.
+pub fn render_midi_to_wav_with_effects_groups(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    effects_groups: u8,
+) -> Option<Vec<u8>> {
+    render_midi_to_wav_observed_with_effects_groups(
+        midi_path,
+        sample_rate,
+        color,
+        effects_groups,
+    )
+    .and_then(|observation| observation.mastered_wav_bytes)
 }
 
 /// Read a WAV, run the full mastering chain, re-encode as 16-bit in memory.
@@ -557,10 +579,14 @@ mod tests {
 
     #[test]
     fn explicit_effects_group_setting_is_content_addressable_in_ordered_argv() {
-        let setting = format!("synth.effects-groups={}", MAX_EFFECTS_GROUPS);
-        assert_eq!(setting, "synth.effects-groups=128");
-        let single_group = "synth.effects-groups=1";
-        assert_ne!(sha256_hex(setting.as_bytes()), sha256_hex(single_group.as_bytes()));
+        let setting = effects_groups_setting(MAX_EFFECTS_GROUPS).unwrap();
+        assert_eq!(setting.to_str(), Some("synth.effects-groups=128"));
+        let single_group = effects_groups_setting(1).unwrap();
+        assert_ne!(
+            sha256_hex(setting.to_str().unwrap().as_bytes()),
+            sha256_hex(single_group.to_str().unwrap().as_bytes()),
+        );
+        assert!(effects_groups_setting(0).is_none());
     }
 
     #[test]
