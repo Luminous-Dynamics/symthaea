@@ -1665,6 +1665,59 @@ mod tests {
     }
 
     #[test]
+    fn mm_majorizer_is_tangent_and_dominates_original_objective() {
+        let world = World::mixed_bias_cancellation();
+        let current = greedy_allocate(&world, GreedyRule::MaxGain).unwrap();
+        let candidate = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
+        let beta_current = context_bias_sums(&world, &current);
+        let beta_candidate = context_bias_sums(&world, &candidate);
+        let majorizer = full_mm_majorizer(&world, &candidate, &beta_current).unwrap();
+        let objective = allocation_dependent_objective(&world, &candidate).unwrap();
+        let expected_gap = (0..CONTEXTS)
+            .map(|x| {
+                world.context_probability[x]
+                    * (beta_candidate[x] - beta_current[x]).powi(2)
+            })
+            .sum::<f64>();
+        assert!((majorizer - objective - expected_gap).abs() < 1e-10);
+        let at_current = full_mm_majorizer(&world, &current, &beta_current).unwrap();
+        let current_objective = allocation_dependent_objective(&world, &current).unwrap();
+        assert!((at_current - current_objective).abs() < 1e-10);
+        assert!(majorizer + EPS >= objective);
+    }
+
+    #[test]
+    fn mm_descent_is_monotone_and_never_beats_the_exact_dp_oracle() {
+        for world in [
+            World::mixed_bias_cancellation(),
+            World::heterogeneous_source_quality(),
+        ] {
+            let exact = exact_dynamic_program(&world, [true; SOURCES]).unwrap().allocation;
+            let exact_objective = allocation_dependent_objective(&world, &exact).unwrap();
+            for initial in [
+                Allocation::default(),
+                greedy_allocate(&world, GreedyRule::MaxGain).unwrap(),
+            ] {
+                let initial_objective =
+                    allocation_dependent_objective(&world, &initial).unwrap();
+                let result = mm_allocate(&world, initial, 24, 128).unwrap();
+                assert!(result.allocation.feasible(&world));
+                assert!(result.objective_trace.len() >= 1);
+                assert!(
+                    result.objective_trace.windows(2).all(|pair| pair[1] <= pair[0] + 1e-10),
+                    "MM objective trace is not monotone: {:?}",
+                    result.objective_trace
+                );
+                let mm_objective =
+                    allocation_dependent_objective(&world, &result.allocation).unwrap();
+                assert!(mm_objective <= initial_objective + 1e-10);
+                assert!(mm_objective + 1e-9 >= exact_objective);
+                assert_eq!(result.objective_trace.len(), result.iterations + 1);
+            }
+        }
+    }
+
+    #[test]
     fn output_is_deterministic_and_has_exact_row_counts() {
         let first = benchmark(2, 123).unwrap();
         let second = benchmark(2, 123).unwrap();
