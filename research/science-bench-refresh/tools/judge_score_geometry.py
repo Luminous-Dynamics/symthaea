@@ -59,7 +59,7 @@ def validate_input(data: Any) -> dict[str, Any]:
     value = _object(data, TOP_FIELDS, "input")
     if value["schema"] != SCHEMA:
         raise GeometryInputError("unsupported score geometry input schema")
-    if value["purpose"] not in {"example_only", "qualified_measurement"}:
+    if not isinstance(value["purpose"], str) or value["purpose"] not in {"example_only", "qualified_measurement"}:
         raise GeometryInputError("purpose must be example_only or qualified_measurement")
     example = value["purpose"] == "example_only"
     for field in ("judge_source_revision",):
@@ -320,17 +320,30 @@ def _matrix_geometry(
     if len(judge_matrix) < 2 or len(human_matrix) < 2:
         return {
             "judge_effective_rank": None, "human_effective_rank": None,
+            "judge_leading_axis_identifiable": False, "human_leading_axis_identifiable": False,
             "leading_axis_angle_degrees": None, "eigensolver_converged": False,
         }
     judge_values, judge_vectors = _jacobi_eigen(_covariance(judge_matrix), tolerance)
     human_values, human_vectors = _jacobi_eigen(_covariance(human_matrix), tolerance)
-    judge_axis = [judge_vectors[row][0] for row in range(len(judge_vectors))]
-    human_axis = [human_vectors[row][0] for row in range(len(human_vectors))]
-    dot = abs(sum(left * right for left, right in zip(judge_axis, human_axis)))
-    angle = math.degrees(math.acos(max(0.0, min(1.0, dot))))
+    def identifiable(values: list[float]) -> bool:
+        if not values or values[0] <= tolerance:
+            return False
+        second = values[1] if len(values) > 1 else 0.0
+        return (values[0] - second) > tolerance * max(1.0, values[0])
+
+    judge_identifiable = identifiable(judge_values)
+    human_identifiable = identifiable(human_values)
+    angle = None
+    if judge_identifiable and human_identifiable:
+        judge_axis = [judge_vectors[row][0] for row in range(len(judge_vectors))]
+        human_axis = [human_vectors[row][0] for row in range(len(human_vectors))]
+        dot = abs(sum(left * right for left, right in zip(judge_axis, human_axis)))
+        angle = math.degrees(math.acos(max(0.0, min(1.0, dot))))
     return {
         "judge_effective_rank": _effective_rank(judge_values),
         "human_effective_rank": _effective_rank(human_values),
+        "judge_leading_axis_identifiable": judge_identifiable,
+        "human_leading_axis_identifiable": human_identifiable,
         "leading_axis_angle_degrees": angle,
         "eigensolver_converged": True,
     }
