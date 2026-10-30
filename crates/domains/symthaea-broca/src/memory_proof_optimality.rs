@@ -157,6 +157,7 @@ struct Enumeration<'a> {
     complete_combinations: u64,
     feasible_combinations: u64,
     best: Option<IndependentPlan>,
+    max_search_nodes: u64,
 }
 
 impl Enumeration<'_> {
@@ -166,10 +167,10 @@ impl Enumeration<'_> {
         selected_ids: &BTreeSet<String>,
         selected_proofs: &mut Vec<SelectedProof>,
     ) -> Result<(), String> {
-        if self.nodes >= self.request.max_search_nodes {
+        if self.nodes >= self.max_search_nodes {
             return Err(format!(
                 "independent optimality verifier exhausted max_search_nodes={} before exhaustive completion",
-                self.request.max_search_nodes
+                self.max_search_nodes
             ));
         }
         self.nodes += 1;
@@ -274,6 +275,22 @@ pub fn verify_minimum_cost_optimality(
     request: &ProofBudgetRequest,
     result: &ProofBudgetResult,
 ) -> Result<ProofOptimalityVerificationReceipt, String> {
+    verify_minimum_cost_optimality_with_limit(request, result, request.max_search_nodes)
+}
+
+/// Verify minimum-cost optimality with a verifier-specific node limit.
+///
+/// This permits the caller to impose a stricter verification budget than the
+/// optimizer used to produce the packet. Hitting the limit is always an error,
+/// never an optimality receipt.
+pub fn verify_minimum_cost_optimality_with_limit(
+    request: &ProofBudgetRequest,
+    result: &ProofBudgetResult,
+    verifier_max_search_nodes: u64,
+) -> Result<ProofOptimalityVerificationReceipt, String> {
+    if verifier_max_search_nodes == 0 {
+        return Err("verifier_max_search_nodes must be greater than zero".into());
+    }
     if result.status != ProofBudgetStatus::Supported {
         return Err("only a Supported result can be checked for minimum-cost optimality".into());
     }
@@ -306,6 +323,7 @@ pub fn verify_minimum_cost_optimality(
         complete_combinations: 0,
         feasible_combinations: 0,
         best: None,
+        max_search_nodes: verifier_max_search_nodes,
     };
     enumeration.visit(0, &BTreeSet::new(), &mut Vec::new())?;
 
@@ -547,10 +565,9 @@ mod tests {
 
     #[test]
     fn independent_verifier_fails_closed_when_its_own_search_budget_is_exhausted() {
-        let mut req = request();
-        req.max_search_nodes = 1;
-        let result = solve_proof_budget(request()).unwrap();
-        let error = verify_minimum_cost_optimality(&req, &result).unwrap_err();
+        let req = request();
+        let result = solve_proof_budget(req.clone()).unwrap();
+        let error = verify_minimum_cost_optimality_with_limit(&req, &result, 1).unwrap_err();
         assert!(error.contains("exhausted max_search_nodes=1"));
     }
 
