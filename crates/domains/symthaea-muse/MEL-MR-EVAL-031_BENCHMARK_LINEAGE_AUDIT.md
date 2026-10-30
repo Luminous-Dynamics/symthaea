@@ -17,7 +17,7 @@ Public interface:
 - `BenchmarkLineageManifest`: benchmark ID, immutable dataset revision, and manifest rows.
 - `BenchmarkLineageRecord`: sample ID, split, operation family, source/target audio SHA-256, instruction SHA-256, optional source score/MIDI SHA-256, and required composition-lineage SHA-256.
 - `audit_benchmark_lineage`: validates identities and checks cross-split reuse.
-- `BenchmarkLineageAudit::is_clean`: clean only when there are no validation or leakage violations.
+- `BenchmarkLineageAudit::is_clean`: clean only when there are no validation/leakage violations and the exposed audit fields still match the audit receipt digest. Call `verify_benchmark_lineage_audit` as well to bind the audit to the original manifest.
 - `verify_benchmark_lineage_audit`: recomputes the manifest and audit; any altered count, row, violation, identity, or digest fails equality.
 
 All fingerprints must be lowercase 64-character hexadecimal SHA-256 values. Invalid records remain committed in the manifest digest and are reported; they are not silently filtered out.
