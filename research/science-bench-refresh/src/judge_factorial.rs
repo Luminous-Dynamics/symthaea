@@ -267,6 +267,7 @@ pub struct CriterionOutcomeV1 {
 #[serde(deny_unknown_fields)]
 pub struct JudgeFactorialObservationV1 {
     pub condition_id: String,
+    pub execution_ordinal: u32,
     pub input_sha256: String,
     pub status: FactorialExecutionStatusV1,
     pub judge_receipt_sha256: Option<String>,
@@ -917,8 +918,15 @@ pub fn analyze_judge_factorial(
 
     let mut expected = BTreeMap::new();
     for block in &plan.blocks {
-        for condition in &block.conditions {
-            expected.insert(condition.condition_id.as_str(), (block, condition));
+        let conditions_by_id: BTreeMap<&str, &FactorialConditionV1> = block.conditions.iter()
+            .map(|condition| (condition.condition_id.as_str(), condition))
+            .collect();
+        for (ordinal, condition_id) in block.execution_order.iter().enumerate() {
+            let condition = conditions_by_id.get(condition_id.as_str())
+                .ok_or_else(|| format!("block {} execution schedule references an unknown condition", block.block_id))?;
+            let execution_ordinal = u32::try_from(ordinal)
+                .map_err(|_| "execution ordinal exceeds u32".to_owned())?;
+            expected.insert(condition_id.as_str(), (block, *condition, execution_ordinal));
         }
     }
     let mut observed_ids = BTreeSet::new();
@@ -926,8 +934,11 @@ pub fn analyze_judge_factorial(
         if !observed_ids.insert(observation.condition_id.as_str()) {
             return Err(format!("duplicate observation condition_id {}", observation.condition_id));
         }
-        let (block, condition) = expected.get(observation.condition_id.as_str())
+        let (block, condition, expected_execution_ordinal) = expected.get(observation.condition_id.as_str())
             .ok_or_else(|| format!("unexpected observation condition_id {}", observation.condition_id))?;
+        if observation.execution_ordinal != *expected_execution_ordinal {
+            return Err(format!("condition {} execution_ordinal differs from the committed schedule", condition.condition_id));
+        }
         if observation.input_sha256 != condition.input_sha256 {
             return Err(format!("condition {} input digest differs from the committed plan", condition.condition_id));
         }
@@ -973,7 +984,7 @@ pub fn analyze_judge_factorial(
     let mut metrics = Vec::new();
     for observation in &receipt.observations {
         if observation.status != FactorialExecutionStatusV1::Completed { continue; }
-        let (block, condition) = expected.get(observation.condition_id.as_str()).unwrap();
+        let (block, condition, _) = expected.get(observation.condition_id.as_str()).unwrap();
         metrics.push(metric_for_observation(block, condition, observation)?);
     }
     let (balanced_metrics, balanced_repeat_count, excluded_incomplete_repeat_count) =
@@ -1013,7 +1024,7 @@ pub fn analyze_judge_factorial(
         plan_commitment_sha256: plan.plan_commitment_sha256,
         planned_block_count: plan.blocks.len() as u64,
         observed_block_count: receipt.observations.iter().filter_map(|observation| {
-            expected.get(observation.condition_id.as_str()).map(|(block, _)| block.block_id.clone())
+            expected.get(observation.condition_id.as_str()).map(|(block, _, _)| block.block_id.clone())
         }).collect::<BTreeSet<_>>().len() as u64,
         planned_condition_count: planned_count,
         observed_condition_count: receipt.observations.len() as u64,
@@ -1109,6 +1120,10 @@ mod tests {
         };
         let plan_bytes = serde_json::to_vec_pretty(&plan).unwrap();
         let options = &block.score_options;
+        let execution_ordinals: BTreeMap<&str, u32> = block.execution_order.iter()
+            .enumerate()
+            .map(|(ordinal, condition_id)| (condition_id.as_str(), ordinal as u32))
+            .collect();
         let mut observations = Vec::new();
         for condition in &block.conditions {
             let selected = if condition.factors.score_option_order == ScoreOptionOrderV1::Reversed {
@@ -1129,6 +1144,7 @@ mod tests {
             }
             observations.push(JudgeFactorialObservationV1 {
                 condition_id: condition.condition_id.clone(),
+                execution_ordinal: *execution_ordinals.get(condition.condition_id.as_str()).unwrap(),
                 input_sha256: condition.input_sha256.clone(),
                 status: FactorialExecutionStatusV1::Completed,
                 judge_receipt_sha256: Some(digest(&format!("receipt-{}", condition.condition_id))),
@@ -1237,6 +1253,16 @@ mod tests {
         let mut fields = plan.fields();
         fields.blocks[0].execution_order.pop();
         assert!(validate_judge_factorial_plan_fields(&fields).is_err());
+    }
+
+    #[test]
+    fn rejects_receipt_execution_ordinal_mismatch() {
+        let (_, plan, receipt) = make_plan();
+        let mut value: serde_json::Value = serde_json::from_slice(&receipt).unwrap();
+        value["observations"][0]["execution_ordinal"] = serde_json::json!(999);
+        let altered = serde_json::to_vec(&value).unwrap();
+        assert!(analyze_judge_factorial(&plan, &altered).unwrap_err()
+            .contains("execution_ordinal differs from the committed schedule"));
     }
 
     #[test]
