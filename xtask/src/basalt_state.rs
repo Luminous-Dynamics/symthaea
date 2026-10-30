@@ -850,6 +850,24 @@ mod tests {
     }
 
     #[test]
+    fn resource_change_digest_has_stable_domain_separated_encoding() {
+        let digest = resource_change_digest(
+            "state-shift-selective-invalidation-001",
+            5,
+            "readme-edit-001",
+            ChangeKind::SourceChange,
+            "repo:README.md",
+            &format!("sha256:{}", "d".repeat(64)),
+            &format!("sha256:{}", "f".repeat(64)),
+        )
+        .unwrap();
+        assert_eq!(
+            digest,
+            "sha256:2da6225ebde58ff73b61cc62ceb8330ec0e3e1a20699bbf890369905d8ebf020"
+        );
+    }
+
+    #[test]
     fn event_digest_is_recomputed_from_the_full_change_payload() {
         let mut value = parsed_example();
         value["entries"][5]["after_digest"] = Value::String(format!("sha256:{}", "9".repeat(64)));
