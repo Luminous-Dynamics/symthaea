@@ -139,6 +139,84 @@ Use each benchmark for the question it actually measures:
 
 The LongMemEval-V2 published baseline table lists AgentRunbook-C at 74.9% overall accuracy on Small (108.3-second reported latency) and 70.1% on Medium (139.9 seconds). The official page's separate leaderboard section currently says leaderboard entries are coming soon; do not mistake the baseline table for a Broca submission or for an independently verified leaderboard result. Reproduce the baseline under the same harness before claiming superiority. TrustMem reports a 12.14-point HaluMem extraction F1 gain over its strongest evaluated baseline, and TAME reports a 14.6-percentage-point gain on GPT-5.2 AIME versus its evaluated strongest method; these results address different tasks and must not be compared numerically to LongMemEval-V2.
 
+## 8A. Decision-use validity extension (D18-D23)
+
+### Why this is a separate axis
+
+State correctness asks whether the ledger represents what happened and what is currently or historically supported. Decision-use validity asks whether that evidence is licensed to govern this particular claim or action. These are not equivalent.
+
+The October 26, 2026 SciValidityBench preprint formalizes this distinction: factuality, provenance, and use validity are separate; its compiler derives source-linked decision-governing state rather than merely retrieving records or adding generic event edges. Its five modules cover inferential stopping/selection, plan-lock and disclosure timing, construct drift, absence semantics, and sunk-cost bias. In that paper's evaluation, the compiled typed state exceeded a generic event graph by 9.2-18.8 percentage points across four model families. These are external, protocol-specific results, not Broca results: https://arxiv.org/abs/2610.34767
+
+This extension is inspired by that problem class but defines an independent Broca evaluation slice. It must not claim to reproduce SciValidityBench without implementing the official TaskSpecs and evaluator.
+
+### D18-D23 deterministic cases
+
+| Case | Governing state | Required result |
+|---|---|---|
+| D18: plan-lock / outcome access | Plan lock time, first outcome access time, actor/role, and source-event transaction time | A record accessed before a confirmatory plan is locked can remain factual but must be labelled exploratory for a confirmatory claim; a matched post-lock history may be admissible |
+| D19: selection and stopping | Predeclared analysis family, number of inspected outcomes, stopping rule, and selected-from relation | A selected result from repeated/adaptive inspection cannot inherit confirmatory status merely because its numeric value is correct |
+| D20: construct drift | Metric definition/version, unit, population, workload, replicate semantics, and declared conversion relation | Same-name metrics are not poolable unless the required compatibility relation is present and valid |
+| D21: absence algebra | Attempt lifecycle, instrument state, detection limit, censoring and observation outcome | Not-run, failed, censored, below-detection, unobserved, and measured-zero remain distinct; no blank-to-zero coercion |
+| D22: sunk-cost invariance | Historical spend/effort versus prospective alternatives and future payoffs | Changing sunk cost alone must not change the optimal prospective action when future payoffs are held fixed |
+| D23: evidence-family dependence | Search family, source/replicate grouping, duplication lineage, and evidence consumption history | Correlated copies or repeated views do not become independent corroboration; an action relying on false independence must be rejected or downgraded |
+
+Each TaskSpec emits a canonical public event history, a versioned governing-state compiler, a finite legal-action set, and an independent symbolic oracle. Keep hidden world state, gold action, and expected relation outside the reader-visible memory packet.
+
+### Paired causal interventions
+
+For every D18-D23 task, generate:
+- **Flip pair:** change exactly one decision-governing relation while preserving the assertion payload, prompt shell, legal actions, and all irrelevant history; the oracle action must flip.
+- **Invariant pair:** change a field declared irrelevant to the TaskSpec; the oracle action must remain invariant.
+- **Exact repair:** remove or corrupt the decisive relation, then apply the inverse patch; the compiled-state digest and oracle action must return to the original.
+- **Matched irrelevant repair:** apply an edit of the same operation class and magnitude to a non-decisive relation; the invalid decision must not recover merely because any graph edit occurred.
+- **Representation control:** compare flat and typed views with identical public nodes, attributes, relations, source links and token count as closely as possible.
+
+A system that gets the right action on one static case but does not obey the paired flip/invariance contract has not demonstrated use of the governing state.
+
+### Comparison arms and metrics
+
+Add the following arms to the existing B0-B6 suite, keeping exact reader, model, prompt, output schema and budget matched:
+- B7 raw-history / retrieval-only use decision.
+- B8 generic event graph with chronology and mention edges but no domain validity compiler.
+- B9 bitemporal source ledger only.
+- B10 typed decision-governing state compiled from the same source events.
+- B11 oracle-minimal decision state, diagnostic upper bound only.
+
+Report separately:
+- valid-action rate under the independent oracle;
+- false-admissibility rate (invalid evidence licensed for use);
+- false-rejection rate and useful admissible-case coverage;
+- abstention and contested-decision calibration;
+- flip-pair and invariant-pair relation accuracy;
+- exact-repair recovery and matched-repair specificity;
+- governing-relation precision/recall and source-span/payload-digest fidelity;
+- stale, retracted, expired, not-comparable, unauthorized and falsely independent evidence-use rates;
+- context tokens, compile/verify latency, reader latency, storage, update cost and total task cost.
+
+Use task-template-level paired bootstrap intervals; do not treat multiple seeds from one template as fully independent samples. Keep benchmark/model/backbone and evaluator versions pinned.
+
+### Proposed project qualification gates
+
+These are project targets, not external standards:
+1. 100% symbolic-oracle agreement on deterministic D18-D23 fixtures.
+2. Zero false-admissibility outcomes on the deterministic hard-negative suite.
+3. 100% rejection of expired, retracted, scope-mismatched and explicitly unauthorized evidence in deterministic verifier fixtures.
+4. At least 95% held-out flip/invariance relation accuracy.
+5. Positive paired lower confidence bound against the generic event-graph arm on held-out task templates.
+6. Report useful admissible-case coverage and risk-coverage curves; an always-abstain system fails.
+7. No superiority claim without a matched end-to-end agent evaluation showing improved task success or reliability without hiding latency, token, storage or maintenance costs.
+
+### External evaluation mapping
+
+- SciValidityBench is the closest use-validity comparator; keep its reported 9.2-18.8 point event-graph gap separate from Broca's own D18-D23 score.
+- StateMemBench tests evolving current versus superseded state; it does not by itself test all decision-use constraints.
+- TEM tests versioned historical recall and temporal labels.
+- Memora/FAMA and MEME test stale-memory, cascade and absence failure modes.
+- LongMemEval-V2 tests downstream long-horizon QA and latency. Its published AgentRunbook-C point (74.9% Small at 108.3s; 70.1% Medium at 139.9s) is an end-to-end reference under that evaluator, not a state-integrity score.
+- STATE-Bench tests procedural task completion, repeat-run reliability, efficiency and user experience after the memory system is integrated into an acting agent.
+
+Do not average these metrics into one score. Publish official evaluator versions, exact source commit, data split, reader/model, prompt, budgets, hardware, raw episode receipts and paired uncertainty.
+
 ## 9. Implementation sequence
 
 1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
