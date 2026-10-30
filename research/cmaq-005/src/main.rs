@@ -158,6 +158,7 @@ fn score(truth_table: &Table, pred_table: &Table, selected_split: &str) -> Resul
     }
     let mut truth_by_id = HashMap::new();
     let mut all_splits = HashMap::new();
+    let mut mechanism_splits: HashMap<String, String> = HashMap::new();
     for row in &truth_table.rows {
         let case_id = token(truth_table.get(row, "case_id")?, "truth case_id")?;
         let mechanism_id = token(truth_table.get(row, "mechanism_id")?, "mechanism_id")?;
@@ -167,6 +168,15 @@ fn score(truth_table: &Table, pred_table: &Table, selected_split: &str) -> Resul
         }
         if all_splits.insert(case_id.clone(), split.clone()).is_some() {
             return Err(format!("duplicate truth case_id {case_id}"));
+        }
+        if let Some(previous_split) = mechanism_splits.get(&mechanism_id) {
+            if previous_split != &split {
+                return Err(format!(
+                    "mechanism family {mechanism_id:?} appears in both {previous_split} and {split} splits"
+                ));
+            }
+        } else {
+            mechanism_splits.insert(mechanism_id.clone(), split.clone());
         }
         truth_by_id.insert(case_id.clone(), Truth {
             case_id,
@@ -315,6 +325,21 @@ b2\t-100\t-100\t0\t1000000\n";
         let dev = "case_id\tpred_do0_milli\tpred_do1_milli\tpred_safe_do0_ppm\tpred_safe_do1_ppm\nd1\t0\t100\t1000000\t1000000\n";
         let (_, dev_pred) = parsed(TRUTH, dev);
         assert!(score(&truth, &dev_pred, "development").unwrap().contains("OVERALL\t1\t0.000\t0.000\t1000000"));
+    }
+    #[test]
+    fn mechanism_family_cannot_cross_development_and_qualification() {
+        let mixed = TRUTH.replace(
+            "d1\\tlawA\\tdevelopment",
+            "d1\\tlawA\\tdevelopment",
+        );
+        let mixed = if mixed == TRUTH {
+            TRUTH.replace("d1\\tdevLaw\\tdevelopment", "d1\\tlawA\\tdevelopment")
+        } else {
+            mixed
+        };
+        let (truth, pred) = parsed(&mixed, EXACT);
+        let error = score(&truth, &pred, "qualification").unwrap_err();
+        assert!(error.contains("mechanism family \\"lawA\\" appears in both qualification and development"));
     }
     #[test]
     fn duplicate_prediction_fails_closed() {
