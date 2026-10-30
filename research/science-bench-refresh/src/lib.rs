@@ -27,6 +27,7 @@ pub mod paired_outcome_analysis;
 pub mod evidence_behavior_contracts;
 pub mod judge_factorial;
 pub mod judge_robustness;
+pub mod imperfect_judge_certification;
 pub mod rubric_commensurability;
 pub mod reference_assurance;
 pub use generator::{generate_task_set_bytes, verify_regeneration, RegenerationReportV1};
