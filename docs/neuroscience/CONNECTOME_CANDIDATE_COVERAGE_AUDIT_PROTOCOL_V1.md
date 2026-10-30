@@ -144,3 +144,17 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
 ```
 
 The frame report only carries PASS after it verifies the exact eligibility-mask artifact digest, packed bit order, byte length, final padding, and consistency between mask foreground voxels and every PSU disposition. This proves no gaps/overlaps and mask-to-PSU consistency inside the declared integer box; it does not prove the box or mask selection rule covers all biologically eligible tissue.
+
+
+## Verified spatial-mask attestation requirement
+
+The candidate-coverage verifier rejects a spatial-frame report unless it declares `eligibility_mask_verified: true` and:
+- its actual mask SHA-256 equals the declared artifact SHA-256;
+- the mask encoding is one of the two protocol-defined LSB-first x-fastest representations;
+- artifact byte count equals `ceil(declared_voxel_count / 8)` for packed bytes or twice that for ASCII hex;
+- mask foreground count/fraction agrees with the declared voxel count;
+- grid dimensions multiply to `total_grid_cells`, and mask tile rows cover that exact count;
+- per-tile geometric volumes sum to the declared voxel count, and per-tile foreground counts sum to the global mask count;
+- positive-mask PSU IDs exactly equal the exported eligible population, with the same cardinality and no duplicates.
+
+A geometry-only status, missing mask fields, digest mismatch, count mismatch, duplicated PSU, or different population set blocks coverage estimation. This binds the coverage estimator to a mask-verified frame report. It still does not independently validate the scientific correctness of the mask-selection rule or prove that the declared volume bounding box is complete.
