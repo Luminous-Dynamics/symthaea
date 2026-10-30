@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-025 — replay-verified FluidSynth support adapter
 
-**Status:** adapter and seven focused source tests authored; no compile, test, real FluidSynth render or dataset run claimed.
+**Status:** adapter v2 consumes replay-verified EVAL-017 segmented v0.2 reports; eight focused source tests authored; no compile, test, real FluidSynth render or dataset run claimed.
 
 ## Objective
 
@@ -12,8 +12,8 @@ Convert replay-verified EVAL-017 per-event acoustic-influence reports into the e
 2. Each render is bound to its exact Score, MIDI bytes, performed-event map artifact, WAV/decoded PCM, renderer executable/SoundFont hashes, process exit and ordered argv using `RendererExecutionReceipt`.
 3. `verify_renderer_audio_binding_for_score` reconstructs the performed-event map from MIDI bytes and returns an opaque `VerifiedRendererAudioBinding`.
 4. At least three independent no-op rerenders establish the per-window/channel repeatability floor. `verify_repeatability_calibration` replays this calibration and returns an opaque `VerifiedRepeatabilityCalibration`.
-5. `measure_counterfactual_influence` computes measured support against that calibration. `verify_counterfactual_influence` replays the report from the exact source Score, maps, schedules, receipts, audio buffers and calibration.
-6. `verify_counterfactual_event_support` refuses to create planner evidence unless step 5 passes. It binds the evidence to the canonical source event ID and typed effects-group assignment.
+5. `measure_counterfactual_influence_segmented` preserves the v0.1 raw report and every per-channel/window RMS/spectral measurement, then applies a versioned v0.2 hysteresis policy. `verify_counterfactual_influence_segmented` replays raw measurements, threshold decisions, hysteresis and tail guard from the exact source Score, maps, schedules, receipts, audio buffers and calibration.
+6. `verify_counterfactual_event_support` refuses to create planner evidence unless the v0.2 replay in step 5 passes. It binds raw, hysteresis, tail-guard and conservative intervals to the canonical source event ID and typed effects-group assignment.
 7. `assemble_counterfactual_support_adapter_report` requires exactly one event record for each source Score index, then produces an opaque aggregate verification token.
 8. `verify_counterfactual_support_adapter_report` independently replays all EVAL-017 reports before returning that token from a serialized report. Only the opaque verified aggregate exposes `planner_event_supports()` for EVAL-019.
 
@@ -25,11 +25,18 @@ Convert replay-verified EVAL-017 per-event acoustic-influence reports into the e
 
 The adapter rebuilds and replay-verifies the EVAL-029 `FluidSynthEffectsGroupAssignment` for values 1–128, then maps every performed MIDI channel for a source event to its observed effects-group domain. Baseline and counterfactual tokens must have the same explicit effects-group count and renderer configuration.
 
-### Support interval and digest contract
+### Support interval and digest contract (adapter v2)
 
-- `acoustic_support` is copied from `CounterfactualInfluenceReport.measured_influence_intervals`.
+- `raw_measured_intervals` preserves the v0.1 independent-window RMS-OR-spectral exceedance intervals.
+- `hysteresis_support_intervals` uses per-channel onset/release segmentation with an explicit persistence count.
+- `tail_guard_intervals` contains only explicit post-hysteresis padding; it is not measured influence.
+- `conservative_support_intervals` is the union of hysteresis and tail guard, and this—not the raw v0.1 interval set—is what populates EVAL-019 `acoustic_support`.
+- `acoustic_support` is copied from `CounterfactualInfluenceSegmentedReport.conservative_support_intervals`.
 - Starts remain inclusive and ends exclusive.
-- The interval horizon is `report.total_frames`: the rendered PCM output frame count. It can include release/reverb tails beyond input MIDI duration.
+- All interval sets use `base_report.total_frames`: the rendered PCM output frame count. It can include release/reverb tails beyond input MIDI duration.
+- Per-window onset and release RMS/spectral booleans and the declared combination rule are all retained in the v0.2 trace.
+- A non-zero tail guard requires a content-addressed tail-profile SHA-256; the referenced profile must be resolved and qualified against the renderer/effects topology by the caller.
+- If the requested guard exceeds `base_report.total_frames`, the event and aggregate report set `tail_guard_was_clipped=true`. The opaque verified planner token refuses `planner_event_supports()` rather than handing truncated support to EVAL-019.
 - Every event receives a domain-separated SHA-256 support evidence digest, even when its measured interval list is empty.
 - Empty intervals plus digest mean the full output scan replayed and found no windows above the declared repeatability/absolute thresholds. It does not prove zero physical influence.
 - The per-event digest commits to the influence report receipt, source Score, event identity, baseline/counterfactual render receipts/audio, repeatability calibration, renderer profile, effects-group assignment, output format/horizon, measured intervals and route-domain metadata.
@@ -67,4 +74,4 @@ The existing `validate_intervention` currently admits only `EventIntervention::R
 
 ## Validation and claim boundary
 
-The adapter code and six focused tests are authored, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
+The adapter code and six focused tests are authored, but this environment has no `cargo`, `rustc`, `rustfmt`, FluidSynth binary, SoundFont or benchmark audio. CI status will be reported as skipped unless it actually executes. No real per-event support measurement, held-out tail-profile qualification, routing completeness, pruning gain, runtime improvement or SOTA result is claimed.
