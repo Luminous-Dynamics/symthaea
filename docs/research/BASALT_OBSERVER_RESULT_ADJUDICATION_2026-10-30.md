@@ -39,6 +39,28 @@ cargo run -p xtask -- basalt-observer-result-audit \
 
 The command prints a machine-readable report. It exits non-zero unless every catalog case has exactly one oracle record and one observer receipt and all per-case, pair, digest and envelope checks pass. The report includes the exact input digests and scenario-level error codes. It does not sign output or make the supplied oracle authentic.
 
+## Do not collapse freshness, coverage and integrity into one status
+
+The next receipt revision should model four orthogonal dimensions rather than a single boolean called `complete`:
+
+| Dimension | States | What it answers |
+|---|---|---|
+| Freshness | `current`, `stale`, `unknown` | Do the recorded dependencies still match this run's inputs? |
+| Coverage | `covered`, `incomplete`, `unsupported`, `lost` | Was every relevant observation channel inside the qualified profile? |
+| Integrity | `intact`, `invalid` | Was the capture interval, process lineage, snapshot and event stream coherent? |
+| Replay | `confirmed`, `unverified`, `contradicted` | Did an independent execution reproduce the expected ground-truth relationship? |
+
+These dimensions have different consequences:
+
+- **Confirmatory eligibility** requires current freshness, covered channels, intact capture integrity, independently confirmed replay, and a separately qualified profile.
+- **Incomplete** means the result may be useful for exploration, but an unsupported or unverified channel prevents confirmatory reuse.
+- **Invalid** means a contradiction, event loss, snapshot race, root escape, or other integrity failure makes the receipt unusable.
+- A changed dependency makes evidence **stale** even when the observer captured it perfectly; capturing a change does not make the previous result current.
+
+This creates a monotonic downgrade rule: adding evidence can move a claim from unknown to covered only when independently verified, but a signature, green test, or observer self-report cannot promote unsupported or lost coverage. Any change to the kernel, hook set, filesystem/mount profile, Landlock ABI, process supervisor, observer binary, buffer policy, network policy or toolchain closure changes the profile identity and may require requalification.
+
+The current result adjudicator intentionally implements only part of this lattice. It checks per-scenario disposition and failure signals; it does not yet establish freshness history, replay truth or a qualified profile.
+
 ## Adjudication contract
 
 | Challenge expectation | Oracle ground truth | Receipt requirement | Evidence-reuse rule |
