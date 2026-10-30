@@ -717,8 +717,8 @@ fn metric_for_observation(
             Some(FactorialDecisionV1::CandidateB) => Some(0.0),
             Some(FactorialDecisionV1::Tie | FactorialDecisionV1::Abstain) | None => None,
         },
-        tie_indicator: f64::from(observation.decision == Some(FactorialDecisionV1::Tie)),
-        abstention_indicator: f64::from(observation.decision == Some(FactorialDecisionV1::Abstain)),
+        tie_indicator: if observation.decision == Some(FactorialDecisionV1::Tie) { 1.0 } else { 0.0 },
+        abstention_indicator: if observation.decision == Some(FactorialDecisionV1::Abstain) { 1.0 } else { 0.0 },
         criterion_scores: scores,
     })
 }
