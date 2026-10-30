@@ -42,12 +42,14 @@ jobs:
           cmp /tmp/vis-dvpc-051-smoke-a.tsv /tmp/vis-dvpc-051-smoke-b.tsv
           awk -F '\t' '$1 == "RESULT" { if (NF != 17) bad=1; n++ } END { if (n != 63 || bad) exit 1 }' /tmp/vis-dvpc-051-smoke-a.tsv
           awk -F '\t' '$1 == "RESULT" { if ($7 < 0.019999 || $8 > 0.980001 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $12 < 0.999999 || $13 <= 0 || $14 <= 0 || $14 > 1 || $15 < 0 || ($12 != $12) || ($13 != $13) || ($15 != $15)) bad=1; if (($4 == "oracle_reward_aware_minimax_ope_variance_grid" || $4 == "reward_greedy_with_floor") && $16 != "true") bad=1; if (($4 != "oracle_reward_aware_minimax_ope_variance_grid" && $4 != "reward_greedy_with_floor") && $16 != "false") bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-051-smoke-a.tsv
-          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-051-smoke-a.tsv)" = "5"
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-051-smoke-a.tsv)" = "6"
+          awk -F '\t' '$1 == "ENVELOPE_SENSITIVITY" { if (NF != 13 || $4 < 1 || $5 < 0.019999 || $6 > 0.980001 || $8 < 0.999999 || $9 <= 0 || $9 > 1 || $10 <= 0 || $11 < 0) bad=1; n++ } END { if (n != 45 || bad) exit 1 }' /tmp/vis-dvpc-051-smoke-a.tsv
       - name: Run full grid-resolution panel
         run: |
           /tmp/vis-dvpc-051 > /tmp/vis-dvpc-051-full.tsv
           awk -F '\t' '$1 == "RESULT" { if (NF != 17) bad=1; n++ } END { if (n != 63 || bad) exit 1 }' /tmp/vis-dvpc-051-full.tsv
           awk -F '\t' '$1 == "RESULT" { if ($7 < 0.019999 || $8 > 0.980001 || $9 < 0 || $9 > 1 || $10 < 0 || $10 > 1 || $12 < 0.999999 || $13 <= 0 || $14 <= 0 || $14 > 1 || $15 < 0 || ($12 != $12) || ($13 != $13) || ($15 != $15)) bad=1 } END { if (bad) exit 1 }' /tmp/vis-dvpc-051-full.tsv
+          awk -F '\t' '$1 == "ENVELOPE_SENSITIVITY" { if (NF != 13 || $4 < 1 || $5 < 0.019999 || $6 > 0.980001 || $8 < 0.999999 || $9 <= 0 || $9 > 1 || $10 <= 0 || $11 < 0) bad=1; n++ } END { if (n != 45 || bad) exit 1 }' /tmp/vis-dvpc-051-full.tsv
           grep -F $'BENCHMARK_CONFIG\tid\tVIS-DVPC-051' /tmp/vis-dvpc-051-full.tsv
       - name: Create exact-source and output SHA-256 receipt
         env:
