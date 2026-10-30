@@ -447,7 +447,7 @@ impl TabularNasBenchmark {
     ///
     /// The closure does not receive the benchmark/evaluator, target table, oracle top-K set,
     /// or evaluator methods. It must actually query architectures to receive P@K credit.
-    pub fn run_search<P>(&self, policy: P) -> TabularNasRun
+    pub fn run_search<P>(self, policy: P) -> TabularNasRun
     where
         P: FnOnce(&[ArchitectureFeatures], &mut QueryOracle<'_>),
     {
