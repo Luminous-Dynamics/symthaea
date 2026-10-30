@@ -24,7 +24,9 @@ use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::paired_outcome_analysis::analyze_paired_evidence_outcomes;
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
 use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
-use science_bench_refresh_validator::reference_assurance::{compute_reference_package_commitment, verify_reference_assurance_package};
+use science_bench_refresh_validator::reference_assurance::{
+    compute_reference_package_commitment, verify_reference_assurance_package,
+};
 use science_bench_refresh_validator::{
     compute_artifact_commitment, compute_protocol_commitment, generate_task_set_bytes, sha256_hex,
     validate_manifest_bytes, verify_regeneration, verify_reveal,
@@ -56,6 +58,8 @@ fn usage(program: &str) {
             "  {program} verify-judge-robustness-plan PLAN.json\n",
             "  {program} commit-judge-robustness-report PLAN.json REPORT_FIELDS.json\n",
             "  {program} verify-judge-robustness-report PLAN.json REPORT.json\n",
+            "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
+            "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
             "  {program} commit-protected-index INDEX_FIELDS.json\n",
             "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
