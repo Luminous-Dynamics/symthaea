@@ -17,6 +17,7 @@
 //! named by `SYMTHAEA_SOUNDFONT`. The Muse Studio launcher provides both
 //! via `nix-shell`.
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::ffi::{OsStr, OsString};
 use std::io::Read;
@@ -25,6 +26,11 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
+/// FluidSynth permits 1..=128 independently configured effects groups.
+pub const MAX_EFFECTS_GROUPS: u8 = 128;
+const MIDI_CHANNEL_COUNT: u8 = 16;
+const EFFECTS_GROUP_ASSIGNMENT_DOMAIN: &[u8] =
+    b"luminous-dynamics-muse-fluidsynth-effects-group-assignment-v1\0";
 static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
@@ -108,6 +114,85 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
     Some((binary, soundfont))
 }
 
+/// One zero-based MIDI channel to FluidSynth effects-group assignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MidiChannelEffectsGroup {
+    pub midi_channel: u8,
+    pub effects_group: u8,
+}
+
+/// Content-addressed FluidSynth effects assignment for its 16 standard MIDI
+/// channels. This is a typed subgraph of renderer configuration, not a complete
+/// route graph and not proof of independence from downstream master processing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FluidSynthEffectsGroupAssignment {
+    pub version: String,
+    pub effects_group_count: u8,
+    pub midi_channel_count: u8,
+    pub channel_assignments: Vec<MidiChannelEffectsGroup>,
+    pub assignment_sha256: String,
+}
+
+fn effects_group_assignment_digest(
+    assignment: &FluidSynthEffectsGroupAssignment,
+) -> Option<String> {
+    let mut unsigned = assignment.clone();
+    unsigned.assignment_sha256.clear();
+    let bytes = serde_json::to_vec(&unsigned).ok()?;
+    let mut hasher = Sha256::new();
+    hasher.update(EFFECTS_GROUP_ASSIGNMENT_DOMAIN);
+    hasher.update(bytes);
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+/// Build the content-addressed, documented zero-based MIDI channel mapping.
+/// FluidSynth wraps channel indices modulo the configured group count.
+pub fn build_effects_group_assignment(
+    effects_groups: u8,
+) -> Option<FluidSynthEffectsGroupAssignment> {
+    if !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
+    let channel_assignments = (0..MIDI_CHANNEL_COUNT)
+        .map(|midi_channel| MidiChannelEffectsGroup {
+            midi_channel,
+            effects_group: midi_channel % effects_groups,
+        })
+        .collect();
+    let mut assignment = FluidSynthEffectsGroupAssignment {
+        version: "muse-fluidsynth-effects-group-assignment-v1".to_owned(),
+        effects_group_count: effects_groups,
+        midi_channel_count: MIDI_CHANNEL_COUNT,
+        channel_assignments,
+        assignment_sha256: String::new(),
+    };
+    assignment.assignment_sha256 = effects_group_assignment_digest(&assignment)?;
+    Some(assignment)
+}
+
+/// Replay-verify a content-addressed effects-group assignment.
+pub fn verify_effects_group_assignment(
+    assignment: &FluidSynthEffectsGroupAssignment,
+) -> bool {
+    build_effects_group_assignment(assignment.effects_group_count)
+        .is_some_and(|expected| expected == *assignment)
+}
+
+/// Return the FluidSynth effects-group index assigned to a zero-based MIDI
+/// channel. This describes effects assignment only, not downstream routing.
+pub fn effects_group_for_midi_channel(midi_channel: u8, effects_groups: u8) -> Option<u8> {
+    if midi_channel >= MIDI_CHANNEL_COUNT || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
+    Some(midi_channel % effects_groups)
+}
+
+fn effects_groups_setting(effects_groups: u8) -> Option<OsString> {
+    (1..=MAX_EFFECTS_GROUPS)
+        .contains(&effects_groups)
+        .then(|| OsString::from(format!("synth.effects-groups={effects_groups}")))
+}
+
 /// Captured local observation of one FluidSynth child-process invocation.
 ///
 /// The complete stdout/stderr streams are committed by digest; only bounded
@@ -119,6 +204,8 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
 pub struct FluidSynthRenderObservation {
     pub executable_path: PathBuf,
     pub soundfont_path: PathBuf,
+    /// Content-addressed group assignment corresponding to the exact argv setting.
+    pub effects_group_assignment: FluidSynthEffectsGroupAssignment,
     pub executable_sha256_before: String,
     pub executable_sha256_after: String,
     pub soundfont_sha256_before: String,
@@ -262,6 +349,25 @@ pub fn render_midi_to_wav_observed(
     sample_rate: u32,
     color: Option<RenderColor>,
 ) -> Option<FluidSynthRenderObservation> {
+    // Preserve the historical FluidSynth behavior explicitly: one shared
+    // reverb/chorus effects group for all MIDI channels.
+    render_midi_to_wav_observed_with_effects_groups(midi_path, sample_rate, color, 1)
+}
+
+/// Execute FluidSynth with an explicit effects-group count. The exact setting
+/// is included in argv and therefore in RendererProcessObservation receipts.
+/// Values outside FluidSynth's documented 1..=128 range and zero sample rates
+/// are rejected before spawning a child process.
+pub fn render_midi_to_wav_observed_with_effects_groups(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    effects_groups: u8,
+) -> Option<FluidSynthRenderObservation> {
+    if sample_rate == 0 || !(1..=MAX_EFFECTS_GROUPS).contains(&effects_groups) {
+        return None;
+    }
+    let effects_group_assignment = build_effects_group_assignment(effects_groups)?;
     let (binary, soundfont) = available()?;
     let binary = binary.canonicalize().ok()?;
     let soundfont = soundfont.canonicalize().ok()?;
@@ -279,7 +385,8 @@ pub fn render_midi_to_wav_observed(
         nonce
     ));
 
-    let mut arguments = Vec::<OsString>::new();
+    let effects_setting = effects_groups_setting(effects_groups)?;
+    let mut arguments = vec![OsString::from("-o"), effects_setting];
     if let Some(c) = color {
         arguments.push(OsString::from("-o"));
         arguments.push(OsString::from(format!(
@@ -385,6 +492,7 @@ pub fn render_midi_to_wav_observed(
     Some(FluidSynthRenderObservation {
         executable_path: binary,
         soundfont_path: soundfont,
+        effects_group_assignment,
         executable_sha256_before,
         executable_sha256_after,
         soundfont_sha256_before,
@@ -404,7 +512,8 @@ pub fn render_midi_to_wav_observed(
 }
 
 /// Backward-compatible convenience wrapper. Evidence-bearing callers should
-/// use render_midi_to_wav_observed and retain its process observation.
+/// use render_midi_to_wav_observed and retain its process observation. This
+/// wrapper explicitly retains the historical single effects-group default.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
@@ -412,6 +521,23 @@ pub fn render_midi_to_wav(
 ) -> Option<Vec<u8>> {
     render_midi_to_wav_observed(midi_path, sample_rate, color)
         .and_then(|observation| observation.mastered_wav_bytes)
+}
+
+/// Render with a caller-selected effects-group count. Use the observed variant
+/// when the exact process receipt and ordered argv must be retained.
+pub fn render_midi_to_wav_with_effects_groups(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    effects_groups: u8,
+) -> Option<Vec<u8>> {
+    render_midi_to_wav_observed_with_effects_groups(
+        midi_path,
+        sample_rate,
+        color,
+        effects_groups,
+    )
+    .and_then(|observation| observation.mastered_wav_bytes)
 }
 
 /// Read a WAV, run the full mastering chain, re-encode as 16-bit in memory.
@@ -507,6 +633,73 @@ fn master_wav(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn effects_group_mapping_matches_fluid_synth_modulo_semantics() {
+        for channel in 0..MIDI_CHANNEL_COUNT {
+            assert_eq!(effects_group_for_midi_channel(channel, 1), Some(0));
+            assert_eq!(effects_group_for_midi_channel(channel, 4), Some(channel % 4));
+            assert_eq!(effects_group_for_midi_channel(channel, 16), Some(channel));
+        }
+        assert_eq!(effects_group_for_midi_channel(15, 128), Some(15));
+        assert_eq!(effects_group_for_midi_channel(16, 16), None);
+        assert_eq!(effects_group_for_midi_channel(0, 0), None);
+
+        let single = build_effects_group_assignment(1).unwrap();
+        assert!(verify_effects_group_assignment(&single));
+        assert!(single.channel_assignments.iter().all(|row| row.effects_group == 0));
+
+        let four = build_effects_group_assignment(4).unwrap();
+        assert!(verify_effects_group_assignment(&four));
+        assert_eq!(
+            four.channel_assignments.iter().map(|row| row.effects_group).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3],
+        );
+
+        let sixteen = build_effects_group_assignment(16).unwrap();
+        assert_eq!(
+            sixteen.channel_assignments.iter().map(|row| row.effects_group).collect::<Vec<_>>(),
+            (0..16).collect::<Vec<_>>(),
+        );
+        assert!(build_effects_group_assignment(0).is_none());
+    }
+
+    #[test]
+    fn effects_group_assignment_receipt_rejects_tampering() {
+        let mut assignment = build_effects_group_assignment(4).unwrap();
+        assignment.channel_assignments[3].effects_group = 7;
+        assert!(!verify_effects_group_assignment(&assignment));
+    }
+
+    #[test]
+    fn explicit_effects_group_setting_is_content_addressable_in_ordered_argv() {
+        let setting = effects_groups_setting(MAX_EFFECTS_GROUPS).unwrap();
+        assert_eq!(setting.to_str(), Some("synth.effects-groups=128"));
+        let single_group = effects_groups_setting(1).unwrap();
+        assert_ne!(
+            sha256_hex(setting.to_str().unwrap().as_bytes()),
+            sha256_hex(single_group.to_str().unwrap().as_bytes()),
+        );
+        assert!(effects_groups_setting(0).is_none());
+        assert_eq!(
+            render_midi_to_wav_observed_with_effects_groups(
+                Path::new("/missing/midi.mid"),
+                48_000,
+                None,
+                0,
+            ),
+            None,
+        );
+        assert_eq!(
+            render_midi_to_wav_observed_with_effects_groups(
+                Path::new("/missing/midi.mid"),
+                0,
+                None,
+                1,
+            ),
+            None,
+        );
+    }
 
     #[test]
     fn child_environment_commitment_is_order_independent_and_content_sensitive() {
