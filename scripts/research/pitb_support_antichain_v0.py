@@ -321,6 +321,28 @@ def self_test():
     assert groups[0]["necessary_across_all_observed_minimal_routes"] == []
     assert groups[0]["possible_across_observed_minimal_routes"] == ["h", "hEq"]
     assert groups[1]["minimal_sufficient_support_antichain"] == [["h1", "h2"]]
+    predictions = []
+    for target, route, required in (
+        ("alternative", ["h"], []),
+        ("conjunctive", ["h1", "h2"], ["h1", "h2"]),
+    ):
+        group = next(g for g in groups if g["target_id"] == target)
+        predictions.append({
+            "schema_version": PREDICTION_SCHEMA,
+            "group_id": group["group_id"],
+            "model_id": "synthetic-control",
+            "model_version": "self-test",
+            "abstained": False,
+            "claimed_necessary_declarations": required,
+            "proposed_sufficient_route": route,
+            "confidence": 0.8,
+            "run_receipt_sha256": hashlib.sha256(target.encode()).hexdigest(),
+        })
+    scored = score_predictions(predictions, groups)
+    assert scored["prediction_coverage"] == 1.0
+    assert scored["route_sufficiency_rate"] == 1.0
+    assert scored["exact_minimal_route_rate"] == 1.0
+    assert abs(scored["route_sufficiency_brier_score"] - 0.04) < 1e-12
     incomplete = alt[:-1]
     try:
         analyze_group(group_key(incomplete[0]), incomplete)
@@ -343,7 +365,7 @@ def self_test():
         pass
     else:
         raise AssertionError("unverified success was accepted")
-    print("PITB_SUPPORT_ANTICHAIN_SELF_TEST_PASS: alternative routes, conjunctive support, exhaustive-lattice rejection, budget identity, and kernel/semantic gate enforcement")
+    print("PITB_SUPPORT_ANTICHAIN_SELF_TEST_PASS: alternative routes, conjunctive support, prediction scoring, exhaustive-lattice rejection, budget identity, and kernel/semantic gate enforcement")
 
 
 def main():
