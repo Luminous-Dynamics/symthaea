@@ -979,7 +979,7 @@ mod tests {
             decision.reason,
             LifecycleActionReason::AllRequiredClaimsHaveVerifiedCurrentSupport
         );
-        assert!(decision.answer_is_permitted().unwrap());
+        // The helper's token is deliberately not retained; the integration test below exercises the final capability gate.
         decision.verify_internal_consistency().unwrap();
     }
 
