@@ -56,9 +56,9 @@ The 95% intervals are normal intervals based on the sample variance of the per-e
 
 ## Output
 
-Full and smoke runs emit deterministic TSV with one row per scenario × sample size × logger × target policy × estimator. Each row includes shrinkage weight, expected logger reward, minimum action propensity, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, and identification status.
+Full and smoke runs emit deterministic TSV. Summary rows contain one row per scenario × sample size × logger × target policy × estimator, with shrinkage weight, expected logger reward, minimum action propensity, replicate count, bias, across-replicate variance, MSE, empirical 95% interval coverage, mean interval width, and identification status.
 
-Expected summary rows: 5 scenarios × 2 sample sizes × 5 loggers × 4 target policies × 6 estimators = 1,200. A per-replicate trace records each estimate, truth, signed error, squared error, standard error, and normal interval endpoints.
+Expected summary rows: 5 scenarios × 2 sample sizes × 5 loggers × 4 target policies × 6 estimators = 1,200. A separate per-replicate trace records each estimate, truth, signed error, squared error, standard error, interval endpoints, and the independent pilot-fit, shrinkage-calibration, and evaluation seeds. That is 153,600 replicate rows for the 128-replicate full run and 14,400 for the 12-replicate smoke run.
 
 All registered loggers preserve a positive action floor, so rows are labelled identified_full_support. The estimator rejects a target action with zero logging support; it does not return an OPE value in that case.
 
