@@ -149,6 +149,7 @@ Use external suites as complementing reference points rather than combine incomp
 - [AgentSuite/COBA](https://proceedings.mlr.press/v306/suh26a.html): benchmark validity methods.
 - [SWE-Shift](https://arxiv.org/abs/2610.32196): clean-to-shifted execution evaluation.
 - [TestJack](https://arxiv.org/abs/2610.10619): requirement-grounded evaluator evolution and executable witness tests for apparently passing patches.
+- BASALT suite-manifest v3: frozen atomic requirement ledger with source-span, expectation, ambiguity, and blocking-check coverage commitments.
 - [OpenAI SWE-bench Pro audit (July 2026)](https://openai.com/index/separating-signal-from-noise-coding-evaluations/): task, ground-truth and grading quality audit.
 - [Epoch AI Terminal-Bench 4.0 review (September 2026)](https://epoch.ai/benchmarks/terminal-bench-4/review): reviewer findings about scoring defects.
 - [HypeCodeNet / The Natural Geometry of Code](https://proceedings.iclr.cc/paper_files/paper/2026/hash/408598c7e142b607c828f5f769e8c1bd-Abstract-Conference.html): motivation for evaluating hyperbolic structural representations.
@@ -224,7 +225,7 @@ Proposed stretch targets—not achievements or universal standards:
 - **Metamorphic robustness:** no more than 5 percentage points of degradation under validated semantics-preserving transformations.
 - **Integrity:** zero false accepts across at least 300 genuinely independent adversarial negative controls as an initial gate.
 - **Patch quality:** separate blinded, calibrated non-blocking quality rubric; no quality score can compensate for a failed blocker.
-- **Oracle validity:** every accepted task has a frozen requirement-to-verifier coverage map; every accepted dynamic witness is requirement-grounded, reference-compatible, independently reviewed, and replayed against every system arm for that task.
+- **Oracle validity:** every accepted task has a frozen requirement-to-verifier coverage ledger; every task requirement is mapped to blocking verifier coverage, and every accepted dynamic witness is requirement-grounded, reference-compatible, independently reviewed, and replayed against every system arm for that task.
 - **Oracle false rejection:** zero accepted witness tests may reject the pinned reference or independently reviewed valid alternative implementations in the qualified control set.
 
 Targets require pre-run power/precision analysis and independent cohort qualification. Zero false accepts in 300 controls is an initial hurdle, not proof of zero risk. The SWE-Shift retention target is a BASALT stretch goal, not a directly comparable external result.
