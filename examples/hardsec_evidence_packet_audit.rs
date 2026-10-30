@@ -37,6 +37,7 @@ struct Evidence {
     status: String,
     subject_sha256: String,
     evidence_sha256: String,
+    uri: String,
     tool: String,
     tool_version: String,
     scope: String,
@@ -157,6 +158,7 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
     let status = required_string(value, "status")?;
     let subject_sha256 = required_string(value, "subject_sha256")?.to_ascii_lowercase();
     let evidence_sha256 = required_string(value, "evidence_sha256")?.to_ascii_lowercase();
+    let uri = required_string(value, "uri")?;
 
     const KINDS: &[&str] = &[
         "stimulus_trace",
@@ -224,6 +226,7 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         status,
         subject_sha256,
         evidence_sha256,
+        uri,
         tool,
         tool_version,
         scope,
@@ -582,6 +585,7 @@ fn run(args: Args) -> Result<(), String> {
             "status": item.status,
             "subject_sha256": item.subject_sha256,
             "evidence_sha256": item.evidence_sha256,
+            "uri": item.uri,
             "tool": item.tool,
             "tool_version": item.tool_version,
             "scope": item.scope,
@@ -693,6 +697,7 @@ mod tests {
                 "kind": "stimulus_trace",
                 "subject_sha256": NETLIST,
                 "evidence_sha256": EVIDENCE,
+                "uri": "fixture/evidence/stimulus-trace.json",
                 "status": "pass",
                 "tool": "fixture-simulator",
                 "tool_version": "1.0",
@@ -761,6 +766,7 @@ mod tests {
             "kind": kind,
             "subject_sha256": NETLIST,
             "evidence_sha256": EVIDENCE,
+            "uri": format!("fixture/evidence/{kind}.json"),
             "status": status,
             "tool": "fixture-tool",
             "tool_version": "1.0",
