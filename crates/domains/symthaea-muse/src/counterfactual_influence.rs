@@ -611,10 +611,31 @@ pub struct CounterfactualInfluenceReport {
     pub receipt_sha256: String,
 }
 
+/// Explicit rule for combining independent RMS and spectral evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InfluenceThresholdCombination {
+    /// Preserve the legacy conservative-any-signal detection semantics.
+    AnyMetricExceeds,
+    /// Require both RMS and spectral evidence to exceed their own thresholds.
+    BothMetricsExceed,
+}
+
+impl InfluenceThresholdCombination {
+    fn combines(self, rms_exceeded: bool, spectral_exceeded: bool) -> bool {
+        match self {
+            Self::AnyMetricExceeds => rms_exceeded || spectral_exceeded,
+            Self::BothMetricsExceed => rms_exceeded && spectral_exceeded,
+        }
+    }
+}
+
 /// Versioned temporal segmentation policy. This is separate from v0.1's raw
 /// influence-analysis configuration so existing reports remain byte-compatible.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceSegmentationConfig {
+    /// Explicit combination rule for separate RMS and spectral channels.
+    pub threshold_combination: InfluenceThresholdCombination,
     /// Offset threshold as a strict fraction of each window's calibrated
     /// onset threshold. Must be finite and strictly between 0 and 1.
     pub release_threshold_ratio: f32,
@@ -624,29 +645,40 @@ pub struct InfluenceSegmentationConfig {
     /// Additional conservative frames appended after the hysteresis end.
     /// This is a guard, not measured influence, and is reported separately.
     pub tail_guard_frames: usize,
+    /// Frozen renderer/effect-topology calibration profile for non-zero tail
+    /// guards. The referenced profile is externally resolved; the digest
+    /// alone does not authenticate its publisher or prove its calibration.
+    pub tail_guard_profile_sha256: Option<String>,
 }
 
 impl Default for InfluenceSegmentationConfig {
     fn default() -> Self {
         Self {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 2,
             tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
         }
     }
 }
 
-/// Per-window hysteresis decision. Raw measurement and release thresholds
-/// remain visible so post-processing can be independently audited.
+/// Per-window hysteresis decision. Independent RMS/spectral booleans, raw
+/// onset decision and release decision remain visible for audit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceWindowSegmentation {
     pub window_index: usize,
     pub start_frame: usize,
     pub end_frame: usize,
     pub channel: usize,
+    pub onset_rms_exceeded: bool,
+    pub onset_spectral_exceeded: bool,
+    pub onset_triggered: bool,
     pub release_rms_threshold: f32,
     pub release_spectral_threshold: f32,
-    pub release_exceeded: bool,
+    pub release_rms_exceeded: bool,
+    pub release_spectral_exceeded: bool,
+    pub release_triggered: bool,
     pub hysteresis_active: bool,
 }
 
@@ -1563,6 +1595,21 @@ fn validate_segmentation_config(
             "tail_guard_frames exceeds the bounded maximum",
         ));
     }
+    if config.tail_guard_frames > 0
+        && !config.tail_guard_profile_sha256.as_deref()
+            .is_some_and(is_lower_hex_sha256)
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "non-zero tail guard requires a frozen profile SHA-256",
+        ));
+    }
+    if config.tail_guard_profile_sha256.as_deref()
+        .is_some_and(|digest| !is_lower_hex_sha256(digest))
+    {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "tail guard profile digest must be lowercase SHA-256",
+        ));
+    }
     Ok(())
 }
 
@@ -1616,6 +1663,12 @@ fn hysteresis_segment(
         for window_index in 0..window_count {
             let measurement_index = window_index * channels + channel;
             let measurement = &measurements[measurement_index];
+            let onset_rms_exceeded =
+                measurement.rms_delta > measurement.calibrated_rms_threshold;
+            let onset_spectral_exceeded =
+                measurement.spectral_magnitude_distance > measurement.calibrated_spectral_threshold;
+            let onset_triggered = segmentation.threshold_combination
+                .combines(onset_rms_exceeded, onset_spectral_exceeded);
             let release_rms_threshold = config.minimum_rms_delta.max(
                 measurement.calibrated_rms_threshold * segmentation.release_threshold_ratio,
             );
@@ -1623,19 +1676,22 @@ fn hysteresis_segment(
                 measurement.calibrated_spectral_threshold
                     * segmentation.release_threshold_ratio,
             );
-            let release_exceeded = measurement.rms_delta > release_rms_threshold
-                || measurement.spectral_magnitude_distance > release_spectral_threshold;
+            let release_rms_exceeded = measurement.rms_delta > release_rms_threshold;
+            let release_spectral_exceeded =
+                measurement.spectral_magnitude_distance > release_spectral_threshold;
+            let release_triggered = segmentation.threshold_combination
+                .combines(release_rms_exceeded, release_spectral_exceeded);
             let mut hysteresis_active = false;
 
             if !active {
-                if measurement.effect_detected {
+                if onset_triggered {
                     active = true;
                     below_release_count = 0;
                     segment_start = measurement.start_frame;
                     segment_end = measurement.end_frame;
                     hysteresis_active = true;
                 }
-            } else if release_exceeded {
+            } else if release_triggered {
                 below_release_count = 0;
                 segment_end = measurement.end_frame;
                 hysteresis_active = true;
@@ -1661,9 +1717,14 @@ fn hysteresis_segment(
                 start_frame: measurement.start_frame,
                 end_frame: measurement.end_frame,
                 channel,
+                onset_rms_exceeded,
+                onset_spectral_exceeded,
+                onset_triggered,
                 release_rms_threshold,
                 release_spectral_threshold,
-                release_exceeded,
+                release_rms_exceeded,
+                release_spectral_exceeded,
+                release_triggered,
                 hysteresis_active,
             });
         }
@@ -2473,9 +2534,11 @@ mod tests {
             influence_measurement(40, 50, 2.0, 0.0, 1.0, true),
         ];
         let config = InfluenceSegmentationConfig {
+            threshold_combination: InfluenceThresholdCombination::AnyMetricExceeds,
             release_threshold_ratio: 0.5,
             release_persistence_windows: 2,
             tail_guard_frames: 0,
+            tail_guard_profile_sha256: None,
         };
         let (decisions, hysteresis, guard, conservative, clipped) =
             hysteresis_segment(
@@ -2551,6 +2614,7 @@ mod tests {
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 15,
+            tail_guard_profile_sha256: Some(sha256_hex(b"held-out-fluidsynth-tail-profile")),
         };
         let (_, hysteresis, guard, conservative, clipped) = hysteresis_segment(
             &measurements,
@@ -2575,6 +2639,7 @@ mod tests {
             release_threshold_ratio: 0.5,
             release_persistence_windows: 1,
             tail_guard_frames: 20,
+            tail_guard_profile_sha256: Some(sha256_hex(b"held-out-fluidsynth-tail-profile")),
         };
         let (_, hysteresis, guard, conservative, clipped) = hysteresis_segment(
             &measurements,
