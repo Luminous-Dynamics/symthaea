@@ -1,0 +1,100 @@
+name: CMAQ-013 selected-action uncertainty calibration benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-013/**"
+      - ".github/workflows/cmaq-013.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selected-action-calibration:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Unit tests
+        working-directory: research/cmaq-013
+        run: cargo test --locked
+      - name: Generate and validate calibration report
+        working-directory: research/cmaq-013
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --quiet --locked > /tmp/cmaq-013-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/cmaq-013-report.json").read_text())
+          assert report["schema_version"] == "cmaq-013-selected-action-calibration-v0.1"
+          assert report["episode_count"] == 512
+          assert report["decisions_per_episode"] == 48
+          assert report["alpha"] == 0.1
+          assert report["feedback_delay_steps"] == 4
+          assert report["feedback_drop_rate"] == 0.1
+          assert report["search_widths"] == [8, 32, 128]
+          assert report["rollout_horizons"] == [1, 3, 8]
+          assert report["scenarios"] == ["stationary", "abrupt_shift", "gradual_shift"]
+          assert len(report["cells"]) == 27
+          expected_methods = {
+              "fixed_gaussian", "random_action_split_conformal", "selected_action_split_conformal",
+              "online_aci_style_quantile", "rolling_residual_quantile", "oracle_selected_quantile"
+          }
+          for cell in report["cells"]:
+              assert cell["episode_count"] == 512
+              assert cell["decisions_per_episode"] == 48
+              assert cell["rollout_horizon"] in [1, 3, 8]
+              assert cell["calibration_samples"] == 8192
+              methods = {row["method"]: row for row in cell["methods"]}
+              assert set(methods) == expected_methods
+              for row in cell["methods"]:
+                  for key in ["selected_action_coverage", "random_action_coverage", "false_safe_rate",
+                              "fallback_rate", "recovery_episode_rate"]:
+                      assert 0.0 <= row[key] <= 1.0
+                  for key in ["pre_shift_selected_coverage", "post_shift_selected_coverage"]:
+                      assert -1.0 <= row[key] <= 1.0
+                  assert row["mean_interval_width"] >= 0.0
+          # Search-selection control: same-width stationary calibration should
+          # require wider bounds for selected actions than for random behavior actions.
+          wide = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 128 and cell["rollout_horizon"] == 8)
+          assert wide["selected_calibration_quantile"] > wide["random_calibration_quantile"]
+          short_horizon = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 32 and cell["rollout_horizon"] == 1)
+          long_horizon = next(cell for cell in report["cells"] if cell["scenario"] == "stationary" and cell["search_width"] == 32 and cell["rollout_horizon"] == 8)
+          assert long_horizon["selected_calibration_quantile"] > short_horizon["selected_calibration_quantile"]
+          selected = next(row for row in wide["methods"] if row["method"] == "selected_action_split_conformal")
+          assert 0.86 <= selected["selected_action_coverage"] <= 0.96
+          oracle = next(cell for cell in report["cells"] if cell["scenario"] == "abrupt_shift" and cell["search_width"] == 128 and cell["rollout_horizon"] == 8)
+          oracle_method = next(row for row in oracle["methods"] if row["method"] == "oracle_selected_quantile")
+          assert oracle_method["selected_action_coverage"] >= 0.88
+          print(json.dumps({
+              "wide_stationary_width128_horizon8": {
+                  "random_calibration_q": wide["random_calibration_quantile"],
+                  "selected_calibration_q": wide["selected_calibration_quantile"],
+                  "selected_coverage": selected["selected_action_coverage"],
+                  "random_coverage": selected["random_action_coverage"],
+                  "pre_shift_coverage": selected["pre_shift_selected_coverage"],
+                  "post_shift_coverage": selected["post_shift_selected_coverage"],
+                  "false_safe_rate": selected["false_safe_rate"],
+                  "fallback_rate": selected["fallback_rate"]
+              },
+              "stationary_width32_horizon_quantiles": {
+                  "horizon1": short_horizon["selected_calibration_quantile"],
+                  "horizon8": long_horizon["selected_calibration_quantile"]
+              },
+              "abrupt_width128_horizon8": {
+                  "oracle_selected_coverage": oracle_method["selected_action_coverage"]
+              }
+          }, sort_keys=True))
+          print("CMAQ-013 schema, selection-conditioned quantiles, coverage/fallback metrics and delayed online calibration validated")
+          PY
