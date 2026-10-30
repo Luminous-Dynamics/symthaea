@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT independent observer challenge oracle ledger v1",
+  "description": "Harness-authored ground truth, separate from untrusted observer receipts. Digests bind byte identity but do not authenticate the oracle author.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "suite_id",
+    "run_id",
+    "catalog_digest",
+    "profile_id",
+    "harness",
+    "records"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "suite_id": {
+      "const": "basalt-observer-oracle-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "harness_id",
+        "binary_digest",
+        "fixture_digest"
+      ],
+      "properties": {
+        "harness_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "binary_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "fixture_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "ground_truth",
+          "injected_resource_id",
+          "mutation",
+          "witness_kind",
+          "independent_replay"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,95}$"
+          },
+          "ground_truth": {
+            "enum": [
+              "consumed",
+              "not_consumed",
+              "unsupported",
+              "integrity_failure"
+            ]
+          },
+          "injected_resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 256
+          },
+          "mutation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "applied",
+              "before_digest",
+              "after_digest"
+            ],
+            "properties": {
+              "applied": {
+                "type": "boolean"
+              },
+              "before_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "after_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
+          },
+          "witness_kind": {
+            "enum": [
+              "controlled_read",
+              "controlled_non_read",
+              "unsupported_channel",
+              "integrity_fault"
+            ]
+          },
+          "independent_replay": {
+            "enum": [
+              "confirmed",
+              "contradicted",
+              "not_run"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
