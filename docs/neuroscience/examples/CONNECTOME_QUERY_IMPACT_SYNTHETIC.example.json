@@ -63,6 +63,16 @@
         "target": 3
       },
       "reference_value": 1
+    },
+    {
+      "query_id": "feed_forward_1_2_3",
+      "weight": 1,
+      "normalization_scale": 12,
+      "metric": {
+        "kind": "triad_motif_count",
+        "motif": "feed_forward_loop"
+      },
+      "reference_value": 12
     }
   ],
   "candidates": [
