@@ -1,7 +1,7 @@
 # BASALT Evaluation Contract
 ## Version 1 — task-level evidence, pairing, and decision rules
 
-**Status:** Proposed protocol; the initial run-record contract remains version 1, while the frozen suite-manifest contract is version 2 to freeze task-specific patch-quality rubrics. Validator compilation and tests have not yet been executed  
+**Status:** Proposed protocol; the run-record schema remains version 1, while the frozen suite-manifest schema is version 3 and freezes task requirements, verifier coverage, and patch-quality rubrics. The Rust validator and its authored tests have not yet been compiled or executed  
 **Date:** 2026-10-29  
 **Scope:** Offline evaluation record and analysis rules for repository-level coding agents
 
@@ -10,7 +10,7 @@ This contract turns the BASALT roadmap into a concrete interchange format. It do
 ## Files
 
 - [Run-record JSON Schema](../../benchmarks/basalt/schema/run-record.schema.json)
-- [Frozen suite-manifest JSON Schema (version 2)](../../benchmarks/basalt/schema/suite-manifest.schema.json)
+- [Frozen suite-manifest JSON Schema (version 3)](../../benchmarks/basalt/schema/suite-manifest.schema.json)
 - [Synthetic run record](../../benchmarks/basalt/examples/run-record.example.json)
 - [Synthetic frozen suite manifest](../../benchmarks/basalt/examples/suite-manifest.example.json)
 - Rust validation command in `xtask`: `cargo run -p xtask -- basalt-validate --input PATH --manifest PATH --spec-root DIR`
@@ -46,7 +46,7 @@ The task-quality auditor must not use which system won as a reason to retain or 
 
 ## Pairing and record invariants
 
-The JSON Schemas validate shape. The initial Rust validator in `xtask/src/basalt_validate.rs` adds cross-record invariants and requires the separately supplied frozen suite manifest. Run it as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json --spec-root TASK-SPEC-DIRECTORY`. Task specifications are loaded offline by their content digest and are never fetched over the network. It hashes the exact manifest bytes, verifies the pinned digest, checks suite/task identity and quality-audit dispositions, and validates paired trial coverage. Ordinary JSON Schema cannot establish all of these properties:
+The JSON Schemas validate shape. The Rust validator in `xtask/src/basalt_validate.rs` adds cross-record invariants and requires the separately supplied frozen suite manifest plus the exact offline task-specification artifacts. Run it as `cargo run -p xtask -- basalt-validate --input RUN.json --manifest SUITE-MANIFEST.json --spec-root TASK-SPEC-DIRECTORY`. Task specifications are loaded offline by their content digest and are never fetched over the network. It hashes the exact manifest bytes, verifies the pinned digest, checks suite/task identity and quality-audit dispositions, and validates paired trial coverage. Ordinary JSON Schema cannot establish all of these properties:
 
 1. `task_id` is unique in `task_records`; `system_id` is unique in `systems`; and every trial references a declared system.
 2. For each eligible `task_id × attempt_index`, every compared system has exactly one row. A declared `paired_group_id`, seed, task spec, base-tree digest, environment, verifier version, and budget policy must match across the comparison arms.
