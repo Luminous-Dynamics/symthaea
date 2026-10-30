@@ -31,6 +31,9 @@ pub enum FactorGraphError {
     #[error("factor table value at index {index} must be finite and nonnegative; got {value}")]
     InvalidFactorValue { index: usize, value: f64 },
 
+    #[error("log-factor value at index {index} must not be NaN or positive infinity; got {value}")]
+    InvalidLogFactorValue { index: usize, value: f64 },
+
     #[error("factor graph must contain at least one factor")]
     EmptyFactorGraph,
 
@@ -146,6 +149,131 @@ impl BinaryFactor {
         }
         Self::new(variables, values)
     }
+}
+
+/// A binary factor stored in log space.
+///
+/// Negative infinity represents an exact zero weight. Products become sums,
+/// and marginalization uses log-sum-exp, preventing underflow in long causal
+/// likelihood products. Scope and assignment-bit ordering match BinaryFactor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BinaryLogFactor {
+    variables: Vec<usize>,
+    log_values: Vec<f64>,
+}
+
+impl BinaryLogFactor {
+    /// Construct a log factor. NaN and positive infinity are rejected;
+    /// negative infinity is the representation of zero probability.
+    pub fn new(
+        variables: Vec<usize>,
+        log_values: Vec<f64>,
+    ) -> Result<Self, FactorGraphError> {
+        for pair in variables.windows(2) {
+            if pair[0] >= pair[1] {
+                return Err(FactorGraphError::ScopeNotStrictlyAscending {
+                    left: pair[0],
+                    right: pair[1],
+                });
+            }
+        }
+        let expected = assignment_count(variables.len())?;
+        if log_values.len() != expected {
+            return Err(FactorGraphError::TableLengthMismatch {
+                expected,
+                actual: log_values.len(),
+            });
+        }
+        for (index, value) in log_values.iter().copied().enumerate() {
+            if value.is_nan() || value == f64::INFINITY {
+                return Err(FactorGraphError::InvalidLogFactorValue { index, value });
+            }
+        }
+        Ok(Self { variables, log_values })
+    }
+
+    pub fn scalar(log_value: f64) -> Result<Self, FactorGraphError> {
+        Self::new(Vec::new(), vec![log_value])
+    }
+
+    pub fn variables(&self) -> &[usize] {
+        &self.variables
+    }
+
+    pub fn log_values(&self) -> &[f64] {
+        &self.log_values
+    }
+
+    /// Multiply two log factors by adding their log tables.
+    pub fn multiply(
+        &self,
+        other: &Self,
+        max_factor_entries: usize,
+    ) -> Result<Self, FactorGraphError> {
+        let variables = sorted_union(&self.variables, &other.variables);
+        let entries = assignment_count(variables.len())?;
+        check_budget(entries, max_factor_entries)?;
+        let mut log_values = Vec::with_capacity(entries);
+        for assignment in 0..entries {
+            let left_index = project_assignment(assignment, &variables, &self.variables)?;
+            let right_index = project_assignment(assignment, &variables, &other.variables)?;
+            let value = self.log_values[left_index] + other.log_values[right_index];
+            if value.is_nan() || value == f64::INFINITY {
+                return Err(FactorGraphError::InvalidLogFactorValue { index: assignment, value });
+            }
+            log_values.push(value);
+        }
+        Self::new(variables, log_values)
+    }
+
+    /// Sum out one variable with numerically stable log-sum-exp.
+    pub fn sum_out(
+        &self,
+        variable: usize,
+        max_factor_entries: usize,
+    ) -> Result<Self, FactorGraphError> {
+        let variable_slot = self
+            .variables
+            .binary_search(&variable)
+            .map_err(|_| FactorGraphError::VariableNotInFactor { variable })?;
+        let mut variables = self.variables.clone();
+        variables.remove(variable_slot);
+        let entries = assignment_count(variables.len())?;
+        check_budget(entries, max_factor_entries)?;
+        let mut log_values = Vec::with_capacity(entries);
+        for assignment in 0..entries {
+            let zero_index = insert_assignment_bit(assignment, variable_slot, false)?;
+            let one_index = insert_assignment_bit(assignment, variable_slot, true)?;
+            log_values.push(log_add_exp(
+                self.log_values[zero_index],
+                self.log_values[one_index],
+            ));
+        }
+        Self::new(variables, log_values)
+    }
+}
+
+/// Telemetry for one completed log-domain min-fill contraction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogFactorEliminationReport {
+    pub factor: BinaryLogFactor,
+    pub elimination_order: Vec<usize>,
+    pub induced_width: usize,
+    pub peak_factor_entries: usize,
+    pub factor_multiplications: usize,
+    pub variables_summed_out: usize,
+}
+
+fn log_add_exp(left: f64, right: f64) -> f64 {
+    if left == f64::NEG_INFINITY {
+        return right;
+    }
+    if right == f64::NEG_INFINITY {
+        return left;
+    }
+    let maximum = left.max(right);
+    let minimum = left.min(right);
+    maximum + (minimum - maximum).exp().ln_1p()
 }
 
 /// Telemetry for one completed deterministic min-fill contraction.
