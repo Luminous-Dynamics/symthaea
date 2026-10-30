@@ -33,6 +33,7 @@ pub struct FixtureRunReport {
     pub evidence_path: String,
     pub workspace_path: String,
     pub oracle_digest: String,
+    pub harness_binary_digest: String,
     pub fixture_digest: String,
     pub worker_binary_digest: String,
     pub qualification_eligible: bool,
@@ -47,7 +48,7 @@ struct FixtureEvidence {
     selected_case_ids: Vec<String>,
     harness_binary_digest: String,
     worker_binary_digest: String,
-    worker_subcommand: &'static str,
+    worker_binary_name: &'static str,
     workspace_relative_path: &'static str,
     gitignore_content_digest: String,
     executions: Vec<ExecutionEvidence>,
@@ -71,7 +72,7 @@ struct ExecutionEvidence {
     counterfactual_check: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct WorkerOutput {
     format_version: u32,
     task_mode: String,
@@ -163,9 +164,21 @@ pub fn run(
         }
     }
 
-    let binary_path = std::env::current_exe()
-        .context("resolving current xtask executable for isolated worker runs")?;
-    let worker_binary_digest = sha256_file(&binary_path)?;
+    let harness_binary_path = std::env::current_exe()
+        .context("resolving current xtask executable for oracle harness identity")?;
+    let harness_binary_digest = sha256_file(&harness_binary_path)?;
+    let worker_binary_name = format!(
+        "basalt_observer_fixture_worker{}",
+        std::env::consts::EXE_SUFFIX
+    );
+    let worker_binary_path = harness_binary_path.with_file_name(&worker_binary_name);
+    if !worker_binary_path.is_file() {
+        bail!(
+            "separate fixture worker is missing at {}; build both xtask binaries with cargo build -p xtask --bins",
+            worker_binary_path.display()
+        );
+    }
+    let worker_binary_digest = sha256_file(&worker_binary_path)?;
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("system clock is before UNIX epoch")?
@@ -246,7 +259,7 @@ pub fn run(
 
         write_synced(&resource_path, &plan.before_bytes)?;
         let (baseline, baseline_pid) =
-            run_worker(&binary_path, plan.mode, &resource_path)?;
+            run_worker(&worker_binary_path, plan.mode, &resource_path)?;
         let expected_baseline = if plan.mode == "consume" {
             sha256_tagged(&plan.before_bytes)
         } else {
@@ -347,7 +360,8 @@ pub fn run(
         "selected_case_ids": ordered_ids,
         "harness": {
             "harness_id": "basalt-controlled-counterfactual-harness-v1",
-            "binary_digest": worker_binary_digest,
+            "binary_digest": harness_binary_digest,
+            "worker_binary_digest": worker_binary_digest,
             "fixture_digest": fixture_digest
         },
         "records": oracle_records
@@ -359,9 +373,9 @@ pub fn run(
         run_id: run_id.clone(),
         catalog_digest,
         selected_case_ids: ordered_ids.clone(),
-        harness_binary_digest: worker_binary_digest.clone(),
+        harness_binary_digest: harness_binary_digest.clone(),
         worker_binary_digest: worker_binary_digest.clone(),
-        worker_subcommand: "basalt-observer-fixture-worker",
+        worker_binary_name: "basalt_observer_fixture_worker",
         workspace_relative_path: "workspace",
         gitignore_content_digest: sha256_tagged(gitignore),
         executions,
@@ -382,29 +396,10 @@ pub fn run(
         evidence_path: evidence_path.display().to_string(),
         workspace_path: workspace.display().to_string(),
         oracle_digest: sha256_tagged(&oracle_bytes),
+        harness_binary_digest,
         fixture_digest,
         worker_binary_digest,
         qualification_eligible: false,
-    })
-}
-
-pub fn run_worker_command(mode: &str, input: &Path) -> anyhow::Result<WorkerOutput> {
-    if mode != "consume" && mode != "ignore" {
-        bail!("worker mode must be consume or ignore");
-    }
-    let (output_digest, bytes_read) = if mode == "consume" {
-        let bytes = fs::read(input)
-            .with_context(|| format!("fixture worker reading {}", input.display()))?;
-        (sha256_tagged(&bytes), bytes.len() as u64)
-    } else {
-        // Deliberately do not open or stat the fixture resource on this path.
-        (sha256_tagged(INDEPENDENT_TASK_OUTPUT), 0)
-    };
-    Ok(WorkerOutput {
-        format_version: 1,
-        task_mode: mode.to_string(),
-        output_digest,
-        bytes_read,
     })
 }
 
@@ -479,38 +474,6 @@ fn sha256_tagged(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn test_path(label: &str) -> PathBuf {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock follows UNIX epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "basalt-fixture-test-{}-{now}-{label}",
-            std::process::id()
-        ))
-    }
-
-    #[test]
-    fn ignore_worker_does_not_open_or_stat_resource() {
-        let missing = test_path("must-not-exist");
-        let output = run_worker_command("ignore", &missing)
-            .expect("ignore mode must not touch the resource path");
-        assert_eq!(output.bytes_read, 0);
-        assert_eq!(output.output_digest, sha256_tagged(INDEPENDENT_TASK_OUTPUT));
-        assert!(!missing.exists());
-    }
-
-    #[test]
-    fn consume_worker_reads_exact_fixture_bytes() {
-        let path = test_path("consume");
-        let bytes = b"fixture payload";
-        fs::write(&path, bytes).expect("fixture writes");
-        let output = run_worker_command("consume", &path).expect("consume mode reads");
-        assert_eq!(output.bytes_read, bytes.len() as u64);
-        assert_eq!(output.output_digest, sha256_tagged(bytes));
-        fs::remove_file(path).expect("fixture cleanup");
-    }
 
     #[test]
     fn fixture_resource_mapping_rejects_unimplemented_resources() {
