@@ -290,6 +290,49 @@ These are project qualification targets, not industry standards:
 6. Report consolidation quality separately from governance quality; always-keep and always-forget policies must both fail.
 7. No production-transfer claim from synthetic scores alone; use independent held-out task families and distribution-shift tests.
 
+## 8C. Governed dialogue memory extension (D32-D37)
+
+### TimlMemBench as a direct comparator
+
+[TimlMemBench](https://aclanthology.org/2026.findings-emnlp.507/) (Findings of EMNLP 2026) targets governed use of long-term dialogue memory, not merely answer retrieval. Its published package contains 208 reviewed Chinese/English samples, 1,566 sessions, 1,715 questions, and 1,821 governance/activation cases. It defines two complementary evaluations:
+- **Canonical-pool LLM-QA control:** compares answer readers over the same sample-local memory pool.
+- **Raw-native evaluation:** requires each memory system to ingest raw sessions and build its own memory before answering governed-memory cases.
+
+The paper reports that memory systems can perform well in the canonical-pool QA control while remaining less stable on raw-native lifecycle updates, scope/boundary control, provenance recovery, activation, and restraint. Those findings directly complement Broca's bitemporal and proof/use-validity work. The sample counts and observations above belong to TimlMemBench, not Broca: https://aclanthology.org/2026.findings-emnlp.507/
+
+### D32-D37 synthetic extension fixtures
+
+The companion [timlmembench-governance-fixtures-v1.json](./timlmembench-governance-fixtures-v1.json) contains six synthetic Broca cases and 30 variants. These are not the official TimlMemBench data or labels.
+
+| Case | Governing state | Required result |
+|---|---|---|
+| D32: revocation | Source revision's transaction-time retraction | A revision is usable before the retraction is known and suppressed after a query's known_at includes it |
+| D33: supersession | Historical and replacement revisions plus query known_at | Historical as-known queries preserve the old revision; later queries select the eligible replacement |
+| D34: private scope | Request scope versus source scope | No cross-user/private-scope retrieval even when the source is otherwise relevant |
+| D35: provenance recovery | Exact source pointer/span digest versus source payload | Reject a derived memory whose cited source span cannot be reconstructed exactly |
+| D36: activation | Current request goal versus memory goal | A valid but irrelevant memory is not activated for the current request |
+| D37: restraint | Evidence-to-claim support relation | Do not emit a claim merely because a nearby memory exists; abstain when the source does not support the requested claim |
+
+Each baseline-to-flip pair changes exactly one governing field; invariance controls change only an irrelevant presentation field. Exact repair must restore the base decision; a matched irrelevant repair must not.
+
+### Required two-mode evaluation
+
+Run both modes separately and never report one as a substitute for the other:
+1. **Canonical-pool control:** hand every reader the same sample-local evidence pool and evaluate question answering / governed-use behavior. This isolates downstream use-validity and restraint when memory construction is held constant.
+2. **Raw-native:** give each system only the licensed raw sessions and require it to ingest, consolidate, retrieve, preserve provenance, apply lifecycle updates, enforce scope, and answer. This is the primary end-to-end memory-system evaluation.
+
+Report a pipeline decomposition for raw-native: source acquisition/ingestion, lifecycle update accuracy, scope violation rate, provenance recovery, activation precision/recall, false activation, restraint/abstention quality, answer correctness, and total latency/cost. Also report canonical-pool QA separately.
+
+### Proposed project gates
+
+These are project targets, not external standards:
+- 100% agreement with the independent symbolic oracle on deterministic D32-D37 fixtures.
+- Zero revoked-after-known_at, cross-scope, and invalid-source-span emissions in deterministic hard negatives.
+- At least 95% held-out activation/relevance and provenance relation accuracy.
+- No reduction in answerable-case coverage from adding the restraint gate without a justified risk-coverage tradeoff.
+- Report canonical-pool and raw-native scores separately with paired task-level uncertainty.
+- The full official TimlMemBench dataset and evaluator must be obtained under its published license before claiming reproduction or direct score comparisons.
+
 ## 9. Implementation sequence
 
 1. Compile and test the authored Rust dependency-aware derivation graph in memory_derivation.rs. Then build the separate Rust symbolic oracle, state-probe output schema, and gold derivation DAG evaluator behind a feature gate.
