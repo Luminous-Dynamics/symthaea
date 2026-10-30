@@ -136,6 +136,21 @@ The schedule leaves 24 units unspent because they cannot improve the integer upp
 
 The allocator's objective is not a claim that the selected schedule minimizes downstream model regret. Benchmark it against uniform allocation, early-only allocation, per-stage threshold allocation and no audit under the same total resource budget. The primary experiment must include actual regret/top-K retention as well as risk-bound and audit-cost diagnostics.
 
+### Allocation-policy schedule comparison
+
+The independent SciPy-backed reference mirror compares the exact DP against two simple pre-outcome schedules on the same three-stage example. The reported objective is the unweighted sum of zero-miss upper-bound counts across the three discarded populations; audit costs are charged at 3, 12 and 48 units per sentinel.
+
+| Audit budget | Exact DP risk bound / cost | Uniform count per stage: risk / cost | Early-only: risk / cost |
+|---:|---:|---:|---:|
+| 166 | 45 / 162 | 192 / 126 | 68 / 165 |
+| 300 | 30 / 291 | 129 / 252 | 64 / 300 |
+| 500 | 20 / 486 | 82 / 483 | 61 / 498 |
+| 832 | 11 / 795 | 50 / 756 | 60 / 576 |
+
+"Uniform" means the largest equal integer sample count at all three stages that fits the budget; "early-only" spends on the first stage until its population is exhausted. These are deterministic mathematical comparisons for this chosen cost/risk objective. They do not show that the DP finds better architectures, that the zero-miss assumption will hold, or that the selected audit schedule is optimal for realized regret. They do demonstrate why cost and stage populations should be solved jointly rather than applying one arbitrary sample fraction everywhere.
+
+
+
 ## 7. Initial Rust primitive
 
 The first code increment provides:
