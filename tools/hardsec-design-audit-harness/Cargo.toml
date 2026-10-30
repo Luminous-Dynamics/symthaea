@@ -1,0 +1,35 @@
+[package]
+name = "hardsec-design-audit-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+autotests = false
+autoexamples = false
+
+# Nested workspace isolates this source example from the root workspace,
+# whose globbed membership currently includes an absent crate manifest.
+[workspace]
+
+[features]
+default = []
+hardsec-design-audit = ["dep:sha2"]
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = { version = "=0.10.9", optional = true }
+
+[[example]]
+name = "hardsec_design_lineage_audit"
+path = "../../examples/hardsec_design_lineage_audit.rs"
+required-features = ["hardsec-design-audit"]
+
+[[example]]
+name = "hardsec_partition_path_audit"
+path = "../../examples/hardsec_partition_path_audit.rs"
+required-features = ["hardsec-design-audit"]
+
+[[example]]
+name = "hardsec_partition_path_stream"
+path = "../../examples/hardsec_partition_path_stream.rs"
+required-features = ["hardsec-design-audit"]
