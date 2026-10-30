@@ -304,6 +304,7 @@ struct SeedResult {
     training_steps: u64,
     source: RegimeMetrics,
     reversal: RegimeMetrics,
+    interaction_shift: RegimeMetrics,
 }
 
 fn run_seed(seed: u64) -> Result<SeedResult, String> {
@@ -332,8 +333,10 @@ fn run_seed(seed: u64) -> Result<SeedResult, String> {
 
     let source_states = evaluation_states(DATA_SEED ^ 0x1111_2222_3333_4444, EVAL_STATES);
     let reversal_states = evaluation_states(DATA_SEED ^ 0xAAAA_BBBB_CCCC_DDDD, EVAL_STATES);
+    let interaction_states = evaluation_states(DATA_SEED ^ 0x1357_9BDF_2468_ACE0, EVAL_STATES);
     let source = evaluate_regime(&model, direct_mode, &source_states, Law::Source)?;
     let reversal = evaluate_regime(&model, direct_mode, &reversal_states, Law::ActionEffectReversal)?;
+    let interaction_shift = evaluate_regime(&model, direct_mode, &interaction_states, Law::InteractionSignReversal)?;
 
     Ok(SeedResult {
         seed,
@@ -342,6 +345,7 @@ fn run_seed(seed: u64) -> Result<SeedResult, String> {
         training_steps: model.training_steps,
         source,
         reversal,
+        interaction_shift,
     })
 }
 
@@ -381,6 +385,7 @@ fn aggregate(results: &[SeedResult], law: Law) -> Aggregate {
     let metrics = results.iter().map(|row| match law {
         Law::Source => row.source,
         Law::ActionEffectReversal => row.reversal,
+        Law::InteractionSignReversal => row.interaction_shift,
     }).collect::<Vec<_>>();
     let lift = metrics.iter().map(|row| row.model_lift_vs_direct).collect::<Vec<_>>();
     let (mean_lift, low, high) = mean_ci95(&lift);
@@ -471,6 +476,7 @@ fn run() -> Result<Vec<SeedResult>, String> {
             || row.training_steps != (TRAIN_SAMPLES * EPOCHS) as u64
             || !row.source.model_lift_vs_direct.is_finite()
             || !row.reversal.model_lift_vs_direct.is_finite()
+            || !row.interaction_shift.model_lift_vs_direct.is_finite()
     }) {
         return Err("non-finite metric or unexpected training-step count".to_owned());
     }
