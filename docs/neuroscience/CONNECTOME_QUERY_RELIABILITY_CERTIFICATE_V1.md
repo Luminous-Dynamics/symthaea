@@ -113,3 +113,6 @@ This is an internal consistency verifier only. It does not fetch source artifact
 
 
 A `CERTIFIED_WITHIN_DECLARED_SCOPE` certificate requires all critical quality gates to be `PASS`; non-critical gates may be `NOT_APPLICABLE` only with a non-empty scope justification. A critical gate marked `NOT_APPLICABLE`, `NOT_ESTIMABLE`, or `FAIL` blocks full certification. A `CONDITIONAL` certificate cannot conceal a failed critical gate. Every uncertainty component must declare at least one explicit assumption; `ESTIMATED` components require a point estimate, while `NOT_ESTIMABLE` components must not carry one or an interval.
+
+
+Certification requires all critical gates to PASS. Non-critical NOT_APPLICABLE gates are allowed only with a scope justification. A critical NOT_APPLICABLE, NOT_ESTIMABLE, or FAIL gate blocks full certification. Every uncertainty component must list assumptions; ESTIMATED components require a point estimate, and NOT_ESTIMABLE components may not carry estimates or intervals.
