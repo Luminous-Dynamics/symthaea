@@ -129,3 +129,10 @@ The Rust verifier checks that roots and child references resolve exactly, roots 
 The synthetic query has a single edge root (`edge-17-42`) that depends on two endpoint neuron nodes. New adversarial tests cover missing roots, unresolved child references, cycles, unreachable extra nodes, and duplicate child edges.
 
 **Scope limitation:** this verifies completeness relative to the supplied root and edge manifest. It cannot prove that the query author declared every scientifically relevant root or that the source objects and dependency edges are biologically correct. That requires query-specific extractor validation and independent review. A future production certificate should bind the query dependency extractor binary, its output manifest, and an independently checked extraction policy.
+
+
+The audit report also emits a canonical, serialization-order-independent dependency graph summary:
+- `dependency_root_count`, `dependency_node_count`, and `dependency_edge_count`;
+- `dependency_graph_sha256`, computed from a domain-separated, length-prefixed encoding of sorted root identities, node identities, and directed dependency edges.
+
+This digest is distinct from the certificate-file SHA-256: it identifies the normalized dependency graph, while the certificate SHA binds the exact complete JSON bytes. Tests verify that reordering node/edge serialization leaves the graph digest unchanged and that removing a dependency edge changes it. Summary counts are diagnostics for the supplied graph, not proof of missing biological dependencies.
