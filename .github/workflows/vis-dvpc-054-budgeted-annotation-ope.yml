@@ -1,0 +1,79 @@
+name: VIS-DVPC-054 budgeted multi-source counterfactual annotation OPE
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/vision-dvpc-054-budgeted-annotation-ope.rs"
+      - "docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md"
+      - ".github/workflows/vis-dvpc-054-budgeted-annotation-ope.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/vision-dvpc-054-budgeted-annotation-ope.rs"
+      - "docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md"
+      - ".github/workflows/vis-dvpc-054-budgeted-annotation-ope.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact VIS-DVPC-054 head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Check formatting for standalone Rust source
+        run: rustfmt --edition=2024 --check tools/vision-dvpc-054-budgeted-annotation-ope.rs
+      - name: Compile and run known-answer, optimizer, and estimator tests
+        run: |
+          rustc --edition=2024 -O --test tools/vision-dvpc-054-budgeted-annotation-ope.rs -o /tmp/vis-dvpc-054-tests
+          /tmp/vis-dvpc-054-tests
+      - name: Verify deterministic smoke output and schemas
+        run: |
+          rustc --edition=2024 -O tools/vision-dvpc-054-budgeted-annotation-ope.rs -o /tmp/vis-dvpc-054
+          /tmp/vis-dvpc-054 --smoke > /tmp/vis-dvpc-054-smoke-a.tsv
+          /tmp/vis-dvpc-054 --smoke > /tmp/vis-dvpc-054-smoke-b.tsv
+          cmp /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-smoke-b.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 14 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          awk -F '\t' '$1 == "NEGATIVE_CONTROL" { if (NF != 9 || $2 == "" || $3 != "annotation_as_factual_residual" || $4 < 1 || $5 < 1 || $6 != $6 || $7 < 0 || $8 < 0 || $9 != "IDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT") bad=1; n++ } END { if (n != 2 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || $8 != "true" && $8 != "false") bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-smoke-a.tsv
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-smoke-a.tsv)" = "8"
+      - name: Run full deterministic multi-source allocation frontier
+        run: |
+          /tmp/vis-dvpc-054 > /tmp/vis-dvpc-054-full.tsv
+          awk -F '\t' '$1 == "RESULT" { if (NF != 17 || $2 == "" || $3 == "" || $4 < 1 || $5 < 1 || $6 < 1 || $7 < 0 || $7 > $6 || $8 < 0 || $9 < 0 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 < 0 || $15 < 0 || $16 < 0 || $17 < 0) bad=1; n++ } END { if (n != 14 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
+          awk -F '\t' '$1 == "NEGATIVE_CONTROL" { if (NF != 9 || $2 == "" || $3 != "annotation_as_factual_residual" || $4 < 1 || $5 < 1 || $6 != $6 || $7 < 0 || $8 < 0 || $9 != "IDENTIFIED_ONLY_BY_FACTUAL_LOGGER_SUPPORT") bad=1; n++ } END { if (n != 2 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
+          awk -F '\t' '$1 == "LOCAL_REGIME" { if (NF != 8 || $2 == "" || $3 != $3 || $4 != $4 || $5 != $5 || $6 < 0 || $7 < 0 || ($8 != "true" && $8 != "false")) bad=1; n++ } END { if (n != 5 || bad) exit 1 }' /tmp/vis-dvpc-054-full.tsv
+          test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-054-full.tsv)" = "8"
+          grep -F $'BENCHMARK_CONFIG\tVIS-DVPC-054' /tmp/vis-dvpc-054-full.tsv
+      - name: Create exact-source and output SHA-256 receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          {
+            printf 'VIS_DVPC_054_RECEIPT\tformat\tv1\n'
+            printf 'commit_sha\t%s\n' "$EXPECTED_HEAD"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            sha256sum tools/vision-dvpc-054-budgeted-annotation-ope.rs docs/research/VIS_DVPC_054_BUDGETED_ANNOTATION_OPE_V0.md /tmp/vis-dvpc-054-smoke-a.tsv /tmp/vis-dvpc-054-full.tsv
+          } > /tmp/vis-dvpc-054-receipt.tsv
+          cat /tmp/vis-dvpc-054-receipt.tsv
+      - name: Publish results and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-054-budgeted-counterfactual-annotation
+          path: |
+            /tmp/vis-dvpc-054-smoke-a.tsv
+            /tmp/vis-dvpc-054-full.tsv
+            /tmp/vis-dvpc-054-receipt.tsv
+          retention-days: 90
