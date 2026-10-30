@@ -304,7 +304,7 @@ pub fn analyze_clustered_advantage(
         workload_instances: observations.len(),
         median_family_quality_difference,
         median_family_log_resource_ratio,
-        median_family_resource_ratio: median_ratio.is_finite().then_some(median_ratio),
+        median_family_resource_ratio: (median_ratio.is_finite() && median_ratio > 0.0).then_some(median_ratio),
         quality_non_inferiority: quality_signs,
         resource_superiority: resource_signs,
         composite_claim_p_value,
@@ -342,7 +342,7 @@ fn family_sign_test(
     }
 }
 
-fn leave_one_out_median_range(mut values: Vec<f64>) -> (f64, f64) {
+fn leave_one_out_median_range(values: Vec<f64>) -> (f64, f64) {
     let mut medians = Vec::with_capacity(values.len());
     for removed in 0..values.len() {
         let reduced: Vec<f64> = values
@@ -353,9 +353,8 @@ fn leave_one_out_median_range(mut values: Vec<f64>) -> (f64, f64) {
         let mut reduced = reduced;
         medians.push(median(&mut reduced));
     }
-    values.clear();
     medians.sort_by(f64::total_cmp);
-    (*medians.first().expect("at least two families"), *medians.last().expect("at least two families"))
+    (medians[0], medians[medians.len() - 1])
 }
 
 fn median(values: &mut [f64]) -> f64 {
@@ -364,7 +363,7 @@ fn median(values: &mut [f64]) -> f64 {
     if values.len() % 2 == 0 {
         let lower = values[middle - 1];
         let upper = values[middle];
-        lower + (upper - lower) * 0.5
+        lower * 0.5 + upper * 0.5
     } else {
         values[middle]
     }
@@ -565,9 +564,11 @@ mod tests {
     #[test]
     fn leave_one_family_out_range_exposes_dependency_on_a_single_family() {
         let mut rows = compact_fixture();
-        for row in rows.iter_mut().filter(|row| row.family_id == "family-07") {
-            row.quantum_resource_per_accepted_answer = 80.0;
-            row.classical_resource_per_accepted_answer = 100.0;
+        for row in rows.iter_mut() {
+            let family_index = row.family_id[7..].parse::<usize>().unwrap();
+            let resource_wins = family_index < 4;
+            row.quantum_resource_per_accepted_answer = if resource_wins { 80.0 } else { 100.0 };
+            row.classical_resource_per_accepted_answer = if resource_wins { 100.0 } else { 80.0 };
         }
         let report = analyze_clustered_advantage(&rows, config(8)).unwrap();
         assert!(report.leave_one_family_out_resource_range.0 < 0.0);
