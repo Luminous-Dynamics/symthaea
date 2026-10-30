@@ -37,6 +37,9 @@ struct Evidence {
     status: String,
     subject_sha256: String,
     evidence_sha256: String,
+    tool: String,
+    tool_version: String,
+    scope: String,
     proof_scope: Option<String>,
     assumptions_sha256: Option<String>,
     witness_sha256: Option<String>,
@@ -55,11 +58,13 @@ struct ClaimSummary {
 
 #[derive(Debug, Clone)]
 struct AuditSummary {
+    packet_id: String,
     packet_sha256: String,
     design_id: String,
     netlist_sha256: String,
     model_sha256: String,
     evidence_count: usize,
+    evidence: Vec<Evidence>,
     claims: Vec<ClaimSummary>,
 }
 
@@ -179,9 +184,9 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         ));
     }
 
-    let _tool = required_string(value, "tool")?;
-    let _tool_version = required_string(value, "tool_version")?;
-    let _scope = required_string(value, "scope")?;
+    let tool = required_string(value, "tool")?;
+    let tool_version = required_string(value, "tool_version")?;
+    let scope = required_string(value, "scope")?;
     let proof_scope = optional_string(value, "proof_scope")?;
     let assumptions_sha256 = optional_string(value, "assumptions_sha256")?;
     let witness_sha256 = optional_string(value, "witness_sha256")?;
@@ -219,6 +224,9 @@ fn parse_evidence(value: &Value, expected_subject: &str) -> Result<Evidence, Str
         status,
         subject_sha256,
         evidence_sha256,
+        tool,
+        tool_version,
+        scope,
         proof_scope,
         assumptions_sha256,
         witness_sha256,
@@ -496,13 +504,15 @@ fn validate_packet(value: &Value, packet_sha256: String) -> Result<AuditSummary,
             .then(left.scope.cmp(&right.scope))
     });
 
-    let _ = packet_id;
+    let evidence_items = evidence.values().cloned().collect::<Vec<_>>();
     Ok(AuditSummary {
+        packet_id,
         packet_sha256,
         design_id,
         netlist_sha256,
         model_sha256,
-        evidence_count: evidence.len(),
+        evidence_count: evidence_items.len(),
+        evidence: evidence_items,
         claims,
     })
 }
