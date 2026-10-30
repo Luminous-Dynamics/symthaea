@@ -1304,13 +1304,11 @@ mod tests {
 
     fn audit_transfer_gate() -> super::super::cross_task_transfer_gate::CrossTaskTransferGate {
         use super::super::cross_task_transfer_gate::{
-            CrossTaskTransferGate, CurveForecastCalibrationConfig, TaskManifest, TaskRole,
-            TransferGateConfig,
+            CrossTaskTransferGate, TaskManifest, TaskRole, TransferGateConfig,
         };
         use super::super::tabular_nas_firewall::MetricDirection;
 
         let make_task = |task_id: &str, role: TaskRole, split_byte: char| {
-            let digest = |suffix: char| format!("{split_byte}{}{}", suffix, "0".repeat(62));
             TaskManifest {
                 task_id: task_id.into(),
                 role,
@@ -1330,14 +1328,6 @@ mod tests {
             make_task("audit-task-c", TaskRole::TransferCalibration, 'd'),
             make_task("target-task", TaskRole::EvaluationTarget, 'a'),
         ];
-        let _ = CurveForecastCalibrationConfig {
-            minimum_calibration_tasks: 3,
-            minimum_forecasts_per_task: 2,
-            minimum_interval_coverage: 0.90,
-            maximum_interval_coverage: 1.0,
-            maximum_mean_absolute_error_pp: 0.1,
-            maximum_mean_interval_width_pp: 5.0,
-        };
         CrossTaskTransferGate::new(
             TransferGateConfig {
                 minimum_calibration_tasks: 3,
@@ -1351,9 +1341,9 @@ mod tests {
     }
 
     fn audit_regret_samples() -> Vec<LearningCurveAuditSample> {
-        (0..3)
+        (0u8..3)
             .flat_map(|task| {
-                (0..3).map(move |index| {
+                (0usize..3).map(move |index| {
                     let initial = 10.0 + ((index * 7) % 19) as f64;
                     let slope = 0.2 + ((index * 11) % 13) as f64 * 0.1;
                     let middle = initial + slope * 10.0;
