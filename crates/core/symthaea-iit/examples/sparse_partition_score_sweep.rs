@@ -172,19 +172,19 @@ fn run() -> Result<(), String> {
 
 fn score_is_finite(score: &symthaea_iit::SystemPhiPartitionScore) -> bool {
     [
-        score.score.phi,
-        score.score.signed_phi,
+        score.phi,
+        score.signed_phi,
         score.normalization_factor,
         score.signed_normalized_phi,
-        score.score.normalized_phi,
+        score.normalized_phi,
         score.cause.selectivity,
         score.cause.forward_probability,
         score.cause.partitioned_forward_probability,
-        score.score.cause.signed_phi,
+        score.cause.signed_phi,
         score.effect.selectivity,
         score.effect.forward_probability,
         score.effect.partitioned_forward_probability,
-        score.score.effect.signed_phi,
+        score.effect.signed_phi,
     ]
     .iter()
     .all(|value| value.is_finite())
