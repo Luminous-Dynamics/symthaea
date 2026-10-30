@@ -125,6 +125,33 @@ For every control and budget, the report also estimates the paired difference **
 
 Per-group deltas help stop strong pooled scores from hiding a weak species × error-family or a queue policy that fails to beat simple alternatives. Duplicate sample IDs fail closed before scoring; aggregate multiple image views at the source-operation level. Balanced-accuracy intervals and paired review-budget delta intervals are provided; AUROC, average precision, Brier score, and log loss currently have point estimates only. The scorer does not validate Parquet labels or certify cluster independence. It always emits `SCORED_NOT_PROMOTED`; model promotion still requires the locked split protocol and independent grouped statistical analysis.
 
+## Counterfactual query-impact review prioritization
+
+The `connectome-query-impact` binary evaluates proposed weighted-edge mutations independently against one immutable directed weighted graph and a preregistered set of scientific queries. It reports each query's baseline value, counterfactual value, delta, normalized absolute delta, and weighted contribution. The candidate score is
+
+```text
+weighted_query_impact =
+    sum(query_weight * min(abs(query_delta) / normalization_scale, 1))
+    / sum(query_weight)
+
+expected_query_impact_per_review_minute =
+    estimated_error_probability * weighted_query_impact / review_minutes
+```
+
+Supported query metrics in schema v1 are directed edge weight, weighted in-degree, weighted out-degree, and directed path existence. Supported candidate mutations are adding/removing positive edge weight. Duplicate graph edges must be aggregated by the producer. The query bundle's weights and scales are scientific-policy choices and must be frozen before evaluation. Candidate error probabilities must come from an independently calibrated model/policy; this tool does not train or calibrate them.
+
+Run the checked-in synthetic example:
+
+```sh
+cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome-query-impact -- \\
+  --input docs/neuroscience/examples/CONNECTOME_QUERY_IMPACT_SYNTHETIC.example.json \\
+  --output query-impact-report.json
+```
+
+The report always has status `RANKED_FOR_HUMAN_REVIEW_ONLY`. No edit is applied. If candidate proposals touch the same baseline edge, their overlap is reported; the tool evaluates each candidate independently and does not compose interactions. A large counterfactual delta means a declared query is sensitive to that proposed mutation, not that the mutation is correct or biologically important. It does not model mesh morphology, synapse uncertainty, path multiplicity, motif counts, dynamic state, query uncertainty, or actual post-review outcomes. Those require separate evidence and validation.
+
+The synthetic fixture deliberately includes a candidate that changes a direct edge weight but leaves reachability unchanged because an alternate route remains, plus two candidates that touch the same edge. It is an executable negative-control example, not biological data.
+
 ## Exit codes
 
 - `0`: all declared checks pass.
