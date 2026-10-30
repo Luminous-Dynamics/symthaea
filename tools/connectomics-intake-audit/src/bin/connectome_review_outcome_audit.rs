@@ -271,6 +271,11 @@ fn validate_proposals(input: &ProposalInput) -> Result<(), String> {
     if input.graph.is_empty() || input.queries.is_empty() || input.candidates.is_empty() {
         return Err("proposal graph, queries, and candidates must all be non-empty".into());
     }
+    if input.queries.iter().any(|query| matches!(query.metric, QueryMetric::TriadMotifCount { .. }))
+        && input.graph.len() > 4096
+    {
+        return Err("triad motif evaluation is limited to subgraphs with at most 4096 directed edges".into());
+    }
     if input.review_budgets_minutes.is_empty()
         || input.review_budgets_minutes.iter().any(|budget| !budget.is_finite() || *budget <= 0.0)
     {
@@ -754,8 +759,10 @@ mod tests {
             "policy_budget_results":[
                 {"policy":"policy_a","review_budget_minutes":1.0,"policy_order_candidate_ids":ids},
                 {"policy":"policy_a","review_budget_minutes":2.0,"policy_order_candidate_ids":ids},
+                {"policy":"policy_a","review_budget_minutes":4.0,"policy_order_candidate_ids":ids},
                 {"policy":"policy_b","review_budget_minutes":1.0,"policy_order_candidate_ids":reverse},
-                {"policy":"policy_b","review_budget_minutes":2.0,"policy_order_candidate_ids":reverse}
+                {"policy":"policy_b","review_budget_minutes":2.0,"policy_order_candidate_ids":reverse},
+                {"policy":"policy_b","review_budget_minutes":4.0,"policy_order_candidate_ids":reverse}
             ]
         })).unwrap()
     }
@@ -791,7 +798,7 @@ mod tests {
         let report = evaluate_fixture();
         assert_eq!(report.status,"POST_HOC_REVIEW_OUTCOMES_EVALUATED");
         assert_eq!(report.candidate_count,3);
-        assert_eq!(report.evaluated_policy_budget_count,4);
+        assert_eq!(report.evaluated_policy_budget_count,6);
     }
 
     #[test]
