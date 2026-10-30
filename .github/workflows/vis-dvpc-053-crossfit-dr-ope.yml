@@ -42,13 +42,13 @@ jobs:
           /tmp/vis-dvpc-053 --smoke > /tmp/vis-dvpc-053-smoke-b.tsv
           cmp /tmp/vis-dvpc-053-smoke-a.tsv /tmp/vis-dvpc-053-smoke-b.tsv
           awk -F '\t' '$1 == "RESULT" { if (NF != 16 || $2 == "" || $3 < 1 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $9 <= 0 || $9 > 0.5 || $10 < 1 || $11 != $11 || $12 < 0 || $13 < 0 || $14 < 0 || $14 > 1 || $15 < 0 || $16 != "identified_full_support") bad=1; n++ } END { if (n != 1200 || bad) exit 1 }' /tmp/vis-dvpc-053-smoke-a.tsv
-          awk -F '\t' '$1 == "REPLICATE" { if (NF != 15 || $3 < 1 || $7 < 0 || $8 != $8 || $9 != $9 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 != $14 || $15 != "identified_full_support") bad=1; n++ } END { if (n != 14400 || bad) exit 1 }' /tmp/vis-dvpc-053-smoke-a.tsv
+          awk -F '\t' '$1 == "REPLICATE" { if (NF != 18 || $3 < 1 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 != $11 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 != $16 || $17 != $17 || $18 != "identified_full_support") bad=1; n++ } END { if (n != 14400 || bad) exit 1 }' /tmp/vis-dvpc-053-smoke-a.tsv
           test "$(grep -c '^BENCHMARK_CONFIG' /tmp/vis-dvpc-053-smoke-a.tsv)" = "8"
       - name: Run full cross-fitted DR OPE frontier
         run: |
           /tmp/vis-dvpc-053 > /tmp/vis-dvpc-053-full.tsv
           awk -F '\t' '$1 == "RESULT" { if (NF != 16 || $7 < 0 || $7 > 1 || $8 < 0 || $8 > 1 || $9 <= 0 || $9 > 0.5 || $10 < 1 || $11 != $11 || $12 < 0 || $13 < 0 || $14 < 0 || $14 > 1 || $15 < 0 || $16 != "identified_full_support") bad=1; n++ } END { if (n != 1200 || bad) exit 1 }' /tmp/vis-dvpc-053-full.tsv
-          awk -F '\t' '$1 == "REPLICATE" { if (NF != 15 || $3 < 1 || $7 < 0 || $8 != $8 || $9 != $9 || $10 != $10 || $11 < 0 || $12 < 0 || $13 != $13 || $14 != $14 || $15 != "identified_full_support") bad=1; n++ } END { if (n != 153600 || bad) exit 1 }' /tmp/vis-dvpc-053-full.tsv
+          awk -F '\t' '$1 == "REPLICATE" { if (NF != 18 || $3 < 1 || $7 < 0 || $8 < 0 || $9 < 0 || $10 < 0 || $11 != $11 || $12 != $12 || $13 != $13 || $14 < 0 || $15 < 0 || $16 != $16 || $17 != $17 || $18 != "identified_full_support") bad=1; n++ } END { if (n != 153600 || bad) exit 1 }' /tmp/vis-dvpc-053-full.tsv
           grep -F $'BENCHMARK_CONFIG\tVIS-DVPC-053' /tmp/vis-dvpc-053-full.tsv
       - name: Create exact-source and output SHA-256 receipt
         env:
