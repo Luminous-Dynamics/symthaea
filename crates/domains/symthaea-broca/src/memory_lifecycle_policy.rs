@@ -189,10 +189,10 @@ pub fn verify_proof_packet_for_lifecycle(
 ) -> Result<VerifiedLifecycleProofToken, String> {
     let context = build_verified_proof_reader_context(request, result)?;
     context.verify_internal_consistency()?;
-    let session_by_evidence_id: std::collections::BTreeMap<&str, &Option<String>> =
+    let session_by_evidence_id: std::collections::BTreeMap<String, Option<String>> =
         context.evidence
             .iter()
-            .map(|evidence| (evidence.evidence_id.as_str(), &evidence.source_session_id))
+            .map(|evidence| (evidence.evidence_id.clone(), evidence.source_session_id.clone()))
             .collect();
     let selected_proofs = context
         .claim_proofs
@@ -204,8 +204,9 @@ pub fn verify_proof_packet_for_lifecycle(
                 .iter()
                 .filter_map(|evidence_id| {
                     session_by_evidence_id
-                        .get(evidence_id.as_str())
-                        .and_then(|session_id| (*session_id).clone())
+                        .get(evidence_id)
+                        .cloned()
+                        .flatten()
                 })
                 .collect();
             (
@@ -243,6 +244,7 @@ pub struct ClaimLifecycleLedgerEntry {
     pub conflicting_evidence_ids: BTreeSet<String>,
     pub rejected_evidence_ids: BTreeSet<String>,
     /// Exact distinct source-session IDs supporting the selected proof.
+    #[serde(default)]
     pub source_session_ids: BTreeSet<String>,
 }
 
@@ -984,7 +986,6 @@ mod tests {
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
                 source_session_ids: BTreeSet::from(["session-1".into()]),
-            source_session_ids: BTreeSet::new(),
             }],
         };
         lifecycle_request.principal_id = "other-principal".into();
@@ -1022,7 +1023,7 @@ mod tests {
                 stale_evidence_ids: BTreeSet::new(),
                 conflicting_evidence_ids: BTreeSet::new(),
                 rejected_evidence_ids: BTreeSet::new(),
-            source_session_ids: BTreeSet::new(),
+                source_session_ids: BTreeSet::from(["session-1".into()]),
             }],
         };
         let decision = decide_lifecycle_action(lifecycle_request, Some(&token)).unwrap();
