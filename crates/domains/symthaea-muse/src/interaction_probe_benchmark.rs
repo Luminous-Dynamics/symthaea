@@ -146,7 +146,7 @@ fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
     if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) }
 }
 
-fn contextual_pair_interaction_l2_norm(
+pub(crate) fn contextual_pair_interaction_l2_norm(
     report: &FactorialGroundTruthReport,
     left: usize,
     right: usize,
