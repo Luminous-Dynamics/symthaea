@@ -173,7 +173,7 @@ jobs:
           }, indent=2))
           PY
           echo "SEQCUBE_ARCHIVE_ROOT=$package_root" >> "$GITHUB_ENV"
-          echo "SEQCUBE_PACKAGE_ROOT=$canonical_root" >> "$GITHUB_ENV"
+          echo "SEQCUBE_PACKAGE_ROOT=$RUNNER_TEMP/seqcube-ht-canonical-crlf" >> "$GITHUB_ENV"
 
       - name: Set up Python for upstream SeqCube verifier
         uses: actions/setup-python@v5
