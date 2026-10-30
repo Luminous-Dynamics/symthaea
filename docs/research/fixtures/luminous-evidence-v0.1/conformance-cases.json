@@ -106,6 +106,19 @@
       "expectedFailure": "LEP_TARGET_MISMATCH",
       "implementationStatus": "manifest-mutation-test-added-not-run",
       "purpose": "A schema-valid verifier result must not validate a different input-artifact set."
+    },
+    {
+      "id": "LEP-SCHEMA-004",
+      "file": "valid-passed.json",
+      "mutation": {
+        "path": "/predicate/unrecognizedCoreField",
+        "value": true
+      },
+      "schemaExpected": "reject",
+      "semanticExpected": "reject",
+      "expectedFailure": "PREDICATE_SCHEMA_VALIDATION_FAILED",
+      "implementationStatus": "manifest-mutation-test-added-not-run",
+      "purpose": "LEP v0.1 rejects unknown fields in closed core objects; extension values belong in the explicit namespaced extensions object."
     }
   ]
 }
