@@ -1,0 +1,997 @@
+{
+  "schema_version": "qarch-016-clustered-advantage/1",
+  "record_id": "QARCH-016-PSEUDOREPLICATION-NEGATIVE-CONTROL",
+  "evidence_class": "synthetic_fixture",
+  "claim_scope": "synthetic_fixture_only",
+  "target_estimand": "family_balanced_median_effect",
+  "comparison_contract": {
+    "contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+    "target_population_fingerprint": "sha256:synthetic-family-population",
+    "workload_family": "synthetic optimization workload hierarchy",
+    "quality_metric": "independently verified objective quality",
+    "quality_unit": "normalized score",
+    "resource_metric": "energy",
+    "resource_unit": "joules per verified acceptable answer",
+    "resource_scope": [
+      "setup",
+      "compilation",
+      "encoding",
+      "execution",
+      "readout",
+      "verification"
+    ],
+    "verifier_id": "synthetic-independent-verifier",
+    "verifier_version": "1.0.0",
+    "classical_baseline_id": "synthetic-classical-reference"
+  },
+  "preregistration": {
+    "minimum_independent_families": 8,
+    "minimum_relative_resource_reduction": 0.1,
+    "quality_non_inferiority_margin": 0.02,
+    "resource_log_ratio_tie_tolerance": 1e-12,
+    "quality_difference_tie_tolerance": 1e-12,
+    "family_aggregation": "median of paired instance-level quality differences and log resource ratios",
+    "family_weighting": "equal weight per independent family",
+    "cluster_definition": "family_id is the independent generator/source-lineage cluster"
+  },
+  "observations": [
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-000",
+      "workload_fingerprint": "sha256:workload-00-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-001",
+      "workload_fingerprint": "sha256:workload-00-001",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-002",
+      "workload_fingerprint": "sha256:workload-00-002",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-003",
+      "workload_fingerprint": "sha256:workload-00-003",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-004",
+      "workload_fingerprint": "sha256:workload-00-004",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-005",
+      "workload_fingerprint": "sha256:workload-00-005",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-006",
+      "workload_fingerprint": "sha256:workload-00-006",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-007",
+      "workload_fingerprint": "sha256:workload-00-007",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-008",
+      "workload_fingerprint": "sha256:workload-00-008",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-009",
+      "workload_fingerprint": "sha256:workload-00-009",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-010",
+      "workload_fingerprint": "sha256:workload-00-010",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-011",
+      "workload_fingerprint": "sha256:workload-00-011",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-012",
+      "workload_fingerprint": "sha256:workload-00-012",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-013",
+      "workload_fingerprint": "sha256:workload-00-013",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-014",
+      "workload_fingerprint": "sha256:workload-00-014",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-015",
+      "workload_fingerprint": "sha256:workload-00-015",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-016",
+      "workload_fingerprint": "sha256:workload-00-016",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-017",
+      "workload_fingerprint": "sha256:workload-00-017",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-018",
+      "workload_fingerprint": "sha256:workload-00-018",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-019",
+      "workload_fingerprint": "sha256:workload-00-019",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-020",
+      "workload_fingerprint": "sha256:workload-00-020",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-021",
+      "workload_fingerprint": "sha256:workload-00-021",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-022",
+      "workload_fingerprint": "sha256:workload-00-022",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-023",
+      "workload_fingerprint": "sha256:workload-00-023",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-024",
+      "workload_fingerprint": "sha256:workload-00-024",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-025",
+      "workload_fingerprint": "sha256:workload-00-025",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-026",
+      "workload_fingerprint": "sha256:workload-00-026",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-027",
+      "workload_fingerprint": "sha256:workload-00-027",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-028",
+      "workload_fingerprint": "sha256:workload-00-028",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-029",
+      "workload_fingerprint": "sha256:workload-00-029",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-030",
+      "workload_fingerprint": "sha256:workload-00-030",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-031",
+      "workload_fingerprint": "sha256:workload-00-031",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-032",
+      "workload_fingerprint": "sha256:workload-00-032",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-033",
+      "workload_fingerprint": "sha256:workload-00-033",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-034",
+      "workload_fingerprint": "sha256:workload-00-034",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-035",
+      "workload_fingerprint": "sha256:workload-00-035",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-036",
+      "workload_fingerprint": "sha256:workload-00-036",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-037",
+      "workload_fingerprint": "sha256:workload-00-037",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-038",
+      "workload_fingerprint": "sha256:workload-00-038",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-039",
+      "workload_fingerprint": "sha256:workload-00-039",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-040",
+      "workload_fingerprint": "sha256:workload-00-040",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-041",
+      "workload_fingerprint": "sha256:workload-00-041",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-042",
+      "workload_fingerprint": "sha256:workload-00-042",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-043",
+      "workload_fingerprint": "sha256:workload-00-043",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-044",
+      "workload_fingerprint": "sha256:workload-00-044",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-045",
+      "workload_fingerprint": "sha256:workload-00-045",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-046",
+      "workload_fingerprint": "sha256:workload-00-046",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-047",
+      "workload_fingerprint": "sha256:workload-00-047",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-048",
+      "workload_fingerprint": "sha256:workload-00-048",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-049",
+      "workload_fingerprint": "sha256:workload-00-049",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-050",
+      "workload_fingerprint": "sha256:workload-00-050",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-051",
+      "workload_fingerprint": "sha256:workload-00-051",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-052",
+      "workload_fingerprint": "sha256:workload-00-052",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-053",
+      "workload_fingerprint": "sha256:workload-00-053",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-054",
+      "workload_fingerprint": "sha256:workload-00-054",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-055",
+      "workload_fingerprint": "sha256:workload-00-055",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-056",
+      "workload_fingerprint": "sha256:workload-00-056",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-057",
+      "workload_fingerprint": "sha256:workload-00-057",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-058",
+      "workload_fingerprint": "sha256:workload-00-058",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-059",
+      "workload_fingerprint": "sha256:workload-00-059",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-060",
+      "workload_fingerprint": "sha256:workload-00-060",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-061",
+      "workload_fingerprint": "sha256:workload-00-061",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-062",
+      "workload_fingerprint": "sha256:workload-00-062",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-063",
+      "workload_fingerprint": "sha256:workload-00-063",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-064",
+      "workload_fingerprint": "sha256:workload-00-064",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-065",
+      "workload_fingerprint": "sha256:workload-00-065",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-066",
+      "workload_fingerprint": "sha256:workload-00-066",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-067",
+      "workload_fingerprint": "sha256:workload-00-067",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-068",
+      "workload_fingerprint": "sha256:workload-00-068",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-069",
+      "workload_fingerprint": "sha256:workload-00-069",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-070",
+      "workload_fingerprint": "sha256:workload-00-070",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-071",
+      "workload_fingerprint": "sha256:workload-00-071",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-072",
+      "workload_fingerprint": "sha256:workload-00-072",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-073",
+      "workload_fingerprint": "sha256:workload-00-073",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-074",
+      "workload_fingerprint": "sha256:workload-00-074",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-075",
+      "workload_fingerprint": "sha256:workload-00-075",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-076",
+      "workload_fingerprint": "sha256:workload-00-076",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-077",
+      "workload_fingerprint": "sha256:workload-00-077",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-078",
+      "workload_fingerprint": "sha256:workload-00-078",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-00",
+      "independent_block_id": "block-00-079",
+      "workload_fingerprint": "sha256:workload-00-079",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 80,
+      "classical_resource_per_accepted_answer": 100,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-01",
+      "independent_block_id": "block-01-000",
+      "workload_fingerprint": "sha256:workload-01-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-02",
+      "independent_block_id": "block-02-000",
+      "workload_fingerprint": "sha256:workload-02-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-03",
+      "independent_block_id": "block-03-000",
+      "workload_fingerprint": "sha256:workload-03-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-04",
+      "independent_block_id": "block-04-000",
+      "workload_fingerprint": "sha256:workload-04-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-05",
+      "independent_block_id": "block-05-000",
+      "workload_fingerprint": "sha256:workload-05-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-06",
+      "independent_block_id": "block-06-000",
+      "workload_fingerprint": "sha256:workload-06-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    },
+    {
+      "family_id": "family-07",
+      "independent_block_id": "block-07-000",
+      "workload_fingerprint": "sha256:workload-07-000",
+      "comparison_contract_fingerprint": "sha256:qarch016-pseudorep-contract",
+      "quantum_resource_per_accepted_answer": 100,
+      "classical_resource_per_accepted_answer": 80,
+      "quantum_quality": 0.995,
+      "classical_quality": 0.99
+    }
+  ],
+  "analysis": {
+    "independent_families": 8,
+    "workload_instances": 87,
+    "median_family_quality_difference": 0.005,
+    "median_family_log_resource_ratio": -0.2231435513142097,
+    "median_family_resource_ratio": 0.8,
+    "quality_non_inferiority": {
+      "wins": 8,
+      "losses": 0,
+      "ties": 0,
+      "independent_families": 8,
+      "p_value_one_sided": 0.00390625
+    },
+    "resource_superiority": {
+      "wins": 1,
+      "losses": 7,
+      "ties": 0,
+      "independent_families": 8,
+      "p_value_one_sided": 0.99609375
+    },
+    "composite_claim_p_value": 0.99609375,
+    "leave_one_family_out_quality_range": [
+      0.005,
+      0.005
+    ],
+    "leave_one_family_out_resource_range": [
+      -0.2231435513142097,
+      -0.2231435513142097
+    ],
+    "family_effects": [
+      {
+        "family_id": "family-00",
+        "instance_count": 80,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": 0.22314355131420976
+      },
+      {
+        "family_id": "family-01",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-02",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-03",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-04",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-05",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-06",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      },
+      {
+        "family_id": "family-07",
+        "instance_count": 1,
+        "median_quality_difference": 0.005,
+        "median_log_classical_over_quantum_resource": -0.2231435513142097
+      }
+    ],
+    "naive_instance_level_counterfactual": {
+      "wins": 80,
+      "losses": 7,
+      "independent_instances": 87,
+      "p_value_one_sided": 4.1279045571139956e-17,
+      "warning": "Invalid for target-family inference: 80 observations share one family lineage."
+    },
+    "claim_disposition": "fixture_only"
+  }
+}

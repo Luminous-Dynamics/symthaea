@@ -1,0 +1,370 @@
+{
+  "schema_version": "qarch-016-cluster-null-simulation/1",
+  "record_id": "QARCH-016-10K-NULL-SIMULATIONS",
+  "evidence_class": "deterministic_synthetic_monte_carlo",
+  "alpha": 0.05,
+  "replicates_per_cell": 10000,
+  "master_seed": 1369948382,
+  "prng": "32-bit LCG: state=(1664525*state+1013904223) mod 2^32; U=state/2^32",
+  "data_generation": {
+    "null_hypothesis": "Each family has a latent fair sign Z. Each instance sign X equals Z with probability sqrt(ICC); otherwise it is an independent fair sign.",
+    "dependence": "For this sign-mixture model, within-family pairwise correlation equals target ICC because E[X|Z]=sqrt(ICC)*Z.",
+    "independence": "Latent family signs and residual instance signs are independent across families and draws.",
+    "naive_method": "One-sided exact sign test over every instance as if all instance signs were independent.",
+    "family_method": "One-sided exact sign test over one family-majority sign per family; even-size ties are non-wins and remain in the family denominator.",
+    "confidence_interval": "Wilson 95% interval for empirical false-positive rate; Monte Carlo uncertainty only."
+  },
+  "designs": [
+    {
+      "design_id": "balanced_8x3",
+      "cluster_sizes": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "cluster_sizes": [
+        21,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "cells": [
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 0,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 313,
+        "rate": 0.0313,
+        "wilson_95": [
+          0.028063003686222634,
+          0.03489696961043572
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 384,
+        "rate": 0.0384,
+        "wilson_95": [
+          0.03480747888342274,
+          0.04234704143605131
+        ]
+      }
+    },
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 0.1,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 457,
+        "rate": 0.0457,
+        "wilson_95": [
+          0.04177838567624322,
+          0.049970528061055446
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 332,
+        "rate": 0.0332,
+        "wilson_95": [
+          0.029863851866004293,
+          0.036894662183238544
+        ]
+      }
+    },
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 0.25,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 605,
+        "rate": 0.0605,
+        "wilson_95": [
+          0.055993769984297885,
+          0.0653437769836589
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 321,
+        "rate": 0.0321,
+        "wilson_95": [
+          0.028820865343941876,
+          0.03573849353275203
+        ]
+      }
+    },
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 0.5,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 997,
+        "rate": 0.0997,
+        "wilson_95": [
+          0.09398068389822223,
+          0.10572675649147764
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 344,
+        "rate": 0.0344,
+        "wilson_95": [
+          0.031002824689338727,
+          0.038154767729957476
+        ]
+      }
+    },
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 0.75,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 1246,
+        "rate": 0.1246,
+        "wilson_95": [
+          0.11827060584509205,
+          0.13121771072321506
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 367,
+        "rate": 0.0367,
+        "wilson_95": [
+          0.033189052940687025,
+          0.04056677302121145
+        ]
+      }
+    },
+    {
+      "design_id": "balanced_8x3",
+      "within_family_icc_target": 1,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 1392,
+        "rate": 0.1392,
+        "wilson_95": [
+          0.1325537995368631,
+          0.14612330386709318
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 360,
+        "rate": 0.036,
+        "wilson_95": [
+          0.0325232511776768,
+          0.03983302458427054
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 0,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 420,
+        "rate": 0.042,
+        "wilson_95": [
+          0.038241152943504116,
+          0.04611060248613003
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 311,
+        "rate": 0.0311,
+        "wilson_95": [
+          0.027873629803116064,
+          0.03468649709853339
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 0.1,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 1695,
+        "rate": 0.1695,
+        "wilson_95": [
+          0.16227345107709684,
+          0.17698038117070686
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 353,
+        "rate": 0.0353,
+        "wilson_95": [
+          0.03185781930362784,
+          0.03909908189320836
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 0.25,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 3184,
+        "rate": 0.3184,
+        "wilson_95": [
+          0.30934045388441583,
+          0.32759901944750897
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 349,
+        "rate": 0.0349,
+        "wilson_95": [
+          0.03147774265407365,
+          0.03867946575274477
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 0.5,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 4628,
+        "rate": 0.4628,
+        "wilson_95": [
+          0.45304331235032363,
+          0.47258525817802205
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 378,
+        "rate": 0.0378,
+        "wilson_95": [
+          0.03423603601420601,
+          0.04171894546679436
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 0.75,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 5010,
+        "rate": 0.501,
+        "wilson_95": [
+          0.491201517418074,
+          0.5107977145569704
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 387,
+        "rate": 0.0387,
+        "wilson_95": [
+          0.035093293534865615,
+          0.04266099637712178
+        ]
+      }
+    },
+    {
+      "design_id": "imbalanced_21_plus_7",
+      "within_family_icc_target": 1,
+      "replicates": 10000,
+      "naive_instance_level": {
+        "false_positives": 5008,
+        "rate": 0.5008,
+        "wilson_95": [
+          0.491001587168622,
+          0.5105977984114136
+        ]
+      },
+      "family_level_exact_sign": {
+        "false_positives": 353,
+        "rate": 0.0353,
+        "wilson_95": [
+          0.03185781930362784,
+          0.0399379434667278
+        ]
+      }
+    }
+  ],
+  "exact_power_sensitivity": [
+    {
+      "independent_families": 5,
+      "probabilities": [
+        {
+          "family_win_probability": 0.6,
+          "power": 0.07776
+        },
+        {
+          "family_win_probability": 0.7,
+          "power": 0.16807
+        },
+        {
+          "family_win_probability": 0.8,
+          "power": 0.32768
+        }
+      ]
+    },
+    {
+      "independent_families": 10,
+      "probabilities": [
+        {
+          "family_win_probability": 0.6,
+          "power": 0.0463574016
+        },
+        {
+          "family_win_probability": 0.7,
+          "power": 0.1493083459
+        },
+        {
+          "family_win_probability": 0.8,
+          "power": 0.3758096384
+        }
+      ]
+    },
+    {
+      "independent_families": 20,
+      "probabilities": [
+        {
+          "family_win_probability": 0.6,
+          "power": 0.1255989727230374
+        },
+        {
+          "family_win_probability": 0.7,
+          "power": 0.4163708294474812
+        },
+        {
+          "family_win_probability": 0.8,
+          "power": 0.8042077854595496
+        }
+      ]
+    },
+    {
+      "independent_families": 30,
+      "probabilities": [
+        {
+          "family_win_probability": 0.6,
+          "power": 0.29147186122349666
+        },
+        {
+          "family_win_probability": 0.7,
+          "power": 0.7303703863027229
+        },
+        {
+          "family_win_probability": 0.8,
+          "power": 0.9743837446646736
+        }
+      ]
+    }
+  ],
+  "cell_seed_schedule": "For zero-based cell index i in the listed cells: seed_i=(master_seed+i*65537) mod 2^32."
+}

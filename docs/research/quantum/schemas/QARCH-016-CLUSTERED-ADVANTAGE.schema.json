@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QARCH-016 family-clustered paired benchmark result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_class",
+    "claim_scope",
+    "target_estimand",
+    "comparison_contract",
+    "preregistration",
+    "observations",
+    "analysis"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "qarch-016-clustered-advantage/1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_fixture",
+        "measured_backend",
+        "calibrated_simulation",
+        "analytic_estimate"
+      ]
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_fixture_only",
+        "finite_suite_descriptive",
+        "sampled_family_population_inference"
+      ]
+    },
+    "target_estimand": {
+      "const": "family_balanced_median_effect"
+    },
+    "comparison_contract": {
+      "type": "object",
+      "required": [
+        "contract_fingerprint",
+        "target_population_fingerprint",
+        "workload_family",
+        "quality_metric",
+        "quality_unit",
+        "resource_metric",
+        "resource_unit",
+        "resource_scope",
+        "verifier_id",
+        "verifier_version",
+        "classical_baseline_id"
+      ],
+      "properties": {
+        "contract_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_population_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workload_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quality_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classical_baseline_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "preregistration": {
+      "type": "object",
+      "required": [
+        "minimum_independent_families",
+        "minimum_relative_resource_reduction",
+        "quality_non_inferiority_margin",
+        "resource_log_ratio_tie_tolerance",
+        "quality_difference_tie_tolerance",
+        "family_aggregation",
+        "family_weighting",
+        "cluster_definition"
+      ],
+      "properties": {
+        "minimum_independent_families": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_relative_resource_reduction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "quality_non_inferiority_margin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resource_log_ratio_tie_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "quality_difference_tie_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "family_aggregation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_weighting": {
+          "const": "equal weight per independent family"
+        },
+        "cluster_definition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "independent_block_id",
+          "workload_fingerprint",
+          "comparison_contract_fingerprint",
+          "quantum_resource_per_accepted_answer",
+          "classical_resource_per_accepted_answer",
+          "quantum_quality",
+          "classical_quality"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "independent_block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workload_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comparison_contract_fingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantum_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "classical_resource_per_accepted_answer": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "quantum_quality": {
+            "type": "number"
+          },
+          "classical_quality": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "required": [
+        "independent_families",
+        "workload_instances",
+        "median_family_quality_difference",
+        "median_family_log_resource_ratio",
+        "median_family_resource_ratio",
+        "quality_non_inferiority",
+        "resource_superiority",
+        "composite_claim_p_value",
+        "leave_one_family_out_quality_range",
+        "leave_one_family_out_resource_range",
+        "family_effects",
+        "naive_instance_level_counterfactual",
+        "claim_disposition"
+      ],
+      "properties": {
+        "independent_families": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "workload_instances": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "median_family_quality_difference": {
+          "type": "number"
+        },
+        "median_family_log_resource_ratio": {
+          "type": "number"
+        },
+        "median_family_resource_ratio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "quality_non_inferiority": {
+          "$ref": "#/$defs/signTest"
+        },
+        "resource_superiority": {
+          "$ref": "#/$defs/signTest"
+        },
+        "composite_claim_p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "leave_one_family_out_quality_range": {
+          "$ref": "#/$defs/range"
+        },
+        "leave_one_family_out_resource_range": {
+          "$ref": "#/$defs/range"
+        },
+        "family_effects": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "family_id",
+              "instance_count",
+              "median_quality_difference",
+              "median_log_classical_over_quantum_resource"
+            ],
+            "properties": {
+              "family_id": {
+                "type": "string"
+              },
+              "instance_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "median_quality_difference": {
+                "type": "number"
+              },
+              "median_log_classical_over_quantum_resource": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "naive_instance_level_counterfactual": {
+          "type": "object",
+          "required": [
+            "wins",
+            "losses",
+            "independent_instances",
+            "p_value_one_sided",
+            "warning"
+          ],
+          "properties": {
+            "wins": {
+              "type": "integer"
+            },
+            "losses": {
+              "type": "integer"
+            },
+            "independent_instances": {
+              "type": "integer"
+            },
+            "p_value_one_sided": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "warning": {
+              "type": "string"
+            }
+          }
+        },
+        "claim_disposition": {
+          "enum": [
+            "fixture_only",
+            "requires_holm_correction",
+            "family_level_result",
+            "not_supported"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "range": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "signTest": {
+      "type": "object",
+      "required": [
+        "wins",
+        "losses",
+        "ties",
+        "independent_families",
+        "p_value_one_sided"
+      ],
+      "properties": {
+        "wins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "losses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ties": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "independent_families": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "p_value_one_sided": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}
