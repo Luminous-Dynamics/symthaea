@@ -581,7 +581,7 @@ fn ratio_within(value: Option<f64>, cap: f64) -> bool {
 /// Exact one-sided Clopper-Pearson upper confidence limit for a binomial
 /// event probability. `alpha` is the upper-tail significance level.
 fn clopper_pearson_upper(events: u64, trials: u64, alpha: f64) -> Result<Option<f64>, String> {
-    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err("alpha must be finite and in (0, 1)".to_owned());
     }
     if trials == 0 {
