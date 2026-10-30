@@ -30,6 +30,22 @@ partial def collectExprFVars : Expr → FVarIdSet
   | .proj _ _ expr => collectExprFVars expr
   | _ => {}
 
+def mergeExprConstNames (left right : Array Name) : Array Name :=
+  right.foldl (init := left) fun accumulated name =>
+    if accumulated.contains name then accumulated else accumulated.push name
+
+partial def collectExprConstNames : Expr → Array Name
+  | .const name _ => #[name]
+  | .app fn arg => mergeExprConstNames (collectExprConstNames fn) (collectExprConstNames arg)
+  | .lam _ type body _ => mergeExprConstNames (collectExprConstNames type) (collectExprConstNames body)
+  | .forallE _ type body _ => mergeExprConstNames (collectExprConstNames type) (collectExprConstNames body)
+  | .letE _ type value body _ =>
+      mergeExprConstNames (collectExprConstNames type)
+        (mergeExprConstNames (collectExprConstNames value) (collectExprConstNames body))
+  | .mdata _ expr => collectExprConstNames expr
+  | .proj _ _ expr => collectExprConstNames expr
+  | _ => #[]
+
 partial def closeLocalSupport (lctx : LocalContext) (frontier visited : FVarIdSet) : FVarIdSet := Id.run do
   if frontier.isEmpty then
     return visited
@@ -70,6 +86,7 @@ elab_rules : tactic
         throwError "PITB support receipt refuses a proof term with unresolved metavariables"
       let direct := collectExprFVars proof
       let transitive := closeLocalSupport declaration.lctx direct {}
+      let directConstants := collectExprConstNames proof
       let mut directRows : Array Json := #[]
       let mut transitiveRows : Array Json := #[]
       for id in direct do
@@ -81,6 +98,7 @@ elab_rules : tactic
         ("schema_version", toJson "pitb.proof-term-support.v0"),
         ("label", toJson label.getString),
         ("proof_term", toJson proofText.pretty),
+        ("direct_global_constants", Json.arr (directConstants.map fun name => toJson name.toString)),
         ("direct_free_variable_support", Json.arr directRows),
         ("transitive_local_dependency_closure", Json.arr transitiveRows)
       ]
