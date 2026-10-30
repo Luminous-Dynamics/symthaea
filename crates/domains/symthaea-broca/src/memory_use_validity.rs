@@ -141,6 +141,15 @@ pub struct EvidenceFamilyRef {
     pub source_revision_ids: BTreeSet<String>,
 }
 
+/// A lineage receipt binds the family partition to a canonical digest.
+/// Receipt authenticity/authority is verified by an external trusted adapter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceFamilyLineageReceipt {
+    pub receipt_sha256: String,
+    pub mapping_sha256: String,
+}
+
 /// Decision-governing information needed for the first executable validity slice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -177,7 +186,7 @@ pub enum GoverningEvidence {
     EvidenceIndependence {
         source_families: Vec<EvidenceFamilyRef>,
         minimum_independent_families: u32,
-        lineage_receipt_sha256: Option<String>,
+        lineage_receipt: Option<EvidenceFamilyLineageReceipt>,
     },
     /// Prospective choice intentionally contains no sunk-cost field.
     /// Historical spend must not affect this decision surface.
@@ -234,10 +243,10 @@ impl GoverningEvidence {
                     valid_sha256(&receipt.right_definition_sha256, "receipt right metric definition digest")?;
                     non_empty(&receipt.left_unit, "receipt left metric unit")?;
                     non_empty(&receipt.right_unit, "receipt right metric unit")?;
-                    if receipt.left_definition_sha256 != *left_definition_sha256
-                        || receipt.right_definition_sha256 != *right_definition_sha256
-                        || receipt.left_unit != *left_unit
-                        || receipt.right_unit != *right_unit
+                    if receipt.left_definition_sha256.as_str() != left_definition_sha256.as_str()
+                        || receipt.right_definition_sha256.as_str() != right_definition_sha256.as_str()
+                        || receipt.left_unit.as_str() != left_unit.as_str()
+                        || receipt.right_unit.as_str() != right_unit.as_str()
                     {
                         return Err("conversion receipt does not bind the exact metric definitions and units".into());
                     }
@@ -269,7 +278,7 @@ impl GoverningEvidence {
             Self::EvidenceIndependence {
                 source_families,
                 minimum_independent_families,
-                lineage_receipt_sha256,
+                lineage_receipt,
             } => {
                 if *minimum_independent_families == 0 {
                     return Err("minimum independent family count must be non-zero".into());
@@ -294,8 +303,9 @@ impl GoverningEvidence {
                         }
                     }
                 }
-                if let Some(receipt) = lineage_receipt_sha256 {
-                    valid_sha256(receipt, "lineage receipt digest")?;
+                if let Some(receipt) = lineage_receipt {
+                    valid_sha256(&receipt.receipt_sha256, "lineage receipt digest")?;
+                    valid_sha256(&receipt.mapping_sha256, "lineage mapping digest")?;
                 }
                 Ok(())
             }
@@ -563,9 +573,9 @@ fn assess_governing_evidence(evidence: &GoverningEvidence) -> Result<EvidenceUse
         GoverningEvidence::EvidenceIndependence {
             source_families,
             minimum_independent_families,
-            lineage_receipt_sha256,
+            lineage_receipt,
         } => {
-            if lineage_receipt_sha256.is_none() {
+            if lineage_receipt.is_none() {
                 reasons.insert(UseValidityReason::EvidenceFamilyLineageUnverified);
                 UseValidityStatus::Contested
             } else if source_families.len() < *minimum_independent_families as usize {
@@ -619,6 +629,21 @@ fn canonical_governing_evidence(mut evidence: GoverningEvidence) -> GoverningEvi
     evidence
 }
 
+fn validate_lineage_receipt_binding(evidence: &GoverningEvidence) -> Result<(), String> {
+    if let GoverningEvidence::EvidenceIndependence {
+        source_families,
+        lineage_receipt: Some(receipt),
+        ..
+    } = evidence
+    {
+        let expected_mapping_sha256 = sha256_json(source_families, "evidence family mapping")?;
+        if receipt.mapping_sha256 != expected_mapping_sha256 {
+            return Err("lineage receipt does not bind the canonical evidence-family mapping".into());
+        }
+    }
+    Ok(())
+}
+
 /// Compile a certificate from source lineage and one typed governing-state
 /// contract. Every required source must be eligible at (valid_at, known_at).
 pub fn assess_evidence_use(
@@ -630,6 +655,7 @@ pub fn assess_evidence_use(
     let source_revisions = canonical_source_revisions(&request, &input.source_revisions)?;
     validate_family_source_bindings(&input.governing_evidence, &source_revisions)?;
     let governing_evidence = canonical_governing_evidence(input.governing_evidence);
+    validate_lineage_receipt_binding(&governing_evidence)?;
 
     let assessment = match source_eligibility(&request, &source_revisions) {
         Some(source_failure) => source_failure,
@@ -849,9 +875,56 @@ mod tests {
                 source_revision_ids: BTreeSet::from(["revision-1".into()]),
             }],
             minimum_independent_families: 3,
-            lineage_receipt_sha256: Some("d".repeat(64)),
+            lineage_receipt: Some(EvidenceFamilyLineageReceipt {
+                receipt_sha256: "d".repeat(64),
+                mapping_sha256: "e".repeat(64),
+            }),
         });
         assert_eq!(result.assessment.status, UseValidityStatus::ExploratoryOnly);
+    }
+
+    #[test]
+    fn exact_lineage_receipt_binds_the_canonical_family_partition() {
+        let families = vec![
+            EvidenceFamilyRef { family_id: "family-A".into(), source_revision_ids: BTreeSet::from(["revision-A".into()]) },
+            EvidenceFamilyRef { family_id: "family-B".into(), source_revision_ids: BTreeSet::from(["revision-B".into()]) },
+            EvidenceFamilyRef { family_id: "family-C".into(), source_revision_ids: BTreeSet::from(["revision-C".into()]) },
+        ];
+        let mapping_sha256 = sha256_json(&families, "evidence family mapping").unwrap();
+        let result = assess_with_sources(
+            GoverningEvidence::EvidenceIndependence {
+                source_families: families,
+                minimum_independent_families: 3,
+                lineage_receipt: Some(EvidenceFamilyLineageReceipt {
+                    receipt_sha256: "d".repeat(64),
+                    mapping_sha256,
+                }),
+            },
+            vec![source("revision-A"), source("revision-B"), source("revision-C")],
+        );
+        assert_eq!(result.assessment.status, UseValidityStatus::Admissible);
+    }
+
+    #[test]
+    fn lineage_receipt_for_a_different_family_partition_is_rejected() {
+        let result = assess_evidence_use(
+            request(),
+            EvidenceUseInput {
+                source_revisions: vec![source("revision-1")],
+                governing_evidence: GoverningEvidence::EvidenceIndependence {
+                    source_families: vec![EvidenceFamilyRef {
+                        family_id: "family-A".into(),
+                        source_revision_ids: BTreeSet::from(["revision-1".into()]),
+                    }],
+                    minimum_independent_families: 1,
+                    lineage_receipt: Some(EvidenceFamilyLineageReceipt {
+                        receipt_sha256: "d".repeat(64),
+                        mapping_sha256: "e".repeat(64),
+                    }),
+                },
+            },
+        );
+        assert!(result.unwrap_err().contains("does not bind the canonical evidence-family mapping"));
     }
 
     #[test]
@@ -864,7 +937,7 @@ mod tests {
                     EvidenceFamilyRef { family_id: "family-C".into(), source_revision_ids: BTreeSet::from(["revision-C".into()]) },
                 ],
                 minimum_independent_families: 3,
-                lineage_receipt_sha256: None,
+                lineage_receipt: None,
             },
             vec![source("revision-A"), source("revision-B"), source("revision-C")],
         );
@@ -966,7 +1039,10 @@ mod tests {
                         source_revision_ids: BTreeSet::from(["revision-other".into()]),
                     }],
                     minimum_independent_families: 1,
-                    lineage_receipt_sha256: Some("d".repeat(64)),
+                    lineage_receipt: Some(EvidenceFamilyLineageReceipt {
+                receipt_sha256: "d".repeat(64),
+                mapping_sha256: "e".repeat(64),
+            }),
                 },
             },
         );
