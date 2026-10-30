@@ -48,12 +48,12 @@ jobs:
           assert report["scenarios"] == ["stationary_unknown_gain", "abrupt_gain_shift"]
           assert report["policies"] == [
               "certainty_equivalent", "shielded_certainty_equivalent", "worst_case_robust",
-              "unconstrained_information_bonus", "budgeted_dual_control",
-              "separated_sensor_probe_reference", "oracle_known_gain"
+              "unconstrained_information_bonus", "weighted_budgeted_dual_control",
+              "dual_gatekeeper", "separated_sensor_probe_reference", "oracle_known_gain"
           ]
 
           rows = report["summary"]
-          assert len(rows) == 14
+          assert len(rows) == 16
           by_key = {(row["scenario"], row["policy"]): row for row in rows}
           assert len(by_key) == len(rows)
           required_numeric = [
@@ -72,11 +72,13 @@ jobs:
               assert row["p95_cost"] >= 0.0
           
           for scenario in report["scenarios"]:
-              dual = by_key[(scenario, "budgeted_dual_control")]
+              weighted = by_key[(scenario, "weighted_budgeted_dual_control")]
+              gatekeeper = by_key[(scenario, "dual_gatekeeper")]
               shielded = by_key[(scenario, "shielded_certainty_equivalent")]
-              assert dual["max_budget_spent"] <= report["mission_degradation_budget"] + 1e-8
-              assert dual["mean_probe_count"] == 0.0
-              assert dual["violation_episode_rate"] == 0.0
+              for dual in (weighted, gatekeeper):
+                  assert dual["max_budget_spent"] <= report["mission_degradation_budget"] + 1e-8
+                  assert dual["mean_probe_count"] == 0.0
+                  assert dual["violation_episode_rate"] == 0.0
               assert shielded["violation_episode_rate"] == 0.0
               probe = by_key[(scenario, "separated_sensor_probe_reference")]
               assert probe["mean_probe_count"] == 8.0
@@ -101,8 +103,8 @@ jobs:
                   }
                   for policy in [
                       "certainty_equivalent", "shielded_certainty_equivalent",
-                      "unconstrained_information_bonus", "budgeted_dual_control",
-                      "separated_sensor_probe_reference", "oracle_known_gain"
+                      "unconstrained_information_bonus", "weighted_budgeted_dual_control",
+                      "dual_gatekeeper", "separated_sensor_probe_reference", "oracle_known_gain"
                   ]
               }
               for scenario in report["scenarios"]
