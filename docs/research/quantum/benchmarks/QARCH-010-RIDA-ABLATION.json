@@ -73,7 +73,9 @@
         0.1,
         0.1,
         0.9
-      ]
+      ],
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-A-high-info-out-of-distribution-v1"
     },
     {
       "experiment_id": "B-representative-low-info",
@@ -86,7 +88,9 @@
         0.2,
         0.2,
         0.2
-      ]
+      ],
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-B-representative-low-info-v1"
     },
     {
       "experiment_id": "C-balanced-rid",
@@ -99,7 +103,9 @@
         0.1,
         0.7,
         0.2
-      ]
+      ],
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-C-balanced-rid-v1"
     },
     {
       "experiment_id": "D-alternative-mix",
@@ -112,7 +118,9 @@
         0.4,
         0.1,
         0.1
-      ]
+      ],
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-D-alternative-mix-v1"
     }
   ],
   "component_formulae": {
@@ -144,7 +152,9 @@
         "representativeness_and_de_amplification": 0.363318042491699,
         "informativeness_and_de_amplification": 0.6633249580710799,
         "full_rid_proxy": 0.5091643369659489
-      }
+      },
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-A-high-info-out-of-distribution-v1"
     },
     {
       "experiment_id": "B-representative-low-info",
@@ -164,7 +174,9 @@
         "representativeness_and_de_amplification": 1,
         "informativeness_and_de_amplification": 0.5773502691896257,
         "full_rid_proxy": 0.6933612743506347
-      }
+      },
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-B-representative-low-info-v1"
     },
     {
       "experiment_id": "C-balanced-rid",
@@ -184,7 +196,9 @@
         "representativeness_and_de_amplification": 0.9197825830053535,
         "informativeness_and_de_amplification": 0.7916228058025279,
         "full_rid_proxy": 0.8262149225665352
-      }
+      },
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-C-balanced-rid-v1"
     },
     {
       "experiment_id": "D-alternative-mix",
@@ -204,7 +218,9 @@
         "representativeness_and_de_amplification": 0.7981227975693966,
         "informativeness_and_de_amplification": 0.6745368781616021,
         "full_rid_proxy": 0.6829199694432901
-      }
+      },
+      "eligibility_status": "eligible",
+      "eligibility_evidence_digest": "synthetic-eligibility-D-alternative-mix-v1"
     }
   ],
   "expected_policy_rankings": {
@@ -446,5 +462,223 @@
     ],
     "expected_full_rid_proxy_winner": "A-high-info-out-of-distribution",
     "prohibited_claim": "A target-distribution change must alter the declared objective only; this synthetic result does not demonstrate deployment performance."
+  },
+  "stale_calibration_exclusion_case": {
+    "case_id": "QARCH-010-INELIGIBLE-CANDIDATE-003",
+    "evidence_class": "synthetic_negative_control",
+    "eligibility_evidence": "synthetic-stale-calibration-record-v1",
+    "profiles": [
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "eligibility_status": "stale_calibration",
+        "eligibility_evidence_digest": "synthetic-stale-calibration-record-v1",
+        "sampling_regime_probabilities": [],
+        "validation_error_by_regime": []
+      },
+      {
+        "experiment_id": "B-representative-low-info",
+        "sampling_regime_probabilities": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "validation_error_by_regime": [
+          0.2,
+          0.2,
+          0.2
+        ],
+        "eligibility_status": "eligible",
+        "eligibility_evidence_digest": "synthetic-eligibility-B-representative-low-info-v1"
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "sampling_regime_probabilities": [
+          0.4,
+          0.4,
+          0.2
+        ],
+        "validation_error_by_regime": [
+          0.1,
+          0.7,
+          0.2
+        ],
+        "eligibility_status": "eligible",
+        "eligibility_evidence_digest": "synthetic-eligibility-C-balanced-rid-v1"
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "sampling_regime_probabilities": [
+          0.2,
+          0.4,
+          0.4
+        ],
+        "validation_error_by_regime": [
+          0.4,
+          0.1,
+          0.1
+        ],
+        "eligibility_status": "eligible",
+        "eligibility_evidence_digest": "synthetic-eligibility-D-alternative-mix-v1"
+      }
+    ],
+    "expected_ineligible_candidates": [
+      {
+        "experiment_id": "A-high-info-out-of-distribution",
+        "eligibility_status": "stale_calibration",
+        "eligibility_evidence_digest": "synthetic-stale-calibration-record-v1"
+      }
+    ],
+    "expected_eligible_component_scores": [
+      {
+        "experiment_id": "B-representative-low-info",
+        "R": 1,
+        "I": 0.5,
+        "D": 1,
+        "te": 0.2,
+        "se": 0.2,
+        "gap": 0
+      },
+      {
+        "experiment_id": "C-balanced-rid",
+        "R": 0.9,
+        "I": 1,
+        "D": 0.9400000000000001,
+        "te": 0.30000000000000004,
+        "se": 0.36,
+        "gap": 0.05999999999999994
+      },
+      {
+        "experiment_id": "D-alternative-mix",
+        "R": 0.7,
+        "I": 0.75,
+        "D": 0.91,
+        "te": 0.25,
+        "se": 0.16000000000000003,
+        "gap": 0.08999999999999997
+      }
+    ],
+    "expected_policy_rankings": {
+      "representativeness_only": [
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 1,
+          "rank": 1
+        },
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.9,
+          "rank": 2
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.7,
+          "rank": 3
+        }
+      ],
+      "informativeness_only": [
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 1,
+          "rank": 1
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.75,
+          "rank": 2
+        },
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 0.5,
+          "rank": 3
+        }
+      ],
+      "de_amplification_only": [
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 1,
+          "rank": 1
+        },
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.9400000000000001,
+          "rank": 2
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.91,
+          "rank": 3
+        }
+      ],
+      "representativeness_and_informativeness": [
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.9486832980505138,
+          "rank": 1
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.7245688373094719,
+          "rank": 2
+        },
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 0.7071067811865476,
+          "rank": 3
+        }
+      ],
+      "representativeness_and_de_amplification": [
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 1,
+          "rank": 1
+        },
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.9197825830053535,
+          "rank": 2
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.7981227975693966,
+          "rank": 3
+        }
+      ],
+      "informativeness_and_de_amplification": [
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.9695359714832659,
+          "rank": 1
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.8261355820929153,
+          "rank": 2
+        },
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 0.7071067811865476,
+          "rank": 3
+        }
+      ],
+      "full_rid_proxy": [
+        {
+          "experiment_id": "C-balanced-rid",
+          "score": 0.945779989272011,
+          "rank": 1
+        },
+        {
+          "experiment_id": "B-representative-low-info",
+          "score": 0.7937005259840998,
+          "rank": 2
+        },
+        {
+          "experiment_id": "D-alternative-mix",
+          "score": 0.7817482155458204,
+          "rank": 3
+        }
+      ]
+    },
+    "expected_invariant": "A stale candidate is not ranked and does not influence the informativeness normalization of eligible candidates.",
+    "prohibited_claim": "Synthetic eligibility control only; not physical calibration evidence."
   }
 }
