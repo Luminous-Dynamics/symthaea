@@ -885,10 +885,6 @@ fn adjudicate_case(
         })
         .unwrap_or_default();
 
-    if hidden_dependency_missed {
-        report.metrics.hidden_dependency_misses += 1;
-    }
-
     match case.expected_disposition.as_str() {
         "capture_dependency" => {
             if matching_observations.len() != 1 {
@@ -932,9 +928,10 @@ fn adjudicate_case(
         || receipt.integrity.unmonitored_process
         || receipt.integrity.snapshot_race
         || receipt.integrity.root_escape;
+    let mut integrity_failure_not_invalidated = false;
 
     if integrity_fault && receipt.disposition != "invalidated" {
-        report.metrics.integrity_failures_not_invalidated += 1;
+        integrity_failure_not_invalidated = true;
         push_error(
             report,
             Some(case_id),
@@ -1051,7 +1048,7 @@ fn adjudicate_case(
             if receipt.disposition != "invalidated"
                 || receipt.reuse_decision != "invalidated"
             {
-                report.metrics.integrity_failures_not_invalidated += 1;
+                integrity_failure_not_invalidated = true;
                 push_error(
                     report,
                     Some(case_id),
@@ -1062,6 +1059,13 @@ fn adjudicate_case(
             }
         }
         _ => {}
+    }
+
+    if hidden_dependency_missed {
+        report.metrics.hidden_dependency_misses += 1;
+    }
+    if integrity_failure_not_invalidated {
+        report.metrics.integrity_failures_not_invalidated += 1;
     }
 }
 
@@ -1078,6 +1082,10 @@ fn validate_pairs(
 
     for case in cases {
         for paired_id in &case.paired_case_ids {
+            // Reciprocal links are adjudicated once in stable lexical order.
+            if case.case_id.as_str() > paired_id.as_str() {
+                continue;
+            }
             let Some(paired_case) = case_by_id.get(paired_id.as_str()).copied() else {
                 push_error(
                     report,
@@ -1456,7 +1464,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_cross_run_or_cross_catalog_receipts() {
+    fn rejects_cross_run_receipts() {
         let (catalog, oracle, receipts) = fixture_inputs();
         let mut receipt_value: Value =
             serde_json::from_slice(&receipts).expect("receipt fixture parses");
