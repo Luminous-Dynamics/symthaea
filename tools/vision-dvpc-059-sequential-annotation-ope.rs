@@ -518,8 +518,6 @@ fn evaluate_batch_adaptive(
     let adaptive_budget = adaptive_batch_budget(world.budget, kappa, pilot_p)?;
     let mut adaptive_world = world;
     adaptive_world.budget = adaptive_budget;
-    let oracle_target = exact_history_adaptive(adaptive_world, world.variance)?.design;
-
     let mut estimates = Vec::with_capacity(replicates);
     let mut analytic_mse = 0.0;
     let mut expected_labels = 0.0;
@@ -587,9 +585,6 @@ fn evaluate_batch_adaptive(
             world.budget
         ));
     }
-    let _oracle_mse =
-        two_batch_variance_objective(world.variance, pilot_p, oracle_target,
-            world.branch_probability, kappa)? / total_n as f64;
     let _ = pilot_expected_labels;
     Ok(Metrics {
         bias,
@@ -925,6 +920,7 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.lines().filter(|line| line.starts_with("RESULT\t")).count(), 8);
         assert_eq!(first.lines().filter(|line| line.starts_with("ORACLE\t")).count(), 2);
+        assert_eq!(first.lines().filter(|line| line.starts_with("TWO_BATCH_ORACLE\t")).count(), 2);
         assert_eq!(first.lines().filter(|line| line.starts_with("BENCHMARK_CONFIG\t")).count(), 8);
         for line in first.lines().filter(|line| line.starts_with("RESULT\t")) {
             assert_eq!(line.split('\t').count(), 20);
