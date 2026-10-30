@@ -11,6 +11,7 @@ on:
       - "schemas/hardsec-*.schema.json"
       - "tools/hardsec-audit-harness/Cargo.toml"
       - "tools/hardsec-audit-harness/requirements-validation.txt"
+      - "tools/hardsec-audit-harness/actions.lock.json"
       - ".github/workflows/hardsec-audit-tests.yml"
   workflow_dispatch:
 
@@ -443,6 +444,32 @@ jobs:
           workflow_blob = subprocess.check_output(
               ["git", "rev-parse", "HEAD:.github/workflows/hardsec-audit-tests.yml"], text=True
           ).strip()
+          workflow_path = Path(".github/workflows/hardsec-audit-tests.yml")
+          workflow_text = workflow_path.read_text(encoding="utf-8")
+          action_lock_path = Path("tools/hardsec-audit-harness/actions.lock.json")
+          action_lock = json.loads(action_lock_path.read_text(encoding="utf-8"))
+          locked_actions = {
+              item["repository"]: item["commit"]
+              for item in action_lock["actions"]
+          }
+          workflow_actions = re.findall(
+              r"^\\s*uses:\\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@([^\\s]+)",
+              workflow_text,
+              flags=re.MULTILINE,
+          )
+          if len(workflow_actions) != len(locked_actions):
+              raise SystemExit(
+                  f"workflow action count {len(workflow_actions)} != lock count {len(locked_actions)}"
+              )
+          for repository, reference in workflow_actions:
+              if not re.fullmatch(r"[a-f0-9]{40}", reference):
+                  raise SystemExit(f"workflow action {repository} is not pinned to a full commit SHA: {reference}")
+              if locked_actions.get(repository) != reference:
+                  raise SystemExit(
+                      f"workflow action pin for {repository} differs from actions.lock.json: {reference}"
+                  )
+          if set(locked_actions) != {repository for repository, _ in workflow_actions}:
+              raise SystemExit("actions.lock.json repositories differ from workflow uses references")
           package_checksums = archive_root / "checksums/SHA256SUMS"
 
           manifest = {
@@ -456,6 +483,12 @@ jobs:
                   "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
                   "event_name": os.environ["GITHUB_EVENT_NAME"],
                   "ref": os.environ["GITHUB_REF"],
+              },
+              "workflow_actions": {
+                  "lock_path": str(action_lock_path),
+                  "lock_sha256": digest(action_lock_path),
+                  "actions": action_lock["actions"],
+                  "verification": "all_workflow_uses_refs_are_full_commit_shas_and_match_the_lock",
               },
               "upstream": {
                   "repository": "kxiaud/seqcube-ht-witness-validation-artifact",
@@ -549,6 +582,7 @@ jobs:
                   "sha256": hashlib.sha256(subject.read_bytes()).hexdigest(),
               },
               "run": manifest["run"],
+              "workflow_actions": manifest["workflow_actions"],
               "upstream": manifest["upstream"],
               "tests": manifest["tests"],
               "replay": manifest["replay"],
