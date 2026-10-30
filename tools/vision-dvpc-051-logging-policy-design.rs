@@ -24,6 +24,7 @@ const POLICY_COUNTS: [usize; 3] = [4, 8, 32];
 const DEFAULT_GRID_INTERVALS: usize = 200;
 const SMOKE_GRID_INTERVALS: usize = 20;
 const EPS: f64 = 1e-12;
+const REWARD_UPPER_ENVELOPE: [[f64; 2]; 2] = [[0.20, 0.95], [0.98, 0.20]];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PortfolioRegime {
@@ -182,13 +183,42 @@ fn weight_second_moment(policy: Policy, logger: Logger) -> f64 {
 /// Registered conservative upper envelope on Bernoulli reward means. The envelope
 /// is an explicit information assumption; it is not estimated from hidden test truth.
 fn reward_upper_mean(context: usize, action: usize) -> f64 {
-    match (context, action) {
-        (0, 0) => 0.20,
-        (0, 1) => 0.95,
-        (1, 0) => 0.98,
-        (1, 1) => 0.20,
-        _ => unreachable!(),
+    REWARD_UPPER_ENVELOPE[context][action]
+}
+
+fn validate_reward_envelope(
+    envelope: [[f64; 2]; 2],
+    true_means: [[f64; 2]; 2],
+) -> Result<(), String> {
+    for context in 0..2 {
+        for action in 0..2 {
+            let upper = envelope[context][action];
+            let truth = true_means[context][action];
+            if !upper.is_finite() || !(0.0..=1.0).contains(&upper) {
+                return Err(format!(
+                    "reward envelope is not a finite Bernoulli mean at context={context}, action={action}"
+                ));
+            }
+            if !truth.is_finite() || !(0.0..=1.0).contains(&truth) {
+                return Err(format!(
+                    "true reward mean is not a finite Bernoulli mean at context={context}, action={action}"
+                ));
+            }
+            if upper + EPS < truth {
+                return Err(format!(
+                    "reward envelope undercovers context={context}, action={action}: upper={upper}, truth={truth}"
+                ));
+            }
+        }
     }
+    Ok(())
+}
+
+fn frozen_reward_mean_table() -> [[f64; 2]; 2] {
+    [
+        [reward_mean(0, 0), reward_mean(0, 1)],
+        [reward_mean(1, 0), reward_mean(1, 1)],
+    ]
 }
 
 /// Upper bound on E_mu[(w_pi R)^2] using the preregistered reward envelope.
@@ -400,6 +430,7 @@ fn benchmark(grid_intervals: usize) -> Result<String, String> {
     if grid_intervals == 0 {
         return Err("grid intervals must be positive".into());
     }
+    validate_reward_envelope(REWARD_UPPER_ENVELOPE, frozen_reward_mean_table())?;
     let mut out = String::from(
         "record_type\tportfolio\tM\tlogger\tp1_context0\tp1_context1\tmin_action_propensity\tmax_action_propensity\texpected_logger_reward\treward_gap_vs_floor_greedy\tworst_policy_id\tworst_weight_second_moment\tworst_reward_envelope_ips_second_moment\timplied_min_ess_fraction\tworst_ips_reward_variance\toracle_only\tgrid_intervals\n",
     );
@@ -474,6 +505,26 @@ mod tests {
                 + 0.3_f64.powi(2) / 0.6
                 + 0.7_f64.powi(2) / 0.4);
         assert!((weight_second_moment(policy, logger) - independently_enumerated).abs() < EPS);
+    }
+
+    #[test]
+    fn registered_reward_envelope_validates_against_frozen_world() {
+        validate_reward_envelope(REWARD_UPPER_ENVELOPE, frozen_reward_mean_table()).unwrap();
+    }
+
+    #[test]
+    fn reward_envelope_fails_closed_on_undercoverage_and_invalid_means() {
+        let mut shifted_world = frozen_reward_mean_table();
+        shifted_world[0][1] = 0.97;
+        assert!(validate_reward_envelope(REWARD_UPPER_ENVELOPE, shifted_world).is_err());
+
+        let mut invalid_envelope = REWARD_UPPER_ENVELOPE;
+        invalid_envelope[1][0] = f64::NAN;
+        assert!(validate_reward_envelope(invalid_envelope, frozen_reward_mean_table()).is_err());
+
+        let mut invalid_truth = frozen_reward_mean_table();
+        invalid_truth[1][1] = 1.01;
+        assert!(validate_reward_envelope(REWARD_UPPER_ENVELOPE, invalid_truth).is_err());
     }
 
     #[test]
