@@ -533,3 +533,13 @@ No stage receives production write credentials. Only an accepted, independently 
 - [Schema](CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.schema.json)
 - [Synthetic example](examples/CONNECTOME_QUERY_RELIABILITY_CERTIFICATE.example.json)
 - `connectome-query-cert-audit` validates cross-field state, dependency, digest, correction-order, and invalidation invariants. The expected synthetic result is `PASS` for a `CONDITIONAL` certificate; this is not biological evidence.
+
+
+### Spatial PSU frame integrity gate (SCI-CONNECTOMICS-013)
+
+- [Protocol V1](CONNECTOME_SPATIAL_FRAME_AUDIT_PROTOCOL_V1.md)
+- [JSON Schema](CONNECTOME_SPATIAL_FRAME.schema.json)
+- [Synthetic frame](examples/CONNECTOME_SPATIAL_FRAME.example.json)
+- [Issue #9260](https://github.com/Luminous-Dynamics/symthaea/issues/9260)
+
+The `connectome-spatial-frame-audit` executable validates exact 3D lattice tiling inside a declared voxel bounding box, partitions every tile into eligible or explicitly excluded, and exports the eligible PSU population. #9204 now requires the exact spatial-frame report bytes and both the complete lattice and eligible-population digests before it will estimate candidate-generation recall. This proves tiling only within the declared box; source and eligibility-mask completeness remain external evidence gates.
