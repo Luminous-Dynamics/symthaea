@@ -433,13 +433,12 @@ fn rank_candidates(input: &Input, input_sha: &str, policy: &str) -> Vec<usize> {
                         / candidate.review_minutes
                 }
                 "deterministic_random" => {
-                    let digest = sha256(format!("{input_sha}:{}", candidate.candidate_id).as_bytes());
-                    let first = u64::from_be_bytes(
-                        hex::decode(&digest[..16]).expect("SHA digest is valid hex")[..8]
-                            .try_into()
-                            .expect("eight bytes"),
+                    let digest = Sha256::digest(
+                        format!("{input_sha}:{}", candidate.candidate_id).as_bytes()
                     );
-                    first as f64 / u64::MAX as f64
+                    let mut first_eight = [0_u8; 8];
+                    first_eight.copy_from_slice(&digest[..8]);
+                    u64::from_be_bytes(first_eight) as f64 / u64::MAX as f64
                 }
                 _ => 0.0,
             };
@@ -494,7 +493,7 @@ fn exact_optimum(
                 cost += input.candidates[index].review_minutes;
             }
         }
-        if cost > budget + 1.0e-9 || cost > best_cost + budget {
+        if cost > budget + 1.0e-9 {
             continue;
         }
         let Ok(candidate_utility) = utility(input, baseline_error, &selected) else {
