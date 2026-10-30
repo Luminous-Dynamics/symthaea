@@ -41,6 +41,13 @@ MemEvoBench explores long-horizon memory contamination from adversarial injectio
 
 These benchmarks address complementary questions. Do not pool their scores or claim that a result on one establishes performance on another.
 
+The broader evaluation landscape adds two important dimensions:
+
+- **MemEvoBench** tests long-horizon memory contamination from adversarial injection, noisy tool outputs, and biased feedback across seven domains and 36 risk types. Broca should test that invalid or low-authority updates cannot gradually alter a supported proposition merely through repetition: https://arxiv.org/abs/2604.15774
+- **COLLABMEM** evaluates multi-agent memory sharing, access visibility, routing, provenance, conflict handling, and retention. Its benchmark describes 58 hand-authored scenarios (1,118 core probes) and a 174-scenario scaled split (3,359 probes); its reported TMS-GRAPH++ framework achieves a 69.6% average across five evaluation splits. These numbers are benchmark-specific and not directly comparable with LongMemEval or MemCalib: https://aclanthology.org/2026.emnlp-main.1194/
+
+A further caution comes from *The Epistemics of Agent Memory* (September 2026). Its authors report that their ConsolidationBench quality score did not predict transfer accuracy on a two-benchmark sample (pooled Spearman rho = -0.24, n = 12, confidence interval spanning zero), while governance properties remained statistically distinct from the quality score. The practical lesson is that intrinsic metrics must be validated against held-out transfer tasks; do not present a high support-state or influence-calibration score as proof of better agent performance: https://arxiv.org/abs/2609.33013
+
 ## 3. A typed influence contract for each memory atom
 
 For each evaluation task, the benchmark oracle labels each candidate memory atom with one intended influence role:
@@ -142,6 +149,21 @@ Compare the same reader under:
 - The official MemCalib/MemCalib-RL baselines where licensing and harness terms permit.
 
 The important comparison is not just whether the full-memory condition beats no memory. It is whether Broca improves *selective use*: correct use of required atoms, invariance to irrelevant atoms, zero influence from invalid memory, and improved task outcomes at equal context and compute budgets.
+
+## 7A. Multi-agent scope, routing, and retention
+
+The same memory atom can be valid for one role and prohibited for another. "Ignore" at the reader level is not a substitute for access control: unauthorized atoms must be filtered before retrieval and must not be exposed in the receiving agent's context.
+
+Add these collaboration-specific conditions alongside the single-agent ablations:
+
+- **Role visibility:** a scoped atom is retrievable only by the roles granted access by policy.
+- **Target routing:** a memory requiring a specialist's action reaches the intended role and does not leak to unrelated roles.
+- **Provenance handoff:** a receiving role retains original source identity, writer identity, policy version, and justification witness rather than inheriting an unattributed summary.
+- **Authority conflict:** updates from different roles are resolved only by a declared authority policy; absent a valid policy winner, expose conflict.
+- **Retention expiry:** deleted or expired information is absent from future role views, indexes, derived state, and answer influence.
+- **Poisoning resistance:** repeated low-authority or adversarial tool claims cannot accumulate into a supported proposition merely through repetition.
+
+These cases should be evaluated with a memory-only multi-agent harness that fixes the history trace, target role, answerer, judge, and gold event. Separate sharing, access, routing, provenance, conflict, and retention failures. Use the official COLLABMEM split where available; do not relabel its scores as MemCalib scores.
 
 ## 8. Proposed internal promotion gates
 
