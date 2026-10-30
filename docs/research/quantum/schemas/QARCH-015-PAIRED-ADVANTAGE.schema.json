@@ -121,7 +121,7 @@
       "required": [
         "independent_unit_definition",
         "within_block_reduction",
-        "minimum_relative_resource_gain",
+        "minimum_relative_resource_reduction",
         "quality_non_inferiority_margin",
         "resource_tie_tolerance_log_ratio",
         "quality_tie_tolerance",
@@ -138,9 +138,10 @@
           "type": "string",
           "minLength": 10
         },
-        "minimum_relative_resource_gain": {
+        "minimum_relative_resource_reduction": {
           "type": "number",
-          "minimum": 0
+          "minimum": 0,
+          "exclusiveMaximum": 1
         },
         "quality_non_inferiority_margin": {
           "type": "number",
