@@ -76,6 +76,7 @@
         "reviewer_id_sha256",
         "verdict",
         "blind_to_generator_identity",
+        "blind_to_intended_relation",
         "blind_to_pipeline_disposition",
         "blind_to_evaluator_outcome",
         "adjudication_artifact_sha256"
@@ -102,6 +103,9 @@
         },
         "adjudication_artifact_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "blind_to_intended_relation": {
+          "const": true
         }
       }
     },
