@@ -270,6 +270,85 @@ fn plan_checks(plan: Option<&GrammarPlanEvidence>) -> Vec<AnalystCheck> {
                 ),
             ),
         ],
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            let plan = &evidence.plan;
+            vec![
+                observed_check(
+                    "prog-suite-section-contract",
+                    "ProgSuite preserves the four-section 4/7/5/4 mixed-meter arc and contiguous timing",
+                    evidence.verification.meter_sequence_valid
+                        && evidence.verification.section_boundaries_contiguous
+                        && evidence.verification.total_duration_matches,
+                    "four contiguous sections with meters [4, 7, 5, 4] and matching score duration",
+                    format!(
+                        "{} sections; meters {:?}; {} realized beats",
+                        plan.sections.len(),
+                        plan.sections.iter().map(|s| s.meter).collect::<Vec<_>>(),
+                        plan.expected_total_beats
+                    ),
+                ),
+                observed_check(
+                    "prog-suite-theme-return",
+                    "The final section's emitted melody is an untransformed return of the opening theme",
+                    evidence.verification.theme_return_identical,
+                    "same pitch/duration sequence and relative onsets in opening A and ReturnA",
+                    format!("{:?}", evidence.verification),
+                ),
+            ]
+        },
+        GrammarPlanEvidence::Sonata(evidence) => vec![
+            observed_check(
+                "sonata-five-section-plan",
+                "Sonata retains the five tonal/thematic regions",
+                evidence.plan.sections.len() == 5,
+                "five sections: exposition P/S, development, recapitulation P/S",
+                format!("{} planned sections", evidence.plan.sections.len()),
+            ),
+            observed_check(
+                "sonata-score-side-obligations",
+                "Every reported Sonata obligation has score-side verification",
+                !evidence.verification.is_empty()
+                    && evidence.verification.iter().all(|item| item.verified),
+                "all obligation verification records are true",
+                format!(
+                    "{}/{} obligations verified",
+                    evidence.verification.iter().filter(|item| item.verified).count(),
+                    evidence.verification.len()
+                ),
+            ),
+        ],
+        GrammarPlanEvidence::Renaissance(evidence) => vec![
+            observed_check(
+                "renaissance-equal-voices",
+                "Renaissance composition preserves three equal voices without chordal harmony",
+                evidence.verification.three_independent_voices_present
+                    && evidence.verification.no_chordal_harmony_voice
+                    && evidence.verification.meter_and_duration_match,
+                "Melody, CounterMelody and Bass present; Harmony absent; declared nine-bar duration matches score",
+                format!("{:?}", evidence.verification),
+            ),
+            observed_check(
+                "renaissance-rotating-entry-orders",
+                "Renaissance points rotate voice entry order instead of using a Fugue answer",
+                evidence.verification.point_one_entry_order_verified
+                    && evidence.verification.point_two_entry_order_verified,
+                "bass-altus-superius, then superius-bass-altus",
+                format!(
+                    "point 1 {}; point 2 {}",
+                    evidence.verification.point_one_entry_order_verified,
+                    evidence.verification.point_two_entry_order_verified
+                ),
+            ),
+            observed_check(
+                "renaissance-clausula",
+                "The score resolves the 7-6 suspension and the 7-6-8 Landini under-third",
+                evidence.verification.alto_suspension_resolves_down_step
+                    && evidence.verification.soprano_landini_underthird_verified
+                    && evidence.verification.bass_closes_on_tonic,
+                "alto 7-6; soprano 7-6-8; bass tonic",
+                format!("{:?}", evidence.verification),
+            ),
+        ],
         GrammarPlanEvidence::Compatibility {
             family,
             form_available,

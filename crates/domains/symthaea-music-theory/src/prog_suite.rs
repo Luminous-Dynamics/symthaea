@@ -53,6 +53,7 @@ use crate::phrase::Period;
 use crate::pitch::Pitch;
 use crate::rhythm::Duration;
 use crate::score::Score;
+use serde::{Deserialize, Serialize};
 
 /// One section's plan: which key, which meter, and which motif
 /// transformation (`None` = the theme unaltered).
@@ -62,6 +63,55 @@ struct SectionPlan {
     meter: f64,
     transform: Option<u64>,
 }
+
+/// Public section receipt bound to the actual realized score timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgSuiteSectionEvidence {
+    pub role: SectionRole,
+    pub key: Key,
+    pub meter: u8,
+    /// Choice 0/1/2 means inversion/retrograde/retrograde-inversion.
+    /// None means the theme is restated without transformation.
+    pub transform: Option<u64>,
+    pub start: Duration,
+    pub end: Duration,
+}
+
+/// The exact mixed-meter structure consumed by the ProgSuite realization.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgSuitePlan {
+    pub sections: Vec<ProgSuiteSectionEvidence>,
+    pub opening_meter: u8,
+    pub bars_per_section_phrase: u8,
+    pub expected_total_beats: f64,
+}
+
+/// A ProgSuite score paired with the plan from the same realization pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProgSuiteRealization {
+    pub score: Score,
+    pub plan: ProgSuitePlan,
+    pub verification: ProgSuiteVerification,
+}
+
+/// Score-side verification of the obligations declared by a ProgSuite plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgSuiteVerification {
+    pub meter_sequence_valid: bool,
+    pub section_boundaries_contiguous: bool,
+    pub total_duration_matches: bool,
+    pub theme_return_identical: bool,
+}
+
+impl ProgSuiteVerification {
+    pub fn all_verified(&self) -> bool {
+        self.meter_sequence_valid
+            && self.section_boundaries_contiguous
+            && self.total_duration_matches
+            && self.theme_return_identical
+    }
+}
+
 
 fn identity_key(k: Key) -> Key {
     k
@@ -75,6 +125,20 @@ pub(crate) fn realize_prog_suite(
     intent: &MusicalIntent,
     spec: &crate::spec::CompositionSpec,
 ) -> Score {
+    realize_prog_suite_with_plan(home_key, tempo, motif, seed, intent, spec).score
+}
+
+/// Plan-preserving counterpart to the canonical ProgSuite realizer. The plan
+/// boundaries are recorded from the actual spliced sub-score lengths, not
+/// recomputed from a second estimate.
+pub(crate) fn realize_prog_suite_with_plan(
+    home_key: Key,
+    tempo: f32,
+    motif: &Motif,
+    seed: u64,
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+) -> ProgSuiteRealization {
     let pivot = motif.notes.iter().find_map(|x| x.degree).unwrap_or(1);
     let b_choice = seed % 3;
     let c_choice = (b_choice + 1) % 3;
@@ -111,6 +175,7 @@ pub(crate) fn realize_prog_suite(
     let mut prev_upper: Vec<Pitch> = Vec::new();
     let mut prev_bass: Option<Pitch> = None;
     let mut cursor = Duration::zero();
+    let mut section_evidence = Vec::with_capacity(plan.len());
     let bars = 4usize;
     let pattern = crate::accompaniment::Accompaniment::Comp; // driving, active — a prog rhythm section
 
@@ -175,15 +240,90 @@ pub(crate) fn realize_prog_suite(
             false,
         );
 
+        let section_start = cursor;
         for n in &phrase_score.notes {
             let mut shifted = *n;
             shifted.onset = shifted.onset + cursor;
             score.push(shifted);
         }
         cursor = cursor + phrase_score.total_beats;
+        section_evidence.push(ProgSuiteSectionEvidence {
+            role: sec.role,
+            key,
+            meter: sec.meter as u8,
+            transform: sec.transform,
+            start: section_start,
+            end: cursor,
+        });
     }
 
-    score
+    let plan = ProgSuitePlan {
+        sections: section_evidence,
+        opening_meter,
+        bars_per_section_phrase: bars as u8,
+        expected_total_beats: cursor.beats(),
+    };
+    let expected_meters = [4, 7, 5, 4];
+    let meter_sequence_valid = plan.sections.len() == 4
+        && plan.opening_meter == score.meter
+        && plan
+            .sections
+            .iter()
+            .map(|section| section.meter)
+            .eq(expected_meters);
+    let section_boundaries_contiguous = plan.sections.len() == 4
+        && plan.sections.first().is_some_and(|section| section.start.beats() == 0.0)
+        && plan.sections.windows(2).all(|pair| {
+            (pair[0].end.beats() - pair[1].start.beats()).abs() <= 1e-7
+        });
+    let total_duration_matches =
+        (score.total_beats.beats() - plan.expected_total_beats).abs() <= 1e-7
+            && plan.sections.last().is_some_and(|section| {
+                (section.end.beats() - score.total_beats.beats()).abs() <= 1e-7
+            });
+    let melody_signature = |start: f64, end: f64| -> Vec<(u8, f64, f64)> {
+        score
+            .voice(crate::score::VoiceRole::Melody)
+            .into_iter()
+            .filter(|note| {
+                note.onset.beats() >= start - 1e-7 && note.onset.beats() < end - 1e-7
+            })
+            .map(|note| {
+                (
+                    note.pitch.midi(),
+                    note.onset.beats() - start,
+                    note.duration.beats(),
+                )
+            })
+            .collect()
+    };
+    let opening_melody =
+        melody_signature(plan.sections[0].start.beats(), plan.sections[0].end.beats());
+    let return_melody =
+        melody_signature(plan.sections[3].start.beats(), plan.sections[3].end.beats());
+    let theme_return_identical = plan.sections.len() == 4
+        && plan.sections[0].role == SectionRole::A
+        && plan.sections[3].role == SectionRole::ReturnA
+        && plan.sections[0].key == plan.sections[3].key
+        && plan.sections[0].meter == plan.sections[3].meter
+        && plan.sections[0].transform.is_none()
+        && plan.sections[3].transform.is_none()
+        && opening_melody.len() == return_melody.len()
+        && opening_melody
+            .iter()
+            .zip(&return_melody)
+            .all(|(left, right)| {
+                left.0 == right.0
+                    && (left.1 - right.1).abs() <= 1e-7
+                    && (left.2 - right.2).abs() <= 1e-7
+            });
+    let verification = ProgSuiteVerification {
+        meter_sequence_valid,
+        section_boundaries_contiguous,
+        total_duration_matches,
+        theme_return_identical,
+    };
+    ProgSuiteRealization { score, plan, verification }
 }
 
 #[cfg(test)]

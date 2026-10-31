@@ -470,6 +470,74 @@ pub fn build_grammar_trace(
                 }
             }
         }
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            for (index, section) in evidence.plan.sections.iter().enumerate() {
+                if let Some(assertion) = structure_for_region(
+                    score,
+                    format!("prog-suite-section-{index}"),
+                    format!(
+                        "prog-{:?}-{}-beat",
+                        section.role,
+                        section.meter
+                    ).to_ascii_lowercase(),
+                    section.start.beats(),
+                    section.end.beats(),
+                    "prog-suite-mixed-meter-plan",
+                ) {
+                    structures.push(assertion);
+                }
+            }
+        }
+        GrammarPlanEvidence::Sonata(evidence) => {
+            for section in &evidence.plan.sections {
+                if let Some(assertion) = structure_for_region(
+                    score,
+                    format!("sonata-{:?}", section.kind).to_ascii_lowercase(),
+                    format!("sonata-{:?}", section.kind).to_ascii_lowercase(),
+                    section.start.beats(),
+                    section.end.beats(),
+                    "sonata-five-section-plan",
+                ) {
+                    structures.push(assertion);
+                }
+            }
+        }
+        GrammarPlanEvidence::Renaissance(evidence) => {
+            let bar = score.meter as f64;
+            let plan = &evidence.plan;
+            for (index, (kind, start_bar, end_bar)) in [
+                ("point-of-imitation-one", 0.0, 3.0),
+                (
+                    "independent-voice-bridge",
+                    plan.bridge_start_bar as f64,
+                    plan.bridge_start_bar as f64 + plan.bridge_bars as f64,
+                ),
+                (
+                    "point-of-imitation-two",
+                    plan.point_two_start_bar as f64,
+                    plan.cadence_start_bar as f64,
+                ),
+                (
+                    "renaissance-clausula",
+                    plan.cadence_start_bar as f64,
+                    plan.total_bars as f64,
+                ),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if let Some(assertion) = structure_for_region(
+                    score,
+                    format!("renaissance-section-{index}"),
+                    kind.into(),
+                    start_bar * bar,
+                    end_bar * bar,
+                    "renaissance-equal-voice-plan",
+                ) {
+                    structures.push(assertion);
+                }
+            }
+        }
     }
 
     let mut obligations = Vec::new();
@@ -626,6 +694,115 @@ pub fn build_grammar_trace(
                 responsible_pass: "jazz-chorus-engine".into(),
                 transformation: Some("role-transformed-theme-per-chorus".into()),
             });
+        }
+        GrammarPlanEvidence::ProgSuite(evidence) => {
+            let plan_valid = evidence.verification.all_verified();
+            obligations.push(ObligationAssertion {
+                obligation_id: "prog-suite-meter-and-theme-return".into(),
+                from: None,
+                to: AssertedObligationState::Created,
+                evidence: Vec::new(),
+                responsible_pass: "prog-suite-planner".into(),
+                transformation: None,
+            });
+            obligations.push(ObligationAssertion {
+                obligation_id: "prog-suite-meter-and-theme-return".into(),
+                from: Some(AssertedObligationState::Created),
+                to: if plan_valid {
+                    AssertedObligationState::Fulfilled
+                } else {
+                    AssertedObligationState::Unresolved
+                },
+                evidence: structures
+                    .iter()
+                    .flat_map(|region| [region.start, region.end])
+                    .collect(),
+                responsible_pass: "prog-suite-score-receipt-check".into(),
+                transformation: Some("4-7-5-4-mixed-meter-theme-return".into()),
+            });
+        }
+        GrammarPlanEvidence::Sonata(evidence) => {
+            for verification in &evidence.verification {
+                let id = format!("sonata-obligation-{}", verification.obligation_id);
+                obligations.push(ObligationAssertion {
+                    obligation_id: id.clone(),
+                    from: None,
+                    to: AssertedObligationState::Created,
+                    evidence: Vec::new(),
+                    responsible_pass: "sonata-planner".into(),
+                    transformation: None,
+                });
+                obligations.push(ObligationAssertion {
+                    obligation_id: id,
+                    from: Some(AssertedObligationState::Created),
+                    to: if verification.verified {
+                        AssertedObligationState::Fulfilled
+                    } else {
+                        AssertedObligationState::Unresolved
+                    },
+                    evidence: structures
+                        .iter()
+                        .flat_map(|region| [region.start, region.end])
+                        .collect(),
+                    responsible_pass: "sonata-score-side-verifier".into(),
+                    transformation: Some(format!("{:?}", verification.metric)),
+                });
+            }
+        }
+        GrammarPlanEvidence::Renaissance(evidence) => {
+            let checks = [
+                (
+                    "renaissance-equal-voices",
+                    evidence.verification.three_independent_voices_present
+                        && evidence.verification.no_chordal_harmony_voice
+                        && evidence.verification.meter_and_duration_match,
+                ),
+                (
+                    "renaissance-point-one-entry-order",
+                    evidence.verification.point_one_entry_order_verified,
+                ),
+                (
+                    "renaissance-point-two-entry-order",
+                    evidence.verification.point_two_entry_order_verified,
+                ),
+                (
+                    "renaissance-7-6-suspension",
+                    evidence.verification.alto_suspension_resolves_down_step,
+                ),
+                (
+                    "renaissance-landini-underthird",
+                    evidence.verification.soprano_landini_underthird_verified,
+                ),
+                (
+                    "renaissance-tonic-close",
+                    evidence.verification.bass_closes_on_tonic,
+                ),
+            ];
+            for (id, verified) in checks {
+                obligations.push(ObligationAssertion {
+                    obligation_id: id.into(),
+                    from: None,
+                    to: AssertedObligationState::Created,
+                    evidence: Vec::new(),
+                    responsible_pass: "renaissance-planner".into(),
+                    transformation: None,
+                });
+                obligations.push(ObligationAssertion {
+                    obligation_id: id.into(),
+                    from: Some(AssertedObligationState::Created),
+                    to: if verified {
+                        AssertedObligationState::Fulfilled
+                    } else {
+                        AssertedObligationState::Unresolved
+                    },
+                    evidence: structures
+                        .iter()
+                        .flat_map(|region| [region.start, region.end])
+                        .collect(),
+                    responsible_pass: "renaissance-score-side-checker".into(),
+                    transformation: None,
+                });
+            }
         }
         GrammarPlanEvidence::Compatibility { .. } => {}
     }

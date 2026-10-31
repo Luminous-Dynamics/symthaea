@@ -221,6 +221,97 @@ pub fn ground_audition_for(
     Some(ground_audition_impl(spec, intent, key, meter, &motif).1)
 }
 
+/// Compose a ProgSuite score while retaining the exact mixed-meter plan
+/// emitted by the same realization pass. Returns `None` for other forms.
+pub fn compose_prog_suite_with_plan(
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+) -> Option<crate::prog_suite::ProgSuiteRealization> {
+    if spec.form_kind(intent.seed) != crate::spec::FormKind::ProgSuite {
+        return None;
+    }
+    let key = spec
+        .mode
+        .and_then(|mode| Key::modal(intent.tonic, mode))
+        .unwrap_or_else(|| {
+            if intent.valence >= 0.0 {
+                Key::major(intent.tonic)
+            } else {
+                Key::minor(intent.tonic)
+            }
+        });
+    let tempo = spec.tempo(intent.arousal)
+        * match spec.attitude {
+            Some(crate::spec::Attitude::Joy) => 1.08,
+            Some(crate::spec::Attitude::Grief) => 0.85,
+            _ => 1.0,
+        };
+    let meter_beats = spec.meter as f64;
+    let motif = spec.motif(intent.arousal, intent.seed);
+    let motif = if spec.texture.hook_cell {
+        crate::hook::graft_hook(
+            &motif,
+            &crate::hook::HookCell::generate_with(&spec.melody, intent.seed, meter_beats),
+            meter_beats,
+        )
+    } else {
+        motif
+    };
+    Some(crate::prog_suite::realize_prog_suite_with_plan(
+        key,
+        tempo,
+        &motif,
+        intent.seed,
+        intent,
+        spec,
+    ))
+}
+
+/// Compose a Renaissance score while retaining its exact equal-voice,
+/// entry-order and cadence evidence from the same realization pass.
+pub fn compose_renaissance_with_plan(
+    intent: &MusicalIntent,
+    spec: &crate::spec::CompositionSpec,
+) -> Option<crate::renaissance::RenaissanceRealization> {
+    if spec.form_kind(intent.seed) != crate::spec::FormKind::Renaissance {
+        return None;
+    }
+    let key = spec
+        .mode
+        .and_then(|mode| Key::modal(intent.tonic, mode))
+        .unwrap_or_else(|| {
+            if intent.valence >= 0.0 {
+                Key::major(intent.tonic)
+            } else {
+                Key::minor(intent.tonic)
+            }
+        });
+    let tempo = spec.tempo(intent.arousal)
+        * match spec.attitude {
+            Some(crate::spec::Attitude::Joy) => 1.08,
+            Some(crate::spec::Attitude::Grief) => 0.85,
+            _ => 1.0,
+        };
+    let meter_beats = spec.meter as f64;
+    let motif = spec.motif(intent.arousal, intent.seed);
+    let motif = if spec.texture.hook_cell {
+        crate::hook::graft_hook(
+            &motif,
+            &crate::hook::HookCell::generate_with(&spec.melody, intent.seed, meter_beats),
+            meter_beats,
+        )
+    } else {
+        motif
+    };
+    Some(crate::renaissance::realize_renaissance_with_plan(
+        key,
+        tempo,
+        spec.meter,
+        &motif,
+        intent.seed,
+    ))
+}
+
 /// Compose a Sonata-form score while retaining its exact plan and obligation
 /// evidence. Returns `None` when the resolved form for this seed is not Sonata.
 ///
@@ -422,7 +513,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // ground-music families do — see `crate::prog_suite`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::ProgSuite {
         return (
-            crate::prog_suite::realize_prog_suite(key, tempo, &motif, intent.seed, intent, spec),
+            compose_prog_suite_with_plan(intent, spec)
+                .expect("the resolved ProgSuite form must produce a plan")
+                .score,
             None,
         );
     }
@@ -445,7 +538,9 @@ fn compose_with_spec_and_form_and_grammar_impl(
     // period pipeline too — see `crate::renaissance`.
     if spec.form_kind(intent.seed) == crate::spec::FormKind::Renaissance {
         return (
-            crate::renaissance::realize_renaissance(key, tempo, meter, &motif, intent.seed),
+            compose_renaissance_with_plan(intent, spec)
+                .expect("the resolved Renaissance form must produce a plan")
+                .score,
             None,
         );
     }
