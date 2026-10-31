@@ -631,7 +631,7 @@ mod tests {
             post_tokenization_manifest_sha256: digest(&format!("tokens-{suffix}")),
             trainer_job_execution_receipt_sha256: digest(&format!("job-{suffix}")),
             checkpoint_custody_receipt_sha256: Some(digest(&format!("custody-{suffix}"))),
-            runner_attestation_sha256: Some(digest(&format!("attestation-{suffix}")),
+            runner_attestation_sha256: Some(digest(&format!("attestation-{suffix}"))),
             started_at_utc: "2026-10-31T00:00:00Z".to_owned(),
             completed_at_utc: "2026-10-31T01:00:00Z".to_owned(),
             wall_clock_millis: 3_600_000,
