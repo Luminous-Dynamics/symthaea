@@ -1,0 +1,9 @@
+case_id	causal_status	transfer_decision	action_decision	completion_state	prediction_before_action	prediction_record_id	latency_us	memory_bytes	tokens	model_calls
+MACE-104	not_identified	record_association_only	seek_intervention_or_preserve_uncertainty	not_applicable	true	synthetic-control-MACE-104	0	0	0	0
+MACE-287	not_identified	record_association_only	seek_intervention_or_preserve_uncertainty	not_applicable	true	synthetic-control-MACE-287	0	0	0	0
+MACE-319	identified	reuse_qualified_transition	reuse_valve_effect_with_preconditions	not_applicable	true	synthetic-control-MACE-319	0	0	0	0
+MACE-604	identified	reuse_qualified_transition	reuse_valve_effect_with_preconditions	not_applicable	true	synthetic-control-MACE-604	0	0	0	0
+MACE-622	regime_shifted	requalify_before_reuse	request_new_measurement_or_abstain	not_applicable	true	synthetic-control-MACE-622	0	0	0	0
+MACE-731	regime_shifted	requalify_before_reuse	request_new_measurement_or_abstain	not_applicable	true	synthetic-control-MACE-731	0	0	0	0
+MACE-845	outcome_unverified	mark_outcome_unknown	reconcile_external_state_before_reuse_or_retry	unknown_pending_reconciliation	true	synthetic-control-MACE-845	0	0	0	0
+MACE-902	outcome_unverified	mark_outcome_unknown	reconcile_external_state_before_reuse_or_retry	unknown_pending_reconciliation	true	synthetic-control-MACE-902	0	0	0	0
