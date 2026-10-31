@@ -92,7 +92,7 @@ These are proposed gates, not claimed current performance. Adjust them only befo
 | Efficiency | publish Pareto curve of NDV versus latency, energy, memory and inference calls; W2/W3 must beat an equal-compute comparator | compute does not buy value |
 | Reproduction | at least 5 independently seeded runs for stochastic training/policy claims; retain exact source, environment, weights, profile and per-episode receipts | no reproducible SOTA claim |
 
-Zero false certificates in 3,000 independent targeted episodes gives a useful upper confidence limit only under the stated independence/sampling assumptions; it does not establish universal safety. The benchmark must publish sample sizes and confidence construction.
+Zero false certificates in 3,000 independent targeted episodes gives a one-sided 95% exact binomial upper bound of approximately 0.0998% (about 1 per 1,002 episodes), assuming independent representative trials. It does not establish universal safety, and clustered or mechanism-correlated episodes reduce the effective sample size. The benchmark must publish the sampling design, effective independent episode count and confidence construction.
 
 ## 6. SOTA comparison protocol
 
