@@ -1,0 +1,193 @@
+{
+  "suite_id": "basalt-linux-runtime-smoke-benchmark-v1",
+  "version": 1,
+  "status": "protocol",
+  "purpose": "Evaluate whether bounded Linux syscall checks truthfully establish a narrow operational capability without implying observer attachment, event capture or qualification.",
+  "non_goals": [
+    "event-delivery benchmarking",
+    "observer completeness",
+    "BPF program attachment",
+    "tracepoint activation",
+    "cgroup creation",
+    "workload execution",
+    "host policy mutation"
+  ],
+  "comparison_arms": [
+    {
+      "arm_id": "kernel_config_only",
+      "role": "baseline",
+      "description": "Use readable kernel configuration only; it must not be interpreted as runtime API availability."
+    },
+    {
+      "arm_id": "read_only_inventory",
+      "role": "baseline",
+      "description": "Use BASALT Linux inventory v1 without executing runtime syscalls."
+    },
+    {
+      "arm_id": "landlock_abi_query",
+      "role": "reference",
+      "description": "Call the documented NULL/zero-size Landlock ABI-version query and preserve errno semantics."
+    },
+    {
+      "arm_id": "fanotify_group_init_close",
+      "role": "reference",
+      "description": "Initialize a FAN_CLASS_NOTIF group with bounded flags, then close the descriptor immediately without marks or event reads."
+    },
+    {
+      "arm_id": "fanotify_permission_class_opt_in",
+      "role": "optional_reference",
+      "description": "Only when explicitly requested, initialize a FAN_CLASS_CONTENT group and close it immediately; this does not generate a permission event."
+    },
+    {
+      "arm_id": "basalt_runtime_smoke",
+      "role": "candidate",
+      "description": "Emit schema-bound observations with per-probe errno, resource creation, explicit cleanup and hard-false capture claims."
+    },
+    {
+      "arm_id": "falco_tetragon_observer_attach",
+      "role": "later_stage_reference",
+      "description": "Separate, future observer qualification lane; compare actual attach/capture behavior only under a controlled task snapshot and independent oracle."
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "operational_status_precision",
+      "phase": "safety",
+      "definition": "Fraction of non-unknown operational probe outcomes that agree with an independent syscall oracle on the same kernel/privilege context.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "unsupported_disabled_denied_classification_accuracy",
+      "phase": "safety",
+      "definition": "Fraction of controlled ENOSYS/EINVAL, EOPNOTSUPP, EPERM/EACCES cases assigned the correct status class; permission denial must not be called unsupported.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "descriptor_cleanup_confirmation",
+      "phase": "safety",
+      "definition": "Fraction of successfully created fanotify group descriptors whose explicit close is confirmed and reported as closed.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "unintended_side_effect_count",
+      "phase": "safety",
+      "definition": "Count of BPF attachments, tracepoint enables, fanotify marks, rulesets, cgroups, namespaces, policy writes, sysctl writes or workload processes caused by this command.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "scenario_count"
+    },
+    {
+      "metric_id": "false_capture_or_qualification_claim_rate",
+      "phase": "safety",
+      "definition": "Fraction of smoke reports that claim observer attachment, event capture, workload execution or qualification based solely on syscall smoke results.",
+      "target": {
+        "operator": "=",
+        "value": 0
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "report_schema_conformance",
+      "phase": "safety",
+      "definition": "Fraction of outputs accepted by strict JSON Schema and cross-field semantic validation.",
+      "target": {
+        "operator": "=",
+        "value": 1
+      },
+      "unit": "proportion"
+    },
+    {
+      "metric_id": "p95_smoke_latency_ms",
+      "phase": "efficiency",
+      "definition": "95th percentile wall-clock duration for default Landlock ABI and fanotify notification-group probes on a warm Linux host.",
+      "target": {
+        "operator": "<=",
+        "value": 150
+      },
+      "unit": "milliseconds"
+    },
+    {
+      "metric_id": "p95_report_size_bytes",
+      "phase": "efficiency",
+      "definition": "95th percentile serialized report size, including all hard-false claims and per-probe dispositions.",
+      "target": {
+        "operator": "<=",
+        "value": 16384
+      },
+      "unit": "bytes"
+    }
+  ],
+  "gates": {
+    "safety": [
+      "operational_status_precision",
+      "unsupported_disabled_denied_classification_accuracy",
+      "descriptor_cleanup_confirmation",
+      "unintended_side_effect_count",
+      "false_capture_or_qualification_claim_rate",
+      "report_schema_conformance"
+    ],
+    "efficiency": [
+      "p95_smoke_latency_ms",
+      "p95_report_size_bytes"
+    ],
+    "promotion_rule": "All safety gates are mandatory and non-compensatory. This command may establish only the narrow syscall operation named by a passed probe. It cannot establish marks, event delivery, process/resource lineage, capture integrity, observer completeness or qualification."
+  },
+  "statistical_protocol": {
+    "confidence_level": 0.95,
+    "independence_unit": "host_kernel_boot_mount_namespace_privilege_context",
+    "stratification": [
+      "kernel_release_and_build",
+      "architecture",
+      "container_or_host",
+      "mount_namespace",
+      "effective_capabilities",
+      "seccomp_profile",
+      "Landlock_boot_state",
+      "fanotify_privilege_context"
+    ],
+    "controls": [
+      "known_supported_api",
+      "kernel_or_syscall_unavailable",
+      "kernel_feature_disabled",
+      "permission_denied",
+      "malformed_or_unsupported_flag",
+      "descriptor_close_failure_injected_in_harness"
+    ],
+    "splits": "Separate development, qualification and untouched confirmation hosts; cluster repeated invocations within the same boot/namespace/privilege context.",
+    "stopping": "Preregister host strata, syscall controls, failure injection, exclusions, and stop rules before qualification."
+  },
+  "required_disclosures": [
+    "kernel_identity",
+    "privilege_context",
+    "per_probe_errno",
+    "fanotify_group_close_status",
+    "permission_class_probe_opt_in",
+    "unattempted_bpf_tracepoint_and_cgroup_checks",
+    "no_marks_or_events",
+    "no_workload",
+    "no_qualification"
+  ],
+  "forbidden_claims": [
+    "fanotify_group_init_proves_event_delivery",
+    "FAN_CLASS_CONTENT_group_init_proves_permission_event_response",
+    "Landlock_ABI_query_creates_or_enforces_a_ruleset",
+    "syscall_smoke_qualifies_observer",
+    "permission_denied_means_not_supported",
+    "smoke_pass_means_dependency_closure_is_complete"
+  ],
+  "targets_are_proposed_not_measured": true
+}
