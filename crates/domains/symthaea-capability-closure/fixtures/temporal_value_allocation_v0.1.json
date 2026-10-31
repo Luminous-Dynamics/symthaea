@@ -65,7 +65,7 @@
       "no_retention_lower_reference"
     ],
     "implementation": {
-      "tests_authored": 12,
+      "tests_authored": 13,
       "tests_executed": false,
       "production_hdc_ltc_integration": false,
       "online_value_predictor": false,
@@ -258,8 +258,8 @@
   },
   "validation": {
     "parent_branch_authored_tests_reported": 209,
-    "new_tests_authored": 21,
-    "combined_source_level_test_count_expected": 230,
+    "new_tests_authored": 22,
+    "combined_source_level_test_count_expected": 231,
     "cargo_build_executed": false,
     "rustfmt_executed": false,
     "clippy_executed": false,
@@ -270,6 +270,7 @@
     "hardware_measurement_executed": false,
     "energy_measurement_executed": false,
     "parent_branch_source_count": 209,
-    "parent_count_source_note": "Counted directly from all 13 Rust source modules at exact parent commit 05220001fc9dda9cf0570506bd2f06e89c8f08b4; the #9529 PR description says 208, but source count is 209."
+    "parent_count_source_note": "Counted directly from all 13 Rust source modules at exact parent commit 05220001fc9dda9cf0570506bd2f06e89c8f08b4; the #9529 PR description says 208, but source count is 209.",
+    "precision_negative_control": "fractional confidence retains small positive temporal value without integer-microsecond truncation"
   }
 }
