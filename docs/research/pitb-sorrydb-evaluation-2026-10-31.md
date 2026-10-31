@@ -79,3 +79,12 @@ The new schema and workflow in this commit validate only the shape and fail-clos
 - Legendre Mathlib retrieval board: https://www.legendre-leaderboard.com/
 - LeanGraphSearch: https://pluslabnlp.github.io/LeanGraphSearch/
 - Lean 4 local instance synthesis: https://lean-lang.org/doc/reference/latest/Type-Classes/Instance-Synthesis/
+
+
+## Source pin and initial manifest audit
+
+The January evaluation file is identified at SorryDB source commit \`74b3b63f8ba890d675f362924b21ac55db410383\`, path \`data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json\`, Git blob SHA-1 \`af3b663429dc4689ee728d2fb5c7d8d5034476f7\`, byte count 1,599,271, and SHA-256 \`26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062\`. A local implementation of the Git blob object hash over the retrieved UTF-8 payload reproduced the exact GitHub tree blob SHA-1. Structural inspection found 1,000 task records, 78 unique repository remotes, zero duplicate task IDs, and no unsafe repository-relative paths.
+
+Two rows use a zero-based start column; therefore the importer allows column zero while retaining one-based line numbers and strictly ordered source spans. This is a source-format detail that the generic documentation example does not make obvious.
+
+A Rust importer has been added to the PITB crate. It verifies byte count and SHA-256 before parsing, checks the fixed task/project counts, validates every repository pin and source coordinate, rejects duplicate IDs/path traversal, and emits a deterministic task manifest with provenance hashes. Its self-tests and real-snapshot run are wired into the focused SorryDB workflow; no compile or workflow pass is claimed until observed.

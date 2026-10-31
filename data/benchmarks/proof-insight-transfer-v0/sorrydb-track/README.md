@@ -139,3 +139,24 @@ The current PITB v2 Lean exporter/context evidence is not yet compiled, and its 
 - Legendre's pinned Mathlib retrieval comparison: https://www.legendre-leaderboard.com/
 - LeanGraphSearch results and route-coverage definition: https://pluslabnlp.github.io/LeanGraphSearch/
 - Lean 4 reference on local instance synthesis: https://lean-lang.org/doc/reference/latest/Type-Classes/Instance-Synthesis/
+
+
+## Exact source identity and importer
+
+The frozen evaluation file is pinned to SorryDB commit \`74b3b63f8ba890d675f362924b21ac55db410383\` and Git blob \`af3b663429dc4689ee728d2fb5c7d8d5034476f7\`. Its exact UTF-8 payload is 1,599,271 bytes with SHA-256 \`26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062\`. The Git blob identity was independently recomputed from the retrieved payload and matched the blob SHA-1 published by the pinned Git tree. The audit found 1,000 records, 78 distinct repository remotes, and no duplicate task IDs.
+
+Two rows use a zero-based start column; therefore the importer and receipt schema allow column zero while retaining one-based line numbers and strictly ordered source spans.
+
+Use the Rust importer after obtaining the file from the pinned checkout:
+
+\`\`\`bash
+cargo run -p symthaea-proof-insights --bin import_sorrydb_snapshot -- --self-test
+
+cargo run -p symthaea-proof-insights --bin import_sorrydb_snapshot -- \\
+  --input /path/to/SorryDB_2601_1000_evaluation_split.json \\
+  --output /tmp/pitb-sorrydb-task-manifest.json
+\`\`\`
+
+The importer rejects altered source bytes, duplicate task IDs, non-canonical repository remotes, malformed commit/toolchain identifiers, unsafe paths, malformed spans, and unexpected task/project counts. It emits a deterministic manifest with source pins, task ordinals, project/repository identity, source coordinates, and hashed debugging-goal strings. The debugging goal is not treated as authoritative proof-state evidence.
+
+The source byte hash and manifest are provenance artifacts only. They do not establish that a source repository can be rebuilt or that any proof obligation has been solved. Lean reconstruction and independent checking remain a separate milestone.

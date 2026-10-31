@@ -28,7 +28,7 @@ const SOURCE_REPOSITORY: &str = "SorryDB/SorryDB";
 const SOURCE_COMMIT: &str = "74b3b63f8ba890d675f362924b21ac55db410383";
 const SOURCE_PATH: &str =
     "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json";
-const SOURCE_GIT_BLOB_SHA1: &str = "af3b663429dc4689ee728d2fb7f87d11780a01be";
+const SOURCE_GIT_BLOB_SHA1: &str = "af3b663429dc4689ee728d2fb5c7d8d5034476f7";
 const SOURCE_SHA256: &str =
     "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062";
 const SOURCE_BYTES: usize = 1_599_271;

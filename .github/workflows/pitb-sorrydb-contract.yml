@@ -3,6 +3,7 @@ name: PITB SorryDB Receipt Contract
 on:
   pull_request:
     paths:
+      - "crates/bridges/symthaea-proof-insights/src/bin/import_sorrydb_snapshot.rs"
       - "data/benchmarks/proof-insight-transfer-v0/sorrydb-track/**"
       - "docs/research/pitb-sorrydb-evaluation-2026-10-31.md"
       - ".github/workflows/pitb-sorrydb-contract.yml"
@@ -132,4 +133,132 @@ jobs:
               raise SystemExit("matched, integrity-complete synthetic success receipt did not pass the semantic audit")
           validator.validate(success)
           print("PITB_SORRYDB_POSITIVE_PASS: synthetic integrity-complete receipt; not an evaluated proof")
+          PY
+
+
+  sorrydb-snapshot-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Checkout exact SorryDB source snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: SorryDB/SorryDB
+          ref: 74b3b63f8ba890d675f362924b21ac55db410383
+          path: _pitb-sorrydb
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Stage PITB research crate as an isolated Cargo package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import shutil
+          import tomllib
+          from pathlib import Path
+
+          root = Path.cwd()
+          crate_dir = root / "crates/bridges/symthaea-proof-insights"
+          crate_text = (crate_dir / "Cargo.toml").read_text()
+          crate = tomllib.loads(crate_text)
+          workspace = tomllib.loads((root / "Cargo.toml").read_text())
+          workspace_deps = workspace["workspace"]["dependencies"]
+          package_text = crate_text.split("[dependencies]", 1)[0].rstrip() + "\n\n[dependencies]\n"
+
+          def toml_value(value):
+              if isinstance(value, str):
+                  return json.dumps(value)
+              if isinstance(value, bool):
+                  return "true" if value else "false"
+              if isinstance(value, int):
+                  return str(value)
+              if isinstance(value, list):
+                  return "[" + ", ".join(toml_value(item) for item in value) + "]"
+              if isinstance(value, dict):
+                  return "{ " + ", ".join(f"{key} = {toml_value(item)}" for key, item in value.items()) + " }"
+              raise TypeError(f"unsupported TOML value: {type(value)!r}")
+
+          dependency_lines = []
+          for name, spec in crate.get("dependencies", {}).items():
+              if isinstance(spec, dict) and spec.get("workspace") is True:
+                  spec = workspace_deps[name]
+              dependency_lines.append(f"{name} = {toml_value(spec)}")
+
+          staged = Path(os.environ["RUNNER_TEMP"]) / "pitb-sorrydb-isolated"
+          if staged.exists():
+              shutil.rmtree(staged)
+          (staged / "src").mkdir(parents=True)
+          (staged / "Cargo.toml").write_text(package_text + "\n".join(dependency_lines) + "\n")
+          shutil.copy2(crate_dir / "src/main.rs", staged / "src/main.rs")
+          for support_source in (crate_dir / "src").glob("*.rs"):
+              if support_source.name != "main.rs":
+                  shutil.copy2(support_source, staged / "src" / support_source.name)
+          if (crate_dir / "src/bin").is_dir():
+              shutil.copytree(crate_dir / "src/bin", staged / "src/bin")
+          shutil.copy2(root / "Cargo.lock", staged / "Cargo.lock")
+          print(f"Staged PITB package at {staged}")
+          PY
+          echo "PITB_MANIFEST=$RUNNER_TEMP/pitb-sorrydb-isolated/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Format, compile, test and lint isolated PITB package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo fmt -- --check
+          cargo test
+          cargo clippy --all-targets -- -D warnings
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          staged = tomllib.loads(Path("Cargo.lock").read_text())
+          workspace = tomllib.loads((Path(os.environ["GITHUB_WORKSPACE"]) / "Cargo.lock").read_text())
+          def registry_packages(lock):
+              return {
+                  (entry["name"], entry["version"], entry.get("source"))
+                  for entry in lock["package"]
+                  if entry.get("source", "").startswith("registry+")
+              }
+          unexpected = sorted(registry_packages(staged) - registry_packages(workspace))
+          if unexpected:
+              raise SystemExit("isolated PITB package resolved packages absent from reviewed workspace lock: " + repr(unexpected))
+          print("PITB_SORRYDB_LOCK_PASS: all isolated registry package versions exist in the reviewed workspace lock")
+          PY
+      - name: Run importer self-tests and hash the exact snapshot twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin import_sorrydb_snapshot -- --self-test
+          input="$GITHUB_WORKSPACE/_pitb-sorrydb/data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
+          cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-a.json"
+          cargo run --locked --bin import_sorrydb_snapshot -- --input "$input" --output "$RUNNER_TEMP/sorrydb-manifest-b.json"
+          cmp "$RUNNER_TEMP/sorrydb-manifest-a.json" "$RUNNER_TEMP/sorrydb-manifest-b.json"
+          python - "$RUNNER_TEMP/sorrydb-manifest-a.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          manifest = json.loads(Path(sys.argv[1]).read_text())
+          assert manifest["snapshot_id"] == "SorryDB_2601"
+          assert manifest["task_count"] == 1000
+          assert manifest["project_count"] == 78
+          assert manifest["source"]["repository"] == "SorryDB/SorryDB"
+          assert manifest["source"]["commit"] == "74b3b63f8ba890d675f362924b21ac55db410383"
+          assert manifest["source"]["git_blob_sha1"] == "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+          assert manifest["source"]["source_sha256"] == "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062"
+          ids = [row["sorry_id"] for row in manifest["tasks"]]
+          assert len(ids) == 1000 and len(set(ids)) == 1000
+          assert [row["ordinal"] for row in manifest["tasks"]] == list(range(1000))
+          print("PITB_SORRYDB_MANIFEST_PASS: pinned commit/blob/sha256, 1000 unique task IDs, 78 projects, deterministic ordinals")
           PY

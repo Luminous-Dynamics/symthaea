@@ -5,10 +5,13 @@
     "snapshot_id": "SorryDB_2601",
     "source_repository": "SorryDB/SorryDB",
     "source_split_path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
-    "source_split_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "source_split_sha256": "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062",
     "full_snapshot_task_count": 2601,
     "evaluation_task_count": 1000,
-    "source_project_count": 78
+    "source_project_count": 78,
+    "source_repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+    "source_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+    "source_byte_count": 1599271
   },
   "task": {
     "sorry_id": "synthetic-task-not-real",

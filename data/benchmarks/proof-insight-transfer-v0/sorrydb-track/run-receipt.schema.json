@@ -35,7 +35,10 @@
         "source_split_sha256",
         "full_snapshot_task_count",
         "evaluation_task_count",
-        "source_project_count"
+        "source_project_count",
+        "source_repository_commit",
+        "source_git_blob_sha1",
+        "source_byte_count"
       ],
       "properties": {
         "snapshot_id": {
@@ -59,6 +62,15 @@
         },
         "source_project_count": {
           "const": 78
+        },
+        "source_repository_commit": {
+          "const": "74b3b63f8ba890d675f362924b21ac55db410383"
+        },
+        "source_git_blob_sha1": {
+          "const": "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+        },
+        "source_byte_count": {
+          "const": 1599271
         }
       }
     },
@@ -109,7 +121,7 @@
         },
         "start_column": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         },
         "end_line": {
           "type": "integer",
@@ -117,7 +129,7 @@
         },
         "end_column": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         }
       }
     },
