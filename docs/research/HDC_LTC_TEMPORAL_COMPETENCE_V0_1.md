@@ -82,6 +82,15 @@ For real data, split by subject/session/source recording *before* windowing. A s
 
 Synthetic generated instances must be source-family split, not merely seed split. The confirmatory evaluator/oracle is not accessible to the candidate model or tuning loop.
 
+### External reference parity tasks from BrainTrace's public experiments
+
+These are added as explicitly named reference tasks, not as evidence that the public repository contains a final-paper test split. Their exact public-code semantics and caveats are recorded in `BRAINTRACE_REFERENCE_AUDIT_V0_1.md`.
+
+- **T8 — Delayed match-to-sample (DMS):** eight motion directions; sample, 1,000 ms delay, then rotated match/non-match test; 1 ms step in the inspected entry point; 100 input channels and a 200-neuron recurrent SNN reference. Preserve the 1,000 ms anchor, then add preregistered shorter/longer delays and distractor variants. Use independent seed families and a sealed test split.
+- **T9 — Sequential evidence accumulation:** seven 100 ms cues separated by 50 ms intervals, followed by a 1,000 ms delay and a 150 ms recall period; the inspected generator creates left/right cue assignments plus recall/noise channels and a binary majority label. Preserve the original semantics as an anchor, then add cue-count, evidence-strength, and delay strata.
+
+The public DMS script uses NumPy global randomness and its inspected entry point hardcodes the I/O-factorized trainer despite README examples for other methods. The evidence-accumulation path seeds BrainState from an explicit argument but its inspected trainer uses an infinite training generator and stops on a training-accuracy threshold; it does not show a separate held-out test path. Our reproduction must supply the missing reproducibility and confirmatory split contract rather than treating those scripts' training curves as test performance.
+
 ## 6. Baseline registry
 
 Required baseline families, where semantics are appropriate:
@@ -182,4 +191,4 @@ The repository contains an isolated, dependency-free Rust prototype under resear
 - a multi-timescale forecasting generator with hidden periods/phases, a hidden middle-third regime boundary, and delayed online feedback;
 - an evaluator-side trace verifier with negative-control tests for altered labels, early feedback, missing feedback, and oracle identity mismatch.
 
-The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. Rust unit tests are authored but unrun in this environment. The full seven-family generator, streaming runner, dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. Rust unit tests are authored but unrun in this environment. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
