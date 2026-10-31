@@ -228,7 +228,7 @@ pub fn reconcile_mechanism_matched_campaign(
                     if record.0.as_str() != direction_id.as_str()
                         || record.1.as_ref() != parent_candidate_sha256.as_ref()
                         || record.2.as_str() != semantic_delta_sha256.as_str()
-                        || &record.3 != outcome
+                        || !same_outcome_semantics(&record.3, outcome)
                     {
                         return Err(MatchedCampaignError::new(
                             format!("tapes[{tape_index}].events[{event_index}]"),
@@ -255,7 +255,7 @@ pub fn reconcile_mechanism_matched_campaign(
                     });
                     if record.0.as_ref() != parent_direction_id.as_ref()
                         || record.1.as_str() != semantic_delta_sha256.as_str()
-                        || &record.2 != outcome
+                        || !same_outcome_semantics(&record.2, outcome)
                     {
                         return Err(MatchedCampaignError::new(
                             format!("tapes[{tape_index}].events[{event_index}]"),
@@ -313,6 +313,70 @@ pub fn reconcile_mechanism_matched_campaign(
         resource_budget_qualified,
         matched_contract_reconciled: true,
     })
+}
+
+
+/// Compare scientific outcomes while allowing per-execution receipt envelopes to differ.
+/// Evaluator/verifier identities and the evidence artifact digest remain part of the comparison;
+/// only the receipt digest itself may be unique to a policy execution.
+fn same_outcome_semantics(left: &ActionOutcome, right: &ActionOutcome) -> bool {
+    match (left, right) {
+        (
+            ActionOutcome::CandidateEvaluation {
+                task_recipe_sha256: left_task,
+                comparison_profile_sha256: left_profile,
+                evaluator_sha256: left_evaluator,
+                verifier_sha256: left_verifier,
+                disposition: left_disposition,
+                score: left_score,
+                uncertainty: left_uncertainty,
+                evidence_sha256: left_evidence,
+                ..
+            },
+            ActionOutcome::CandidateEvaluation {
+                task_recipe_sha256: right_task,
+                comparison_profile_sha256: right_profile,
+                evaluator_sha256: right_evaluator,
+                verifier_sha256: right_verifier,
+                disposition: right_disposition,
+                score: right_score,
+                uncertainty: right_uncertainty,
+                evidence_sha256: right_evidence,
+                ..
+            },
+        ) => {
+            left_task == right_task
+                && left_profile == right_profile
+                && left_evaluator == right_evaluator
+                && left_verifier == right_verifier
+                && left_disposition == right_disposition
+                && left_score == right_score
+                && left_uncertainty == right_uncertainty
+                && left_evidence == right_evidence
+        }
+        (
+            ActionOutcome::DirectionVerification {
+                task_recipe_sha256: left_task,
+                comparison_profile_sha256: left_profile,
+                verifier_sha256: left_verifier,
+                disposition: left_disposition,
+                ..
+            },
+            ActionOutcome::DirectionVerification {
+                task_recipe_sha256: right_task,
+                comparison_profile_sha256: right_profile,
+                verifier_sha256: right_verifier,
+                disposition: right_disposition,
+                ..
+            },
+        ) => {
+            left_task == right_task
+                && left_profile == right_profile
+                && left_verifier == right_verifier
+                && left_disposition == right_disposition
+        }
+        _ => false,
+    }
 }
 
 fn digest_serializable<T: Serialize>(value: &T) -> Result<String, MatchedCampaignError> {
@@ -468,7 +532,7 @@ mod tests {
         let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
         let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
         let summary = reconcile_mechanism_matched_campaign(&[left, right]).unwrap();
-        assert_eq!(summary.policy_ids, vec!["board", "thompson"]);
+        assert_eq!(summary.policy_ids, vec!["board".to_owned(), "thompson".to_owned()]);
         assert_eq!(summary.shared_candidate_identity_count, 1);
         assert_eq!(summary.candidate_identity_shared_by_all_policies, 1);
         assert!(summary.resource_budget_qualified);
@@ -499,7 +563,7 @@ mod tests {
         let baseline = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
         let oracle = policy_tape("oracle", "oracle-build-1", json!({"peek": true}), 0.99, false);
         let summary = reconcile_mechanism_matched_campaign(&[baseline, oracle]).unwrap();
-        assert_eq!(summary.oracle_policy_ids, vec!["oracle"]);
+        assert_eq!(summary.oracle_policy_ids, vec!["oracle".to_owned()]);
     }
 
     #[test]
