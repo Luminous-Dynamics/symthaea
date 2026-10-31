@@ -1222,6 +1222,11 @@ impl DirectionCampaignRun {
                         task_recipe_sha256: task_recipe_sha256.clone(),
                         comparison_profile_sha256: PROFILE_SHA256.to_owned(),
                         evaluator_sha256: evaluator_sha256.clone(),
+                        verifier_sha256: verifier_sha256.clone(),
+                        verifier_receipt_sha256: digest(&format!(
+                            "synthetic-candidate-verifier-receipt:{}:{}",
+                            candidate_sha256, evaluation_index
+                        )),
                         disposition: CandidateDisposition::Verified,
                         score: Some(score),
                         uncertainty: None,
