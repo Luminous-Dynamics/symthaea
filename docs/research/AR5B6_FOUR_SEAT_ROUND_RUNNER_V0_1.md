@@ -76,7 +76,7 @@ Eight tests are authored for:
 - frozen pre-round snapshot binding on every result receipt;
 - fixed-set treatment of the high-payoff D arm without a free NEW proposal;
 - no-new-direction negative controls for DirectionBoard and Coral directions-only ablations;
-- paired comparisons that reject incomplete/mismatched seed sets.
+- paired comparisons that reject incomplete/mismatched seed sets, extra/duplicate runs and manifest tampering.
 
 The tests exercise the simulator and contract together, but they have **not** been compiled or executed in the authoring environment.
 
