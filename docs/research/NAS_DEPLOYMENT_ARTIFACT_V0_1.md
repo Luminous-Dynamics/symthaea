@@ -24,7 +24,7 @@ The v0.1 pipeline manifest requires exactly one digest for each sorted component
 
 It also binds candidate ID/configuration SHA-256, benchmark ID, target ID, exact HardwareProfileManifest digest and exact ObjectiveRegistry digest.
 
-Cross-validation requires compiler toolchain, quantization, firmware and runtime component digests to equal the exact hardware profile. The target profile must also exist inside the objective registry. No silent fallback to a nearby profile or toolchain is allowed.
+Cross-validation requires compiler toolchain, quantization, firmware and runtime component digests to equal the exact hardware profile. The target profile must also exist inside the objective registry. No silent fallback to a nearby profile or toolchain is allowed. The pipeline benchmark ID must equal the objective registry benchmark ID. Deserialization of the pipeline, build receipt, measurement receipt, objective observation, outcome, cost, registry, objective definitions, normalization and hardware profile rejects unknown fields before they can be omitted from canonical receipt hashing.
 
 ## Build receipt and artifact identity
 
