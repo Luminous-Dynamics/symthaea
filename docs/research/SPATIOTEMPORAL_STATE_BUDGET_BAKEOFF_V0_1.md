@@ -162,7 +162,7 @@ A successful result establishes only the declared architecture, task, split, bud
 
 ## 10. Execution order
 
-1. Build and validate Stage 0 exact-gradient dependency oracle.
+1. Extend and validate the implemented scalar Stage 0 exact-gradient oracle into two- and four-module dependency cases.
 2. Implement measurement adapters for the full training-state budget.
 3. Reproduce pinned STDL and BrainTrace task/model baselines with clean development/confirmatory splits.
 4. Run fixed architecture arms at 25/50/75/100% memory budgets.
