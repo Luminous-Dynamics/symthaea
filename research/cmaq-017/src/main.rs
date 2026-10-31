@@ -151,6 +151,8 @@ impl SplitMix64 {
 struct CandidateScore {
     ranking_score: f64,
     predicted_prefix_return: Option<f64>,
+    model_transition_evaluations: usize,
+    oracle_transition_evaluations: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -297,13 +299,15 @@ fn rollout_model(
     scenario: Scenario,
     head: usize,
     oracle: bool,
-) -> (f64, f64) {
+) -> (f64, f64, usize) {
     let mut state = initial;
     let mut total = 0.0;
     let mut prefix = 0.0;
+    let mut transition_evaluations = 0usize;
 
     for (index, action) in actions.iter().enumerate() {
         let transition = model_step(state, *action, start_step + index, scenario, head, oracle);
+        transition_evaluations += 1;
         let weighted = DISCOUNT.powi(index as i32) * transition.reward;
         total += weighted;
         if index < block_len {
@@ -315,7 +319,7 @@ fn rollout_model(
         }
     }
 
-    (total, prefix)
+    (total, prefix, transition_evaluations)
 }
 
 fn direct_sequence_score(state: State, actions: &[f64]) -> f64 {
@@ -334,6 +338,16 @@ fn direct_sequence_score(state: State, actions: &[f64]) -> f64 {
 fn aggregate_scores(values: &[(f64, f64)], policy: Policy) -> CandidateScore {
     let full: Vec<f64> = values.iter().map(|value| value.0).collect();
     let prefix: Vec<f64> = values.iter().map(|value| value.1).collect();
+    let model_transition_evaluations = if policy.is_oracle() {
+        0
+    } else {
+        values.iter().map(|value| value.2).sum()
+    };
+    let oracle_transition_evaluations = if policy.is_oracle() {
+        values.iter().map(|value| value.2).sum()
+    } else {
+        0
+    };
 
     match policy {
         Policy::PessimisticEnsembleCem => CandidateScore {
@@ -341,6 +355,8 @@ fn aggregate_scores(values: &[(f64, f64)], policy: Policy) -> CandidateScore {
             predicted_prefix_return: Some(
                 prefix.iter().copied().fold(f64::INFINITY, f64::min),
             ),
+            model_transition_evaluations,
+            oracle_transition_evaluations,
         },
         Policy::UncertaintyLcbCem => {
             let mean_full = full.iter().sum::<f64>() / full.len() as f64;
@@ -360,11 +376,15 @@ fn aggregate_scores(values: &[(f64, f64)], policy: Policy) -> CandidateScore {
             CandidateScore {
                 ranking_score: mean_full - 1.25 * std_full,
                 predicted_prefix_return: Some(mean_prefix - 1.25 * std_prefix),
+                model_transition_evaluations,
+                oracle_transition_evaluations,
             }
         }
         _ => CandidateScore {
             ranking_score: full[0],
             predicted_prefix_return: Some(prefix[0]),
+            model_transition_evaluations,
+            oracle_transition_evaluations,
         },
     }
 }
@@ -381,6 +401,8 @@ fn evaluate_candidate(
         return CandidateScore {
             ranking_score: direct_sequence_score(state, actions),
             predicted_prefix_return: None,
+            model_transition_evaluations: 0,
+            oracle_transition_evaluations: 0,
         };
     }
 
@@ -458,6 +480,8 @@ fn plan_actions(
         .collect();
     let mut std_dev = vec![0.62; horizon];
     let mut best: Option<Candidate> = None;
+    let mut model_transition_evaluations = 0usize;
+    let mut oracle_transition_evaluations = 0usize;
     let base_per_round = candidate_budget / rounds;
     let remainder = candidate_budget % rounds;
 
@@ -490,6 +514,8 @@ fn plan_actions(
                 start_step,
                 block_len,
             );
+            model_transition_evaluations += score.model_transition_evaluations;
+            oracle_transition_evaluations += score.oracle_transition_evaluations;
             let candidate = Candidate { actions, score };
 
             let replace_best = best
@@ -517,16 +543,8 @@ fn plan_actions(
         } else {
             0
         },
-        model_transition_evaluations: if policy.uses_world_model() {
-            candidate_budget * policy.heads() * horizon
-        } else {
-            0
-        },
-        oracle_transition_evaluations: if policy.is_oracle() {
-            candidate_budget * horizon
-        } else {
-            0
-        },
+        model_transition_evaluations,
+        oracle_transition_evaluations,
     }
 }
 
