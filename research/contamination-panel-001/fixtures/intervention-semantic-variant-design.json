@@ -40,9 +40,9 @@
         "math-source-cluster-02-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
-      "exposure_token_count": 510,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
-      "matched_placebo_token_count": 510
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-03",
@@ -54,9 +54,9 @@
         "math-source-cluster-03-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
-      "exposure_token_count": 520,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
-      "matched_placebo_token_count": 520
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-04",
@@ -68,9 +68,9 @@
         "math-source-cluster-04-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
-      "exposure_token_count": 530,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
-      "matched_placebo_token_count": 530
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-05",
@@ -82,9 +82,9 @@
         "math-source-cluster-05-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
-      "exposure_token_count": 540,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
-      "matched_placebo_token_count": 540
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-06",
@@ -96,9 +96,9 @@
         "math-source-cluster-06-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
-      "exposure_token_count": 550,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
-      "matched_placebo_token_count": 550
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-07",
@@ -110,9 +110,9 @@
         "math-source-cluster-07-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
-      "exposure_token_count": 560,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
-      "matched_placebo_token_count": 560
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "math-source-cluster-08",
@@ -124,9 +124,9 @@
         "math-source-cluster-08-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
-      "exposure_token_count": 570,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
-      "matched_placebo_token_count": 570
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-01",
@@ -152,9 +152,9 @@
         "code-source-cluster-02-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000001d",
-      "exposure_token_count": 510,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
-      "matched_placebo_token_count": 510
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-03",
@@ -166,9 +166,9 @@
         "code-source-cluster-03-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000020",
-      "exposure_token_count": 520,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
-      "matched_placebo_token_count": 520
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-04",
@@ -180,9 +180,9 @@
         "code-source-cluster-04-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000023",
-      "exposure_token_count": 530,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000024",
-      "matched_placebo_token_count": 530
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-05",
@@ -194,9 +194,9 @@
         "code-source-cluster-05-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000026",
-      "exposure_token_count": 540,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000027",
-      "matched_placebo_token_count": 540
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-06",
@@ -208,9 +208,9 @@
         "code-source-cluster-06-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
-      "exposure_token_count": 550,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000002a",
-      "matched_placebo_token_count": 550
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-07",
@@ -222,9 +222,9 @@
         "code-source-cluster-07-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000002c",
-      "exposure_token_count": 560,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000002d",
-      "matched_placebo_token_count": 560
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "code-source-cluster-08",
@@ -236,9 +236,9 @@
         "code-source-cluster-08-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000002f",
-      "exposure_token_count": 570,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000030",
-      "matched_placebo_token_count": 570
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-01",
@@ -264,9 +264,9 @@
         "science-source-cluster-02-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000035",
-      "exposure_token_count": 510,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000036",
-      "matched_placebo_token_count": 510
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-03",
@@ -278,9 +278,9 @@
         "science-source-cluster-03-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000038",
-      "exposure_token_count": 520,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000039",
-      "matched_placebo_token_count": 520
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-04",
@@ -292,9 +292,9 @@
         "science-source-cluster-04-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000003b",
-      "exposure_token_count": 530,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000003c",
-      "matched_placebo_token_count": 530
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-05",
@@ -306,9 +306,9 @@
         "science-source-cluster-05-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000003e",
-      "exposure_token_count": 540,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000003f",
-      "matched_placebo_token_count": 540
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-06",
@@ -320,9 +320,9 @@
         "science-source-cluster-06-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000041",
-      "exposure_token_count": 550,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000042",
-      "matched_placebo_token_count": 550
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-07",
@@ -334,9 +334,9 @@
         "science-source-cluster-07-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000044",
-      "exposure_token_count": 560,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000045",
-      "matched_placebo_token_count": 560
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "science-source-cluster-08",
@@ -348,9 +348,9 @@
         "science-source-cluster-08-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000047",
-      "exposure_token_count": 570,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000048",
-      "matched_placebo_token_count": 570
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-01",
@@ -376,9 +376,9 @@
         "logic-source-cluster-02-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000004d",
-      "exposure_token_count": 510,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000004e",
-      "matched_placebo_token_count": 510
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-03",
@@ -390,9 +390,9 @@
         "logic-source-cluster-03-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000050",
-      "exposure_token_count": 520,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000051",
-      "matched_placebo_token_count": 520
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-04",
@@ -404,9 +404,9 @@
         "logic-source-cluster-04-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000053",
-      "exposure_token_count": 530,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000054",
-      "matched_placebo_token_count": 530
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-05",
@@ -418,9 +418,9 @@
         "logic-source-cluster-05-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000056",
-      "exposure_token_count": 540,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000057",
-      "matched_placebo_token_count": 540
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-06",
@@ -432,9 +432,9 @@
         "logic-source-cluster-06-item-03"
       ],
       "exposure_variant_sha256": "0000000000000000000000000000000000000000000000000000000000000059",
-      "exposure_token_count": 550,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000005a",
-      "matched_placebo_token_count": 550
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-07",
@@ -446,9 +446,9 @@
         "logic-source-cluster-07-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000005c",
-      "exposure_token_count": 560,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "000000000000000000000000000000000000000000000000000000000000005d",
-      "matched_placebo_token_count": 560
+      "matched_placebo_token_count": 500
     },
     {
       "cluster_id": "logic-source-cluster-08",
@@ -460,9 +460,11 @@
         "logic-source-cluster-08-item-03"
       ],
       "exposure_variant_sha256": "000000000000000000000000000000000000000000000000000000000000005f",
-      "exposure_token_count": 570,
+      "exposure_token_count": 500,
       "matched_placebo_record_sha256": "0000000000000000000000000000000000000000000000000000000000000060",
-      "matched_placebo_token_count": 570
+      "matched_placebo_token_count": 500
     }
-  ]
+  ],
+  "shared_training_corpus_sha256": "abababababababababababababababababababababababababababababababab",
+  "shared_training_token_count": 92000
 }
