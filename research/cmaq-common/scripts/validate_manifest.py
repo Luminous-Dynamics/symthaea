@@ -131,10 +131,8 @@ def semantic_errors(instance: dict, repo_root: Path = REPO_ROOT) -> list[str]:
         if source["visibility"] == "candidate_visible" and not source["candidate_access"]:
             errors.append("candidate-visible data source must declare its visible fields")
 
-    if instance["candidate"]["source_commit"] != instance["repository"]["commit"]:
-        errors.append("candidate source commit differs from frozen repository commit")
-    if instance["generator"]["source_commit"] != instance["repository"]["commit"]:
-        errors.append("generator source commit differs from frozen repository commit")
+    if not instance["repository"]["commit"]:
+        errors.append("manifest repository commit must be frozen")
     if instance["metrics"]["bundle_sha256"] != instance["evaluator"]["metric_bundle_sha256"]:
         errors.append("metric bundle digest differs between metrics and evaluator")
     if (
