@@ -377,7 +377,7 @@ pub fn verify_decision_focused_voc_plan(
     recorded_plan: &DecisionFocusedVoCPlan,
 ) -> bool {
     match plan_decision_focused_voc(manifest, posterior, actions, config) {
-        Ok(replayed) => replayed == *recorded_plan,
+        Ok(replayed) => &replayed == recorded_plan,
         Err(_) => false,
     }
 }
