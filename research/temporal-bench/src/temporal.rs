@@ -184,7 +184,7 @@ impl fmt::Display for TemporalVerificationError {
             Self::InvalidFeedback { source_step } => {
                 write!(
                     f,
-                    "delayed feedback is early, reordered, or has an invalid label for source step {source_step}"
+                    "delayed feedback/order/label error at source step {source_step}"
                 )
             }
             Self::UnexpectedTrailingEvent => {
