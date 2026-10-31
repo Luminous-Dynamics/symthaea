@@ -36,9 +36,9 @@ This provides API-level separation inside one process, not a secure benchmark bo
 
 ## Primary metrics (no composite score)
 
-The runner reports verified obligations and fully verified completion, completion claims and false completion, false-support claims, missed mandatory verification, operations and abstract cost, redundant operation count and wasted-operation cost, cost to first sufficient proof, evaluator-only oracle minimum cost and cost regret, and correct abstention.
+The runner reports verified obligations and fully verified completion, completion claims and false completion, false-support claims, missed mandatory verification, operations and abstract cost, rejected-evidence candidate count/cost, redundant operation count and wasted-operation cost, cost to first sufficient proof, evaluator-only oracle minimum cost and cost regret, and correct abstention.
 
-An operation that produces no newly verified support is not automatically wasteful: mandatory checks are classified separately and still incur cost. This prevents efficiency metrics from rewarding skipped safety checks.
+A failed operation that targeted an open obligation is reported as a rejected evidence candidate, not automatically as wasted computation: its verifier rejection can be decision-relevant. An operation that could not target any remaining obligation is classified as redundant/irrelevant. Mandatory checks are separately classified and still incur cost. This prevents efficiency metrics from rewarding skipped safety checks.
 
 ## Limitations and next gates
 
