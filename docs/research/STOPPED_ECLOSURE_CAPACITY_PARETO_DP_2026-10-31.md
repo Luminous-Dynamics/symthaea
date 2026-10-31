@@ -97,6 +97,32 @@ Across all cardinalities the reference implementation runs one DP per candidate 
 
 This is a practical exact solver for instances with manageable Pareto frontiers, not a universal scalability result.
 
+## 3. New integration: capacity-aware Anchored e-BH
+
+Ramdas (2026), arXiv:2610.11279, proves Anchored e-BH strictly improves ordinary e-BH under arbitrary dependence while remaining incomparable to closed e-BH. Its local collection has the simple projective form
+
+[
+E_S=1-rac{|S|}{m}+rac1msum_{iin S}e_i
+=1+sum_{iin S}rac1m(e_i-1).
+]
+
+The ordinary e-BH rejection set (B) is always in this closure. Therefore the capacity optimizer can use the uniform global weights (w_i=1/m) and initialize its mandatory set with (B). It then selects a utility-maximizing certified superset while preserving every baseline e-BH discovery.
+
+The new module validation/anchored_capacity_e_bh.py implements:
+- exact e-BH baseline construction, including all ties at the rejection threshold;
+- the anchored local e-value (E_S);
+- exhaustive small-family checks of (B)'s intersection certificates;
+- capacity-aware optimization of a certified superset of (B);
+- independent replay of baseline retention, closure feasibility and Pareto optimality.
+
+Two exact fixtures:
+- (e=(30,14,6)), (alpha=0.1): ordinary e-BH returns ({1}); the anchored closure certifies ({1,2}). With utilities ((1,100,1)), unit costs and capacity 2, the capacity optimizer selects ({1,2}).
+- (e=(29,1,0)), (alpha=0.1): ordinary e-BH returns the empty set, but the anchored collection can still certify ({1}). This shows the extension need not be limited to adding discoveries to a nonempty baseline.
+
+The guarantee is fixed-family FDR under arbitrary dependence, conditional on each input (e_i) being a valid marginal e-value. It does not extend to sequential evidence or SupFDR by itself. The capacity must be sufficient to retain the full baseline e-BH set.
+
+This is a concrete operational generalization of Anchored e-BH, not an invention of the anchoring principle. Required comparisons now include ordinary e-BH, Anchored e-BH (maximum-cardinality certified superset), closed e-BH/RC-eBH, and capacity-aware Anchored e-BH.
+
 ## 3. Irrevocability and non-persistence warning
 
 The raw intersection e-processes are future-extension coherent but are not necessarily time-monotone. Their certified menus need not be nested.
@@ -130,6 +156,7 @@ The test module validation/test_stopped_eclosure_capacity_pareto.py covers:
 Run from the repository root:
 
     PYTHONPATH=validation python -m unittest -v test_stopped_eclosure_capacity_pareto.py
+    PYTHONPATH=validation python -m unittest -v test_anchored_capacity_e_bh.py
 
 The committed suite has not been executed in this environment. A separate private exact-rational prototype matched exhaustive subset search on 800 randomized instances with N=1..8. A 100-hypothesis sparse-strong-signal prototype completed with a maximum frontier of 48 states in approximately 0.6 seconds. Those are development measurements, not CI or a general runtime guarantee.
 
@@ -162,6 +189,7 @@ The raw globally weighted projective e-collection is future-extension coherent. 
 
 ## References
 
+- Ramdas (2026), [Anchored multiple testing: a transparent use of e-closure to improve FDR procedures](https://arxiv.org/abs/2610.11279).
 - de Heide (2026), [Dynamic e-closure for online hypotheses with any-time-valid evidence](https://arxiv.org/abs/2608.09927).
 - Xu, Fischer & Ramdas (2026), [Online analogs of e-closure and compound e-values](https://proceedings.mlr.press/v337/xu26a.html).
 - [PR #9599 — linear-time raw projective e-closure separator](https://github.com/Luminous-Dynamics/symthaea/pull/9599).
