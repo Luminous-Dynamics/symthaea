@@ -136,6 +136,8 @@ def _normalise_stream(
         raise ValueError("every coordinate e-process path must have one value per update")
     if any(x < 0 for row in paths for x in row):
         raise ValueError("coordinate e-process values must be nonnegative")
+    if any(row[0] > 1 for row in paths):
+        raise ValueError("coordinate e-process initial values must be at most one")
 
     w = tuple(as_fraction(x) for x in weights)
     if any(x < 0 for x in w) or sum(w) > 1:
