@@ -167,7 +167,8 @@ pub fn evaluate_anytime_bounded_mean(
     let estimate = replicate_values
         .iter()
         .map(|value| *value / divisor)
-        .sum::<f64>();
+        .sum::<f64>()
+        .clamp(config.range_min, config.range_max);
     let support_width = config.range_max - config.range_min;
     let concentration = ((2.0f64).ln() - per_look_alpha.ln())
         / (2.0 * sample_count as f64);
