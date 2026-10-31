@@ -12,7 +12,6 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_TEXT_BYTES: u64 = 8 * 1024 * 1024;
@@ -140,7 +139,7 @@ pub fn probe_linux() -> anyhow::Result<LinuxProbeReport> {
     let (bpftool_evidence, bpftool_version) = match find_executable("bpftool") {
         Some(path) => (
             executable_evidence("bpftool", &path),
-            command_version_evidence("bpftool_version", &path),
+            not_probed_evidence("bpftool_version", "version command is intentionally not executed"),
         ),
         None => (
             missing_evidence("bpftool", "bpftool"),
@@ -514,29 +513,6 @@ fn executable_evidence(key: &str, path: &Path) -> ProbeEvidence {
             content_digest: None,
             path: Some(path.display().to_string()),
         },
-    }
-}
-
-fn command_version_evidence(key: &str, executable: &Path) -> ProbeEvidence {
-    match Command::new(executable).arg("--version").output() {
-        Ok(output) if output.status.success() => {
-            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            ProbeEvidence {
-                key: key.to_string(),
-                status: EvidenceStatus::Collected,
-                content_digest: Some(sha256_tagged(output.stdout.as_slice())),
-                value: Some(text),
-                path: Some(executable.display().to_string()),
-            }
-        }
-        Ok(output) => ProbeEvidence {
-            key: key.to_string(),
-            status: EvidenceStatus::NotProbed,
-            content_digest: Some(sha256_tagged(&output.stderr)),
-            value: Some(format!("exit={}", output.status)),
-            path: Some(executable.display().to_string()),
-        },
-        Err(_) => not_probed_evidence(key, "version invocation failed"),
     }
 }
 
