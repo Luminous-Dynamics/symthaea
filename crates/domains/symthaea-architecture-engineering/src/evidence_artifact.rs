@@ -160,7 +160,7 @@ impl EvidenceArtifactManifest {
             previous_id = Some(artifact.artifact_id.as_str());
             if artifact.media_type.trim().is_empty() || artifact.storage_locator.trim().is_empty() {
                 return Err(EvidenceArtifactError::new(
-                    &path,
+                    path.clone(),
                     "media_type and storage_locator must be non-empty",
                 ));
             }
