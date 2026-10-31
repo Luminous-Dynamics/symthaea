@@ -578,18 +578,19 @@ fn qualification_failures(
 /// Run null, positive-effect and negative-effect Monte Carlo scenarios for
 /// each candidate block count. The primary contrast is selected before
 /// simulation and receives a two-sided t-test at the configured alpha.
-pub fn qualify_search_time_trial_design(
+pub fn configuration_digest(config: &SearchTimePowerConfigV1) -> Result<String, String> {
+    let mut normalized = config.clone();
+    normalized.simulation_seed_hex.clear();
+    let bytes = serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize normalized power config: {error}"))?;
+    Ok(hash_domain(b"search-time-power-config.v1", &bytes))
+}
+
+fn qualify_search_time_trial_design(
     config: &SearchTimePowerConfigV1,
 ) -> Result<SearchTimePowerReportV1, String> {
     let seed = validate_config(config)?;
-    let config_bytes = {
-        let mut normalized = config.clone();
-        normalized.simulation_seed_hex.clear();
-        serde_json::to_vec(&normalized)
-            .map_err(|error| format!("cannot serialize normalized power config: {error}"))?
-    };
-    let configuration_sha256 =
-        hash_domain(b"search-time-power-config.v1", &config_bytes);
+    let configuration_sha256 = configuration_digest(config)?;
     let simulation_seed_commitment_sha256 =
         hash_domain(b"search-time-power-seed.v1", &seed);
 
@@ -655,110 +656,18 @@ pub fn qualify_search_time_trial_design(
 
 /// Verify exact report integrity and recompute whether any candidate passes.
 pub fn verify_search_time_power_report(
+    config: &SearchTimePowerConfigV1,
     report: &SearchTimePowerReportV1,
 ) -> Result<(), String> {
-    if report.schema != SEARCH_POWER_REPORT_SCHEMA {
-        return Err(format!("power report schema must be {SEARCH_POWER_REPORT_SCHEMA}"));
-    }
-    for (digest, label) in [
-        (&report.configuration_sha256, "configuration_sha256"),
-        (&report.simulation_seed_commitment_sha256, "simulation_seed_commitment_sha256"),
-    ] {
-        if !valid_digest(digest) {
-            return Err(format!("{label} must be a lowercase SHA-256 digest"));
-        }
-    }
-    if report.monte_carlo_repetitions < 1_000
-        || report.alpha_permille != 50
-        || report.candidate_results.is_empty()
-        || report.candidate_results.len() > SEARCH_POWER_MAX_CANDIDATES
-    {
-        return Err("power report has invalid repetition/alpha/candidate metadata".to_owned());
-    }
-    let mut normalized = report.clone();
-    normalized.report_sha256.clear();
-    let bytes = serde_json::to_vec(&normalized)
-        .map_err(|error| format!("cannot serialize normalized power report: {error}"))?;
-    if hash_domain(b"search-time-power-report.v1", &bytes) != report.report_sha256 {
-        return Err("power report digest does not match contents".to_owned());
-    }
-    if report.alpha_permille != 50
-        || report.minimum_power_lower_permille > 1_000
-        || report.minimum_coverage_lower_permille >= report.maximum_coverage_upper_permille
-    {
-        return Err("power report contains unsupported V1 qualification thresholds".to_owned());
-    }
-    let mut previous_count = 0_u32;
-    for candidate in &report.candidate_results {
-        if candidate.candidate_block_count <= previous_count
-            || candidate.candidate_block_count > SEARCH_POWER_MAX_CANDIDATE_BLOCKS
-        {
-            return Err("power report candidate block counts must be strictly increasing and in range".to_owned());
-        }
-        previous_count = candidate.candidate_block_count;
-        for outcome in [
-            &candidate.null_type_i_error,
-            &candidate.positive_effect_power,
-            &candidate.negative_effect_power,
-        ] {
-            if outcome.planned_repetitions != report.monte_carlo_repetitions
-                || outcome.estimable_repetitions.saturating_add(outcome.inconclusive_repetitions)
-                    != outcome.planned_repetitions
-                || outcome.rejection_rate.trials != u64::from(outcome.estimable_repetitions)
-                || outcome.coverage_rate.trials != u64::from(outcome.estimable_repetitions)
-                || outcome.rejection_rate.successes > outcome.rejection_rate.trials
-                || outcome.coverage_rate.successes > outcome.coverage_rate.trials
-            {
-                return Err("power simulation outcome counts are internally inconsistent".to_owned());
-            }
-        }
-        let null = &candidate.null_type_i_error;
-        let positive = &candidate.positive_effect_power;
-        let negative = &candidate.negative_effect_power;
-        let inconclusive_rate = |outcome: &SearchPowerSimulationOutcomeV1| {
-            outcome.inconclusive_repetitions as f64 * 1_000.0
-                / outcome.planned_repetitions.max(1) as f64
-        };
-        let clipped = positive.clipped_score_fraction_permille
-            .into_iter()
-            .chain(negative.clipped_score_fraction_permille)
-            .fold(0.0_f64, f64::max);
-        let coverage_ok = |outcome: &SearchPowerSimulationOutcomeV1| {
-            matches!(
-                (outcome.coverage_rate.lower_95_permille, outcome.coverage_rate.upper_95_permille),
-                (Some(lower), Some(upper))
-                    if lower >= f64::from(report.minimum_coverage_lower_permille)
-                        && upper <= f64::from(report.maximum_coverage_upper_permille)
-            )
-        };
-        let expected_pass = matches!(
-            null.rejection_rate.upper_95_permille,
-            Some(upper) if upper <= f64::from(report.maximum_type_i_upper_permille)
-        ) && matches!(
-            positive.rejection_rate.lower_95_permille,
-            Some(lower) if lower >= f64::from(report.minimum_power_lower_permille)
-        ) && matches!(
-            negative.rejection_rate.lower_95_permille,
-            Some(lower) if lower >= f64::from(report.minimum_power_lower_permille)
-        ) && coverage_ok(positive)
-            && coverage_ok(negative)
-            && inconclusive_rate(null) <= f64::from(report.maximum_inconclusive_rate_permille)
-            && inconclusive_rate(positive) <= f64::from(report.maximum_inconclusive_rate_permille)
-            && inconclusive_rate(negative) <= f64::from(report.maximum_inconclusive_rate_permille)
-            && clipped <= f64::from(report.maximum_clipped_score_fraction_permille);
-        if candidate.qualification_passes != expected_pass
-            || candidate.qualification_passes != candidate.qualification_failures.is_empty()
-        {
-            return Err("power candidate pass/fail status does not match its Monte Carlo intervals and thresholds".to_owned());
-        }
-    }
-    let expected_minimum = report.candidate_results.iter()
-        .find(|candidate| candidate.qualification_passes)
-        .map(|candidate| candidate.candidate_block_count);
-    if expected_minimum != report.minimum_qualified_block_count
-        || report.design_qualified != expected_minimum.is_some()
-    {
-        return Err("power report qualification summary does not match candidate results".to_owned());
+    // Re-run the exact bounded simulation from the evaluator config/seed.
+    // This is stronger than trusting a rehashed self-reported result table.
+    let expected = qualify_search_time_trial_design(config)?;
+    let expected_bytes = serde_json::to_vec(&expected)
+        .map_err(|error| format!("cannot serialize regenerated power report: {error}"))?;
+    let supplied_bytes = serde_json::to_vec(report)
+        .map_err(|error| format!("cannot serialize supplied power report: {error}"))?;
+    if expected_bytes != supplied_bytes {
+        return Err("power report does not match deterministic regeneration from the supplied config and seed".to_owned());
     }
     Ok(())
 }
@@ -806,7 +715,7 @@ mod tests {
             serde_json::to_vec(&first).unwrap(),
             serde_json::to_vec(&second).unwrap()
         );
-        verify_search_time_power_report(&first).unwrap();
+        verify_search_time_power_report(&config, &first).unwrap();
     }
 
     #[test]
@@ -860,13 +769,13 @@ mod tests {
         let mut changed = report.clone();
         changed.candidate_results[0].qualification_passes =
             !changed.candidate_results[0].qualification_passes;
-        assert!(verify_search_time_power_report(&changed)
-            .unwrap_err().contains("digest does not match"));
+        assert!(verify_search_time_power_report(&config(), &changed)
+            .unwrap_err().contains("deterministic regeneration"));
         let mut rehashed = changed;
         rehashed.report_sha256.clear();
         let bytes = serde_json::to_vec(&rehashed).unwrap();
         rehashed.report_sha256 = hash_domain(b"search-time-power-report.v1", &bytes);
-        assert!(verify_search_time_power_report(&rehashed)
-            .unwrap_err().contains("pass/fail status"));
+        assert!(verify_search_time_power_report(&config(), &rehashed)
+            .unwrap_err().contains("deterministic regeneration"));
     }
 }
