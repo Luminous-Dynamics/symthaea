@@ -143,3 +143,17 @@ A particularly strong result would be: **same independently verified target qual
 
 
 The weighted model supports host CPU, action wall-time, accelerator time, energy, input/output tokens, tool calls, evaluator calls, verifier calls, and memory-time proxy terms. The memory-time terms currently multiply a measured action peak by action wall duration; this is a declared conservative proxy, not an integral of the actual memory time-series. A campaign making memory-efficiency claims must collect true memory telemetry (preferably sampled/integrated over the execution interval) and should version a model using that signal. The synthetic direction campaign uses the ActionUnit model and intentionally remains unqualified for real compute-efficiency claims because its hardware resource meters are Unknown.
+
+## Unified confirmatory comparison gate
+
+The `matched_campaign::qualify_mechanism_matched_campaign` entry point consumes all policy tapes and all corresponding offer-set manifests. It first reconciles the common experiment and executable budget model, then verifies each manifest against its tape and requires identical options/state digests at every policy decision boundary. It returns an explicit qualification decision with blockers instead of treating a common header hash as a matched comparison.
+
+The gate qualifies a campaign for *confirmatory mechanism comparison* only when: at least two distinct policies have a common experiment contract; all decision-boundary offer sets match; all sequential/batched execution schedules are complete; every required resource meter and normalized charge is known and internally recomputed; and all policies have equal realized normalized spend. Equal ceilings alone are insufficient. An unmetered synthetic campaign remains structurally useful but is blocked from resource-efficiency claims.
+
+This is an execution-fairness gate, not a scientific-discovery verdict. It does not prove novelty, human usefulness, causal mechanism, external replication, or SOTA. Those require independently controlled evaluator/verifier processes, sealed test landscapes, registered hypotheses/endpoints, held-out transfer, and independent replay.
+
+## Current claim ceiling
+
+The AR-5B4 work now has implementation candidates for the event tape, executable cost models, cross-policy reconciliation, content-addressed offer-set manifests, and four-seat Coral round accounting. The source-state digest in an offer-set manifest remains a commitment until the underlying evaluator-owned state artifact is retained and independently rehashed. The Coral four-seat adapter preserves the published scheduler as advisory and verifies worker claims; it is not a reproduction of the complete Coral autonomous-agent runtime or a reproduction of the Coral paper's empirical results.
+
+No result is claimed as a verified compile/test pass or a benchmark win until exact-head validation and independent reproduction are available.
