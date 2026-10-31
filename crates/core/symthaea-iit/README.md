@@ -110,15 +110,69 @@ cause factors; it never recomputes the background posterior from the cut model.
 The sparse partition scorer combines Eq. 3, Eq. 4, cause/effect GID, positive-part
 clamping and the dense scorer's cut-edge normalization.
 
+### Exact multi-query reuse across partitions and state ties
+
+The sparse system analyzer separates state-independent inference from
+partition-dependent inference and state-pair score lookup:
+
+- One shared context prepares the original uncut observation factors,
+  candidate/background variable maps, posterior normalizer, and min-fill cost
+  telemetry for the fixed model, candidate, observed state, and factor budget.
+- The uncut cause-likelihood/selectivity and Eq. 3 effect selectivity are
+  computed once per system analysis.
+- Each directed cut is applied once. Its partitioned Eq. 4 likelihood vector
+  and Eq. 3 effect repertoire are computed once and reused across every tied
+  cause/effect specified-state pair.
+- Only the indexed scalar GID terms, combined score, and receipt are produced
+  per state-pair × partition combination.
+
+This does **not** reuse a cut posterior across different cuts: the original
+uncut posterior factors and normalizer are shared, while each target-specific
+cut likelihood still performs its own exact factor contraction. The report
+distinguishes the shared posterior-normalizer contraction from newly performed
+target contractions. Receipt versions and algorithm identifiers were bumped
+for the changed report and search contracts.
+
+The regression test compares the sparse analyzer's complete state-pair winners
+against the dense analyzer on a small system, then compares cached partition
+terms against independently prepared single-partition scores. The
+`sparse_system_search_reuse_sweep` benchmark compares the optimized full
+analyzer with a deliberately uncached exhaustive loop that calls the
+single-partition API once for every state pair × partition. It checks every
+state-pair winner, cut matrix, and score before emitting latency.
+
+Run:
+
+    cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep
+    cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 7
+
+This measures the effect of scoped reuse inside Symthaea's sparse backend. It
+is not a PyPhi speed comparison; use the benchmark policy below for any
+cross-implementation claim.
+
 Dense-vs-sparse parity covers local transitions, Eq. 3 repertoires, uncut Eq. 4,
 maximum-entropy-cut TPM cells, partitioned Eq. 4 and complete per-partition
 cause/effect scores for an embedded five-unit substrate.
 
-This remains a **per-partition scoring substrate, not yet a complete sparse
-Integration-level phi_s search**. The exhaustive full system search and its
-intrinsic specified-state tie selection still run through the dense reference
-model. A large sparse per-partition benchmark must not be represented as full
-system-analysis throughput.
+The sparse backend now also exposes a bounded exhaustive
+`analyze_iit4_2023_system_phi_s` path for the declared binary local-CPT profile.
+It performs the sparse intrinsic cause/effect state selection, canonical
+directed-partition enumeration, per-partition Eq. 3/Eq. 4 scoring, MIP ranking,
+and state-pair tie cascade. It uses the same explicit state-pair, partition,
+partition-score, and factor-entry budgets as the dense path. It binds the
+certified `n(n-1)` upper bound only when the theorem assumptions hold; TotalCut
+and mandatory one-unit TotalCut remain outside that bound domain.
+
+The sparse system search is exact for the declared computation when it returns
+`complete = true`, but it is **not yet generally qualified against PyPhi**.
+Dense-vs-sparse tests cover selected small systems and score families; they do
+not replace an independently pinned PyPhi fixture corpus. Nonzero
+Composition-level specified-state ties still return an explicit unresolved
+status because this crate does not yet construct distinctions, relations, or
+big Phi. The IIT 4.0 (2026) intrinsic-information requirement remains a
+separate unimplemented path. A large sparse benchmark must be described as
+sparse IIT 4.0 (2023) system search only when it actually runs the full
+bounded analyzer—not as a PyPhi-equivalent result.
 
 Validation includes dense-to-sparse transition equality, Eq. 3 repertoire
 parity, maximum-entropy cut TPM and partitioned Eq. 4 parity, full per-partition
@@ -209,8 +263,8 @@ conformance.
 For binary units with a conditionally independent TPM and the ordinary
 directed-set-partition family that preserves self-connections, IIT 4.0
 (2023) has the certified upper bound phi_s <= n(n - 1) (Zaeemzadeh &
-Tononi, 2024, Table 2). The dense system-search path checks this bound on
-every completed scalar result and fails closed if it is exceeded.
+Tononi, 2024, Table 2). Both the dense and sparse system-search paths bind this
+bound into completed results and fail closed if a returned scalar exceeds it.
 
 The helper returns no certificate when TotalCut is requested, because that
 special cut severs self-connections; it also returns no certificate for a
