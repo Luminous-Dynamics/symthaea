@@ -1,0 +1,57 @@
+name: HARDSEC-013 localization receipt audit
+
+on:
+  pull_request:
+    paths:
+      - "examples/hardsec_localization_audit.rs"
+      - "schemas/hardsec-localization-explanation-v1.schema.json"
+      - "tests/fixtures/hardsec/localization-audit-v1/**"
+      - "tools/hardsec-localization-audit-harness/**"
+      - ".github/workflows/hardsec-localization-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hardsec-localization-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  localization-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact pull request revision
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check examples/hardsec_localization_audit.rs
+      - name: Run focused unit suite
+        run: cargo test --locked --manifest-path tools/hardsec-localization-audit-harness/Cargo.toml --features hardsec-localization-audit --example hardsec_localization_audit
+      - name: Run known-answer fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$(mktemp -d)"
+          cargo run --locked --manifest-path tools/hardsec-localization-audit-harness/Cargo.toml --features hardsec-localization-audit --example hardsec_localization_audit -- \
+            --explanation tests/fixtures/hardsec/localization-audit-v1/explanation.json \
+            --graph tests/fixtures/hardsec/localization-audit-v1/source-graph.json \
+            --oracle tests/fixtures/hardsec/localization-audit-v1/evaluator-oracle.json \
+            --receipt "$out_dir/receipt.json"
+          python3 - "$out_dir/receipt.json" <<'PY'
+          import json, math, sys
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              receipt = json.load(handle)
+          assert receipt["result"] == "evaluated"
+          result = receipt["review_budget_result"]
+          assert result["selected_region_count"] == 1, result
+          assert result["true_positive_nodes"] == 2, result
+          assert result["precision"] == 1.0, result
+          assert math.isclose(result["recall"], 2.0 / 3.0, rel_tol=0.0, abs_tol=1e-12), result
+          assert receipt["path_audit"]["retained_matched_path_count"] == 1
+          assert receipt["inputs"]["label_semantics"] == "insertion_footprint"
+          PY
