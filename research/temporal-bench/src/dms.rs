@@ -58,9 +58,13 @@ pub struct DmsTask {
     pub stream_id: u64,
     pub dt_ms: u32,
     pub observations: Vec<DmsObservation>,
-    /// Public decision window; the class label and stimulus directions are hidden.
+    /// Public sample presentation window; the sample direction remains hidden.
+    pub sample_start_step: u32,
+    pub sample_end_step: u32,
+    /// Public delayed decision window; the test direction and class remain hidden.
     pub test_start_step: u32,
     pub test_end_step: u32,
+    pub delay_steps: u32,
     pub input_channels: usize,
     pub rotation_steps: u8,
 }
@@ -218,8 +222,11 @@ pub fn generate_dms_task(
             stream_id,
             dt_ms: config.dt_ms,
             observations,
+            sample_start_step: sample_start,
+            sample_end_step: sample_end,
             test_start_step: test_start,
             test_end_step: test_end,
+            delay_steps,
             input_channels: config.input_channels,
             rotation_steps: config.rotation_steps,
         },
@@ -272,11 +279,13 @@ pub fn verify_dms_trace(
     if task.stream_id != oracle.stream_id {
         return Err(DmsVerificationError::StreamIdMismatch);
     }
-    if task.test_start_step >= task.test_end_step
+    if task.sample_start_step >= task.sample_end_step
+        || task.sample_end_step.saturating_add(task.delay_steps) != task.test_start_step
+        || task.test_start_step >= task.test_end_step
         || usize::try_from(task.test_end_step).unwrap_or(usize::MAX) != task.observations.len()
-        || task.test_start_step as usize >= task.observations.len()
         || task.input_channels == 0
         || task.input_channels > 4_096
+        || task.dt_ms == 0
     {
         return Err(DmsVerificationError::InvalidDecisionWindow);
     }
@@ -419,6 +428,9 @@ mod tests {
         assert_eq!(config.test_ms, 500);
         let (task, _) = generate_dms_task(config).unwrap();
         assert_eq!(task.observations.len(), 2_010);
+        assert_eq!(task.sample_start_step, 10);
+        assert_eq!(task.sample_end_step, 510);
+        assert_eq!(task.delay_steps, 1_000);
         assert_eq!(task.test_start_step, 1_510);
         assert_eq!(task.test_end_step, 2_010);
     }
@@ -489,7 +501,8 @@ mod tests {
             .iter_mut()
             .find(|observation| !observation.active_channels.is_empty())
             .unwrap();
-        observation.active_channels.push(observation.active_channels[0]);
+        let first_channel = observation.active_channels[0];
+        observation.active_channels.push(first_channel);
         observation.active_channels.sort_unstable();
         assert!(matches!(
             verify_dms_trace(&task, &oracle),
