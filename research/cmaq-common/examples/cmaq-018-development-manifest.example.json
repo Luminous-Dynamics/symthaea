@@ -11,29 +11,29 @@
   },
   "repository": {
     "url": "https://github.com/Luminous-Dynamics/symthaea",
-    "commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
+    "commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
     "dirty_tree": false,
     "source_tree_sha256": null
   },
   "candidate": {
     "name": "CMAQ-018 synthetic predictor-arm suite",
     "kind": "synthetic_reference_arms",
-    "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
+    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
     "artifact_sha256": null,
-    "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+    "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
     "weights_sha256": null,
     "adapter_sha256": null,
     "build_status": "source_only_not_compiled"
   },
   "generator": {
     "name": "CMAQ-018 deterministic same-history branch generator",
-    "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-    "config_sha256": "01ad379e3ccdb65542eacba18ebeeb5e67ce35783f53a29eb7984cc1e84f2791"
+    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+    "config_sha256": "cdc87841a4a5de86ebfe96e67de32695e685aec87b6fc9dde56d5162af9151e6"
   },
   "evaluator": {
     "name": "CMAQ-018 branch-fidelity evaluator",
-    "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-    "metric_bundle_sha256": "c91e25b997c25b75fb9d32659945dd373ed9655253b16565d661c9875b0a4069",
+    "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+    "metric_bundle_sha256": "8dc2463d1b812cb540573e54e2d2b72270732e503f9cd39ef119117d1fee2871",
     "version": "0.1.0",
     "external_judge": null
   },
@@ -44,7 +44,7 @@
       "name": "CMAQ-018 seven-family deterministic intervention generator",
       "revision": "cmaq-018-v0.1",
       "split": "development",
-      "manifest_sha256": "01ad379e3ccdb65542eacba18ebeeb5e67ce35783f53a29eb7984cc1e84f2791",
+      "manifest_sha256": "4935148bb09293ea9bce35a4e6516d0d8e9b5b586bf49a51d4eb26ffee74c61a",
       "license": "internal synthetic",
       "visibility": "mixed_with_explicit_partition",
       "candidate_access": [
@@ -60,15 +60,15 @@
     "suite": "CMAQ-018",
     "environment_id": "cmaq018-matched-history-synthetic",
     "environment_revision": "0.1.0",
-    "observation_schema_sha256": "09bd3c3b58af999146df651666ecc1c8a6ee4544a510b490ffc5973984d04877",
-    "action_schema_sha256": "fb9f31cbc14f6e156657d98ce3f9b095919d745789bf7f7c0e32d9d85b5b2f3c",
-    "reward_definition_sha256": "61c28333ded50f8e3bb54182dcbdb984a36859799574e176fc5c7b86fbad2252",
+    "observation_schema_sha256": "68b19f4c240da5f57e9a258dbcbe0e38012976e4abad16e0d75b546bcb64e124",
+    "action_schema_sha256": "5206eed15d9bea16ca7cd2edf3c1e54cce79f7f49afe91d4425f2b00bc410fd0",
+    "reward_definition_sha256": "1a410b977370fa9e24e3e03e54552b1ad1ac38b22d0ae3a54409245d38645cff",
     "wrapper_stack": [
       "same-history branch cloning",
       "common disturbance within episode",
       "canonical action identity"
     ],
-    "wrapper_stack_sha256": "67aac6e59f57d8444b2b34885120462d335c0f9b2195b32423c2c01dbc383d73",
+    "wrapper_stack_sha256": "072d1104a47ad6a20549ca48323b83dfdeb613558d3ae666dcad7efa33cc78cd",
     "action_repeat": 1,
     "simulator_steps_per_action": 1,
     "controller_horizon": 1,
@@ -95,7 +95,8 @@
       "calibration": [],
       "qualification": [],
       "family_disjoint": false
-    }
+    },
+    "episode_count_scope": "per_scenario_model_condition"
   },
   "budgets": {
     "episode_limit": 64,
@@ -115,8 +116,8 @@
       "id": "point_outcome",
       "role": "primary",
       "kind": "world_model",
-      "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-      "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Synthetic fixed predictor; no trained model or compute-matched deployment claim.",
       "cost_accounting": "not_measured"
@@ -125,8 +126,8 @@
       "id": "explicit_effect_head",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-      "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Pair-effect head has different query granularity from absolute branch prediction.",
       "cost_accounting": "not_measured"
@@ -135,8 +136,8 @@
       "id": "shuffled_action_labels",
       "role": "negative_control",
       "kind": "negative_control",
-      "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-      "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Intentional action-identity corruption; negative control only.",
       "cost_accounting": "not_measured"
@@ -145,8 +146,8 @@
       "id": "support_aware_point",
       "role": "world_model_control",
       "kind": "world_model",
-      "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-      "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "diagnostic_only",
       "ineligibility_reason": "Deterministic support rule is not a calibrated learned uncertainty model.",
       "cost_accounting": "not_measured"
@@ -155,8 +156,8 @@
       "id": "oracle",
       "role": "oracle_ceiling",
       "kind": "oracle",
-      "source_commit": "1df8d3c12ba527bc37395842e773b2f3cdc07f2b",
-      "config_sha256": "cfd8d52f4bc7fb9295eba6776079fce34680e81a513bfddf5c0f25b68dfa34bb",
+      "source_commit": "043883b36e383a3e27cb19e7e15eabb121f6c5d6",
+      "config_sha256": "49fe170c255c14b93808ad8de22f1300cdc2e342374295e0ed0990be5f0f7b11",
       "eligibility": "oracle_only",
       "ineligibility_reason": "Evaluator-owned truth; not candidate deployable.",
       "cost_accounting": "not_measured"
@@ -194,18 +195,30 @@
   ],
   "metrics": {
     "bundle_id": "cmaq018-v0.1-metrics",
-    "bundle_sha256": "c91e25b997c25b75fb9d32659945dd373ed9655253b16565d661c9875b0a4069",
+    "bundle_sha256": "8dc2463d1b812cb540573e54e2d2b72270732e503f9cd39ef119117d1fee2871",
     "required_metrics": [
       "pair_coverage",
       "effect_sign_accuracy",
+      "effect_sign_accuracy_episode_count",
+      "effect_sign_accuracy_ci95",
       "effect_magnitude_mae",
+      "effect_magnitude_mae_episode_count",
+      "effect_magnitude_mae_ci95",
       "kendall_tau_b",
+      "rank_tau_b_episode_count",
+      "rank_tau_b_ci95",
       "top1_regret",
+      "top1_regret_episode_count",
+      "top1_regret_ci95",
       "null_false_effect_rate",
+      "null_false_effect_episode_count",
+      "null_false_effect_rate_ci95",
       "branch_coverage",
       "branch_outcome_mae",
       "branch_state_mae",
-      "terminal_false_safe_rate"
+      "terminal_false_safe_rate",
+      "terminal_false_safe_rate_episode_count",
+      "terminal_false_safe_rate_ci95"
     ],
     "cross_track_pooling": false
   },
