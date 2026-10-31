@@ -702,6 +702,68 @@ fn drum_hits(
                 }
             }
         }
+        P::AfroCuban => {
+            // Son 3-2 clave: the three-side occupies the first 4/4 bar
+            // (1, 2&, 4); the two-side answers in the next bar (2, 3).
+            // bar is absolute over the complete score, so phrase/section
+            // boundaries cannot silently restart the two-bar cycle.
+            if (meter - 4.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    if bar % 2 == 0 {
+                        for (beat, velocity) in [(0.0, 0.72), (1.5, 0.58), (3.0, 0.66)] {
+                            push(&mut hits, DrumType::Clave, b0 + beat, velocity);
+                        }
+                    } else {
+                        for (beat, velocity) in [(1.0, 0.60), (2.0, 0.68)] {
+                            push(&mut hits, DrumType::Clave, b0 + beat, velocity);
+                        }
+                    }
+                    // Conga and bongo answer around the clave rather than
+                    // simply doubling its strokes.
+                    push(&mut hits, DrumType::Conga, b0 + 0.5, 0.34);
+                    push(&mut hits, DrumType::Conga, b0 + 2.5, 0.42);
+                    if bar % 2 == 1 {
+                        push(&mut hits, DrumType::Bongo, b0 + 3.5, 0.26);
+                        push(&mut hits, DrumType::Cowbell, b0 + 2.5, 0.22);
+                    }
+                }
+            }
+        }
+        P::FlamencoPalmas => {
+            // Accent anchors of the 12-count compas. Strongest at the
+            // cycle close (12) and its midpoint (6); positions are local
+            // to the 12-beat measure and repeat on each global barline.
+            if (meter - 12.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    for (beat, velocity) in [
+                        (2.0, 0.52),
+                        (5.0, 0.66),
+                        (7.0, 0.42),
+                        (9.0, 0.48),
+                        (11.0, 0.78),
+                    ] {
+                        push(&mut hits, DrumType::HandClap, b0 + beat, velocity);
+                    }
+                }
+            }
+        }
+        P::BossaNova => {
+            // Light, continuous cabasa eighths; sparse conga answers leave
+            // the syncopated, continuously-held BossaComp chords in front.
+            if (meter - 4.0).abs() < 1e-9 {
+                for bar in 0..total_bars {
+                    let b0 = bar as f64 * meter;
+                    for k in 0..8 {
+                        let velocity = if k % 2 == 0 { 0.19 } else { 0.13 };
+                        push(&mut hits, DrumType::Cabasa, b0 + k as f64 * 0.5, velocity);
+                    }
+                    push(&mut hits, DrumType::Conga, b0 + 1.5, 0.28);
+                    push(&mut hits, DrumType::Conga, b0 + 3.5, 0.24);
+                }
+            }
+        }
     }
     percussion::humanize_hits(&mut hits, state.consciousness_level, seed as u32);
     hits
