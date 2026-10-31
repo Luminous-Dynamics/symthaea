@@ -34,11 +34,11 @@
     "rust_tests_authored": true,
     "oracle_trace_verifier_implemented": true,
     "oracle_process_isolation_implemented": false,
-    "rust_tests_authored_count": 83,
+    "rust_tests_authored_count": 85,
     "rust_tests_by_file": {
       "research/temporal-bench/src/digest.rs": 2,
       "research/temporal-bench/src/lib.rs": 16,
-      "research/temporal-bench/src/temporal.rs": 20,
+      "research/temporal-bench/src/temporal.rs": 22,
       "research/temporal-bench/src/dms.rs": 16,
       "research/temporal-bench/src/evidence.rs": 17,
       "research/temporal-bench/src/irregular.rs": 12
