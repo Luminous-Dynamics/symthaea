@@ -145,6 +145,7 @@ pub enum RegisterPlacementDisposition {
     OctaveRebalanced,
     BlockedByOtherInvariant,
     NoLegalOctavePlacement,
+    BlockedWithoutPartIdentity,
     RepairRejectedByValidator,
 }
 
@@ -248,6 +249,18 @@ pub fn place_parts_within_validation_range(
     {
         return receipt(
             RegisterPlacementDisposition::BlockedByOtherInvariant,
+            Vec::new(),
+            before_min,
+            before_max,
+        );
+    }
+
+    // Part IDs are the only authoritative way to keep simultaneous voices
+    // separate during an octave shift. Do not infer lines from VoiceRole:
+    // some generators reuse roles and some do not emit complete part identity.
+    if !score.has_part_identity() {
+        return receipt(
+            RegisterPlacementDisposition::BlockedWithoutPartIdentity,
             Vec::new(),
             before_min,
             before_max,
@@ -937,6 +950,33 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn octave_placement_abstains_when_part_identity_is_missing() {
+        use crate::harmony::Key;
+        use crate::pitch::{Pitch, PitchClass};
+        use crate::rhythm::Duration;
+        use crate::score::{Emphasis, PartId, Score, ScoreNote, VoiceRole};
+
+        let mut score = Score::new(Key::major(PitchClass::new(0)), 90.0, 4);
+        score.push(ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: Pitch::from_midi(110),
+            onset: Duration::zero(),
+            duration: Duration::new(1, 1),
+            velocity: 0.5,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        });
+        let original = score.clone();
+        let receipt = place_parts_within_validation_range(&mut score);
+        assert_eq!(
+            receipt.disposition,
+            RegisterPlacementDisposition::BlockedWithoutPartIdentity
+        );
+        assert_eq!(score, original, "unidentified voices must not be conflated");
+    }
+
     fn octave_placement_refuses_parts_that_cannot_fit_without_note_warping() {
         use crate::harmony::Key;
         use crate::pitch::{Pitch, PitchClass};
