@@ -4,30 +4,86 @@
   "title": "Co-linear merge morphology profile input",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "dataset_id", "dataset_revision_commit_sha", "detector", "noise", "tracks"],
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_revision_commit_sha",
+    "detector",
+    "noise",
+    "tracks"
+  ],
   "properties": {
-    "schema_version": { "const": 1 },
-    "dataset_id": { "type": "string", "minLength": 1 },
-    "dataset_revision_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "schema_version": {
+      "const": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "detector": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["half_window_samples", "score_threshold", "min_separation_nm"],
+      "required": [
+        "half_window_samples",
+        "score_threshold",
+        "min_separation_nm"
+      ],
       "properties": {
-        "half_window_samples": { "type": "integer", "minimum": 3 },
-        "score_threshold": { "type": "number", "exclusiveMinimum": 0 },
-        "min_separation_nm": { "type": "number", "exclusiveMinimum": 0 }
-      }
+        "half_window_samples": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "score_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_separation_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "resample_interval_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional physical-arclength V2 mode. Resample each track on this fixed uniform nanometre grid using piecewise-linear interpolation."
+        },
+        "half_window_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Required with resample_interval_nm. Physical half-window in nanometres; Rust validation requires an integer multiple of resample_interval_nm and at least three resampled samples."
+        }
+      },
+      "description": "V1 uses half_window_samples. Optional V2 physical-arclength mode requires both resample_interval_nm and half_window_nm; do not mix one physical parameter with one absent parameter."
     },
     "noise": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["radius_nm", "tangent_degrees", "membrane_integrity", "synapse_density"],
+      "required": [
+        "radius_nm",
+        "tangent_degrees",
+        "membrane_integrity",
+        "synapse_density"
+      ],
       "properties": {
-        "radius_nm": { "type": "number", "exclusiveMinimum": 0 },
-        "tangent_degrees": { "type": "number", "exclusiveMinimum": 0 },
-        "membrane_integrity": { "type": "number", "exclusiveMinimum": 0 },
-        "synapse_density": { "type": "number", "exclusiveMinimum": 0 }
+        "radius_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tangent_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "membrane_integrity": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "synapse_density": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
       }
     },
     "tracks": {
@@ -36,22 +92,48 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["track_id", "samples"],
+        "required": [
+          "track_id",
+          "samples"
+        ],
         "properties": {
-          "track_id": { "type": "string", "minLength": 1 },
+          "track_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "samples": {
             "type": "array",
             "minItems": 7,
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["distance_nm", "radius_nm", "tangent_degrees", "membrane_integrity", "synapse_density"],
+              "required": [
+                "distance_nm",
+                "radius_nm",
+                "tangent_degrees",
+                "membrane_integrity",
+                "synapse_density"
+              ],
               "properties": {
-                "distance_nm": { "type": "number" },
-                "radius_nm": { "type": "number", "exclusiveMinimum": 0 },
-                "tangent_degrees": { "type": "number" },
-                "membrane_integrity": { "type": "number", "minimum": 0, "maximum": 1 },
-                "synapse_density": { "type": "number", "minimum": 0 }
+                "distance_nm": {
+                  "type": "number"
+                },
+                "radius_nm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "tangent_degrees": {
+                  "type": "number"
+                },
+                "membrane_integrity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "synapse_density": {
+                  "type": "number",
+                  "minimum": 0
+                }
               }
             }
           }
