@@ -14,7 +14,21 @@ import json
 import math
 from typing import Any, Sequence
 
-from crc_finite_recertification import as_fraction
+
+def as_fraction(value: int | float | str | Fraction) -> Fraction:
+    if isinstance(value, Fraction):
+        return value
+    if isinstance(value, bool):
+        raise TypeError("bool is not a rational input")
+    if isinstance(value, int):
+        return Fraction(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("rational inputs must be finite")
+        return Fraction(str(value))
+    if isinstance(value, str):
+        return Fraction(value)
+    raise TypeError(f"unsupported rational input: {type(value).__name__}")
 
 
 def _fraction_pair(value: Fraction) -> list[int]:
