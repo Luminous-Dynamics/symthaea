@@ -172,6 +172,7 @@ pub struct ReplicatedCausalAnalysisReportV1 {
     pub localization_randomization_p_value: f64,
     pub localization_randomization_draws: u32,
     pub randomization_null: String,
+    pub family_effects: Vec<FamilyEffectV1>,
     pub replicate_effects: Vec<ReplicateEffectV1>,
     pub confirmatory_eligible: bool,
     pub analysis_status: String,
@@ -357,7 +358,31 @@ fn validate_replicate(
     {
         return Err("replicate lacks a consistent completed paired training execution audit".to_owned());
     }
+    let audit_bytes = serde_json::to_vec(&replicate.training_receipt_audit)
+        .map_err(|error| format!("cannot serialize training receipt audit: {error}"))?;
+    let expected_audit_digest =
+        hash_domain(b"paired-training-execution-audit.v1", &audit_bytes);
+    if replicate.training_receipt_audit_sha256 != expected_audit_digest {
+        return Err("training receipt audit digest does not match report contents".to_owned());
+    }
+    if replicate.training_receipt_audit.independently_verified {
+        return Err("self-asserted independent verification cannot be trusted by this analysis module".to_owned());
+    }
+    if !replicate.training_receipt_audit.paired_checkpoints_distinct
+        || !replicate.training_receipt_audit.base_checkpoint_matched
+        || !replicate.training_receipt_audit.training_configuration_matched
+        || !replicate.training_receipt_audit.corpus_identities_matched_to_design
+        || !replicate.training_receipt_audit.intervention_payloads_matched_to_assignment
+        || !replicate.training_receipt_audit.observed_token_budgets_complete
+        || !replicate.training_receipt_audit.observed_step_budgets_complete
+        || !replicate.training_receipt_audit.runner_attestation_digests_present
+        || !replicate.training_receipt_audit.checkpoint_custody_digests_present
+        || !replicate.training_receipt_audit.ready_for_independent_attestation_verification
+    {
+        return Err("training execution audit is missing a required consistency or external-attestation receipt".to_owned());
+    }
     if replicate.training_receipt_audit.design_sha256 != replicate.manifest.design_sha256
+        || replicate.training_receipt_audit.manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate.training_receipt_audit.intervention_manifest_sha256 != replicate.manifest.manifest_sha256
         || replicate.training_receipt_audit.treatment_checkpoint_sha256
             != replicate.evaluation_evidence.treatment_checkpoint_sha256
@@ -504,6 +529,8 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
     let placebo_score = sample_mean(&placebo_rates)?;
     let exposed_mean = sample_mean(&exposed_advantages)?;
     let unexposed_mean = sample_mean(&unexposed_advantages)?;
+    let stratified_localization =
+        stratum_localization(&replicate.cluster_outcomes, None)?;
     let item_base = item_base_success as f64 * 1_000.0 / item_total as f64;
     let item_treatment = item_treatment_success as f64 * 1_000.0 / item_total as f64;
     let item_placebo = item_placebo_success as f64 * 1_000.0 / item_total as f64;
@@ -542,7 +569,7 @@ fn replicate_effect(replicate: &CausalReplicateInputV1) -> Result<ReplicateEffec
         treatment_minus_placebo_item_weighted_permille: item_treatment - item_placebo,
         exposed_cluster_advantage_permille: exposed_mean,
         unexposed_cluster_advantage_permille: unexposed_mean,
-        exposure_localization_contrast_permille: exposed_mean - unexposed_mean,
+        exposure_localization_contrast_permille: stratified_localization,
         families,
     })
 }
@@ -664,8 +691,9 @@ pub fn analyze_replicated_causal_study(
     let mut seed_commitments = BTreeSet::new();
     let mut all_checkpoint_digests = BTreeSet::new();
     let mut all_training_audit_digests = BTreeSet::new();
+    let mut all_evaluation_receipt_digests = BTreeSet::new();
     let mut replicate_effects = Vec::with_capacity(study.replicates.len());
-    let mut independent_receipts_verified = true;
+    let independent_receipts_verified = false;
     let mut all_receipts_consistent = true;
     let mut all_ready_for_external_verification = true;
     let mut issues = Vec::new();
@@ -695,7 +723,15 @@ pub fn analyze_replicated_causal_study(
         if !all_training_audit_digests.insert(replicate.training_receipt_audit_sha256.as_str()) {
             return Err("training receipt audit digests must be unique across replicates".to_owned());
         }
-        independent_receipts_verified &= replicate.training_receipt_audit.independently_verified;
+        for evaluation_digest in [
+            replicate.evaluation_evidence.base_evaluation_receipt_sha256.as_str(),
+            replicate.evaluation_evidence.treatment_evaluation_receipt_sha256.as_str(),
+            replicate.evaluation_evidence.placebo_evaluation_receipt_sha256.as_str(),
+        ] {
+            if !all_evaluation_receipt_digests.insert(evaluation_digest) {
+                return Err("evaluation receipt digests must be unique across model-pair replicates".to_owned());
+            }
+        }
         all_receipts_consistent &= replicate.training_receipt_audit.execution_consistent;
         all_ready_for_external_verification &= replicate.training_receipt_audit.ready_for_independent_attestation_verification;
         if !replicate.training_receipt_audit.independently_verified {
@@ -770,15 +806,15 @@ pub fn analyze_replicated_causal_study(
     let replicate_count_meets_minimum =
         study.replicates.len() >= study.minimum_confirmatory_replicates as usize;
     let execution_ready = all_receipts_consistent && all_ready_for_external_verification;
-    let confirmatory_eligible = replicate_count_meets_minimum
-        && independent_receipts_verified
-        && execution_ready;
-    let analysis_status = if confirmatory_eligible {
-        "confirmatory_eligible_after_external_trust_verification"
-    } else if !replicate_count_meets_minimum {
+    // This module has no trust-root/signature verifier, so it cannot issue a
+    // confirmatory eligibility decision, even when all digest receipts exist.
+    let confirmatory_eligible = false;
+    let analysis_status = if !replicate_count_meets_minimum {
         "exploratory_insufficient_independent_model_pair_replicates"
+    } else if !execution_ready {
+        "exploratory_execution_evidence_incomplete"
     } else {
-        "exploratory_training_receipts_not_independently_authenticated"
+        "exploratory_waiting_for_external_signature_verification"
     }.to_owned();
     if !replicate_count_meets_minimum {
         issues.push(format!(
@@ -811,6 +847,7 @@ pub fn analyze_replicated_causal_study(
         localization_randomization_p_value: randomization_p,
         localization_randomization_draws: study.randomization_test_draws,
         randomization_null: "Fisher_sharp_null_no_assignment_effect_on_any_cluster_paired_advantage_including_spillover".to_owned(),
+        family_effects: family_reports,
         replicate_effects,
         confirmatory_eligible,
         analysis_status,
