@@ -537,7 +537,30 @@ pub fn evaluate_fleet_candidate(
 
     let has_incomplete = !missing_evidence.is_empty() || !incomplete_reasons.is_empty();
     let all_measured = !has_incomplete && infeasibility_reasons.is_empty();
+    // A known hard-threshold violation is conclusive even if a different target's
+    // evidence is still missing. Unknown outcomes never erase known infeasibility.
     let mut constraint_violations = Vec::new();
+    for item in &evidence {
+        if item.disposition != FleetEvidenceDisposition::Measured {
+            continue;
+        }
+        let objective = manifest
+            .objectives
+            .iter()
+            .find(|objective| objective.objective_id == item.objective_id)
+            .ok_or_else(|| FleetEnvelopeError::new("evidence.objective_id", "objective absent from manifest"))?;
+        let utility = item.normalized_utility.ok_or_else(|| {
+            FleetEnvelopeError::new("evidence.normalized_utility", "measured evidence lacks normalized utility")
+        })?;
+        if utility + FLOAT_TOLERANCE < objective.minimum_utility {
+            constraint_violations.push(FleetConstraintViolation {
+                target_id: item.target_id.clone(),
+                objective_id: item.objective_id.clone(),
+                normalized_utility: utility,
+                required_minimum_utility: objective.minimum_utility,
+            });
+        }
+    }
     let objective_envelopes = if all_measured {
         let mut envelopes = Vec::with_capacity(manifest.objectives.len());
         for objective in &manifest.objectives {
@@ -561,18 +584,6 @@ pub fn evaluate_fleet_candidate(
                 .copied()
                 .ok_or_else(|| FleetEnvelopeError::new("objective_envelope", "empty target values"))?;
             let satisfies = worst_utility + FLOAT_TOLERANCE >= objective.minimum_utility;
-            if !satisfies {
-                for (target_id, utility) in values {
-                    if *utility + FLOAT_TOLERANCE < objective.minimum_utility {
-                        constraint_violations.push(FleetConstraintViolation {
-                            target_id: (*target_id).to_owned(),
-                            objective_id: objective.objective_id.clone(),
-                            normalized_utility: *utility,
-                            required_minimum_utility: objective.minimum_utility,
-                        });
-                    }
-                }
-            }
             envelopes.push(FleetObjectiveEnvelope {
                 objective_id: objective.objective_id.clone(),
                 value_unit: objective.value_unit.clone(),
@@ -1051,6 +1062,24 @@ mod tests {
         ).unwrap();
         assert_eq!(result.status, FleetCandidateStatus::InfeasibleAtLeastOneRequiredTarget);
         assert!(result.infeasibility_reasons[0].contains("flash_budget_exceeded"));
+    }
+
+    #[test]
+    fn known_floor_violation_dominates_unrelated_incomplete_evidence() {
+        let (profiles, registries, mut manifest, config) = fixture();
+        manifest.objectives[0].minimum_utility = 0.80;
+        manifest.fleet_sha256 =
+            compute_fleet_deployment_manifest_sha256(&manifest).unwrap();
+        let observations = complete_observations(
+            &profiles[..1], &registries[..1], [0.40, 0.95], [20.0, 20.0],
+        );
+        let result = evaluate_fleet_candidate(
+            &manifest, &registries, "candidate-A", &config, &observations,
+        ).unwrap();
+        assert_eq!(result.status, FleetCandidateStatus::InfeasibleAtLeastOneRequiredTarget);
+        assert_eq!(result.missing_evidence.len(), 2);
+        assert_eq!(result.constraint_violations.len(), 1);
+        assert_eq!(result.constraint_violations[0].target_id, "nrf52840");
     }
 
     #[test]
