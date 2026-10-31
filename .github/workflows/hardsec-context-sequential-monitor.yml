@@ -79,7 +79,7 @@ jobs:
           assert "perfectly_dependent_shared_latent_null" in plan["scenarios"]
           assert "authors_python_official_cctm_current_main" in plan["baselines"]
           reference = plan["reference_calibration_design"]
-          assert reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] == 0.05
+          assert abs(reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] - 0.05) < 1e-12
           assert reference["context_count_for_fixture"] == 2
           assert reference["alpha_per_context_for_fixture"] == 0.02
           assert reference["delta_per_context_for_fixture"] == 0.005
