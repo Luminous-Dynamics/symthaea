@@ -74,7 +74,29 @@ jobs:
           awk -F '\t' '$1 == "GOLD_CLAIM" { found=1 } END { exit !found }' "$workdir/oracle.poar.sealed"
           printf 'planner_sha256=%s\n' "$planner_sha256"
           printf 'oracle_sha256=%s\n' "$(sha256sum "$workdir/oracle.poar.sealed" | awk '{print $1}')"
-          # The oracle is intentionally not uploaded as a public artifact.
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-prediction-demo -- 1729 test "$planner_sha256" "$workdir/predictions.poar"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-eval -- "$workdir/planner.poar" "$workdir/oracle.poar.sealed" "$workdir/predictions.poar" "$GITHUB_SHA" "$workdir/evaluation-receipt.tsv"
+          grep -q '^POAR-EVAL-RECEIPT/1
+      - name: Preserve qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: pod-meta-qualification-${{ github.sha }}
+          path: pod-meta-qualification-receipt.txt
+          if-no-files-found: error
+          retention-days: 90
+ "$workdir/evaluation-receipt.tsv"
+          grep -q "^planner_sha256=$planner_sha256$" "$workdir/evaluation-receipt.tsv"
+          grep -q '^cases=16
+      - name: Preserve qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: pod-meta-qualification-${{ github.sha }}
+          path: pod-meta-qualification-receipt.txt
+          if-no-files-found: error
+          retention-days: 90
+ "$workdir/evaluation-receipt.tsv"
+          cat "$workdir/evaluation-receipt.tsv" >> pod-meta-qualification-receipt.txt
+          # The oracle is intentionally never uploaded as a public artifact.
           rm -rf "$workdir"
 
       - name: Preserve qualification receipt
