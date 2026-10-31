@@ -175,7 +175,7 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
     if str_value(plan, "status", "plan")? != "planned" {
         return Err(fail("plan", "this auditor currently accepts status=planned only"));
     }
-    if root.len() != 15 {
+    if root.len() != 16 {
         return Err(fail("plan", "top-level field count does not match the v1 contract"));
     }
 
@@ -224,7 +224,8 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
     let scope_note = str_value(targets, "scope_note", "plan.aspirational_targets")?;
     if !(0.0..=1.0).contains(&pooled) || !(0.0..=1.0).contains(&worst)
         || fpd <= 0.0 || delay == 0 || median_overhead < 0.0 || p95_overhead < median_overhead
-        || silent_clears != 0 || scope_note.to_lowercase().contains("achieved") {
+        || silent_clears != 0 || (scope_note.to_lowercase().contains("achieved")
+            && !scope_note.to_lowercase().contains("not achieved")) {
         return Err(fail("plan.aspirational_targets", "target values or aspirational scope note violate v1 constraints"));
     }
 
