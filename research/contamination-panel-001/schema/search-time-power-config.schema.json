@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/search-time-power-config-v1.json",
+  "title": "Search-time access trial power design config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "design_id",
+    "primary_contrast",
+    "candidate_block_counts",
+    "monte_carlo_repetitions",
+    "baseline_score_permille",
+    "smallest_effect_of_interest_permille",
+    "shared_block_noise_sd_permille",
+    "arm_residual_noise_sd_permille",
+    "within_block_correlation_permille",
+    "effect_heterogeneity_sd_permille",
+    "run_order_effect_permille",
+    "missing_block_rate_permille",
+    "alpha_permille",
+    "maximum_type_i_upper_permille",
+    "minimum_power_lower_permille",
+    "minimum_coverage_lower_permille",
+    "maximum_coverage_upper_permille",
+    "maximum_inconclusive_rate_permille",
+    "maximum_clipped_score_fraction_permille",
+    "simulation_seed_hex"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.search_time_power_config.v1"
+    },
+    "design_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "primary_contrast": {
+      "type": "string",
+      "enum": [
+        "allowlisted_minus_network_disabled",
+        "unrestricted_minus_network_disabled"
+      ]
+    },
+    "candidate_block_counts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 10000
+      }
+    },
+    "monte_carlo_repetitions": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 100000
+    },
+    "baseline_score_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "smallest_effect_of_interest_permille": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000
+    },
+    "shared_block_noise_sd_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "arm_residual_noise_sd_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "within_block_correlation_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999
+    },
+    "effect_heterogeneity_sd_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "run_order_effect_permille": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "missing_block_rate_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999
+    },
+    "alpha_permille": {
+      "const": 50
+    },
+    "maximum_type_i_upper_permille": {
+      "type": "integer",
+      "minimum": 50,
+      "maximum": 500
+    },
+    "minimum_power_lower_permille": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 990
+    },
+    "minimum_coverage_lower_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 990
+    },
+    "maximum_coverage_upper_permille": {
+      "type": "integer",
+      "minimum": 950,
+      "maximum": 1000
+    },
+    "maximum_inconclusive_rate_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "maximum_clipped_score_fraction_permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "simulation_seed_hex": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2}){32,}$"
+    }
+  }
+}
