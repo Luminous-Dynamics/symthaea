@@ -537,6 +537,7 @@ pub fn evaluate_fleet_candidate(
 
     let has_incomplete = !missing_evidence.is_empty() || !incomplete_reasons.is_empty();
     let all_measured = !has_incomplete && infeasibility_reasons.is_empty();
+    let mut constraint_violations = Vec::new();
     let objective_envelopes = if all_measured {
         let mut envelopes = Vec::with_capacity(manifest.objectives.len());
         for objective in &manifest.objectives {
@@ -980,7 +981,7 @@ mod tests {
             &profiles,
             &registries,
             [0.99, 0.81],
-            [20.0, 75.0],
+            [20.0, 35.0],
         );
         let result = evaluate_fleet_candidate(
             &manifest, &registries, "candidate-A", &config, &observations,
@@ -988,8 +989,8 @@ mod tests {
         assert_eq!(result.status, FleetCandidateStatus::FeasibleAllRequiredTargets);
         let latency = result.objective_envelopes.as_ref().unwrap().iter()
             .find(|item| item.objective_id == "latency").unwrap();
-        assert!((latency.worst_utility - 0.25).abs() < 1e-12);
-        assert!((latency.cross_target_spread - 0.55).abs() < 1e-12);
+        assert!((latency.worst_utility - 0.65).abs() < 1e-12);
+        assert!((latency.cross_target_spread - 0.15).abs() < 1e-12);
     }
 
     #[test]
