@@ -400,7 +400,7 @@ fn group_bootstrap_interval(
             "independent_group_count": group_count,
             "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
             "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
-            "confidence_level": 0.95,
+            "nominal_percentile_level": 0.95,
             "lower_95": null,
             "upper_95": null,
             "seed_sha256": seed_sha256,
@@ -1600,6 +1600,57 @@ mod tests {
         assert_eq!(receipt["primary_metrics"]["benign_invalid_sensor_cases"], 2);
         assert_eq!(receipt["primary_metrics"]["benign_false_alert_rate_on_valid_sensor_cases"], 0.5);
         assert_eq!(receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"], 0.5);
+    }
+
+    fn test_binomial_pmf(k: usize, n: usize, probability: f64) -> f64 {
+        if probability == 0.0 {
+            return if k == 0 { 1.0 } else { 0.0 };
+        }
+        if probability == 1.0 {
+            return if k == n { 1.0 } else { 0.0 };
+        }
+        if k > n {
+            return 0.0;
+        }
+        let terms = k.min(n - k);
+        let mut log_choose = 0.0f64;
+        for index in 1..=terms {
+            log_choose += ((n - terms + index) as f64).ln() - (index as f64).ln();
+        }
+        (log_choose
+            + (k as f64) * probability.ln()
+            + ((n - k) as f64) * (-probability).ln_1p())
+            .exp()
+    }
+
+    fn test_binomial_quantile(n: usize, probability: f64, quantile: f64) -> usize {
+        (0..=n)
+            .find(|count| binomial_lower_tail(*count, n, probability) >= quantile)
+            .unwrap_or(n)
+    }
+
+    fn exact_binary_percentile_bootstrap_coverage(n: usize, truth: f64) -> f64 {
+        let mut coverage = 0.0f64;
+        for observed_successes in 0..=n {
+            let observed_rate = observed_successes as f64 / n as f64;
+            let lower = test_binomial_quantile(n, observed_rate, 0.025) as f64 / n as f64;
+            let upper = test_binomial_quantile(n, observed_rate, 0.975) as f64 / n as f64;
+            if lower <= truth && truth <= upper {
+                coverage += test_binomial_pmf(observed_successes, n, truth);
+            }
+        }
+        coverage
+    }
+
+    #[test]
+    fn percentile_bootstrap_undercoverage_is_detected_at_boundary_rates() {
+        // Exact enumeration of the Bernoulli-group sampling distribution;
+        // this is not a Monte Carlo approximation.
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.05) - 0.4).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.10) - 0.65).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.50) - 0.978515625).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.90) - 0.65).abs() < 1e-12);
+        assert!((exact_binary_percentile_bootstrap_coverage(10, 0.95) - 0.4).abs() < 1e-12);
     }
 
     #[test]
