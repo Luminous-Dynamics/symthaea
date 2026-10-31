@@ -1141,7 +1141,7 @@ mod tests {
             &manifest, &registries, "candidate-A", &config, &observations, &result,
         ).unwrap();
         let mut changed = result.clone();
-        changed.status = FleetCandidateStatus::FeasibleAllRequiredTargets;
+        changed.status = FleetCandidateStatus::IncompleteEvidence;
         changed.evaluation_sha256 = compute_evaluation_sha256(&changed).unwrap();
         verify_fleet_candidate_evaluation_digest(&changed).unwrap();
         assert!(verify_fleet_candidate_evaluation(
