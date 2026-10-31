@@ -280,6 +280,24 @@ pub fn evaluate_detector_run(
     {
         return Err("detector run has invalid identity or threshold".to_owned());
     }
+    match run.kind {
+        DetectorKindV1::TokenNgramJaccard
+            if !(2..=8).contains(&run.token_ngram_size) =>
+        {
+            return Err("detector run has unsupported token_ngram_size".to_owned());
+        }
+        DetectorKindV1::ExactTextEquality | DetectorKindV1::NormalizedTextEquality
+            if run.token_ngram_size != 0 =>
+        {
+            return Err("non-ngram detector run must have token_ngram_size=0".to_owned());
+        }
+        _ => {}
+    }
+    if !crate::valid_digest(&sealed_key.seed_commitment_sha256)
+        || !crate::valid_digest(&sealed_key.public_packet_sha256)
+    {
+        return Err("sealed key has an invalid artifact or seed commitment".to_owned());
+    }
     if sealed_key.pair_truth.len() != packet.pairs.len() {
         return Err("sealed-key truth count does not match public packet pair count".to_owned());
     }
@@ -303,6 +321,52 @@ pub fn evaluate_detector_run(
         if truth.target_control_label != expected_label {
             return Err(format!(
                 "sealed-key target control label is inconsistent for pair {}",
+                truth.pair_id
+            ));
+        }
+        if !crate::valid_digest(&truth.left_source_lineage_sha256)
+            || !crate::valid_digest(&truth.right_source_lineage_sha256)
+            || !crate::valid_digest(&truth.left_recipe_family_sha256)
+            || !crate::valid_digest(&truth.right_recipe_family_sha256)
+        {
+            return Err(format!(
+                "sealed-key lineage digest is invalid for pair {}",
+                truth.pair_id
+            ));
+        }
+        let mechanism_has_same_source = truth.planted_mechanisms_present.iter().any(|mechanism| {
+            matches!(
+                mechanism,
+                ExposureMechanismV1::ExactInstance
+                    | ExposureMechanismV1::DerivativeInstance
+                    | ExposureMechanismV1::SemanticEquivalentInstance
+            )
+        });
+        let source_lineage_is_shared =
+            truth.left_source_lineage_sha256 == truth.right_source_lineage_sha256;
+        if mechanism_has_same_source != source_lineage_is_shared {
+            return Err(format!(
+                "sealed-key source lineage contradicts planted mechanisms for pair {}",
+                truth.pair_id
+            ));
+        }
+        let mechanism_has_shared_recipe = truth
+            .planted_mechanisms_present
+            .contains(&ExposureMechanismV1::SharedTaskRecipe);
+        let recipe_lineage_is_shared =
+            truth.left_recipe_family_sha256 == truth.right_recipe_family_sha256;
+        if mechanism_has_shared_recipe != recipe_lineage_is_shared {
+            return Err(format!(
+                "sealed-key recipe lineage contradicts planted mechanisms for pair {}",
+                truth.pair_id
+            ));
+        }
+        let mut sorted_mechanisms = truth.planted_mechanisms_present.clone();
+        sorted_mechanisms.sort();
+        sorted_mechanisms.dedup();
+        if sorted_mechanisms != truth.planted_mechanisms_present {
+            return Err(format!(
+                "sealed-key mechanisms are duplicated or not canonically ordered for pair {}",
                 truth.pair_id
             ));
         }
@@ -634,6 +698,7 @@ mod tests {
             if truth.target_tier == TierV1::T1Exact {
                 truth.target_control_label = crate::TargetControlLabelV1::PositiveForTargetTier;
                 truth.planted_mechanisms_present.push(ExposureMechanismV1::ExactInstance);
+                truth.right_source_lineage_sha256 = truth.left_source_lineage_sha256.clone();
             }
         }
         // This fixture intentionally violates the generated balanced-control
