@@ -15,6 +15,7 @@ Memory allocation asks what should be retained. Active sensing asks when to acqu
 
 `research/temporal-sensing/src/lib.rs` exposes:
 - fixed-interval sampling;
+- deterministic jittered-interval sampling with a candidate-visible seed;
 - two-rate scheduling using candidate event-risk and uncertainty estimates;
 - event-risk threshold;
 - novelty threshold;
@@ -41,7 +42,7 @@ A VOI trigger compares estimated TED reduction per observation nJ to a preregist
 - PPM confidence/novelty/risk features are bounded;
 - the maximum inter-observation gap is a hard scheduling deadline;
 - the minimum gap defers early triggers;
-- observation-count and energy-budget exhaustion return an explicit blocked decision with the deadline, not a silent skip;
+- observation-count and energy-budget exhaustion return an explicit blocked decision with the deadline and whether it has already been missed, not a silent skip;
 - all delays are bounded by the remaining maximum-gap interval;
 - timestamp arithmetic uses checked addition.
 
@@ -133,7 +134,7 @@ No schedule should be called "energy-efficient" based on fewer samples alone. Me
 ## 10. Validation status
 
 - `research/temporal-sensing/Cargo.toml` and `src/lib.rs` authored.
-- Thirteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, budget exhaustion, novelty, residual and invalid-input controls.
+- Fourteen Rust test functions authored for fixed interval, event trigger, multi-rate, min/max gap, VOI, budget exhaustion, novelty, residual and invalid-input controls.
 - No Cargo build, rustfmt, Clippy or tests have run; the authoring environment lacks cargo/rustc/rustfmt.
 - No candidate model, real sensor, baseline or hardware/energy campaign has run.
 - No production model or default changed.
