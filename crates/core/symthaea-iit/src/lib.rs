@@ -256,14 +256,15 @@ pub struct Iit4SystemPhiSearchConfig {
 /// The theorem assumes binary units, a conditionally independent TPM, and
 /// system partitions that do not sever self-connections. Those assumptions
 /// hold for this crate's binary factored model and ordinary directed
-/// set-partition family, but not when the special TotalCut is enabled.
-/// None therefore means that the theorem must not be used for pruning or
-/// validation under the requested policy.
+/// set-partition family, but not when the special TotalCut is included. A
+/// one-unit search always includes TotalCut, even when the caller's flag is
+/// false, so it is also outside the theorem's domain. None therefore means
+/// that the theorem must not be used for pruning or validation.
 pub fn certified_iit4_2023_system_phi_upper_bound(
     candidate_units: usize,
     include_total_cut: bool,
 ) -> Option<usize> {
-    if candidate_units == 0 || include_total_cut {
+    if candidate_units <= 1 || include_total_cut {
         return None;
     }
     candidate_units.checked_mul(candidate_units - 1)
@@ -3658,7 +3659,7 @@ mod tests {
 
     #[test]
     fn certified_system_phi_bound_is_enabled_only_inside_theorem_domain() {
-        assert_eq!(certified_iit4_2023_system_phi_upper_bound(1, false), Some(0));
+        assert_eq!(certified_iit4_2023_system_phi_upper_bound(1, false), None);
         assert_eq!(certified_iit4_2023_system_phi_upper_bound(3, false), Some(6));
         assert_eq!(certified_iit4_2023_system_phi_upper_bound(16, false), Some(240));
         assert_eq!(certified_iit4_2023_system_phi_upper_bound(3, true), None);
