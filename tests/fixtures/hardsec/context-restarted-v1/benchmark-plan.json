@@ -152,5 +152,36 @@
     "unit_definition": "one independently justified calibration score per context; repeated windows from one execution do not automatically qualify as separate units",
     "iid_reference_assumption_required": true,
     "windows_do_not_establish_reference_independence": true
-  }
+  },
+  "industry_comparators": [
+    {
+      "id": "pou_etal_2026_riscv_hpc_c910",
+      "source_url": "https://doi.org/10.1186/s42400-026-00662-8",
+      "platform": "single XuanTie C910 core",
+      "reported_precision_benign": 0.99,
+      "reported_precision_malicious": 0.99,
+      "reported_malicious_classification_performance": 0.95,
+      "reported_perf_collection_overhead": 0.02,
+      "sampling_interval_seconds": 0.01,
+      "observed_counter_interference_over_3x": true,
+      "simultaneous_counter_collection": "some events collected in isolation after >300 percent observer-effect increase",
+      "transfer_limitations": [
+        "single microarchitecture",
+        "no cross-platform transfer validation",
+        "temporal models not evaluated",
+        "instruction-retired normalization is platform-specific"
+      ],
+      "reproduction_status": "published_result_not_independently_reproduced"
+    },
+    {
+      "id": "kosasih_etal_2024_sok_hpc_cache_detection",
+      "source_url": "https://doi.org/10.1145/3634737.3637649",
+      "platform": "literature survey and reproduced cache side-channel monitor",
+      "reported_accuracy": null,
+      "reported_overhead": null,
+      "threat_model_warning": "benign program modification can preserve statistically indistinguishable hardware counter behavior",
+      "reproducibility_warning": "many published artifacts unavailable",
+      "reproduction_status": "qualitative_field_critique_not_a_numeric_baseline"
+    }
+  ]
 }
