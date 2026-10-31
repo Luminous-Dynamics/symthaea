@@ -244,6 +244,7 @@ pub struct VoCQualificationReceipt {
     pub version: String,
     pub benchmark_id: String,
     pub metric_id: String,
+    pub resource_unit: String,
     pub decision: QualificationDecision,
     pub failure_reasons: Vec<String>,
     pub source_artifact_sha256: String,
@@ -475,6 +476,7 @@ pub fn qualify_voc_model(
         version: VERSION.to_owned(),
         benchmark_id: manifest.benchmark_id.clone(),
         metric_id: manifest.metric_id.clone(),
+        resource_unit: manifest.resource_unit.clone(),
         decision: if failure_reasons.is_empty() {
             QualificationDecision::Qualified
         } else {
@@ -1572,6 +1574,7 @@ mod tests {
         assert_eq!(receipt.metrics.top1_accuracy, 1.0);
         assert_eq!(receipt.metrics.topk_credible_set_coverage, 1.0);
         assert_eq!(receipt.metrics.effective_sample_size_fraction, 1.0);
+        assert_eq!(receipt.resource_unit, "gpu-seconds");
         verify_voc_qualification_receipt(&manifest, &episodes, &thresholds, &receipt).unwrap();
     }
 
