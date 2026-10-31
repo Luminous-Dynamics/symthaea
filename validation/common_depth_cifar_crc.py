@@ -327,6 +327,7 @@ def run_pool_count_benchmark(
     for alpha in alphas:
         engine=CommonDepthCIFARCRC(n_calibration,alpha)
         started=time.perf_counter()
+        crc_baseline=engine.baseline("crc")
         baseline=engine.baseline("envelope")
         controller=dict(baseline)
         snapshots={0:dict(controller)}
@@ -336,11 +337,12 @@ def run_pool_count_benchmark(
                 snapshots[k]=dict(controller)
         build_seconds=time.perf_counter()-started
         method_rows={}
-        for k,table in snapshots.items():
+        comparison_tables={"CRC":crc_baseline,**{f"envelope_round_{k}":v for k,v in snapshots.items()}}
+        for label,table in comparison_tables.items():
             split_metrics=[]
             for cal,test in splits:
                 split_metrics.append(engine.aggregate_test_metrics(table,cal,test))
-            method_rows[str(k)]={
+            method_rows[label]={
                 key:_metric_summary([row[key] for row in split_metrics])
                 for key in ("risk","expected_node_size","correct_specificity")
             }
@@ -349,11 +351,19 @@ def run_pool_count_benchmark(
         for k,table in snapshots.items():
             cs=np.asarray([engine.aggregate_test_metrics(table,cal,test)["correct_specificity"] for cal,test in splits])
             deltas[str(k)]=_metric_summary((cs-baseline_cs).tolist())
+        crc_cs=np.asarray([engine.aggregate_test_metrics(crc_baseline,cal,test)["correct_specificity"] for cal,test in splits])
+        recert500_cs=split_rows[max(rounds)][:,2]
+        delta_crc=(recert500_cs-crc_cs)*100
+        se_crc=delta_crc.std(ddof=1)/math.sqrt(len(delta_crc))
         all_results.append({
             "alpha":alpha,"calibration_states":len(engine.states),
             "augmented_states":len(engine.augmented),
             "build_0_to_500_seconds":build_seconds,
             "methods":method_rows,"paired_specificity_gain_vs_envelope":deltas,
+            "recert500_gain_vs_crc":{
+                "mean_gain_pp":float(delta_crc.mean()),"se_pp":float(se_crc),
+                "ci95_pp":[float(delta_crc.mean()-1.96*se_crc),float(delta_crc.mean()+1.96*se_crc)]
+            },
             "all_rounds_valid":True
         })
     return {
