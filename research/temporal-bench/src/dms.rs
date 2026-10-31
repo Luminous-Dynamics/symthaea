@@ -581,6 +581,7 @@ mod tests {
         let config = DmsConfig::braintrace_reference(93);
         let (mut task, oracle) = generate_dms_task(config).unwrap();
         task.sample_end_step = task.sample_end_step.saturating_add(1);
+        task.content_sha256 = dms_content_digest(&task);
         assert_eq!(
             verify_dms_trace(&task, &oracle),
             Err(DmsVerificationError::InvalidDecisionWindow)
@@ -592,6 +593,7 @@ mod tests {
         let config = DmsConfig::braintrace_reference(93);
         let (task, mut oracle) = generate_dms_task(config).unwrap();
         oracle.test_direction = (oracle.test_direction + 1) % MOTION_CHOICES;
+        oracle.content_sha256 = dms_oracle_digest(&oracle);
         assert_eq!(
             verify_dms_trace(&task, &oracle),
             Err(DmsVerificationError::InvalidOracle)
@@ -610,6 +612,7 @@ mod tests {
         let first_channel = observation.active_channels[0];
         observation.active_channels.push(first_channel);
         observation.active_channels.sort_unstable();
+        task.content_sha256 = dms_content_digest(&task);
         assert!(matches!(
             verify_dms_trace(&task, &oracle),
             Err(DmsVerificationError::ChannelsNotStrictlyOrdered { .. })
