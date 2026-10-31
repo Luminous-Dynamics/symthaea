@@ -35,6 +35,7 @@ pub enum ProbeStatus {
     NotSupported,
     Disabled,
     PermissionDenied,
+    InvalidRequest,
     NotAttempted,
     Failed,
 }
@@ -236,7 +237,7 @@ fn probe_landlock_abi() -> ProbeObservation {
 fn probe_fanotify_group(probe_id: &'static str, class_flag: libc::c_uint) -> ProbeObservation {
     // FAN_REPORT_FID is required for the limited unprivileged fanotify API on
     // modern kernels. No mark is installed, no event is generated or read.
-    let flags = FAN_CLOEXEC | FAN_NONBLOCK | FAN_REPORT_FID | class_flag;
+    let flags = fanotify_init_flags(class_flag);
     let event_file_flags = libc::O_RDONLY | libc::O_LARGEFILE;
     let result = unsafe {
         libc::syscall(
@@ -298,9 +299,18 @@ fn probe_fanotify_group(probe_id: &'static str, _class_flag: u32) -> ProbeObserv
     not_attempted(probe_id, "Linux-only fanotify syscall is unavailable on this target")
 }
 
+fn fanotify_init_flags(class_flag: libc::c_uint) -> libc::c_uint {
+    // FAN_REPORT_FID is mandatory for restricted unprivileged notification
+    // groups, but the kernel rejects it with FAN_CLASS_CONTENT/PRE_CONTENT.
+    let object_id_flag = if class_flag == 0 { FAN_REPORT_FID } else { 0 };
+    FAN_CLOEXEC | FAN_NONBLOCK | object_id_flag | class_flag
+}
+
 fn classify_errno(errno: i32) -> ProbeStatus {
-    if errno == libc::ENOSYS || errno == libc::EINVAL {
+    if errno == libc::ENOSYS {
         ProbeStatus::NotSupported
+    } else if errno == libc::EINVAL {
+        ProbeStatus::InvalidRequest
     } else if errno == libc::EOPNOTSUPP {
         ProbeStatus::Disabled
     } else if errno == libc::EPERM || errno == libc::EACCES {
@@ -356,7 +366,7 @@ mod tests {
     #[test]
     fn errno_mapping_distinguishes_unsupported_disabled_and_denied() {
         assert_eq!(classify_errno(libc::ENOSYS), ProbeStatus::NotSupported);
-        assert_eq!(classify_errno(libc::EINVAL), ProbeStatus::NotSupported);
+        assert_eq!(classify_errno(libc::EINVAL), ProbeStatus::InvalidRequest);
         assert_eq!(classify_errno(libc::EOPNOTSUPP), ProbeStatus::Disabled);
         assert_eq!(classify_errno(libc::EPERM), ProbeStatus::PermissionDenied);
         assert_eq!(classify_errno(libc::EACCES), ProbeStatus::PermissionDenied);
@@ -365,11 +375,14 @@ mod tests {
 
     #[test]
     fn fanotify_flags_are_bounded_notification_or_permission_class_only() {
-        let notification = FAN_CLOEXEC | FAN_NONBLOCK | FAN_REPORT_FID;
-        let permission = notification | FAN_CLASS_CONTENT;
+        let notification = fanotify_init_flags(0);
+        let permission = fanotify_init_flags(FAN_CLASS_CONTENT);
         assert_eq!(notification & FAN_CLASS_CONTENT, 0);
+        assert_ne!(notification & FAN_REPORT_FID, 0);
         assert_eq!(permission & FAN_CLASS_CONTENT, FAN_CLASS_CONTENT);
+        assert_eq!(permission & FAN_REPORT_FID, 0);
         assert_eq!(notification & !(FAN_CLOEXEC | FAN_NONBLOCK | FAN_REPORT_FID), 0);
+        assert_eq!(permission & !(FAN_CLOEXEC | FAN_NONBLOCK | FAN_CLASS_CONTENT), 0);
     }
 
     #[test]
@@ -479,6 +492,7 @@ mod tests {
             item.status,
             ProbeStatus::Passed
                 | ProbeStatus::NotSupported
+                | ProbeStatus::InvalidRequest
                 | ProbeStatus::Disabled
                 | ProbeStatus::PermissionDenied
                 | ProbeStatus::Failed
