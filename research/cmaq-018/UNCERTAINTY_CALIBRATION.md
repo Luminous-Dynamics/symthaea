@@ -148,3 +148,12 @@ WorldOracle's dataset-access restriction in the existing CMAQ frontier remains u
 ## Claim ceiling
 
 Passing these metric tests proves only that the interval calculations and validation rules behave as specified. It does not prove the current Symthaea predictor is calibrated, that an action-set confidence certificate is valid under distribution shift, that a planner is safer, or that the model beats SOTA. Those claims require an actual VIS-005 adapter, frozen calibration data, a sealed qualification panel, measured compute and independent replay.
+
+
+## Executable VIS-005 joint action-bank interface
+
+The current branch adds a typed action-bank object to `src/uncertainty.rs` and a separate [VIS-005 adapter contract](VIS005_ACTION_SET_ADAPTER.md). A bank contains one history digest, one horizon, a canonical action-manifest digest, one scalar outcome channel, unique action IDs, unique joint-draw IDs, a content digest for the draw bank, a declared coupling kind, and outcome samples indexed by action and shared draw.
+
+The API validates the complete bank, returns action intervals, constructs all pairwise effects from same-column differences, and orders effect results by action ID rather than input row order. Tests demonstrate common-mode cancellation and action-row permutation invariance, and reject duplicate IDs, malformed provenance, invalid horizons and sample-cardinality mismatches.
+
+The focused workflow now schema-validates a synthetic joint-bank fixture and hostile duplicate-ID mutations. These are interface/metric tests only. They do not show that a production CfC/vision predictor emits calibrated joint distributions, nor that a producer is honest about its draw coupling. A future VIS-005 adapter must retain and independently verify the action manifest and joint-draw bytes while preserving the Predicted/Counterfactual memory boundary.
