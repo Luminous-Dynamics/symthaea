@@ -1572,10 +1572,14 @@ mod tests {
     fn identical_wrong_answers_are_consistent_but_never_correct() {
         let base = base_bundle();
         let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
-        let responses = bundle.public_packet.tasks.iter().map(|task| {
-            let response_text = r#"{"x":0,"y":0}"#.to_owned();
+        let responses = bundle.sealed_oracle.entries.iter().map(|entry| {
+            let wrong = ExactLinearSolutionV1 {
+                x: entry.solution.x + 1,
+                y: entry.solution.y,
+            };
+            let response_text = serde_json::to_string(&wrong).unwrap();
             FreshMetamorphicResponseV1 {
-                item_id: task.item_id.clone(),
+                item_id: entry.item_id.clone(),
                 response_sha256: response_digest(&response_text),
                 response_text,
             }
@@ -1649,6 +1653,26 @@ mod tests {
         responses[0].item_id = "unknown-form".to_owned();
         let submission = make_submission(&bundle, responses);
         assert!(score_fresh_metamorphic_submission(&base, &bundle, &serde_json::to_vec(&submission).unwrap()).is_err());
+    }
+
+    #[test]
+    fn malformed_duplicate_key_and_extra_field_outputs_are_invalid_not_consistent() {
+        let base = base_bundle();
+        let bundle = generate_fresh_metamorphic_bundle(&base).unwrap();
+        let mut responses = exact_responses(&bundle);
+        responses[0].response_text = r#"{"x":1,"x":2,"y":3}"#.to_owned();
+        responses[0].response_sha256 = response_digest(&responses[0].response_text);
+        responses[1].response_text = r#"{"x":1,"y":2,"extra":true}"#.to_owned();
+        responses[1].response_sha256 = response_digest(&responses[1].response_text);
+        let submission = make_submission(&bundle, responses);
+        let report = score_fresh_metamorphic_submission(
+            &base,
+            &bundle,
+            &serde_json::to_vec(&submission).unwrap(),
+        ).unwrap();
+        assert_eq!(report.invalid_format_count, 2);
+        assert_eq!(report.incomplete_group_count, 1);
+        assert_eq!(report.complete_valid_group_count, 2);
     }
 
     #[test]
