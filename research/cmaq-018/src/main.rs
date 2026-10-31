@@ -846,7 +846,7 @@ mod tests {
             branch_predictions(Model::PointOutcome, other.history, &ACTIONS);
         let first = predicted_effect(
             Model::PointOutcome,
-            case,
+            case.history,
             ACTIONS[4],
             ACTIONS[1],
             &prediction_first,
@@ -854,7 +854,7 @@ mod tests {
         .unwrap();
         let second = predicted_effect(
             Model::PointOutcome,
-            other,
+            other.history,
             ACTIONS[4],
             ACTIONS[1],
             &prediction_second,
