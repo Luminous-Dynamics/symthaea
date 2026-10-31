@@ -79,6 +79,162 @@ impl RoundSchedulerPolicy {
     }
 }
 
+/// Paired comparison against one baseline on an identical landscape/seed/round matrix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FourSeatPairedComparison {
+    pub landscape: DirectionLandscapeFamily,
+    pub candidate_policy: RoundSchedulerPolicy,
+    pub baseline_policy: RoundSchedulerPolicy,
+    pub round_count: usize,
+    pub pair_count: usize,
+    /// Positive means the candidate achieved a higher final held-out score.
+    pub mean_final_score_delta: f64,
+    pub final_score_delta_sample_sd: f64,
+    /// Positive means the candidate reduced simple regret.
+    pub mean_simple_regret_reduction: f64,
+    pub candidate_win_rate: f64,
+    pub tie_rate: f64,
+}
+
+/// Run every requested policy on the same deterministic landscape/seed matrix.
+pub fn run_four_seat_campaign_matrix(
+    landscapes: &[DirectionLandscapeFamily],
+    policies: &[RoundSchedulerPolicy],
+    round_count: usize,
+    seeds: &[u64],
+) -> Result<Vec<FourSeatCampaignRun>, String> {
+    if landscapes.is_empty() || policies.is_empty() || seeds.is_empty() {
+        return Err("landscapes, policies and seeds must all be non-empty".to_owned());
+    }
+    if landscapes.iter().copied().collect::<BTreeSet<_>>().len() != landscapes.len()
+        || policies.iter().copied().collect::<BTreeSet<_>>().len() != policies.len()
+        || seeds.iter().copied().collect::<BTreeSet<_>>().len() != seeds.len()
+    {
+        return Err("landscape, policy and seed inputs must not contain duplicates".to_owned());
+    }
+    let mut runs = Vec::with_capacity(landscapes.len() * policies.len() * seeds.len());
+    for landscape in landscapes {
+        for policy in policies {
+            for seed in seeds {
+                runs.push(run_four_seat_campaign(
+                    *landscape,
+                    *policy,
+                    round_count,
+                    *seed,
+                )?);
+            }
+        }
+    }
+    Ok(runs)
+}
+
+/// Compare one candidate policy against every represented baseline using exact paired seeds.
+/// Missing or duplicated runs are errors; the function never silently drops unmatched trials.
+pub fn compare_four_seat_campaign_runs(
+    runs: &[FourSeatCampaignRun],
+    candidate_policy: RoundSchedulerPolicy,
+) -> Result<Vec<FourSeatPairedComparison>, String> {
+    let mut index = BTreeMap::new();
+    let mut landscapes = BTreeSet::new();
+    let mut policies = BTreeSet::new();
+    let mut common_round_count: Option<usize> = None;
+    for run in runs {
+        if run.schema != RUN_SCHEMA || run.version != RUN_VERSION {
+            return Err("run schema/version mismatch".to_owned());
+        }
+        match common_round_count {
+            None => common_round_count = Some(run.round_count),
+            Some(count) if count == run.round_count => {}
+            Some(_) => return Err("runs have different round budgets".to_owned()),
+        }
+        let key = (run.landscape, run.policy, run.seed);
+        if index.insert(key, run).is_some() {
+            return Err("duplicate landscape/policy/seed run".to_owned());
+        }
+        landscapes.insert(run.landscape);
+        policies.insert(run.policy);
+    }
+    if !policies.contains(&candidate_policy) {
+        return Err("candidate policy is absent from the run matrix".to_owned());
+    }
+
+    let mut comparisons = Vec::new();
+    for landscape in landscapes {
+        let candidate_runs: BTreeMap<u64, &FourSeatCampaignRun> = index
+            .iter()
+            .filter_map(|((run_landscape, policy, seed), run)| {
+                (*run_landscape == landscape && *policy == candidate_policy)
+                    .then_some((*seed, *run))
+            })
+            .collect();
+        if candidate_runs.is_empty() {
+            continue;
+        }
+        let candidate_seeds: BTreeSet<u64> = candidate_runs.keys().copied().collect();
+        for baseline_policy in policies.iter().copied() {
+            if baseline_policy == candidate_policy {
+                continue;
+            }
+            let baseline_runs: BTreeMap<u64, &FourSeatCampaignRun> = index
+                .iter()
+                .filter_map(|((run_landscape, policy, seed), run)| {
+                    (*run_landscape == landscape && *policy == baseline_policy)
+                        .then_some((*seed, *run))
+                })
+                .collect();
+            let baseline_seeds: BTreeSet<u64> = baseline_runs.keys().copied().collect();
+            if baseline_seeds != candidate_seeds {
+                return Err(format!(
+                    "unpaired seed sets for {landscape:?}: {candidate_policy:?} vs {baseline_policy:?}"
+                ));
+            }
+            let mut score_deltas = Vec::with_capacity(candidate_seeds.len());
+            let mut regret_reductions = Vec::with_capacity(candidate_seeds.len());
+            let mut wins = 0usize;
+            let mut ties = 0usize;
+            for seed in &candidate_seeds {
+                let candidate = candidate_runs[seed];
+                let baseline = baseline_runs[seed];
+                let delta = candidate.final_best_score - baseline.final_best_score;
+                score_deltas.push(delta);
+                regret_reductions.push(baseline.simple_regret - candidate.simple_regret);
+                if delta > f64::EPSILON {
+                    wins += 1;
+                } else if delta.abs() <= f64::EPSILON {
+                    ties += 1;
+                }
+            }
+            let pair_count = candidate_seeds.len();
+            let mean_final_score_delta =
+                score_deltas.iter().sum::<f64>() / pair_count as f64;
+            let final_score_delta_sample_sd = if pair_count > 1 {
+                (score_deltas
+                    .iter()
+                    .map(|delta| (delta - mean_final_score_delta).powi(2))
+                    .sum::<f64>()
+                    / (pair_count - 1) as f64)
+                    .sqrt()
+            } else {
+                0.0
+            };
+            comparisons.push(FourSeatPairedComparison {
+                landscape,
+                candidate_policy,
+                baseline_policy,
+                round_count: common_round_count.unwrap_or(0),
+                pair_count,
+                mean_final_score_delta,
+                final_score_delta_sample_sd,
+                mean_simple_regret_reduction: regret_reductions.iter().sum::<f64>()
+                    / pair_count as f64,
+                candidate_win_rate: wins as f64 / pair_count as f64,
+                tie_rate: ties as f64 / pair_count as f64,
+            });
+        }
+    }
+    Ok(comparisons)
+}
+
 /// A plan and close receipt pair retained as the executable evidence for one round.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RoundExecutionRecord {
