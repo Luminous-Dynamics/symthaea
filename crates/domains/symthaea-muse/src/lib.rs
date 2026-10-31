@@ -53,6 +53,8 @@ pub mod closed_loop;
 #[cfg(feature = "theory")]
 pub mod cognitive_bridge;
 #[cfg(feature = "theory")]
+pub mod corpus_registry;
+#[cfg(feature = "theory")]
 pub mod cognitive_evidence_report;
 #[cfg(feature = "theory")]
 pub mod cognitive_experiment;
