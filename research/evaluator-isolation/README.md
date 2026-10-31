@@ -77,6 +77,14 @@ The library:
 
 After import, only parse and score the private copy. Do not reopen the candidate-controlled exchange path. The copied bytes are what the digest binds; an attacker may still race writes to the exchange file during intake, so the evaluator must validate the complete artifact schema and compare its run/task/model binding to protected evaluator metadata. If source metadata changes or the byte count differs, intake rejects the artifact.
 
+## Receipts and replay consumption
+
+The evaluator-only receipt module is `src/receipt.rs`. It encodes a versioned canonical binary payload and signs it using Ed25519 from `ed25519-dalek` 3.0.0. The signing key is read only from the evaluator's systemd credential directory; the key ID, task/oracle commitments, prediction/model/config/evaluator profile hashes, run/nonce/counter, three separate TED dimensions and measured resource costs are bound into the signature. Verification uses `verify_strict` against a trusted public key allow-list.
+
+The local `ReplayLedger` consumes nonce, run-ID and per-key monotonic-counter markers after signature verification. The private evaluator ledger directory is enforced as evaluator-owned, directory-only and inaccessible to group/other users. Marker and counter writes are synced. A crash can consume an identifier without recording a successful result, but cannot permit replay of that identifier. Restoring an old ledger backup can roll back replay state; this prototype is not a distributed monotonic database. Do not accept receipts after unverified ledger restore.
+
+The receipt and replay code are source-authored; their Rust tests have not been executed and the code is not wired into a working evaluator binary yet.
+
 ## Mandatory host attacks
 
 Run these with the candidate UID, then preserve stdout/stderr, exit status and the evaluator's raw audit record:
@@ -89,7 +97,7 @@ Run these with the candidate UID, then preserve stdout/stderr, exit status and t
 6. Attempt to replace oracle/task/prediction after commitment and replay a receipt against a different run/task/model/config digest.
 7. Verify unsupported namespaces or missing openat2 produce an explicit failed qualification, never a permissive fallback.
 
-Systemd's private network namespace does not block every AF_UNIX connection. The module hides common system sockets, including the D-Bus/systemd sockets, the Nix daemon socket, Docker/containerd, udev, NetworkManager, Avahi and Podman endpoints. The host's actual socket inventory must still be inspected. Filesystem namespace controls can also be unavailable or degrade on some kernels or service-manager configurations. A successful systemd-analyze security score is diagnostic only, not evidence of confidentiality. Validate with real access attempts under the exact target NixOS generation, kernel and systemd release.
+Systemd's private network namespace does not block every AF_UNIX connection. The module hides common system sockets, including the D-Bus/systemd sockets, the Nix daemon socket, Docker/containerd, udev, NetworkManager, Avahi and Podman endpoints. The host's actual socket inventory must still be inspected. Filesystem namespace controls can also be unavailable or degrade on some kernels or service-manager configurations. A successful systemd-analyze security score is diagnostic only, not evidence of confidentiality. A source-equivalent three-unit fixture passed `systemd-analyze verify` with systemd 257.9 in the authoring container. The Nix module itself has not been evaluated because Nix is unavailable; `systemd-analyze security` could not be run because this container is not booted with systemd as PID 1. Validate the generated units with real access attempts under the exact target NixOS generation, kernel and systemd release.
 
 ## Claim ceiling
 
