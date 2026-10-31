@@ -362,25 +362,43 @@ fn relative_delta(left: f64, right: f64) -> Option<f64> {
     }
 }
 
-fn compare_resource_arms(
+fn paired_relative_deltas(
+    rows: &[BTreeMap<Arm, Row>],
     left: Arm,
     right: Arm,
-    arm_metrics: &BTreeMap<Arm, ArmMetrics>,
+    select: fn(&Row) -> Option<f64>,
+) -> Option<Vec<f64>> {
+    rows.iter()
+        .map(|episode| {
+            let left_value = select(&episode[&left])?;
+            let right_value = select(&episode[&right])?;
+            relative_delta(left_value, right_value)
+        })
+        .collect()
+}
+
+fn relative_percentile(values: &Option<Vec<f64>>, quantile: f64) -> Option<f64> {
+    values.as_ref().map(|values| percentile(&mut values.clone(), quantile))
+}
+
+fn compare_resource_arms(
+    rows: &[BTreeMap<Arm, Row>],
+    left: Arm,
+    right: Arm,
 ) -> ResourcePairDelta {
-    let left_metrics = &arm_metrics[&left];
-    let right_metrics = &arm_metrics[&right];
+    let compute = paired_relative_deltas(rows, left, right, |row| {
+        row.compute_work_units.map(|value| value as f64)
+    });
+    let latency = paired_relative_deltas(rows, left, right, |row| Some(row.latency_ms));
+    let memory = paired_relative_deltas(rows, left, right, |row| {
+        row.peak_memory_bytes.map(|value| value as f64)
+    });
     ResourcePairDelta {
-        compute_work_p50_relative: left_metrics.resources.p50_compute_work_units
-            .zip(right_metrics.resources.p50_compute_work_units)
-            .and_then(|(a, b)| relative_delta(a, b)),
-        compute_work_p95_relative: left_metrics.resources.p95_compute_work_units
-            .zip(right_metrics.resources.p95_compute_work_units)
-            .and_then(|(a, b)| relative_delta(a, b)),
-        latency_p50_relative: relative_delta(left_metrics.p50_latency_ms, right_metrics.p50_latency_ms),
-        latency_p95_relative: relative_delta(left_metrics.p95_latency_ms, right_metrics.p95_latency_ms),
-        memory_p95_relative: left_metrics.resources.p95_peak_memory_bytes
-            .zip(right_metrics.resources.p95_peak_memory_bytes)
-            .and_then(|(a, b)| relative_delta(a, b)),
+        compute_work_p50_relative: relative_percentile(&compute, 0.50),
+        compute_work_p95_relative: relative_percentile(&compute, 0.95),
+        latency_p50_relative: relative_percentile(&latency, 0.50),
+        latency_p95_relative: relative_percentile(&latency, 0.95),
+        memory_p95_relative: relative_percentile(&memory, 0.95),
     }
 }
 
@@ -396,7 +414,7 @@ fn pair_is_within_tolerance(delta: &ResourcePairDelta) -> bool {
 
 fn evaluate_resource_match(
     episodes: &[BTreeMap<Arm, Row>],
-    arm_metrics: &BTreeMap<Arm, ArmMetrics>,
+    _arm_metrics: &BTreeMap<Arm, ArmMetrics>,
 ) -> ResourceMatch {
     let reference = &episodes[0][&Arm::D0];
     let method = reference.resource_measurement_method;
@@ -442,20 +460,20 @@ fn evaluate_resource_match(
             })
         });
 
-    let d1_vs_w1 = compare_resource_arms(Arm::D1, Arm::W1, arm_metrics);
-    let w1_vs_w2 = compare_resource_arms(Arm::W1, Arm::W2, arm_metrics);
+    let d1_vs_w1 = compare_resource_arms(episodes, Arm::D1, Arm::W1);
+    let w1_vs_w2 = compare_resource_arms(episodes, Arm::W1, Arm::W2);
     let energy_complete = [Arm::D1, Arm::W1, Arm::W2].iter().all(|arm| {
         episodes.iter().all(|episode| episode[arm].energy_millijoules.is_some())
     });
     let energy_status = if !energy_complete {
         "unmeasured"
     } else {
-        let energy_mean = |arm: Arm| -> f64 {
-            episodes.iter().map(|episode| episode[&arm].energy_millijoules.unwrap()).sum::<f64>()
-                / episodes.len() as f64
-        };
-        let d1_w1 = relative_delta(energy_mean(Arm::D1), energy_mean(Arm::W1)).unwrap_or(f64::INFINITY);
-        let w1_w2 = relative_delta(energy_mean(Arm::W1), energy_mean(Arm::W2)).unwrap_or(f64::INFINITY);
+        let d1_w1 = paired_relative_deltas(episodes, Arm::D1, Arm::W1, |row| row.energy_millijoules)
+            .map(|values| mean(&values))
+            .unwrap_or(f64::INFINITY);
+        let w1_w2 = paired_relative_deltas(episodes, Arm::W1, Arm::W2, |row| row.energy_millijoules)
+            .map(|values| mean(&values))
+            .unwrap_or(f64::INFINITY);
         if d1_w1 <= 0.10 && w1_w2 <= 0.10 { "measured_and_within_10_percent" }
         else { "measured_but_outside_10_percent" }
     };
@@ -873,6 +891,19 @@ mod tests {
         lines.join("\n") + "\n"
     }
 
+    fn alter_arm_seed_field(input: &str, arm_name: &str, field_index: usize, by_seed: &[&str]) -> String {
+        let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
+        for line in lines.iter_mut().skip(1) {
+            let mut fields: Vec<String> = line.split('\t').map(str::to_string).collect();
+            if fields[4] == arm_name {
+                let seed = fields[3].parse::<usize>().unwrap();
+                fields[field_index] = by_seed[seed].to_string();
+                *line = fields.join("\t");
+            }
+        }
+        lines.join("\n") + "\n"
+    }
+
     fn alter_arm_rows_field(input: &str, arm_name: &str, field_index: usize, value: &str) -> String {
         let mut lines: Vec<String> = input.lines().map(str::to_string).collect();
         for line in lines.iter_mut().skip(1) {
@@ -969,6 +1000,20 @@ mod tests {
         let report = build_report(&modified,500,11).unwrap();
         assert_eq!(report.groups[0].resource_match.status, "budget_unmatched");
         assert_eq!(report.groups[0].eligibility, "budget_unmatched");
+    }
+
+    #[test]
+    fn paired_cost_mismatch_is_rejected_even_when_marginal_distributions_match() {
+        let input = synthetic_tsv(4,1.0,2.0,4.0,2.0,5.0);
+        let d1 = ["100000", "200000", "100000", "200000"];
+        let wm = ["200000", "100000", "200000", "100000"];
+        let input = alter_arm_seed_field(&input, "D1", 22, &d1);
+        let input = alter_arm_seed_field(&input, "W1", 22, &wm);
+        let input = alter_arm_seed_field(&input, "W2", 22, &wm);
+        let report = build_report(&input,500,11).unwrap();
+        assert_eq!(report.groups[0].resource_match.status, "budget_unmatched");
+        assert_eq!(report.groups[0].resource_match.d1_vs_w1.compute_work_p50_relative, Some(0.5));
+        assert_eq!(report.groups[0].resource_match.d1_vs_w1.compute_work_p95_relative, Some(0.5));
     }
 
     #[test]
