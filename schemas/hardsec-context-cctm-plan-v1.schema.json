@@ -22,7 +22,9 @@
     "null_stream_assumption_status",
     "reference_iid_assumption_status",
     "context_assignment_assumption_status",
-    "contexts"
+    "contexts",
+    "context_assignment_policy_id",
+    "context_assignment_artifact_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -129,6 +131,14 @@
           }
         }
       }
+    },
+    "context_assignment_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_assignment_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
