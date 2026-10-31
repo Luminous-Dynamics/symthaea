@@ -158,8 +158,9 @@ impl FormKind {
     }
 }
 
-/// Drum policy, interpreted by the renderer (the symbolic layer only names
-/// the intent; kick/snare/hat synthesis is muse's business).
+/// Drum policy interpreted by Muse's renderer. The symbolic layer names
+/// the rhythmic intent; synthesis and exact patch realization remain Muse's
+/// responsibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DrumPolicy {
     /// No kit (chamber music).
@@ -170,6 +171,12 @@ pub enum DrumPolicy {
     BarPulse,
     /// Full backbeat: kick 1 & 3, snare 2 & 4, eighth-note hats.
     Backbeat,
+    /// Two-bar son-clave cycle with restrained Afro-Cuban auxiliary percussion.
+    AfroCuban,
+    /// Palmas-style handclaps on the 12-beat compás accent anchors.
+    FlamencoPalmas,
+    /// Subtle cabasa subdivision with sparse conga responses.
+    BossaNova,
 }
 
 /// A compositional ATTITUDE — an emotional posture deeper than a style
