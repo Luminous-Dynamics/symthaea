@@ -175,3 +175,61 @@ These are project targets, not standards or achieved Symthaea results:
 ## 11. Claim ceiling
 
 This protocol can establish trace lineage, dependence diagnostics and statistical support for named datasets, trace sources and split policies. It does not authenticate labels, prove that a malicious effect occurred, establish causal detection, or certify hardware. Effective sample size estimates are conditional on their assumptions and cannot turn one program into thousands of independent programs.
+
+
+## 12. First executable lineage auditor
+
+The first implementation is now versioned at `examples/hardsec_trace_lineage_audit.rs`, with an isolated locked Cargo harness at `tools/hardsec-trace-lineage-audit-harness` and focused workflow `.github/workflows/hardsec-trace-lineage-audit.yml`.
+
+It audits a strict manifest with:
+- dataset/corpus digest and sampling policy;
+- trace ID, raw trace digest, program/binary, execution, device/configuration, attack/adaptation family and split;
+- origin type (`original`, `replayed`, `repeated_iteration`, `unknown`), parent trace and iteration ID;
+- window ID, monotonic sample index, optional source offsets, and derived-window SHA-256.
+
+Semantic checks include:
+- unique trace and global window IDs;
+- lowercase SHA-256 format for corpus, binary, source-trace and window digests;
+- original traces have no parent and iteration zero;
+- repeated iterations reference an original trace with the same program, binary, execution, configuration, families and split;
+- replayed traces reference an original parent and use a distinct execution ID;
+- iteration IDs are unique per parent;
+- program, execution, attack-family and adaptation-family holdout groups do not cross train/validation/test (benign/no-adaptation sentinel `none` is excluded from attack/adaptation family counts);
+- known offsets obey window size and stride; unknown offsets remain null and do not acquire fabricated time semantics;
+- duplicate window hashes are reported, not discarded or treated as new independent trials.
+
+The deterministic unsigned receipt reports raw window count, original/repeated/replayed counts, duplicate-content groups/extra occurrences, unique program/execution/family support, split window counts, and offset/stride checks. It explicitly emits no effective sample-size estimate: lineage counts and hashes alone cannot establish temporal independence.
+
+### Known-answer fixture
+
+`tests/fixtures/hardsec/telemetry-trace-lineage-v1.json` contains:
+- 5 trace records;
+- 4 original traces and 1 repeated iteration;
+- 7 windows total, of which 2 belong to the repeated iteration;
+- 4 unique program IDs and 4 execution IDs;
+- 2 duplicated window-content hash groups with 2 extra occurrences;
+- train/validation/test groups disjoint on the required holdout axes.
+
+The fixture demonstrates that adding a repeated iteration adds two raw windows but does not increase the unique program or execution counts. This is evaluator-mechanics evidence only.
+
+Fourteen Rust unit tests are authored for known-answer counts, program/execution/attack-family/adaptation-family holdout leakage, repeated-parent semantics, replay execution identity, stride and size mismatch, mixed offsets, duplicate window IDs and fabricated offsets under unknown timing semantics.
+
+### Reproduction command
+
+~~~bash
+cargo test --locked \
+  --manifest-path tools/hardsec-trace-lineage-audit-harness/Cargo.toml \
+  --features hardsec-trace-lineage-audit \
+  --example hardsec_trace_lineage_audit
+
+cargo run --locked \
+  --manifest-path tools/hardsec-trace-lineage-audit-harness/Cargo.toml \
+  --features hardsec-trace-lineage-audit \
+  --example hardsec_trace_lineage_audit -- \
+  --manifest tests/fixtures/hardsec/telemetry-trace-lineage-v1.json \
+  --receipt /tmp/hardsec-trace-lineage-receipt.json
+~~~
+
+The focused workflow runs Rust 1.96.0, rustfmt, the locked unit suite and known-answer receipt assertions. The source was re-fetched and the fixture JSON parsed; no Rust compiler is installed in the current environment. No local compilation or hosted exact-head pass is claimed.
+
+**Claim ceiling:** this first tool checks caller-declared manifest lineage and metadata consistency. It does not read/hash the raw trace bytes, prove that the program/execution IDs are truthful, establish independence, estimate ESS, or validate attack labels. A later importer integration must bind the manifest back to exact downloaded raw/derived bytes and the corpus receipt from HARDSEC-003.
