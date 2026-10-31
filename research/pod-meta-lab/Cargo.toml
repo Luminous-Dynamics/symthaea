@@ -26,4 +26,4 @@ path = "src/bin/poar_graph_export.rs"
 
 [[bin]]
 name = "poar-graph-eval"
-path = "src/bin/poar_graph_eval.rs"
+path = "src/bin/poar_artifact_eval.rs"
