@@ -942,12 +942,12 @@ fn audit_values_with_context_receipt(
             "valid_observation_count":valid_count,
             "abstention_count":abstention_counts.values().sum::<usize>(),
             "abstention_counts_by_reason":abstention_counts,
-            "alarm_is_latched":first_alarm_sequence_index.is_some(),
+            "alarm_is_latched":first_restart_alarm_sequence_index.is_some(),
             "post_alarm_reset_count":0,
             "window_decisions":output_records
         },
         "statistical_guarantees":{
-            "method":"conditional_conformal_test_martingale_with_dkw_ecdf_correction",
+            "method":"dkw_corrected_conditional_conformal_test_martingale_with_weighted_restarts",
             "reference_cdf_confidence":1.0-plan.delta_budget,
             "conditional_type_i_error_budget_if_all_context_reference_bands_hold":plan.alpha_budget,
             "unconditional_type_i_upper_bound_if_all_paper_assumptions_hold":(plan.alpha_budget+plan.delta_budget).min(1.0),
@@ -1074,7 +1074,7 @@ fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("HARDSEC-019 CCTM monitor failed: {error}");
+            eprintln!("HARDSEC-021 restarted CCTM monitor failed: {error}");
             ExitCode::FAILURE
         }
     }
