@@ -183,5 +183,25 @@
     "failed_runs_preserved": true,
     "na_reason_required": true,
     "simulator_physical_synthetic_separate": true
-  }
+  },
+  "dataset_sources": [
+    {
+      "id": "harpy-v-physical-v2",
+      "doi": "10.34810/DATA2538",
+      "evidence_domain": "physical_hardware",
+      "availability_status": "metadata_discovered_archive_unverified"
+    },
+    {
+      "id": "harpy-v-gem5-v1-1",
+      "doi": "10.34810/DATA2711",
+      "evidence_domain": "simulator",
+      "availability_status": "metadata_discovered_archive_unverified"
+    },
+    {
+      "id": "harpy-v-gem5-100c",
+      "doi": "10.34810/DATA3542",
+      "evidence_domain": "simulator",
+      "availability_status": "metadata_discovered_archive_unverified"
+    }
+  ]
 }
