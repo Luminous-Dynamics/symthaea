@@ -1,0 +1,325 @@
+#!/usr/bin/env python3
+"""Global randomized CRC LP for common-depth hierarchical classification.
+
+Uses the exact finite-population hypergeometric distribution for calibration
+count states and the residual-pool test-type distribution conditional on each
+calibration state. Action support is the three piecewise-linear breakpoints
+a in {0,1,2}. Randomizing over these actions convexifies the piecewise-linear
+risk/utility trade-off.
+
+The LP enforces every augmented-multiset risk constraint. The population
+counts used for the utility objective are an oracle benchmark: they must be
+known independently/frozen before calibration for a deployable procedure.
+"""
+from __future__ import annotations
+import argparse
+import json
+import math
+import platform
+import time
+from pathlib import Path
+from typing import Iterable
+import numpy as np
+from scipy.optimize import linprog
+from scipy.sparse import lil_matrix
+
+
+def count_vectors(total: int, types: int=3) -> list[tuple[int,...]]:
+    if total<0 or types<1:raise ValueError("invalid count-vector dimensions")
+    if types==1:return [(total,)]
+    out=[]
+    for first in range(total+1):
+        for tail in count_vectors(total-first,types-1):
+            out.append((first,)+tail)
+    return out
+
+
+def log_combination(n: int, k: int) -> float:
+    if k<0 or k>n:return -math.inf
+    return math.lgamma(n+1)-math.lgamma(k+1)-math.lgamma(n-k+1)
+
+
+def finite_population_state_weights(
+    n_calibration: int, pool_counts: Iterable[int]
+) -> tuple[list[tuple[int,...]],np.ndarray]:
+    pool=np.asarray(list(pool_counts),dtype=np.int64)
+    if pool.ndim!=1 or pool.size<2 or np.any(pool<0):
+        raise ValueError("pool_counts must be a nonnegative vector with at least two types")
+    if int(pool.sum())<n_calibration or n_calibration<1:
+        raise ValueError("calibration sample exceeds the pool or is empty")
+    states=count_vectors(n_calibration,len(pool))
+    log_den=log_combination(int(pool.sum()),n_calibration)
+    log_weights=[]
+    for d in states:
+        if any(d[i]>pool[i] for i in range(len(pool))):
+            log_weights.append(-math.inf)
+        else:
+            log_weights.append(sum(log_combination(int(pool[i]),int(d[i]))
+                                   for i in range(len(pool)))-log_den)
+    w=np.exp(np.asarray(log_weights,dtype=np.float64))
+    total=float(w.sum())
+    if not math.isfinite(total) or total<=0:raise ArithmeticError("invalid hypergeometric weights")
+    w/=total
+    return states,w
+
+
+def depth_probabilities(a: float) -> np.ndarray:
+    if not math.isfinite(a) or not 0<=a<=2:raise ValueError("depth must be in [0,2]")
+    return np.asarray([max(1-a,0.0),1-abs(a-1.0),max(a-1.0,0.0)])
+
+
+def type_loss(error_type: int, a: float) -> float:
+    if error_type==0:return 0.0
+    if error_type==1:return .5*max(a-1.0,0.0)
+    if error_type==2:return .5*a
+    raise ValueError("error_type must be 0,1,2")
+
+
+def per_type_metrics(a: float) -> dict[str,np.ndarray]:
+    pi=depth_probabilities(a)
+    superclass_information=math.log(20.0)/math.log(100.0)
+    specificity=np.asarray([
+        pi[1]*superclass_information+pi[2],
+        pi[1]*superclass_information,
+        0.0
+    ])
+    node_size=np.full(3,100.0*pi[0]+5.0*pi[1]+pi[2])
+    risks=np.asarray([type_loss(z,a) for z in range(3)])
+    return {"risk":risks,"specificity":specificity,"node_size":node_size}
+
+
+def residual_test_probabilities(pool_counts: Iterable[int], calibration_counts: tuple[int,...]) -> np.ndarray:
+    pool=np.asarray(list(pool_counts),dtype=np.int64)
+    d=np.asarray(calibration_counts,dtype=np.int64)
+    if pool.shape!=d.shape or np.any(d>pool):
+        raise ValueError("calibration counts incompatible with population")
+    remaining=pool-d
+    denom=int(remaining.sum())
+    if denom<=0:raise ValueError("no test population remains after calibration")
+    return remaining.astype(np.float64)/denom
+
+
+class RandomizedCommonDepthCRC:
+    """LP optimizer over randomized common-depth maps on the {0,1,2} action support."""
+
+    def __init__(self, n_calibration: int, alpha: float,
+                 pool_counts: Iterable[int]=(7300,969,1731),
+                 action_grid: Iterable[float]=(0.0,1.0,2.0)):
+        pool=np.asarray(list(pool_counts),dtype=np.int64)
+        actions=np.asarray(list(action_grid),dtype=np.float64)
+        if pool.shape!=(3,) or np.any(pool<0) or pool.sum()<=n_calibration:
+            raise ValueError("common-depth CIFAR pool must contain three types and exceed n")
+        if n_calibration<1 or not math.isfinite(alpha) or not 0<alpha<1:
+            raise ValueError("invalid n or alpha")
+        if actions.ndim!=1 or actions.size<2 or np.any(~np.isfinite(actions)) or np.any((actions<0)|(actions>2)):
+            raise ValueError("action_grid must be a finite vector in [0,2]")
+        if len(set(actions.tolist()))!=actions.size or not np.all(np.diff(actions)>0):
+            raise ValueError("action_grid must be strictly increasing and unique")
+        if not all(any(abs(a-x)<1e-12 for x in actions) for a in (0.,1.,2.)):
+            raise ValueError("piecewise-linear exact support must include breakpoints 0,1,2")
+        self.n=int(n_calibration)
+        self.alpha=float(alpha)
+        self.pool=pool
+        self.actions=actions
+        self.budget=(self.n+1)*self.alpha
+        self.states,self.weights=finite_population_state_weights(self.n,self.pool)
+        self.augmented=count_vectors(self.n+1,3)
+        self.index={D:i for i,D in enumerate(self.states)}
+        self.conditional_test_probs=np.asarray([
+            residual_test_probabilities(self.pool,D) for D in self.states
+        ])
+        self.losses=np.asarray([
+            [type_loss(z,a) for a in self.actions] for z in range(3)
+        ])
+        self.metrics=[per_type_metrics(float(a)) for a in self.actions]
+        self.utility=np.asarray([
+            [np.dot(self.conditional_test_probs[i],self.metrics[j]["specificity"])
+             for j in range(len(self.actions))]
+            for i in range(len(self.states))
+        ])
+
+    def solve(self) -> dict:
+        n_states=len(self.states)
+        n_actions=len(self.actions)
+        n_variables=n_states*n_actions
+        A_ub=lil_matrix((len(self.augmented),n_variables),dtype=np.float64)
+        for row,S in enumerate(self.augmented):
+            for z,multiplicity in enumerate(S):
+                if multiplicity:
+                    D=list(S);D[z]-=1
+                    state_index=self.index[tuple(D)]
+                    start=state_index*n_actions
+                    A_ub[row,start:start+n_actions]+=multiplicity*self.losses[z]
+        A_eq=lil_matrix((n_states,n_variables),dtype=np.float64)
+        for i in range(n_states):
+            A_eq[i,i*n_actions:(i+1)*n_actions]=1.0
+        objective=-(self.weights[:,None]*self.utility).reshape(-1)
+        started=time.perf_counter()
+        result=linprog(
+            objective,
+            A_ub=A_ub.tocsr(),
+            b_ub=np.full(len(self.augmented),self.budget),
+            A_eq=A_eq.tocsr(),
+            b_eq=np.ones(n_states),
+            bounds=[(0.0,1.0)]*n_variables,
+            method="highs",
+            options={"primal_feasibility_tolerance":1e-9,
+                     "dual_feasibility_tolerance":1e-9},
+        )
+        runtime=time.perf_counter()-started
+        if not result.success or result.x is None:
+            raise RuntimeError(f"randomized CRC LP failed: {result.message}")
+        probabilities=result.x.reshape(n_states,n_actions)
+        report=self.verify(probabilities)
+        if not report["valid"]:
+            raise ArithmeticError(f"LP solution failed exact augmented-state verification: {report}")
+        metrics=self.evaluate(probabilities)
+        supports=(probabilities>1e-8).sum(axis=1)
+        return {
+            "action_grid":self.actions.tolist(),
+            "probabilities":probabilities.tolist(),
+            "expected_metrics":metrics,
+            "verification":report,
+            "solver":{"method":"HiGHS","success":bool(result.success),
+                      "status":str(result.message),"runtime_seconds":runtime,
+                      "objective_value":float(-result.fun),
+                      "n_variables":n_variables,
+                      "n_equality_constraints":n_states,
+                      "n_inequality_constraints":len(self.augmented)},
+            "randomization":{
+                "states_with_multiple_actions":int(np.sum(supports>1)),
+                "fraction_states_randomized":float(np.mean(supports>1)),
+                "support_histogram":{str(k):int(np.sum(supports==k)) for k in np.unique(supports)},
+            },
+        }
+
+    def verify(self, probabilities: np.ndarray, tolerance: float=1e-9) -> dict:
+        P=np.asarray(probabilities,dtype=np.float64)
+        if P.shape!=(len(self.states),len(self.actions)) or np.any(~np.isfinite(P)) or np.any(P<-tolerance):
+            raise ValueError("invalid randomized action table")
+        row_sums=P.sum(axis=1)
+        if np.max(np.abs(row_sums-1.0))>tolerance:
+            raise ValueError("every calibration state must have a normalized action distribution")
+        worst=(-math.inf,None)
+        totals={}
+        for S in self.augmented:
+            total=0.0
+            for z,multiplicity in enumerate(S):
+                if multiplicity:
+                    D=list(S);D[z]-=1
+                    i=self.index[tuple(D)]
+                    total+=multiplicity*float(np.dot(P[i],self.losses[z]))
+            totals[",".join(map(str,S))]=total
+            if total>worst[0]:worst=(total,S)
+        excess=float(worst[0]-self.budget)
+        return {
+            "valid":bool(excess<=tolerance),
+            "max_budget_excess":excess,
+            "worst_augmented_count":worst[1],
+            "worst_augmented_total":float(worst[0]),
+            "budget":self.budget,
+            "augmented_states_checked":len(self.augmented),
+            "calibration_states":len(self.states),
+            "all_augmented_totals":totals,
+        }
+
+    def evaluate(self, probabilities: np.ndarray) -> dict:
+        P=np.asarray(probabilities,dtype=np.float64)
+        totals={"risk":0.0,"correct_specificity":0.0,"mean_node_size":0.0}
+        for i in range(len(self.states)):
+            w=self.weights[i]
+            q=self.conditional_test_probs[i]
+            for j in range(len(self.actions)):
+                mass=w*P[i,j]
+                if mass==0:continue
+                totals["risk"]+=mass*float(np.dot(q,self.metrics[j]["risk"]))
+                totals["correct_specificity"]+=mass*float(self.utility[i,j])
+                totals["mean_node_size"]+=mass*float(np.dot(q,self.metrics[j]["node_size"]))
+        return totals
+
+
+def evaluate_deterministic_controller(engine: RandomizedCommonDepthCRC,
+                                      controller: dict[tuple[int,...],float]) -> dict:
+    metrics={"risk":0.0,"correct_specificity":0.0,"mean_node_size":0.0}
+    for i,D in enumerate(engine.states):
+        q=engine.conditional_test_probs[i]
+        w=engine.weights[i]
+        action=float(controller[D])
+        point=per_type_metrics(action)
+        metrics["risk"]+=w*float(np.dot(q,point["risk"]))
+        metrics["correct_specificity"]+=w*float(np.dot(q,point["specificity"]))
+        metrics["mean_node_size"]+=w*float(np.dot(q,point["node_size"]))
+    return metrics
+
+
+def run_suite(n: int=50, pool_counts: tuple[int,int,int]=(7300,969,1731),
+              alphas: tuple[float,...]=(.02,.05,.10,.15), recertification_rounds: int=500) -> dict:
+    from common_depth_cifar_crc import CommonDepthCIFARCRC
+    results=[]
+    for alpha in alphas:
+        engine=RandomizedCommonDepthCRC(n,alpha,pool_counts)
+        lp=engine.solve()
+        baseline_engine=CommonDepthCIFARCRC(n,alpha)
+        crc=baseline_engine.baseline("crc")
+        envelope=baseline_engine.baseline("envelope")
+        recertified,history=baseline_engine.recertify(envelope,rounds=recertification_rounds)
+        results.append({
+            "alpha":alpha,
+            "n_states":len(engine.states),
+            "n_augmented_states":len(engine.augmented),
+            "standard_crc":evaluate_deterministic_controller(engine,crc),
+            "envelope_crc":evaluate_deterministic_controller(engine,envelope),
+            "equal_share_recertified":evaluate_deterministic_controller(engine,recertified),
+            "equal_share_rounds_executed":len(history)-1,
+            "randomized_global_lp":lp["expected_metrics"],
+            "global_gain_vs_equal_share":{
+                key:lp["expected_metrics"][key]-evaluate_deterministic_controller(engine,recertified)[key]
+                for key in lp["expected_metrics"]},
+            "solver":lp["solver"],
+            "verification":{
+                "valid":lp["verification"]["valid"],
+                "max_budget_excess":lp["verification"]["max_budget_excess"],
+                "worst_augmented_count":lp["verification"]["worst_augmented_count"],
+                "augmented_states_checked":lp["verification"]["augmented_states_checked"]},
+            "randomization":lp["randomization"],
+            "probabilities":lp["probabilities"],
+        })
+    return {
+        "schema":"symthaea-randomized-global-common-depth-crc-v1",
+        "status":"ORACLE_FINITE_POPULATION_UTILITY_BENCHMARK_NOT_DEPLOYMENT_RESULT",
+        "reference":"Bai & Ramdas (2026), arXiv:2610.35821, common-depth CIFAR-100 family",
+        "protocol":{
+            "pool_counts":list(pool_counts),"n_calibration":n,"alphas":list(alphas),
+            "reference_calibration_weights":"exact multivariate hypergeometric from the finite pool",
+            "conditional_test_type_weights":"residual pool counts after each calibration multiset",
+            "action_support":[0.0,1.0,2.0],
+            "decision":"for each calibration state D, sample one depth from the solved categorical distribution, then apply the paper's prediction-node randomization",
+            "objective":"expected correct specificity on the residual finite population",
+            "validity":"all augmented multiset expected-loss constraints checked exactly",
+            "objective_provenance":"oracle benchmark using the published full-pool type counts; a deployable system must freeze weights from independent data"
+        },
+        "results":results,
+        "limitations":[
+            "uses aggregate full-pool type counts to define the utility objective; this is an oracle benchmark and not a deployable calibration rule",
+            "risk validity is certified by every augmented multiset constraint, not inferred from empirical test risk",
+            "common-depth family only; confidence-adaptive image-specific controller is separate",
+            "the global LP optimizes the chosen finite action support and hierarchy-specific expected specificity, not all possible utilities",
+            "finite exchangeability only; no arbitrary distribution-shift guarantee"
+        ],
+        "environment":{"python":platform.python_version(),"numpy":np.__version__}
+    }
+
+
+if __name__=="__main__":
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output",required=True)
+    args=parser.parse_args()
+    payload=run_suite()
+    Path(args.output).write_text(json.dumps(payload,indent=2)+"\n",encoding="utf-8")
+    print(json.dumps({"output":args.output,"results":[
+        {"alpha":x["alpha"],"global":x["randomized_global_lp"],
+         "equal_share":x["equal_share_recertified"],
+         "gain":x["global_gain_vs_equal_share"],
+         "max_violation":x["verification"]["max_budget_excess"],
+         "runtime_seconds":x["solver"]["runtime_seconds"]}
+        for x in payload["results"]]},indent=2))
