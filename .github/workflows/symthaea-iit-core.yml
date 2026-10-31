@@ -92,6 +92,9 @@ jobs:
       - name: Benchmark sparse local-CPT Eq4 across growing substrates
         run: cargo run --locked -p symthaea-iit --example sparse_eq4_scale_sweep -- --repeats 3 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-scale.csv
 
+      - name: Benchmark sparse Eq4 across ring, hub-spoke, and grid topologies
+        run: cargo run --release --locked -p symthaea-iit --example sparse_eq4_topology_sweep -- --repeats 3 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-topologies.csv
+
       - name: Benchmark sparse fixed-state partition scoring
         run: cargo run --locked -p symthaea-iit --example sparse_partition_score_sweep -- --repeats 1 2>&1 | tee target/iit-benchmark-evidence/sparse-partition-score.csv
 
