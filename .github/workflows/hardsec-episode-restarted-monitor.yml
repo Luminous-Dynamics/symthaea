@@ -66,6 +66,8 @@ jobs:
               assert qualified[event_id]["co_scheduled"]["status"] == "confirmatory_eligible_under_declared_thresholds"
               assert qualified[event_id]["overcommitted"]["confirmatory_eligible"] is False
           assert receipt["support"]["independence_status"] == "not_established"
+          assert receipt["support"]["trial_count"] == len(json.load(open("tests/fixtures/hardsec/pmu-metrology-v1/observations.json", encoding="utf-8"))["trials"])
+          assert receipt["support"]["matched_block_count"] == 2
           PY
           echo "$out_dir" > "$RUNNER_TEMP/hardsec-021-output-dir"
       - name: Run episode packer and restarted detector using qualified PMU receipt
