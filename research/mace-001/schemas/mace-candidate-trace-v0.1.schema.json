@@ -30,7 +30,11 @@
           "latency_us",
           "memory_bytes",
           "tokens",
-          "model_calls"
+          "model_calls",
+          "write_decision",
+          "maintenance_decision",
+          "retrieval_decision",
+          "use_decision"
         ],
         "properties": {
           "case_id": {
@@ -86,6 +90,39 @@
           "model_calls": {
             "type": "integer",
             "minimum": 0
+          },
+          "write_decision": {
+            "enum": [
+              "store_association_only",
+              "store_qualified_transition",
+              "store_transition_with_regime",
+              "store_outcome_unknown"
+            ]
+          },
+          "maintenance_decision": {
+            "enum": [
+              "preserve_uncertainty",
+              "retain_with_preconditions",
+              "mark_stale_on_regime_change",
+              "retain_unknown_until_reconciled"
+            ]
+          },
+          "retrieval_decision": {
+            "enum": [
+              "retrieve_association_evidence",
+              "retrieve_preconditioned_transition",
+              "retrieve_with_regime_warning",
+              "retrieve_execution_conflict",
+              "retrieve_more_evidence"
+            ]
+          },
+          "use_decision": {
+            "enum": [
+              "do_not_generalize_causal_effect",
+              "reuse_if_preconditions_hold",
+              "requalify_before_action",
+              "reconcile_before_retry"
+            ]
           }
         }
       }
