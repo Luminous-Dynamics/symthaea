@@ -92,6 +92,8 @@ pub enum AdjudicationDecisionV1 {
     SameTargetSameInstance,
     SameConstructDifferentInstance,
     SharedRecipeDifferentInstance,
+    SameDomainDifferentTarget,
+    SharedDomainDifferentRecipe,
     DifferentConstruct,
     Indeterminate,
 }
@@ -102,6 +104,8 @@ impl AdjudicationDecisionV1 {
             Self::SameTargetSameInstance => "same_target_same_instance",
             Self::SameConstructDifferentInstance => "same_construct_different_instance",
             Self::SharedRecipeDifferentInstance => "shared_recipe_different_instance",
+            Self::SameDomainDifferentTarget => "same_domain_different_target",
+            Self::SharedDomainDifferentRecipe => "shared_domain_different_recipe",
             Self::DifferentConstruct => "different_construct",
             Self::Indeterminate => "indeterminate",
         }
