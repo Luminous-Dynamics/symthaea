@@ -549,7 +549,9 @@ fn nondominated_vectors(points: &[Vec<f64>]) -> Vec<Vec<f64>> {
 /// Inputs are maximization vectors. Points that do not strictly exceed the reference in
 /// every dimension contribute zero volume. Complexity is intended for small archived fronts
 /// and at most four objectives, not millions of points.
-fn exact_hypervolume(points: &[Vec<f64>], reference: &[f64]) -> Result<f64, ParetoError> {
+/// Compute exact dominated hypervolume for maximization-utility points and a fixed reference.
+/// Supports any dimension, but ParetoAnalysisPlan currently caps validated results at four.
+pub fn exact_hypervolume(points: &[Vec<f64>], reference: &[f64]) -> Result<f64, ParetoError> {
     if points.is_empty() {
         return Ok(0.0);
     }
