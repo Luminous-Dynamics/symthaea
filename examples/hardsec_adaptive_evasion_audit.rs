@@ -356,7 +356,11 @@ fn group_bootstrap_interval(
         });
     }
 
-    let mut state = u64::from_le_bytes(seed_digest[..8].try_into().expect("SHA-256 has at least eight bytes"));
+    let mut state = u64::from_le_bytes(
+        seed_digest[..8]
+            .try_into()
+            .expect("SHA-256 has at least eight bytes"),
+    );
     if state == 0 {
         state = 0x9E37_79B9_7F4A_7C15;
     }
