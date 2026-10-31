@@ -1,8 +1,8 @@
 //! Minimal, separately compiled BASALT fixture task.
 //!
-//! This executable has no catalog/oracle/receipt API. It either reads one input
-//! and emits its content digest, or ignores the path and emits a fixed output.
-//! The parent harness pins this binary's SHA-256 before spawning it.
+//! This executable has no catalog/oracle/receipt API. It can consume an input,
+//! read and discard it, or not access it. The parent harness pins this binary's
+//! SHA-256 before spawning it.
 
 use anyhow::{Context, bail};
 use serde::Serialize;
@@ -48,17 +48,27 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run(mode: &str, input: &std::path::Path) -> anyhow::Result<WorkerOutput> {
-    if mode != "consume" && mode != "ignore" {
-        bail!("worker mode must be consume or ignore");
+    if !matches!(mode, "consume" | "read_discard" | "ignore") {
+        bail!("worker mode must be consume, read_discard, or ignore");
     }
 
-    let (output_digest, bytes_read) = if mode == "consume" {
-        let bytes = fs::read(input)
-            .with_context(|| format!("fixture worker reading {}", input.display()))?;
-        (sha256_tagged(&bytes), bytes.len() as u64)
-    } else {
-        // Deliberately do not open, stat, canonicalize, or inspect the fixture path.
-        (sha256_tagged(INDEPENDENT_TASK_OUTPUT), 0)
+    let (output_digest, bytes_read) = match mode {
+        "consume" => {
+            let bytes = fs::read(input)
+                .with_context(|| format!("fixture worker reading {}", input.display()))?;
+            (sha256_tagged(&bytes), bytes.len() as u64)
+        }
+        "read_discard" => {
+            let bytes = fs::read(input)
+                .with_context(|| format!("fixture worker reading and discarding {}", input.display()))?;
+            // The access is real, but the data-derived value is intentionally unused.
+            (sha256_tagged(INDEPENDENT_TASK_OUTPUT), bytes.len() as u64)
+        }
+        "ignore" => {
+            // Deliberately do not open, stat, canonicalize, or inspect the fixture path.
+            (sha256_tagged(INDEPENDENT_TASK_OUTPUT), 0)
+        }
+        _ => unreachable!("worker mode was validated above"),
     };
 
     Ok(WorkerOutput {
@@ -108,6 +118,20 @@ mod tests {
         let output = run("consume", &path).expect("consume mode reads file");
         assert_eq!(output.bytes_read, bytes.len() as u64);
         assert_eq!(output.output_digest, sha256_tagged(bytes));
+        fs::remove_file(path).expect("fixture cleanup");
+    }
+
+    #[test]
+    fn read_discard_mode_reads_input_but_keeps_output_independent() {
+        let path = test_path("read-discard");
+        fs::write(&path, b"before state").expect("baseline fixture writes");
+        let before = run("read_discard", &path).expect("baseline is read and discarded");
+        fs::write(&path, b"after---state").expect("mutated fixture writes");
+        let after = run("read_discard", &path).expect("mutated input is read and discarded");
+        assert_eq!(before.bytes_read, b"before state".len() as u64);
+        assert_eq!(after.bytes_read, b"after---state".len() as u64);
+        assert_eq!(before.output_digest, after.output_digest);
+        assert_eq!(after.output_digest, sha256_tagged(INDEPENDENT_TASK_OUTPUT));
         fs::remove_file(path).expect("fixture cleanup");
     }
 }

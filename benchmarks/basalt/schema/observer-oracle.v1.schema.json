@@ -175,6 +175,14 @@
                 "minimum": 0
               }
             }
+          },
+          "semantic_effect": {
+            "type": "string",
+            "enum": [
+              "demonstrated",
+              "not_demonstrated_in_tested_domain"
+            ],
+            "description": "Optional semantic-output effect classification. It never changes the ground-truth access classification or permission to omit an accessed resource."
           }
         }
       }

@@ -100,7 +100,8 @@
           "task_mode": {
             "enum": [
               "consume",
-              "ignore"
+              "ignore",
+              "read_discard"
             ]
           },
           "before_input_digest": {

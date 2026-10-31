@@ -66,6 +66,8 @@ pub struct ResultAuditMetrics {
     pub unresolved_channel_misses: usize,
     pub integrity_failures_not_invalidated: usize,
     pub observed_resource_attributions: usize,
+    pub semantic_influence_demonstrated: usize,
+    pub semantic_access_without_output_effect_in_tested_domain: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,6 +77,7 @@ pub struct CaseAssessment {
     pub oracle_ground_truth: Option<String>,
     pub observer_disposition: Option<String>,
     pub reuse_decision: Option<String>,
+    pub semantic_effect: Option<String>,
     pub passed: bool,
     pub error_codes: Vec<String>,
 }
@@ -189,6 +192,8 @@ struct OracleRecord {
     mutation: MutationWitness,
     witness_kind: String,
     independent_replay: String,
+    #[serde(default)]
+    semantic_effect: Option<String>,
     execution_witness: ExecutionWitness,
 }
 
@@ -585,6 +590,7 @@ pub fn audit_bytes(
             oracle_ground_truth: oracle_record.map(|record| record.ground_truth.clone()),
             observer_disposition: receipt_record.map(|record| record.disposition.clone()),
             reuse_decision: receipt_record.map(|record| record.reuse_decision.clone()),
+            semantic_effect: oracle_record.and_then(|record| record.semantic_effect.clone()),
             passed,
             error_codes,
         });
@@ -1212,19 +1218,50 @@ fn validate_execution_witness(
         );
     }
 
+    if let Some(effect) = oracle.semantic_effect.as_deref() {
+        if !matches!(effect, "demonstrated" | "not_demonstrated_in_tested_domain") {
+            push_error(
+                report,
+                Some(case_id),
+                "E_SEMANTIC_EFFECT_INVALID",
+                &format!("cases[{case_id}].oracle.semantic_effect"),
+                "semantic_effect must be demonstrated or not_demonstrated_in_tested_domain",
+            );
+        }
+    }
+
     match case.expected_disposition.as_str() {
         "capture_dependency" => {
-            if witness.baseline_bytes_read == 0
-                || witness.mutated_bytes_read == 0
-                || witness.baseline_output_digest == witness.mutated_output_digest
-            {
-                push_error(
-                    report,
-                    Some(case_id),
-                    "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED",
-                    &path,
-                    "consumed-input control requires bytes read in both runs and a changed task-output digest",
-                );
+            if oracle.semantic_effect.as_deref() == Some("not_demonstrated_in_tested_domain") {
+                report.metrics.semantic_access_without_output_effect_in_tested_domain += 1;
+                if witness.baseline_bytes_read == 0
+                    || witness.mutated_bytes_read == 0
+                    || witness.baseline_output_digest != witness.mutated_output_digest
+                {
+                    push_error(
+                        report,
+                        Some(case_id),
+                        "E_SEMANTIC_NON_INFLUENCE_WITNESS",
+                        &path,
+                        "read-but-discard requires observed reads in both runs and identical declared task-output digests",
+                    );
+                }
+            } else {
+                if oracle.semantic_effect.as_deref() == Some("demonstrated") {
+                    report.metrics.semantic_influence_demonstrated += 1;
+                }
+                if witness.baseline_bytes_read == 0
+                    || witness.mutated_bytes_read == 0
+                    || witness.baseline_output_digest == witness.mutated_output_digest
+                {
+                    push_error(
+                        report,
+                        Some(case_id),
+                        "E_COUNTERFACTUAL_INFLUENCE_NOT_ESTABLISHED",
+                        &path,
+                        "consumed-input influence control requires bytes read in both runs and a changed task-output digest",
+                    );
+                }
             }
         }
         "preserve_unrelated" => {
@@ -1325,13 +1362,20 @@ fn validate_pairs(
             ];
             let is_recall_selectivity_pair = dispositions.contains(&"capture_dependency")
                 && dispositions.contains(&"preserve_unrelated");
-            if !is_recall_selectivity_pair {
+            let semantic_effects = [
+                left_oracle.semantic_effect.as_deref(),
+                right_oracle.semantic_effect.as_deref(),
+            ];
+            let is_semantic_influence_pair = dispositions.iter().all(|d| *d == "capture_dependency")
+                && semantic_effects.contains(&Some("demonstrated"))
+                && semantic_effects.contains(&Some("not_demonstrated_in_tested_domain"));
+            if !is_recall_selectivity_pair && !is_semantic_influence_pair {
                 push_error(
                     report,
                     Some(&case.case_id),
                     "E_PAIR_DISPOSITION_MISMATCH",
                     "catalog.cases.paired_case_ids",
-                    "paired controls must include one capture_dependency and one preserve_unrelated case",
+                    "paired controls must be either capture_dependency + preserve_unrelated or a demonstrated + read-but-discard capture_dependency pair",
                 );
             }
 
@@ -1339,36 +1383,28 @@ fn validate_pairs(
                 receipts_by_id.get(case.case_id.as_str()).copied(),
                 receipts_by_id.get(paired_id.as_str()).copied(),
             ) {
-                let capture_case = if case.expected_disposition == "capture_dependency" {
-                    Some((case, left))
-                } else if paired_case.expected_disposition == "capture_dependency" {
-                    Some((paired_case, right))
-                } else {
-                    None
-                };
-                let preserve_case = if case.expected_disposition == "preserve_unrelated" {
-                    Some((case, left))
-                } else if paired_case.expected_disposition == "preserve_unrelated" {
-                    Some((paired_case, right))
-                } else {
-                    None
-                };
-                if let (Some((capture, capture_receipt)), Some((preserve, preserve_receipt))) =
-                    (capture_case, preserve_case)
-                {
-                    let resource = capture.ground_truth_resource_id.value.as_deref();
-                    let capture_has_resource = resource.is_some_and(|id| {
-                        capture_receipt
-                            .observed_resources
-                            .iter()
-                            .any(|observed| observed.resource_id == id)
-                    });
-                    let preserve_has_resource = resource.is_some_and(|id| {
-                        preserve_receipt
-                            .observed_resources
-                            .iter()
-                            .any(|observed| observed.resource_id == id)
-                    });
+                let resource = case.ground_truth_resource_id.value.as_deref();
+                let left_has_resource = resource.is_some_and(|id| {
+                    left.observed_resources.iter().any(|observed| observed.resource_id == id)
+                });
+                let right_has_resource = resource.is_some_and(|id| {
+                    right.observed_resources.iter().any(|observed| observed.resource_id == id)
+                });
+
+                if is_semantic_influence_pair {
+                    if !left_has_resource || !right_has_resource {
+                        push_error(
+                            report,
+                            Some(&case.case_id),
+                            "E_SEMANTIC_PAIR_ACCESS_MISSED",
+                            "observer_receipts.records",
+                            "both read-but-discard and read-and-influence executions must retain the accessed resource; semantic non-influence never erases access",
+                        );
+                    }
+                } else if is_recall_selectivity_pair {
+                    let capture_is_left = case.expected_disposition == "capture_dependency";
+                    let capture_has_resource = if capture_is_left { left_has_resource } else { right_has_resource };
+                    let preserve_has_resource = if capture_is_left { right_has_resource } else { left_has_resource };
                     if !capture_has_resource || preserve_has_resource {
                         push_error(
                             report,

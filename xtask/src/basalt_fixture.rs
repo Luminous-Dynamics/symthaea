@@ -21,6 +21,8 @@ const FIXTURE_CASES: &[&str] = &[
     "unused-neighbor-change",
     "irrelevant-docs-change",
     "docs-consumed-positive-control",
+    "read-but-discard",
+    "read-and-influence",
 ];
 const INDEPENDENT_TASK_OUTPUT: &[u8] = b"basalt-fixture-task-output:v1:input-independent";
 
@@ -224,11 +226,7 @@ pub fn run(
         if expected_resource_id != resource_id {
             bail!("fixture resource mapping mismatch for {case_id}");
         }
-        let mode = match case.expected_disposition.as_str() {
-            "capture_dependency" => "consume",
-            "preserve_unrelated" => "ignore",
-            other => bail!("fixture runner does not synthesize disposition {other}"),
-        };
+        let mode = fixture_mode(&case.case_id, &case.expected_disposition)?;
         let before_bytes = format!(
             "BASALT-ORACLE-FIXTURE-V1\nresource={resource_id}\nstate=baseline\n"
         )
@@ -293,8 +291,13 @@ pub fn run(
         } else {
             sha256_tagged(INDEPENDENT_TASK_OUTPUT)
         };
+        let expected_baseline_bytes_read = if plan.mode == "ignore" {
+            0
+        } else {
+            plan.before_bytes.len() as u64
+        };
         if baseline.output_digest != expected_baseline
-            || baseline.bytes_read != if plan.mode == "consume" { plan.before_bytes.len() as u64 } else { 0 }
+            || baseline.bytes_read != expected_baseline_bytes_read
         {
             bail!("baseline worker output disagrees with the parent-side fixture oracle for {}", plan.case_id);
         }
@@ -307,18 +310,28 @@ pub fn run(
         } else {
             sha256_tagged(INDEPENDENT_TASK_OUTPUT)
         };
+        let expected_mutated_bytes_read = if plan.mode == "ignore" {
+            0
+        } else {
+            plan.after_bytes.len() as u64
+        };
         if mutated.output_digest != expected_mutated
-            || mutated.bytes_read != if plan.mode == "consume" { plan.after_bytes.len() as u64 } else { 0 }
+            || mutated.bytes_read != expected_mutated_bytes_read
         {
             bail!("mutated worker output disagrees with the parent-side fixture oracle for {}", plan.case_id);
         }
 
-        let counterfactual_ok = if plan.mode == "consume" {
-            baseline.output_digest != mutated.output_digest
-        } else {
-            baseline.output_digest == mutated.output_digest
+        let counterfactual_ok = match plan.mode {
+            "consume" => baseline.output_digest != mutated.output_digest
+                && baseline.bytes_read > 0
+                && mutated.bytes_read > 0,
+            "read_discard" => baseline.output_digest == mutated.output_digest
+                && baseline.bytes_read == plan.before_bytes.len() as u64
+                && mutated.bytes_read == plan.after_bytes.len() as u64,
+            "ignore" => baseline.output_digest == mutated.output_digest
                 && baseline.bytes_read == 0
-                && mutated.bytes_read == 0
+                && mutated.bytes_read == 0,
+            _ => false,
         };
         if !counterfactual_ok {
             bail!("counterfactual influence check failed for {}", plan.case_id);
@@ -326,20 +339,26 @@ pub fn run(
 
         let before_digest = sha256_tagged(&plan.before_bytes);
         let after_digest = sha256_tagged(&plan.after_bytes);
-        let ground_truth = if plan.mode == "consume" {
-            "consumed"
-        } else {
+        let ground_truth = if plan.mode == "ignore" {
             "not_consumed"
-        };
-        let witness_kind = if plan.mode == "consume" {
-            "controlled_read"
         } else {
+            "consumed"
+        };
+        let witness_kind = if plan.mode == "ignore" {
             "controlled_non_read"
+        } else {
+            "controlled_read"
+        };
+        let semantic_effect = match plan.mode {
+            "consume" => Some("demonstrated"),
+            "read_discard" => Some("not_demonstrated_in_tested_domain"),
+            _ => None,
         };
 
         oracle_records.push(json!({
             "case_id": plan.case_id,
             "ground_truth": ground_truth,
+            "semantic_effect": semantic_effect,
             "injected_resource_id": plan.resource_id,
             "mutation": {
                 "applied": true,
@@ -432,6 +451,21 @@ pub fn run(
         worker_binary_digest,
         qualification_eligible: false,
     })
+}
+
+fn fixture_mode(case_id: &str, expected_disposition: &str) -> anyhow::Result<&'static str> {
+    match case_id {
+        "read-but-discard" if expected_disposition == "capture_dependency" => Ok("read_discard"),
+        "read-and-influence" if expected_disposition == "capture_dependency" => Ok("consume"),
+        "read-but-discard" | "read-and-influence" => {
+            bail!("semantic-influence fixtures must remain capture_dependency cases")
+        }
+        _ => match expected_disposition {
+            "capture_dependency" => Ok("consume"),
+            "preserve_unrelated" => Ok("ignore"),
+            other => bail!("fixture runner does not synthesize disposition {other}"),
+        },
+    }
 }
 
 fn initialize_git_fixture(workspace: &Path, has_tracked_docs: bool) -> anyhow::Result<String> {
@@ -581,6 +615,9 @@ mod tests {
         assert!(fixture_resource("fixture:unlisted-secret.txt").is_ok());
         assert!(fixture_resource("fixture:docs/unused.md").is_ok());
         assert!(fixture_resource("fixture:arbitrary-input").is_err());
+        assert_eq!(fixture_mode("read-but-discard", "capture_dependency").unwrap(), "read_discard");
+        assert_eq!(fixture_mode("read-and-influence", "capture_dependency").unwrap(), "consume");
+        assert!(fixture_mode("read-but-discard", "preserve_unrelated").is_err());
     }
 
     #[test]
