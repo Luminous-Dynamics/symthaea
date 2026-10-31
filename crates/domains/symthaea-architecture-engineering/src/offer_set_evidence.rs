@@ -123,6 +123,46 @@ impl OfferSetSourceState {
                 "retained evaluator state must be a JSON object",
             ));
         }
+        let source_offers = self.evaluator_state
+            .get("available_direction_ids")
+            .and_then(Value::as_array)
+            .ok_or_else(|| OfferSetEvidenceError::new(
+                "state.evaluator_state.available_direction_ids",
+                "retained state must include the exact eligible direction list",
+            ))?;
+        let source_ids = source_offers.iter()
+            .map(|value| value.as_str().map(str::to_owned).ok_or_else(|| {
+                OfferSetEvidenceError::new(
+                    "state.evaluator_state.available_direction_ids",
+                    "every eligible direction ID must be a string",
+                )
+            }))
+            .collect::<Result<Vec<_>, _>>()?;
+        if source_ids != self.available_direction_ids {
+            return Err(OfferSetEvidenceError::new(
+                "state.evaluator_state.available_direction_ids",
+                "retained state's eligible direction list differs from the extracted offer set",
+            ));
+        }
+        let source_new_permission = self.evaluator_state
+            .get("new_proposal_allowed")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| OfferSetEvidenceError::new(
+                "state.evaluator_state.new_proposal_allowed",
+                "retained state must include the NEW permission boolean",
+            ))?;
+        if source_new_permission != self.new_proposal_allowed {
+            return Err(OfferSetEvidenceError::new(
+                "state.evaluator_state.new_proposal_allowed",
+                "retained state's NEW permission differs from the extracted offer set",
+            ));
+        }
+        if !self.evaluator_state.get("state").is_some_and(Value::is_object) {
+            return Err(OfferSetEvidenceError::new(
+                "state.evaluator_state.state",
+                "retained evaluator state payload must be a JSON object",
+            ));
+        }
         Ok(())
     }
 
@@ -562,7 +602,7 @@ mod tests {
     fn source_state_canonicalizes_offers_and_binds_full_evaluator_payload() {
         let left = OfferSetStateArtifact::new(source_state(
             vec!["B".into(), "A".into()],
-            json!({"eligible": ["A", "B"], "verifier_epoch": 7}),
+            json!({"available_direction_ids": ["A", "B"], "new_proposal_allowed": true, "state": {"verifier_epoch": 7}}),
         )).unwrap();
         let right = OfferSetStateArtifact::new(source_state(
             vec!["A".into(), "B".into()],
@@ -577,9 +617,9 @@ mod tests {
     fn tampered_evaluator_state_is_rejected_even_when_offer_list_is_unchanged() {
         let mut artifact = OfferSetStateArtifact::new(source_state(
             vec!["A".into()],
-            json!({"eligibility_rule": "verified_only", "verifier_epoch": 7}),
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"eligibility_rule": "verified_only", "verifier_epoch": 7}}),
         )).unwrap();
-        artifact.state.evaluator_state["verifier_epoch"] = json!(8);
+        artifact.state.evaluator_state["state"]["verifier_epoch"] = json!(8);
         let error = artifact.validate().unwrap_err();
         assert!(error.message.contains("does not match its content digest"));
     }
@@ -588,7 +628,7 @@ mod tests {
     fn snapshot_reconstruction_binds_boundary_and_new_permission() {
         let artifact = OfferSetStateArtifact::new(source_state(
             vec!["A".into(), "B".into()],
-            json!({"eligible": ["A", "B"], "new_permission": true}),
+            json!({"available_direction_ids": ["A", "B"], "new_proposal_allowed": true, "state": {"new_permission": true}}),
         )).unwrap();
         let snapshot = artifact.to_snapshot().unwrap();
         artifact.matches_snapshot(&snapshot).unwrap();
@@ -610,7 +650,7 @@ mod tests {
             0,
             vec!["A".into()],
             true,
-            json!({"eligible": ["A"], "verifier_epoch": 3}),
+            json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {"verifier_epoch": 3}}),
         ).unwrap();
         let left_bundle = OfferSetEvidenceBundle::new(&left_tape, vec![shared_state.clone()]).unwrap();
         let right_bundle = OfferSetEvidenceBundle::new(&right_tape, vec![shared_state]).unwrap();
@@ -641,7 +681,7 @@ mod tests {
             json!({"eligible": ["A"], "verifier_epoch": 3}),
         ).unwrap();
         let mut bundle = OfferSetEvidenceBundle::new(&event_tape, vec![state]).unwrap();
-        bundle.state_artifacts[0].state.evaluator_state["verifier_epoch"] = json!(4);
+        bundle.state_artifacts[0].state.evaluator_state["state"]["verifier_epoch"] = json!(4);
         assert!(bundle.validate_for_tape(&event_tape).is_err());
     }
 
@@ -649,11 +689,16 @@ mod tests {
     fn duplicate_or_non_object_source_state_is_rejected() {
         assert!(OfferSetSourceState::new(
             "campaign-1", "0123456789abcdef0123456789abcdef01234567",
-            1, None, 0, vec!["A".into(), "A".into()], true, json!({"eligible": ["A"]}),
+            1, None, 0, vec!["A".into(), "A".into()], true, json!({"available_direction_ids": ["A"], "new_proposal_allowed": true, "state": {}}),
         ).is_err());
         assert!(OfferSetSourceState::new(
             "campaign-1", "0123456789abcdef0123456789abcdef01234567",
             1, None, 0, vec!["A".into()], true, json!(["not", "an", "object"]),
+        ).is_err());
+        assert!(OfferSetSourceState::new(
+            "campaign-1", "0123456789abcdef0123456789abcdef01234567",
+            1, None, 0, vec!["A".into()], true,
+            json!({"available_direction_ids": ["B"], "new_proposal_allowed": true, "state": {}}),
         ).is_err());
     }
 }
