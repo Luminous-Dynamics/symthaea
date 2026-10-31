@@ -1,0 +1,74 @@
+{
+  "schema": "symthaea.rollback_resistant_receipt_witness",
+  "version": "0.1.0",
+  "tracking_issue": 9631,
+  "status": "verification_primitives_authored_not_executed",
+  "source": "research/temporal-evaluator/src/witness.rs",
+  "receipt_source": "research/evaluator-isolation/src/receipt.rs",
+  "checkpoint": {
+    "canonical_encoding": "domain_separated_little_endian_v1",
+    "signature": "Ed25519_strict",
+    "bound_fields": [
+      "evaluator_id",
+      "evaluator_key_id",
+      "epoch",
+      "highest_receipt_sequence",
+      "highest_monotonic_counter",
+      "receipt_count",
+      "previous_checkpoint_sha256",
+      "receipt_chain_head_sha256",
+      "issued_at_unix_ns"
+    ],
+    "evaluator_key_allow_list_required": true,
+    "previous_checkpoint_continuity_must_be_checked_by_witness": true
+  },
+  "byzantine_quorum": {
+    "total_witnesses": 4,
+    "max_byzantine_witnesses": 1,
+    "threshold": 3,
+    "invariant": "n >= 3f+1 and 2f+1 <= q <= n-f",
+    "witness_registry_fixed": true,
+    "missing_responses_reduce_availability_not_threshold": true,
+    "honest_witness_must_refuse_same_epoch_equivocation": true
+  },
+  "witness_attestation": {
+    "signature": "Ed25519_strict",
+    "bound_fields": [
+      "witness_id",
+      "evaluator_id",
+      "fresh_256_bit_challenge",
+      "checkpoint_epoch",
+      "checkpoint_sha256",
+      "previous_checkpoint_sha256",
+      "observed_at_unix_ns"
+    ],
+    "challenge_generation": "evaluator_OS_CSPRNG_required_not_implemented",
+    "stale_challenge_replay_rejected": true,
+    "transport_adapter": false,
+    "durable_witness_service": false
+  },
+  "verifier_rules": [
+    "verify_evaluator_checkpoint_signature",
+    "verify_allowlisted_witness_signatures",
+    "reject_unknown_witness",
+    "reject_duplicate_witness_response",
+    "reject_challenge_mismatch",
+    "group_attestations_by_epoch_checkpoint_digest_and_previous_digest",
+    "require_2f_plus_1_matching_witnesses",
+    "local_rollback_requires_higher_epoch_quorum",
+    "same_epoch_conflict_requires_conflicting_quorum",
+    "single_faulty_witness_cannot_override_current_quorum",
+    "fail_closed_on_missing_current_quorum"
+  ],
+  "tests_authored": 9,
+  "tests_executed": false,
+  "adapters": {
+    "TPM2_NV_counter": false,
+    "remote_witness_RPC": false,
+    "Mycelix_witness_dna": false,
+    "checkpoint_key_rotation": false,
+    "witness_quorum_migration": false,
+    "snapshot_restore_campaign": false
+  },
+  "claim_ceiling": "Pure checkpoint and quorum verification code only; no witness persistence, independent durability, TPM attestation, remote consensus or rollback-resistant deployment demonstrated."
+}
