@@ -1023,7 +1023,8 @@ mod tests {
     fn evoi_scales_probe_value_with_downstream_decision_horizon() {
         let worlds = mechanisms();
         let posterior: Vec<usize> = (0..worlds.len()).collect();
-        let max_gain = all_queries()
+        let (safe_queries, _, _) = available_probe_queries(&worlds, &posterior, &BTreeSet::new());
+        let max_gain = safe_queries
             .iter()
             .map(|query| expected_value_of_probe(&worlds, &posterior, *query))
             .fold(0.0_f64, f64::max);
