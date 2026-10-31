@@ -282,3 +282,18 @@ Sources:
 A shared sequential anytime history/target-receipt module is implemented in \`pareto_anytime.rs\`, exported by the crate, and documented in \`AR5B5_ANYTIME_IMPLEMENTATION_V0_1.md\`. It binds algorithm/evaluator/verifier build identities, execution environment, target plan, cost model, hash-chained evaluation/verification/auxiliary events, resource aggregation, archive-prefix HV/IGD+/epsilon, and explicit reached/not-reached outcomes.
 
 The next step is optimizer trace integration, tracked in Issue #9606. The module is committed but remains uncompiled/unexecuted; it records verifier assertions and digest references and does not yet independently resolve artifact bytes or authenticate verifier signatures. No benchmark result or SOTA claim is established.
+
+
+### AR-5B5 artifact-byte integrity foundation
+
+A second reusable Rust primitive is now implemented in \`evidence_artifact.rs\` and exported from the architecture-engineering crate. It canonicalizes run/candidate/source-commit artifact manifests, verifies complete resolved byte sets against exact lengths and SHA-256 digests, binds byte results to verifier identity/build and manifest digest, and supports deterministic receipt reconstruction.
+
+This is intentionally only byte integrity. A caller supplies the bytes; a bounded CAS/object-store resolver, remote-store authenticity, verifier signatures, and domain-specific semantic validation are not implemented. Integration into the anytime evidence promotion path is tracked in Issue #9608. No evidence-verification or science-validity pass is claimed.
+
+Implementation record: \`docs/research/AR5B5_EVIDENCE_ARTIFACT_BYTES_V0_1.md\`.
+
+The current development sequence is:
+1. #9429: shared sequential anytime history and content-addressed artifact byte verification primitives.
+2. #9606: optimizer trace integration for NSGA-II, MOEA/D-DE, SMS-EMOA with no search-decision changes.
+3. #9608: bounded artifact resolver, receipt binding, and evidence-promotion reconstruction.
+4. External parity against pinned PlatEMO/COCO and confirmatory held-out cluster-level comparisons.
