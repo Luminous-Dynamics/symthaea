@@ -552,6 +552,7 @@ pub struct EpochSealReport {
     pub epoch_id: Option<String>,
     pub partition_id: Option<String>,
     pub ledger_reconciled: bool,
+    pub ledger_loss_free: bool,
     pub seal_well_formed: bool,
     pub ledger_binding_matches: bool,
     pub event_chain_matches: bool,
@@ -583,6 +584,7 @@ fn audit_seal_bytes(ledger_bytes: &[u8], seal_bytes: &[u8]) -> EpochSealReport {
         epoch_id: None,
         partition_id: None,
         ledger_reconciled: false,
+        ledger_loss_free: false,
         seal_well_formed: false,
         ledger_binding_matches: false,
         event_chain_matches: false,
@@ -600,6 +602,7 @@ fn audit_seal_bytes(ledger_bytes: &[u8], seal_bytes: &[u8]) -> EpochSealReport {
     };
 
     let ledger_audit = audit_bytes(ledger_bytes);
+    report.ledger_loss_free = ledger_audit.loss_free;
     report.ledger_reconciled = ledger_audit.ledger_well_formed
         && ledger_audit.sequence_accounting_reconciled
         && ledger_audit.counters_consistent
@@ -1411,6 +1414,20 @@ mod tests {
         assert!(!report.source_close_claims_match);
         assert!(!report.integrity_passed);
         assert!(report.errors.iter().any(|error| error.code == "E_SEAL_CLOSE_CLAIMS"));
+    }
+
+    #[test]
+    fn known_classified_loss_can_be_integrity_sealed_but_never_loss_free() {
+        let mut input = fixture();
+        add_lost_tail(&mut input);
+        let ledger = input.to_string().into_bytes();
+        let seal = make_seal(&ledger);
+        let report = audit_seal_bytes(&ledger, &seal);
+        assert!(report.ledger_reconciled, "{:?}", report.errors);
+        assert!(!report.ledger_loss_free);
+        assert!(report.integrity_passed);
+        assert!(!report.observer_delivery_qualified);
+        assert!(!report.qualification_eligible);
     }
 
     #[test]
