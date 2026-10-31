@@ -709,7 +709,8 @@ mod tests {
         let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let c=find(&suite,"assertion-content-mismatch");
         let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"assertion-path".into()},&["e-assertion"]);
-        let score=&suite.evaluate(&[p]).case_scores[12];
+        let report=suite.evaluate(&[p]);
+        let score=&report.case_scores[12];
         assert_eq!(score.false_supported_claims,1);
         assert_eq!(score.invalid_citations,1);
     }
@@ -719,7 +720,8 @@ mod tests {
         let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
         let c=find(&suite,"unverified-source");
         let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"unverified-path".into()},&["e-unverified"]);
-        let score=&suite.evaluate(&[p]).case_scores[13];
+        let report=suite.evaluate(&[p]);
+        let score=&report.case_scores[13];
         assert_eq!(score.false_supported_claims,1);
         assert_eq!(score.integrity_violations,1);
         assert_eq!(score.invalid_citations,1);
