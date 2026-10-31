@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/hardsec-telemetry-trace-lineage-v1.schema.json",
+  "title": "HARDSEC telemetry trace lineage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "source_corpus_sha256",
+    "sampling_policy",
+    "holdout_axes",
+    "traces"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hardsec-telemetry-trace-lineage-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_corpus_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sampling_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset_unit",
+        "window_size",
+        "stride"
+      ],
+      "properties": {
+        "offset_unit": {
+          "enum": [
+            "committed_instructions",
+            "record_index",
+            "byte_offset",
+            "unknown"
+          ]
+        },
+        "window_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stride": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "holdout_axes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "program",
+          "execution",
+          "device_config",
+          "attack_family",
+          "adaptation_family"
+        ]
+      }
+    },
+    "traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "source_trace_sha256",
+          "program_id",
+          "binary_sha256",
+          "execution_id",
+          "device_config_id",
+          "attack_family_id",
+          "adaptation_family_id",
+          "split",
+          "origin",
+          "parent_trace_id",
+          "iteration_id",
+          "windows"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_trace_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "program_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "binary_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "execution_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "device_config_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attack_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adaptation_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ]
+          },
+          "origin": {
+            "enum": [
+              "original",
+              "replayed",
+              "repeated_iteration",
+              "unknown"
+            ]
+          },
+          "parent_trace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iteration_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "windows": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "window_id",
+                "sample_index",
+                "start_offset",
+                "end_offset",
+                "window_sha256"
+              ],
+              "properties": {
+                "window_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "start_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "end_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "window_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Schema shape is not enough: Rust validates parent relationships, split groups, ordered offsets, window sizes/strides, duplicate content and counts. Unknown offsets remain null."
+}
