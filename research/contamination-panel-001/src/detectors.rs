@@ -624,13 +624,13 @@ mod tests {
 
     #[test]
     fn normalized_text_baseline_separates_syntactic_positive_controls() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         let detector_run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::NormalizedTextEquality, 1_000, 0),
         )
         .unwrap();
-        let report = evaluate_detector_run(&packet, &key, &detector_run).unwrap();
+        let report = evaluate_detector_run(&packet, &key, &manifest, &detector_run).unwrap();
         let t2 = report
             .metrics_by_tier
             .iter()
@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn detector_run_must_cover_each_public_pair_exactly_once() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         let mut run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::ExactTextEquality, 500, 0),
@@ -671,14 +671,14 @@ mod tests {
 
     #[test]
     fn duplicate_or_unknown_score_ids_fail_closed() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         let mut run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::ExactTextEquality, 500, 0),
         )
         .unwrap();
         run.scores[1].pair_id = run.scores[0].pair_id.clone();
-        assert!(evaluate_detector_run(&packet, &key, &run)
+        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
             .unwrap_err()
             .contains("repeats pair ID"));
 
@@ -688,14 +688,34 @@ mod tests {
         )
         .unwrap();
         run.scores[0].pair_id = "not-a-pair".to_owned();
-        assert!(evaluate_detector_run(&packet, &key, &run)
+        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
             .unwrap_err()
             .contains("unknown pair ID"));
     }
 
     #[test]
+    fn sealed_key_mutation_without_manifest_update_fails_closed() {
+        let (packet, mut key, manifest) = fixture();
+        let run = score_public_packet(
+            &packet,
+            &spec(DetectorKindV1::ExactTextEquality, 500, 0),
+        )
+        .unwrap();
+        key.pair_truth[0].target_control_label =
+            if key.pair_truth[0].target_control_label
+                == crate::TargetControlLabelV1::PositiveForTargetTier
+            {
+                crate::TargetControlLabelV1::NegativeForTargetTier
+            } else {
+                crate::TargetControlLabelV1::PositiveForTargetTier
+            };
+        let error = evaluate_detector_run(&packet, &key, &manifest, &run).unwrap_err();
+        assert!(error.contains("sealed key bytes do not match the manifest commitment"));
+    }
+
+    #[test]
     fn wrong_sealed_key_or_packet_commitment_fails_closed() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         let run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::ExactTextEquality, 500, 0),
@@ -717,7 +737,7 @@ mod tests {
 
     #[test]
     fn unsupported_ngram_sizes_and_scores_outside_range_are_rejected() {
-        let (packet, key) = fixture();
+        let (packet, key, manifest) = fixture();
         assert!(score_public_packet(
             &packet,
             &spec(DetectorKindV1::TokenNgramJaccard, 500, 1)
@@ -730,14 +750,14 @@ mod tests {
         )
         .unwrap();
         run.scores[0].risk_permille = 1_001;
-        assert!(evaluate_detector_run(&packet, &key, &run)
+        assert!(evaluate_detector_run(&packet, &key, &manifest, &run)
             .unwrap_err()
             .contains("exceeds 1000"));
     }
 
     #[test]
     fn empty_class_denominators_are_not_estimable() {
-        let (packet, mut key) = fixture();
+        let (packet, mut key, mut manifest) = fixture();
         for truth in &mut key.pair_truth {
             if truth.target_tier == TierV1::T1Exact {
                 truth.target_control_label = crate::TargetControlLabelV1::PositiveForTargetTier;
@@ -747,6 +767,8 @@ mod tests {
                 truth.right_source_lineage_sha256 = truth.left_source_lineage_sha256.clone();
             }
         }
+        let key_bytes = serde_json::to_vec_pretty(&key).unwrap();
+        manifest.sealed_key_sha256 = hash_domain(b"sealed-key.v1", &key_bytes);
         // This fixture intentionally violates the generated balanced-control
         // pattern but remains internally consistent for the metrics contract.
         let run = score_public_packet(
@@ -754,7 +776,7 @@ mod tests {
             &spec(DetectorKindV1::ExactTextEquality, 500, 0),
         )
         .unwrap();
-        let report = evaluate_detector_run(&packet, &key, &run).unwrap();
+        let report = evaluate_detector_run(&packet, &key, &manifest, &run).unwrap();
         let t1 = report.metrics_by_tier.iter().find(|metric| metric.tier == TierV1::T1Exact).unwrap();
         assert_eq!(t1.negative_support, 0);
         assert_eq!(t1.specificity_permille, None);
@@ -771,7 +793,7 @@ mod tests {
 
     #[test]
     fn strict_detector_run_deserialization_rejects_unknown_fields() {
-        let (packet, _) = fixture();
+        let (packet, _, _) = fixture();
         let run = score_public_packet(
             &packet,
             &spec(DetectorKindV1::ExactTextEquality, 500, 0),
