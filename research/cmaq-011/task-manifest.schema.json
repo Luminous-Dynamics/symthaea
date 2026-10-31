@@ -37,7 +37,10 @@
       "type": "object",
       "required": [
         "suite",
-        "environment_id"
+        "environment_id",
+        "episode_horizon_base_simulator_steps",
+        "simulator_steps_per_action",
+        "reward_aggregation"
       ],
       "properties": {
         "suite": {
@@ -101,6 +104,29 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "episode_horizon_base_simulator_steps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "simulator_steps_per_action": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "reward_aggregation": {
+          "enum": [
+            "single_step",
+            "sum_within_action_repeat",
+            "discounted_sum",
+            "task_native",
+            "unknown"
           ]
         }
       },
