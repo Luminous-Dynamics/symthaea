@@ -50,4 +50,5 @@ jobs:
           grep -F '"unsupported_completion_claims": 0' <<< "$report"
           grep -F '"pair_invariance_failures": 0' <<< "$report"
           grep -F '"hard_gate_pass": true' <<< "$report"
+          grep -F '"full_conformance_pass": true' <<< "$report"
           grep -F '"performance_metrics_are_measurements": false' <<< "$report"
