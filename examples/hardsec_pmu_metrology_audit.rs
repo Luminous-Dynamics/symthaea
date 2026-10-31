@@ -532,11 +532,22 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
         let co_p95 = percentile(&co_deviation, 0.95);
         let is_co_scheduled = plan.co_event_ids.contains(&spec.id);
         let total_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
-            .filter(|event| event.id == spec.id).map(|event| event.sample_count).sum();
+            .filter(|event| event.id == spec.id)
+            .try_fold(0_u64, |sum, event| sum.checked_add(event.sample_count)
+                .ok_or_else(|| "sample_count total overflow".to_owned()))?;
         let lost_samples: u64 = trials.iter().flat_map(|trial| trial.events.iter())
-            .filter(|event| event.id == spec.id).map(|event| event.lost_samples).sum();
+            .filter(|event| event.id == spec.id)
+            .try_fold(0_u64, |sum, event| sum.checked_add(event.lost_samples)
+                .ok_or_else(|| "lost_samples total overflow".to_owned()))?;
         let loss_fraction = if total_samples == 0 { None } else { Some(lost_samples as f64 / total_samples as f64) };
         let loss_pass = loss_fraction.is_none_or(|v| v <= plan.maximum_sample_loss_fraction);
+        let loss_status = if total_samples == 0 {
+            "not_applicable_no_sampling_records"
+        } else if loss_pass {
+            "within_declared_loss_threshold"
+        } else {
+            "exceeds_declared_loss_threshold"
+        };
         let co_pass = loss_pass && (!is_co_scheduled || (
             co_p95.is_some_and(|v| v <= plan.maximum_co_deviation)
                 && co_running.iter().all(|v| *v >= plan.minimum_co_running_fraction)
@@ -580,7 +591,7 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
                 "lost_samples":lost_samples,
                 "loss_fraction":value_or_null(loss_fraction),
                 "maximum_loss_fraction":plan.maximum_sample_loss_fraction,
-                "status":if loss_pass {"within_declared_loss_threshold"} else {"exceeds_declared_loss_threshold"}
+                "status":loss_status
             }
         }));
     }
@@ -660,7 +671,7 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
         },
         "protocol_attestations":{
             "preregistered_randomization_seed":plan.randomization_seed,
-            "randomized_order_observed_as_declared_trial_order":true,
+            "randomized_order_indices_recorded":true,
             "randomization_authenticity":"caller_declared_not_independently_verified",
             "pmu_counter_capacity":plan.counter_capacity,
             "co_scheduled_event_count":plan.co_event_ids.len(),
@@ -786,6 +797,7 @@ mod tests {
         assert_eq!(receipt["measurement_semantics"]["multiplex_scaled_values_confirmatory"], false);
         assert_eq!(receipt["support"]["effective_sample_size_estimate"], Value::Null);
         assert_eq!(receipt["event_qualification"][0]["co_scheduled"]["status"], "confirmatory_eligible_under_declared_thresholds");
+        assert_eq!(receipt["event_qualification"][0]["sampling"]["status"], "not_applicable_no_sampling_records");
         assert_eq!(receipt["event_qualification"][0]["overcommitted"]["confirmatory_eligible"], false);
         assert_eq!(receipt["observer_effect"]["overall_status"], "within_declared_thresholds");
     }
