@@ -17,6 +17,7 @@
     "all_explicit_requirements_covered",
     "all_requirement_preconditions_covered",
     "no_orphan_evaluator_checks",
+    "no_orphan_precondition_mappings",
     "no_unknown_requirement_references",
     "no_unknown_precondition_references",
     "review_dispositions_valid",
@@ -28,6 +29,7 @@
     "missing_capability_count",
     "exposed_prohibited_capability_count",
     "orphan_evaluator_check_count",
+    "orphan_precondition_mapping_count",
     "unknown_requirement_reference_count",
     "review_finding_count",
     "unresolved_blocker_count",
@@ -172,6 +174,13 @@
     "report_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
+    },
+    "no_orphan_precondition_mappings": {
+      "type": "boolean"
+    },
+    "orphan_precondition_mapping_count": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }
