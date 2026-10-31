@@ -13,6 +13,7 @@ use super::knowledge_stream::{
     KnowledgeStreamOracle, KnowledgeStreamTask, KnowledgeVerificationError,
 };
 use super::temporal_error_debt::KnowledgeExposureWindow;
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub const CURRENT_TRAJECTORY_QUERY_ID: u64 = 1;
