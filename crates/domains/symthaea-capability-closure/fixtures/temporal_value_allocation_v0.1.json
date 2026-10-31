@@ -28,8 +28,7 @@
       "last_update_us",
       "expected_retention_us",
       "valid_until_us",
-      "access_count",
-      "predicted_ted_reduction_horizon_is_effective_retention_horizon"
+      "access_count"
     ],
     "estimate_provenance": "estimate_model_sha256",
     "probability_scale_ppm": 1000000,
