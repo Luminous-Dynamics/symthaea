@@ -409,6 +409,16 @@ fn classify_wrong_nofact(
     window: KnowledgeExposureWindow,
     score: &mut TemporalErrorDebtScore,
 ) {
+    if window.known_at < oracle.retraction_observed_at
+        && window.valid_at >= oracle.retraction_valid_from
+    {
+        score.future_knowledge_leak_windows =
+            score.future_knowledge_leak_windows.saturating_add(1);
+        score.future_knowledge_leak_exposure = score
+            .future_knowledge_leak_exposure
+            .saturating_add(u128::from(window.duration));
+    }
+
     if window.known_at >= oracle.correction_observed_at
         && window.known_at < oracle.retraction_observed_at
         && window.valid_at >= oracle.correction_valid_from
@@ -620,6 +630,23 @@ mod tests {
         );
         let score = score_temporal_error_debt(&oracle, &windows, &candidate).unwrap();
         assert_eq!(score.future_knowledge_leak_exposure, u128::from(oracle.correction_observed_at));
+        assert_eq!(score.wrong_belief_exposure, u128::from(oracle.correction_observed_at));
+    }
+
+    #[test]
+    fn no_fact_before_known_retraction_counts_as_future_knowledge_leak() {
+        let (oracle, windows) = fixture();
+        let candidate = predictions(
+            KnowledgeCandidateAnswer::NoFact,
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            KnowledgeCandidateAnswer::Value(oracle.corrected_value),
+            KnowledgeCandidateAnswer::NoFact,
+        );
+        let score = score_temporal_error_debt(&oracle, &windows, &candidate).unwrap();
+        assert_eq!(
+            score.future_knowledge_leak_exposure,
+            u128::from(oracle.correction_observed_at)
+        );
         assert_eq!(score.wrong_belief_exposure, u128::from(oracle.correction_observed_at));
     }
 
