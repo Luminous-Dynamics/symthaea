@@ -210,12 +210,24 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "checkpoint_custody_receipt_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runner_attestation_sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "started_at_utc": {
           "type": "string",
