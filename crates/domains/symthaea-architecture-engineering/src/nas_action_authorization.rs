@@ -379,6 +379,7 @@ pub fn verify_measurement_preflight(
         .filter(|quantity| {
             quantity.unit == objective.measurement_cost_unit
                 && quantity.units == voc.incremental_cost_units
+                && quantity.cost_model_sha256 == objective.measurement_cost_model_sha256
         })
         .count();
     if matching_cost_dimensions != 1 {
