@@ -40,6 +40,10 @@ pub struct CargoFixtureRunReport {
     pub catalog_digest: String,
     pub fixture_digest: String,
     pub cargo_binary_digest: String,
+    pub rustc_launcher_digest: String,
+    pub rustc_sysroot_binary_digest: String,
+    pub rustc_version: String,
+    pub rustc_sysroot: String,
     pub baseline_output_digest: String,
     pub warm_incremental_output_digest: String,
     pub fresh_replay_output_digest: String,
@@ -58,6 +62,10 @@ struct Evidence {
     fixture_digest: String,
     cargo_binary_digest: String,
     cargo_version: String,
+    rustc_launcher_digest: String,
+    rustc_sysroot_binary_digest: String,
+    rustc_version: String,
+    rustc_sysroot: String,
     workspace_relative_path: &'static str,
     git_baseline_commit: String,
     input_resource_id: &'static str,
@@ -111,6 +119,9 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<CargoFixtureRu
     let cargo = resolve_executable(&cargo_name)?;
     let cargo_digest = sha256_file(&cargo)?;
     let cargo_version = cargo_version(&cargo)?;
+    let (rustc, rustc_version, rustc_sysroot, rustc_sysroot_binary) = rustc_identity()?;
+    let rustc_launcher_digest = sha256_file(&rustc)?;
+    let rustc_sysroot_binary_digest = sha256_file(&rustc_sysroot_binary)?;
     let fixture_digest = fixture_digest()?;
 
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH)
@@ -129,14 +140,14 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<CargoFixtureRu
     let manifest = workspace.join("Cargo.toml");
     let warm_target = run_dir.join("target-warm");
     let fresh_target = run_dir.join("target-fresh");
-    let baseline = run_cargo(&cargo, &workspace, &manifest, &warm_target, "baseline")?;
+    let baseline = run_cargo(&cargo, &rustc, &workspace, &manifest, &warm_target, "baseline")?;
     if baseline.stdout_value != input_value(BEFORE) {
         bail!("baseline task output does not match the baseline resource value");
     }
 
     write_replace(&workspace.join("build.rs-input.txt"), AFTER)?;
-    let warm = run_cargo(&cargo, &workspace, &manifest, &warm_target, "warm_incremental_after_mutation")?;
-    let fresh = run_cargo(&cargo, &workspace, &manifest, &fresh_target, "fresh_replay_after_mutation")?;
+    let warm = run_cargo(&cargo, &rustc, &workspace, &manifest, &warm_target, "warm_incremental_after_mutation")?;
+    let fresh = run_cargo(&cargo, &rustc, &workspace, &manifest, &fresh_target, "fresh_replay_after_mutation")?;
 
     let stale = warm.stdout_value == baseline.stdout_value;
     let fresh_matches = fresh.stdout_value == input_value(AFTER);
@@ -158,6 +169,10 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<CargoFixtureRu
         fixture_digest: fixture_digest.clone(),
         cargo_binary_digest: cargo_digest.clone(),
         cargo_version,
+        rustc_launcher_digest: rustc_launcher_digest.clone(),
+        rustc_sysroot_binary_digest: rustc_sysroot_binary_digest.clone(),
+        rustc_version: rustc_version.clone(),
+        rustc_sysroot: rustc_sysroot.clone(),
         workspace_relative_path: "workspace",
         git_baseline_commit: baseline_commit,
         input_resource_id: RESOURCE_ID,
@@ -190,6 +205,10 @@ pub fn run(catalog_path: &Path, out_dir: &Path) -> anyhow::Result<CargoFixtureRu
         catalog_digest: sha256(&catalog_bytes),
         fixture_digest,
         cargo_binary_digest: cargo_digest,
+        rustc_launcher_digest,
+        rustc_sysroot_binary_digest,
+        rustc_version,
+        rustc_sysroot,
         baseline_output_digest: sha256(baseline_output_value(&evidence).as_bytes()),
         warm_incremental_output_digest: sha256(evidence.warm_incremental_after_mutation.stdout_value.as_bytes()),
         fresh_replay_output_digest: sha256(evidence.fresh_replay_after_mutation.stdout_value.as_bytes()),
@@ -243,12 +262,48 @@ fn cargo_version(cargo: &Path) -> anyhow::Result<String> {
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
-fn run_cargo(cargo: &Path, workspace: &Path, manifest: &Path, target: &Path, stage: &'static str) -> anyhow::Result<Execution> {
+fn rustc_identity() -> anyhow::Result<(PathBuf, String, String, PathBuf)> {
+    let requested = env::var_os("RUSTC").unwrap_or_else(|| OsStr::new("rustc").to_os_string());
+    let launcher = resolve_executable(&requested)?;
+    let version_output = Command::new(&launcher)
+        .args(["--version", "--verbose"])
+        .output()
+        .context("executing rustc --version --verbose")?;
+    if !version_output.status.success() {
+        bail!("rustc version query failed: {}", String::from_utf8_lossy(&version_output.stderr));
+    }
+    let version = String::from_utf8(version_output.stdout)?.trim().to_string();
+
+    let sysroot_output = Command::new(&launcher)
+        .args(["--print", "sysroot"])
+        .output()
+        .context("executing rustc --print sysroot")?;
+    if !sysroot_output.status.success() {
+        bail!("rustc sysroot query failed: {}", String::from_utf8_lossy(&sysroot_output.stderr));
+    }
+    let sysroot = String::from_utf8(sysroot_output.stdout)?.trim().to_string();
+    let actual = PathBuf::from(&sysroot)
+        .join("bin")
+        .join(format!("rustc{}", env::consts::EXE_SUFFIX));
+    let actual = if actual.is_file() {
+        actual.canonicalize().context("canonicalizing sysroot rustc binary")?
+    } else {
+        launcher.clone()
+    };
+    Ok((launcher, version, sysroot, actual))
+}
+
+fn run_cargo(cargo: &Path, rustc: &Path, workspace: &Path, manifest: &Path, target: &Path, stage: &'static str) -> anyhow::Result<Execution> {
     let mut child = Command::new(cargo)
         .args(["run", "--quiet", "--offline", "--locked", "--manifest-path"])
         .arg(manifest)
         .current_dir(workspace)
         .env("CARGO_TARGET_DIR", target)
+        .env("RUSTC", rustc)
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
         .env("CARGO_NET_OFFLINE", "true")
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_TERM_COLOR", "never")
