@@ -78,11 +78,15 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
   --evaluation-partition development \
   --review-time-basis synthetic-proxy \
   --require-domain-shift-audit \
-  --ood-score-threshold 0.50 \
-  --output domain-shift-report.json
+  --domain-split-manifest-sha256 <exact-64-character-domain-split-manifest-digest> \
+  --ood-detector-id mahalanobis-diagonal-v1 \
+  --ood-detector-profile-sha256 <exact-64-character-ood-detector-digest> \
+  --output domain-shift-development-report.json
 ```
 
 The placeholders above must be replaced with the exact pinned dataset and profile identities before a real run. The checked-in fixture uses synthetic IDs and is only a regression input.
+
+For a later confirmatory/lockbox report, use the same frozen split-manifest digest and detector ID/profile digest, supply `--ood-score-threshold <development-selected-value>` plus `--ood-threshold-selection-partition development`, and change `--evaluation-partition` to `confirmatory` or `lockbox`. The scorer rejects threshold application to the development partition itself. Never pass confirmatory or lockbox labels back into threshold selection.
 
 For a later confirmatory/lockbox report, use the same frozen split-manifest digest and detector ID/profile digest, supply `--ood-score-threshold <development-selected-value>` plus `--ood-threshold-selection-partition development`, and change `--evaluation-partition` to `confirmatory` or `lockbox`. The scorer rejects threshold application to the development partition itself. Never pass confirmatory or lockbox labels back into threshold selection.
 
