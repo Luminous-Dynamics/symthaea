@@ -15,6 +15,7 @@ pub mod dms;
 pub mod evidence;
 pub mod fast_event;
 pub mod irregular;
+pub mod knowledge_stream;
 pub mod phase;
 pub mod retention;
 pub mod temporal;
