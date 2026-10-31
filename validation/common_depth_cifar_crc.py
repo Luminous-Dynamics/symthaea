@@ -360,7 +360,8 @@ def run_pool_count_benchmark(
             "augmented_states":len(engine.augmented),
             "build_0_to_500_seconds":build_seconds,
             "methods":method_rows,"paired_specificity_gain_vs_envelope":deltas,
-            "recert500_gain_vs_crc":{
+            "final_recertified_round":max(rounds),
+            "final_gain_vs_crc":{
                 "mean_gain_pp":float(delta_crc.mean()),"se_pp":float(se_crc),
                 "ci95_pp":[float(delta_crc.mean()-1.96*se_crc),float(delta_crc.mean()+1.96*se_crc)]
             },
