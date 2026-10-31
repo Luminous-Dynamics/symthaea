@@ -49,7 +49,7 @@ The command:
 - spawns no workload process;
 - never claims event capture, observer attachment or qualification.
 
-The output is create-new (no overwrite) and binds the observation to kernel release, architecture, a digest of the boot ID and the mount-namespace inode when readable. Each probe records its status, errno where applicable, resource-creation flag and cleanup state. A successful fanotify initialization with failed/unconfirmed close is a failed probe, not a pass.
+The output is create-new (no overwrite) and binds the observation to kernel release, architecture, and a digest of the boot ID. Its process-security context records effective UID/GID, CapEff and CapBnd masks, NoNewPrivs, Seccomp mode, and mount/user/pid namespace inode identities when readable. Reads of /proc/self/status, osrelease and boot_id are bounded; missing or malformed values remain null rather than being inferred. Each probe records its status, errno where applicable, resource-creation flag and cleanup state. A successful fanotify initialization with failed/unconfirmed close is a failed probe, not a pass.
 
 The report schema hard-requires all observer, workload, event-capture and qualification claims to remain false. The benchmark protocol treats these as safety gates, not compensating score components.
 
@@ -88,7 +88,7 @@ Proposed targets (not measured results or industry standards):
 - 100% schema and cross-field validation;
 - p95 default smoke latency no more than 150 ms and p95 report size no more than 16 KiB.
 
-Use the host/kernel-boot/mount-namespace/privilege-context as the independent unit. Repeated probes on one boot are clustered observations, not independent samples. Include seccomp and container privilege profiles in the test strata. Inject failures into a testable syscall adapter in unit tests before relying on live hosts for denied/disabled cases.
+Use the host/kernel-boot/mount-namespace/privilege-context as the independent unit. Bind the exact effective capability masks, seccomp mode, NoNewPrivs and user/pid/mount namespace identity to every runtime outcome. Repeated probes on one boot are clustered observations, not independent samples. Include seccomp and container privilege profiles in the test strata. Inject failures into a testable syscall adapter in unit tests before relying on live hosts for denied/disabled cases.
 
 ## Next high-value work
 
