@@ -20,6 +20,12 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # SOURCE-ONLY PROTOTYPE (2026-10-31): this directory contains a tracked
+    # attestation adapter source file, but no Cargo package manifest and no
+    # currently exported observation_fabric API in symthaea-core. Keep it out
+    # of workspace member discovery until its public contract and integration
+    # are completed; do not add a placeholder manifest just to satisfy the glob.
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
