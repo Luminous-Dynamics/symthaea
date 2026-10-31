@@ -14,10 +14,28 @@ No one benchmark below covers all four.
 | Work | What it measures / contributes | How CMAQ should use it | Important boundary |
 | --- | --- | --- | --- |
 | **WorldSimProbe** | Five released action-conditioned video diagnostics: local action calibration; global trajectory coverage; behaviour-source preservation; interaction grounding; interaction dynamics. Tests whether the causal chain from supplied action to robot motion/object response is preserved. | First external visual manipulation adapter candidate. Keep all five task scores separate. Report Task 1 response-ratio calibration; Tasks 2–3 flow/action-source fidelity; Task 4 hallucinated interaction; Task 5 primitive accuracy. | Public test inputs and a separate local validation set are released; hidden official scoring references remain evaluator-side. It is a video/action-following suite, not a full same-history set of alternative physical interventions. |
+| **WBench** | 39 video world models, 5 dimensions and 22 metrics; 289 cases / 1,058 turns with a 158-case Navi subset. Supports text, camera/6-DoF and discrete-action interfaces. | Add as a broad multi-turn video/navigation and action-conditioning quality track. Keep quality, consistency, interaction, setting and physical dimensions separate; action-conditioned comparisons use only the discrete-action Navi interface. | Mixed outputs and judge provenance matter. Latest VWA-World Navi 81.7 is 16 submitter-evaluated plus 3 organizer-evaluated VLM metrics; do not treat this as fully independent organizer scoring. Scores across interface types or VLM judges are not directly comparable. It does not measure physical paired execution or exact alternative-action effects. |
 | **WorldOracle** | Action-conditioned generated rollouts are evaluated against paired real executions using the same initial observation and low-level action sequence; measures physical-state correctness, interaction alignment and multi-view coherence over long, successful and failed episodes. | **Highest-priority external real-execution track:** reproduce on its disclosed validation set, then submit to the official withheld leaderboard test through the portal. | The official repository announces the validation release (Oct 15, 2026), but the Hugging Face dataset card still contains stale/private wording. The disclosed validation GT is described as 32 AgiBot G2 episodes (20 human-operated + 12 policy-rollout; ~18.6 GiB). Confirm data access and CC BY-NC-SA 4.0 terms before use. Test inputs may be released, but test GT remains withheld and evaluated by the official service. |
 | **MiraBench** | Human-judgement-oriented evaluation of action-following fidelity and optimism bias across multiple world-model configurations. It probes whether the model obeys the requested action and overstates plausible outcomes. | Use as an external action-following/optimism diagnostic reference; compare definitions and failure taxonomy, not raw scores across incompatible datasets. | Human annotation protocol and model/task interface differ from CMAQ's deterministic paired causal branches. |
 | **Rollback** | A policy-improvement method using rewind/branch/counterfactual comparisons to obtain action-level supervision and improve robot policies. | Later downstream algorithmic comparator for a *frozen* counterfactual evaluator; report policy lift over its strongest eligible direct baseline. | It is an algorithm/method paper, not a benchmark metric or substitute for verifying branch truth. Its reported task gains must not be treated as a portable baseline score without reproducing its task/protocol. |
 | **RoboWM-Bench** | Video-to-executable-action evaluation: generated motion must be grounded in a physically executable action sequence in the simulator/robot task. | Add as a separate manipulation/action-execution lane after the task interface, license and evaluator are pinned. | It tests executable action translation, not the same estimand as model-based action-effect ranking. |
+
+### Pin: WBench public benchmark release
+
+- Repository: https://github.com/meituan-longcat/WBench
+- Exact source commit: `edc4e80e642baac4f2b5764dec9f1a491200af8f`.
+- Code/data license in repository: MIT; model weights retain their original licenses.
+- Paper: https://arxiv.org/abs/2605.25874.
+- Public data: https://huggingface.co/datasets/meituan-longcat/WBench.
+- 289 cases / 1,058 interaction turns / four interaction types (navigation, subject action, event editing, perspective switching).
+- 158-case Navi subset for camera-conditioned (6-DoF) and discrete-action conditioned interfaces. Keep text-conditioned 289-case comparisons separate.
+- Five dimensions / 22 metrics: quality (6), consistency (8), interaction (4), setting (2), physical (2). Exact metric names and source hashes are in `wbench-baseline.lock.json`.
+- Published Oct 12 results:
+  - VWA-World, action-conditioned, Navi, 158 cases: 81.7. Provenance states 16 submitter-evaluated metrics + 3 organizer-evaluated VLM metrics (causal fidelity, scene adherence, subject adherence); the 16 local metrics had aggregate schema/count checks only, with no per-case local scores supplied.
+  - gd_world, camera-conditioned, Navi, 158 cases: 81.2, organizer evaluation. It is a camera interface, not an action-conditioned result.
+- Judge model listed in the pinned provenance: `doubao-seed-2-0-lite-260215`. WBench warns that scores from different judges are not directly comparable.
+- Before reproduction, pin judge version, exact dataset subset, generation frame/timestep contract, source model/checkpoint and original checkpoint license. Measure video generation and benchmark evaluation cost separately.
+- These aggregate submissions are references, not independently reproduced results. No Symthaea score or SOTA claim exists.
 
 ### Pin: WorldOracle public validation release
 
@@ -104,7 +122,7 @@ For any adapter:
 
 ## Decision on immediate work
 
-WorldSimProbe is the first practical external video/action-conditioning adapter candidate because its code, MIT license, public submission format, task definitions and a local validation set are available at a pinned revision. It should be integrated as a **separate visual track**, not silently merged with MRS.Q/WIMLE DMC scores or the synthetic CMAQ-018 branch results.
+WorldSimProbe and WBench are separate visual/action-conditioning tracks. WBench is the broad multi-turn video/navigation suite; WorldSimProbe adds simulator-grounded local/global action-following and interaction diagnostics. Neither replaces WorldOracle's paired real-execution track, nor CMAQ-018's exact same-history alternative-intervention tests. Do not merge visual scores with MRS.Q/WIMLE DMC outcomes or synthetic CMAQ branch metrics.
 
 WorldOracle is now the highest-value external real-execution adapter because the official code and a disclosed validation split are released. The contradictory Hugging Face card wording makes access/license verification the first gate, not a reason to misclassify the entire validation release as private. Test GT remains withheld.
 
