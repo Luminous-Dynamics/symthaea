@@ -73,7 +73,7 @@ The same candidate-prediction checks are reported separately by:
 - learning-curve shape;
 - noise regime.
 
-Every stratum must meet the pre-registered minimum episode count and global ceilings/floors for top-1 ECE, top-K membership Brier, credible-set coverage and interval coverage. Undersized strata force abstention rather than disappearing from the report.
+Every stratum must meet the pre-registered minimum episode count and global ceilings/floors for top-1 ECE, top-K membership Brier skill against K/N, credible-set coverage and interval coverage. Undersized strata force abstention rather than disappearing from the report.
 
 ## 4. Fail-closed behavior
 
@@ -104,7 +104,7 @@ A benchmark harness should prove that the gate abstains under at least these con
 9. Omit late learners, high-noise cases, failed runs or dormant-candidate reactivations.
 10. Edit a replay episode, threshold or receipt field after scoring.
 
-The current fourteen Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, rejection of undeclared evaluation strata, and Brier skill behavior against the K/N baseline. They are test declarations only until compiled and run.
+The current eighteen Rust tests cover basic pass/replay, receipt tampering, split leakage, invalid categorical probabilities, likelihood misspecification, ESS degeneration, minimize-is-better semantics, order-invariant replay evidence, consistent action-category semantics, reordered equivalent outcomes, fidelity-order digest binding, rejection of undeclared evaluation strata, Brier skill behavior against the K/N baseline, and family/seed leakage, missing-family coverage, and degenerate K=N controls. They are test declarations only until compiled and run.
 
 ## 7. Benchmark campaign and competitive baselines
 
