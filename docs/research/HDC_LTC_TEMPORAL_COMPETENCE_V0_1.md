@@ -52,9 +52,15 @@ This is not a presumption that three-timescale memory must win. Include null wor
 
 ## 4. Task contract
 
-### T1 — Fast reaction and event timing
+### T1 — Always-on sparse-event detection and event timing
 
-Use quiet intervals, isolated events, bursts, and distractor noise. Report event precision/recall, false triggers per unit idle time, and event-to-decision latency p50/p95/p99. Count preprocessing and input encoding in the system result.
+A Rust synthetic prequalification generator is implemented in `research/temporal-bench/src/fast_event.rs`. Its reference configuration provides a 16,384-sample continuous scalar stream at 1 ms/sample, with eight target motifs, sixteen similar non-target motifs, bounded background noise, and randomized placements in non-overlapping temporal blocks. A quiet-idle mode contains no motifs. The candidate receives only timestamped samples; event boundaries, labels, codes, and amplitudes remain in the oracle.
+
+This is an event-detection control for temporal semantics, not an audio wake-word benchmark and not a reproduction of MLPerf Tiny. The target signature is a fixed eight-sample binary motif. High-similarity distractors differ in 1–3 of eight positions; low-similarity distractors differ in 4–7. All baselines receive exactly the same public stream.
+
+Report target-event precision/recall, misses, duplicate activations, distractor false alarms, quiet-idle false alarms, monitored quiet exposure, idle false triggers per hour, and event-to-decision latency p50/p95/p99. Publish raw false-positive counts alongside rates; do not present a rate without its measured exposure. Count preprocessing, input encoding, event scheduling, and decision post-processing in the system result. Add burst-cluster variants as a subsequent task extension; v0.1 currently qualifies rare events, distractors, and quiet idle, not a separately parameterized burst process.
+
+This task is aligned with the *measurement principle* behind MLPerf Tiny v1.4's continuous streaming wake-word workload, which explicitly considers idle listening and calibrated energy, but it is not that workload's audio data, model, or official metric implementation. [MLPerf Tiny v1.4 overview](https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/).
 
 ### T2 — Delayed-cue associative recall
 
@@ -192,7 +198,7 @@ These are targets, not measured results:
 ## 10. Execution ladder
 
 1. Validate the JSON matrix and deterministic generator contracts.
-2. Complete the remaining T1 fast-event, T6 selective-retention, and T7 phase-prediction synthetic generators.
+2. Complete T7 phase-sensitive prediction and add burst-cluster variants to T1.
 3. Implement the isolated taskgen/candidate/evaluator runner in #9437; verify SHA-256 content binding and signed receipt/replay semantics before any confirmatory claim.
 4. Compile and run the standalone Rust tests and negative controls.
 5. Add the runner adapter without modifying active neuron code.
@@ -220,6 +226,7 @@ The repository contains an isolated Rust research crate under research/temporal-
 - an evidence-accumulation generator/verifier matching the pinned seven-cue/1,000 ms delay/150 ms recall task structure;
 - an irregular-time/missingness generator with jittered microsecond timestamps, explicit dropped-slot manifests, bounded noise, and latent oracle points;
 - a selective-retention/invalidation generator with before/after query semantics and stale-memory abstention;
+- an always-on sparse-event generator with rare target motifs, controlled distractor similarity, a quiet-idle control, event-level scoring, and false-trigger exposure accounting;
 - canonical SHA-256 digests for public streams and oracle records, with mutation negative controls.
 
 The generated public event stream and oracle remain returned in one process. The verifier has been implemented, but the confirmatory oracle is **not yet sealed by process or permission isolation**. 101 Rust unit tests are authored but unrun in this environment; the environment used for this work has no cargo, rustc, or rustfmt. The full nine-family generator (including the DMS and evidence-accumulation adapters), streaming runner, real-dataset adapters, separate evaluator service, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
