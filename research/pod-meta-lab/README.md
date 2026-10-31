@@ -30,7 +30,7 @@ cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
 - An AND/OR graph generator with private source-truth labels, a separate recursive oracle, disjoint source-family and source-ID splits, valid-time / known-time evidence revisions, source-independence groups, scope/authority constraints, cycle rejection, a 64-claim dependency chain, false asserted content, and an unverified-source case.
 - Controlled mutations for retraction, asserted-polarity flip, known/valid-time shifts, scope/authority changes, integrity downgrade, and independence-group merging; hidden source-truth labels remain unchanged.
 - 39 authored unit tests: 24 scheduler/receipt tests, one POAR routing-suite test, and 14 graph/oracle tests.
-- Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, and correlated-source violations as separate metrics; there is no composite score.
+- Graph benchmarks report disposition correctness, false support/refutation, unsupported proof paths, citation completeness, temporal/scope/authority/integrity violations, retracted citations, correlated-source violations, plus ranked temporal evidence coverage@3 and precision@3; retrieval ranking is separate from final proof citations, and there is no composite score.
 
 ## Deliberate limits
 
