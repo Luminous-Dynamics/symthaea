@@ -41,8 +41,9 @@ jobs:
         run: |
           set -euo pipefail
           cargo run --quiet --manifest-path research/pod-meta-efficiency-lab/Cargo.toml --bin pod-meta-efficiency > pod-meta-efficiency.tsv
-          test "$(wc -l < pod-meta-efficiency.tsv)" -eq 241
-          grep -Fq 'proof_obligation_guided' pod-meta-efficiency.tsv
+          test "$(wc -l < pod-meta-efficiency.tsv)" -eq 281
+          grep -Fq 'pod_meta_router' pod-meta-efficiency.tsv
+          grep -Fq 'mask_coverage_greedy' pod-meta-efficiency.tsv
           grep -Fq 'oracle_minimum_cost' pod-meta-efficiency.tsv
           grep -Fq 'unverified_confidence' pod-meta-efficiency.tsv
           sha256sum pod-meta-efficiency.tsv
