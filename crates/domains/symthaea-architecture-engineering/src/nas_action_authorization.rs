@@ -1202,6 +1202,7 @@ mod tests {
             measurement_protocol_sha256: sha('4'),
             instrument_identity_sha256: sha('5'),
             observation_likelihood_model_sha256: sha('6'),
+            confidence_family_manifest_sha256: sha('a'),
             resource_registry_sha256: sha('7'),
             resource_budget_sha256: sha('8'),
             resource_cost_sha256: sha('9'),
