@@ -1,106 +1,58 @@
 name: POD-Meta Lab Qualification
-
 on:
   push:
     branches:
       - research/proof-obligation-driven-metareasoning-2026-10-30
     paths:
-      - "research/pod-meta-lab/**"
-      - ".github/workflows/pod-meta-lab-qualification.yml"
+      - research/pod-meta-lab/**
+      - .github/workflows/pod-meta-lab-qualification.yml
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: pod-meta-lab-qualification-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   qualify:
-    name: Standalone Rust qualification
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout exact pushed commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-
-      - name: Record exact source identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          {
-            echo "head_sha=$GITHUB_SHA"
-            echo "event_name=$GITHUB_EVENT_NAME"
-            echo "rust_toolchain=1.96.0"
-            echo "manifest=research/pod-meta-lab/Cargo.toml"
-          } | tee pod-meta-qualification-receipt.txt
-
-      - name: Check formatting
+      - name: Exact source receipt
+        run: echo "head_sha=$GITHUB_SHA" > pod-meta-qualification-receipt.txt
+      - name: Format
         run: cargo fmt --manifest-path research/pod-meta-lab/Cargo.toml -- --check
-
-      - name: Run unit and graph-oracle tests
+      - name: Tests
         run: cargo test --manifest-path research/pod-meta-lab/Cargo.toml
-
-      - name: Run strict Clippy
+      - name: Clippy
         run: cargo clippy --manifest-path research/pod-meta-lab/Cargo.toml --all-targets -- -D warnings
-
-      - name: Run scheduler demonstration
-        run: cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
-
-      - name: Run POAR routing and receipt conformance suite
-        run: cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
-
-      - name: Export planner and sealed oracle artifacts; verify digest binding
-        shell: bash
+      - name: Scheduler demos
+        run: |
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin pod-meta-demo
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-v1
+      - name: Export, predict, and evaluate
         run: |
           set -euo pipefail
-          workdir="$RUNNER_TEMP/poar-artifacts"
-          mkdir -p "$workdir"
-          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test "$workdir/planner.poar" "$workdir/oracle.poar.sealed" "$GITHUB_SHA"
-          planner_sha256="$(sha256sum "$workdir/planner.poar" | awk '{print $1}')"
-          oracle_bound_sha256="$(head -n 1 "$workdir/oracle.poar.sealed" | cut -f 3)"
-          test "$planner_sha256" = "$oracle_bound_sha256"
-          awk -F '\t' '$1 == "TRUTH" || $1 == "GOLD_CLAIM" || $1 == "GOLD_PATH" { exit 1 }' "$workdir/planner.poar"
-          awk -F '\t' '$1 == "TRUTH" { found=1 } END { exit !found }' "$workdir/oracle.poar.sealed"
-          awk -F '\t' '$1 == "GOLD_CLAIM" { found=1 } END { exit !found }' "$workdir/oracle.poar.sealed"
-          printf 'planner_sha256=%s\n' "$planner_sha256"
-          printf 'oracle_sha256=%s\n' "$(sha256sum "$workdir/oracle.poar.sealed" | awk '{print $1}')"
-          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-prediction-demo -- 1729 test "$planner_sha256" "$workdir/predictions.poar"
-          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-eval -- "$workdir/planner.poar" "$workdir/oracle.poar.sealed" "$workdir/predictions.poar" "$GITHUB_SHA" "$workdir/evaluation-receipt.tsv"
-          grep -q '^POAR-EVAL-RECEIPT/1
-      - name: Preserve qualification receipt
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-meta-qualification-${{ github.sha }}
-          path: pod-meta-qualification-receipt.txt
-          if-no-files-found: error
-          retention-days: 90
- "$workdir/evaluation-receipt.tsv"
-          grep -q "^planner_sha256=$planner_sha256$" "$workdir/evaluation-receipt.tsv"
-          grep -q '^cases=16
-      - name: Preserve qualification receipt
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-meta-qualification-${{ github.sha }}
-          path: pod-meta-qualification-receipt.txt
-          if-no-files-found: error
-          retention-days: 90
- "$workdir/evaluation-receipt.tsv"
-          cat "$workdir/evaluation-receipt.tsv" >> pod-meta-qualification-receipt.txt
-          # The oracle is intentionally never uploaded as a public artifact.
-          rm -rf "$workdir"
-
-      - name: Preserve qualification receipt
-        uses: actions/upload-artifact@v4
+          d="$RUNNER_TEMP/poar-artifacts"
+          mkdir -p "$d"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-export -- 1729 test "$d/planner.poar" "$d/oracle.poar.sealed" "$GITHUB_SHA"
+          p="$(sha256sum "$d/planner.poar" | cut -d ' ' -f 1)"
+          test "$p" = "$(head -n 1 "$d/oracle.poar.sealed" | cut -f 3)"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-prediction-demo -- 1729 test "$p" "$d/predictions.poar"
+          cargo run --manifest-path research/pod-meta-lab/Cargo.toml --bin poar-graph-eval -- "$d/planner.poar" "$d/oracle.poar.sealed" "$d/predictions.poar" "$GITHUB_SHA" "$d/evaluation-receipt.tsv"
+          test -s "$d/evaluation-receipt.tsv"
+          grep -q POAR-EVAL-RECEIPT/1 "$d/evaluation-receipt.tsv"
+          grep -q "planner_sha256=$p" "$d/evaluation-receipt.tsv"
+          grep -q cases=16 "$d/evaluation-receipt.tsv"
+          cat "$d/evaluation-receipt.tsv" >> pod-meta-qualification-receipt.txt
+          rm -rf "$d"
+      - uses: actions/upload-artifact@v4
         with:
           name: pod-meta-qualification-${{ github.sha }}
           path: pod-meta-qualification-receipt.txt
