@@ -1,0 +1,516 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-factorial-report.schema.json",
+  "title": "Symthaea Judge Nuisance Factorial Analysis Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "study_id",
+    "analyzer_source_revision",
+    "analyzer_worktree_clean",
+    "balanced_repeat_count",
+    "excluded_incomplete_repeat_count",
+    "effects_use_only_fully_completed_repeats",
+    "plan_sha256",
+    "receipt_sha256",
+    "plan_commitment_sha256",
+    "report_commitment_sha256",
+    "planned_block_count",
+    "observed_block_count",
+    "planned_condition_count",
+    "observed_condition_count",
+    "completed_condition_count",
+    "ineligible_condition_count",
+    "all_blocks_present",
+    "all_conditions_present",
+    "all_conditions_completed",
+    "level_counts",
+    "main_effects",
+    "criterion_order_effects",
+    "pairwise_interactions",
+    "block_summaries",
+    "execution_authenticity_proven",
+    "randomization_proven",
+    "raw_prompt_custody_proven",
+    "semantic_equivalence_proven",
+    "causal_effect_identified",
+    "generalized_accuracy_estimated",
+    "external_anchor_required",
+    "scoring_eligible_declared",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_factorial_report.v1"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "analyzer_source_revision": {
+      "allOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        {
+          "not": {
+            "pattern": "^0{40}$"
+          }
+        }
+      ]
+    },
+    "balanced_repeat_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "excluded_incomplete_repeat_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "effects_use_only_fully_completed_repeats": {
+      "const": true
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "report_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "planned_block_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_block_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "planned_condition_count": {
+      "type": "integer",
+      "minimum": 32
+    },
+    "observed_condition_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "completed_condition_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ineligible_condition_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "all_blocks_present": {
+      "type": "boolean"
+    },
+    "all_conditions_present": {
+      "type": "boolean"
+    },
+    "all_conditions_completed": {
+      "type": "boolean"
+    },
+    "level_counts": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/level_count"
+      }
+    },
+    "main_effects": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/main_effect"
+      }
+    },
+    "criterion_order_effects": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/criterion_effect"
+      }
+    },
+    "pairwise_interactions": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/interaction"
+      }
+    },
+    "block_summaries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/block_summary"
+      }
+    },
+    "execution_authenticity_proven": {
+      "const": false
+    },
+    "randomization_proven": {
+      "const": false
+    },
+    "raw_prompt_custody_proven": {
+      "const": false
+    },
+    "semantic_equivalence_proven": {
+      "const": false
+    },
+    "causal_effect_identified": {
+      "const": false
+    },
+    "generalized_accuracy_estimated": {
+      "const": false
+    },
+    "external_anchor_required": {
+      "const": true
+    },
+    "scoring_eligible_declared": {
+      "const": false
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "analyzer_worktree_clean": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "factor": {
+      "enum": [
+        "candidate_order",
+        "score_option_order",
+        "criterion_order",
+        "provenance_cue",
+        "presentation_format"
+      ]
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "number_or_null": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "level_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factor",
+        "low_level",
+        "high_level",
+        "low_planned",
+        "low_completed",
+        "low_ineligible",
+        "high_planned",
+        "high_completed",
+        "high_ineligible"
+      ],
+      "properties": {
+        "factor": {
+          "$ref": "#/$defs/factor"
+        },
+        "low_level": {
+          "type": "string",
+          "minLength": 1
+        },
+        "high_level": {
+          "type": "string",
+          "minLength": 1
+        },
+        "low_planned": {
+          "$ref": "#/$defs/count"
+        },
+        "low_completed": {
+          "$ref": "#/$defs/count"
+        },
+        "low_ineligible": {
+          "$ref": "#/$defs/count"
+        },
+        "high_planned": {
+          "$ref": "#/$defs/count"
+        },
+        "high_completed": {
+          "$ref": "#/$defs/count"
+        },
+        "high_ineligible": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "main_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factor",
+        "complete_low_count",
+        "complete_high_count",
+        "excluded_completed_low_count",
+        "excluded_completed_high_count",
+        "ineligible_low_count",
+        "ineligible_high_count",
+        "candidate_score_gap_delta_millionths",
+        "criterion_score_delta_millionths",
+        "selected_option_position_delta_millionths",
+        "candidate_a_choice_rate_delta_millionths",
+        "decisive_low_count",
+        "decisive_high_count",
+        "tie_rate_delta_millionths",
+        "abstention_rate_delta_millionths",
+        "tie_low_count",
+        "tie_high_count",
+        "abstention_low_count",
+        "abstention_high_count"
+      ],
+      "properties": {
+        "factor": {
+          "$ref": "#/$defs/factor"
+        },
+        "complete_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "complete_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "excluded_completed_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "excluded_completed_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "ineligible_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "ineligible_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "candidate_score_gap_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "criterion_score_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "selected_option_position_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "candidate_a_choice_rate_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "decisive_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decisive_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_rate_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "abstention_rate_delta_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "tie_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_high_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_low_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_high_count": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "criterion_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "canonical_mean_millionths",
+        "reversed_mean_millionths",
+        "reversed_minus_canonical_millionths",
+        "canonical_completed_count",
+        "reversed_completed_count"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "canonical_mean_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "reversed_mean_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "reversed_minus_canonical_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "canonical_completed_count": {
+          "$ref": "#/$defs/count"
+        },
+        "reversed_completed_count": {
+          "$ref": "#/$defs/count"
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factor_a",
+        "factor_b",
+        "candidate_score_gap_interaction_millionths",
+        "criterion_score_interaction_millionths",
+        "complete_00_count",
+        "complete_01_count",
+        "complete_10_count",
+        "complete_11_count",
+        "decisive_00_count",
+        "decisive_01_count",
+        "decisive_10_count",
+        "decisive_11_count",
+        "candidate_a_choice_interaction_millionths",
+        "excluded_conditions_across_four_cells",
+        "tie_00_count",
+        "tie_01_count",
+        "tie_10_count",
+        "tie_11_count",
+        "abstention_00_count",
+        "abstention_01_count",
+        "abstention_10_count",
+        "abstention_11_count",
+        "tie_rate_interaction_millionths",
+        "abstention_rate_interaction_millionths"
+      ],
+      "properties": {
+        "factor_a": {
+          "$ref": "#/$defs/factor"
+        },
+        "factor_b": {
+          "$ref": "#/$defs/factor"
+        },
+        "candidate_score_gap_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "criterion_score_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "complete_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "complete_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "complete_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "complete_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decisive_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decisive_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decisive_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "decisive_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "candidate_a_choice_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "excluded_conditions_across_four_cells": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_00_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_01_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_10_count": {
+          "$ref": "#/$defs/count"
+        },
+        "abstention_11_count": {
+          "$ref": "#/$defs/count"
+        },
+        "tie_rate_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        },
+        "abstention_rate_interaction_millionths": {
+          "$ref": "#/$defs/number_or_null"
+        }
+      }
+    },
+    "block_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "planned_condition_count",
+        "completed_condition_count",
+        "ineligible_condition_count",
+        "fully_completed"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "planned_condition_count": {
+          "$ref": "#/$defs/count"
+        },
+        "completed_condition_count": {
+          "$ref": "#/$defs/count"
+        },
+        "ineligible_condition_count": {
+          "$ref": "#/$defs/count"
+        },
+        "fully_completed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-factorial-receipt.schema.json",
+  "title": "Symthaea Judge Nuisance Factorial Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "run_id",
+    "plan_sha256",
+    "plan_commitment_sha256",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "rubric_sha256",
+    "observations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_factorial_receipt.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "analyzer_source_revision": {
+      "allOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        {
+          "not": {
+            "pattern": "^0{40}$"
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "candidate_a",
+        "candidate_b",
+        "tie",
+        "abstain"
+      ]
+    },
+    "criterion_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "score_millionths",
+        "selected_option_id"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "score_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "selected_option_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "execution_ordinal",
+        "input_sha256",
+        "status",
+        "judge_receipt_sha256",
+        "decision",
+        "candidate_a_score_millionths",
+        "candidate_b_score_millionths",
+        "criterion_scores"
+      ],
+      "properties": {
+        "condition_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "timed_out",
+            "blocked",
+            "invalid_receipt",
+            "not_started"
+          ]
+        },
+        "judge_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/decision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_a_score_millionths": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "candidate_b_score_millionths": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "criterion_scores": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/criterion_score"
+          }
+        },
+        "execution_ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "judge_receipt_sha256": {
+                "$ref": "#/$defs/digest"
+              },
+              "decision": {
+                "$ref": "#/$defs/decision"
+              },
+              "candidate_a_score_millionths": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "candidate_b_score_millionths": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "criterion_scores": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "timed_out",
+                  "blocked",
+                  "invalid_receipt",
+                  "not_started"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "judge_receipt_sha256": {
+                "type": "null"
+              },
+              "decision": {
+                "type": "null"
+              },
+              "candidate_a_score_millionths": {
+                "type": "null"
+              },
+              "candidate_b_score_millionths": {
+                "type": "null"
+              },
+              "criterion_scores": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "plan_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "judge_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "judge_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

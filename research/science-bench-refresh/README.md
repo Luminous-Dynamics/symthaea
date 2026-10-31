@@ -27,6 +27,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - schema/metamorphic-evaluator-plan.schema.json and schema/metamorphic-evaluator-receipt.schema.json: strict preregistered pair-plan and observed-outcome receipt contracts.
 - tools/metamorphic_evaluator_audit.py: deterministic paired-outcome relation checker; no judge execution or causal identification claim.
 - tools/metamorphic_evaluator_fixture.py and tools/test_metamorphic_evaluator_audit.py: eight-pair/seven-family synthetic fixture generator and hostile relation/receipt controls.
+- docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md: balanced 2^5 experimental design for candidate order, score-option order, criterion order, provenance cue and presentation format.
+- src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
+- schema/judge-factorial-plan.schema.json, schema/judge-factorial-receipt.schema.json and schema/judge-factorial-report.schema.json: preregistered plan, ordinal-bound complete-denominator receipt and typed report contracts.
+- tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -37,6 +41,21 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Analyze interacting judge nuisance factors
+
+The Rust factorial analyzer checks a complete five-factor (2^5) design per semantic block: candidate order, score-option order, criterion order, provenance cue and presentation format. It requires every factor cell at every repeat, an exact execution-order permutation, exact condition IDs, input-digest echoes and execution ordinals that must match the committed per-block schedule. Missing and ineligible observations are never imputed.
+
+```sh
+python3 research/science-bench-refresh/tools/judge_factorial_fixture.py /tmp/judge-factorial
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-judge-factorial-plan /tmp/judge-factorial/judge-factorial-plan.example.json
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  analyze-judge-factorial /tmp/judge-factorial/judge-factorial-plan.example.json \
+  /tmp/judge-factorial/judge-factorial-receipt.example.json
+```
+
+The report pins the exact analyzer revision and records build-time worktree cleanliness; qualified plans are rejected from dirty analyzer worktrees. The report contains main effects, per-criterion criterion-order shifts and all ten pairwise factor interactions. It also reports candidate score-gap and candidate-choice effects, including decisive-choice counts for each interaction cell. The synthetic fixture deliberately plants an interaction in which candidate A keeps the higher numeric score but the judge chooses B when B is first and provenance is hidden; displaying provenance reverses that choice. This checks analyzer recovery only, not a real judge result. All effect estimates use only fully completed 32-cell block/repeat units; incomplete repeats are excluded whole, with completed-but-excluded conditions separately counted while every planned cell remains in the denominator. The analyzer is descriptive only; it does not authenticate execution/randomization, prove raw prompt custody or semantic equivalence, estimate population effects, or permit scoring. See [SCI-FACTORIAL-JUDGE-BIAS-001](../../docs/research/SCI-FACTORIAL-JUDGE-BIAS-001.md).
 
 ## Audit intervention-based evaluator consistency
 

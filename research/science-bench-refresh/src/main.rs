@@ -13,6 +13,9 @@ use science_bench_refresh_validator::exact_protected_matcher::{
     ProtectedSearchArtifactIndexCommitmentInput, compute_protected_index_commitment,
     match_search_exposure_exact, verify_search_exposure_exact_match_report,
 };
+use science_bench_refresh_validator::judge_factorial::{
+    analyze_judge_factorial, compute_judge_factorial_plan_commitment, verify_judge_factorial_plan,
+};
 use science_bench_refresh_validator::judge_robustness::{
     compute_judge_robustness_plan_commitment, compute_judge_robustness_report_commitment,
     verify_judge_robustness_plan, verify_judge_robustness_report,
@@ -56,6 +59,9 @@ fn usage(program: &str) {
             "  {program} verify-judge-robustness-plan PLAN.json\n",
             "  {program} commit-judge-robustness-report PLAN.json REPORT_FIELDS.json\n",
             "  {program} verify-judge-robustness-report PLAN.json REPORT.json\n",
+            "  {program} commit-judge-factorial-plan PLAN_FIELDS.json\n",
+            "  {program} verify-judge-factorial-plan PLAN.json\n",
+            "  {program} analyze-judge-factorial PLAN.json RECEIPT.json\n",
             "  {program} commit-reference-assurance-package-fields PACKAGE_FIELDS.json\n",
             "  {program} verify-reference-assurance-package PACKAGE.json\n",
             "  {program} analyze-paired-evidence-outcomes PLAN.json OUTCOME_REPORT.json ANALYSIS_PLAN.json\n",
@@ -88,6 +94,99 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-judge-factorial-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "judge factorial plan fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_judge_factorial_plan_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_factorial_plan_commitment.v1",
+                            "plan_commitment_sha256": commitment
+                        }))
+                        .expect("judge factorial plan commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "verify-judge-factorial-plan" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge factorial plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match verify_judge_factorial_plan(&plan_bytes) {
+                Ok((plan, plan_sha256)) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_judge_factorial_plan_verification.v1",
+                            "valid": true,
+                            "plan_sha256": plan_sha256,
+                            "plan_commitment_sha256": plan.plan_commitment_sha256,
+                            "analyzer_source_revision": plan.analyzer_source_revision,
+                            "study_id": plan.study_id,
+                            "planned_block_count": plan.blocks.len(),
+                            "planned_condition_count": plan.blocks.iter().map(|block| block.conditions.len()).sum::<usize>(),
+                            "repeats_per_condition": plan.repeats_per_condition,
+                            "factor_count": 5,
+                            "factorial_cells_per_repeat": 32,
+                            "scoring_eligible": false,
+                            "external_anchor_required": true
+                        }))
+                        .expect("judge factorial plan verification serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "analyze-judge-factorial" => {
+            if args.len() != 3 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let plan_bytes = match read(&args[1], "judge factorial plan") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let receipt_bytes = match read(&args[2], "judge factorial receipt") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match analyze_judge_factorial(&plan_bytes, &receipt_bytes) {
+                Ok(report) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .expect("judge factorial analysis report serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
         "commit-judge-robustness-plan" => {
             if args.len() != 2 {
                 usage("science-bench-refresh-validator");

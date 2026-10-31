@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/judge-factorial-plan.schema.json",
+  "title": "Symthaea Judge Nuisance Factorial Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "study_id",
+    "judge_source_revision",
+    "judge_prompt_sha256",
+    "rubric_sha256",
+    "semantic_task_set_sha256",
+    "repeats_per_condition",
+    "blocks",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_judge_factorial_plan.v1"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "judge_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "judge_prompt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "rubric_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "semantic_task_set_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "repeats_per_condition": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "analyzer_source_revision": {
+      "allOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        {
+          "not": {
+            "pattern": "^0{40}$"
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_order",
+        "score_option_order",
+        "criterion_order",
+        "provenance_cue",
+        "presentation_format"
+      ],
+      "properties": {
+        "candidate_order": {
+          "enum": [
+            "candidate_a_first",
+            "candidate_b_first"
+          ]
+        },
+        "score_option_order": {
+          "enum": [
+            "canonical",
+            "reversed"
+          ]
+        },
+        "criterion_order": {
+          "enum": [
+            "canonical",
+            "reversed"
+          ]
+        },
+        "provenance_cue": {
+          "enum": [
+            "anonymous",
+            "displayed"
+          ]
+        },
+        "presentation_format": {
+          "enum": [
+            "structured",
+            "prose"
+          ]
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "repeat_index",
+        "factors",
+        "input_sha256"
+      ],
+      "properties": {
+        "condition_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repeat_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "factors": {
+          "$ref": "#/$defs/factors"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "score_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option_id",
+        "score_millionths"
+      ],
+      "properties": {
+        "option_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "score_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "block_id",
+        "task_semantics_sha256",
+        "candidate_a_id",
+        "candidate_b_id",
+        "criterion_ids",
+        "score_options",
+        "execution_order",
+        "conditions"
+      ],
+      "properties": {
+        "block_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "task_semantics_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "candidate_a_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "candidate_b_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "criterion_ids": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "score_options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/score_option"
+          }
+        },
+        "execution_order": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 100000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 100000,
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "judge_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "judge_prompt_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "rubric_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "semantic_task_set_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
