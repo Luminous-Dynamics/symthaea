@@ -1324,83 +1324,83 @@ mod tests {
 
     fn report_fields(plan_bytes: &[u8]) -> JudgeRobustnessReportFieldsV1 {
         let plan: JudgeRobustnessPlanV1 = serde_json::from_slice(plan_bytes).unwrap();
-        let cases =
-            plan.cases
-                .iter()
-                .map(|case| {
-                    let reference_baseline_decision = SemanticDecisionV1::CandidateA;
-                    let reference_variant_decision =
-                        if case.family == JudgeAuditFamilyV1::SemanticSensitivityControl {
-                            SemanticDecisionV1::CandidateB
+        let cases = plan
+            .cases
+            .iter()
+            .map(|case| {
+                let reference_baseline_decision = SemanticDecisionV1::CandidateA;
+                let reference_variant_decision =
+                    if case.family == JudgeAuditFamilyV1::SemanticSensitivityControl {
+                        SemanticDecisionV1::CandidateB
+                    } else {
+                        SemanticDecisionV1::CandidateA
+                    };
+                let observations = [
+                    JudgeAuditConditionV1::Baseline,
+                    JudgeAuditConditionV1::Variant,
+                ]
+                .into_iter()
+                .flat_map(|condition| {
+                    (0..plan.repeats_per_condition).map(move |repeat_index| {
+                        let is_variant = condition == JudgeAuditConditionV1::Variant;
+                        let order = if is_variant {
+                            case.variant_order
                         } else {
-                            SemanticDecisionV1::CandidateA
+                            case.baseline_order
                         };
-                    let observations = [
-                        JudgeAuditConditionV1::Baseline,
-                        JudgeAuditConditionV1::Variant,
-                    ]
-                    .into_iter()
-                    .flat_map(|condition| {
-                        (0..plan.repeats_per_condition).map(move |repeat_index| {
-                            let is_variant = condition == JudgeAuditConditionV1::Variant;
-                            let order = if is_variant {
-                                case.variant_order
+                        // The synthetic oracle is semantically consistent for every
+                        // invariance case and changes its winner for the sensitivity control.
+                        let semantic_winner = if is_variant {
+                            reference_variant_decision
+                        } else {
+                            reference_baseline_decision
+                        };
+                        let raw_decision = match (semantic_winner, order) {
+                            (
+                                SemanticDecisionV1::CandidateA,
+                                CandidateOrderV1::CandidateAFirst,
+                            )
+                            | (
+                                SemanticDecisionV1::CandidateB,
+                                CandidateOrderV1::CandidateBFirst,
+                            ) => RawJudgeDecisionV1::Left,
+                            (
+                                SemanticDecisionV1::CandidateB,
+                                CandidateOrderV1::CandidateAFirst,
+                            )
+                            | (
+                                SemanticDecisionV1::CandidateA,
+                                CandidateOrderV1::CandidateBFirst,
+                            ) => RawJudgeDecisionV1::Right,
+                            (SemanticDecisionV1::Tie, _) => RawJudgeDecisionV1::Tie,
+                            (SemanticDecisionV1::Abstain, _) => RawJudgeDecisionV1::Abstain,
+                        };
+                        JudgeAuditObservationV1 {
+                            condition,
+                            repeat_index,
+                            input_sha256: if is_variant {
+                                case.variant_input_sha256.clone()
                             } else {
-                                case.baseline_order
-                            };
-                            // The synthetic oracle is semantically consistent for every
-                            // invariance case and changes its winner for the sensitivity control.
-                            let semantic_winner = if is_variant {
-                                reference_variant_decision
-                            } else {
-                                reference_baseline_decision
-                            };
-                            let raw_decision = match (semantic_winner, order) {
-                                (
-                                    SemanticDecisionV1::CandidateA,
-                                    CandidateOrderV1::CandidateAFirst,
-                                )
-                                | (
-                                    SemanticDecisionV1::CandidateB,
-                                    CandidateOrderV1::CandidateBFirst,
-                                ) => RawJudgeDecisionV1::Left,
-                                (
-                                    SemanticDecisionV1::CandidateB,
-                                    CandidateOrderV1::CandidateAFirst,
-                                )
-                                | (
-                                    SemanticDecisionV1::CandidateA,
-                                    CandidateOrderV1::CandidateBFirst,
-                                ) => RawJudgeDecisionV1::Right,
-                                (SemanticDecisionV1::Tie, _) => RawJudgeDecisionV1::Tie,
-                                (SemanticDecisionV1::Abstain, _) => RawJudgeDecisionV1::Abstain,
-                            };
-                            JudgeAuditObservationV1 {
-                                condition,
-                                repeat_index,
-                                input_sha256: if is_variant {
-                                    case.variant_input_sha256.clone()
-                                } else {
-                                    case.baseline_input_sha256.clone()
-                                },
-                                candidate_order: order,
-                                raw_decision,
-                                judge_receipt_sha256: digest(&format!(
-                                    "{}:{:?}:{}",
-                                    case.case_id, condition, repeat_index
-                                )),
-                            }
-                        })
+                                case.baseline_input_sha256.clone()
+                            },
+                            candidate_order: order,
+                            raw_decision,
+                            judge_receipt_sha256: digest(&format!(
+                                "{}:{:?}:{}",
+                                case.case_id, condition, repeat_index
+                            )),
+                        }
                     })
-                    .collect();
-                    JudgeAuditCaseOutcomeV1 {
-                        case_id: case.case_id.clone(),
-                        reference_baseline_decision,
-                        reference_variant_decision,
-                        observations,
-                    }
                 })
                 .collect();
+                JudgeAuditCaseOutcomeV1 {
+                    case_id: case.case_id.clone(),
+                    reference_baseline_decision,
+                    reference_variant_decision,
+                    observations,
+                }
+            })
+            .collect();
         JudgeRobustnessReportFieldsV1 {
             schema: JUDGE_ROBUSTNESS_REPORT_SCHEMA.to_owned(),
             purpose: JudgeAuditPurposeV1::QualifiedRun,
