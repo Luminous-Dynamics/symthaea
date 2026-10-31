@@ -861,6 +861,15 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_labels_must_agree_with_independent_scm_reference() {
+        let mutated = ORACLE_INPUT.replace(
+            "MACE-104\\tnot_identified",
+            "MACE-104\\tidentified",
+        );
+        assert!(audit_texts(AGENT_INPUT, &mutated, ("agent-sha", "oracle-sha")).is_err());
+    }
+
+    #[test]
     fn false_causal_claim_is_non_compensatory() {
         let trace = REFERENCE_TRACE.replace(
             "MACE-104\tnot_identified",
