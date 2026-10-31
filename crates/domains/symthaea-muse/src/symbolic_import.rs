@@ -458,6 +458,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_zero_microseconds_per_beat_tempo_event() {
+        let midi = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x60,
+            0x4d, 0x54, 0x72, 0x6b, 0x00, 0x00, 0x00, 0x13,
+            0x00, 0xff, 0x51, 0x03, 0x00, 0x00, 0x00,
+            0x00, 0x90, 0x3c, 0x64,
+            0x60, 0x80, 0x3c, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        assert!(
+            parse_midi(&midi).is_err(),
+            "zero microseconds per beat must be rejected"
+        );
+    }
+
+    #[test]
     fn parses_minimal_musicxml_without_forcing_a_territory() {
         let xml = br#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats></time></attributes>
