@@ -219,6 +219,7 @@ pub struct TargetDeltaCandidateResultV1 {
 pub struct TargetDeltaFamilyMetricsV1 {
     pub transformation_family: String,
     pub candidate_count: u64,
+    pub unique_semantic_cluster_count: u64,
     pub valid_count: u64,
     pub invalid_count: u64,
     pub ambiguous_count: u64,
@@ -862,6 +863,7 @@ pub fn analyze_intervention_target_delta(
         let metrics = family.entry(family_name.clone()).or_insert_with(|| TargetDeltaFamilyMetricsV1 {
             transformation_family: family_name.clone(),
             candidate_count: 0,
+            unique_semantic_cluster_count: 0,
             valid_count: 0,
             invalid_count: 0,
             ambiguous_count: 0,
@@ -960,7 +962,16 @@ pub fn analyze_intervention_target_delta(
         generation_wall_clock_ms: wall,
         final_valid_accepted_unique_per_1000_tokens: per_1000_tokens(final_valid_accepted_unique, tokens),
         final_valid_accepted_unique_per_usd: per_usd(final_valid_accepted_unique, cost),
-        family_metrics: family.into_values().collect(),
+        family_metrics: family
+            .into_iter()
+            .map(|(family_name, mut metrics)| {
+                metrics.unique_semantic_cluster_count = family_cluster_ids
+                    .get(&family_name)
+                    .map(|clusters| clusters.len() as u64)
+                    .unwrap_or(0);
+                metrics
+            })
+            .collect(),
         candidate_results,
         reviewer_independence_proven: false,
         reviewer_competence_proven: false,
