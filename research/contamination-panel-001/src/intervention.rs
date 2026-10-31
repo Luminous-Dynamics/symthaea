@@ -226,13 +226,14 @@ fn validate_digest(value: &str, label: &str) -> Result<(), String> {
 fn priority_digest(
     seed: &[u8],
     experiment_id: &str,
+    replicate_id: &str,
     stratum_id: &str,
     cluster_id: &str,
 ) -> String {
     let mut message = Vec::with_capacity(
-        experiment_id.len() + stratum_id.len() + cluster_id.len() + 48,
+        experiment_id.len() + replicate_id.len() + stratum_id.len() + cluster_id.len() + 56,
     );
-    for value in [experiment_id, stratum_id, cluster_id] {
+    for value in [experiment_id, replicate_id, stratum_id, cluster_id] {
         message.extend_from_slice(&(value.len() as u64).to_be_bytes());
         message.extend_from_slice(value.as_bytes());
     }
@@ -298,6 +299,8 @@ fn validate_design(
     let mut cluster_ids = BTreeSet::new();
     let mut item_ids = BTreeSet::new();
     let mut source_digests = BTreeSet::new();
+    let mut exposure_variant_digests = BTreeSet::new();
+    let mut placebo_record_digests = BTreeSet::new();
     for cluster in &design.clusters {
         if cluster.cluster_id.trim().is_empty()
             || cluster.cluster_id.len() > 256
@@ -320,6 +323,12 @@ fn validate_design(
             &cluster.matched_placebo_record_sha256,
             "cluster.matched_placebo_record_sha256",
         )?;
+        if !exposure_variant_digests.insert(cluster.exposure_variant_sha256.as_str()) {
+            return Err("exposure variant record digest is reused across source clusters".to_owned());
+        }
+        if !placebo_record_digests.insert(cluster.matched_placebo_record_sha256.as_str()) {
+            return Err("matched placebo record digest is reused across source clusters".to_owned());
+        }
         if cluster.item_ids.is_empty() || cluster.item_ids.len() > 10_000 {
             return Err(format!("cluster {} must contain 1..=10000 item IDs", cluster.cluster_id));
         }
@@ -420,13 +429,21 @@ pub fn randomize_intervention(
         .map_err(|_| "total cluster count exceeds u64")?;
 
     for (stratum, mut clusters) in strata {
+        if design.target_exposure_fraction_permille > 0
+            && design.target_exposure_fraction_permille < 1_000
+            && clusters.len() < 2
+        {
+            return Err(format!(
+                "stratum {stratum} has fewer than two clusters and cannot contain both treatment and placebo"
+            ));
+        }
         let bucket = size_bucket(clusters[0].item_ids.len());
         let task_family = clusters[0].task_family.clone();
         let mut ranked: Vec<(String, &SourceClusterV1)> = clusters
             .drain(..)
             .map(|cluster| {
                 (
-                    priority_digest(seed, &design.experiment_id, &stratum, &cluster.cluster_id),
+                    priority_digest(seed, &design.experiment_id, &design.replicate_id, &stratum, &cluster.cluster_id),
                     cluster,
                 )
             })
@@ -793,6 +810,36 @@ mod tests {
         assert!(randomize_intervention(&design, &seed())
             .unwrap_err()
             .contains("source family"));
+    }
+
+    #[test]
+    fn replicate_id_changes_randomized_priorities_when_seed_is_reused() {
+        let mut first_design = design();
+        let first = randomize_intervention(&first_design, &seed()).unwrap();
+        first_design.replicate_id = "replicate-002".to_owned();
+        let second = randomize_intervention(&first_design, &seed()).unwrap();
+        let first_assignments: BTreeMap<&str, bool> = first.assignments.iter()
+            .map(|assignment| (assignment.cluster_id.as_str(), assignment.assigned_to_exposure))
+            .collect();
+        let second_assignments: BTreeMap<&str, bool> = second.assignments.iter()
+            .map(|assignment| (assignment.cluster_id.as_str(), assignment.assigned_to_exposure))
+            .collect();
+        assert_ne!(first_assignments, second_assignments);
+    }
+
+    #[test]
+    fn duplicate_exposure_or_placebo_record_digest_is_rejected() {
+        let mut invalid = design();
+        invalid.clusters[1].exposure_variant_sha256 =
+            invalid.clusters[0].exposure_variant_sha256.clone();
+        assert!(randomize_intervention(&invalid, &seed())
+            .unwrap_err().contains("exposure variant record digest is reused"));
+
+        let mut invalid = design();
+        invalid.clusters[1].matched_placebo_record_sha256 =
+            invalid.clusters[0].matched_placebo_record_sha256.clone();
+        assert!(randomize_intervention(&invalid, &seed())
+            .unwrap_err().contains("matched placebo record digest is reused"));
     }
 
     #[test]
