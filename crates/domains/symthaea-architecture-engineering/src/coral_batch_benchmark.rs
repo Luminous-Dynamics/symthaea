@@ -5,7 +5,7 @@
 //! All four recommendations in a batch are fixed from the same pre-batch board snapshot;
 //! results are recorded only after the batch assignment is complete.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -32,7 +32,8 @@ pub struct CoralBatchAction {
     pub assigned_arm: CoralArm,
     /// For NEW candidates, this is the verifier's canonical destination if admitted/duplicate.
     pub canonical_direction_id: Option<String>,
-    pub disposition: DirectionProposalDisposition,
+    /// Some only for NEW-arm verifier decisions; direction claims have no proposal verdict.
+    pub disposition: Option<DirectionProposalDisposition>,
     pub score: Option<f64>,
     pub action_units: u64,
 }
@@ -243,7 +244,9 @@ pub fn run_coral_batch_campaign(
 
         let remaining_budget = (action_budget_units - total_action_units) as usize;
         if remaining_budget < coral_config.agent_count {
-            return Err("reference campaign budget ended inside a four-seat batch".to_owned());
+            // Claim caps can leave unspent budget. Do not turn a four-seat reference
+            // configuration into a partial batch merely to consume the residual units.
+            break;
         }
         let first_coral_allocation_round = scheduled_round == 1;
         let mut direction_claims: BTreeMap<String, usize> = BTreeMap::new();
@@ -312,9 +315,7 @@ pub fn run_coral_batch_campaign(
                         worker_id,
                         assigned_arm: assigned_arm.clone(),
                         canonical_direction_id: Some(direction_id.clone()),
-                        disposition: DirectionProposalDisposition::Duplicate {
-                            existing_direction_id: direction_id.clone(),
-                        },
+                        disposition: None,
                         score: Some(score),
                         action_units: 1,
                     });
@@ -383,9 +384,9 @@ pub fn run_coral_batch_campaign(
                                 worker_id,
                                 assigned_arm: CoralArm::New,
                                 canonical_direction_id: Some(direction_id.to_owned()),
-                                disposition: DirectionProposalDisposition::Admitted {
+                                disposition: Some(DirectionProposalDisposition::Admitted {
                                     canonical_direction_id: direction_id.to_owned(),
-                                },
+                                }),
                                 score: Some(score),
                                 action_units: 1,
                             });
@@ -458,7 +459,7 @@ pub fn run_coral_batch_campaign(
                         worker_id,
                         assigned_arm: CoralArm::New,
                         canonical_direction_id: canonical,
-                        disposition,
+                        disposition: Some(disposition),
                         score,
                         action_units: 1,
                     });
