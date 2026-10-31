@@ -551,6 +551,7 @@ fn score_case(
     score
 }
 
+#[allow(clippy::too_many_arguments)] // Synthetic fixture fields are deliberately explicit at call sites.
 fn ev(
     split: DatasetSplit, family: &str, id: &str, claim: &str, polarity: Polarity, group: &str,
     valid: (u64, Option<u64>), known: (u64, Option<u64>), scope: &str, authority: &str,
@@ -578,6 +579,7 @@ fn claim(id: &str, alternatives: Vec<ProofAlternative>) -> ClaimNode {
     ClaimNode { id: id.into(), alternatives }
 }
 
+#[allow(clippy::too_many_arguments)] // Fixture constructor keeps case, graph, evidence, and oracle labels visible.
 fn add(
     suite: &mut GraphSuite, seed: u64, split: DatasetSplit, suffix: &str, query: QueryProfile,
     targets: &[&str], claims: Vec<ClaimNode>, evidence: Vec<EvidenceRevision>,
