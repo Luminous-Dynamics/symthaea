@@ -270,6 +270,10 @@ fn load_oracle(input: &str) -> Result<HashMap<String, OracleCase>, String> {
             "expected_transfer",
             "expected_action",
             "expected_completion_state",
+            "expected_write",
+            "expected_maintain",
+            "expected_retrieve",
+            "expected_use",
         ],
         "evaluator oracle",
     )?;
@@ -285,6 +289,10 @@ fn load_oracle(input: &str) -> Result<HashMap<String, OracleCase>, String> {
         let expected_transfer = table.cell(row, "expected_transfer", "evaluator oracle")?.to_owned();
         let expected_action = table.cell(row, "expected_action", "evaluator oracle")?.to_owned();
         let expected_completion = table.cell(row, "expected_completion_state", "evaluator oracle")?.to_owned();
+        let expected_write = table.cell(row, "expected_write", "evaluator oracle")?.to_owned();
+        let expected_maintain = table.cell(row, "expected_maintain", "evaluator oracle")?.to_owned();
+        let expected_retrieve = table.cell(row, "expected_retrieve", "evaluator oracle")?.to_owned();
+        let expected_use = table.cell(row, "expected_use", "evaluator oracle")?.to_owned();
 
         if !matches!(
             family.as_str(),
@@ -310,6 +318,13 @@ fn load_oracle(input: &str) -> Result<HashMap<String, OracleCase>, String> {
         if !valid_completion(&expected_completion) {
             return Err(format!("evaluator oracle: case {id} has invalid expected_completion_state"));
         }
+        if !valid_write_stage(&expected_write)
+            || !valid_maintenance_stage(&expected_maintain)
+            || !valid_retrieval_stage(&expected_retrieve)
+            || !valid_use_stage(&expected_use)
+        {
+            return Err(format!("evaluator oracle: case {id} has an invalid lifecycle-stage label"));
+        }
 
         let item = OracleCase {
             id: id.clone(),
@@ -320,6 +335,10 @@ fn load_oracle(input: &str) -> Result<HashMap<String, OracleCase>, String> {
             expected_transfer,
             expected_action,
             expected_completion,
+            expected_write,
+            expected_maintain,
+            expected_retrieve,
+            expected_use,
         };
         if cases.insert(id.clone(), item).is_some() {
             return Err(format!("evaluator oracle: duplicate case_id {id:?}"));
@@ -363,6 +382,10 @@ fn audit_inputs(
             || item.expected_transfer != projection.expected_transfer
             || item.expected_action != projection.expected_action
             || item.expected_completion != projection.expected_completion
+            || item.expected_write != projection.expected_write
+            || item.expected_maintain != projection.expected_maintain
+            || item.expected_retrieve != projection.expected_retrieve
+            || item.expected_use != projection.expected_use
         {
             return Err(format!(
                 "evaluator oracle: case {} disagrees with the independent {} SCM projection",
@@ -399,6 +422,10 @@ fn audit_inputs(
             || anchor.expected_transfer != control.expected_transfer
             || anchor.expected_action != control.expected_action
             || anchor.expected_completion != control.expected_completion
+            || anchor.expected_write != control.expected_write
+            || anchor.expected_maintain != control.expected_maintain
+            || anchor.expected_retrieve != control.expected_retrieve
+            || anchor.expected_use != control.expected_use
         {
             return Err(format!("pair {pair_id:?} changes its evaluator decision oracle"));
         }
