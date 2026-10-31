@@ -247,6 +247,29 @@
       "reported_scope": "1730 complex temporal queries, 3976 decomposed steps, 13 domains",
       "proposed_use": "external temporal completeness and multi-period retrieval parity for T10/OAKS",
       "license_audit_required": true
+    },
+    "pmsn": {
+      "citation": "Chen et al., PMSN: A Parallel Multi-Compartment Spiking Neuron for Multiscale Temporal Processing, IEEE TNNLS, 2026-07-13",
+      "doi": "10.1109/TNNLS.2026.3708510",
+      "paper_url": "https://pubmed.ncbi.nlm.nih.gov/42441458/",
+      "code_url": "https://github.com/xychen-comp/Parallel-Multi-compartment-Spiking-Neuron-PMSN",
+      "reported_scope": "Configurable interacting compartments and temporal parallelization; authors report >10x acceleration and 30% accuracy improvement over LIF on their Sequential CIFAR-10 setup at comparable compute",
+      "reproduction_status": "literature_only_not_reproduced",
+      "required_parity_tasks": [
+        "Sequential_CIFAR10_1024_steps",
+        "S_MNIST",
+        "PS_MNIST",
+        "SHD"
+      ],
+      "comparison_axes": [
+        "compartment_count",
+        "temporal_parallelization",
+        "state_bytes",
+        "parameter_count",
+        "delay_conditioned_quality",
+        "memory_traffic",
+        "calibrated_energy"
+      ]
     }
   },
   "security": {
