@@ -824,6 +824,7 @@ pub fn build_grammar_trace(
                 ("opera-nine-bar-duration", evidence.verification.nine_bar_timeline_matches),
                 ("opera-statement-a-isolation", evidence.verification.statement_a_isolated),
                 ("opera-statement-b-isolation", evidence.verification.statement_b_isolated),
+                ("opera-statement-a-home-key-theme", evidence.verification.statement_a_matches_home_key_theme),
                 ("opera-statement-b-relative-key", evidence.verification.statement_b_uses_relative_key),
                 ("opera-dialogue-turn-taking", evidence.verification.dialogue_alternates_one_bar_at_a_time),
                 ("opera-interruption-cutoff", evidence.verification.interruption_cuts_theme_b_at_exact_boundary),
