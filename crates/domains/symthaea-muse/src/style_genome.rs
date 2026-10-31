@@ -326,7 +326,7 @@ pub struct LayerCoverage {
     pub nonzero_across_trials: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GenomeArchiveConfig {
     pub max_entries: usize,
     /// Normalized Euclidean distance. Near-clone rejection is a duplicate
@@ -964,19 +964,42 @@ fn reference_population_digest(
 
 impl GenomeEvaluation {
     pub fn verify_digest(&self) -> bool {
+        let reference_binding_valid = match &self.reference_population_sha256 {
+            Some(digest) => {
+                self.reference_population_member_count > 0
+                    && is_sha256_hex(digest)
+            }
+            None => self.reference_population_member_count == 0,
+        };
         self.schema == STYLE_GENOME_EVALUATION_SCHEMA
             && self.genome.verify_id()
-            && self.evaluation_config_sha256.len() == 64
-            && self.evaluation_config_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && is_sha256_hex(&self.evaluation_config_sha256)
             && config_digest(&self.evaluation_config).is_ok_and(|expected| {
                 expected == self.evaluation_config_sha256
             })
-            && self.reference_population_sha256.as_ref().is_none_or(|digest| {
-                digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
-            })
+            && reference_binding_valid
             && self.seed_count == self.evaluation_config.seeds.len()
+            && self.seed_count == self.trials.len()
+            && self.trials.iter().all(|trial| {
+                is_sha256_hex(&trial.score_sha256)
+                    && trial.structural_fingerprint.len() == fingerprint::STRUCT_DIMS
+                    && trial.structural_fingerprint.iter().all(|value| value.is_finite())
+                    && trial.score_duration_beats.is_finite()
+                    && trial.score_duration_beats > 0.0
+            })
+            && self.mean_structural_fingerprint.len() == fingerprint::STRUCT_DIMS
+            && self.mean_structural_fingerprint.iter().all(|value| value.is_finite())
+            && self.objectives.within_genome_diversity.is_finite()
+            && (0.0..=1.0).contains(&self.objectives.motif_transformation_richness)
+            && (0.0..=1.0).contains(&self.objectives.form_variation)
+            && self.objectives.novelty_distance.is_none_or(|value| value.is_finite() && value >= 0.0)
             && evaluation_digest(self).is_ok_and(|expected| expected == self.evaluation_sha256)
     }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn domain_sha256(domain: &[u8], bytes: &[u8]) -> String {
