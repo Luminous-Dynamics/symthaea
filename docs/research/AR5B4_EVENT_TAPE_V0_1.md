@@ -12,7 +12,7 @@ It is not a benchmark result, a digital signature, proof of runner identity, or 
 
 ## Frozen identities
 
-The header binds the campaign, policy ID and algorithm ID, canonical JSON policy configuration and its SHA-256 digest, task recipe, comparison profile, evaluator, verifier, proposal source, initial canonical direction IDs, execution mode, worker count, and total normalized budget ceiling.
+The header binds the campaign, policy ID and algorithm ID, canonical JSON policy configuration and its SHA-256 digest, task recipe, comparison profile, evaluator, verifier, proposal source, initial canonical direction IDs, execution mode, worker count, declared seats per round, claim caps, and total normalized budget ceiling.
 
 A mechanism-matched tape must include a shared proposal-stream digest. A best-practical-system tape may use a different proposal source, but must identify that source. These comparison modes must not be merged into one result table.
 
@@ -34,7 +34,7 @@ A reading is either `Measured(value)` or `Unknown(reason)`. Measured zero is val
 
 Sequential events must use worker 0, have no batch ID, advance one round per event, and see the entire completed prefix.
 
-Batched events use a common batch ID and round. All events in the batch must have the same pre-batch visibility cutoff and the same visible-history digest. Each worker may contribute at most one action to a batch, and sibling results cannot become visible until a later batch. Worker count and claim caps are part of the frozen header.
+Batched events use a common batch ID and round. All events in the batch must have the same pre-batch visibility cutoff and the same visible-history digest. Each worker may contribute at most one action to a batch, and sibling results cannot become visible until a later batch. The declared seats-per-round count must be met before a batch can close or the tape can qualify; a partial final batch remains structurally inspectable but fails qualification. Worker count and claim caps and seats-per-round are part of the frozen header.
 
 ## Integrity and replay
 
@@ -42,7 +42,7 @@ The tape is append-only at the API boundary. The first event's prior hash is the
 
 A `PolicyReplay` adapter must identify the same policy ID and frozen config digest, then receives only the event prefix declared visible for a decision plus that decision's worker/round context. It must reproduce whether the policy selected a registered direction or requested a new direction. Candidate-generation and evaluator correctness remain separate responsibilities.
 
-The SHA-256 chain is tamper-evident only when the tape is retained and compared against a trusted digest. It does not authenticate who produced the tape. Signing, remote append-only storage, independent evaluator deployment, and cross-policy campaign reconciliation remain follow-on work.
+The first event links to a digest of the frozen header, so changing the budget, worker count, policy snapshot or other header field invalidates the chain. The SHA-256 chain is tamper-evident only when the tape is retained and compared against a trusted digest. It does not authenticate who produced the tape. Signing, remote append-only storage, independent evaluator deployment, and cross-policy campaign reconciliation remain follow-on work.
 
 ## Qualification limits
 
