@@ -703,6 +703,9 @@ fn lineage_summaries(
         let hysteresis = observation.hysteresis_support_end_frame
             .map(|end| end.saturating_sub(observation.final_note_off_frame))
             .unwrap_or(0);
+        if observation.observed_tail_frames != raw.max(hysteresis) {
+            return Err(TailProfileError::AdapterReportInvalid);
+        }
         entry.1 = entry.1.max(raw);
         entry.2 = entry.2.max(hysteresis);
         entry.3 = entry.3.max(raw.max(hysteresis));
