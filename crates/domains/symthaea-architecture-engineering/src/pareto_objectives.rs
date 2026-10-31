@@ -826,7 +826,7 @@ mod tests {
     }
 
     #[test]
-    fn hypervolume_is_zero_when_no_candidate_exceeds_reference_in_all_dimensions() {
+    fn hypervolume_ignores_candidate_that_fails_one_reference_coordinate() {
         let volume = exact_hypervolume(
             &[vec![0.9, 0.1], vec![0.2, 0.8]],
             &[0.0, 0.3],
