@@ -845,7 +845,7 @@ mod tests {
                     scale_upper: 1.0,
                 },
             ],
-            vec![0.0, 0.0],
+            vec![-0.1, -0.1],
         ).unwrap();
         assert!(!analysis.analysis.nondominated_candidate_ids.is_empty());
 
