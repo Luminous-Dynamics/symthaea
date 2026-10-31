@@ -143,9 +143,12 @@ The initial comparison should be deliberately modest and interpretable.
 | Random Forest (RF) | Strong tabular baseline | Measure actual end-to-end overhead |
 | Instruction-only detector | Low-cost candidate where the modality exists | No use where aligned instruction telemetry is absent |
 | HPC-only detector | Microarchitectural signal baseline | Counter acquisition may perturb the workload |
-| Instruction-first → HPC attribution cascade | Test selective monitoring hypothesis | Only meaningful where both signals and ordering are available |
+| Published workload-conditioned two-stage detector (T-SMADE) | Existing cascade comparator for evasive Spectre under varied workloads | Reproduce the workload classifier, selected HPC set, attack variants, platform and alert semantics; do not compare the abstract's rates across datasets |
+| Instruction-first → HPC attribution cascade | Test selective monitoring hypothesis | Only meaningful where both signals and ordering are available; distinguish from T-SMADE's workload-first design |
 | Always-on HPC detector | Compare against cascade's resource trade-off | Include the full instrumentation cost |
 | Symthaea HDC/CfC candidate | Test the project-specific hypothesis | Must compete under the same groups, threshold policy, and budgets |
+
+T-SMADE is a published two-stage baseline: its first stage identifies workload type and selects a second-stage detector using four HPC events. Its 2024 paper reports Evasive Spectre-NOP detection increasing from 27.52% to 95.42% under a memory-stress workload and Evasive Spectre-memory from 59.8% to 100%. These are source-paper outcomes on that study's hardware and workload setup, not results on HARPY-V or Symthaea. A fair reproduction must recover exact data, hardware, variants, operating point, benign false-alert behavior and full acquisition cost: https://www.mdpi.com/2079-9292/13/20/4090.
 
 A probabilistic baseline or other model may be added in a labeled extension, but the comparison cannot silently change the set after test results are seen. Hyperparameter search and model selection are confined to the training/validation partitions.
 
