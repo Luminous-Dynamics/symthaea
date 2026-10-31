@@ -182,6 +182,16 @@ pub struct TailProfileQualification {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TailProfileLineageSummary {
+    pub source_lineage_sha256: String,
+    pub split: TailProfileSplit,
+    pub event_count: usize,
+    pub maximum_raw_tail_frames: u64,
+    pub maximum_hysteresis_tail_frames: u64,
+    pub maximum_observed_tail_frames: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TailProfile {
     pub version: String,
     pub profile_id: String,
@@ -189,6 +199,9 @@ pub struct TailProfile {
     pub benchmark_manifest_sha256: String,
     pub benchmark_audit_sha256: String,
     pub context: TailProfileContext,
+    pub builder_spec: TailProfileBuildSpec,
+    pub event_observations: Vec<TailProfileEventObservation>,
+    pub lineage_summaries: Vec<TailProfileLineageSummary>,
     pub statistics: TailProfileStatistics,
     pub qualification: TailProfileQualification,
     pub calibration_lineage_set_sha256: String,
@@ -618,6 +631,61 @@ fn aggregate_lineage_tails(
     Ok(grouped)
 }
 
+fn lineage_summaries(
+    observations: &[TailProfileEventObservation],
+) -> Result<Vec<TailProfileLineageSummary>, TailProfileError> {
+    let mut grouped = BTreeMap::<(TailProfileSplit, String), (usize, u64, u64, u64)>::new();
+    for observation in observations {
+        if !is_sha256(&observation.source_lineage_sha256)
+            || !is_sha256(&observation.event_evidence_sha256)
+            || observation.source_event_id.trim().is_empty()
+            || observation.output_frame_count == 0
+            || observation.final_note_off_frame > observation.output_frame_count
+            || observation.raw_measured_end_frame.is_some_and(|end| end > observation.output_frame_count)
+            || observation.hysteresis_support_end_frame.is_some_and(|end| end > observation.output_frame_count)
+        {
+            return Err(TailProfileError::AdapterReportInvalid);
+        }
+        if observation.split == TailProfileSplit::Test {
+            return Err(TailProfileError::InvalidLineageAssignment);
+        }
+        let entry = grouped
+            .entry((observation.split, observation.source_lineage_sha256.clone()))
+            .or_insert((0, 0, 0, 0));
+        entry.0 += 1;
+        let raw = observation.raw_measured_end_frame
+            .map(|end| end.saturating_sub(observation.final_note_off_frame))
+            .unwrap_or(0);
+        let hysteresis = observation.hysteresis_support_end_frame
+            .map(|end| end.saturating_sub(observation.final_note_off_frame))
+            .unwrap_or(0);
+        entry.1 = entry.1.max(raw);
+        entry.2 = entry.2.max(hysteresis);
+        entry.3 = entry.3.max(raw.max(hysteresis));
+    }
+    let mut summaries = grouped
+        .into_iter()
+        .map(|((split, lineage), (event_count, raw, hysteresis, observed))| {
+            TailProfileLineageSummary {
+                source_lineage_sha256: lineage,
+                split,
+                event_count,
+                maximum_raw_tail_frames: raw,
+                maximum_hysteresis_tail_frames: hysteresis,
+                maximum_observed_tail_frames: observed,
+            }
+        })
+        .collect::<Vec<_>>();
+    summaries.sort_by(|left, right| {
+        (left.split, &left.source_lineage_sha256)
+            .cmp(&(right.split, &right.source_lineage_sha256))
+    });
+    if summaries.len() > MAX_PROFILE_LINEAGES * 2 {
+        return Err(TailProfileError::InvalidField("too many lineage summaries"));
+    }
+    Ok(summaries)
+}
+
 fn zero_miss_upper_rate_95_micros(n: usize) -> Option<u32> {
     if n == 0 {
         return None;
@@ -741,6 +809,9 @@ fn create_profile_unsigned(
         benchmark_manifest_sha256: benchmark_manifest_sha256.to_owned(),
         benchmark_audit_sha256: benchmark_audit_sha256.to_owned(),
         context,
+        builder_spec: spec.clone(),
+        event_observations: observations.to_vec(),
+        lineage_summaries: lineage_summaries(observations)?,
         statistics,
         qualification,
         calibration_lineage_set_sha256,
