@@ -191,7 +191,9 @@
         "minimum_singleton_running_fraction",
         "minimum_co_scheduled_running_fraction",
         "maximum_co_scheduled_relative_deviation",
-        "maximum_instrumentation_throughput_degradation"
+        "maximum_instrumentation_throughput_degradation",
+        "maximum_sample_loss_fraction",
+        "maximum_pmu_read_overhead_fraction"
       ],
       "properties": {
         "randomized_order_required": {
@@ -224,6 +226,16 @@
           "maximum": 1
         },
         "maximum_instrumentation_throughput_degradation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_sample_loss_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_pmu_read_overhead_fraction": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
