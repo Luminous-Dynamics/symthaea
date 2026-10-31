@@ -202,8 +202,8 @@ impl CoralSeatRound {
         tape: &EventTape,
     ) -> Result<(), CoralExecutionError> {
         self.validate_against_board(source_board)?;
-        tape.validate_integrity()
-            .map_err(|error| CoralExecutionError::new("event_tape.integrity", error.to_string()))?;
+        tape.validate()
+            .map_err(|error| CoralExecutionError::new("event_tape.qualification", error.to_string()))?;
 
         let header = tape.header();
         if header.policy.has_hidden_oracle_access {
@@ -483,7 +483,6 @@ mod tests {
             ActionEvent, ActionOutcome, CandidateDisposition, EventTapeHeader, MeterValue,
             PolicySnapshot, ProposalDisposition, ResourceReceipt,
         };
-        use serde_json::Value;
 
         const H1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         const H2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
