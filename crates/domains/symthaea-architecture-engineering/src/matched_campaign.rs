@@ -883,9 +883,16 @@ mod tests {
         let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
         let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
         let left_manifest = offer_manifest(&left);
-        let mut right_manifest = offer_manifest(&right);
-        right_manifest.snapshots[0].available_direction_ids = vec!["A".to_owned(), "B".to_owned()];
-        // Mutation also invalidates the manifest digest; a mismatch cannot be normalized away.
+        let right_snapshot = super::super::offer_set::OfferSetSnapshot::new(
+            1,
+            None,
+            0,
+            vec!["A".to_owned(), "B".to_owned()],
+            true,
+            H2,
+        )
+        .unwrap();
+        let right_manifest = OfferSetManifest::new(&right, vec![right_snapshot]).unwrap();
         assert!(qualify_mechanism_matched_campaign(
             &[left, right],
             &[left_manifest, right_manifest],
