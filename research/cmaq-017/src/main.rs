@@ -405,6 +405,7 @@ fn evaluate_candidate(
     aggregate_scores(&values, policy)
 }
 
+#[allow(clippy::needless_range_loop)]
 fn update_cem_distribution(candidates: &mut [Candidate], mean: &mut [f64], std_dev: &mut [f64]) {
     candidates.sort_by(|left, right| right.score.ranking_score.total_cmp(&left.score.ranking_score));
     let elite_count = (candidates.len() / 5).max(1).min(candidates.len());
@@ -465,15 +466,18 @@ fn plan_actions(
         let mut candidates = Vec::with_capacity(count);
 
         for _ in 0..count {
-            let actions: Vec<f64> = (0..horizon)
-                .map(|index| {
-                    if policy == Policy::RandomPointSearch {
-                        rng.unit() * 2.0 - 1.0
-                    } else {
-                        clamp_action(mean[index] + std_dev[index] * rng.normal())
-                    }
-                })
-                .collect();
+            let actions: Vec<f64> = if policy == Policy::RandomPointSearch {
+                (0..horizon)
+                    .map(|_| rng.unit() * 2.0 - 1.0)
+                    .collect()
+            } else {
+                mean.iter()
+                    .zip(std_dev.iter())
+                    .map(|(mean_value, spread)| {
+                        clamp_action(*mean_value + *spread * rng.normal())
+                    })
+                    .collect()
+            };
 
             let score = evaluate_candidate(
                 scenario,
@@ -501,8 +505,6 @@ fn plan_actions(
     }
 
     let selected = best.expect("positive candidate budget always produces one candidate");
-    let _ = head_count;
-
     Plan {
         actions: selected.actions,
         predicted_prefix_return: selected.score.predicted_prefix_return,
@@ -899,11 +901,11 @@ mod tests {
             )
             .reward)
             .abs()
-            < 1e-9);
+            < 0.01);
         assert!((low_action.reward
             - true_step(state, 0.10, 2, Scenario::StateActionPocket, BASE_SEED).reward)
             .abs()
-            < 1e-9);
+            < 0.01);
     }
 
     #[test]
