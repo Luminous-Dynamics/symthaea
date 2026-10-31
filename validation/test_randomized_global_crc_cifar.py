@@ -55,6 +55,34 @@ class RandomizedGlobalCommonDepthTests(unittest.TestCase):
             self.assertTrue(result["verification"]["valid"])
             self.assertLessEqual(result["verification"]["max_budget_excess"],1e-8)
 
+
+    def test_breakpoint_action_support_convexifies_all_piecewise_linear_depths(self):
+        from randomized_global_crc_cifar import per_type_metrics
+        for a in (.05,.25,.75,.95):
+            left=per_type_metrics(0.0)
+            mid=per_type_metrics(1.0)
+            weights=(1-a,a)
+            for key in ("risk","specificity","node_size"):
+                mixed=weights[0]*left[key]+weights[1]*mid[key]
+                direct=per_type_metrics(a)[key]
+                self.assertTrue(np.allclose(mixed,direct,atol=1e-12,rtol=0.0))
+        for a in (1.05,1.25,1.75,1.95):
+            mid=per_type_metrics(1.0)
+            right=per_type_metrics(2.0)
+            weights=(2-a,a-1)
+            for key in ("risk","specificity","node_size"):
+                mixed=weights[0]*mid[key]+weights[1]*right[key]
+                direct=per_type_metrics(a)[key]
+                self.assertTrue(np.allclose(mixed,direct,atol=1e-12,rtol=0.0))
+
+    def test_validity_does_not_depend_on_reference_weights(self):
+        engine=RandomizedCommonDepthCRC(5,.2,(70,20,10))
+        result=engine.solve()
+        # A controller certified by every augmented state remains feasible
+        # regardless of a different utility/reference pool distribution.
+        self.assertTrue(engine.verify(np.asarray(result["probabilities"]))["valid"])
+        self.assertEqual(result["verification"]["augmented_states_checked"],len(engine.augmented))
+
     def test_invalid_population_and_action_grid_fail_closed(self):
         with self.assertRaises(ValueError):
             RandomizedCommonDepthCRC(50,.1,(10,10,10))
