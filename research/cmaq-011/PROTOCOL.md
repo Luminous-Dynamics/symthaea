@@ -86,11 +86,12 @@ At minimum, evaluate where the environment adapter permits:
 2. Random or fixed-action smoke control (sanity baseline only).
 3. MPC/CEM with the same proposal candidates and simulator-query budget.
 4. MRS.Q from a pinned external revision and its published settings.
-5. DR.Q as a strong representation/off-policy control baseline; report its training budget and clarify that it does not test predictive planning at inference.
-6. Pessimistic ensemble-value search (minimum over value heads), with ensemble size and training budget stated.
-7. Symthaea one-step / short-horizon model.
-8. Symthaea with uncertainty-aware or integrity-gated planning.
-9. Oracle environment-model upper bound (diagnostic ceiling, never a deployable baseline).
+5. WIMLE from a pinned external revision on the verified shared DMC/HumanoidBench task intersection; report its ensemble, training and synthetic-data budgets.
+6. DR.Q as a strong representation/off-policy control baseline; report its training budget and clarify that it does not test predictive planning at inference.
+7. Pessimistic ensemble-value search (minimum over value heads), with ensemble size and training budget stated.
+8. Symthaea one-step / short-horizon model.
+9. Symthaea with uncertainty-aware or integrity-gated planning.
+10. Oracle environment-model upper bound (diagnostic ceiling, never a deployable baseline).
 
 For predictive-advantage claims, also run the matched D0/D1/W1/W2/W3 arms specified in `PREDICTIVE_ADVANTAGE.md`. A published algorithmic baseline such as DR.Q or MRS.Q does not replace the within-task matched direct-policy control.
 
