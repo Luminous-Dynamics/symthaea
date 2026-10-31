@@ -518,6 +518,48 @@ pub fn generate_poar_graph_suite(seed: u64, split: DatasetSplit) -> GraphSuite {
     ],vec![ev(split,"future","e-future","claim",Polarity::Supports,"g-future",(t,None),(t+20,None),"scope-a","authority-a")],
     &[("e-future",HiddenTruth::SupportsAssertion)]);
 
+    // A genuinely deep dependency chain (not merely a list of targets).
+    {
+        let depth = 64usize;
+        let mut claims = Vec::with_capacity(depth);
+        for index in 0..depth {
+            let id = format!("chain-{index:03}");
+            let alternative = if index + 1 == depth {
+                alt("chain-tail", Polarity::Supports,
+                    vec![ProofRequirement::Evidence("e-chain-leaf".into())], 1)
+            } else {
+                alt(&format!("chain-step-{index:03}"), Polarity::Supports,
+                    vec![ProofRequirement::Claim {
+                        claim_id: format!("chain-{:03}", index + 1),
+                        polarity: Polarity::Supports,
+                    }], 1)
+            };
+            claims.push(ClaimNode { id, alternatives: vec![alternative] });
+        }
+        let leaf = format!("chain-{:03}", depth - 1);
+        add(&mut suite, seed, split, "long-chain-64", q(t+5,t+5), &["chain-000"], claims,
+            vec![ev(split,"long-chain","e-chain-leaf",&leaf,Polarity::Supports,"g-chain-leaf",
+                (t,None),(t,None),"scope-a","authority-a")],
+            &[("e-chain-leaf",HiddenTruth::SupportsAssertion)]);
+    }
+
+    // The public assertion is plausible but the hidden source-truth label disagrees.
+    add(&mut suite,seed,split,"assertion-content-mismatch",q(t+5,t+5),&["claim"],vec![
+        claim("claim",vec![alt("assertion-path",Polarity::Supports,
+            vec![ProofRequirement::Evidence("e-assertion".into())],1)]),
+    ],vec![ev(split,"assertion","e-assertion","claim",Polarity::Supports,"g-assertion",
+        (t,None),(t,None),"scope-a","authority-a")],
+    &[("e-assertion",HiddenTruth::Irrelevant)]);
+
+    // Truthful content is still inadmissible when the source-integrity floor fails.
+    let mut unverified = ev(split,"integrity","e-unverified","claim",Polarity::Supports,"g-unverified",
+        (t,None),(t,None),"scope-a","authority-a");
+    unverified.integrity = SourceIntegrity::Unverified;
+    add(&mut suite,seed,split,"unverified-source",q(t+5,t+5),&["claim"],vec![
+        claim("claim",vec![alt("unverified-path",Polarity::Supports,
+            vec![ProofRequirement::Evidence("e-unverified".into())],1)]),
+    ],vec![unverified],&[("e-unverified",HiddenTruth::SupportsAssertion)]);
+
     suite
 }
 
@@ -644,6 +686,39 @@ mod tests {
         let report=suite.evaluate(&[packet(c,"claim",ClaimDisposition::Supported{alternative_id:"future-path".into()},&["e-future"])]);
         assert_eq!(report.case_scores[10].temporal_violations,1);
         assert_eq!(report.case_scores[10].false_supported_claims,1);
+    }
+
+    #[test]
+    fn deep_dependency_chain_requires_terminal_evidence() {
+        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let c=find(&suite,"long-chain-64");
+        let good=packet(c,"chain-000",ClaimDisposition::Supported{alternative_id:"chain-step-000".into()},&["e-chain-leaf"]);
+        let report=suite.evaluate(&[good]);
+        assert_eq!(report.case_scores[11].correct_dispositions,1);
+        let missing=packet(c,"chain-000",ClaimDisposition::Supported{alternative_id:"chain-step-000".into()},&[]);
+        let missing_report=suite.evaluate(&[missing]);
+        assert_eq!(missing_report.case_scores[11].missing_required_citations,1);
+    }
+
+    #[test]
+    fn asserted_polarity_does_not_replace_hidden_source_truth() {
+        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let c=find(&suite,"assertion-content-mismatch");
+        let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"assertion-path".into()},&["e-assertion"]);
+        let score=&suite.evaluate(&[p]).case_scores[12];
+        assert_eq!(score.false_supported_claims,1);
+        assert_eq!(score.invalid_citations,1);
+    }
+
+    #[test]
+    fn unverified_source_cannot_discharge_a_claim() {
+        let suite=generate_poar_graph_suite(7,DatasetSplit::Test);
+        let c=find(&suite,"unverified-source");
+        let p=packet(c,"claim",ClaimDisposition::Supported{alternative_id:"unverified-path".into()},&["e-unverified"]);
+        let score=&suite.evaluate(&[p]).case_scores[13];
+        assert_eq!(score.false_supported_claims,1);
+        assert_eq!(score.integrity_violations,1);
+        assert_eq!(score.invalid_citations,1);
     }
 
     #[test]
