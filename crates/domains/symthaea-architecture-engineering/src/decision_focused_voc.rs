@@ -1110,6 +1110,14 @@ mod tests {
             metric_direction: MetricDirection::Maximize,
             evaluation_task_id: "target-task".to_owned(),
             calibration_task_ids: vec!["cal-task-1".to_owned(), "cal-task-2".to_owned()],
+            fidelity_levels: vec![
+                FidelityLevel { id: "epoch-5".to_owned(), cumulative_cost_units: 1 },
+                FidelityLevel { id: "epoch-15".to_owned(), cumulative_cost_units: 2 },
+                FidelityLevel { id: "epoch-30".to_owned(), cumulative_cost_units: 3 },
+                FidelityLevel { id: "epoch-60".to_owned(), cumulative_cost_units: 8 },
+            ],
+            fidelity_cost_model: FidelityCostModel::ResumablePrefix,
+            resource_unit: "gpu_seconds".to_owned(),
             source_artifact_sha256: SOURCE_SHA.to_owned(),
             posterior_model_sha256: String::new(),
             observation_likelihood_model_sha256: String::new(),
@@ -1152,6 +1160,9 @@ mod tests {
             action_id: action_id.to_owned(),
             kind: VoCActionKind::FidelityQuery,
             candidate_id: Some(candidate_id.to_owned()),
+            fidelity_id: "epoch-30".to_owned(),
+            fidelity_index: 2,
+            current_fidelity_index: Some(1),
             resource_unit: "gpu_seconds".to_owned(),
             incremental_cost_units: cost,
             source_artifact_sha256: SOURCE_SHA.to_owned(),
@@ -1168,6 +1179,14 @@ mod tests {
                 },
             ],
         }
+    }
+
+    fn high_cost_query_action(action_id: &str, candidate_id: &str) -> VoCAction {
+        let mut action = query_action(action_id, candidate_id, 8);
+        action.fidelity_id = "epoch-60".to_owned();
+        action.fidelity_index = 3;
+        action.current_fidelity_index = None;
+        action
     }
 
     fn bind_manifest(
@@ -1270,8 +1289,8 @@ mod tests {
         let plan = evaluate(
             &p,
             vec![
-                query_action("big-query", "A", 8),
-                query_action("small-query", "A", 2),
+                high_cost_query_action("big-query", "A"),
+                query_action("small-query", "A", 1),
             ],
             &cfg,
             MetricDirection::Maximize,
@@ -1287,7 +1306,7 @@ mod tests {
         cfg.total_budget_units = 1;
         let plan = evaluate(
             &p,
-            vec![query_action("query", "A", 2)],
+            vec![high_cost_query_action("query", "A")],
             &cfg,
             MetricDirection::Maximize,
         ).unwrap();
@@ -1398,6 +1417,36 @@ mod tests {
             compute_posterior_model_sha256(&p),
             compute_posterior_model_sha256(&reversed)
         );
+    }
+
+    #[test]
+    fn rejects_fidelity_name_index_mismatch() {
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        actions[0].fidelity_id = "epoch-15".to_owned();
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
+    }
+
+    #[test]
+    fn rejects_action_cost_that_disagrees_with_fidelity_cost_model() {
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        actions[0].incremental_cost_units = 2;
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
+    }
+
+    #[test]
+    fn independent_restart_cost_is_not_charged_as_a_resumable_delta() {
+        let p = posterior();
+        let mut actions = vec![high_cost_query_action("query", "A")];
+        let mut manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        manifest.fidelity_cost_model = FidelityCostModel::IndependentRuns;
+        // Rebind the likelihood model after the fidelity-model manifest change is not needed:
+        // the action likelihood digest contains the action cost and rung, not the cost-model enum.
+        actions[0].incremental_cost_units = 8;
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
     }
 
     #[test]
