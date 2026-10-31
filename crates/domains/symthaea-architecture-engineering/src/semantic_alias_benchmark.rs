@@ -105,7 +105,22 @@ pub struct AliasAdjudicationKey {
     utility_by_identity: BTreeMap<String, f64>,
 }
 
+#[derive(Serialize)]
+struct AliasAdjudicationPayload<'a> {
+    challenge_sha256: &'a str,
+    truth_identity_by_proposal: &'a BTreeMap<String, String>,
+    utility_by_identity: &'a BTreeMap<String, f64>,
+}
+
 impl AliasAdjudicationKey {
+    fn adjudication_sha256(&self) -> Result<String, SemanticAliasError> {
+        digest_serializable(&AliasAdjudicationPayload {
+            challenge_sha256: &self.challenge_sha256,
+            truth_identity_by_proposal: &self.truth_identity_by_proposal,
+            utility_by_identity: &self.utility_by_identity,
+        })
+    }
+
     fn validate_for(
         &self,
         challenge: &PolicyVisibleAliasChallenge,
@@ -262,6 +277,8 @@ pub struct SemanticAliasBenchmarkReport {
     pub challenge_id: String,
     pub challenge_sha256: String,
     pub trial_sha256: String,
+    /// Digest of evaluator-only truth labels and utility values; never exposes them.
+    pub adjudication_sha256: String,
     pub proposal_count: usize,
     pub admitted_decision_count: usize,
     pub duplicate_decision_count: usize,
@@ -287,6 +304,7 @@ struct SemanticAliasReceiptPayload<'a> {
     challenge_id: &'a str,
     challenge_sha256: &'a str,
     trial_sha256: &'a str,
+    adjudication_sha256: &'a str,
     proposal_count: usize,
     admitted_decision_count: usize,
     duplicate_decision_count: usize,
@@ -466,6 +484,7 @@ pub fn evaluate_alias_trial(
         challenge_id: &challenge.challenge_id,
         challenge_sha256: &challenge_sha256,
         trial_sha256: &trial_sha256,
+        adjudication_sha256: &adjudication.adjudication_sha256()?,
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
@@ -489,6 +508,7 @@ pub fn evaluate_alias_trial(
         challenge_id: challenge.challenge_id.clone(),
         challenge_sha256,
         trial_sha256,
+        adjudication_sha256: adjudication.adjudication_sha256()?,
         proposal_count: challenge.proposals.len(),
         admitted_decision_count,
         duplicate_decision_count,
