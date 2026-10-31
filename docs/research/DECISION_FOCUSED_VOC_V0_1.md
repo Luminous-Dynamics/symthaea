@@ -2,7 +2,7 @@
 
 **Status:** Rust source and test declarations added to a dependent research branch. Compilation, execution, calibration qualification and benchmark performance are unverified.
 
-**Tracking:** [#9267 — adaptive value-of-computation scheduler](https://github.com/Luminous-Dynamics/symthaea/issues/9267).
+**Tracking:** [#9267 — adaptive value-of-computation scheduler](https://github.com/Luminous-Dynamics/symthaea/issues/9267); [#9349 — qualify posterior and action likelihoods](https://github.com/Luminous-Dynamics/symthaea/issues/9349).
 
 **Implementation:** `crates/domains/symthaea-architecture-engineering/src/decision_focused_voc.rs`.
 
@@ -65,7 +65,7 @@ The planner requires:
 
 The planner computes and checks canonical posterior and action-likelihood digests. Candidate/action/particle order and action/outcome order do not affect the canonical content digest when semantic content is unchanged.
 
-The planner verifies supplied qualification metadata; it does not independently reproduce the cross-task calibration experiment. A false qualification flag, invalid digest, missing action outcome, inconsistent likelihood model, leakage of target task into calibration tasks, or mismatched provenance must fail closed.
+The planner verifies supplied qualification metadata; it does not independently reproduce the cross-task calibration experiment. The empirical qualification receipt and independent verifier are tracked in #9349. A false qualification flag, invalid digest, missing action outcome, inconsistent likelihood model, leakage of target task into calibration tasks, or mismatched provenance must fail closed.
 
 For a sentinel-audit action, the observation categories are restricted to aggregate dispositions:
 - `continue_pruning`
