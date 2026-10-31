@@ -224,8 +224,7 @@ fn audit_plan(plan: &Value, plan_bytes: &[u8]) -> Result<Value, String> {
     let scope_note = str_value(targets, "scope_note", "plan.aspirational_targets")?;
     if !(0.0..=1.0).contains(&pooled) || !(0.0..=1.0).contains(&worst)
         || fpd <= 0.0 || delay == 0 || median_overhead < 0.0 || p95_overhead < median_overhead
-        || silent_clears != 0 || (scope_note.to_lowercase().contains("achieved")
-            && !scope_note.to_lowercase().contains("not achieved")) {
+        || silent_clears != 0 || !scope_note.to_lowercase().contains("not achieved") {
         return Err(fail("plan.aspirational_targets", "target values or aspirational scope note violate v1 constraints"));
     }
 
