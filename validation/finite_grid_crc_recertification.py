@@ -71,7 +71,7 @@ class FiniteGridCRC:
         c={}
         worst=self.loss.max(axis=1)
         for D in self.states:
-            cal=np.zeros(self.R)
+            cal=np.zeros((self.R,self.A))
             for z,count in enumerate(D):
                 cal += count*self.loss[:,z,:]
             feasible=np.ones(self.A,dtype=bool)
