@@ -24,7 +24,7 @@ A response at a neuron with no direct edge from the stimulated neuron may arise 
 
 The current structure-to-function protocol tests paired prediction gains from independently verified reconstruction changes against held-out neural activity. A further step is to evaluate whether anatomy constrains responses to controlled perturbations rather than merely describing observational co-variation.
 
-A useful external baseline exists in C. elegans. Creamer, Leifer and Pillow's 2025 bioRxiv v3 preprint fits connectome-constrained dynamics to whole-brain recordings under single-neuron optogenetic perturbation. It describes 156 head neurons recorded across 110 animals, an 80-animal training set and 30-animal test set, and reports that the model captured 92% of measured causal interaction structure. This is a serious reproduction/falsification target, not a result from Symthaea.
+A useful external baseline exists in C. elegans. Creamer, Leifer and Pillow's study has multiple preprint versions: v3 (2025) reported 92%, while the later v4 (posted 18 May 2026) reports 82% capture of measured causal interaction structure relative to the reproducibility of the perturbation data. Use v4 as the primary reproduction target and preserve v3 as a historical sensitivity analysis; never quote 92% as the current v4 result. The v4 model is a latent linear dynamical system whose nonzero neuron-to-neuron weights are restricted to anatomical chemical/electrical connections; it accounts for responses in unconnected pairs through multi-hop propagation. Pin the exact v4 data/code, animal partitions, cell eligibility, preprocessing and metric before scoring. This is an external reproduction/falsification target, not a result from Symthaea.
 
 The zebrafish resources offer complementary tiers:
 - Fish1.5 aligns EM and two-photon calcium imaging at single-cell resolution in the same specimen.
@@ -37,7 +37,7 @@ These tiers must remain separate because they support different estimands.
 
 ### Tier A — C. elegans optogenetic perturbation
 
-Primary reference: Creamer, Leifer and Pillow, *Bridging the gap between the connectome and whole-brain activity in C. elegans*, bioRxiv v3 (2025), https://doi.org/10.1101/2024.09.22.614271
+Primary reference: Creamer, Leifer and Pillow, *Bridging the gap between the connectome and whole-brain activity in C. elegans*, latest located version v4 (18 May 2026), https://doi.org/10.1101/2024.09.22.614271
 
 Use this as an external reproduction/falsification benchmark for connectome-constrained response prediction. The recording cohort spans animals while the anatomical connectome is a species-level constraint; it is not an individually reconstructed connectome for every recorded animal. Therefore this tier may support cross-animal anatomical-template prediction, but it cannot estimate the effect of proofreading a particular animal's connectome on that same animal's recorded responses.
 
@@ -49,6 +49,17 @@ Required pins:
 - preprocessing, cell inclusion, missingness and model/checkpoint digests.
 
 If the source data, code, checkpoint or split cannot be obtained, report NOT_REPRODUCIBLE. Do not silently substitute a reimplementation with different inputs or partitions and call it an exact reproduction.
+
+
+
+### Additional 2026 behavior and circuit-model comparators
+
+- **Lee (bioRxiv, 9 September 2026), *What an atlas-fitted connectome can and cannot do: evolutionary search over interneuron stimulation in a whole-body C. elegans model*** (https://doi.org/10.64898/2026.09.06.749731). The reported 302-neuron OpenWorm c302 system couples dynamics fitted once to a signal-propagation atlas, a literature-derived motor layer and a viscoelastic body. An external agent may inject current only into a small whitelist of interneurons. The abstract reports 91% chemotaxis success over four of five training seeds when stimulating five command/steering interneurons; eight sensory-neuron stimulation targets perform no better than chance. Shuffled wiring reduces performance to roughly one fifth. This is a model-based behavioral result, not an in-vivo intervention result or proof that the connectome alone explains sensory-to-command transformation. Reproduce the exact preregistration, seeds, maze geometry, fitted parameters and body/motor assumptions before comparing.
+- **Chung and Kim (Scientific Reports, 21 May 2026), *Optimization of connectome weights for a neural network model generating both forward and backward locomotion in C. elegans*** (https://www.nature.com/articles/s41598-026-54384-5). This work optimizes effective synaptic weights against anatomical weight proportions, muscle activity and SMD/neck-bend phase relationships. Its methods add phenomenological proprioceptive feedback connections that are not anatomically identified synapses. Treat it as a behavior/muscle-fit comparator, but score held-out perturbations and behavior separately from objectives used for weight fitting.
+- **An (bioRxiv, 24 September 2026), *How sparse can a fly-brain model be?*** (https://doi.org/10.64898/2026.09.19.752860). The FlyLite study compares six connectome-sparsification operators at matched edge budgets across feeding, bitter suppression and grooming tasks and across silent/active states. It reports that weak-synapse pruning preserves 79% of feeding output with 6% of edges in its setting, but task-aware pruning loses held-out inhibition early and task/state failure modes differ. This motivates a separate task- and state-conditioned connection-criticality benchmark; it does not justify a universal pruning threshold.
+- **Liu et al. (bioRxiv, 24 September 2026), *Connectome-based biophysical modeling of a figure-ground discrimination circuit*** (https://doi.org/10.64898/2026.09.17.752514). The authors use Drosophila connectomics and morphologically detailed biophysics to model T4a-vCH interactions and motion/figure-ground discrimination. Treat this as a circuit-specific biophysical comparator, not a whole-brain dynamics result.
+
+These studies imply that model comparisons must factor anatomy, effective physiological coupling, cell-intrinsic dynamics, proprioceptive/body feedback, network state and task. They also require task/condition holdouts that were not used to fit parameters.
 
 ### Tier B — Fish1.5 same-specimen structure/function
 
