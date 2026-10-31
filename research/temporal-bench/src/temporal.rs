@@ -686,6 +686,7 @@ mod tests {
         if let TemporalEventKind::Feedback { label, .. } = &mut event.kind {
             *label = -*label;
         }
+        task.content_sha256 = multiscale_content_digest(&task);
         assert!(matches!(
             verify_multiscale_trace(&task, &oracle),
             Err(TemporalVerificationError::InvalidFeedback { .. })
@@ -701,6 +702,7 @@ mod tests {
             .find(|event| matches!(&event.kind, TemporalEventKind::Feedback { .. }))
             .unwrap();
         event.step = event.step.saturating_sub(1);
+        task.content_sha256 = multiscale_content_digest(&task);
         assert!(matches!(
             verify_multiscale_trace(&task, &oracle),
             Err(TemporalVerificationError::InvalidFeedback { .. })
@@ -716,6 +718,7 @@ mod tests {
             .position(|event| matches!(&event.kind, TemporalEventKind::Feedback { .. }))
             .unwrap();
         task.events.remove(index);
+        task.content_sha256 = multiscale_content_digest(&task);
         assert!(matches!(
             verify_multiscale_trace(&task, &oracle),
             Err(TemporalVerificationError::MissingFeedback { .. })
