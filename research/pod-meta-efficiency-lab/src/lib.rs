@@ -9,6 +9,12 @@
 //! a claim of state-of-the-art performance.
 
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use pod_meta_lab::{
+    choose_next as pod_meta_choose_next, CandidateOperation as PodCandidateOperation,
+    Obligation as PodObligation, ObligationState, OperationKind, SchedulingClass,
+    Selection as PodSelection, SelectionContext,
+};
 
 pub const TEMPORAL: u8 = 0b0001;
 pub const INDEPENDENCE: u8 = 0b0010;
@@ -22,7 +28,8 @@ pub enum Policy {
     FixedOrder,
     GenericVoc,
     BudgetMatchedRandom,
-    ProofObligationGuided,
+    PodMetaRouter,
+    MaskCoverageGreedy,
     UnverifiedConfidence,
     OracleMinimumCost,
 }
@@ -32,7 +39,8 @@ impl Policy {
         Self::FixedOrder,
         Self::GenericVoc,
         Self::BudgetMatchedRandom,
-        Self::ProofObligationGuided,
+        Self::PodMetaRouter,
+        Self::MaskCoverageGreedy,
         Self::UnverifiedConfidence,
         Self::OracleMinimumCost,
     ];
@@ -42,7 +50,8 @@ impl Policy {
             Self::FixedOrder => "fixed_order",
             Self::GenericVoc => "generic_voc",
             Self::BudgetMatchedRandom => "budget_matched_random",
-            Self::ProofObligationGuided => "proof_obligation_guided",
+            Self::PodMetaRouter => "pod_meta_router",
+            Self::MaskCoverageGreedy => "mask_coverage_greedy",
             Self::UnverifiedConfidence => "unverified_confidence",
             Self::OracleMinimumCost => "oracle_minimum_cost",
         }
@@ -259,6 +268,7 @@ pub struct TrialResult {
     pub budget: u32,
     pub spent: u32,
     pub operation_count: usize,
+    pub scheduler_candidate_rejections: u32,
     pub verified_obligations: u32,
     pub required_obligations: u32,
     pub reported_complete: bool,
@@ -333,6 +343,99 @@ fn oracle_subset(case: &TaskCase) -> Option<(u64, u32)> {
     best.map(|(subset, cost, _)| (subset, cost))
 }
 
+fn choose_with_pod_meta_router(
+    case: &TaskCase,
+    attempted: &[bool],
+    attempted_without_progress: &BTreeSet<(String, String)>,
+    verified_mask: u8,
+    progress_key: &str,
+    spent: u32,
+    budget: u32,
+) -> (Option<usize>, u32) {
+    let obligation_rows = [
+        (TEMPORAL, "temporal", ObligationState::StaleOrRetracted, 6),
+        (INDEPENDENCE, "independence", ObligationState::Contested, 6),
+        (AUTHORITY, "authority", ObligationState::CandidateEvidenceAvailable, 8),
+        (PROOF_PATH, "proof_path", ObligationState::CandidateEvidenceAvailable, 8),
+    ];
+
+    let obligations: Vec<PodObligation> = obligation_rows
+        .iter()
+        .filter(|(bit, _, _, _)| case.required_mask & *bit != 0)
+        .map(|(bit, id, initial_state, priority)| {
+            let state = if verified_mask & *bit != 0 {
+                ObligationState::SupportedUnderProfile
+            } else {
+                *initial_state
+            };
+            PodObligation::new(*id, state, *priority)
+                .with_state_identity(progress_key.to_owned())
+        })
+        .collect();
+
+    let all_ids = vec![
+        "temporal".to_owned(),
+        "independence".to_owned(),
+        "authority".to_owned(),
+        "proof_path".to_owned(),
+    ];
+    let operations: Vec<PodCandidateOperation> = case.operations
+        .iter()
+        .map(|operation| {
+            let mask = operation.public.advertised_mask & case.required_mask;
+            let targets: Vec<String> = obligation_rows
+                .iter()
+                .filter(|(bit, _, _, _)| mask & *bit != 0)
+                .map(|(_, id, _, _)| (*id).to_owned())
+                .collect();
+            let targets = if targets.is_empty() { all_ids.clone() } else { targets };
+
+            let kind = if mask == 0 {
+                OperationKind::RepairDerivation
+            } else if mask & TEMPORAL != 0 && mask & INDEPENDENCE != 0 {
+                OperationKind::CompareAlternatives
+            } else if mask & INDEPENDENCE != 0 {
+                OperationKind::SeekIndependentEvidence
+            } else if mask & TEMPORAL != 0 {
+                OperationKind::RefreshEvidence
+            } else {
+                OperationKind::Verify
+            };
+            let class = if operation.public.mandatory_mask != 0 {
+                SchedulingClass::Mandatory
+            } else {
+                SchedulingClass::Competitive
+            };
+            let candidate = PodCandidateOperation::new(
+                operation.public.id,
+                kind,
+                targets,
+                class,
+                u64::from(operation.public.cost),
+                progress_key.to_owned(),
+            );
+            if mask == 0 { candidate.inapplicable() } else { candidate }
+        })
+        .collect();
+
+    let decision = pod_meta_choose_next(&SelectionContext {
+        obligations: &obligations,
+        operations: &operations,
+        attempted_without_progress,
+        remaining_work_units: u64::from(budget.saturating_sub(spent)),
+        mandatory_reserve_units: u64::from(case.mandatory_cost(attempted)),
+    });
+    let rejection_count = decision.rejected.len() as u32;
+    let selected_id = match decision.selection {
+        PodSelection::Run { operation_id, .. } => Some(operation_id),
+        PodSelection::Stop(_) => None,
+    };
+    let selected_index = selected_id.and_then(|id| {
+        case.operations.iter().position(|operation| operation.public.id == id)
+    });
+    (selected_index, rejection_count)
+}
+
 fn choose_next(
     case: &TaskCase,
     policy: Policy,
@@ -368,7 +471,7 @@ fn choose_next(
             state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
             Some(affordable[((state >> 32) as usize) % affordable.len()])
         }
-        Policy::ProofObligationGuided => {
+        Policy::MaskCoverageGreedy => {
             let mandatory_remaining: Vec<usize> = case.operations.iter().enumerate()
                 .filter_map(|(i, operation)| {
                     (operation.public.mandatory_mask != 0 && !attempted[i]).then_some(i)
@@ -434,7 +537,18 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
             break;
         }
 
-        let Some(index) = choose_next(case, policy, &attempted, unresolved, spent, budget, seed) else {
+        let progress_key = format!("proof-state-{progress_version}");
+        let next = if policy == Policy::PodMetaRouter {
+            let (selected, rejected) = choose_with_pod_meta_router(
+                case, &attempted, &attempted_without_progress, verified_mask,
+                &progress_key, spent, budget,
+            );
+            scheduler_candidate_rejections = scheduler_candidate_rejections.saturating_add(rejected);
+            selected
+        } else {
+            choose_next(case, policy, &attempted, unresolved, spent, budget, seed)
+        };
+        let Some(index) = next else {
             break;
         };
         let unresolved_before = case.required_mask & !verified_mask;
@@ -454,6 +568,12 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
             claimed_mask |= operation.public.advertised_mask & case.required_mask;
         } else {
             claimed_mask = verified_mask;
+        }
+
+        if newly_verified == 0 {
+            attempted_without_progress.insert((operation.public.id.to_owned(), progress_key));
+        } else {
+            progress_version = progress_version.saturating_add(1);
         }
 
         if newly_verified == 0 && operation.public.mandatory_mask == 0 {
@@ -511,6 +631,7 @@ pub fn run_trial(case: &TaskCase, policy: Policy, budget: u32, seed: u64) -> Tri
         budget,
         spent,
         operation_count: operations,
+        scheduler_candidate_rejections,
         verified_obligations: popcount(verified_mask & case.required_mask),
         required_obligations: popcount(case.required_mask),
         reported_complete,
@@ -552,7 +673,7 @@ mod tests {
     fn proof_guided_completes_minimum_sufficient_multi_obligation_packet() {
         let case = build_cases().into_iter()
             .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
-        let result = run_trial(&case, Policy::ProofObligationGuided, 7, 1729);
+        let result = run_trial(&case, Policy::MaskCoverageGreedy, 7, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.spent, 6);
         assert_eq!(result.missed_mandatory_count, 0);
@@ -563,7 +684,7 @@ mod tests {
     fn proof_guided_does_not_accept_stale_evidence_claim_as_temporal_support() {
         let case = build_cases().into_iter()
             .find(|c| c.id == "attractive_but_stale_evidence").unwrap();
-        let result = run_trial(&case, Policy::ProofObligationGuided, 10, 1729);
+        let result = run_trial(&case, Policy::MaskCoverageGreedy, 10, 1729);
         assert!(result.completion_verified);
         assert_eq!(result.false_support_count, 0);
         assert_eq!(result.missed_mandatory_count, 0);
@@ -584,7 +705,28 @@ mod tests {
     fn mandatory_work_is_not_displaced_by_nonmandatory_gain() {
         let case = build_cases().into_iter()
             .find(|c| c.id == "minimum_sufficient_combined_packet").unwrap();
-        let result = run_trial(&case, Policy::ProofObligationGuided, 5, 1729);
+        let result = run_trial(&case, Policy::MaskCoverageGreedy, 5, 1729);
+        assert_eq!(result.spent, 0);
+        assert!(!result.completion_verified);
+        assert_eq!(result.missed_mandatory_count, 2);
+    }
+
+    #[test]
+    fn actual_pod_meta_router_completes_verified_workflow_under_matched_budget() {
+        let case = build_cases().into_iter()
+            .find(|c| c.id == "valid_multi_obligation_packet").unwrap();
+        let result = run_trial(&case, Policy::PodMetaRouter, 14, 1729);
+        assert!(result.completion_verified);
+        assert_eq!(result.missed_mandatory_count, 0);
+        assert_eq!(result.false_support_count, 0);
+        assert!(result.scheduler_candidate_rejections > 0);
+    }
+
+    #[test]
+    fn actual_pod_meta_router_preserves_mandatory_budget_reserve() {
+        let case = build_cases().into_iter()
+            .find(|c| c.id == "minimum_sufficient_combined_packet").unwrap();
+        let result = run_trial(&case, Policy::PodMetaRouter, 5, 1729);
         assert_eq!(result.spent, 0);
         assert!(!result.completion_verified);
         assert_eq!(result.missed_mandatory_count, 2);
@@ -595,7 +737,7 @@ mod tests {
         for case in build_cases() {
             let oracle = run_trial(&case, Policy::OracleMinimumCost, 100, 1729);
             assert!(oracle.completion_verified, "{}", case.id);
-            let proof = run_trial(&case, Policy::ProofObligationGuided, 100, 1729);
+            let proof = run_trial(&case, Policy::MaskCoverageGreedy, 100, 1729);
             assert!(proof.completion_verified, "{}", case.id);
             assert!(oracle.spent <= proof.spent, "{}", case.id);
         }
@@ -612,7 +754,7 @@ mod tests {
     fn proof_aware_policy_never_false_completes() {
         for case in build_cases() {
             for budget in [3, 5, 7, 10, 14] {
-                let result = run_trial(&case, Policy::ProofObligationGuided, budget, 42);
+                let result = run_trial(&case, Policy::MaskCoverageGreedy, budget, 42);
                 assert!(!result.false_completion, "{}:{}", case.id, budget);
                 assert_eq!(result.false_support_count, 0);
             }
@@ -623,7 +765,7 @@ mod tests {
     fn oracle_is_not_a_promotion_candidate() {
         assert!(!Policy::OracleMinimumCost.promotion_candidate());
         assert!(!Policy::UnverifiedConfidence.promotion_candidate());
-        assert!(Policy::ProofObligationGuided.promotion_candidate());
+        assert!(Policy::MaskCoverageGreedy.promotion_candidate());
     }
 
     #[test]
@@ -644,8 +786,8 @@ mod tests {
     #[test]
     fn exhaustive_budget_curve_contains_low_and_high_budget_points() {
         let case = build_cases().remove(1);
-        let low = run_trial(&case, Policy::ProofObligationGuided, 3, 10);
-        let high = run_trial(&case, Policy::ProofObligationGuided, 14, 10);
+        let low = run_trial(&case, Policy::MaskCoverageGreedy, 3, 10);
+        let high = run_trial(&case, Policy::MaskCoverageGreedy, 14, 10);
         assert!(high.spent >= low.spent);
         assert!(high.verified_obligations >= low.verified_obligations);
     }
@@ -654,7 +796,7 @@ mod tests {
     fn rejected_evidence_and_irrelevant_computation_have_separate_costs() {
         let cases = build_cases();
         let stale = cases.iter().find(|c| c.id == "attractive_but_stale_evidence").unwrap();
-        let rejected = run_trial(stale, Policy::ProofObligationGuided, 10, 10);
+        let rejected = run_trial(stale, Policy::MaskCoverageGreedy, 10, 10);
         assert!(rejected.rejected_candidate_count > 0);
         assert!(rejected.rejected_candidate_cost > 0);
 
