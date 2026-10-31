@@ -255,9 +255,17 @@
       "counter_file_owner": "evaluator_uid",
       "counter_file_mode": "0600"
     },
-    "tests_authored": 12,
+    "tests_authored": 14,
     "tests_executed": false,
-    "not_wired_to_evaluator_binary": true
+    "not_wired_to_evaluator_binary": true,
+    "validation_rules": [
+      "exposure_sum_not_greater_than_episode",
+      "resource_overrun_requires_out_of_budget_disposition",
+      "completed_energy_budget_requires_measured_energy",
+      "completed_failure_code_zero",
+      "non_completed_failure_code_nonzero"
+    ],
+    "measured_energy_absent_on_failed_run": "permitted_and_recorded_as_missing_not_zero"
   },
   "validation": {
     "local_kernel": "Linux 6.18.57 x86_64",
@@ -279,7 +287,7 @@
     "signed_receipt_replay_campaign": false,
     "systemd_analyze_verify_synthetic_equivalent_units": "passed_systemd_257_9",
     "nix_module_evaluation": false,
-    "source_authored_tests": 17,
+    "source_authored_tests": 19,
     "openat2_syscall_local": "passed_linux_6_18_57"
   },
   "claim_ceiling": "Source prototype plus synthetic systemd unit syntax and local openat2 availability checks only. No verified sandbox, security claim, working end-to-end evaluator, signing pipeline or replay-qualified production system."
