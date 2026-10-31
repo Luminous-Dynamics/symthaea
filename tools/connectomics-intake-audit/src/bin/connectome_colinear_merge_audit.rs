@@ -130,6 +130,8 @@ struct TrackResamplingCount {
     track_id: String,
     original_sample_count: usize,
     resampled_sample_count: usize,
+    /// Terminal cable span omitted because the uniform grid does not extend past the source endpoint.
+    uncovered_terminal_nm: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -229,9 +231,9 @@ fn validate_input(input: &Input) -> Result<(), String> {
             let rounded = ratio.round();
             if !ratio.is_finite() || rounded < 3.0
                 || (ratio - rounded).abs() > 1.0e-9 * ratio.abs().max(1.0)
-                || rounded > usize::MAX as f64
+                || rounded > (usize::MAX / 2) as f64
             {
-                return Err("half_window_nm must be an integer multiple of resample_interval_nm with at least three samples per half-window".into());
+                return Err("half_window_nm must be an integer multiple of resample_interval_nm with at least three samples per half-window and safe index arithmetic".into());
             }
         }
         _ => return Err("resample_interval_nm and half_window_nm must either both be present or both be absent".into()),
@@ -255,8 +257,11 @@ fn validate_input(input: &Input) -> Result<(), String> {
             return Err("track IDs must be non-empty and unique".into());
         }
         let window = input.detector.half_window_samples;
-        if track.samples.len() < (2 * window + 1) {
-            return Err(format!("track {} needs at least {} samples", track.track_id, 2 * window + 1));
+        let minimum_samples = window.checked_mul(2)
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| "sample-index half-window overflows required sample count".to_string())?;
+        if track.samples.len() < minimum_samples {
+            return Err(format!("track {} needs at least {} samples", track.track_id, minimum_samples));
         }
         if let Some(half_window_nm) = input.detector.half_window_nm {
             let span_nm = track.samples.last().unwrap().distance_nm
@@ -371,6 +376,9 @@ fn build_physical_resampled_input(input: &Input) -> Result<(Option<Input>, Optio
         _ => return Err("physical resampling configuration is incomplete".into()),
     };
     let half_window_samples = (half_window_nm / interval_nm).round() as usize;
+    let minimum_physical_samples = half_window_samples.checked_mul(2)
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| "physical half-window overflows required sample count".to_string())?;
     let mut physical_input = input.clone();
     physical_input.detector.half_window_samples = half_window_samples;
     let mut per_track_sample_counts = Vec::with_capacity(input.tracks.len());
@@ -391,7 +399,7 @@ fn build_physical_resampled_input(input: &Input) -> Result<(Option<Input>, Optio
     }
     physical_input.tracks = resampled_tracks;
     if physical_input.tracks.iter().any(|track| {
-        track.samples.len() < (2 * half_window_samples + 1)
+        track.samples.len() < minimum_physical_samples
     }) {
         return Err("one or more resampled tracks are too short for the configured physical window".into());
     }
@@ -982,6 +990,39 @@ mod tests {
         }
         assert!(detected_positions.windows(2).all(|pair| pair[0] == pair[1]),
             "physical proposals changed across source sampling densities: {detected_positions:?}");
+    }
+
+    #[test]
+    fn physical_resampling_reports_non_grid_terminal_tail_instead_of_hiding_it() {
+        let track = Track {
+            track_id: "non-grid-endpoint".into(),
+            samples: vec![0.0, 100.0, 250.0, 375.0, 525.0, 625.0]
+                .into_iter()
+                .map(|distance_nm| Sample {
+                    distance_nm,
+                    radius_nm: 60.0,
+                    tangent_degrees: 5.0,
+                    membrane_integrity: 0.9,
+                    synapse_density: 0.2,
+                })
+                .collect(),
+        };
+        let mut input = base_input(vec![track]);
+        enable_physical_mode(&mut input, 100.0, 200.0);
+        let (_, report) = build_physical_resampled_input(&input).unwrap();
+        let report = report.unwrap();
+        assert_eq!(report.per_track_sample_counts[0].resampled_sample_count, 7);
+        assert!((report.per_track_sample_counts[0].uncovered_terminal_nm - 25.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn physical_half_window_overflow_is_rejected_before_index_arithmetic() {
+        let track = make_sampled_track("physical-step", 100, |x| {
+            if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
+        });
+        let mut input = base_input(vec![track]);
+        enable_physical_mode(&mut input, 1.0, (usize::MAX / 2) as f64 + 1.0);
+        assert!(validate_input(&input).unwrap_err().contains("safe index arithmetic"));
     }
 
     #[test]
