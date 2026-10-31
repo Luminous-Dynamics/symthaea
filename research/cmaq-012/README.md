@@ -40,7 +40,7 @@ The dependency-free Rust CLI consumes strict UTF-8 TSV. It rejects:
 
 The exact header is:
 
-    task    capability    split    seed    arm    initial_state_sha256    proposer_sha256    candidate_set_sha256    environment_config_sha256    adapter_sha256    source_sha256    checkpoint_sha256    candidate_count    rollout_horizon    planner_compute_budget_units    status    return    task_success    latency_ms
+    task    capability    split    seed    arm    initial_state_sha256    proposer_sha256    candidate_set_sha256    environment_config_sha256    adapter_sha256    source_sha256    checkpoint_sha256    candidate_count    rollout_horizon    planner_compute_budget_units    status    return    task_success    latency_ms    resource_profile_sha256    profiling_receipt_sha256    resource_measurement_method    compute_work_units    peak_memory_bytes    energy_millijoules    direct_value_calls    world_model_forward_calls    world_model_transition_calls    oracle_transition_calls    environment_transition_calls    optimizer_iterations
 
 Each task × capability × split × seed must have exactly one D0, D1, W1, W2 and W3 row. Each row binds its own source and checkpoint digests. The shared state/proposer/candidate/environment/adapter digests and budget fields must match within a paired episode.
 
