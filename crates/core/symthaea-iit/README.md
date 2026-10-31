@@ -454,6 +454,21 @@ each case also asserts that ordinary min-fill is rejected under that same budget
 The 8x8 baseline needs 1,024 factor entries, while the conditioned residual fits
 within 32. Its timing ratio is a cost tradeoff, not a speedup claim.
 
+The benchmark pins the current deterministic min-fill width/peak regression
+frontier:
+
+| Grid | Cutset row (0-based) | Exact branches | Plain width | Plain peak entries | Conditioned width | Conditioned peak entries |
+|---:|---:|---:|---:|---:|---:|---:|
+| 4×4 | 2 | 16 | 4 | 32 | 2 | 8 |
+| 5×5 | 2 | 32 | 5 | 64 | 2 | 8 |
+| 6×6 | 3 | 64 | 6 | 128 | 3 | 16 |
+| 8×8 | 4 | 256 | 9 | 1,024 | 4 | 32 |
+
+These are planner regression targets for the stated graph/elimination ordering,
+not measured runtime or total-RSS values. Changing the min-fill heuristic or
+separator changes requires updating the complete-output parity and budget tests
+together, not weakening either check.
+
 Run:
 
     cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep
