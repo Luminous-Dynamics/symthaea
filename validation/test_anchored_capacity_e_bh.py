@@ -81,6 +81,66 @@ class AnchoredCapacityEbhTests(unittest.TestCase):
                     best_mask, best_size = candidate, size
             self.assertEqual(result["rejection_mask"], best_mask)
 
+    def test_step_up_matches_exhaustive_randomized_closure_search(self):
+        import random
+
+        rng = random.Random(20261031)
+        for m in range(1, 8):
+            for _ in range(20):
+                e = [
+                    Fraction(rng.randrange(0, 100), rng.choice([1, 2, 5, 10]))
+                    for _ in range(m)
+                ]
+                alpha = Fraction(1, rng.choice([20, 10, 5, 2]))
+                baseline = e_bh_baseline(e, alpha)["rejection_mask"]
+                maximum_size = baseline.bit_count()
+                for mask in range(1 << m):
+                    if mask & baseline != baseline:
+                        continue
+                    k = mask.bit_count()
+                    if k == 0:
+                        continue
+                    slack = alpha - sum(
+                        (
+                            max(
+                                (Fraction(1, k) if (mask >> i) & 1 else Fraction(0))
+                                - alpha * (e[i] - 1) / m,
+                                Fraction(0),
+                            )
+                            for i in range(m)
+                        ),
+                        Fraction(0),
+                    )
+                    if slack >= 0:
+                        maximum_size = max(maximum_size, k)
+                result = anchored_e_bh_max_cardinality(e, alpha)
+                self.assertEqual(result["rejection_count"], maximum_size)
+
+    def test_capacity_optimizer_reports_anchored_step_up_comparator(self):
+        e = [30, 14, 6]
+        alpha = Fraction(1, 10)
+        result = select_anchored_capacity_e_bh(
+            e, alpha, values=[1, 1, 1], costs=[1, 1, 1], capacity=3
+        )
+        self.assertEqual(
+            result["selected"]["decisions"][0]["rejection_mask"].bit_count(),
+            result["anchored_max_cardinality"]["rejection_count"],
+        )
+
+    def test_verifier_rejects_tampered_anchored_step_up_receipt(self):
+        import copy
+
+        e = [30, 14, 6]
+        alpha = Fraction(1, 10)
+        values = [1, 100, 1]
+        costs = [1, 1, 1]
+        result = select_anchored_capacity_e_bh(e, alpha, values, costs, capacity=2)
+        tampered = copy.deepcopy(result)
+        tampered["anchored_max_cardinality"]["rejection_mask"] = 0
+        check = verify_anchored_capacity_e_bh(tampered, e, alpha, values, costs)
+        self.assertFalse(check["valid"])
+        self.assertIn("anchored_max_cardinality_baseline_mismatch", check["failures"])
+
     def test_anchored_closure_can_discover_when_ordinary_e_bh_is_empty(self):
         # Ordinary e-BH has no k meeting e_(k) >= m/(alpha*k), but the
         # anchored local collection has enough global slack to certify {1}.
