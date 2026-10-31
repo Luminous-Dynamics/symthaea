@@ -100,6 +100,7 @@ pub struct StyleRouteCoverage {
     pub tempo_range_bpm: [f32; 2],
     pub form_pool: Vec<String>,
     pub motif_bank_counts: [usize; 3],
+    pub melodic_dna_style_specific: bool,
     pub progression_spec: ProgressionSpec,
     pub accompaniment_pool: Vec<String>,
     pub melodic_dna: MelodicDna,
@@ -258,6 +259,12 @@ pub fn collect_style_coverage() -> StyleCoverageReport {
                             spec.motifs_medium.len(),
                             spec.motifs_busy.len(),
                         ],
+                        melodic_dna_style_specific: !spec.melody.hook_rhythms.is_empty()
+                            || !spec.melody.hook_contours.is_empty()
+                            || spec.melody.appoggiatura_rate > 0.0
+                            || spec.melody.ornament_rate > 0.0
+                            || spec.melody.blue_note_rate > 0.0
+                            || spec.melody.use_procedural_foundry,
                         progression_spec: spec.progression.clone(),
                         accompaniment_pool: spec
                             .accompaniment_pool
@@ -293,6 +300,7 @@ pub fn collect_style_coverage() -> StyleCoverageReport {
                         tempo_range_bpm: [0.0, 0.0],
                         form_pool: Vec::new(),
                         motif_bank_counts: [0, 0, 0],
+                        melodic_dna_style_specific: false,
                         progression_spec: ProgressionSpec::Grammar,
                         accompaniment_pool: Vec::new(),
                         melodic_dna: MelodicDna::default(),
@@ -425,13 +433,11 @@ fn build_axes(
         StyleCoverageState::DeclaredInSpec
     };
 
-    let has_style_specific_melody = !route.melodic_dna.hook_rhythms.is_empty()
-        || !route.melodic_dna.hook_contours.is_empty()
-        || route.melodic_dna.appoggiatura_rate > 0.0
-        || route.melodic_dna.ornament_rate > 0.0
-        || route.melodic_dna.blue_note_rate > 0.0
-        || route.melodic_dna.use_procedural_foundry;
-    let melody_state = if has_style_specific_melody {
+    // Every route owns motif banks in its CompositionSpec. The separate
+    // MelodicDna field may still be empty and use shared hook defaults; report
+    // that distinction in detail rather than downgrading the entire melodic
+    // axis to "missing".
+    let melody_state = if route.motif_bank_counts.iter().all(|count| *count > 0) {
         StyleCoverageState::DeclaredInSpec
     } else {
         StyleCoverageState::SharedEngineDefault
@@ -447,7 +453,7 @@ fn build_axes(
     vec![
         axis(StyleCoverageAxis::CorpusAndProvenance, StyleCoverageState::FamilyHypothesisOnly, "source-specific corpus lineage is not recorded in the canonical style catalogue"),
         axis(StyleCoverageAxis::Structure, StyleCoverageState::RegisteredComposerRoute, &format!("{} / {}; form pool: {:?}", route.composer_style, route.grammar_family, route.form_pool)),
-        axis(StyleCoverageAxis::Melody, melody_state, &format!("{} hook rhythms, {} hook contours; appoggiatura {:.3}, ornament {:.3}, blue-note {:.3}; motif banks {:?}", route.melodic_dna.hook_rhythms.len(), route.melodic_dna.hook_contours.len(), route.melodic_dna.appoggiatura_rate, route.melodic_dna.ornament_rate, route.melodic_dna.blue_note_rate, route.motif_bank_counts)),
+        axis(StyleCoverageAxis::Melody, melody_state, &format!("motif banks {:?}; melodic DNA style-specific={}; {} hook rhythms, {} hook contours; appoggiatura {:.3}, ornament {:.3}, blue-note {:.3}", route.motif_bank_counts, route.melodic_dna_style_specific, route.melodic_dna.hook_rhythms.len(), route.melodic_dna.hook_contours.len(), route.melodic_dna.appoggiatura_rate, route.melodic_dna.ornament_rate, route.melodic_dna.blue_note_rate)),
         axis(StyleCoverageAxis::Rhythm, StyleCoverageState::DeclaredInSpec, &format!("meter {} quarter-note beats; accompaniment {:?}; meter alternatives {:?}", route.meter_quarter_beats_per_bar, route.accompaniment_pool, route.meter_pool)),
         axis(StyleCoverageAxis::HarmonyAndTuning, harmony_state, &format!("progression {:?}; mode {:?}; mode pool {:?}", route.progression_spec, route.mode, route.mode_pool)),
         axis(StyleCoverageAxis::TextureAndCounterpoint, StyleCoverageState::DeclaredInSpec, &format!("rhetoric {}; development {}; texture fields recorded", route.phrase_rhetoric, route.development_dna)),
