@@ -157,3 +157,8 @@ The current branch adds a typed action-bank object to `src/uncertainty.rs` and a
 The API validates the complete bank, returns action intervals, constructs all pairwise effects from same-column differences, and orders effect results by action ID rather than input row order. Tests demonstrate common-mode cancellation and action-row permutation invariance, and reject duplicate IDs, malformed provenance, invalid horizons and sample-cardinality mismatches.
 
 The focused workflow now schema-validates a synthetic joint-bank fixture and hostile duplicate-ID mutations. These are interface/metric tests only. They do not show that a production CfC/vision predictor emits calibrated joint distributions, nor that a producer is honest about its draw coupling. A future VIS-005 adapter must retain and independently verify the action manifest and joint-draw bytes while preserving the Predicted/Counterfactual memory boundary.
+
+
+### Joint action-bank content integrity
+
+The new action-bank structure has a canonical SHA-256 over its exact semantic content (history/horizon/action manifest/outcome channel/action IDs/draw IDs/coupling/matrix dimensions/f64 bits). The public compute helper produces this digest; validation recomputes and rejects mismatch. The digest is deterministic across little-endian canonical encoding rules and is pinned by a Rust known-answer test plus an independent Python workflow calculation. This closes payload-tampering risk but does not attest producer honesty or calibration.
