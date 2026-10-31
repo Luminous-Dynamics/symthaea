@@ -77,7 +77,8 @@ cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin conne
   --input /path/to/connectomebench2_metadata.jsonl \\
   --dataset-revision-commit-sha <resolved-v2-commit-sha> \\
   --cube-edge-nm 50000 \\
-  --output connectomebench2-lineage-audit.json
+  --output connectomebench2-lineage-audit.json \\
+  --cohort-manifest-output connectomebench2-modality-cohorts.json
 ```
 
 The `--dataset-revision-commit-sha` argument is required and must be the exact 40-character commit SHA resolved from the Hugging Face `v2` revision used to download the dataset; do not pass the literal string `v2`. The report records both this dataset commit and the pinned upstream code commit. The SHA is operator-supplied provenance: the offline auditor does not contact Hugging Face or independently prove that the local files came from that commit.
@@ -89,6 +90,19 @@ Cross-split root identity is reported as a warning, not a hard failure. A neuron
 The report also includes a deterministic `modality_coverage` map for `overall`, task route, sample type, species, split, source archive, sample-type × species × split, and route × species × split strata. Each row-count group reports geometry availability, any EM slot, missing EM, per-view `em_xy`/`em_xz`/`em_yz` counts, rows with at least one non-label-conditioned EM view, rows with the full three-view EM set, `em_best` presence and EM-best-only rows, fused geometry+usable-EM eligibility, and corresponding fractions. `em_best` is counted separately and never contributes to usable EM eligibility; it is not an allowed single-segment model input. Route strata count one row in each declared route, so counts across routes can exceed the overall row count. This is a metadata-sidecar eligibility summary only: it does not resolve payload bytes, certify readable images, establish a probability-sampling design, or show that EM missingness is random. Paired model comparisons must still use the same sample IDs, labels, source revision and exact modality transformations.
 
 The synthetic fixture `docs/neuroscience/examples/CONNECTOMEBENCH2_V2_METADATA_LINEAGE.example.jsonl` has one fake row per sample type. It is not a substitute for running the audit on the exact downloaded V2 revision. The V2 revision commit SHA still must be recorded in the intake manifest; this offline binary does not resolve the Hugging Face branch to a commit or prove that the downloaded bytes came from that branch.
+
+### Content-addressed modality cohorts
+
+The optional `--cohort-manifest-output` writes a deterministic sample-ID manifest **only when the metadata audit status is PASS**. The schema is `docs/neuroscience/CONNECTOME_MODALITY_COHORT_MANIFEST.schema.json`. It contains:
+- `geometry_all`;
+- `em_legal_any_view` (at least one of `em_xy`, `em_xz`, `em_yz`);
+- `em_legal_full_triplet` (all three legal EM views);
+- `fused_geometry_legal_em`;
+- `paired_geometry_only` and `paired_em_legal_views`, which have exactly identical sorted sample IDs;
+- `geometry_without_legal_em`;
+- `em_best_only_excluded`.
+
+Each membership has a sorted unique ID list, count, SHA-256, explicit eligibility rule and `NOT_ESTIMABLE` status for empty cohorts. The cohort-set digest binds the exact dataset revision SHA, source sidecar JSONL SHA-256, policy version, cohort names/rules/counts and membership digests. It proves the identity of the declared sidecar-derived cohort manifest, not that image payloads exist or are readable. Paired comparisons must still verify the exact transformation/labels and actual Parquet bytes in the next qualification tier. The output path must differ from `--output`.
 
 ## Frozen prediction scorer
 
