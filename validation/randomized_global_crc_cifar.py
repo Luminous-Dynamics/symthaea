@@ -239,13 +239,18 @@ class RandomizedCommonDepthCRC:
         P=np.asarray(probabilities,dtype=np.float64)
         x=P.reshape(-1)
         c=-(self.weights[:,None]*self.utility).reshape(-1)
-        y_ub=np.asarray(dual_witness.get("inequality_marginals",[]),dtype=np.float64)
-        y_eq=np.asarray(dual_witness.get("equality_marginals",[]),dtype=np.float64)
-        y_lower=np.asarray(dual_witness.get("lower_marginals",[]),dtype=np.float64)
-        y_upper=np.asarray(dual_witness.get("upper_marginals",[]),dtype=np.float64)
+        try:
+            y_ub=np.asarray(dual_witness.get("inequality_marginals",[]),dtype=np.float64)
+            y_eq=np.asarray(dual_witness.get("equality_marginals",[]),dtype=np.float64)
+            y_lower=np.asarray(dual_witness.get("lower_marginals",[]),dtype=np.float64)
+            y_upper=np.asarray(dual_witness.get("upper_marginals",[]),dtype=np.float64)
+        except (TypeError,ValueError,OverflowError):
+            return {"valid":False,"reason":"dual witness contains nonnumeric values"}
         if (y_ub.shape!=(len(self.augmented),) or y_eq.shape!=(n_states,)
                 or y_lower.shape!=(n_variables,) or y_upper.shape!=(n_variables,)):
             return {"valid":False,"reason":"dual witness shape mismatch"}
+        if any(np.any(~np.isfinite(v)) for v in (y_ub,y_eq,y_lower,y_upper)):
+            return {"valid":False,"reason":"dual witness contains nonfinite values"}
         inequality_slack=b_ub-A_ub@x
         equality_residual=A_eq@x-b_eq
         stationarity=c-A_ub.T@y_ub-A_eq.T@y_eq-y_lower-y_upper
