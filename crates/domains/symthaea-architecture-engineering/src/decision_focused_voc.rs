@@ -955,8 +955,6 @@ mod tests {
     use super::*;
 
     const SOURCE_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const POSTERIOR_SHA: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const LIKELIHOOD_SHA: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     fn manifest() -> DecisionFocusedVoCModelManifest {
         DecisionFocusedVoCModelManifest {
@@ -966,8 +964,8 @@ mod tests {
             evaluation_task_id: "target-task".to_owned(),
             calibration_task_ids: vec!["cal-task-1".to_owned(), "cal-task-2".to_owned()],
             source_artifact_sha256: SOURCE_SHA.to_owned(),
-            posterior_model_sha256: POSTERIOR_SHA.to_owned(),
-            observation_likelihood_model_sha256: LIKELIHOOD_SHA.to_owned(),
+            posterior_model_sha256: String::new(),
+            observation_likelihood_model_sha256: String::new(),
             task_calibration_qualified: true,
         }
     }
@@ -1010,8 +1008,8 @@ mod tests {
             resource_unit: "gpu_seconds".to_owned(),
             incremental_cost_units: cost,
             source_artifact_sha256: SOURCE_SHA.to_owned(),
-            posterior_model_sha256: POSTERIOR_SHA.to_owned(),
-            observation_likelihood_model_sha256: LIKELIHOOD_SHA.to_owned(),
+            posterior_model_sha256: String::new(),
+            observation_likelihood_model_sha256: String::new(),
             observation_outcomes: vec![
                 ObservationLikelihood {
                     outcome_id: "high".to_owned(),
@@ -1025,27 +1023,69 @@ mod tests {
         }
     }
 
+    fn bind_manifest(
+        posterior: &PosteriorModel,
+        actions: &mut [VoCAction],
+        direction: MetricDirection,
+    ) -> DecisionFocusedVoCModelManifest {
+        let mut manifest = manifest();
+        manifest.metric_direction = direction;
+        manifest.posterior_model_sha256 = compute_posterior_model_sha256(posterior);
+        for action in actions.iter_mut() {
+            action.source_artifact_sha256 = manifest.source_artifact_sha256.clone();
+            action.posterior_model_sha256 = manifest.posterior_model_sha256.clone();
+        }
+        manifest.observation_likelihood_model_sha256 =
+            compute_observation_likelihood_model_sha256(actions, posterior);
+        for action in actions.iter_mut() {
+            action.observation_likelihood_model_sha256 =
+                manifest.observation_likelihood_model_sha256.clone();
+        }
+        manifest
+    }
+
+    fn evaluate(
+        posterior: &PosteriorModel,
+        mut actions: Vec<VoCAction>,
+        config: &DecisionFocusedVoCConfig,
+        direction: MetricDirection,
+    ) -> Result<DecisionFocusedVoCPlan, DecisionFocusedVoCError> {
+        let manifest = bind_manifest(posterior, &mut actions, direction);
+        plan_decision_focused_voc(&manifest, posterior, &actions, config)
+    }
+
     #[test]
     fn decision_focused_voi_beats_an_interval_width_surrogate() {
-        let action = query_action("query-A", "A", 1);
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).unwrap();
+        let p = posterior();
+        let plan = evaluate(
+            &p,
+            vec![query_action("query-A", "A", 1)],
+            &config(),
+            MetricDirection::Maximize,
+        ).unwrap();
         assert!((plan.current_expected_regret - 0.5).abs() < 1e-9);
         let evaluation = &plan.action_evaluations[0];
         assert!((evaluation.expected_posterior_regret - 0.1).abs() < 1e-9);
         assert!((evaluation.expected_regret_reduction - 0.4).abs() < 1e-9);
         assert!((evaluation.net_expected_utility - 0.3).abs() < 1e-9);
         assert_eq!(plan.selected_action_id.as_deref(), Some("query-A"));
-        assert!(plan.plan_sha256.len() == 64);
+        assert_eq!(plan.plan_sha256.len(), 64);
     }
 
     #[test]
     fn uninformative_action_is_rejected_and_planner_stops() {
+        let p = posterior();
         let mut action = query_action("noop", "A", 1);
         action.observation_outcomes = vec![ObservationLikelihood {
             outcome_id: "same".to_owned(),
             likelihood_by_particle: vec![1.0, 1.0],
         }];
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).unwrap();
+        let plan = evaluate(
+            &p,
+            vec![action],
+            &config(),
+            MetricDirection::Maximize,
+        ).unwrap();
         assert_eq!(plan.selected_action_id, None);
         assert_eq!(plan.stop_reason, Some(VoCStopReason::NoPositiveNetExpectedUtility));
         assert_eq!(plan.action_evaluations[0].expected_regret_reduction, 0.0);
@@ -1054,39 +1094,40 @@ mod tests {
 
     #[test]
     fn top_k_objective_reduces_to_zero_when_all_candidates_are_selected() {
+        let p = posterior();
         let mut cfg = config();
         cfg.target_k = 2;
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[], &cfg).unwrap();
+        let plan = evaluate(&p, Vec::new(), &cfg, MetricDirection::Maximize).unwrap();
         assert_eq!(plan.current_expected_regret, 0.0);
         assert_eq!(plan.stop_reason, Some(VoCStopReason::NoLegalActions));
     }
 
     #[test]
     fn lower_is_better_metrics_are_transformed_to_utility() {
-        let mut m = manifest();
-        m.metric_direction = MetricDirection::Minimize;
         let mut p = posterior();
         p.particles[0].final_values = vec![0.0, 1.0];
         p.particles[1].final_values = vec![1.0, 0.0];
-        let plan = plan_decision_focused_voc(&m, &p, &[], &config()).unwrap();
+        let plan = evaluate(&p, Vec::new(), &config(), MetricDirection::Minimize).unwrap();
         assert!((plan.current_expected_regret - 0.5).abs() < 1e-9);
     }
 
     #[test]
     fn protected_reserve_is_preserved_for_a_dormant_candidate() {
+        let p = posterior();
         let mut cfg = config();
         cfg.total_budget_units = 10;
         cfg.reserves = vec![VoCActionReserve {
             kind: VoCActionKind::DormantReactivation,
             reserve_units: 3,
         }];
-        let too_expensive = query_action("big-query", "A", 8);
-        let affordable = query_action("small-query", "A", 2);
-        let plan = plan_decision_focused_voc(
-            &manifest(),
-            &posterior(),
-            &[too_expensive, affordable],
+        let plan = evaluate(
+            &p,
+            vec![
+                query_action("big-query", "A", 8),
+                query_action("small-query", "A", 2),
+            ],
             &cfg,
+            MetricDirection::Maximize,
         ).unwrap();
         assert_eq!(plan.selected_action_id.as_deref(), Some("small-query"));
         assert_eq!(plan.action_evaluations[0].status, VoCActionStatus::BlockedByProtectedReserve);
@@ -1094,44 +1135,58 @@ mod tests {
 
     #[test]
     fn hard_total_budget_blocks_unaffordable_actions() {
+        let p = posterior();
         let mut cfg = config();
         cfg.total_budget_units = 1;
-        let action = query_action("query", "A", 2);
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[action], &cfg).unwrap();
+        let plan = evaluate(
+            &p,
+            vec![query_action("query", "A", 2)],
+            &cfg,
+            MetricDirection::Maximize,
+        ).unwrap();
         assert_eq!(plan.stop_reason, Some(VoCStopReason::NoActionFitsResourceAndReserveBudgets));
         assert_eq!(plan.action_evaluations[0].status, VoCActionStatus::BlockedByTotalBudget);
     }
 
     #[test]
     fn rejects_calibration_task_leakage() {
-        let mut m = manifest();
-        m.evaluation_task_id = "cal-task-1".to_owned();
-        assert!(plan_decision_focused_voc(&m, &posterior(), &[], &config()).is_err());
+        let p = posterior();
+        let mut actions = Vec::new();
+        let mut manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        manifest.evaluation_task_id = "cal-task-1".to_owned();
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
     }
 
     #[test]
     fn rejects_unqualified_likelihood_model() {
-        let mut m = manifest();
-        m.task_calibration_qualified = false;
-        assert!(plan_decision_focused_voc(&m, &posterior(), &[], &config()).is_err());
+        let p = posterior();
+        let mut actions = Vec::new();
+        let mut manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        manifest.task_calibration_qualified = false;
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
     }
 
     #[test]
     fn rejects_action_digest_mismatch() {
-        let mut action = query_action("query", "A", 1);
-        action.posterior_model_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned();
-        assert!(plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).is_err());
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        actions[0].posterior_model_sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned();
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
     }
 
     #[test]
     fn rejects_non_normalized_observation_likelihoods() {
-        let mut action = query_action("query", "A", 1);
-        action.observation_outcomes[0].likelihood_by_particle = vec![0.9, 0.9];
-        assert!(plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).is_err());
+        let p = posterior();
+        let mut actions = vec![query_action("query", "A", 1)];
+        actions[0].observation_outcomes[0].likelihood_by_particle = vec![0.9, 0.9];
+        let manifest = bind_manifest(&p, &mut actions, MetricDirection::Maximize);
+        assert!(plan_decision_focused_voc(&manifest, &p, &actions, &config()).is_err());
     }
 
     #[test]
-    fn sentinel_audits_expose_no_individual_candidate_id() {
+    fn sentinel_audits_expose_only_aggregate_dispositions() {
+        let p = posterior();
         let mut action = query_action("audit", "A", 1);
         action.kind = VoCActionKind::SentinelAudit;
         action.candidate_id = None;
@@ -1145,15 +1200,71 @@ mod tests {
                 likelihood_by_particle: vec![0.1, 0.9],
             },
         ];
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[action], &config()).unwrap();
+        let plan = evaluate(
+            &p,
+            vec![action],
+            &config(),
+            MetricDirection::Maximize,
+        ).unwrap();
         assert_eq!(plan.selected_action_id.as_deref(), Some("audit"));
     }
 
     #[test]
     fn deterministic_tie_break_uses_lexical_action_id() {
-        let a = query_action("a-query", "A", 1);
-        let b = query_action("b-query", "B", 1);
-        let plan = plan_decision_focused_voc(&manifest(), &posterior(), &[b, a], &config()).unwrap();
+        let p = posterior();
+        let plan = evaluate(
+            &p,
+            vec![
+                query_action("b-query", "B", 1),
+                query_action("a-query", "A", 1),
+            ],
+            &config(),
+            MetricDirection::Maximize,
+        ).unwrap();
         assert_eq!(plan.selected_action_id.as_deref(), Some("a-query"));
+    }
+
+    #[test]
+    fn posterior_digest_is_invariant_to_particle_and_candidate_permutations() {
+        let p = posterior();
+        let mut reversed = PosteriorModel {
+            candidate_ids: vec!["B".to_owned(), "A".to_owned()],
+            particles: vec![
+                FinalPerformanceParticle {
+                    particle_id: "p2".to_owned(),
+                    probability: 0.5,
+                    final_values: vec![1.0, 0.0],
+                },
+                FinalPerformanceParticle {
+                    particle_id: "p1".to_owned(),
+                    probability: 0.5,
+                    final_values: vec![0.0, 1.0],
+                },
+            ],
+        };
+        assert_eq!(
+            compute_posterior_model_sha256(&p),
+            compute_posterior_model_sha256(&reversed)
+        );
+        reversed.particles[0].final_values[0] = 0.8;
+        assert_ne!(
+            compute_posterior_model_sha256(&p),
+            compute_posterior_model_sha256(&reversed)
+        );
+    }
+
+    #[test]
+    fn observation_model_digest_is_invariant_to_action_and_outcome_order() {
+        let p = posterior();
+        let mut left = vec![
+            query_action("a-query", "A", 1),
+            query_action("b-query", "B", 2),
+        ];
+        let mut right = vec![left[1].clone(), left[0].clone()];
+        right[0].observation_outcomes.reverse();
+        assert_eq!(
+            compute_observation_likelihood_model_sha256(&left, &p),
+            compute_observation_likelihood_model_sha256(&right, &p)
+        );
     }
 }
