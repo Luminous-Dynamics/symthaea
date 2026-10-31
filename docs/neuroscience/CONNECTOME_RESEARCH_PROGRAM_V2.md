@@ -57,7 +57,13 @@ Entropy or detector confidence is not scientific value. Choose between re-imagin
 
 A global graph invariant or completed queue cannot certify every path, motif, cell type, synapse family or circuit claim. Certificates bind a query, exact dependency closure, sources, sampled population, uncertainty and revision history. See #9255.
 
-### 2.7 From static certification to event-driven currentness
+### 2.7 From global convergence to explicit biological completeness
+
+Stable graph invariants are not synaptic completeness and are not proof that a query-critical circuit is correct. The July 2026 connectome-stopping preprint reports a zebrafish case in which its global invariant composite is estimated at roughly 85% of projected asymptote at 50,000 edits while synaptic completeness is only about 20%; the authors define the latter by whether both pre- and postsynaptic locations belong to fully proofread cells. This is a preprint result, not a universal benchmark or stopping threshold. It motivates an explicit false-stop control in [#9007](https://github.com/Luminous-Dynamics/symthaea/issues/9007).
+
+**Executable increment in PR #8883:** stopping snapshots may now carry optional `synaptic_completeness` numerator/denominator evidence, bound to a population-definition digest, synapse-population digest and fully-proofread-cell-set digest. The audit reports the latest fraction and separate tail status. Missing records, partial tails and zero denominators are not silently dropped or converted to zero. A checked-in three-snapshot synthetic false-stop example has stable graph invariants, a stable 20% synaptic completeness and a rare query-critical path count changing from 12 to 1; the tool still recommends `CONTINUE_REVIEW`. The metric is never inferred from graph invariants, and the tool does not independently verify the endpoint memberships—the evidence producer must do that.
+
+### 2.8 From static certification to event-driven currentness
 
 A valid certificate is not valid forever. Reuse the repository's broader lifecycle work:
 - [#9210](https://github.com/Luminous-Dynamics/symthaea/issues/9210): trusted workspace/source event capture;
