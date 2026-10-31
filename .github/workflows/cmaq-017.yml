@@ -1,0 +1,177 @@
+name: CMAQ-017 multi-step exploitability benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-017/**"
+      - ".github/workflows/cmaq-017.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-017/**"
+      - ".github/workflows/cmaq-017.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multi-step-exploitability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: research/cmaq-017
+        run: cargo fmt --all -- --check
+      - name: Unit tests
+        working-directory: research/cmaq-017
+        run: cargo test --locked
+      - name: Clippy
+        working-directory: research/cmaq-017
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Install JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check "jsonschema==4.25.1"
+      - name: Generate and validate deterministic report
+        working-directory: research/cmaq-017
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --release --locked > /tmp/cmaq-017-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import validate
+
+          report = json.loads(Path("/tmp/cmaq-017-report.json").read_text())
+          schema = json.loads(Path("report.schema.json").read_text())
+          validate(instance=report, schema=schema)
+          assert report["schema_version"] == "cmaq-017-multistep-exploitability-v0.1"
+          assert report["episode_count"] == 16
+          assert report["environment_steps"] == 12
+          assert report["evaluator_structured_probe_count"] == 201
+          assert report["horizons"] == [1, 4, 8]
+          assert report["candidate_budgets"] == [8, 32, 64]
+          assert report["execution_blocks"] == [1, 4]
+          assert len(report["summary"]) == 600
+
+          rows = report["summary"]
+          keys = [(r["scenario"], r["horizon"], r["execution_block"],
+                   r["candidate_budget"], r["policy"]) for r in rows]
+          assert len(keys) == len(set(keys))
+          assert set(r["scenario"] for r in rows) == set(report["scenarios"])
+          assert set(r["policy"] for r in rows) == set(report["policies"])
+
+          for row in rows:
+              assert row["episode_count"] == 16
+              assert row["horizon"] in (1, 4, 8)
+              assert row["execution_block"] in (1, 4)
+              assert row["execution_block"] <= row["horizon"]
+              assert row["candidate_budget"] in (8, 32, 64)
+              assert row["return_ci95_lower"] <= row["mean_return"] <= row["return_ci95_upper"]
+              assert row["worst_episode_return"] <= row["lower_decile_mean_return"] <= row["mean_return"]
+              assert row["structured_probe_one_step_state_rmse"] >= 0.0
+              assert row["paired_delta_vs_shuffled_ci95_lower"] <= (
+                  row["paired_return_delta_vs_shuffled_future"]
+              ) <= row["paired_delta_vs_shuffled_ci95_upper"]
+              assert 0.0 <= row["mean_ood_visit_fraction"] <= 1.0
+              assert 0.0 <= row["reference_model_false_safe_rate"] <= 1.0
+              for key in ("mean_return", "mean_selected_one_step_state_rmse",
+                          "mean_candidate_sequence_queries", "mean_model_head_evaluations",
+                          "mean_model_transition_evaluations", "mean_oracle_transition_evaluations",
+                          "mean_evaluator_diagnostic_transition_evaluations", "mean_executed_steps"):
+                  assert isinstance(row[key], (int, float))
+                  assert abs(row[key]) < 1e8
+
+              assert row["mean_model_transition_evaluations"] <= (
+                  row["mean_model_head_evaluations"] * row["horizon"]
+              )
+              assert row["mean_oracle_transition_evaluations"] <= (
+                  row["mean_candidate_sequence_queries"] * row["horizon"]
+              )
+              if row["policy"] in ("random_point_search", "adaptive_point_cem",
+                                   "pessimistic_ensemble_cem", "uncertainty_lcb_cem",
+                                   "shuffled_future_negative_control"):
+                  assert row["mean_model_transition_evaluations"] > 0.0
+              if row["policy"] == "oracle_cem":
+                  assert row["mean_oracle_transition_evaluations"] > 0.0
+              assert row["mean_evaluator_diagnostic_transition_evaluations"] == (
+                  row["mean_executed_steps"]
+              )
+
+              if row["policy"] == "direct_policy":
+                  assert row["mean_candidate_sequence_queries"] == 0.0
+                  assert row["mean_model_head_evaluations"] == 0.0
+                  assert row["mean_oracle_transition_evaluations"] == 0.0
+                  assert row["mean_predicted_minus_realized_block_return"] is None
+              elif row["policy"] == "direct_search_control":
+                  assert row["mean_candidate_sequence_queries"] > 0.0
+                  assert row["mean_model_head_evaluations"] == 0.0
+                  assert row["mean_oracle_transition_evaluations"] == 0.0
+                  assert row["mean_predicted_minus_realized_block_return"] is None
+              elif row["policy"] == "oracle_cem":
+                  assert row["mean_oracle_transition_evaluations"] > 0.0
+                  assert row["mean_model_head_evaluations"] == 0.0
+                  assert row["mean_predicted_minus_realized_block_return"] is not None
+              elif row["policy"] in ("pessimistic_ensemble_cem", "uncertainty_lcb_cem"):
+                  assert row["mean_model_head_evaluations"] == (
+                      row["mean_candidate_sequence_queries"] * 3
+                  )
+              else:
+                  assert row["mean_model_head_evaluations"] == row["mean_candidate_sequence_queries"]
+
+          # Each condition includes every policy arm; no failed or terminal row is dropped.
+          condition_counts = {}
+          for r in rows:
+              condition = (r["scenario"], r["horizon"], r["execution_block"], r["candidate_budget"])
+              condition_counts[condition] = condition_counts.get(condition, 0) + 1
+          assert len(condition_counts) == 75
+          assert set(condition_counts.values()) == {8}
+          PY
+
+      - name: Create run receipt
+        working-directory: research/cmaq-017
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          from pathlib import Path
+
+          report_path = Path("/tmp/cmaq-017-report.json")
+          receipt = {
+              "schema_version": "cmaq-017-run-receipt-v0.1",
+              "source_commit": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+              "report_bytes": report_path.stat().st_size,
+              "rustc_version": subprocess.check_output(
+                  ["rustc", "--version"], text=True
+              ).strip(),
+              "cargo_version": subprocess.check_output(
+                  ["cargo", "--version"], text=True
+              ).strip(),
+              "runner_platform": platform.platform(),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+          }
+          Path("/tmp/cmaq-017-run-receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, indent=2) + "\n"
+          )
+          PY
+          sha256sum /tmp/cmaq-017-report.json /tmp/cmaq-017-run-receipt.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cmaq-017-report-and-run-receipt
+          path: |
+            /tmp/cmaq-017-report.json
+            /tmp/cmaq-017-run-receipt.json
+          retention-days: 30
