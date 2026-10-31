@@ -1,6 +1,6 @@
 # POAR Planner / Oracle Artifact Boundary v1
 
-**Status:** design contract; implementation tracked by [Issue #9360](https://github.com/Luminous-Dynamics/symthaea/issues/9360)  
+**Status:** partially implemented research contract; protected deployment boundary remains tracked by [Issue #9360](https://github.com/Luminous-Dynamics/symthaea/issues/9360)  
 **Date:** 2026-10-31  
 **Scope:** research-only synthetic POAR; not yet an externally deployable hidden benchmark.
 
@@ -121,19 +121,24 @@ Fail closed if:
 
 Never collapse hard integrity failures into average accuracy. Preserve separate counts for false support/refutation, false closure, abstention quality, proof-path validity, source admissibility, temporal coverage/precision, retraction recall, unaffected-claim stability, and resource cost.
 
-## 6. Current implementation gap
+## 6. Implemented evaluator and remaining implementation gap
 
 Implemented:
 - Deterministic planner-only and oracle-only TSV encoders in `graph.rs`.
 - `poar-graph-export` binary that writes the two files and binds the oracle header to the planner file's SHA-256 digest using the system `sha256sum` executable.
 - Unit tests that assert hidden truth and gold claim/path records are absent from planner output and present in oracle output; non-canonical planner digests are rejected.
-- Focused qualification workflow smoke step that verifies the digest binding and checks record separation in temporary runner storage, then deletes the oracle without uploading it.
+- `encode_prediction_artifact_v1` emits canonical frozen `POAR-PRED/1` records for model identity, dispositions, ranked retrieval, and citations.
+- `evaluate_poar_artifacts_v1` parses planner, oracle, and prediction bytes; validates UTF-8/LF canonical form, strict record ordering, lowercase hex, canonical integers, exact field counts, schema/version, digest equality, seed/split/generator identity, duplicate/dangling references, target-disposition completeness, and contiguous retrieval ranks.
+- Before scoring, the evaluator independently recomputes oracle claim states and proof witnesses from parsed source-truth labels and rejects incomplete or inconsistent `GOLD_CLAIM` / `GOLD_PATH` records.
+- The `poar-artifact-eval` CLI hashes exact input bytes, evaluates only after the prediction artifact is frozen, and emits a machine-readable `POAR-EVAL-RECEIPT/1` with input digests, model/config identity, per-run metrics, and a hard-invariant flag. The receipt is not cryptographically signed.
+- Six new parser/evaluator tests cover valid round-trip, malformed byte streams, digest mismatch, missing/duplicate dispositions, retrieval gaps, unknown evidence, oracle tampering, and proof citation scoring.
 
 Still not implemented:
-- An independent artifact parser / evaluator process that consumes frozen predictions and the sealed oracle.
-- Protected storage or permission boundaries that prevent the planner from reading oracle bytes.
-- Signed benchmark run receipts and an externally auditable model evaluation pipeline.
+- Protected storage, key management, and permission boundaries that prevent the planner from reading oracle bytes.
+- A separate organization/operator controlling the private generator seed and evaluator implementation; the code and deterministic public fixture templates remain in the same repository.
+- Cryptographic signing/attestation of evaluation receipts or an externally auditable model evaluation service.
+- A contamination audit or a clean, sequestered confirmatory test set.
 
-The exporter currently emits both files within one process; it makes the data boundary explicit and testable but is **not itself a secure boundary**. This design document remains the target for the remaining work.
+The exporter still creates planner and oracle files within one process, and the deterministic generator is public. The evaluator now consumes frozen byte artifacts in a separate CLI process, but this is **process separation, not a security boundary or organizational independence**. The benchmark is still a synthetic conformance harness, not a clean public leaderboard or an uncontaminated hidden test set.
 
 Issue [#9360](https://github.com/Luminous-Dynamics/symthaea/issues/9360) tracks implementation, tests, protected-job design, and acceptance evidence.
