@@ -89,7 +89,7 @@ An action may spend its own reserve but cannot consume resources protected for o
 
 ## 6. Authored test coverage
 
-Twenty Rust test declarations cover:
+Twenty-one Rust test declarations cover:
 - the discrete-posterior value-of-information example (current regret 0.5, expected post-action regret 0.1, VOI 0.4);
 - no-information actions and explicit stopping;
 - top-K objective and lower-is-better metric semantics;
