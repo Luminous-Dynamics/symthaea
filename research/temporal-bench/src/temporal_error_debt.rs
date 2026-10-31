@@ -541,6 +541,8 @@ mod tests {
         assert_eq!(score.correction_latency, Some(0));
         assert_eq!(score.retraction_latency, Some(0));
         assert_eq!(score.full_stream_prediction_coverage_ppm(), 1_000_000);
+        let expected_total: u128 = windows.iter().map(|window| u128::from(window.duration)).sum();
+        assert_eq!(score.total_observed_exposure(), expected_total);
     }
 
     #[test]
