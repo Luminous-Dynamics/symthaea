@@ -28,7 +28,8 @@
       "last_update_us",
       "expected_retention_us",
       "valid_until_us",
-      "access_count"
+      "access_count",
+      "predicted_ted_reduction_horizon_is_effective_retention_horizon"
     ],
     "estimate_provenance": "estimate_model_sha256",
     "probability_scale_ppm": 1000000,
@@ -70,7 +71,8 @@
       "production_hdc_ltc_integration": false,
       "online_value_predictor": false,
       "tiered_memory_and_refresh_cost_model": false
-    }
+    },
+    "predicted_value_semantics": "predicted_ted_reduction_us must be estimated over min(expected_retention_us, remaining hard validity horizon), not over an unbounded or longer horizon"
   },
   "continuous_time_reference": {
     "path": "research/temporal-bench/src/continuous_risk.rs",
