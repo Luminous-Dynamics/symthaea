@@ -83,6 +83,14 @@ struct Args {
     #[arg(long, default_value_t = 500)]
     bootstrap_replicates: usize,
 
+    /// Require complete domain metadata for calibration/shift diagnostics.
+    #[arg(long, default_value_t = false)]
+    require_domain_shift_audit: bool,
+
+    /// Frozen OOD novelty-score threshold; never selected from confirmatory labels.
+    #[arg(long)]
+    ood_score_threshold: Option<f64>,
+
     /// Write report to this JSON file (stdout if omitted).
     #[arg(long)]
     output: Option<PathBuf>,
@@ -107,6 +115,85 @@ struct Prediction {
     review_minutes: f64,
     /// Independent evaluator weight for scientific impact; must never be available to the runtime ranker.
     impact_weight: f64,
+    /// Optional predeclared evaluation domain (separate from task/error-family group).
+    #[serde(default)]
+    domain_id: Option<String>,
+    /// One shift axis per input run: species, region, source_volume, source_archive,
+    /// acquisition_protocol, segmentation_lineage, modality_availability, or morphology_regime.
+    #[serde(default)]
+    shift_axis: Option<String>,
+    /// True only when the frozen split protocol held this domain out of model/calibrator fitting.
+    #[serde(default)]
+    is_ood_domain: Option<bool>,
+    /// Frozen model novelty score, separate from p_error and review_priority_score.
+    #[serde(default)]
+    ood_score: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct CalibrationBin {
+    index: usize,
+    lower: f64,
+    upper: f64,
+    upper_inclusive: bool,
+    count: usize,
+    mean_predicted_probability: Option<f64>,
+    observed_error_rate: Option<f64>,
+    absolute_calibration_gap: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct ConfidenceThresholdRisk {
+    threshold: f64,
+    selected_count: usize,
+    false_accept_count: usize,
+    false_accept_fraction: Option<f64>,
+    precision: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct LowConfidenceErrorMass {
+    threshold: f64,
+    missed_error_count: usize,
+    missed_error_impact_weight: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct CalibrationDiagnostics {
+    fixed_bin_count: usize,
+    brier_score: Option<f64>,
+    log_loss: Option<f64>,
+    expected_calibration_error: Option<f64>,
+    maximum_calibration_error: Option<f64>,
+    bins: Vec<CalibrationBin>,
+    high_confidence_at_90: ConfidenceThresholdRisk,
+    high_confidence_at_95: ConfidenceThresholdRisk,
+    low_confidence_below_10: LowConfidenceErrorMass,
+}
+
+#[derive(Debug, Serialize)]
+struct DomainEvaluation {
+    domain_id: String,
+    shift_axis: String,
+    is_ood_domain: bool,
+    n: usize,
+    independent_cluster_count: usize,
+    classification: ClassificationMetrics,
+    calibration: CalibrationDiagnostics,
+}
+
+#[derive(Debug, Serialize)]
+struct OodDetectionMetrics {
+    n: usize,
+    in_domain_count: usize,
+    held_out_domain_count: usize,
+    roc_auc: Option<f64>,
+    average_precision: Option<f64>,
+    frozen_threshold: Option<f64>,
+    false_ood_count: Option<usize>,
+    false_ood_rate_on_in_domain: Option<f64>,
+    missed_ood_count: Option<usize>,
+    held_out_domain_recall: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -137,6 +224,11 @@ struct Report {
     risk_coverage_results: Vec<RiskCoveragePoint>,
     /// Matched-budget controls generated from the same frozen rows: uncertainty, probability, and deterministic random.
     baseline_comparisons: Vec<PolicyEvaluation>,
+    domain_shift_audit_status: &'static str,
+    domain_shift_axis: Option<String>,
+    overall_calibration: Option<CalibrationDiagnostics>,
+    per_domain: Option<BTreeMap<String, DomainEvaluation>>,
+    ood_detection: Option<OodDetectionMetrics>,
     scope_note: &'static str,
 }
 
@@ -310,10 +402,66 @@ fn parse_jsonl(bytes: &[u8]) -> Result<Vec<Prediction>, String> {
         if !row.impact_weight.is_finite() || row.impact_weight < 0.0 {
             return Err(format!("line {} impact_weight must be finite and non-negative", index + 1));
         }
+        let domain_fields = [
+            row.domain_id.is_some(),
+            row.shift_axis.is_some(),
+            row.is_ood_domain.is_some(),
+        ];
+        let has_domain_metadata = domain_fields.iter().any(|present| *present);
+        if has_domain_metadata && domain_fields.iter().any(|present| !present) {
+            return Err(format!("line {} must provide domain_id, shift_axis, and is_ood_domain together", index + 1));
+        }
+        if let Some(domain_id) = &row.domain_id {
+            if domain_id.trim().is_empty() {
+                return Err(format!("line {} domain_id must be non-empty", index + 1));
+            }
+        }
+        if let Some(axis) = &row.shift_axis {
+            let allowed = [
+                "species", "region", "source_volume", "source_archive",
+                "acquisition_protocol", "segmentation_lineage",
+                "modality_availability", "morphology_regime",
+            ];
+            if !allowed.contains(&axis.as_str()) {
+                return Err(format!("line {} has unsupported shift_axis {:?}", index + 1, axis));
+            }
+        }
+        if let Some(score) = row.ood_score {
+            if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+                return Err(format!("line {} ood_score must be finite and in [0,1]", index + 1));
+            }
+            if !has_domain_metadata {
+                return Err(format!("line {} ood_score requires complete domain metadata", index + 1));
+            }
+        }
         records.push(row);
     }
     if records.is_empty() {
         return Err("input contains no prediction records".into());
+    }
+    let domain_rows = records.iter().filter(|row| row.domain_id.is_some()).count();
+    if domain_rows != 0 && domain_rows != records.len() {
+        return Err("domain metadata must be present for every row or for none; partial domain coverage is invalid".into());
+    }
+    let ood_score_rows = records.iter().filter(|row| row.ood_score.is_some()).count();
+    if ood_score_rows != 0 && ood_score_rows != records.len() {
+        return Err("ood_score must be present for every row or for none; partial novelty scores are invalid".into());
+    }
+    let mut domain_contracts = BTreeMap::<String, (String, bool)>::new();
+    let mut axes = BTreeSet::<String>::new();
+    for row in &records {
+        if let (Some(domain), Some(axis), Some(is_ood)) = (&row.domain_id, &row.shift_axis, row.is_ood_domain) {
+            axes.insert(axis.clone());
+            let contract = (axis.clone(), is_ood);
+            if let Some(previous) = domain_contracts.insert(domain.clone(), contract.clone()) {
+                if previous != contract {
+                    return Err(format!("domain_id {:?} has inconsistent shift_axis or is_ood_domain declarations", domain));
+                }
+            }
+        }
+    }
+    if axes.len() > 1 {
+        return Err("one scoring input may contain only one shift_axis; run separate audits for each axis".into());
     }
     let total_review_minutes: f64 = records.iter().map(|row| row.review_minutes).sum();
     if !total_review_minutes.is_finite() {
@@ -860,6 +1008,235 @@ fn baseline_policy_results(
     }).collect()
 }
 
+fn calibration_threshold_risk(rows: &[&Prediction], threshold: f64) -> ConfidenceThresholdRisk {
+    let selected = rows.iter().filter(|row| row.p_error >= threshold).collect::<Vec<_>>();
+    let false_accepts = selected.iter().filter(|row| !row.label_is_error).count();
+    ConfidenceThresholdRisk {
+        threshold,
+        selected_count: selected.len(),
+        false_accept_count: false_accepts,
+        false_accept_fraction: ratio(false_accepts, selected.len()),
+        precision: ratio(selected.len() - false_accepts, selected.len()),
+    }
+}
+
+fn calibration_diagnostics(rows: &[&Prediction]) -> CalibrationDiagnostics {
+    const BIN_COUNT: usize = 10;
+    let mut counts = [0_usize; BIN_COUNT];
+    let mut probability_sums = [0.0_f64; BIN_COUNT];
+    let mut positive_counts = [0_usize; BIN_COUNT];
+    let mut brier_sum = 0.0_f64;
+    let mut log_loss_sum = 0.0_f64;
+    let mut low_confidence_error_count = 0_usize;
+    let mut low_confidence_error_impact = 0.0_f64;
+
+    for row in rows {
+        let bin = ((row.p_error * BIN_COUNT as f64).floor() as usize).min(BIN_COUNT - 1);
+        counts[bin] += 1;
+        probability_sums[bin] += row.p_error;
+        if row.label_is_error {
+            positive_counts[bin] += 1;
+        }
+        let target = if row.label_is_error { 1.0 } else { 0.0 };
+        brier_sum += (row.p_error - target).powi(2);
+        let p = row.p_error.clamp(1e-15, 1.0 - 1e-15);
+        log_loss_sum -= target * p.ln() + (1.0 - target) * (1.0 - p).ln();
+        if row.label_is_error && row.p_error < 0.10 {
+            low_confidence_error_count += 1;
+            low_confidence_error_impact += row.impact_weight;
+        }
+    }
+
+    let mut bins = Vec::with_capacity(BIN_COUNT);
+    let mut ece = 0.0_f64;
+    let mut max_gap = 0.0_f64;
+    for index in 0..BIN_COUNT {
+        let count = counts[index];
+        let mean = if count == 0 { None } else { Some(probability_sums[index] / count as f64) };
+        let observed = if count == 0 { None } else { Some(positive_counts[index] as f64 / count as f64) };
+        let gap = match (mean, observed) {
+            (Some(predicted), Some(actual)) => {
+                let value = (predicted - actual).abs();
+                ece += count as f64 / rows.len().max(1) as f64 * value;
+                max_gap = max_gap.max(value);
+                Some(value)
+            }
+            _ => None,
+        };
+        bins.push(CalibrationBin {
+            index,
+            lower: index as f64 / BIN_COUNT as f64,
+            upper: (index + 1) as f64 / BIN_COUNT as f64,
+            upper_inclusive: index == BIN_COUNT - 1,
+            count,
+            mean_predicted_probability: mean,
+            observed_error_rate: observed,
+            absolute_calibration_gap: gap,
+        });
+    }
+
+    CalibrationDiagnostics {
+        fixed_bin_count: BIN_COUNT,
+        brier_score: if rows.is_empty() { None } else { Some(brier_sum / rows.len() as f64) },
+        log_loss: if rows.is_empty() { None } else { Some(log_loss_sum / rows.len() as f64) },
+        expected_calibration_error: if rows.is_empty() { None } else { Some(ece) },
+        maximum_calibration_error: if rows.is_empty() { None } else { Some(max_gap) },
+        bins,
+        high_confidence_at_90: calibration_threshold_risk(rows, 0.90),
+        high_confidence_at_95: calibration_threshold_risk(rows, 0.95),
+        low_confidence_below_10: LowConfidenceErrorMass {
+            threshold: 0.10,
+            missed_error_count: low_confidence_error_count,
+            missed_error_impact_weight: low_confidence_error_impact,
+        },
+    }
+}
+
+fn binary_ranking_metrics(labels_and_scores: &[(bool, f64)]) -> (Option<f64>, Option<f64>) {
+    let positives = labels_and_scores.iter().filter(|(label, _)| *label).count();
+    let negatives = labels_and_scores.len() - positives;
+    if positives == 0 || negatives == 0 {
+        return (None, None);
+    }
+
+    let mut ascending = labels_and_scores.to_vec();
+    ascending.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let mut negatives_before = 0_usize;
+    let mut concordant = 0.0_f64;
+    let mut index = 0_usize;
+    while index < ascending.len() {
+        let mut end = index + 1;
+        while end < ascending.len() && ascending[end].1.total_cmp(&ascending[index].1).is_eq() {
+            end += 1;
+        }
+        let group_positives = ascending[index..end].iter().filter(|(label, _)| *label).count();
+        let group_negatives = end - index - group_positives;
+        concordant += group_positives as f64 * negatives_before as f64
+            + 0.5 * group_positives as f64 * group_negatives as f64;
+        negatives_before += group_negatives;
+        index = end;
+    }
+    let roc_auc = Some(concordant / (positives as f64 * negatives as f64));
+
+    let mut descending = labels_and_scores.to_vec();
+    descending.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let mut seen_positive = 0_usize;
+    let mut seen_negative = 0_usize;
+    let mut average_precision = 0.0_f64;
+    index = 0;
+    while index < descending.len() {
+        let mut end = index + 1;
+        while end < descending.len() && descending[end].1.total_cmp(&descending[index].1).is_eq() {
+            end += 1;
+        }
+        let group_positives = descending[index..end].iter().filter(|(label, _)| *label).count();
+        let group_negatives = end - index - group_positives;
+        seen_positive += group_positives;
+        seen_negative += group_negatives;
+        if group_positives > 0 {
+            average_precision += (group_positives as f64 / positives as f64)
+                * (seen_positive as f64 / (seen_positive + seen_negative) as f64);
+        }
+        index = end;
+    }
+    (roc_auc, Some(average_precision))
+}
+
+fn ood_detection_metrics(
+    rows: &[&Prediction],
+    threshold: Option<f64>,
+) -> OodDetectionMetrics {
+    let labelled_scores = rows.iter().filter_map(|row| {
+        Some((row.is_ood_domain?, row.ood_score?))
+    }).collect::<Vec<_>>();
+    let (roc_auc, average_precision) = binary_ranking_metrics(&labelled_scores);
+    let in_domain_count = rows.iter().filter(|row| row.is_ood_domain == Some(false)).count();
+    let held_out_domain_count = rows.iter().filter(|row| row.is_ood_domain == Some(true)).count();
+    let operating = threshold.map(|cutoff| {
+        let predicted_ood = rows.iter().filter(|row| row.ood_score.unwrap_or(0.0) >= cutoff);
+        let (false_ood_count, missed_ood_count) = predicted_ood.fold((0_usize, 0_usize), |(fp, missed), row| {
+            if row.is_ood_domain == Some(false) { (fp + 1, missed) } else { (fp, missed) }
+        });
+        let true_ood_count = rows.iter().filter(|row| row.is_ood_domain == Some(true) && row.ood_score.unwrap_or(0.0) >= cutoff).count();
+        let missed = held_out_domain_count - true_ood_count;
+        (false_ood_count, missed, ratio(false_ood_count, in_domain_count), ratio(true_ood_count, held_out_domain_count))
+    });
+
+    OodDetectionMetrics {
+        n: rows.len(),
+        in_domain_count,
+        held_out_domain_count,
+        roc_auc,
+        average_precision,
+        frozen_threshold: threshold,
+        false_ood_count: operating.map(|value| value.0),
+        false_ood_rate_on_in_domain: operating.map(|value| value.2),
+        missed_ood_count: operating.map(|value| value.1),
+        held_out_domain_recall: operating.map(|value| value.3),
+    }
+}
+
+fn domain_shift_evaluation(
+    records: &[Prediction],
+    required: bool,
+    ood_threshold: Option<f64>,
+) -> Result<(
+    &'static str,
+    Option<String>,
+    Option<CalibrationDiagnostics>,
+    Option<BTreeMap<String, DomainEvaluation>>,
+    Option<OodDetectionMetrics>,
+), String> {
+    let tagged = records.iter().any(|row| row.domain_id.is_some());
+    if !tagged {
+        if required {
+            return Err("--require-domain-shift-audit was set but no domain metadata is present".into());
+        }
+        if ood_threshold.is_some() {
+            return Err("--ood-score-threshold requires complete domain metadata and novelty scores".into());
+        }
+        return Ok(("NOT_PROVIDED", None, None, None, None));
+    }
+
+    let axis = records.first().and_then(|row| row.shift_axis.clone())
+        .ok_or_else(|| "domain-shift audit is missing shift_axis".to_string())?;
+    let mut grouped = BTreeMap::<String, Vec<&Prediction>>::new();
+    for row in records {
+        let domain = row.domain_id.as_ref().ok_or_else(|| "domain-shift audit has partial domain IDs".to_string())?;
+        grouped.entry(domain.clone()).or_default().push(row);
+    }
+    let mut per_domain = BTreeMap::new();
+    for (domain_id, rows) in grouped {
+        let first = rows[0];
+        let clusters = rows.iter().map(|row| row.cluster_id.as_str()).collect::<BTreeSet<_>>();
+        let refs = rows.iter().copied().collect::<Vec<_>>();
+        per_domain.insert(domain_id.clone(), DomainEvaluation {
+            domain_id,
+            shift_axis: axis.clone(),
+            is_ood_domain: first.is_ood_domain.unwrap_or(false),
+            n: rows.len(),
+            independent_cluster_count: clusters.len(),
+            classification: classification(&refs),
+            calibration: calibration_diagnostics(&refs),
+        });
+    }
+
+    let novelty_present = records.iter().all(|row| row.ood_score.is_some());
+    if ood_threshold.is_some() && !novelty_present {
+        return Err("--ood-score-threshold requires an ood_score for every row".into());
+    }
+    let refs = records.iter().collect::<Vec<_>>();
+    let overall_calibration = Some(calibration_diagnostics(&refs));
+    let ood_detection = if novelty_present {
+        Some(ood_detection_metrics(&refs, ood_threshold))
+    } else {
+        None
+    };
+    let status = if ood_detection.is_some() { "OOD_SCORED" } else { "DOMAIN_STRATIFIED_ONLY" };
+    Ok((status, Some(axis), overall_calibration, Some(per_domain), ood_detection))
+}
+
+
 fn run() -> Result<i32, String> {
     let args = Args::parse();
     if args.mapping_reference.trim().is_empty() {
@@ -867,6 +1244,11 @@ fn run() -> Result<i32, String> {
     }
     if args.bootstrap_replicates < 100 {
         return Err("--bootstrap-replicates must be at least 100".into());
+    }
+    if let Some(threshold) = args.ood_score_threshold {
+        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+            return Err("--ood-score-threshold must be finite and in [0,1]".into());
+        }
     }
     if !is_lower_hex(&args.dataset_revision_commit_sha, 40) {
         return Err("--dataset-revision-commit-sha must be a lowercase 40-character Git SHA".into());
@@ -884,6 +1266,8 @@ fn run() -> Result<i32, String> {
         .map_err(|e| format!("failed to read input {}: {e}", args.input.display()))?;
     let input_hash = sha256(&input_bytes);
     let records = parse_jsonl(&input_bytes)?;
+    let (domain_shift_audit_status, domain_shift_axis, overall_calibration, per_domain, ood_detection) =
+        domain_shift_evaluation(&records, args.require_domain_shift_audit, args.ood_score_threshold)?;
     let refs: Vec<&Prediction> = records.iter().collect();
     let overall = classification(&refs);
     let overall_cluster_bootstrap_95 = cluster_bootstrap(
@@ -918,7 +1302,7 @@ fn run() -> Result<i32, String> {
     let risk_coverage_results = risk_coverage(&refs, &coverage_targets);
 
     let report = Report {
-        schema_version: 4,
+        schema_version: 5,
         scorer: "proofreading-score",
         scorer_version: env!("CARGO_PKG_VERSION"),
         dataset_id: DATASET_ID,
@@ -949,6 +1333,11 @@ fn run() -> Result<i32, String> {
             args.bootstrap_replicates,
             &format!("{input_hash}:overall"),
         ),
+        domain_shift_audit_status,
+        domain_shift_axis,
+        overall_calibration,
+        per_domain,
+        ood_detection,
         scope_note: "Metrics describe this frozen prediction file only. Cluster-bootstrap intervals resample the caller-declared cluster_id; they do not prove that the chosen cluster unit is independent. This scorer does not validate dataset labels/mapping truth or establish prospective review-time savings. Use a locked evaluation protocol before claims.",
     };
     let json = serde_json::to_string_pretty(&report)
@@ -987,7 +1376,147 @@ mod tests {
             review_priority_score: priority,
             review_minutes: mins,
             impact_weight: impact,
+            domain_id: None,
+            shift_axis: None,
+            is_ood_domain: None,
+            ood_score: None,
         }
+    }
+
+    fn tagged_row(
+        id: &str,
+        label: bool,
+        p: f64,
+        domain: &str,
+        is_ood: bool,
+        novelty: f64,
+    ) -> Prediction {
+        let mut prediction = row(id, label, p, p, 1.0, 1.0, "merge");
+        prediction.domain_id = Some(domain.into());
+        prediction.shift_axis = Some("species".into());
+        prediction.is_ood_domain = Some(is_ood);
+        prediction.ood_score = Some(novelty);
+        prediction
+    }
+
+    #[test]
+    fn calibration_bins_expose_counts_and_expected_error() {
+        let rows = vec![
+            row("c1", true, 0.95, 0.5, 1.0, 1.0, "merge"),
+            row("c2", false, 0.05, 0.5, 1.0, 1.0, "merge"),
+            row("c3", true, 0.85, 0.5, 1.0, 1.0, "merge"),
+            row("c4", false, 0.15, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let diagnostics = calibration_diagnostics(&refs);
+        assert_eq!(diagnostics.fixed_bin_count, 10);
+        assert_eq!(diagnostics.bins.iter().map(|bin| bin.count).sum::<usize>(), 4);
+        assert!(diagnostics.expected_calibration_error.unwrap() < 0.06);
+        assert_eq!(diagnostics.high_confidence_at_90.false_accept_count, 0);
+    }
+
+    #[test]
+    fn ood_detection_scores_are_separate_from_error_probabilities() {
+        let rows = vec![
+            tagged_row("d1", true, 0.9, "mouse", false, 0.1),
+            tagged_row("d2", false, 0.1, "mouse", false, 0.2),
+            tagged_row("d3", true, 0.1, "zebrafish", true, 0.9),
+            tagged_row("d4", false, 0.9, "zebrafish", true, 0.8),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let metrics = ood_detection_metrics(&refs, Some(0.5));
+        assert_eq!(metrics.roc_auc, Some(1.0));
+        assert_eq!(metrics.average_precision, Some(1.0));
+        assert_eq!(metrics.false_ood_count, Some(0));
+        assert_eq!(metrics.missed_ood_count, Some(0));
+        let zebrafish = refs.iter().filter(|row| row.domain_id.as_deref() == Some("zebrafish")).copied().collect::<Vec<_>>();
+        let calibration = calibration_diagnostics(&zebrafish);
+        assert_eq!(calibration.high_confidence_at_90.false_accept_count, 1);
+        assert_eq!(calibration.low_confidence_below_10.missed_error_count, 0);
+    }
+
+    #[test]
+    fn equal_novelty_scores_produce_half_auc() {
+        let metrics = binary_ranking_metrics(&[(false, 0.5), (false, 0.5), (true, 0.5), (true, 0.5)]);
+        assert_eq!(metrics.0, Some(0.5));
+    }
+
+    #[test]
+    fn calibration_threshold_reports_zero_denominator_as_none() {
+        let risk = calibration_threshold_risk(&[], 0.95);
+        assert_eq!(risk.selected_count, 0);
+        assert_eq!(risk.false_accept_fraction, None);
+        assert_eq!(risk.precision, None);
+    }
+
+    #[test]
+    fn domain_audit_groups_domains_and_keeps_axis_explicit() {
+        let rows = vec![
+            tagged_row("e1", true, 0.9, "mouse", false, 0.1),
+            tagged_row("e2", false, 0.1, "mouse", false, 0.2),
+            tagged_row("e3", true, 0.1, "zebrafish", true, 0.9),
+            tagged_row("e4", false, 0.9, "zebrafish", true, 0.8),
+        ];
+        let (status, axis, overall, domains, ood) = domain_shift_evaluation(&rows, true, Some(0.5)).unwrap();
+        assert_eq!(status, "OOD_SCORED");
+        assert_eq!(axis.as_deref(), Some("species"));
+        assert!(overall.is_some());
+        assert_eq!(domains.unwrap().len(), 2);
+        assert_eq!(ood.unwrap().roc_auc, Some(1.0));
+    }
+
+    #[test]
+    fn domain_audit_refuses_missing_metadata_when_required() {
+        let rows = vec![row("n1", true, 0.9, 0.9, 1.0, 1.0, "merge")];
+        assert!(domain_shift_evaluation(&rows, true, None).is_err());
+    }
+
+    #[test]
+    fn domain_audit_refuses_threshold_without_novelty_scores() {
+        let mut item = tagged_row("n2", true, 0.9, "mouse", false, 0.2);
+        item.ood_score = None;
+        assert!(domain_shift_evaluation(&[item], false, Some(0.5)).is_err());
+    }
+
+    #[test]
+    fn parser_rejects_partial_domain_metadata() {
+        let line = r#"{"sample_id":"x","group":"mouse:merge","cluster_id":"c1","label_is_error":true,"p_error":0.9,"review_priority_score":0.9,"review_minutes":1.0,"impact_weight":1.0,"domain_id":"mouse"}"#;
+        assert!(parse_jsonl(line.as_bytes()).unwrap_err().contains("provide domain_id"));
+    }
+
+    #[test]
+    fn parser_rejects_multiple_shift_axes_in_one_run() {
+        let mut first = tagged_row("a1", true, 0.9, "mouse", false, 0.1);
+        let mut second = tagged_row("a2", false, 0.1, "fly", false, 0.1);
+        second.shift_axis = Some("region".into());
+        let input = format!("{}\n{}", serde_json::to_string(&first).unwrap(), serde_json::to_string(&second).unwrap());
+        assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("only one shift_axis"));
+        first.sample_id = "unused".into();
+    }
+
+    #[test]
+    fn parser_rejects_inconsistent_domain_holdout_labels() {
+        let first = tagged_row("b1", true, 0.9, "mouse", false, 0.1);
+        let second = tagged_row("b2", false, 0.1, "mouse", true, 0.9);
+        let input = format!("{}\n{}", serde_json::to_string(&first).unwrap(), serde_json::to_string(&second).unwrap());
+        assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("inconsistent"));
+    }
+
+    #[test]
+    fn parser_rejects_partial_novelty_scores() {
+        let first = tagged_row("p1", true, 0.9, "mouse", false, 0.1);
+        let mut second = tagged_row("p2", false, 0.1, "mouse", false, 0.1);
+        second.ood_score = None;
+        let input = format!("{}\n{}", serde_json::to_string(&first).unwrap(), serde_json::to_string(&second).unwrap());
+        assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("present for every row"));
+    }
+
+    #[test]
+    fn parser_rejects_out_of_range_novelty_score() {
+        let mut item = tagged_row("r1", true, 0.9, "mouse", false, 0.1);
+        item.ood_score = Some(1.1);
+        let input = serde_json::to_string(&item).unwrap();
+        assert!(parse_jsonl(input.as_bytes()).unwrap_err().contains("ood_score must be finite"));
     }
 
     #[test]
