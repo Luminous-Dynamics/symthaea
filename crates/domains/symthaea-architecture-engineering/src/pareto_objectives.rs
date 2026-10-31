@@ -598,7 +598,7 @@ fn hypervolume_recursive(points: &[Vec<f64>], reference: &[f64]) -> Result<f64, 
     }
     levels.push(reference[last]);
     levels.sort_by(f64::total_cmp);
-    levels.dedup_by(|left, right| left.total_cmp(right) == Ordering::Equal);
+    levels.dedup_by(|left, right| *left == *right);
 
     let mut volume = 0.0;
     for pair in levels.windows(2) {
@@ -625,7 +625,7 @@ fn hypervolume_recursive(points: &[Vec<f64>], reference: &[f64]) -> Result<f64, 
 fn same_vector(left: &[f64], right: &[f64]) -> bool {
     left.len() == right.len()
         && left.iter().zip(right)
-            .all(|(left_value, right_value)| left_value.total_cmp(right_value) == Ordering::Equal)
+            .all(|(left_value, right_value)| left_value == right_value)
 }
 
 fn validate_sha256(value: &str, path: &str) -> Result<(), ParetoError> {
@@ -832,6 +832,17 @@ mod tests {
             &[0.0, 0.3],
         ).unwrap();
         assert!((volume - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn signed_zero_reference_points_are_semantically_equal() {
+        let benchmark = plan(vec![
+            candidate("a", 0.8, 0.4, 80.0, true, vec![], H1),
+        ]);
+        assert!(analyze_reference_sensitivity(
+            &benchmark,
+            &[vec![-0.0, 0.0, -0.0]],
+        ).is_err());
     }
 
     #[test]
