@@ -535,6 +535,7 @@ mod tests {
             score,
             unknown_wall_time,
             H2,
+            100,
         )
     }
 
@@ -545,6 +546,7 @@ mod tests {
         score: f64,
         unknown_wall_time: bool,
         budget_model_sha256: &str,
+        charge: u64,
     ) -> EventTape {
         let config_sha256 = digest(&config_value);
         let header = EventTapeHeader {
@@ -595,7 +597,7 @@ mod tests {
             tool_calls: meter(0),
             evaluator_calls: meter(1),
             verifier_calls: meter(1),
-            charged_budget_microunits: meter(100),
+            charged_budget_microunits: meter(charge),
         };
         if unknown_wall_time {
             resources.wall_millis = unknown("test runner did not provide wall-time telemetry");
@@ -681,6 +683,7 @@ mod tests {
             0.91,
             false,
             H3,
+            100,
         );
         assert!(reconcile_mechanism_matched_campaign(&[left, right]).is_err());
     }
