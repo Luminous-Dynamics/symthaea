@@ -51,7 +51,7 @@ Every event therefore has `routing_complete = false`, and the aggregate says the
 
 ## Adversarial source tests authored
 
-Eight adapter tests cover:
+Eleven adapter tests cover:
 
 - An empty measured support still has a mandatory evidence digest and retains the `NoEffectAboveNoiseFloor` disposition.
 - Changing a measured interval invalidates the per-event evidence digest.
