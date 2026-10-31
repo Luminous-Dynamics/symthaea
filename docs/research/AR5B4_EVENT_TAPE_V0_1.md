@@ -56,3 +56,14 @@ The `matched_campaign` module accepts two or more per-policy tapes for one campa
 For every candidate digest appearing in multiple tapes, direction, parent, semantic delta, and full evaluator/verifier outcome must agree. The same rule applies to repeated proposal descriptor digests and verifier outcomes. The summary reports candidate/proposal identity overlap, per-policy event counts and charges, batch completion, strict resource qualification, and oracle-policy IDs separately.
 
 This reconciler establishes common-contract consistency and cross-policy outcome consistency for identities that overlap. It does **not** prove that the evaluator's complete offered-choice set was materialized or that a shared stream digest faithfully represents every possible option. A future campaign-input artifact must carry the actual offer-set manifest and digest, with independent verification that every policy received the same manifest. It also does not establish scientific superiority; paired statistical analysis and held-out transfer remain separate gates.
+
+
+## Coral four-seat execution adapter
+
+The separate `coral_execution` module wraps the formula-level scheduler baseline without changing its allocation equations. It rejects modified scheduler parameters for the reference profile: W=32, prior_n=4, infancy_k=3, κ=0.05, four agents, first-round per-direction cap=1, and later per-direction cap=2.
+
+For each round, it freezes the pre-round board digest, the exact advisory allocation, four worker IDs, their actual arm claims, and a round digest. The event-tape batch ID is derived from that round digest, so the four action events can refer to the precise seat plan. The four actual claims must cover workers 0–3 exactly once, obey the direction caps, and map one-for-one to four events in the matching event-tape batch. Candidate-evaluation events must match the claimed direction; proposal events correspond to NEW.
+
+The recommendation remains advisory. The adapter records deviation between suggested and actual seat allocation instead of forcing a worker to follow a board recommendation. This reflects Coral Discovery's documented workflow in which agents finish a line of work, consult the direction board, and choose; duplicate/crowding checks are separate from the board's advisory allocation. The adapter is not presented as a complete reproduction of the multi-agent runtime or as proof of Coral's empirical result.
+
+The event-batch reconciliation requires strict event-tape qualification, including measured resource receipts. Synthetic data with unknown resource dimensions cannot pass this gate. Each round-plan artifact should be stored next to its event tape; the content-derived batch ID creates a deterministic cross-reference, while the plan digest remains independently auditable.
