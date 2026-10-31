@@ -232,6 +232,10 @@ fn parse_plan(value: &Value) -> Result<Plan, String> {
         || over_event_ids.iter().any(|id| !all_event_ids.contains(id.as_str())) {
         return Err("acquisition condition references an event absent from plan.events".to_owned());
     }
+    let declared_over: BTreeSet<_> = over_event_ids.iter().map(String::as_str).collect();
+    if declared_over != all_event_ids {
+        return Err("overcommitted_event_ids must contain every declared event exactly once".to_owned());
+    }
 
     let protocol = value.get("protocol").ok_or("plan.protocol is required")?;
     bool_true(protocol, "randomized_order_required", "plan.protocol")?;
@@ -575,36 +579,34 @@ fn audit_values(plan_value: &Value, observation_value: &Value, plan_bytes: &[u8]
                 "sample_count":total_samples,
                 "lost_samples":lost_samples,
                 "loss_fraction":value_or_null(loss_fraction),
+                "maximum_loss_fraction":plan.maximum_sample_loss_fraction,
                 "status":if loss_pass {"within_declared_loss_threshold"} else {"exceeds_declared_loss_threshold"}
             }
         }));
     }
 
-    let mut throughput_by_condition: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut observer_degradation_by_condition: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut read_overhead_by_condition: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     let mut block_map: BTreeMap<String, BTreeMap<String, &Trial>> = BTreeMap::new();
     for trial in &trials {
         block_map.entry(trial.block_id.clone()).or_default().insert(trial.condition.clone(), trial);
     }
-    for (block_id, conditions) in &block_map {
+    for conditions in block_map.values() {
         let baseline = conditions.get(&plan.baseline_condition).ok_or("missing baseline after block validation")?;
         let baseline_rate = baseline.work_units as f64 / baseline.elapsed_ns as f64;
         for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition.as_str()) {
             let trial = conditions.get(*condition).ok_or("missing condition after block validation")?;
             let rate = trial.work_units as f64 / trial.elapsed_ns as f64;
             let degradation = 1.0 - (rate / baseline_rate);
-            throughput_by_condition.entry((*condition).to_owned()).or_default().push(rate);
             observer_degradation_by_condition.entry((*condition).to_owned()).or_default().push(degradation);
             read_overhead_by_condition.entry((*condition).to_owned()).or_default()
                 .push(trial.pmu_read_overhead_ns as f64 / baseline.elapsed_ns as f64);
         }
-        let _ = block_id;
     }
 
     let mut throughput_reports = Vec::new();
     let mut throughput_gate_pass = true;
-    for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition) {
+    for condition in CONDITIONS.iter().filter(|c| **c != plan.baseline_condition.as_str()) {
         let degradations = observer_degradation_by_condition.get(*condition).ok_or("throughput condition invariant failed")?;
         let p95 = percentile(degradations, 0.95).unwrap_or(f64::INFINITY);
         let read_overheads = read_overhead_by_condition.get(*condition).ok_or("read overhead condition invariant failed")?;
@@ -785,6 +787,7 @@ mod tests {
         assert_eq!(receipt["support"]["effective_sample_size_estimate"], Value::Null);
         assert_eq!(receipt["event_qualification"][0]["co_scheduled"]["status"], "confirmatory_eligible_under_declared_thresholds");
         assert_eq!(receipt["event_qualification"][0]["overcommitted"]["confirmatory_eligible"], false);
+        assert_eq!(receipt["observer_effect"]["overall_status"], "within_declared_thresholds");
     }
 
     #[test]
@@ -882,6 +885,31 @@ mod tests {
             "time_enabled_ns":10,"time_running_ns":10,"sample_count":2,"lost_samples":3
         }]);
         assert!(audit(&p, &o).unwrap_err().contains("lost_samples exceeds sample_count"));
+    }
+
+
+    #[test]
+    fn rejects_sample_loss_above_preregistered_fraction() {
+        let (p, mut o, _, _) = fixture();
+        o["trials"][0]["events"][0]["sample_count"] = json!(100);
+        o["trials"][0]["events"][0]["lost_samples"] = json!(1);
+        let receipt = audit(&p, &o).unwrap();
+        assert_eq!(receipt["result"], "measurement_quality_gate_failed");
+        assert_eq!(receipt["event_qualification"][0]["sampling"]["status"], "exceeds_declared_loss_threshold");
+    }
+
+    #[test]
+    fn rejects_pmu_read_overhead_above_preregistered_fraction() {
+        let (p, mut o, _, _) = fixture();
+        for trial in o["trials"].as_array_mut().unwrap() {
+            if trial["condition"] == "grouped_co_scheduled" {
+                trial["pmu_read_overhead_ns"] = json!(50_000);
+            }
+        }
+        let receipt = audit(&p, &o).unwrap();
+        assert_eq!(receipt["result"], "measurement_quality_gate_failed");
+        assert!(receipt["observer_effect"]["condition_reports"].as_array().unwrap().iter()
+            .any(|entry| entry["status"] == "exceeds_declared_observer_effect_thresholds"));
     }
 
     #[test]
