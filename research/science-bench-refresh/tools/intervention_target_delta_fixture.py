@@ -42,6 +42,9 @@ def run_cli(*arguments: str) -> dict[str, Any]:
 
 def reviewer_panel(
     candidate_id: str,
+    target_identity_sha256: str,
+    baseline_artifact_sha256: str,
+    variant_artifact_sha256: str,
     observed_change: str,
     changed_claim_ids: list[str],
     collateral: str = "none_observed",
@@ -49,6 +52,9 @@ def reviewer_panel(
     return [
         {
             "reviewer_id_sha256": digest(f"target-reviewer:{candidate_id}:{index}".encode()),
+            "reviewed_target_identity_sha256": target_identity_sha256,
+            "baseline_artifact_sha256": baseline_artifact_sha256,
+            "variant_artifact_sha256": variant_artifact_sha256,
             "observed_target_change": observed_change,
             "observed_changed_claim_ids_sha256": changed_claim_ids,
             "collateral_change": collateral,
@@ -104,9 +110,13 @@ def generate(output_dir: Path) -> dict[str, Any]:
             preserved_ids = [control_id]
             expected_target_id = target_id
 
+        baseline_artifact = candidate["baseline_input_sha256"]
+        variant_artifact = candidate["variant_input_sha256"]
         target_candidates.append({
             "candidate_id": candidate_id,
             "target_identity_sha256": expected_target_id,
+            "baseline_artifact_sha256": baseline_artifact,
+            "variant_artifact_sha256": variant_artifact,
             "baseline_target_state_sha256": baseline_state,
             "variant_target_state_sha256": variant_state,
             "expected_target_change": relation,
@@ -118,13 +128,13 @@ def generate(output_dir: Path) -> dict[str, Any]:
             # A deliberately non-consensus panel. Global quality is also
             # ambiguous for this candidate; neither ambiguity is promoted.
             panels = [
-                reviewer_panel(candidate_id, "unchanged", [], "none_observed")[0],
-                reviewer_panel(candidate_id, "unchanged", [digest(b"unexpected claim one")], "none_observed")[1],
-                reviewer_panel(candidate_id, "unchanged", [digest(b"unexpected claim two")], "none_observed")[2],
+                reviewer_panel(candidate_id, expected_target_id, baseline_artifact, variant_artifact, "unchanged", [], "none_observed")[0],
+                reviewer_panel(candidate_id, expected_target_id, baseline_artifact, variant_artifact, "unchanged", [digest(b"unexpected claim one")], "none_observed")[1],
+                reviewer_panel(candidate_id, expected_target_id, baseline_artifact, variant_artifact, "unchanged", [digest(b"unexpected claim two")], "none_observed")[2],
             ]
         else:
             observed_change = relation
-            panels = reviewer_panel(candidate_id, observed_change, changed_ids)
+            panels = reviewer_panel(candidate_id, expected_target_id, baseline_artifact, variant_artifact, observed_change, changed_ids)
 
         target_observations.append({
             "candidate_id": candidate_id,
