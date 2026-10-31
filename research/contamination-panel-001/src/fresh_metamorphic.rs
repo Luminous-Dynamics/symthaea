@@ -183,7 +183,9 @@ pub struct FreshMetamorphicSubmissionV1 {
     pub model_access_mode: String,
     pub model_checkpoint_sha256: String,
     pub base_public_packet_sha256: String,
+    pub base_manifest_sha256: String,
     pub metamorphic_public_packet_sha256: String,
+    pub metamorphic_manifest_sha256: String,
     pub inference_harness_sha256: String,
     pub prompt_and_decoding_sha256: String,
     pub metric_definition_sha256: String,
@@ -329,10 +331,16 @@ fn compute_rhs(
 }
 
 fn scale_i32(value: i32, factor: i32, label: &str) -> Result<i32, String> {
+    if factor == 0 {
+        return Err("row scaling factor must be nonzero".to_owned());
+    }
     value.checked_mul(factor).ok_or_else(|| format!("{label} overflows i32 under row scaling"))
 }
 
 fn scale_i64(value: i64, factor: i64, label: &str) -> Result<i64, String> {
+    if factor == 0 {
+        return Err("row scaling factor must be nonzero".to_owned());
+    }
     value.checked_mul(factor).ok_or_else(|| format!("{label} overflows i64 under row scaling"))
 }
 
@@ -744,7 +752,9 @@ pub fn score_fresh_metamorphic_submission(
     }
     if submission.model_checkpoint_sha256 != bundle.public_packet.model_checkpoint_sha256
         || submission.base_public_packet_sha256 != bundle.public_packet.base_public_packet_sha256
+        || submission.base_manifest_sha256 != bundle.public_packet.base_manifest_sha256
         || submission.metamorphic_public_packet_sha256 != bundle.public_packet.public_packet_sha256
+        || submission.metamorphic_manifest_sha256 != bundle.manifest.manifest_sha256
     {
         return Err("metamorphic submission checkpoint or packet binding mismatch".to_owned());
     }
@@ -1066,7 +1076,9 @@ mod tests {
             model_access_mode: "offline-fixture".to_owned(),
             model_checkpoint_sha256: bundle.public_packet.model_checkpoint_sha256.clone(),
             base_public_packet_sha256: bundle.public_packet.base_public_packet_sha256.clone(),
+            base_manifest_sha256: bundle.public_packet.base_manifest_sha256.clone(),
             metamorphic_public_packet_sha256: bundle.public_packet.public_packet_sha256.clone(),
+            metamorphic_manifest_sha256: bundle.manifest.manifest_sha256.clone(),
             inference_harness_sha256: digest("harness"),
             prompt_and_decoding_sha256: digest("prompt"),
             metric_definition_sha256: hash_domain(
@@ -1146,9 +1158,10 @@ mod tests {
     }
 
     #[test]
-    fn zero_scale_is_not_an_exposed_transformation() {
-        // The public transform enum has no zero-scale value; test the arithmetic guard directly.
+    fn zero_scale_and_overflow_are_rejected() {
+        assert!(scale_i32(7, 0, "test").is_err());
         assert!(scale_i32(i32::MAX, 2, "test").is_err());
+        assert!(scale_i64(i64::MAX, 2, "test").is_err());
     }
 
     #[test]
