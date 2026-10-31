@@ -1113,6 +1113,25 @@ mod tests {
     }
 
     #[test]
+    fn proposal_free_scheduler_track_allows_zero_new_proposal_capacity() {
+        let mut plan = plan();
+        plan.seats[2].action = RoundAction::EvaluateDirection("D".to_owned());
+        plan.claim_caps.max_new_proposals_per_round = 0;
+        plan.plan_sha256 = plan.compute_digest().unwrap();
+        plan.validate_integrity().unwrap();
+    }
+
+    #[test]
+    fn ledger_rejects_rounds_from_a_different_campaign() {
+        let plan = plan();
+        let close = close_for(&plan);
+        let mut ledger = RoundLedger::new("other-campaign").unwrap();
+        assert!(ledger.append(&plan, &close).is_err());
+        assert_eq!(ledger.entries.len(), 0);
+        assert_eq!(ledger.total_action_count, 0);
+    }
+
+    #[test]
     fn unknown_or_zero_action_charge_is_rejected() {
         let plan = plan();
         let mut close = close_for(&plan);
