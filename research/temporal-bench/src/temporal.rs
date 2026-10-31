@@ -137,6 +137,7 @@ pub enum TemporalVerificationError {
     InvalidOracleModel,
     OracleLengthMismatch,
     InvalidOracleTarget { source_step: u64 },
+    InvalidObservationValue { step: u64 },
     MissingObservation { step: u64 },
     InvalidObservationOrder { step: u64 },
     MissingFeedback { source_step: u64 },
@@ -154,6 +155,9 @@ impl fmt::Display for TemporalVerificationError {
             Self::OracleLengthMismatch => write!(f, "oracle target count differs from observation count"),
             Self::InvalidOracleTarget { source_step } => {
                 write!(f, "oracle target record is invalid at source step {source_step}")
+            }
+            Self::InvalidObservationValue { step } => {
+                write!(f, "multiscale observation exceeds its declared noise bound at step {step}")
             }
             Self::MissingObservation { step } => {
                 write!(f, "missing observation event at step {step}")
@@ -271,6 +275,19 @@ pub fn verify_multiscale_trace(
             || !matches!(&observation.kind, TemporalEventKind::Observation { .. })
         {
             return Err(TemporalVerificationError::InvalidObservationOrder { step });
+        }
+        if let TemporalEventKind::Observation { fast, medium, slow } = &observation.kind {
+            let expected = [
+                wave(step, oracle.hidden_periods[0], oracle.hidden_phases[0]),
+                wave(step, oracle.hidden_periods[1], oracle.hidden_phases[1]),
+                wave(step, oracle.hidden_periods[2], oracle.hidden_phases[2]),
+            ];
+            let actual = [*fast, *medium, *slow];
+            if actual.into_iter().zip(expected).any(|(observed, latent)| {
+                (i32::from(observed) - i32::from(latent)).abs() > 20
+            }) {
+                return Err(TemporalVerificationError::InvalidObservationValue { step });
+            }
         }
         cursor = cursor.saturating_add(1);
 
@@ -673,6 +690,19 @@ mod tests {
     fn generated_public_stream_has_valid_sha256() {
         let (task, _) = generate_multiscale_task(config(true)).unwrap();
         assert_eq!(task.content_sha256, multiscale_content_digest(&task));
+    }
+
+    #[test]
+    fn verifier_rejects_recommitted_observation_outside_noise_bound() {
+        let (mut task, oracle) = generate_multiscale_task(config(true)).unwrap();
+        if let TemporalEventKind::Observation { fast, .. } = &mut task.events[0].kind {
+            *fast = 1_000;
+        }
+        task.content_sha256 = multiscale_content_digest(&task);
+        assert_eq!(
+            verify_multiscale_trace(&task, &oracle),
+            Err(TemporalVerificationError::InvalidObservationValue { step: 0 })
+        );
     }
 
     #[test]
