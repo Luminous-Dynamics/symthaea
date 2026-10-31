@@ -1326,4 +1326,5 @@ mod tests {
             verify_tail_profile(&profile, &registry.authorities).unwrap_err(),
             TailProfileError::ProfileReceiptInvalid
         );
-    }}
+    }
+}
