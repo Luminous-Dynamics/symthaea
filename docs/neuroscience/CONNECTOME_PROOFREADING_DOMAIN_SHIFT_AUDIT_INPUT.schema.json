@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json",
+  "title": "Connectome proofreading frozen prediction with optional domain-shift evidence",
+  "description": "One frozen candidate prediction. Domain fields are optional as a complete group; a scoring run may cover exactly one preregistered shift axis. The Rust scorer additionally enforces all-row completeness and stable domain holdout declarations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sample_id",
+    "group",
+    "cluster_id",
+    "label_is_error",
+    "p_error",
+    "review_priority_score",
+    "review_minutes",
+    "impact_weight"
+  ],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "group": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Task/error-family group, distinct from domain_id."
+    },
+    "cluster_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Independent dependency unit used for cluster-aware uncertainty."
+    },
+    "label_is_error": {
+      "type": "boolean"
+    },
+    "p_error": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "review_priority_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "review_minutes": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "impact_weight": {
+      "type": "number",
+      "minimum": 0
+    },
+    "domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shift_axis": {
+      "enum": [
+        "species",
+        "region",
+        "source_volume",
+        "source_archive",
+        "acquisition_protocol",
+        "segmentation_lineage",
+        "modality_availability",
+        "morphology_regime"
+      ]
+    },
+    "is_ood_domain": {
+      "type": "boolean",
+      "description": "Predeclared from the frozen training/calibration split, never inferred from this model's novelty score."
+    },
+    "ood_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Frozen novelty score; independent of p_error and ranking priority."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "domain_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift_axis",
+          "is_ood_domain"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "shift_axis"
+        ]
+      },
+      "then": {
+        "required": [
+          "domain_id",
+          "is_ood_domain"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "is_ood_domain"
+        ]
+      },
+      "then": {
+        "required": [
+          "domain_id",
+          "shift_axis"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "ood_score"
+        ]
+      },
+      "then": {
+        "required": [
+          "domain_id",
+          "shift_axis",
+          "is_ood_domain"
+        ]
+      }
+    }
+  ]
+}
