@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BASALT source epoch seal benchmark definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suite_id",
+    "benchmark_version",
+    "title",
+    "claim_ceiling",
+    "independent_unit",
+    "scenario_schema",
+    "scenarios",
+    "metrics",
+    "benchmark_policy"
+  ],
+  "properties": {
+    "suite_id": {
+      "const": "basalt-source-epoch-seal-benchmark-v1"
+    },
+    "benchmark_version": {
+      "const": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "independent_unit": {
+      "type": "string"
+    },
+    "scenario_schema": {
+      "type": "string"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "mutation",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "mutation": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "unit",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "class": {
+            "enum": [
+              "safety",
+              "efficiency"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "target": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "benchmark_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "all_safety_gates_must_pass_before_efficiency_is_scored",
+        "report_every_mutation_and_invalid_run",
+        "no_event_level_pseudoreplication",
+        "efficiency_targets_are_research_targets_not_results",
+        "held_out_confirmatory_runs_required"
+      ],
+      "properties": {
+        "all_safety_gates_must_pass_before_efficiency_is_scored": {
+          "const": true
+        },
+        "report_every_mutation_and_invalid_run": {
+          "const": true
+        },
+        "no_event_level_pseudoreplication": {
+          "const": true
+        },
+        "efficiency_targets_are_research_targets_not_results": {
+          "const": true
+        },
+        "held_out_confirmatory_runs_required": {
+          "const": true
+        }
+      }
+    }
+  }
+}
