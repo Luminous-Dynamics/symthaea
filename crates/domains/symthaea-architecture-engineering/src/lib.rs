@@ -18,6 +18,7 @@ pub mod analytical_benchmark;
 pub mod pruning_audit;
 pub mod budgeted_audit;
 pub mod run_wide_pruning_risk;
+pub mod decision_focused_voc;
 
 const MATRIX_SCHEMA: &str = "symthaea.architecture-engineering.candidate-matrix";
 const MATRIX_VERSION: &str = "0.1.0";
