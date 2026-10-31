@@ -25,15 +25,15 @@ use crate::{
 const SPARSE_MODEL_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-BINARY-CAUSAL-MODEL\0v0.1\0";
 const SPARSE_EVALUATION_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EVALUATION\0v0.1\0";
 const SPARSE_EQ4_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-REQUEST\0v0.1\0";
-const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.2\0";
+const SPARSE_EQ4_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-EQ4-RECEIPT\0v0.3\0";
 const SPARSE_PARTITION_SCORE_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-REQUEST\0v0.1\0";
 const SPARSE_SYSTEM_SEARCH_REQUEST_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-SYSTEM-SEARCH-REQUEST\0v0.1\0";
 pub const SPARSE_IIT4_2023_SYSTEM_SEARCH_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-2023-system-search/0.1.0";
-const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.1\0";
-pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.2.0";
+    "symthaea-iit/sparse-iit4-2023-system-search/0.2.0";
+const SPARSE_PARTITION_SCORE_RECEIPT_MAGIC: &[u8] = b"SYMTHAEA-IIT-SPARSE-PARTITION-SCORE-RECEIPT\0v0.2\0";
+pub const SPARSE_IIT4_EQ4_ALGORITHM_ID: &str = "symthaea-iit/sparse-iit4-eq4-minfill/0.3.0";
 pub const SPARSE_IIT4_PARTITION_SCORE_ALGORITHM_ID: &str =
-    "symthaea-iit/sparse-iit4-partition-score/0.1.0";
+    "symthaea-iit/sparse-iit4-partition-score/0.2.0";
 
 pub const MAX_SPARSE_UNITS: usize = 1_000_000;
 pub const MAX_LOCAL_PARENTS: usize = 20;
@@ -178,6 +178,12 @@ pub struct SparseEq4Report {
     pub forward_likelihood: Vec<f64>,
     pub posterior_induced_width: usize,
     pub maximum_target_induced_width: usize,
+    /// True when this report reused the original model/state posterior prepared by
+    /// a surrounding multi-partition analysis instead of contracting it again.
+    pub posterior_contraction_reused: bool,
+    /// Factor multiplications performed to build the reusable posterior. This is
+    /// reported even when reused, but is not added to this report's work counter.
+    pub posterior_factor_multiplications: usize,
     /// Largest preflight bucket table for the observed-state posterior contraction.
     pub posterior_predicted_peak_factor_entries: usize,
     /// Largest preflight bucket table across target-wise likelihood contractions.
@@ -207,6 +213,8 @@ impl SparseEq4Report {
         }
         sparse_receipt_u64(&mut bytes, self.posterior_induced_width as u64);
         sparse_receipt_u64(&mut bytes, self.maximum_target_induced_width as u64);
+        bytes.push(u8::from(self.posterior_contraction_reused));
+        sparse_receipt_u64(&mut bytes, self.posterior_factor_multiplications as u64);
         sparse_receipt_u64(&mut bytes, self.posterior_predicted_peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.maximum_target_predicted_peak_factor_entries as u64);
         sparse_receipt_u64(&mut bytes, self.predicted_peak_factor_entries as u64);
@@ -214,6 +222,47 @@ impl SparseEq4Report {
         sparse_receipt_u64(&mut bytes, self.factor_multiplications as u64);
         Ok(sparse_hex_digest(&bytes))
     }
+}
+
+
+/// Reusable Eq. 4 posterior over the original, uncut substrate and observation.
+/// Candidate-past variables are duplicated in the target query; external variables
+/// remain shared. A context is scoped to one model, candidate ordering, state and
+/// factor-entry budget.
+#[derive(Debug, Clone)]
+struct SparseEq4PosteriorContext {
+    model_sha256: String,
+    candidate_system: Vec<usize>,
+    current_state: Vec<bool>,
+    max_factor_entries: usize,
+    y_base: usize,
+    y_map: Vec<usize>,
+    posterior_factors: Vec<BinaryLogFactor>,
+    eliminate_posterior: Vec<usize>,
+    candidate_state_count: usize,
+    posterior_log_normalizer: f64,
+    posterior_induced_width: usize,
+    posterior_predicted_peak_factor_entries: usize,
+    posterior_peak_factor_entries: usize,
+    posterior_factor_multiplications: usize,
+}
+
+/// Values independent of a particular partition or specified cause/effect state.
+#[derive(Debug, Clone)]
+struct SparseIit4ScoringBaseline {
+    posterior: SparseEq4PosteriorContext,
+    cause_forward: SparseEq4Report,
+    cause_selectivity: Vec<f64>,
+    effect_selectivity: Vec<f64>,
+}
+
+/// Partition-dependent repertoire outputs computed once and reused for every
+/// tied intrinsic cause/effect specified-state pair.
+#[derive(Debug, Clone)]
+struct SparseIit4PartitionTerms {
+    partitioned_cause: SparseEq4Report,
+    effect_partitioned: Vec<f64>,
+    severed_connections: usize,
 }
 
 /// Proof-carrying sparse per-partition score report.
@@ -570,7 +619,92 @@ impl SparseBinaryCausalModel {
         system_state: &crate::Iit4SystemState,
         max_factor_entries: usize,
     ) -> Result<SparsePartitionScoreReport, SparseCausalError> {
-        self.check_state(current_state)?;
+        let baseline = self.prepare_iit4_scoring_baseline(
+            partition.candidate_system(),
+            current_state,
+            max_factor_entries,
+        )?;
+        let terms = self.prepare_iit4_partition_terms(partition, &baseline)?;
+        self.score_iit4_system_partition_from_terms(partition, system_state, &baseline, &terms)
+    }
+
+    fn prepare_iit4_scoring_baseline(
+        &self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        max_factor_entries: usize,
+    ) -> Result<SparseIit4ScoringBaseline, SparseCausalError> {
+        let posterior = self.prepare_iit4_eq4_posterior(
+            candidate_system,
+            current_state,
+            max_factor_entries,
+        )?;
+        let cause_forward = self.forward_cause_likelihood_iit4_with_posterior(
+            self,
+            &posterior,
+            false,
+        )?;
+        let cause_mass = cause_forward.forward_likelihood.iter().sum::<f64>();
+        if !cause_mass.is_finite() || cause_mass <= 0.0 {
+            return Err(SparseCausalError::UndefinedBackgroundPosterior);
+        }
+        let cause_selectivity = cause_forward
+            .forward_likelihood
+            .iter()
+            .map(|value| value / cause_mass)
+            .collect::<Vec<_>>();
+        let effect_selectivity = self.effect_repertoire_iit4(
+            candidate_system,
+            candidate_system,
+            current_state,
+            candidate_system,
+            max_factor_entries,
+        )?;
+        Ok(SparseIit4ScoringBaseline {
+            posterior,
+            cause_forward,
+            cause_selectivity,
+            effect_selectivity,
+        })
+    }
+
+    fn prepare_iit4_partition_terms(
+        &self,
+        partition: &DirectedSystemPartition,
+        baseline: &SparseIit4ScoringBaseline,
+    ) -> Result<SparseIit4PartitionTerms, SparseCausalError> {
+        let severed_connections = partition.cut_matrix().iter().filter(|cut| **cut).count();
+        if severed_connections == 0 {
+            return Err(SparseCausalError::ZeroSeveredConnections);
+        }
+        let cut_model = self.apply_partition(partition)?;
+        let partitioned_cause = self.forward_cause_likelihood_iit4_with_posterior(
+            &cut_model,
+            &baseline.posterior,
+            true,
+        )?;
+        let candidate = partition.candidate_system();
+        let effect_partitioned = cut_model.effect_repertoire_iit4(
+            candidate,
+            candidate,
+            &baseline.posterior.current_state,
+            candidate,
+            baseline.posterior.max_factor_entries,
+        )?;
+        Ok(SparseIit4PartitionTerms {
+            partitioned_cause,
+            effect_partitioned,
+            severed_connections,
+        })
+    }
+
+    fn score_iit4_system_partition_from_terms(
+        &self,
+        partition: &DirectedSystemPartition,
+        system_state: &crate::Iit4SystemState,
+        baseline: &SparseIit4ScoringBaseline,
+        terms: &SparseIit4PartitionTerms,
+    ) -> Result<SparsePartitionScoreReport, SparseCausalError> {
         let candidate = partition.candidate_system();
         if system_state.cause_specified_state.len() != candidate.len() {
             return Err(SparseCausalError::SpecifiedStateLength {
@@ -586,46 +720,6 @@ impl SparseBinaryCausalModel {
                 actual: system_state.effect_specified_state.len(),
             });
         }
-        let severed_connections = partition.cut_matrix().iter().filter(|cut| **cut).count();
-        if severed_connections == 0 {
-            return Err(SparseCausalError::ZeroSeveredConnections);
-        }
-
-        let cause_forward_report = self.forward_cause_likelihood_iit4(
-            candidate,
-            current_state,
-            max_factor_entries,
-        )?;
-        let cause_mass = cause_forward_report.forward_likelihood.iter().sum::<f64>();
-        if !cause_mass.is_finite() || cause_mass <= 0.0 {
-            return Err(SparseCausalError::UndefinedBackgroundPosterior);
-        }
-        let cause_selectivity = cause_forward_report.forward_likelihood
-            .iter()
-            .map(|value| value / cause_mass)
-            .collect::<Vec<_>>();
-        let effect_selectivity = self.effect_repertoire_iit4(
-            candidate,
-            candidate,
-            current_state,
-            candidate,
-            max_factor_entries,
-        )?;
-
-        let cut_model = self.apply_partition(partition)?;
-        let cause_partitioned = self.partitioned_forward_cause_likelihood_iit4(
-            partition,
-            current_state,
-            max_factor_entries,
-        )?;
-        let effect_partitioned = cut_model.effect_repertoire_iit4(
-            candidate,
-            candidate,
-            current_state,
-            candidate,
-            max_factor_entries,
-        )?;
-
         let cause_state_index = system_state.cause_specified_state
             .iter()
             .enumerate()
@@ -641,18 +735,18 @@ impl SparseBinaryCausalModel {
 
         let cause = sparse_direction_score(
             CausalDirection::Cause,
-            cause_selectivity[cause_state_index],
-            cause_forward_report.forward_likelihood[cause_state_index],
-            cause_partitioned.forward_likelihood[cause_state_index],
+            baseline.cause_selectivity[cause_state_index],
+            baseline.cause_forward.forward_likelihood[cause_state_index],
+            terms.partitioned_cause.forward_likelihood[cause_state_index],
         );
         let effect = sparse_direction_score(
             CausalDirection::Effect,
-            effect_selectivity[effect_state_index],
-            effect_selectivity[effect_state_index],
-            effect_partitioned[effect_state_index],
+            baseline.effect_selectivity[effect_state_index],
+            baseline.effect_selectivity[effect_state_index],
+            terms.effect_partitioned[effect_state_index],
         );
         let signed_phi = cause.signed_phi.min(effect.signed_phi);
-        let normalization_factor = 1.0 / severed_connections as f64;
+        let normalization_factor = 1.0 / terms.severed_connections as f64;
         let signed_normalized_phi = signed_phi * normalization_factor;
 
         let score = SystemPhiPartitionScore {
@@ -663,19 +757,19 @@ impl SparseBinaryCausalModel {
             normalization_factor,
             signed_normalized_phi,
             normalized_phi: signed_normalized_phi.max(0.0),
-            severed_connections,
+            severed_connections: terms.severed_connections,
         };
         let request_sha256 = self.partition_score_request_sha256(
             partition,
-            current_state,
+            &baseline.posterior.current_state,
             system_state,
-            max_factor_entries,
+            baseline.posterior.max_factor_entries,
         );
         Ok(SparsePartitionScoreReport {
             request_sha256,
-            max_factor_entries,
-            uncut_cause_receipt_sha256: cause_forward_report.receipt_sha256()?,
-            partitioned_cause_receipt_sha256: cause_partitioned.receipt_sha256()?,
+            max_factor_entries: baseline.posterior.max_factor_entries,
+            uncut_cause_receipt_sha256: baseline.cause_forward.receipt_sha256()?,
+            partitioned_cause_receipt_sha256: terms.partitioned_cause.receipt_sha256()?,
             score,
         })
     }
@@ -1170,15 +1264,22 @@ impl SparseBinaryCausalModel {
         }
 
         let state_pairs = intrinsic.state_pairs();
-        let mut state_pair_results = Vec::with_capacity(state_pair_count);
-        for system_state in state_pairs {
-            let mut scores = Vec::with_capacity(partitions.len());
-            for partition in &partitions {
-                let report = self.score_iit4_system_partition(
+        let baseline = self.prepare_iit4_scoring_baseline(
+            candidate_system,
+            current_state,
+            max_factor_entries,
+        )?;
+        let mut scores_by_state_pair = (0..state_pair_count)
+            .map(|_| Vec::with_capacity(partitions.len()))
+            .collect::<Vec<_>>();
+        for partition in &partitions {
+            let terms = self.prepare_iit4_partition_terms(partition, &baseline)?;
+            for (state_pair_index, system_state) in state_pairs.iter().enumerate() {
+                let report = self.score_iit4_system_partition_from_terms(
                     partition,
-                    current_state,
-                    &system_state,
-                    max_factor_entries,
+                    system_state,
+                    &baseline,
+                    &terms,
                 )?;
                 // Validate receipt serialization before moving the score out.
                 let _receipt_sha256 = report.receipt_sha256()?;
@@ -1187,12 +1288,17 @@ impl SparseBinaryCausalModel {
                     || !score.phi.is_finite()
                     || !score.normalized_phi.is_finite()
                 {
-                    return Err(SystemPhiError::NonFinitePartitionScore);
+                    return Err(SystemPhiError::NonFinitePartitionScore.into());
                 }
-                scores.push(score);
+                scores_by_state_pair[state_pair_index].push(score);
             }
+        }
+
+        let mut state_pair_results = Vec::with_capacity(state_pair_count);
+        for (state_pair_index, system_state) in state_pairs.into_iter().enumerate() {
+            let scores = std::mem::take(&mut scores_by_state_pair[state_pair_index]);
             if scores.is_empty() {
-                return Err(SystemPhiError::ZeroSeveredConnections);
+                return Err(SystemPhiError::ZeroSeveredConnections.into());
             }
             let winner_index = crate::select_pyphi_sia_partition(&partitions, &scores, epsilon);
             let winner_score = scores[winner_index].clone();
@@ -1307,19 +1413,13 @@ impl SparseBinaryCausalModel {
         )
     }
 
-    fn forward_cause_likelihood_iit4_with_target_model(
+    fn prepare_iit4_eq4_posterior(
         &self,
-        target_model: &Self,
         candidate_system: &[usize],
         current_state: &[bool],
         max_factor_entries: usize,
-    ) -> Result<SparseEq4Report, SparseCausalError> {
+    ) -> Result<SparseEq4PosteriorContext, SparseCausalError> {
         self.check_state(current_state)?;
-        if target_model.n_units != self.n_units {
-            return Err(SparseCausalError::InvalidUnitCount {
-                units: target_model.n_units,
-            });
-        }
         if candidate_system.is_empty() {
             return Err(SparseCausalError::EmptyCandidateSystem);
         }
@@ -1390,40 +1490,85 @@ impl SparseBinaryCausalModel {
             return Err(SparseCausalError::UndefinedBackgroundPosterior);
         }
 
-        let mut forward = vec![1.0; candidate_state_count];
+        Ok(SparseEq4PosteriorContext {
+            model_sha256: self.model_sha256(),
+            candidate_system: candidate_system.to_vec(),
+            current_state: current_state.to_vec(),
+            max_factor_entries,
+            y_base,
+            y_map,
+            posterior_factors,
+            eliminate_posterior,
+            candidate_state_count,
+            posterior_log_normalizer,
+            posterior_induced_width: normalizer.induced_width,
+            posterior_predicted_peak_factor_entries: normalizer.predicted_peak_factor_entries,
+            posterior_peak_factor_entries: normalizer.peak_factor_entries,
+            posterior_factor_multiplications: normalizer.factor_multiplications,
+        })
+    }
+
+    fn forward_cause_likelihood_iit4_with_posterior(
+        &self,
+        target_model: &Self,
+        posterior: &SparseEq4PosteriorContext,
+        posterior_contraction_reused: bool,
+    ) -> Result<SparseEq4Report, SparseCausalError> {
+        if self.model_sha256() != posterior.model_sha256 {
+            return Err(SparseCausalError::UndefinedBackgroundPosterior);
+        }
+        if target_model.n_units != self.n_units {
+            return Err(SparseCausalError::InvalidUnitCount {
+                units: target_model.n_units,
+            });
+        }
+
+        let mut forward = vec![1.0; posterior.candidate_state_count];
         let mut maximum_target_induced_width = 0usize;
         let mut maximum_target_predicted_peak_factor_entries = 0usize;
-        let mut predicted_peak_factor_entries = normalizer.predicted_peak_factor_entries;
-        let mut peak_factor_entries = normalizer.peak_factor_entries;
-        let mut factor_multiplications = normalizer.factor_multiplications;
+        let mut predicted_peak_factor_entries =
+            posterior.posterior_predicted_peak_factor_entries;
+        let mut peak_factor_entries = posterior.posterior_peak_factor_entries;
+        let mut factor_multiplications = if posterior_contraction_reused {
+            0
+        } else {
+            posterior.posterior_factor_multiplications
+        };
 
-        for target in candidate_system.iter().copied() {
+        for target in posterior.candidate_system.iter().copied() {
             let target_factor = target_model.observation_log_factor(
-                target, current_state, &y_map, max_factor_entries,
+                target,
+                &posterior.current_state,
+                &posterior.y_map,
+                posterior.max_factor_entries,
             )?;
-            let mut factors = posterior_factors.clone();
+            let mut factors = posterior.posterior_factors.clone();
             factors.push(target_factor);
             let report = min_fill_log_sum_product(
-                &factors, &eliminate_posterior, max_factor_entries,
+                &factors,
+                &posterior.eliminate_posterior,
+                posterior.max_factor_entries,
             )?;
             if report.factor.variables().iter().any(|variable| {
-                *variable < y_base || *variable >= y_base + candidate_system.len()
+                *variable < posterior.y_base
+                    || *variable >= posterior.y_base + posterior.candidate_system.len()
             }) {
                 return Err(SparseCausalError::UndefinedBackgroundPosterior);
             }
 
-            let mut cause_factor = vec![0.0; candidate_state_count];
+            let mut cause_factor = vec![0.0; posterior.candidate_state_count];
             for (candidate_state, value) in cause_factor.iter_mut().enumerate() {
                 let local_index = report.factor.variables().iter().enumerate().fold(
                     0usize,
                     |index, (factor_slot, variable)| {
-                        let candidate_slot = variable - y_base;
+                        let candidate_slot = variable - posterior.y_base;
                         if ((candidate_state >> candidate_slot) & 1) != 0 {
                             index | (1usize << factor_slot)
                         } else { index }
                     },
                 );
-                *value = (report.factor.log_values()[local_index] - posterior_log_normalizer).exp();
+                *value = (report.factor.log_values()[local_index]
+                    - posterior.posterior_log_normalizer).exp();
             }
             if cause_factor.iter().any(|value| {
                 !value.is_finite() || *value < 0.0 || *value > 1.0 + 1e-12
@@ -1433,11 +1578,13 @@ impl SparseBinaryCausalModel {
             for (joint, factor_value) in forward.iter_mut().zip(cause_factor) {
                 *joint *= factor_value;
             }
-            maximum_target_induced_width = maximum_target_induced_width.max(report.induced_width);
-            maximum_target_predicted_peak_factor_entries = maximum_target_predicted_peak_factor_entries
-                .max(report.predicted_peak_factor_entries);
-            predicted_peak_factor_entries = predicted_peak_factor_entries
-                .max(report.predicted_peak_factor_entries);
+            maximum_target_induced_width =
+                maximum_target_induced_width.max(report.induced_width);
+            maximum_target_predicted_peak_factor_entries =
+                maximum_target_predicted_peak_factor_entries
+                    .max(report.predicted_peak_factor_entries);
+            predicted_peak_factor_entries =
+                predicted_peak_factor_entries.max(report.predicted_peak_factor_entries);
             peak_factor_entries = peak_factor_entries.max(report.peak_factor_entries);
             factor_multiplications += report.factor_multiplications;
         }
@@ -1447,22 +1594,44 @@ impl SparseBinaryCausalModel {
         }
         let request_sha256 = self.eq4_request_sha256(
             target_model,
-            candidate_system,
-            current_state,
-            max_factor_entries,
+            &posterior.candidate_system,
+            &posterior.current_state,
+            posterior.max_factor_entries,
         );
         Ok(SparseEq4Report {
             request_sha256,
-            max_factor_entries,
+            max_factor_entries: posterior.max_factor_entries,
             forward_likelihood: forward,
-            posterior_induced_width: normalizer.induced_width,
+            posterior_induced_width: posterior.posterior_induced_width,
             maximum_target_induced_width,
-            posterior_predicted_peak_factor_entries: normalizer.predicted_peak_factor_entries,
+            posterior_contraction_reused,
+            posterior_factor_multiplications: posterior.posterior_factor_multiplications,
+            posterior_predicted_peak_factor_entries:
+                posterior.posterior_predicted_peak_factor_entries,
             maximum_target_predicted_peak_factor_entries,
             predicted_peak_factor_entries,
             peak_factor_entries,
             factor_multiplications,
         })
+    }
+
+    fn forward_cause_likelihood_iit4_with_target_model(
+        &self,
+        target_model: &Self,
+        candidate_system: &[usize],
+        current_state: &[bool],
+        max_factor_entries: usize,
+    ) -> Result<SparseEq4Report, SparseCausalError> {
+        let posterior = self.prepare_iit4_eq4_posterior(
+            candidate_system,
+            current_state,
+            max_factor_entries,
+        )?;
+        self.forward_cause_likelihood_iit4_with_posterior(
+            target_model,
+            &posterior,
+            false,
+        )
     }
 
     fn partition_score_request_sha256(
