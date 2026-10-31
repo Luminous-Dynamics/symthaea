@@ -32,11 +32,11 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION: &str =
-    "mel-mr-eval-025-counterfactual-support-adapter-v1";
+    "mel-mr-eval-025-counterfactual-support-adapter-v2";
 const EVENT_EVIDENCE_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-event-support-evidence-v2\0";
 const ADAPTER_REPORT_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v1\0";
+    b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v2\0";
 const MAX_ADAPTER_EVENTS: usize = 100_000;
 const MAX_SUPPORT_INTERVALS_PER_EVENT: usize = 100_000;
 const ROUTING_INCOMPLETE_REASON: &str =
@@ -66,6 +66,9 @@ pub struct CounterfactualEventSupportEvidence {
     pub channels: usize,
     pub output_frame_count: u64,
     pub disposition: InfluenceDisposition,
+    /// Raw threshold-positive windows retained for audit, not planner use.
+    pub raw_measured_support: Vec<AcousticSupportInterval>,
+    /// Hysteresis-qualified intervals are carried by support.acoustic_support.
     pub support: EventInteractionSupport,
     /// Domain-separated hash over this evidence with both digest fields blank.
     pub evidence_sha256: String,
@@ -123,6 +126,14 @@ impl CounterfactualSupportAdapterReport {
             && self.events.iter().enumerate().all(|(index, event)| {
                 event.source_event_index == index
                     && event.support.source_event_index == index
+                    && event.raw_measured_support.iter().all(|interval| {
+                        interval.start_frame < interval.end_frame
+                            && interval.end_frame <= event.output_frame_count
+                    })
+                    && event.support.acoustic_support.iter().all(|interval| {
+                        interval.start_frame < interval.end_frame
+                            && interval.end_frame <= event.output_frame_count
+                    })
                     && event.support.support_evidence_sha256.as_deref()
                         == Some(event.evidence_sha256.as_str())
                     && is_sha256(&event.evidence_sha256)
@@ -306,31 +317,38 @@ fn build_event_support(
         domains.insert(format!("fluidsynth:effects-group:{group}"));
     }
 
-    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
+    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT
+        || report.qualified_support_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT
+    {
         return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
     }
-    let mut acoustic_support = Vec::with_capacity(report.measured_influence_intervals.len());
-    for interval in &report.measured_influence_intervals {
-        let start_frame = u64::try_from(interval.start_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        let end_frame = u64::try_from(interval.end_frame)
-            .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
-        if start_frame >= end_frame || end_frame > report.total_frames as u64 {
-            return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
-        }
-        acoustic_support.push(AcousticSupportInterval { start_frame, end_frame });
-    }
-    acoustic_support.sort_unstable();
-    let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(acoustic_support.len());
-    for interval in acoustic_support {
-        if let Some(previous) = merged.last_mut() {
-            if interval.start_frame <= previous.end_frame {
-                previous.end_frame = previous.end_frame.max(interval.end_frame);
-                continue;
+    let convert_intervals = |source: &[crate::audio_preservation::FrameInterval]| {
+        let mut converted = Vec::with_capacity(source.len());
+        for interval in source {
+            let start_frame = u64::try_from(interval.start_frame)
+                .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+            let end_frame = u64::try_from(interval.end_frame)
+                .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
+            if start_frame >= end_frame || end_frame > report.total_frames as u64 {
+                return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
             }
+            converted.push(AcousticSupportInterval { start_frame, end_frame });
         }
-        merged.push(interval);
-    }
+        converted.sort_unstable();
+        let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(converted.len());
+        for interval in converted {
+            if let Some(previous) = merged.last_mut() {
+                if interval.start_frame <= previous.end_frame {
+                    previous.end_frame = previous.end_frame.max(interval.end_frame);
+                    continue;
+                }
+            }
+            merged.push(interval);
+        }
+        Ok::<Vec<AcousticSupportInterval>, CounterfactualSupportAdapterError>(merged)
+    };
+    let raw_measured_support = convert_intervals(&report.measured_influence_intervals)?;
+    let qualified_support = convert_intervals(&report.qualified_support_intervals)?;
 
     let mut evidence = CounterfactualEventSupportEvidence {
         version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
@@ -355,9 +373,10 @@ fn build_event_support(
         channels: report.channels,
         output_frame_count: report.total_frames as u64,
         disposition: report.disposition,
+        raw_measured_support,
         support: EventInteractionSupport {
             source_event_index,
-            acoustic_support: merged,
+            acoustic_support: qualified_support,
             routing_domains: domains.into_iter().collect(),
             // Partial effects-group topology is not a complete render graph.
             // EVAL-019 will conservatively expand pair scope until this changes.
@@ -551,6 +570,7 @@ mod tests {
             } else {
                 InfluenceDisposition::EffectDetected
             },
+            raw_measured_support: intervals.clone(),
             support: EventInteractionSupport {
                 source_event_index: index,
                 acoustic_support: intervals,
@@ -590,6 +610,13 @@ mod tests {
             altered.evidence_sha256,
             event_evidence_sha256(&altered).unwrap()
         );
+
+        let mut raw_altered = verified.evidence.clone();
+        raw_altered.raw_measured_support[0].end_frame = 66;
+        assert_ne!(
+            raw_altered.evidence_sha256,
+            event_evidence_sha256(&raw_altered).unwrap()
+        );
     }
 
     fn lineage(source_index: usize, channel: u8, midi_note: u8) -> crate::performed_event_map::PerformedEventLineage {
@@ -617,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn single_event_binding_maps_channels_and_preserves_measured_empty_support() {
+    fn raw_isolated_measurement_is_retained_but_not_sent_to_the_planner() {
         let baseline_samples = vec![0.0_f32; 67 * 2];
         let counterfactual_samples = baseline_samples.clone();
         let baseline_audio = crate::audio_preservation::AudioView {
@@ -714,7 +741,13 @@ mod tests {
             },
             total_channel_windows: 0,
             affected_channel_windows: 0,
-            measured_influence_intervals: Vec::new(),
+            support_policy: crate::counterfactual_influence::InfluenceSupportPolicy::default(),
+            window_measurements: Vec::new(),
+            measured_influence_intervals: vec![crate::audio_preservation::FrameInterval { start_frame: 20, end_frame: 30 }],
+            qualified_support_intervals: Vec::new(),
+            qualified_channel_windows: 0,
+            bridged_channel_windows: 0,
+            tail_extension_frames_applied: 0,
             disposition: InfluenceDisposition::NoEffectAboveNoiseFloor,
             receipt_sha256: digest("influence-report"),
         };
@@ -723,6 +756,10 @@ mod tests {
         let evidence = verified.evidence();
         assert_eq!(evidence.source_event_index, 1);
         assert_eq!(evidence.output_frame_count, 67);
+        assert_eq!(
+            evidence.raw_measured_support,
+            vec![AcousticSupportInterval { start_frame: 20, end_frame: 30 }]
+        );
         assert!(evidence.support.acoustic_support.is_empty());
         assert_eq!(
             evidence.support.routing_domains,
