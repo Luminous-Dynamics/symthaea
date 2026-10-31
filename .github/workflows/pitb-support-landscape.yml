@@ -6,6 +6,7 @@ on:
       - "scripts/research/pitb_support_landscape_v1.py"
       - "data/benchmarks/proof-insight-transfer-v0/support-landscape-trial.schema.json"
       - "docs/research/pitb-probabilistic-support-landscape-2026-10-31.md"
+      - "docs/research/pitb-support-landscape-context-closure-2026-10-31.md"
       - ".github/workflows/pitb-support-landscape.yml"
   workflow_dispatch:
 
@@ -58,7 +59,7 @@ jobs:
               "toolchain_sha256": "d" * 64, "fixed_context_sha256": "e" * 64,
               "replicate_count": 20, "replicate_index": 0, "budget": budget,
               "mutable_declarations": ["h"], "fixed_declarations": ["base"],
-              "declaration_order": ["h"], "declaration_dependencies": {"h": []},
+              "declaration_order": ["base", "h"], "declaration_dependencies": {"base": [], "h": []},
               "requested_declarations": ["h"], "context_well_formed": True,
               "local_context_sha256": "f" * 64, "context_receipt_sha256": "1" * 64,
               "seed_sha256": "2" * 64, "run_receipt_sha256": "3" * 64,
