@@ -1302,3 +1302,5 @@ mod tests {
         assert!(serde_json::from_slice::<PublicChallengePacketV1>(&bytes).is_err());
     }
 }
+
+pub mod dvd;
