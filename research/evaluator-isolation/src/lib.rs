@@ -52,6 +52,7 @@ pub enum IntakeError {
     InvalidFileName,
     OpenAt2Unavailable,
     OpenAt2(io::ErrorKind),
+    Io(io::ErrorKind),
     SourceNotRegular,
     SourceHasMultipleLinks { links: u64 },
     SourceTooLarge { size: u64, maximum: u64 },
@@ -71,6 +72,7 @@ impl fmt::Display for IntakeError {
                 "openat2 is unavailable; refusing an insecure path-resolution fallback"
             ),
             Self::OpenAt2(kind) => write!(f, "openat2 failed: {kind:?}"),
+            Self::Io(kind) => write!(f, "artifact intake I/O failed: {kind:?}"),
             Self::SourceNotRegular => write!(f, "candidate artifact is not a regular file"),
             Self::SourceHasMultipleLinks { links } => {
                 write!(f, "candidate artifact has link count {links}; expected exactly one")
@@ -124,7 +126,7 @@ pub fn import_candidate_artifact(
     // SAFETY: openat2 returned a new owned file descriptor.
     let mut source = unsafe { File::from_raw_fd(source_fd) };
 
-    let before = source.metadata().map_err(map_open_error)?;
+    let before = source.metadata().map_err(map_io_error)?;
     if !before.file_type().is_file() {
         return Err(IntakeError::SourceNotRegular);
     }
@@ -154,7 +156,7 @@ pub fn import_candidate_artifact(
 
     let copy_result = (|| -> Result<(), IntakeError> {
         loop {
-            let read = source.read(&mut buffer).map_err(map_open_error)?;
+            let read = source.read(&mut buffer).map_err(map_io_error)?;
             if read == 0 {
                 break;
             }
@@ -169,7 +171,7 @@ pub fn import_candidate_artifact(
             }
             destination
                 .write_all(&buffer[..read])
-                .map_err(map_open_error)?;
+                .map_err(map_io_error)?;
             hasher.update(&buffer[..read]);
         }
 
@@ -193,7 +195,7 @@ pub fn import_candidate_artifact(
             return Err(IntakeError::SourceChangedDuringCopy);
         }
 
-        destination.sync_all().map_err(map_open_error)?;
+        destination.sync_all().map_err(map_io_error)?;
         Ok(())
     })();
 
@@ -283,12 +285,8 @@ fn openat2_raw(
     Err(IntakeError::OpenAt2(error.kind()))
 }
 
-fn map_open_error(error: io::Error) -> IntakeError {
-    if error.raw_os_error() == Some(libc::ENOSYS) {
-        IntakeError::OpenAt2Unavailable
-    } else {
-        IntakeError::OpenAt2(error.kind())
-    }
+fn map_io_error(error: io::Error) -> IntakeError {
+    IntakeError::Io(error.kind())
 }
 
 #[cfg(test)]
