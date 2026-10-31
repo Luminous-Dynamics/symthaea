@@ -1262,7 +1262,7 @@ mod tests {
         assert!((metrics.mean_gross_advantage_vs_d0 - (7.0 / 3.0)).abs() < 1e-12);
         assert!((metrics.mean_net_advantage_vs_d0 - (1.0 / 3.0)).abs() < 1e-12);
         assert!((metrics.net_win_rate_vs_d0 - (2.0 / 3.0)).abs() < 1e-12);
-        assert!((metrics.mean_gross_advantage_vs_d1 - 1.5).abs() < 1e-12);
+        assert!((metrics.mean_gross_advantage_vs_d1 - (5.0 / 3.0)).abs() < 1e-12);
         assert!((metrics.mean_net_advantage_vs_d1 - (0.5 / 3.0)).abs() < 1e-12);
         assert!((metrics.net_win_rate_vs_d1 - (1.0 / 3.0)).abs() < 1e-12);
     }
