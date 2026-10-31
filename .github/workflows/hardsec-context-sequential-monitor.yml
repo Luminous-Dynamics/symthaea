@@ -63,3 +63,34 @@ jobs:
           assert all(row["action"] != "benign" for row in monitor["window_decisions"])
           assert any(row["abstention_reason"] == "unseen_workload_context" for row in monitor["window_decisions"])
           PY
+
+      - name: Check preregistered sequential benchmark contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/context-sequential-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert len(plan["baselines"]) == 9
+          assert len(plan["candidates"]) == 4
+          assert "perfectly_dependent_shared_latent_null" in plan["scenarios"]
+          assert "authors_python_official_cctm_current_main" in plan["baselines"]
+          reference = plan["reference_calibration_design"]
+          assert reference["total_alpha_budget"] + reference["total_dkw_delta_budget"] == 0.05
+          assert reference["context_count_for_fixture"] == 2
+          assert reference["alpha_per_context_for_fixture"] == 0.02
+          assert reference["delta_per_context_for_fixture"] == 0.005
+          required = reference["required_independent_reference_units_per_context"]
+          assert required == {
+              "epsilon_le_0_05": 1199,
+              "epsilon_le_0_025": 4794,
+              "epsilon_le_0_01": 29958,
+              "epsilon_le_0_005": 119830,
+          }
+          assert reference["iid_reference_assumption_required"] is True
+          assert reference["windows_do_not_establish_reference_independence"] is True
+          assert "windows" in reference["unit_definition"]
+          PY
