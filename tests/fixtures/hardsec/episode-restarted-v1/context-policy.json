@@ -1,0 +1,35 @@
+{
+  "schema_version": "hardsec-context-assignment-policy-v1",
+  "policy_id": "hs020-episode-context-policy-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "episode-stream-synthetic-v1",
+  "evaluation_group_id": "episode-eval-cohort-01",
+  "assignment_mode": "frozen_classifier",
+  "assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "anomaly_score_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "assignment_not_derived_from_anomaly_score": true,
+  "assignment_not_derived_from_sequential_wealth": true,
+  "allowed_contexts": [
+    "compute",
+    "memory"
+  ],
+  "minimum_top1_confidence": 0.8,
+  "minimum_top1_top2_margin": 0.2,
+  "classifier_training_group_ids": [
+    "train-exec-1",
+    "train-exec-2",
+    "train-exec-3",
+    "train-exec-4",
+    "train-exec-5",
+    "train-exec-6",
+    "train-exec-7",
+    "train-exec-8"
+  ],
+  "classifier_calibration_group_ids": [
+    "selection-exec-1",
+    "selection-exec-2",
+    "selection-exec-3",
+    "selection-exec-4"
+  ],
+  "frozen_before_evaluation": true
+}
