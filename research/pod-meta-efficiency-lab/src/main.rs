@@ -22,6 +22,8 @@ fn main() {
             row.mandatory_required_mask,
             row.mandatory_verified_mask,
             row.missed_mandatory_count,
+            row.rejected_candidate_count,
+            row.rejected_candidate_cost,
             row.redundant_operation_count,
             row.wasted_operation_cost,
             row.correct_abstention,
