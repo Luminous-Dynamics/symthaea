@@ -61,7 +61,8 @@ pub struct ProbeObservation {
 #[derive(Debug, Serialize)]
 pub struct KernelIdentity {
     pub release: Option<String>,
-    pub architecture: &'static str,
+    pub kernel_machine: Option<String>,
+    pub userspace_architecture: &'static str,
     pub boot_id_digest: Option<String>,
 }
 
@@ -190,11 +191,27 @@ fn kernel_identity() -> KernelIdentity {
 
     KernelIdentity {
         release,
-        architecture: std::env::consts::ARCH,
+        kernel_machine: kernel_machine_architecture(),
+        userspace_architecture: std::env::consts::ARCH,
         boot_id_digest,
     }
 }
 
+#[cfg(target_os = "linux")]
+fn kernel_machine_architecture() -> Option<String> {
+    let mut uts = std::mem::MaybeUninit::<libc::utsname>::zeroed();
+    if unsafe { libc::uname(uts.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    let uts = unsafe { uts.assume_init() };
+    let machine = unsafe { std::ffi::CStr::from_ptr(uts.machine.as_ptr()) };
+    Some(machine.to_string_lossy().into_owned())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn kernel_machine_architecture() -> Option<String> {
+    None
+}
 fn proc_status_value<'a>(status: &'a str, key: &str) -> Option<&'a str> {
     status.lines().find_map(|line| {
         let (name, value) = line.split_once(':')?;
@@ -667,7 +684,7 @@ mod tests {
             observed_at_unix_ns: 1,
             kernel: KernelIdentity {
                 release: None,
-                architecture: "x86_64",
+                kernel_machine: None, userspace_architecture: "x86_64",
                 boot_id_digest: None,
             },
             process_context: ProcessSecurityContext {
@@ -751,7 +768,7 @@ mod tests {
             suite_id: "basalt-linux-runtime-smoke-v1",
             probe_id: "schema-test".to_string(),
             observed_at_unix_ns: 1,
-            kernel: KernelIdentity { release: None, architecture: "x86_64", boot_id_digest: None },
+            kernel: KernelIdentity { release: None, kernel_machine: None, userspace_architecture: "x86_64", boot_id_digest: None },
             process_context: ProcessSecurityContext {
                 effective_uid: None, effective_gid: None, cap_eff_hex: None, cap_bnd_hex: None,
                 no_new_privs: None, seccomp_mode: None, mount_namespace_inode: None,
