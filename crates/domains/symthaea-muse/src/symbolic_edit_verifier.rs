@@ -184,10 +184,26 @@ fn score_metadata_valid(score: &Score) -> bool {
         })
 }
 
-fn top_level_non_pitch_fields_equal(source: &Score, target: &Score) -> bool {
-    source.tempo_bpm.to_bits() == target.tempo_bpm.to_bits()
-        && source.meter == target.meter
-        && source.total_beats == target.total_beats
+fn score_metadata_failure_ids(
+    source: &Score,
+    target: &Score,
+    contract: &FrozenEditContract,
+    key_is_expected: bool,
+) -> Vec<String> {
+    let mut affected = Vec::new();
+    if source.tempo_bpm.to_bits() != target.tempo_bpm.to_bits() {
+        affected.extend(obligation_ids_for(contract, EditAttribute::Onset));
+    }
+    if source.meter != target.meter || source.total_beats != target.total_beats {
+        affected.extend(obligation_ids_for(contract, EditAttribute::Duration));
+    }
+    if !key_is_expected {
+        affected.extend(obligation_ids_for(contract, EditAttribute::Pitch));
+        affected.extend(obligation_ids_for(contract, EditAttribute::NeighboringContent));
+    }
+    affected.sort();
+    affected.dedup();
+    affected
 }
 
 fn expected_pitch_at(contract: &FrozenEditContract) -> Option<(usize, u8)> {
@@ -245,14 +261,13 @@ fn verify_pitch_at(
     let duration_ids = obligation_ids_for(contract, EditAttribute::Duration);
     let neighbor_ids = obligation_ids_for(contract, EditAttribute::NeighboringContent);
 
-    if !top_level_non_pitch_fields_equal(source, target) || source.key != target.key {
-        let mut affected = onset_ids.clone();
-        affected.extend(duration_ids.clone());
+    let metadata_failures = score_metadata_failure_ids(source, target, contract, source.key == target.key);
+    if !metadata_failures.is_empty() {
         push_failure(
             failures,
             SymbolicFailureKind::ScoreMetadataChanged,
             Vec::new(),
-            affected,
+            metadata_failures,
         );
     }
 
@@ -314,8 +329,10 @@ fn verify_pitch_at(
         let after = target_events[index];
         if index == selected_index {
             if !non_pitch_note_equal(before, after) {
-                let mut affected = duration_ids.clone();
+                let mut affected = pitch_ids.clone();
                 affected.extend(onset_ids.clone());
+                affected.extend(duration_ids.clone());
+                affected.extend(obligation_ids_for(contract, EditAttribute::RmsEnvelope));
                 push_failure(
                     failures,
                     SymbolicFailureKind::EditedNoteAttributesModified,
@@ -364,17 +381,13 @@ fn verify_transpose(
     let expected_tonic = (source.key.tonic.value() as i32 + delta).rem_euclid(12) as u8;
     let key_matches = target.key.tonic.value() == expected_tonic
         && target.key.tonality == source.key.tonality;
-    if !top_level_non_pitch_fields_equal(source, target) || !key_matches {
-        let mut affected = onset_ids.clone();
-        affected.extend(duration_ids.clone());
-        if !key_matches {
-            affected.extend(pitch_ids.clone());
-        }
+    let metadata_failures = score_metadata_failure_ids(source, target, contract, key_matches);
+    if !metadata_failures.is_empty() {
         push_failure(
             failures,
             SymbolicFailureKind::ScoreMetadataChanged,
             Vec::new(),
-            affected,
+            metadata_failures,
         );
     }
 
