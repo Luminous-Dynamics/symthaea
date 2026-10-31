@@ -115,3 +115,5 @@ Use multiple problem instances and seeds. Compare fixed-target attainment curves
 - Next baseline: SMS-EMOA, followed by NSGA-III/RVEA for higher objective counts; extend test functions to WFG, constrained DTLZ, noisy/expensive and multimodal settings.
 
 No performance or SOTA claim is made.
+
+The implementation caps population size at 2,048 because exact pairwise weight-neighborhood construction is quadratic in population size. This is an implementation guard, not a theoretical MOEA/D limit.
