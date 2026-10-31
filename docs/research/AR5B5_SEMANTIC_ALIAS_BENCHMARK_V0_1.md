@@ -28,7 +28,7 @@ It contains no ground-truth identity or utility.
 - per-truth utility value;
 - digest of the exact policy-visible challenge.
 
-The key has private fields and is not serialized into the challenge. The evaluator report publishes only a digest of the adjudication key, not its labels or utilities. The policy under test must receive only the challenge and return decisions.
+The key has private fields, is constructed separately by the evaluator, and is not serialized into the challenge. The evaluator report publishes only a digest of the adjudication key, not its labels or utilities. The policy under test must receive only the challenge and return decisions.
 
 The included fixture has three latent directions, two syntactic aliases, and utilities in [0,1]. It is deliberately small for unit tests. The benchmark needs larger hidden suites with paraphrase families, structural rewrites, operator aliases, near-neighbour non-aliases and domain-specific adjudication.
 
@@ -87,9 +87,15 @@ No tests have been executed in this environment.
 1. Expand to hundreds/thousands of hidden semantic clusters across multiple operator families, with independently adjudicated paraphrases and hard near-neighbour negatives.
 2. Use multiple independent adjudicators and resolve disagreements before freezing ground truth.
 3. Add false-merge, false-split, false-new and false-reject rates across preregistered corruption levels.
-4. Add seeded randomized corruption schedules and retain the exact schedule digest in each report.
+4. Expand seeded corruption schedules into larger preregistered rate sweeps, retain each exact schedule digest in its report, and calibrate rates against observed false-merge/false-split outcomes.
 5. Connect canonical direction IDs to EventTape proposals and candidate evaluations; compute regret from measured downstream outcomes rather than synthetic utilities.
 6. Run a calibration study: compare verifier confidence against empirical identity correctness, including out-of-distribution descriptor families.
 7. Test adversarial proposal attacks: order changes, surface perturbations, token aliases, structural rewrites and deliberately misleading descriptors.
 
 No verifier accuracy or SOTA claim is made by this synthetic fixture.
+
+### Seeded corruption schedules
+
+`AliasCorruptionRates` and `seeded_alias_corruption_schedule` generate a reproducible per-proposal corruption plan from the hidden challenge/key, a clean reference trial, frozen category rates and a seed. The schedule is a separate artifact with its own SHA-256 digest and records its challenge digest, seed, rates and exact proposal-level corruption list. The seeded evaluation path binds that schedule digest into the semantic-alias report receipt, and `verify_seeded_alias_schedule_report` replays the schedule and the report from those exact inputs.
+
+Rates are conditional on eligibility: false merges apply only when another canonical direction has already been registered; false-new admissions apply only to aliases with an existing canonical registration; false novelty rejection applies only to a first proposal for a new identity. If an earlier proposal failed to register an identity, later aliases are marked inconclusive rather than emitting structurally invalid duplicate references. The configured rates must be finite, each in [0,1], and sum to at most one.
