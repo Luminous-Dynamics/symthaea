@@ -33,9 +33,7 @@ use crate::multi_resource_budget::{
     ResourceCostVector, ResourceHeadroom, ResourceRegistry,
 };
 use crate::nas_action_authorization::{
-    compute_preflight_receipt_sha256, verify_action_preflight_receipt_digest,
-    NasActionKind, NasActionPreflightReceipt,
-    VerifiedMeasurementReservation,
+    verify_action_preflight_receipt_digest, NasActionKind, VerifiedMeasurementReservation,
 };
 
 const LEDGER_SCHEMA: &str = "symthaea.nas.resource-reservation-ledger";
@@ -1063,6 +1061,9 @@ mod tests {
     use crate::multi_resource_budget::{
         compute_resource_registry_sha256, ResourceBudgetLimit, ResourceClass,
         ResourceDefinition, ResourceQuantity,
+    };
+    use crate::nas_action_authorization::{
+        compute_preflight_receipt_sha256, NasActionPreflightReceipt,
     };
 
     fn sha(byte: char) -> String {
