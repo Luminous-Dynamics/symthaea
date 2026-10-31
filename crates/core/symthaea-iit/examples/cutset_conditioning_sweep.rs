@@ -1,0 +1,312 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Exact cutset-conditioning versus ordinary min-fill on square binary grids.
+//!
+//! Run with:
+//! cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep
+//!
+//! The comparison uses identical log factors and checks the complete retained
+//! factor before reporting timing. The baseline is allowed a much larger factor
+//! table; the cutset path uses per-topology budgets (8, 8, 16, and 32 entries) and therefore
+//! reports a time-for-peak-table-width tradeoff, not a speedup.
+
+use std::time::{Duration, Instant};
+
+use symthaea_iit::{
+    min_fill_log_sum_product, min_fill_log_sum_product_with_cutset,
+    min_fill_log_sum_product_with_cutset_plan, plan_min_fill_cutset_elimination,
+    BinaryLogFactor,
+};
+
+#[derive(Clone, Copy)]
+struct Fixture {
+    side: usize,
+    cutset_factor_entry_budget: usize,
+    expected_baseline_width: usize,
+    expected_baseline_peak_entries: usize,
+    expected_cutset_width: usize,
+    expected_cutset_peak_entries: usize,
+}
+
+const FIXTURES: [Fixture; 4] = [
+    Fixture {
+        side: 4,
+        cutset_factor_entry_budget: 8,
+        expected_baseline_width: 4,
+        expected_baseline_peak_entries: 32,
+        expected_cutset_width: 2,
+        expected_cutset_peak_entries: 8,
+    },
+    Fixture {
+        side: 5,
+        cutset_factor_entry_budget: 8,
+        expected_baseline_width: 5,
+        expected_baseline_peak_entries: 64,
+        expected_cutset_width: 2,
+        expected_cutset_peak_entries: 8,
+    },
+    Fixture {
+        side: 6,
+        cutset_factor_entry_budget: 16,
+        expected_baseline_width: 6,
+        expected_baseline_peak_entries: 128,
+        expected_cutset_width: 3,
+        expected_cutset_peak_entries: 16,
+    },
+    Fixture {
+        side: 8,
+        cutset_factor_entry_budget: 32,
+        expected_baseline_width: 9,
+        expected_baseline_peak_entries: 1_024,
+        expected_cutset_width: 4,
+        expected_cutset_peak_entries: 32,
+    },
+];
+
+const PAIR_POTENTIAL: [f64; 4] = [0.83, 0.17, 0.29, 0.71];
+const BASELINE_FACTOR_ENTRY_BUDGET: usize = 1 << 16;
+
+fn grid_factors(side: usize) -> Result<Vec<BinaryLogFactor>, String> {
+    let mut factors = Vec::new();
+    for row in 0..side {
+        for column in 0..side {
+            let here = row * side + column;
+            if column + 1 < side {
+                factors.push(BinaryLogFactor::new(
+                    vec![here, here + 1],
+                    PAIR_POTENTIAL.iter().map(|value| value.ln()).collect(),
+                ).map_err(|error| error.to_string())?);
+            }
+            if row + 1 < side {
+                factors.push(BinaryLogFactor::new(
+                    vec![here, here + side],
+                    PAIR_POTENTIAL.iter().map(|value| value.ln()).collect(),
+                ).map_err(|error| error.to_string())?);
+            }
+        }
+    }
+    Ok(factors)
+}
+
+fn median_duration(samples: &mut [Duration]) -> Duration {
+    samples.sort_unstable();
+    samples[samples.len() / 2]
+}
+
+fn parse_repeats() -> Result<usize, String> {
+    let mut args = std::env::args().skip(1);
+    let mut repeats = 5usize;
+    while let Some(argument) = args.next() {
+        match argument.as_str() {
+            "--repeats" => {
+                let value = args.next().ok_or("--repeats requires a positive integer")?;
+                repeats = value.parse().map_err(|_| format!("invalid repeats: {value}"))?;
+                if !(1..=25).contains(&repeats) {
+                    return Err("--repeats must be in 1..=25".to_string());
+                }
+            }
+            "--help" | "-h" => {
+                println!("cutset_conditioning_sweep [--repeats N]");
+                std::process::exit(0);
+            }
+            other => return Err(format!("unknown argument: {other}")),
+        }
+    }
+    Ok(repeats)
+}
+
+fn equivalent(left: &[f64], right: &[f64]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(a, b)| {
+            if a == b { true } else { (a - b).abs() <= 1e-10 }
+        })
+}
+
+fn run() -> Result<(), String> {
+    let repeats = parse_repeats()?;
+    println!(
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,conditioned_factor_entries_written,branch_output_entries_accumulated,factor_multiplications,cutset_plan_build_ns,baseline_median_ns,cutset_replanned_median_ns,cutset_reused_plan_median_ns,cutset_replanned_over_baseline_ratio,cutset_reused_over_baseline_ratio,exact_output_parity,within_cutset_budget"
+    );
+
+    for fixture in FIXTURES {
+        let side = fixture.side;
+        let variables = side * side;
+        let retained = variables - 1;
+        let factors = grid_factors(side)?;
+        let eliminate = (0..variables)
+            .filter(|variable| *variable != retained)
+            .collect::<Vec<_>>();
+        let cutset_start = (side / 2) * side;
+        let cutset = (cutset_start..cutset_start + side).collect::<Vec<_>>();
+        let branch_budget = 1usize << cutset.len();
+        let cutset_factor_entry_budget = fixture.cutset_factor_entry_budget;
+        let standard_rejects_budget = matches!(
+            min_fill_log_sum_product(
+                &factors,
+                &eliminate,
+                cutset_factor_entry_budget,
+            ),
+            Err(symthaea_iit::FactorGraphError::IntermediateTooLarge { .. })
+        );
+        if !standard_rejects_budget {
+            return Err(format!(
+                "unconditioned min-fill did not exceed the configured table budget for {side}x{side}"
+            ));
+        }
+
+        let factor_scopes = factors
+            .iter()
+            .map(|factor| factor.variables().to_vec())
+            .collect::<Vec<_>>();
+        let plan_start = Instant::now();
+        let cutset_plan = plan_min_fill_cutset_elimination(
+            &factor_scopes,
+            &eliminate,
+            &cutset,
+            cutset_factor_entry_budget,
+            branch_budget,
+        ).map_err(|error| format!("cutset preflight failed for {side}x{side}: {error}"))?;
+        let cutset_plan_build_ns = plan_start.elapsed().as_nanos();
+
+        let baseline = min_fill_log_sum_product(
+            &factors,
+            &eliminate,
+            BASELINE_FACTOR_ENTRY_BUDGET,
+        ).map_err(|error| format!("baseline failed for {side}x{side}: {error}"))?;
+        let cutset_report = min_fill_log_sum_product_with_cutset_plan(
+            &factors,
+            &cutset_plan,
+        ).map_err(|error| format!("reused cutset plan failed for {side}x{side}: {error}"))?;
+        let cutset_replanned_report = min_fill_log_sum_product_with_cutset(
+            &factors,
+            &eliminate,
+            &cutset,
+            cutset_factor_entry_budget,
+            branch_budget,
+        ).map_err(|error| format!("replanned cutset path failed for {side}x{side}: {error}"))?;
+        if !equivalent(
+            cutset_report.factor.log_values(),
+            cutset_replanned_report.factor.log_values(),
+        ) {
+            return Err(format!("reused/rebuilt plan parity failed for {side}x{side}"));
+        }
+
+        if baseline.factor.variables() != [retained]
+            || cutset_report.factor.variables() != [retained]
+            || !equivalent(
+                baseline.factor.log_values(),
+                cutset_report.factor.log_values(),
+            )
+        {
+            return Err(format!("complete retained-factor parity failed for {side}x{side}"));
+        }
+        if baseline.induced_width != fixture.expected_baseline_width
+            || baseline.peak_factor_entries != fixture.expected_baseline_peak_entries
+            || cutset_report.induced_width != fixture.expected_cutset_width
+            || cutset_report.peak_factor_entries != fixture.expected_cutset_peak_entries
+        {
+            return Err(format!(
+                "width/peak regression for {side}x{side}: baseline=({}, {}), cutset=({}, {})",
+                baseline.induced_width,
+                baseline.peak_factor_entries,
+                cutset_report.induced_width,
+                cutset_report.peak_factor_entries,
+            ));
+        }
+        if cutset_report.peak_factor_entries > cutset_factor_entry_budget
+            || cutset_report.predicted_peak_factor_entries != cutset_report.peak_factor_entries
+            || cutset_report.cutset_assignments_evaluated != branch_budget
+            || cutset_report.max_cutset_assignments != branch_budget
+            || cutset_report.max_factor_entries != cutset_factor_entry_budget
+        {
+            return Err(format!("cutset resource invariant failed for {side}x{side}"));
+        }
+
+        let mut baseline_samples = Vec::with_capacity(repeats);
+        let mut cutset_replanned_samples = Vec::with_capacity(repeats);
+        let mut cutset_reused_samples = Vec::with_capacity(repeats);
+        for _ in 0..repeats {
+            let start = Instant::now();
+            let baseline_trial = min_fill_log_sum_product(
+                &factors,
+                &eliminate,
+                BASELINE_FACTOR_ENTRY_BUDGET,
+            ).map_err(|error| error.to_string())?;
+            baseline_samples.push(start.elapsed());
+
+            let start = Instant::now();
+            let cutset_replanned_trial = min_fill_log_sum_product_with_cutset(
+                &factors,
+                &eliminate,
+                &cutset,
+                cutset_factor_entry_budget,
+                branch_budget,
+            ).map_err(|error| error.to_string())?;
+            cutset_replanned_samples.push(start.elapsed());
+
+            let start = Instant::now();
+            let cutset_reused_trial = min_fill_log_sum_product_with_cutset_plan(
+                &factors,
+                &cutset_plan,
+            ).map_err(|error| error.to_string())?;
+            cutset_reused_samples.push(start.elapsed());
+
+            if !equivalent(
+                baseline_trial.factor.log_values(),
+                cutset_replanned_trial.factor.log_values(),
+            ) || !equivalent(
+                baseline_trial.factor.log_values(),
+                cutset_reused_trial.factor.log_values(),
+            ) {
+                return Err(format!("timed-trial parity changed for {side}x{side}"));
+            }
+        }
+
+        let baseline_median = median_duration(&mut baseline_samples).as_nanos();
+        let cutset_replanned_median = median_duration(&mut cutset_replanned_samples).as_nanos();
+        let cutset_reused_median = median_duration(&mut cutset_reused_samples).as_nanos();
+        let replanned_ratio = if baseline_median == 0 {
+            0.0
+        } else {
+            cutset_replanned_median as f64 / baseline_median as f64
+        };
+        let reused_ratio = if baseline_median == 0 {
+            0.0
+        } else {
+            cutset_reused_median as f64 / baseline_median as f64
+        };
+        println!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{:.4},{},{}",
+            side,
+            variables,
+            factors.len(),
+            cutset.len(),
+            branch_budget,
+            cutset_factor_entry_budget,
+            standard_rejects_budget,
+            baseline.induced_width,
+            baseline.peak_factor_entries,
+            cutset_report.induced_width,
+            cutset_report.peak_factor_entries,
+            cutset_report.conditioned_factor_entries_written,
+            cutset_report.branch_output_entries_accumulated,
+            cutset_report.factor_multiplications,
+            cutset_plan_build_ns,
+            baseline_median,
+            cutset_replanned_median,
+            cutset_reused_median,
+            replanned_ratio,
+            reused_ratio,
+            true,
+            cutset_report.peak_factor_entries <= cutset_factor_entry_budget,
+        );
+    }
+    Ok(())
+}
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("cutset conditioning sweep failed: {error}");
+        std::process::exit(1);
+    }
+}

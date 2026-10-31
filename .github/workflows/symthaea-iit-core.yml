@@ -1,0 +1,112 @@
+name: Symthaea IIT Rust Core
+
+on:
+  push:
+    branches:
+      - research/symthaea-iit-rust-core-20261029
+  pull_request:
+    paths:
+      - "crates/core/symthaea-iit/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/symthaea-iit-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core:
+    name: Compile and test the IIT model/repertoire core
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Capture benchmark environment and source identity
+        shell: bash
+        run: |
+          mkdir -p target/iit-benchmark-evidence
+          {
+            echo "git_commit=${GITHUB_SHA}"
+            echo "git_ref=${GITHUB_REF}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            echo "captured_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "----- rustc -----"
+            rustc --version --verbose
+            echo
+            echo "----- cargo -----"
+            cargo --version
+            echo
+            echo "----- kernel -----"
+            uname -a
+            echo
+            echo "----- cpu -----"
+            lscpu
+          } > target/iit-benchmark-evidence/environment.txt
+
+      - name: Test locked workspace package
+        run: cargo test --locked -p symthaea-iit 2>&1 | tee target/iit-benchmark-evidence/cargo-test.log
+
+      # Keep the locked gate fail-closed, but capture the exact resolver delta
+      # if the submitted lockfile is stale. The generated lock exists only on the
+      # ephemeral runner; contributors must review and commit it explicitly.
+      - name: Diagnose Cargo.lock drift after a locked-test failure
+        if: failure()
+        shell: bash
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          set +e
+          cargo metadata --format-version 1 >/tmp/cargo-metadata.json 2>/tmp/cargo-metadata.stderr
+          metadata_status=$?
+          set -e
+          echo "cargo metadata exit: $metadata_status"
+          cat /tmp/cargo-metadata.stderr
+          echo "----- Cargo.lock delta generated for diagnosis only -----"
+          git diff --no-index -- /tmp/Cargo.lock.before Cargo.lock || true
+          echo "----- End Cargo.lock delta -----"
+
+      - name: Exercise deterministic partition sweep
+        run: cargo run --locked -p symthaea-iit --example directed_partition_sweep -- --repeats 2 2>&1 | tee target/iit-benchmark-evidence/directed-partitions.csv
+
+      - name: Exercise bounded factor-graph elimination sweep
+        run: cargo run --locked -p symthaea-iit --example factor_elimination_sweep 2>&1 | tee target/iit-benchmark-evidence/factor-elimination.csv
+
+      - name: Exercise exact cutset conditioning under a bounded factor budget
+        run: cargo run --release --locked -p symthaea-iit --example cutset_conditioning_sweep -- --repeats 2 2>&1 | tee target/iit-benchmark-evidence/cutset-conditioning.csv
+
+      - name: Rank exact cutset separator candidates before inference
+        run: cargo run --release --locked -p symthaea-iit --example cutset_frontier_sweep 2>&1 | tee target/iit-benchmark-evidence/cutset-frontier.csv
+
+      - name: Benchmark proper-system Eq4 with sparse external backgrounds
+        run: cargo run --locked -p symthaea-iit --example eq4_sparse_background_sweep 2>&1 | tee target/iit-benchmark-evidence/eq4-background.csv
+
+      - name: Benchmark sparse local-CPT Eq4 across growing substrates
+        run: cargo run --locked -p symthaea-iit --example sparse_eq4_scale_sweep -- --repeats 3 2>&1 | tee target/iit-benchmark-evidence/sparse-eq4-scale.csv
+
+      - name: Benchmark sparse fixed-state partition scoring
+        run: cargo run --locked -p symthaea-iit --example sparse_partition_score_sweep -- --repeats 1 2>&1 | tee target/iit-benchmark-evidence/sparse-partition-score.csv
+
+      - name: Benchmark exact sparse system-search reuse
+        run: cargo run --release --locked -p symthaea-iit --example sparse_system_search_reuse_sweep -- --repeats 2 --max-units 2048 2>&1 | tee target/iit-benchmark-evidence/sparse-full-system-search.csv
+
+      - name: Clippy the isolated crate
+        run: cargo clippy --locked -p symthaea-iit --all-targets -- -D warnings 2>&1 | tee target/iit-benchmark-evidence/clippy.log
+
+      - name: Upload immutable IIT benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: symthaea-iit-evidence-${{ github.sha }}
+          path: target/iit-benchmark-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+

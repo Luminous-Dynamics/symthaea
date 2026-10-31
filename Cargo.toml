@@ -15,6 +15,13 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Legacy placeholder directory retained in-tree with only an empty
+    # examples/unused.rs; it has no Cargo.toml. Exclude it from the crates/core/*
+    # workspace glob so Cargo can resolve even package-scoped commands.
+    "crates/core/symthaea",
+    # Source-only stale directory with no crate manifest; keep it outside the
+    # workspace until it is restored as a valid package.
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
@@ -31,6 +38,8 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # README-only planning placeholder has no crate manifest.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",

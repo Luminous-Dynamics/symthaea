@@ -6181,6 +6181,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
+ "const-oid 0.9.6",
  "crypto-common 0.1.7",
  "subtle",
 ]
@@ -18756,6 +18757,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -19149,6 +19151,14 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-vision-manifold",
+]
+
+[[package]]
+name = "symthaea-iit"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
