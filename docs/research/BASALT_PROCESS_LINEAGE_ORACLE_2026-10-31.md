@@ -102,3 +102,23 @@ This PR does not claim Rust compilation, test execution, live process observatio
 - Falco event-drop diagnostics: https://falco.org/docs/troubleshooting/dropping/
 - SLSA Build track basics: https://slsa.dev/spec/build-track-basics
 - SLSA build provenance and `resolvedDependencies`: https://slsa.dev/spec/build-provenance
+
+
+## Semantic event identity extension (2026-10-31)
+
+A process event is not fully described by its event kind and process instance alone. Repeated `exec` occurrences may refer to different executable images, and `clone` events can represent different task semantics depending on the exact flags.
+
+The oracle and observer event contracts now require:
+- `exec_ordinal`: a 1-based, contiguous per-process execution occurrence number; zero for non-exec events;
+- `exec_image_digest`: the SHA-256 digest of the executable image resolved against the pinned immutable snapshot; empty for non-exec events;
+- `clone_flags`: the exact observed clone flag word for clone events; zero for other event kinds.
+
+The auditor's semantic event key now includes those fields. This means an observer cannot satisfy the event-set check merely by reporting the right number of exec/clone events while substituting a different executable image or clone behavior. Exec ordinals must be unique and contiguous within each process instance. Exact duplicate semantic keys are rejected.
+
+`CLONE_THREAD` (0x00010000) is explicitly rejected by the process-only v1 profile. Thread/task lineage requires a future contract with `tid`, `tgid`, clone flags and exec de-threading semantics. Unsupported thread behavior must remain unresolved, not be relabelled as a process child.
+
+Executable image digests are a strong requirement. A sensor that cannot bind the executed image to exact bytes in the pinned snapshot must report this channel unsupported/unresolved. A pathname-only match is insufficient. For scripts, interpreter resolution and the actual executable image must be defined by the adapter; for memfd or other non-snapshot executables, the adapter must provide an independently bound image digest or remain unresolved.
+
+The benchmark adds three non-compensatory safety metrics: executable-image identity recall, exec-occurrence order integrity, and clone-flag semantic integrity. New negative controls inject a wrong image digest, reordered/duplicate exec ordinals, altered clone flags and attempted `CLONE_THREAD` normalization.
+
+These additions strengthen semantic reconciliation but do not authenticate the oracle or observer. The digest still binds bytes; it does not prove who authored the observation or that the underlying event sensor was complete.
