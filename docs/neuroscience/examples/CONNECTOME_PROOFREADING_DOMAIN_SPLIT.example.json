@@ -131,6 +131,102 @@
       "cluster_id": "human-psu-2",
       "domain_id": "human-cortex",
       "partition": "development"
+    },
+    {
+      "sample_id": "mouse-cf-01",
+      "cluster_id": "mouse-confirm-psu-1",
+      "domain_id": "mouse-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "mouse-cf-02",
+      "cluster_id": "mouse-confirm-psu-1",
+      "domain_id": "mouse-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "mouse-cf-03",
+      "cluster_id": "mouse-confirm-psu-2",
+      "domain_id": "mouse-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "mouse-cf-04",
+      "cluster_id": "mouse-confirm-psu-2",
+      "domain_id": "mouse-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "fly-cf-01",
+      "cluster_id": "fly-confirm-psu-1",
+      "domain_id": "fly-brain",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "fly-cf-02",
+      "cluster_id": "fly-confirm-psu-1",
+      "domain_id": "fly-brain",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "fly-cf-03",
+      "cluster_id": "fly-confirm-psu-2",
+      "domain_id": "fly-brain",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "fly-cf-04",
+      "cluster_id": "fly-confirm-psu-2",
+      "domain_id": "fly-brain",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "zfish-cf-01",
+      "cluster_id": "zfish-confirm-psu-1",
+      "domain_id": "zebrafish",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "zfish-cf-02",
+      "cluster_id": "zfish-confirm-psu-1",
+      "domain_id": "zebrafish",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "zfish-cf-03",
+      "cluster_id": "zfish-confirm-psu-2",
+      "domain_id": "zebrafish",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "zfish-cf-04",
+      "cluster_id": "zfish-confirm-psu-2",
+      "domain_id": "zebrafish",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "human-cf-01",
+      "cluster_id": "human-confirm-psu-1",
+      "domain_id": "human-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "human-cf-02",
+      "cluster_id": "human-confirm-psu-1",
+      "domain_id": "human-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "human-cf-03",
+      "cluster_id": "human-confirm-psu-2",
+      "domain_id": "human-cortex",
+      "partition": "confirmatory"
+    },
+    {
+      "sample_id": "human-cf-04",
+      "cluster_id": "human-confirm-psu-2",
+      "domain_id": "human-cortex",
+      "partition": "confirmatory"
     }
   ]
 }
