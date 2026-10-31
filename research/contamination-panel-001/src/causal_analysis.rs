@@ -341,6 +341,9 @@ fn validate_replicate(
     expected_benchmark_version: &str,
     expected_metric_digest: &str,
 ) -> Result<(), String> {
+    if !(1..1_000).contains(&replicate.design.target_exposure_fraction_permille) {
+        return Err("causal localization requires an interior exposure fraction in [1, 999] permille".to_owned());
+    }
     let seed = decode_seed_hex(&replicate.randomization_seed_hex, "randomization_seed_hex")?;
     audit_intervention(&replicate.design, &replicate.manifest, &seed)?;
     if replicate.design.benchmark_id != expected_benchmark_id
@@ -659,6 +662,7 @@ pub fn analyze_replicated_causal_study(
         return Err(format!("study schema must be {CAUSAL_STUDY_SCHEMA}"));
     }
     if study.study_id.trim().is_empty()
+        || study.study_id.len() > 128
         || study.benchmark_id.trim().is_empty()
         || study.benchmark_version.trim().is_empty()
         || study.primary_metric_id.trim().is_empty()
@@ -684,6 +688,9 @@ pub fn analyze_replicated_causal_study(
     let root_seed = decode_seed_hex(&study.randomization_test_seed_hex, "randomization_test_seed_hex")?;
     if study.replicates.len() < 2 {
         return Err("at least two independent model-pair replicates are required for uncertainty".to_owned());
+    }
+    if study.replicates.len() > 1_000 {
+        return Err("study must contain no more than 1000 independent model-pair replicates".to_owned());
     }
 
     let first = &study.replicates[0].design;
