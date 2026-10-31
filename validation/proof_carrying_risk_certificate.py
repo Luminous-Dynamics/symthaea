@@ -218,6 +218,21 @@ def _validate_receipt(manifest: dict, manifest_digest: str, receipt: dict) -> No
             if (len(worst_state) != 3 or any(not isinstance(x, int) or x < 0 for x in worst_state)
                     or sum(worst_state) != n + 1):
                 raise CertificateError("worst augmented count vector has an invalid shape or total")
+    elif lane == "analytical_fdr_theorem":
+        if receipt["status"] == "pass" and not (
+            isinstance(checks.get("theorem_reference"), str)
+            and checks["theorem_reference"]
+            and checks.get("assumption_contract_checked") is True
+        ):
+            raise CertificateError("FDR theorem pass requires a theorem reference and assumption-contract check")
+    elif lane == "exact_intersection_closure":
+        if receipt["status"] == "pass":
+            count = checks.get("intersection_count_checked")
+            if not isinstance(count, int) or count < 1:
+                raise CertificateError("intersection-closure pass needs a positive intersection count")
+            violation = parse_exact_fraction(checks.get("max_excess"), "checks.max_excess")
+            if violation > 0:
+                raise CertificateError("intersection-closure receipt has a positive violation")
     elif lane == "theorem_backed_eprocess":
         if receipt["status"] == "pass" and not (
             isinstance(checks.get("theorem_reference"), str)
