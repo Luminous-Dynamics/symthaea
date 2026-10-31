@@ -10,6 +10,7 @@
 //! rights-holder / community authorization.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const CORPUS_REGISTRY_SCHEMA: &str = "muse-corpus-registry-v1";
@@ -214,6 +215,15 @@ pub struct CorpusArtifactRecord {
     pub cultural_protocol: CulturalProtocolEvidence,
     pub ingest_stage: IngestStage,
     pub exclusion_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CorpusRegistrySnapshot {
+    pub schema: String,
+    pub artifact_count: usize,
+    pub artifacts: Vec<CorpusArtifactRecord>,
+    /// Domain-separated digest of the snapshot with this field empty.
+    pub registry_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -450,8 +460,85 @@ pub fn validate_artifact_record(record: &CorpusArtifactRecord) -> Vec<Eligibilit
         }
     }
 
+    if matches!(
+        record.ingest_stage,
+        IngestStage::RightsEvidenceChecked | IngestStage::ArtifactDigestVerified
+    ) {
+        for layer in required_rights_layers(record.modality) {
+            match record.rights.iter().find(|grant| grant.layer == layer) {
+                None => issues.push(issue(
+                    "rights_stage_missing_layer",
+                    Some(layer),
+                    "rights evidence stage requires a grant record for every modality layer".into(),
+                )),
+                Some(grant) if grant.disposition == RightsDisposition::Unknown => {
+                    issues.push(issue(
+                        "rights_stage_unresolved_layer",
+                        Some(layer),
+                        "rights evidence stage cannot be reached while a required layer is Unknown".into(),
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
+    }
+
     validate_cultural_protocol(&record.cultural_protocol, &mut issues);
     issues
+}
+
+pub fn build_registry_snapshot(
+    mut artifacts: Vec<CorpusArtifactRecord>,
+) -> Result<CorpusRegistrySnapshot, Vec<EligibilityIssue>> {
+    artifacts.sort_by(|left, right| left.artifact_id.cmp(&right.artifact_id));
+    let mut issues = Vec::new();
+    let mut seen = BTreeSet::new();
+    for artifact in &artifacts {
+        if !seen.insert(artifact.artifact_id.clone()) {
+            issues.push(issue(
+                "duplicate_artifact_id",
+                None,
+                format!("artifact_id {} occurs more than once", artifact.artifact_id),
+            ));
+        }
+        issues.extend(validate_artifact_record(artifact));
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let mut snapshot = CorpusRegistrySnapshot {
+        schema: CORPUS_REGISTRY_SCHEMA.into(),
+        artifact_count: artifacts.len(),
+        artifacts,
+        registry_sha256: String::new(),
+    };
+    snapshot.registry_sha256 = snapshot_digest(&snapshot)?;
+    Ok(snapshot)
+}
+
+fn snapshot_digest(snapshot: &CorpusRegistrySnapshot) -> Result<String, Vec<EligibilityIssue>> {
+    let mut copy = snapshot.clone();
+    copy.registry_sha256.clear();
+    let bytes = serde_json::to_vec(&copy).map_err(|error| {
+        vec![issue(
+            "registry_serialization_failed",
+            None,
+            error.to_string(),
+        )]
+    })?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea:muse-corpus-registry-snapshot:v1\n");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+impl CorpusRegistrySnapshot {
+    pub fn verify_digest(&self) -> bool {
+        snapshot_digest(self)
+            .map(|expected| expected == self.registry_sha256)
+            .unwrap_or(false)
+    }
 }
 
 pub fn evaluate_eligibility(
@@ -799,6 +886,34 @@ mod tests {
             required_rights_layers(ArtifactModality::ScholarlyAnnotation),
             vec![RightsLayer::Annotation, RightsLayer::Metadata]
         );
+    }
+
+    #[test]
+    fn rights_review_stage_cannot_be_reached_with_unknown_required_layer() {
+        let mut record = audio_record();
+        record.rights[1].disposition = RightsDisposition::Unknown;
+        record.ingest_stage = IngestStage::RightsEvidenceChecked;
+        let issues = validate_artifact_record(&record);
+        assert!(issues.iter().any(|issue| {
+            issue.code == "rights_stage_unresolved_layer"
+                && issue.layer == Some(RightsLayer::Performance)
+        }));
+    }
+
+    #[test]
+    fn registry_snapshot_is_sorted_deduplicated_and_digest_bound() {
+        let first = audio_record();
+        let mut second = audio_record();
+        second.artifact_id = "example-audio-002".into();
+        second.title = "Second recording".into();
+        let left = build_registry_snapshot(vec![second.clone(), first.clone()]).unwrap();
+        let right = build_registry_snapshot(vec![first.clone(), second.clone()]).unwrap();
+        assert_eq!(left, right);
+        assert_eq!(left.artifact_count, 2);
+        assert!(left.verify_digest());
+
+        let duplicate = build_registry_snapshot(vec![first.clone(), first]).unwrap_err();
+        assert!(duplicate.iter().any(|issue| issue.code == "duplicate_artifact_id"));
     }
 
     #[test]
