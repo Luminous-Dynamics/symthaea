@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_PERTURBATION_ORACLE_REPORT.schema.json",
+  "title": "Connectome Perturbation Synthetic Oracle Report",
+  "description": "Strict report contract for the dependency-free synthetic known-answer oracle. This schema intentionally fixes the evidence class and claim ceiling to prevent synthetic output from being presented as biological validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_class": {
+      "const": "synthetic_known_answer"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "target_node",
+          "reference_effect",
+          "candidate_effect",
+          "target_rmse",
+          "control",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "direct_one_step",
+              "indirect_two_hop_sign",
+              "explicit_two_epoch_delay",
+              "recurrent_feedback",
+              "shared_input_not_direct_causation",
+              "rewired_topology_negative_control"
+            ]
+          },
+          "target_node": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reference_effect": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          },
+          "candidate_effect": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          },
+          "target_rmse": {
+            "type": "number",
+            "minimum": 0
+          },
+          "control": {
+            "enum": [
+              "exact_replay",
+              "rewired_topology_negative_control"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "id": {
+                  "const": "rewired_topology_negative_control"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "then": {
+              "properties": {
+                "control": {
+                  "const": "rewired_topology_negative_control"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "control": {
+                  "const": "exact_replay"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "direct_one_step"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "indirect_two_hop_sign"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "explicit_two_epoch_delay"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "recurrent_feedback"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "shared_input_not_direct_causation"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "const": "rewired_topology_negative_control"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    }
+  }
+}
