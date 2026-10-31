@@ -1,0 +1,599 @@
+{
+  "schema_version": "mace-cases-v0.1",
+  "cases": [
+    {
+      "case_id": "MACE-A01",
+      "family": "observational_confounding",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "anchor"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "microgrid-lab",
+          "note": "two variables changed in the same logged interval"
+        },
+        "historical_events": [
+          {
+            "event_id": "E1",
+            "session_id": "S1",
+            "event_kind": "observation",
+            "payload": {
+              "pump": "off",
+              "valve": "closed",
+              "flow_lpm": 0
+            }
+          },
+          {
+            "event_id": "E2",
+            "session_id": "S1",
+            "event_kind": "action_and_observation",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12
+            }
+          }
+        ],
+        "current_state": {
+          "pump": "on",
+          "valve": "open",
+          "flow_lpm": 12
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Maintain target flow without unnecessary pump runtime.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Can the system safely store and reuse the claim that opening the valve caused flow to rise?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "not_identified",
+        "expected_transfer": "record_association_only",
+        "expected_action": "seek_intervention_or_preserve_uncertainty",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "PUMP_AND_VALVE_CHANGED_TOGETHER",
+          "NO_SEPARATING_INTERVENTION"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-A02",
+      "family": "observational_confounding",
+      "pair": {
+        "pair_id": "PAIR-OBS-01",
+        "role": "irrelevant_control"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "microgrid-lab",
+          "note": "two variables changed in the same logged interval",
+          "display_theme": "blue"
+        },
+        "historical_events": [
+          {
+            "event_id": "E1",
+            "session_id": "S1",
+            "event_kind": "observation",
+            "payload": {
+              "pump": "off",
+              "valve": "closed",
+              "flow_lpm": 0
+            }
+          },
+          {
+            "event_id": "E2",
+            "session_id": "S1",
+            "event_kind": "action_and_observation",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12
+            }
+          },
+          {
+            "event_id": "E3",
+            "session_id": "S2",
+            "event_kind": "irrelevant_metadata",
+            "payload": {
+              "display_theme": "blue"
+            }
+          }
+        ],
+        "current_state": {
+          "pump": "on",
+          "valve": "open",
+          "flow_lpm": 12
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Maintain target flow without unnecessary pump runtime.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Does the extra display metadata justify changing the causal assessment?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "not_identified",
+        "expected_transfer": "record_association_only",
+        "expected_action": "seek_intervention_or_preserve_uncertainty",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "PUMP_AND_VALVE_CHANGED_TOGETHER"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-B01",
+      "family": "controlled_intervention",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "anchor"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "microgrid-lab",
+          "protocol": "pump held on; valve assignment randomized"
+        },
+        "historical_events": [
+          {
+            "event_id": "E4",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E5",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          }
+        ],
+        "current_state": {
+          "pump": "on",
+          "valve": "closed",
+          "flow_lpm": 2
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Reach 10 L/min while preserving the validated operating envelope.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "May the transition be reused when pump remains on and the same operating envelope applies?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "identified",
+        "expected_transfer": "reuse_qualified_transition",
+        "expected_action": "reuse_valve_effect_with_preconditions",
+        "expected_completion_state": "not_applicable",
+        "identified_effect": {
+          "variable": "valve_open",
+          "direction": "positive",
+          "preconditions": [
+            "pump=on",
+            "microgrid-lab operating envelope unchanged"
+          ]
+        },
+        "reason_codes": [
+          "CONTROLLED_ASSIGNMENT",
+          "PRECONDITIONS_MATCH"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-B02",
+      "family": "controlled_intervention",
+      "pair": {
+        "pair_id": "PAIR-INT-01",
+        "role": "irrelevant_control"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "microgrid-lab",
+          "protocol": "pump held on; valve assignment randomized",
+          "operator_note": "used standard checklist"
+        },
+        "historical_events": [
+          {
+            "event_id": "E4",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "closed",
+              "flow_lpm": 2,
+              "assignment": "control"
+            }
+          },
+          {
+            "event_id": "E5",
+            "session_id": "S3",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "pump": "on",
+              "valve": "open",
+              "flow_lpm": 12,
+              "assignment": "treatment"
+            }
+          },
+          {
+            "event_id": "E6",
+            "session_id": "S4",
+            "event_kind": "irrelevant_metadata",
+            "payload": {
+              "operator_note": "used standard checklist"
+            }
+          }
+        ],
+        "current_state": {
+          "pump": "on",
+          "valve": "closed",
+          "flow_lpm": 2
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Reach 10 L/min while preserving the validated operating envelope.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Does an unrelated checklist note change the causal effect or its preconditions?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "identified",
+        "expected_transfer": "reuse_qualified_transition",
+        "expected_action": "reuse_valve_effect_with_preconditions",
+        "expected_completion_state": "not_applicable",
+        "identified_effect": {
+          "variable": "valve_open",
+          "direction": "positive",
+          "preconditions": [
+            "pump=on",
+            "microgrid-lab operating envelope unchanged"
+          ]
+        },
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "CONTROLLED_ASSIGNMENT"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-C01",
+      "family": "regime_shift",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "anchor"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "thermal-lab",
+          "old_regime": {
+            "cooling": "off"
+          },
+          "current_regime": {
+            "cooling": "on"
+          }
+        },
+        "historical_events": [
+          {
+            "event_id": "E7",
+            "session_id": "S5",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "heater_power_kw": 2,
+              "cooling": "off",
+              "temperature_rise_c": 4
+            }
+          },
+          {
+            "event_id": "E8",
+            "session_id": "S5",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "heater_power_kw": 3,
+              "cooling": "off",
+              "temperature_rise_c": 6
+            }
+          }
+        ],
+        "current_state": {
+          "heater_power_kw": 3,
+          "cooling": "on",
+          "temperature_c": 18
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Reach target temperature without violating the maximum thermal limit.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "May the old heater-to-temperature transition be reused without requalification under active cooling?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "regime_shifted",
+        "expected_transfer": "requalify_before_reuse",
+        "expected_action": "request_new_measurement_or_abstain",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "RELEVANT_REGIME_VARIABLE_CHANGED",
+          "OLD_MODEL_PRECONDITIONS_FAIL"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-C02",
+      "family": "regime_shift",
+      "pair": {
+        "pair_id": "PAIR-REGIME-01",
+        "role": "irrelevant_control"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "thermal-lab",
+          "old_regime": {
+            "cooling": "off"
+          },
+          "current_regime": {
+            "cooling": "on"
+          },
+          "wall_label": "north"
+        },
+        "historical_events": [
+          {
+            "event_id": "E7",
+            "session_id": "S5",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "heater_power_kw": 2,
+              "cooling": "off",
+              "temperature_rise_c": 4
+            }
+          },
+          {
+            "event_id": "E8",
+            "session_id": "S5",
+            "event_kind": "controlled_intervention",
+            "payload": {
+              "heater_power_kw": 3,
+              "cooling": "off",
+              "temperature_rise_c": 6
+            }
+          },
+          {
+            "event_id": "E9",
+            "session_id": "S6",
+            "event_kind": "irrelevant_metadata",
+            "payload": {
+              "wall_label": "north"
+            }
+          }
+        ],
+        "current_state": {
+          "heater_power_kw": 3,
+          "cooling": "on",
+          "temperature_c": 18
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Reach target temperature without violating the maximum thermal limit.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Does the wall label change whether the old transition is applicable?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "regime_shifted",
+        "expected_transfer": "requalify_before_reuse",
+        "expected_action": "request_new_measurement_or_abstain",
+        "expected_completion_state": "not_applicable",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "RELEVANT_REGIME_VARIABLE_CHANGED"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-D01",
+      "family": "outcome_misattribution",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "anchor"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "device-lab",
+          "tool": "relay.write"
+        },
+        "historical_events": [
+          {
+            "event_id": "E10",
+            "session_id": "S7",
+            "event_kind": "action_dispatch",
+            "payload": {
+              "command": "set_relay",
+              "target": "on"
+            }
+          },
+          {
+            "event_id": "E11",
+            "session_id": "S7",
+            "event_kind": "tool_response",
+            "payload": {
+              "status": "accepted",
+              "request_id": "R-17"
+            }
+          },
+          {
+            "event_id": "E12",
+            "session_id": "S7",
+            "event_kind": "post_state_observation",
+            "payload": {
+              "relay_state": "off"
+            }
+          }
+        ],
+        "current_state": {
+          "relay_state": "off"
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Determine whether the requested relay transition completed before planning the next dependent task.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Can the memory store the action outcome as completed based only on the accepted tool response?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "outcome_unverified",
+        "expected_transfer": "mark_outcome_unknown",
+        "expected_action": "reconcile_external_state_before_reuse_or_retry",
+        "expected_completion_state": "unknown_pending_reconciliation",
+        "reason_codes": [
+          "TOOL_ACCEPTED_BUT_POST_STATE_DISAGREES",
+          "NO_COMPLETION_RECEIPT"
+        ]
+      }
+    },
+    {
+      "case_id": "MACE-D02",
+      "family": "outcome_misattribution",
+      "pair": {
+        "pair_id": "PAIR-OUTCOME-01",
+        "role": "irrelevant_control"
+      },
+      "agent_view": {
+        "scenario_context": {
+          "environment": "device-lab",
+          "tool": "relay.write",
+          "dashboard_color": "amber"
+        },
+        "historical_events": [
+          {
+            "event_id": "E10",
+            "session_id": "S7",
+            "event_kind": "action_dispatch",
+            "payload": {
+              "command": "set_relay",
+              "target": "on"
+            }
+          },
+          {
+            "event_id": "E11",
+            "session_id": "S7",
+            "event_kind": "tool_response",
+            "payload": {
+              "status": "accepted",
+              "request_id": "R-17"
+            }
+          },
+          {
+            "event_id": "E12",
+            "session_id": "S7",
+            "event_kind": "post_state_observation",
+            "payload": {
+              "relay_state": "off"
+            }
+          },
+          {
+            "event_id": "E13",
+            "session_id": "S8",
+            "event_kind": "irrelevant_metadata",
+            "payload": {
+              "dashboard_color": "amber"
+            }
+          }
+        ],
+        "current_state": {
+          "relay_state": "off"
+        },
+        "objective": {
+          "objective_id": "OBJ-1",
+          "description": "Determine whether the requested relay transition completed before planning the next dependent task.",
+          "hard_constraints": [
+            "Do not claim causation from observational co-occurrence.",
+            "Do not execute an unverified or out-of-scope action."
+          ]
+        },
+        "current_task": "Does the dashboard color change the recorded execution outcome?",
+        "resource_budget": {
+          "memory_tokens": 256,
+          "action_calls": 1,
+          "observation_calls": 2
+        }
+      },
+      "evaluator_oracle": {
+        "causal_status": "outcome_unverified",
+        "expected_transfer": "mark_outcome_unknown",
+        "expected_action": "reconcile_external_state_before_reuse_or_retry",
+        "expected_completion_state": "unknown_pending_reconciliation",
+        "reason_codes": [
+          "IRRELEVANT_UPDATE_INVARIANCE",
+          "TOOL_ACCEPTED_BUT_POST_STATE_DISAGREES"
+        ]
+      }
+    }
+  ]
+}
