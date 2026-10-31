@@ -43,8 +43,10 @@ There are 64 deterministic episode seeds per scenario. The branch set contains b
 
 The candidate-facing prediction interface accepts only:
 
-- the observed history `(id, x, v)`;
+- the observed physical history `(x, v)`;
 - the canonical action identities and parameters.
+
+The branch/history identifier is evaluator-only metadata and is not placed in the candidate-facing observation.
 
 It does not receive the hidden regime bit, evaluator disturbance, scenario label, or realized branch outcomes. The oracle is implemented as a separate evaluator-only branch. The branch observations retain an identical history ID and a unique action ID; the evaluator checks this invariant.
 
