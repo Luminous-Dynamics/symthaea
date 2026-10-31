@@ -193,6 +193,8 @@ pub struct OperaSectionPlan {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OperaPlan {
     pub engine_version: String,
+    /// The seed selects the immutable Theme A and Theme B motif variants.
+    pub seed: u64,
     pub meter: u8,
     pub total_bars: u8,
     pub sections: Vec<OperaSectionPlan>,
@@ -213,6 +215,7 @@ pub struct OperaVerification {
     pub nine_bar_timeline_matches: bool,
     pub statement_a_isolated: bool,
     pub statement_b_isolated: bool,
+    pub statement_a_matches_home_key_theme: bool,
     pub statement_b_uses_relative_key: bool,
     pub dialogue_alternates_one_bar_at_a_time: bool,
     pub interruption_cuts_theme_b_at_exact_boundary: bool,
@@ -225,6 +228,7 @@ impl OperaVerification {
         self.nine_bar_timeline_matches
             && self.statement_a_isolated
             && self.statement_b_isolated
+            && self.statement_a_matches_home_key_theme
             && self.statement_b_uses_relative_key
             && self.dialogue_alternates_one_bar_at_a_time
             && self.interruption_cuts_theme_b_at_exact_boundary
@@ -242,9 +246,10 @@ pub struct OperaRealization {
     pub verification: OperaVerification,
 }
 
-fn opera_plan(meter: u8) -> OperaPlan {
+fn opera_plan(meter: u8, seed: u64) -> OperaPlan {
     OperaPlan {
         engine_version: "two-theme-dialogue-v1".into(),
+        seed,
         meter,
         total_bars: 9,
         sections: vec![
@@ -307,14 +312,6 @@ fn notes_in_bar(
         .collect()
 }
 
-fn pitch_belongs_to_key(note: &ScoreNote, key: Key) -> bool {
-    let scale = key.scale();
-    (1..=7).any(|degree| {
-        scale.degree_pitch(degree, 4).midi().rem_euclid(12)
-            == note.pitch.midi().rem_euclid(12)
-    })
-}
-
 pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) -> OperaVerification {
     let meter = plan.meter as f64;
     let expected_total = plan.total_bars as f64 * meter;
@@ -358,8 +355,14 @@ pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) 
         && statement_b_melody.is_empty()
         && (2..4).all(|bar| !notes_in_bar(score, VoiceRole::CounterMelody, bar, meter).is_empty());
     let relative_key = home_key.relative();
-    let statement_b_uses_relative_key = !statement_b_counter.is_empty()
-        && statement_b_counter.iter().all(|note| pitch_belongs_to_key(note, relative_key));
+    let expected_a_once = expected_theme_pitches(&theme_a_for_seed(plan.seed), home_key, 5);
+    let expected_b_once = expected_theme_pitches(&theme_b_for_seed(plan.seed), relative_key, 4);
+    let expected_a: Vec<_> = (0..2).flat_map(|_| expected_a_once.iter().copied()).collect();
+    let expected_b: Vec<_> = (0..2).flat_map(|_| expected_b_once.iter().copied()).collect();
+    let actual_a: Vec<_> = statement_a_melody.iter().map(|note| note.pitch.midi()).collect();
+    let actual_b: Vec<_> = statement_b_counter.iter().map(|note| note.pitch.midi()).collect();
+    let statement_a_matches_home_key_theme = actual_a == expected_a;
+    let statement_b_uses_relative_key = actual_b == expected_b;
 
     let expected_dialogue = [
         VoiceRole::Melody,
@@ -426,12 +429,14 @@ pub(crate) fn verify_opera_plan(score: &Score, home_key: Key, plan: &OperaPlan) 
     let mut b_pitches: Vec<_> = statement_b_counter.iter().map(|note| note.pitch.midi()).collect();
     a_pitches.sort_unstable();
     b_pitches.sort_unstable();
-    let theme_identities_are_distinct = a_pitches != b_pitches;
+    let theme_identities_are_distinct = expected_a_once != expected_b_once
+        && a_pitches != b_pitches;
 
     OperaVerification {
         nine_bar_timeline_matches: timeline_matches,
         statement_a_isolated,
         statement_b_isolated,
+        statement_a_matches_home_key_theme,
         statement_b_uses_relative_key,
         dialogue_alternates_one_bar_at_a_time,
         interruption_cuts_theme_b_at_exact_boundary,
@@ -460,7 +465,7 @@ pub(crate) fn realize_opera_with_plan(
     seed: u64,
     intent: &MusicalIntent,
 ) -> OperaRealization {
-    let plan = opera_plan(meter as u8);
+    let plan = opera_plan(meter as u8, seed);
     let bar = Duration::new(meter as i64, 1);
     let relative_key = home_key.relative();
     let melody_octave = 5;
