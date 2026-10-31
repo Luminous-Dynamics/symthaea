@@ -453,13 +453,14 @@ fn select_probe(
                 .then_with(|| right.cmp(left))
         }),
         Strategy::Evoi => {
+            let available_count = available.len();
             let best = available.into_iter().max_by(|left, right| {
                 expected_value_of_probe(worlds, posterior, *left)
                     .total_cmp(&expected_value_of_probe(worlds, posterior, *right))
                     .then_with(|| right.cmp(left))
             })?;
             let gain = expected_value_of_probe(worlds, posterior, best);
-            let allocator_cost = available.len() as f64 * allocator_cost_per_evaluation;
+            let allocator_cost = available_count as f64 * allocator_cost_per_evaluation;
             if gain * decision_horizon as f64 > probe_cost + allocator_cost {
                 Some(best)
             } else {
@@ -578,6 +579,9 @@ fn evaluate_strategy(
 
         if !matches!(strategy, Strategy::Oracle | Strategy::NoProbe) {
             for _ in 0..probe_budget {
+                if posterior.len() <= 1 {
+                    break;
+                }
                 let (safe_candidates, blocked_candidates) =
                     available_probe_queries(&worlds, &posterior, &used);
                 safety_blocked_candidate_total += blocked_candidates;
@@ -940,7 +944,8 @@ mod tests {
             0.0,
         ).expect("at least one probe should have positive decision value");
         let chosen_gain = expected_value_of_probe(&worlds, &posterior, chosen);
-        for query in all_queries() {
+        let (safe_queries, _) = available_probe_queries(&worlds, &posterior, &used);
+        for query in safe_queries {
             assert!(chosen_gain + 1e-9 >= expected_value_of_probe(&worlds, &posterior, query));
         }
 
@@ -1025,10 +1030,51 @@ mod tests {
         assert!(fixed.mean_net_regret + 1e-9 >= fixed.mean_regret);
     }
 
+
+    #[test]
+    fn probes_must_be_safe_under_every_remaining_hypothesis() {
+        let worlds = mechanisms();
+        let posterior: Vec<usize> = (0..worlds.len()).collect();
+        let used = BTreeSet::new();
+        let (safe, blocked) = available_probe_queries(&worlds, &posterior, &used);
+        assert!(!safe.is_empty());
+        assert!(blocked > 0);
+        assert!(safe.iter().all(|query| robustly_safe_probe(&worlds, &posterior, *query)));
+        for query in all_queries().into_iter().filter(|query| !safe.contains(query)) {
+            assert!(!robustly_safe_probe(&worlds, &posterior, query));
+        }
+    }
+
+    #[test]
+    fn no_strategy_executes_an_unsafe_probe() {
+        for strategy in Strategy::all() {
+            let summary = evaluate_strategy(strategy, 4_242, 2, 1, 0.25, 0.0);
+            assert_eq!(summary.unsafe_probes, 0, "strategy {}", strategy.name());
+        }
+    }
+
+    #[test]
+    fn allocator_evaluation_cost_is_charged_and_can_stop_evoi() {
+        let no_allocator_cost = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.25, 0.0);
+        let expensive_allocator = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.25, 100.0);
+        assert!(no_allocator_cost.mean_allocator_score_evaluations > 0.0);
+        assert_eq!(expensive_allocator.mean_probes, 0.0);
+        assert!(expensive_allocator.mean_allocator_cost > 0.0);
+        assert!(expensive_allocator.mean_net_regret >= no_allocator_cost.mean_net_regret);
+    }
+
+    #[test]
+    fn decision_change_metrics_capture_beneficial_and_harmful_outcomes() {
+        let summary = evaluate_strategy(Strategy::Evoi, 4_242, 2, 1, 0.0, 0.0);
+        assert!((0.0..=1.0).contains(&summary.mean_decision_flip_fraction));
+        assert!(summary.beneficial_flip_fraction + summary.harmful_flip_fraction <= 1.0 + 1e-12);
+        assert!(summary.mean_safety_blocked_candidates > 0.0);
+    }
+
     #[test]
     fn seeded_report_is_reproducible() {
         let first = evaluate_strategy(Strategy::Random, 12_345, 2, 1, 0.25, 0.0);
-        let second = evaluate_strategy(Strategy::Random, 12_345, 2, 1, 0.25);
+        let second = evaluate_strategy(Strategy::Random, 12_345, 2, 1, 0.25, 0.0);
         assert_eq!(first.strategy, second.strategy);
         assert_eq!(first.mean_probes, second.mean_probes);
         assert_eq!(first.mean_regret, second.mean_regret);
