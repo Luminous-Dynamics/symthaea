@@ -175,12 +175,17 @@ pub fn evaluate_intervals(
 
     let count = observations.len() as f64;
     let empirical_coverage = covered_count as f64 / count;
+    let mean_width = total_width / count;
+    let mean_interval_score = total_interval_score / count;
+    if !mean_width.is_finite() || !mean_interval_score.is_finite() {
+        return Err(IntervalError::NonFiniteDerivedMetric);
+    }
     Ok(Some(IntervalMetrics {
         sample_count: observations.len(),
         nominal_coverage,
         empirical_coverage,
-        mean_width: total_width / count,
-        mean_interval_score: total_interval_score / count,
+        mean_width,
+        mean_interval_score,
         absolute_coverage_error: (empirical_coverage - nominal_coverage).abs(),
     }))
 }
