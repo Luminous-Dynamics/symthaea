@@ -155,13 +155,19 @@ class RandomizedCommonDepthCRC:
             A_eq[i,i*n_actions:(i+1)*n_actions]=1.0
         objective=-(self.weights[:,None]*self.utility).reshape(-1)
         started=time.perf_counter()
+        A_ub_csr=A_ub.tocsr()
+        A_eq_csr=A_eq.tocsr()
+        b_ub=np.full(len(self.augmented),self.budget)
+        b_eq=np.ones(n_states)
+        lower_bounds=np.zeros(n_variables)
+        upper_bounds=np.ones(n_variables)
         result=linprog(
             objective,
-            A_ub=A_ub.tocsr(),
-            b_ub=np.full(len(self.augmented),self.budget),
-            A_eq=A_eq.tocsr(),
-            b_eq=np.ones(n_states),
-            bounds=[(0.0,1.0)]*n_variables,
+            A_ub=A_ub_csr,
+            b_ub=b_ub,
+            A_eq=A_eq_csr,
+            b_eq=b_eq,
+            bounds=list(zip(lower_bounds,upper_bounds)),
             method="highs",
             options={"primal_feasibility_tolerance":1e-9,
                      "dual_feasibility_tolerance":1e-9},
@@ -170,6 +176,55 @@ class RandomizedCommonDepthCRC:
         if not result.success or result.x is None:
             raise RuntimeError(f"randomized CRC LP failed: {result.message}")
         probabilities=result.x.reshape(n_states,n_actions)
+
+        # Independently audit the HiGHS primal/dual solution. SciPy's
+        # marginals use the sign convention in which KKT stationarity is
+        # c - A_ub.T*y_ub - A_eq.T*y_eq - lower - upper = 0.
+        y_ub=np.asarray(result.ineqlin.marginals,dtype=np.float64)
+        y_eq=np.asarray(result.eqlin.marginals,dtype=np.float64)
+        y_lower=np.asarray(result.lower.marginals,dtype=np.float64)
+        y_upper=np.asarray(result.upper.marginals,dtype=np.float64)
+        stationarity=(
+            objective
+            - A_ub_csr.T@y_ub
+            - A_eq_csr.T@y_eq
+            - y_lower
+            - y_upper
+        )
+        dual_objective=float(
+            np.dot(b_ub,y_ub)
+            + np.dot(b_eq,y_eq)
+            + np.dot(lower_bounds,y_lower)
+            + np.dot(upper_bounds,y_upper)
+        )
+        inequality_slack=b_ub-A_ub_csr@result.x
+        equality_residual=A_eq_csr@result.x-b_eq
+        complementarity=max(
+            float(np.max(np.abs(y_ub*inequality_slack))),
+            float(np.max(np.abs(y_lower*(result.x-lower_bounds)))),
+            float(np.max(np.abs(y_upper*(upper_bounds-result.x)))),
+        )
+        dual_certificate={
+            "primal_max_inequality_violation":float(np.max(np.maximum(-inequality_slack,0.0))),
+            "primal_max_equality_residual":float(np.max(np.abs(equality_residual))),
+            "primal_max_bound_violation":float(max(
+                np.max(np.maximum(lower_bounds-result.x,0.0)),
+                np.max(np.maximum(result.x-upper_bounds,0.0)))),
+            "dual_inequality_sign_violation":float(np.max(np.maximum(y_ub,0.0))),
+            "dual_lower_sign_violation":float(np.max(np.maximum(-y_lower,0.0))),
+            "dual_upper_sign_violation":float(np.max(np.maximum(y_upper,0.0))),
+            "stationarity_max_abs":float(np.max(np.abs(stationarity))),
+            "complementarity_max_abs":complementarity,
+            "primal_objective_min":float(result.fun),
+            "dual_objective_min":dual_objective,
+            "duality_gap_abs":float(abs(result.fun-dual_objective)),
+            "convention":"SciPy/HiGHS LP marginals; stationarity c-A_ub.T*y_ub-A_eq.T*y_eq-lower-upper=0"
+        }
+        worst_kkt=max(v for k,v in dual_certificate.items()
+                      if k.endswith("violation") or k.endswith("residual")
+                      or k.endswith("max_abs") or k=="duality_gap_abs")
+        if worst_kkt>1e-7:
+            raise ArithmeticError(f"LP primal/dual optimality receipt failed: {dual_certificate}")
         report=self.verify(probabilities)
         if not report["valid"]:
             raise ArithmeticError(f"LP solution failed exact augmented-state verification: {report}")
@@ -185,7 +240,8 @@ class RandomizedCommonDepthCRC:
                       "objective_value":float(-result.fun),
                       "n_variables":n_variables,
                       "n_equality_constraints":n_states,
-                      "n_inequality_constraints":len(self.augmented)},
+                      "n_inequality_constraints":len(self.augmented),
+                      "dual_certificate":dual_certificate},
             "randomization":{
                 "states_with_multiple_actions":int(np.sum(supports>1)),
                 "fraction_states_randomized":float(np.mean(supports>1)),
