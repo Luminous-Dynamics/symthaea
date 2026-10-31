@@ -633,6 +633,54 @@ mod tests {
         hash_domain(b"dvd-test", label.as_bytes())
     }
 
+    fn inverse_normal_reference(probability: f64) -> f64 {
+        // Acklam's rational approximation, used only to make a fixed,
+        // deterministic approximately Gaussian negative-control fixture.
+        let a = [
+            -3.969_683_028_665_376e1,
+            2.209_460_984_245_205e2,
+            -2.759_285_104_469_687e2,
+            1.383_577_518_672_69e2,
+            -3.066_479_806_614_716e1,
+            2.506_628_277_459_239,
+        ];
+        let b = [
+            -5.447_609_879_822_406e1,
+            1.615_858_368_580_409e2,
+            -1.556_989_798_598_866e2,
+            6.680_131_188_771_972e1,
+            -1.328_068_155_288_572e1,
+        ];
+        let c = [
+            -7.784_894_002_430_293e-3,
+            -3.223_964_580_411_365e-1,
+            -2.400_758_277_161_838,
+            -2.549_732_539_343_734,
+            4.374_664_141_464_968,
+            2.938_163_982_698_783,
+        ];
+        let d = [
+            7.784_695_709_041_462e-3,
+            3.224_671_290_700_398e-1,
+            2.445_134_137_142_996,
+            3.754_408_661_907_416,
+        ];
+        let low = 0.024_25;
+        let high = 1.0 - low;
+        if probability < low {
+            let q = (-2.0 * probability.ln()).sqrt();
+            (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+                / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        } else if probability <= high {
+            let q = probability - 0.5;
+            let r = q * q;
+            (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+                / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        } else {
+            -inverse_normal_reference(1.0 - probability)
+        }
+    }
+
     fn input_from_difficulties(values: &[f64]) -> DvdGenerationInputV1 {
         let tail_token_count = 4_u32;
         let generations = values
@@ -756,6 +804,20 @@ mod tests {
     }
 
     #[test]
+    fn high_variance_gaussian_clean_control_does_not_prefer_two_components() {
+        let values: Vec<f64> = (0..50)
+            .map(|index| {
+                let quantile = (index as f64 + 0.5) / 50.0;
+                let normal_score = inverse_normal_reference(quantile);
+                -2.0 + 0.45 * normal_score
+            })
+            .collect();
+        let report = score_dvd_item(&input_from_difficulties(&values)).unwrap();
+        assert!(report.dvd_population_variance > 0.1);
+        assert!(report.delta_bic_two_vs_one < 0.0);
+    }
+
+    #[test]
     fn one_extreme_outlier_is_visible_in_raw_and_robust_dispersion() {
         let mut values = vec![-2.0; 49];
         values.push(-20.0);
@@ -763,6 +825,7 @@ mod tests {
         assert!(report.dvd_population_variance > 0.0);
         assert!(report.winsorized_variance_10_90 < report.dvd_population_variance);
         assert!(report.median_absolute_deviation < 1.0e-12);
+        assert!(!report.two_component.minimum_component_weight_met);
     }
 
     #[test]
