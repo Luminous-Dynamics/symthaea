@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "cases": [
+    {"id":"pairwise_threshold_synergy","context":"resting","interaction":[0.000000000000,1.000000000000,0.000000000000],"expected":[0.000000000000,1.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"pairwise_additive_null","context":"resting","interaction":[0.000000000000,0.000000000000,0.000000000000],"expected":[0.000000000000,0.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"saturation_subadditivity","context":"resting","interaction":[0.000000000000,-1.000000000000,0.000000000000],"expected":[0.000000000000,-1.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"third_order_threshold_synergy","context":"active","interaction":[0.000000000000,1.000000000000,0.000000000000],"expected":[0.000000000000,1.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"state_gated_edge_resting","context":"resting","interaction":[0.000000000000,0.000000000000,0.000000000000],"expected":[0.000000000000,0.000000000000,0.000000000000],"status":"PASS"},
+    {"id":"state_gated_edge_active","context":"active","interaction":[0.000000000000,0.750000000000,0.000000000000],"expected":[0.000000000000,0.750000000000,0.000000000000],"status":"PASS"}
+  ]
+}
