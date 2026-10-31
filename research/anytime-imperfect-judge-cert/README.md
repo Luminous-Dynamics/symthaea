@@ -7,7 +7,7 @@ Run:
     cargo fmt --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml -- --check
     cargo test --locked --manifest-path research/anytime-imperfect-judge-cert/Cargo.toml
 
-The crate implements summable alpha spending, one-sided Hoeffding bounds, the four-bound measurement-channel envelope, the TPR-lower / FPR-upper discrimination gate, a consistency gate for test-positive upper versus FPR lower bounds, and a strict affirmative certification threshold with an inconclusive fallback.
+The crate implements summable alpha spending, one-sided Hoeffding bounds, the four-bound measurement-channel envelope, the TPR-lower / FPR-upper discrimination gate, a consistency gate for test-positive upper versus FPR lower bounds, checked count aggregation, immutable validated bound objects, and a strict affirmative certification threshold with an inconclusive fallback.
 
 The deterministic sequential-null Monte Carlo test is an implementation smoke test, not a coverage proof or empirical certification.
 
