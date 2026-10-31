@@ -22,6 +22,7 @@ pub mod event_tape;
 pub mod matched_campaign;
 pub mod offer_set;
 pub mod offer_set_evidence;
+pub mod pareto_objectives;
 pub mod coral_baseline;
 pub mod coral_execution;
 pub mod resource_pareto;
