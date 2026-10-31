@@ -468,6 +468,9 @@ pub fn validate_target_delta_plan_fields(
         if parent_binding.is_none() || (intended != "semantic_invariant" && intended != "semantic_change") {
             issues.push(format!("candidate {} does not exist in the parent quality plan", candidate.candidate_id));
         }
+        if candidate.expected_target_change == TargetChangeKindV1::OtherDeclaredChange {
+            issues.push(format!("candidate {} must preregister a specific target transition, not other_declared_change", candidate.candidate_id));
+        }
         if !valid_digest(&candidate.target_identity_sha256, allow_zero)
             || !valid_digest(&candidate.baseline_artifact_sha256, false)
             || !valid_digest(&candidate.variant_artifact_sha256, false)
@@ -1411,6 +1414,21 @@ mod tests {
         )
         .unwrap_err()
         .contains("exact target and parent quality artifacts"));
+    }
+
+    #[test]
+    fn rejects_non_specific_expected_target_transition() {
+        let (quality_plan, _, target_plan, _, _) = fixtures();
+        let mut plan = parse_receipt(&target_plan);
+        plan["candidates"][1]["expected_target_change"] = json!("other_declared_change");
+        let fields_value = {
+            let mut value = plan.clone();
+            value.as_object_mut().unwrap().remove("plan_commitment_sha256");
+            value
+        };
+        let fields: TargetDeltaPlanFieldsV1 = serde_json::from_value(fields_value).unwrap();
+        let issues = validate_target_delta_plan_fields(&fields, &quality_plan).unwrap_err();
+        assert!(issues.iter().any(|issue| issue.contains("must preregister a specific target transition")));
     }
 
     #[test]
