@@ -48,11 +48,11 @@ Every row is keyed by scenario, horizon, execution block, candidate budget, and 
 
 - Realized episode return and a paired-episode 95% normal-approximation interval.
 - Lower-decile mean and worst-episode return. Sixteen episodes are not enough to make a stable CVaR95 estimate; these are tail diagnostics, not a CVaR95 claim.
-- Paired return deltas versus the direct and compute-matched direct arms.
+- Paired return deltas versus the direct, compute-matched direct, and shuffled-future negative-control arms (D0, D1, and W2 contrasts).
 - Paired return gap to the oracle arm.
 - Predicted-minus-realized return over the executed block, where the planner emitted a model prediction.
 - Fraction of visited states outside a declared rectangular training-support proxy.
-- Selected-trajectory one-step state RMSE against the reference point model.
+- Uniform 201-point one-step state-transition RMSE and selected-trajectory one-step state RMSE against the reference point model. The former is an evaluator-only, low-dimensional diagnostic; the two errors are intentionally reported side by side.
 - Reference-model false-safe rate when the point model predicts nontermination but the environment terminates.
 - Candidate-sequence queries, model-head evaluations, learned-model transition evaluations, oracle transition evaluations, and evaluator-only diagnostic transitions, separately.
 
