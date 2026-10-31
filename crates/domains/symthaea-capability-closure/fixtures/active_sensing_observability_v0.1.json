@@ -1,0 +1,59 @@
+{
+  "schema": "symthaea.active_sensing_observability_aliasing",
+  "version": "0.1.0",
+  "tracking_issue": 9563,
+  "evaluator_package": "research/temporal-evaluator",
+  "evaluator_module": "research/temporal-evaluator/src/sensing.rs",
+  "candidate_policy_pr": 9616,
+  "status": "source_authored_not_executed",
+  "event_interval_semantics": "half_open_start_inclusive_end_exclusive",
+  "direct_observability": "at_least_one_candidate_observation_timestamp_inside_hidden_event_interval",
+  "outcome_categories": [
+    "directly_observable",
+    "detected_observable",
+    "missed_observable",
+    "unobserved",
+    "inferred_without_direct_observation",
+    "false_detection_unknown_event_id"
+  ],
+  "metrics": [
+    "event_observability_ppm",
+    "observable_event_recall_ppm",
+    "detection_latency_us",
+    "maximum_inter_observation_gap_us",
+    "maximum_gap_deadline_missed",
+    "observation_budget_exceeded",
+    "energy_budget_exceeded",
+    "false_detection_ids",
+    "unobserved_event_ids",
+    "inferred_without_direct_observation_ids"
+  ],
+  "alias_pair_contract": {
+    "signal_model": "piecewise_linear_integer_microsecond_timestamps_integer_milli_unit_values",
+    "observed_equivalence": "all_candidate_observation_timestamps_match_within_integer_tolerance",
+    "hidden_divergence": "at_least_one_evaluator_probe_between_observations_differs_beyond_tolerance",
+    "arithmetic": "checked_i128_rational_interpolation_no_float_equality"
+  },
+  "adversarial_strata": [
+    "uniform",
+    "quasi_uniform",
+    "clustered",
+    "bursty",
+    "short_transient_between_observations",
+    "adverse_transient_phase",
+    "adverse_change_point_phase",
+    "alias_pair_same_sampled_values",
+    "quiet_then_rare_event",
+    "MCAR_missingness",
+    "structured_missingness",
+    "state_dependent_missingness",
+    "clock_jitter",
+    "timestamp_quantization",
+    "delayed_observation_delivery"
+  ],
+  "test_functions_authored": 10,
+  "tests_executed": false,
+  "candidate_hidden_label_exposure": false,
+  "OS_level_isolation_dependency": 9437,
+  "no_sota_or_energy_claim": true
+}
