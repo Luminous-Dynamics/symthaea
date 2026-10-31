@@ -7,12 +7,13 @@ autobins = false
 autotests = false
 autoexamples = false
 
-# Isolated nested workspace compiles the exact tracked example.
+# Isolated nested workspace compiles the exact tracked examples.
 [workspace]
 
 [features]
 default = []
 hardsec-adaptive-evasion-audit = []
+hardsec-case-trace-link-audit = []
 
 [dependencies]
 serde_json = "=1.0.150"
@@ -22,3 +23,8 @@ sha2 = "=0.10.9"
 name = "hardsec_adaptive_evasion_audit"
 path = "../../examples/hardsec_adaptive_evasion_audit.rs"
 required-features = ["hardsec-adaptive-evasion-audit"]
+
+[[example]]
+name = "hardsec_case_trace_link_audit"
+path = "../../examples/hardsec_case_trace_link_audit.rs"
+required-features = ["hardsec-case-trace-link-audit"]
