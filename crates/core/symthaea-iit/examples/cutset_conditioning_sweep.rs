@@ -91,7 +91,7 @@ fn equivalent(left: &[f64], right: &[f64]) -> bool {
 fn run() -> Result<(), String> {
     let repeats = parse_repeats()?;
     println!(
-        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
+        "side,variables,factors,cutset_variables,cutset_assignments,cutset_factor_entry_budget,standard_minfill_rejected_same_budget,baseline_induced_width,baseline_peak_entries,cutset_induced_width,cutset_peak_entries,conditioned_factor_entries_written,branch_output_entries_accumulated,factor_multiplications,baseline_median_ns,cutset_median_ns,cutset_over_baseline_time_ratio,exact_output_parity,within_cutset_budget"
     );
 
     for fixture in FIXTURES {
@@ -188,7 +188,7 @@ fn run() -> Result<(), String> {
             cutset_median as f64 / baseline_median as f64
         };
         println!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.4},{},{}",
             side,
             variables,
             factors.len(),
@@ -200,6 +200,9 @@ fn run() -> Result<(), String> {
             baseline.peak_factor_entries,
             cutset_report.induced_width,
             cutset_report.peak_factor_entries,
+            cutset_report.conditioned_factor_entries_written,
+            cutset_report.branch_output_entries_accumulated,
+            cutset_report.factor_multiplications,
             baseline_median,
             cutset_median,
             ratio,
