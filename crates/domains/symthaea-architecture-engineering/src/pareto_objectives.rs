@@ -4,7 +4,7 @@
 //! arbitrary weighted score. Every objective is transformed into a maximization utility
 //! using frozen scale anchors; feasibility is a separate gate; nondominated candidates
 //! remain visible; and exact hypervolume is reported only against an explicit reference
-//! point. Exact hypervolume is supported for one through four dimensions.
+//! point. Validated plans support exact hypervolume for two through four dimensions.
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -814,6 +814,24 @@ mod tests {
         assert!(ParetoAnalysisPlan::new(
             "campaign", specs(), vec![0.0, 0.0, 0.0], vec![invalid_evidence],
         ).is_err());
+    }
+
+    #[test]
+    fn exact_four_dimensional_single_box_volume_is_computed() {
+        let volume = exact_hypervolume(
+            &[vec![0.5, 0.5, 0.5, 0.5]],
+            &[0.0, 0.0, 0.0, 0.0],
+        ).unwrap();
+        assert!((volume - 0.0625).abs() < 1e-12);
+    }
+
+    #[test]
+    fn hypervolume_is_zero_when_no_candidate_exceeds_reference_in_all_dimensions() {
+        let volume = exact_hypervolume(
+            &[vec![0.9, 0.1], vec![0.2, 0.8]],
+            &[0.0, 0.3],
+        ).unwrap();
+        assert!((volume - 0.5).abs() < 1e-12);
     }
 
     #[test]
