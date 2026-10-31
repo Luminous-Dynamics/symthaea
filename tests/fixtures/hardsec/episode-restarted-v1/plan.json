@@ -194,5 +194,15 @@
     "eval-exec-0130",
     "eval-exec-0131",
     "eval-exec-0132"
+  ],
+  "pmu_metrology_protocol_id": "hs018-pmu-counterfactual-acquisition-v1",
+  "pmu_platform_id": "riscv-sim-pmu-v1",
+  "pmu_workload_id": "fixed-workload-v1",
+  "pmu_workload_binary_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "pmu_acquisition_condition_id": "grouped_co_scheduled",
+  "pmu_event_ids": [
+    "instret",
+    "cycles",
+    "l1_miss"
   ]
 }
