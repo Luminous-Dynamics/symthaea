@@ -1,0 +1,202 @@
+{
+  "schema_version": "hardsec-context-cctm-rpit-stream-v1",
+  "evidence_domain": "synthetic_fixture",
+  "stream_id": "stream-cctm-demo-01",
+  "evaluation_group_id": "heldout-execution-cctm-01",
+  "scoring_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "records": [
+    {
+      "sequence_index": 1,
+      "window_id": "cctm-window-001",
+      "context_id": "compute",
+      "anomaly_score": 3,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-001",
+      "pit_randomizer_uniform": 0.3865979381443299
+    },
+    {
+      "sequence_index": 2,
+      "window_id": "cctm-window-002",
+      "context_id": "memory",
+      "anomaly_score": 3,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-002",
+      "pit_randomizer_uniform": 0.7680412371134021
+    },
+    {
+      "sequence_index": 3,
+      "window_id": "cctm-window-003",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-003",
+      "pit_randomizer_uniform": 0.14948453608247422
+    },
+    {
+      "sequence_index": 4,
+      "window_id": "cctm-window-004",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-004",
+      "pit_randomizer_uniform": 0.5309278350515464
+    },
+    {
+      "sequence_index": 5,
+      "window_id": "cctm-window-005",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-005",
+      "pit_randomizer_uniform": 0.9123711340206185
+    },
+    {
+      "sequence_index": 6,
+      "window_id": "cctm-window-006",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-006",
+      "pit_randomizer_uniform": 0.29381443298969073
+    },
+    {
+      "sequence_index": 7,
+      "window_id": "cctm-window-007",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-007",
+      "pit_randomizer_uniform": 0.6752577319587629
+    },
+    {
+      "sequence_index": 8,
+      "window_id": "cctm-window-008",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-008",
+      "pit_randomizer_uniform": 0.05670103092783505
+    },
+    {
+      "sequence_index": 9,
+      "window_id": "cctm-window-009",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-009",
+      "pit_randomizer_uniform": 0.4381443298969072
+    },
+    {
+      "sequence_index": 10,
+      "window_id": "cctm-window-010",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-010",
+      "pit_randomizer_uniform": 0.8195876288659794
+    },
+    {
+      "sequence_index": 11,
+      "window_id": "cctm-window-011",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-011",
+      "pit_randomizer_uniform": 0.20103092783505155
+    },
+    {
+      "sequence_index": 12,
+      "window_id": "cctm-window-012",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-012",
+      "pit_randomizer_uniform": 0.5824742268041238
+    },
+    {
+      "sequence_index": 13,
+      "window_id": "cctm-window-013",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-013",
+      "pit_randomizer_uniform": 0.9639175257731959
+    },
+    {
+      "sequence_index": 14,
+      "window_id": "cctm-window-014",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-014",
+      "pit_randomizer_uniform": 0.34536082474226804
+    },
+    {
+      "sequence_index": 15,
+      "window_id": "cctm-window-015",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-015",
+      "pit_randomizer_uniform": 0.7268041237113402
+    },
+    {
+      "sequence_index": 16,
+      "window_id": "cctm-window-016",
+      "context_id": "compute",
+      "anomaly_score": 8,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-016",
+      "pit_randomizer_uniform": 0.10824742268041238
+    },
+    {
+      "sequence_index": 17,
+      "window_id": "cctm-window-017",
+      "context_id": "compute",
+      "anomaly_score": 8.5,
+      "sensor_state": "stale",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-017",
+      "pit_randomizer_uniform": 0.4896907216494845
+    },
+    {
+      "sequence_index": 18,
+      "window_id": "cctm-window-018",
+      "context_id": "new-regime",
+      "anomaly_score": 8.5,
+      "sensor_state": "valid",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-018",
+      "pit_randomizer_uniform": 0.8711340206185567
+    },
+    {
+      "sequence_index": 19,
+      "window_id": "cctm-window-019",
+      "context_id": "memory",
+      "anomaly_score": 8.5,
+      "sensor_state": "untrusted",
+      "pmu_qualification_result": "qualified_for_named_acquisition_conditions",
+      "randomizer_id": "pit-randomizer-019",
+      "pit_randomizer_uniform": 0.25257731958762886
+    }
+  ],
+  "context_assignment_policy_id": "hs020-frozen-workload-context-v1",
+  "context_assignment_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "pit_randomizer_source_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+}
