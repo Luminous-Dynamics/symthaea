@@ -2151,7 +2151,7 @@ mod tests {
             .unwrap();
         assert_eq!(sparse_result.formalism, dense_result.formalism);
         assert_eq!(sparse_result.certified_upper_bound, dense_result.certified_upper_bound);
-        assert_eq!(sparse_result.certified_upper_bound, Some(CANDIDATE.len() * (CANDIDATE.len() - 1)));
+        assert_eq!(sparse_result.certified_upper_bound, Some(candidate.len() * (candidate.len() - 1)));
         assert_eq!(sparse_result.receipt_sha256().unwrap(), sparse
             .analyze_iit4_2023_system_phi_s(&candidate, &current_state, config, 1 << 16)
             .unwrap()
