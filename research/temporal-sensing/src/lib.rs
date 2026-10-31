@@ -117,6 +117,7 @@ pub enum SensingError {
         field: &'static str,
         value: u32,
     },
+    InvalidJitter { jitter_per_mille: u16 },
     TimestampOverflow,
     ArithmeticOverflow,
 }
@@ -133,6 +134,9 @@ impl fmt::Display for SensingError {
             Self::ZeroInterval => write!(f, "policy observation intervals must be nonzero"),
             Self::InvalidProbability { field, value } => {
                 write!(f, "{field}={value} exceeds the PPM maximum 1000000")
+            }
+            Self::InvalidJitter { jitter_per_mille } => {
+                write!(f, "jitter {jitter_per_mille} per mille must be below 1000")
             }
             Self::TimestampOverflow => write!(f, "next observation timestamp overflowed"),
             Self::ArithmeticOverflow => write!(f, "value-of-information arithmetic overflowed"),
@@ -342,10 +346,7 @@ fn validate_policy(policy: SensingPolicy) -> Result<(), SensingError> {
             if interval_us == 0 {
                 Err(SensingError::ZeroInterval)
             } else {
-                Err(SensingError::InvalidProbability {
-                    field: "jitter_per_mille",
-                    value: u32::from(jitter_per_mille),
-                })
+                Err(SensingError::InvalidJitter { jitter_per_mille })
             }
         }
         SensingPolicy::MultiRate {
@@ -544,6 +545,7 @@ mod tests {
             SensingDecision::BudgetBlocked {
                 reason: BudgetBlock::ObservationCountExhausted,
                 must_observe_by_us: 100,
+                deadline_missed: true,
             }
         ));
 
