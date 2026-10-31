@@ -1200,7 +1200,7 @@ mod tests {
         let events_before = ledger.events().len();
         // Retry is issued from the same preflight capability and original expected head.
         let (_, _, cost_again) = fixture();
-        let mut retry_proof = proof(&ledger, "measure-001", &scope, cost_again, 'e');
+        let mut retry_proof = proof(&ledger, "measure-001", &scope, cost_again, 'd');
         retry_proof.reservation_ledger_head_sha256 = head.clone();
         let retry = ledger
             .reserve_measurement(&head, retry_proof, 5)
@@ -1209,7 +1209,7 @@ mod tests {
         assert_eq!(first.receipt_sha256, retry.receipt_sha256);
         assert_eq!(ledger.events().len(), events_before);
         let (_, _, cost_changed_lease) = fixture();
-        let mut conflicting_retry = proof(&ledger, "measure-001", &scope, cost_changed_lease, 'e');
+        let mut conflicting_retry = proof(&ledger, "measure-001", &scope, cost_changed_lease, 'd');
         conflicting_retry.reservation_ledger_head_sha256 = head.clone();
         assert!(ledger
             .reserve_measurement(&head, conflicting_retry, 6)
