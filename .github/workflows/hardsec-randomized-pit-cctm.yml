@@ -8,7 +8,9 @@ on:
       - "schemas/hardsec-context-cctm-rpit-*.schema.json"
       - "schemas/hardsec-context-assignment-*.schema.json"
       - "tests/fixtures/hardsec/context-cctm-rpit-v1/**"
+      - "schemas/hardsec-randomized-pit-benchmark-v1.schema.json"
       - "tests/fixtures/hardsec/context-assignment-v1/**"
+      - "tests/fixtures/hardsec/context-cctm-rpit-v1/benchmark-plan.json"
       - "tools/hardsec-adaptive-evasion-audit-harness/**"
       - ".github/workflows/hardsec-context-assignment-audit.yml"
       - ".github/workflows/hardsec-randomized-pit-cctm.yml"
@@ -40,6 +42,29 @@ jobs:
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-assignment-audit --example hardsec_context_assignment_audit
       - name: Run randomized PIT CCTM unit suite
         run: cargo test --locked --manifest-path tools/hardsec-adaptive-evasion-audit-harness/Cargo.toml --features hardsec-context-cctm-rpit-monitor --example hardsec_context_cctm_randomized_pit
+
+      - name: Check randomized PIT benchmark matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          path = "tests/fixtures/hardsec/context-cctm-rpit-v1/benchmark-plan.json"
+          with open(path, "r", encoding="utf-8") as handle:
+              plan = json.load(handle)
+          assert plan["status"] == "planned"
+          assert len(plan["reference_implementations"]) == 9
+          assert len(plan["score_distributions"]) == 8
+          assert len(plan["randomizer_scenarios"]) == 9
+          assert "fixed_reused_uniform" in [x["id"] for x in plan["randomizer_scenarios"]]
+          assert "score_dependent_uniform" in [x["id"] for x in plan["randomizer_scenarios"]]
+          assert "perfectly_repeated_latent_null" in plan["null_dependence_scenarios"]
+          frontier = plan["calibration_frontier"]
+          assert frontier["total_alpha"] == 0.04
+          assert frontier["total_delta"] == 0.01
+          assert frontier["independent_reference_units_per_context"] == [1199, 4794, 29958, 119830]
+          assert plan["claim_rules"]["randomizer_independence_must_be_justified"] is True
+          PY
       - name: Generate truth-free context receipt and run randomized PIT CCTM
         shell: bash
         run: |
