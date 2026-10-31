@@ -2208,6 +2208,7 @@ mod tests {
             (4..12).collect::<Vec<_>>(), // 256 branches, width 1, peak 4
             (0..15).collect::<Vec<_>>(), // Exceeds the 1,024-branch budget.
             vec![7, 6, 5, 4],            // Exact metric tie with candidate 0.
+            (4..9).collect::<Vec<_>>(),  // 64 branches, same width/peak: dominated by 0.
         ];
 
         let report = plan_min_fill_cutset_frontier(
@@ -2220,7 +2221,7 @@ mod tests {
 
         assert_eq!(
             report.candidates.iter().map(|candidate| candidate.candidate_index).collect::<Vec<_>>(),
-            vec![0, 1, 3]
+            vec![0, 1, 3, 4]
         );
         assert_eq!(report.frontier_candidate_indices, vec![0, 1]);
         assert_eq!(report.rejected_candidates.len(), 1);
@@ -2248,6 +2249,30 @@ mod tests {
             1
         );
         assert_eq!(report.candidates[1].plan.predicted_peak_factor_entries(), 4);
+    }
+
+    #[test]
+    fn cutset_frontier_reports_when_every_candidate_is_over_budget() {
+        let scopes = vec![vec![0, 1]];
+        let report = plan_min_fill_cutset_frontier(
+            &scopes,
+            &[0],
+            &[vec![0], vec![0, 1]],
+            2,
+            4,
+        ).unwrap();
+
+        assert!(report.candidates.is_empty());
+        assert!(report.frontier_candidate_indices.is_empty());
+        assert_eq!(report.rejected_candidates.len(), 2);
+        assert_eq!(
+            report.rejected_candidates.iter().map(|candidate| candidate.candidate_index).collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        assert!(report.rejected_candidates.iter().all(|candidate| matches!(
+            candidate.error,
+            FactorGraphError::IntermediateTooLarge { limit: 2, .. }
+        )));
     }
 
     #[test]
