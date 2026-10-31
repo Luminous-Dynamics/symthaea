@@ -222,7 +222,7 @@ fn decode_seed_hex(value: &str) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
-fn validate_bundle(
+pub(crate) fn validate_bundle(
     bundle: &FreshChallengeBundleV1,
 ) -> Result<BTreeMap<String, ExactLinearSolutionV1>, String> {
     let public = &bundle.public_packet;
