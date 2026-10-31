@@ -1,7 +1,7 @@
 # PITB SorryDB toolchain stratification and smoke cohort
 
 **Date:** 2026-10-31  
-**Status:** source-inspected candidate selection only; no project has been rebuilt and no proof has been attempted.
+**Status:** source-inspected candidate selection; a pinned source verifier is implemented and wired into CI, but no project has been rebuilt and no proof has been attempted.
 
 ## Environment is an independent experimental variable
 
@@ -71,3 +71,17 @@ The full SorryDB report must retain all toolchain strata. The matched causal com
 - Raw bytes SHA-256: 26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062
 
 The exact per-task repository/config/source-file pins are recorded in the candidate JSON. This is provenance, not a claim that any repository has been built or any SorryDB row solved.
+
+
+## Independent checkout verification
+
+The Rust binary \`verify_sorrydb_smoke_cohort\` validates each materialized repository before any build:
+- exact repository origin and HEAD commit;
+- clean tracked worktree;
+- Git blob SHA-1 for the actual \`lean-toolchain\`, \`lakefile.toml\`, \`lake-manifest.json\`, and target Lean source file;
+- exact Lean toolchain text and Mathlib revision from the pinned Lake manifest;
+- repository-relative path safety and the exact \`sorry\` token span using zero-based Unicode codepoint columns.
+
+The focused workflow checks out each project at its recorded commit and invokes the verifier. Its result is only a source-integrity receipt: it does not establish that dependencies are available, the unchanged project builds, or Lean's actual metavariable state has been exported.
+
+The three sorry spans were rechecked against their exact source commits. Each source-file blob matches its manifest pin, and zero-based character slicing selects exactly \`sorry\` in all three files. This agrees with SorryDB's \`position_to_index\` implementation, which uses Unicode character columns; raw UTF-8 byte offsets would be incorrect for these Lean files.

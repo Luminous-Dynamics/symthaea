@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.schema.json",
+  "title": "PITB SorryDB smoke cohort candidate manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset",
+    "cohort_status",
+    "policy",
+    "toolchain_stratification",
+    "tasks"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb.smoke-candidates.v0"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "source_repository",
+        "source_repository_commit",
+        "source_split_path",
+        "source_git_blob_sha1",
+        "source_sha256",
+        "source_bytes",
+        "task_count",
+        "project_count"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "const": "SorryDB_2601"
+        },
+        "source_repository": {
+          "const": "SorryDB/SorryDB"
+        },
+        "source_repository_commit": {
+          "const": "74b3b63f8ba890d675f362924b21ac55db410383"
+        },
+        "source_split_path": {
+          "const": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
+        },
+        "source_git_blob_sha1": {
+          "const": "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+        },
+        "source_sha256": {
+          "const": "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062"
+        },
+        "source_bytes": {
+          "const": 1599271
+        },
+        "task_count": {
+          "const": 1000
+        },
+        "project_count": {
+          "const": 78
+        }
+      }
+    },
+    "cohort_status": {
+      "const": "selected_candidate_not_reconstructed"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_selection",
+        "proof_state_source",
+        "proof_result_claimed",
+        "build_or_import_run_claimed",
+        "attempt_budget",
+        "next_action"
+      ],
+      "properties": {
+        "candidate_selection": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proof_state_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proof_result_claimed": {
+          "const": false
+        },
+        "build_or_import_run_claimed": {
+          "const": false
+        },
+        "attempt_budget": {
+          "const": "not_registered"
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "toolchain_stratification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distinct_toolchain_tags",
+        "task_counts"
+      ],
+      "properties": {
+        "distinct_toolchain_tags": {
+          "const": 14
+        },
+        "task_counts": {
+          "type": "array",
+          "minItems": 14,
+          "maxItems": 14,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "lean_version",
+              "tasks"
+            ],
+            "properties": {
+              "lean_version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tasks": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ordinal",
+          "task_id",
+          "selection_role",
+          "checkout_directory",
+          "repository",
+          "location",
+          "project_pins",
+          "target_hint",
+          "debug_context_signal",
+          "source_inspected",
+          "environment_reconstructed",
+          "project_build_status",
+          "lean_evidence_status",
+          "proof_attempt_status"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "task_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "selection_role": {
+            "enum": [
+              "stable_toolchain_baseline",
+              "stable_toolchain_and_dependency_context",
+              "explicit_local_instance_registry_challenge"
+            ]
+          },
+          "checkout_directory": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "repository": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "remote",
+              "branch",
+              "commit",
+              "lean_version"
+            ],
+            "properties": {
+              "remote": {
+                "type": "string",
+                "format": "uri"
+              },
+              "branch": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "lean_version": {
+                "type": "string",
+                "pattern": "^v[A-Za-z0-9.+-]+$"
+              }
+            }
+          },
+          "location": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "start_line",
+              "start_column",
+              "end_line",
+              "end_column",
+              "column_indexing",
+              "verified_source_slice",
+              "source_file_git_blob_sha1"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "start_column": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_column": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "column_indexing": {
+                "const": "zero_based"
+              },
+              "verified_source_slice": {
+                "const": "sorry"
+              },
+              "source_file_git_blob_sha1": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          },
+          "project_pins": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "lean_toolchain_file_git_blob_sha1",
+              "lakefile_toml_git_blob_sha1",
+              "lake_manifest_json_git_blob_sha1",
+              "mathlib_revision"
+            ],
+            "properties": {
+              "lean_toolchain_file_git_blob_sha1": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "lakefile_toml_git_blob_sha1": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "lake_manifest_json_git_blob_sha1": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "mathlib_revision": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          },
+          "target_hint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "debug_context_signal": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_inspected": {
+            "const": true
+          },
+          "environment_reconstructed": {
+            "const": false
+          },
+          "project_build_status": {
+            "const": "not_run"
+          },
+          "lean_evidence_status": {
+            "const": "not_run"
+          },
+          "proof_attempt_status": {
+            "const": "not_run"
+          }
+        }
+      }
+    }
+  }
+}

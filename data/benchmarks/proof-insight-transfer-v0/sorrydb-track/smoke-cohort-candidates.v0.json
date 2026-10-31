@@ -114,7 +114,8 @@
       "environment_reconstructed": false,
       "project_build_status": "not_run",
       "lean_evidence_status": "not_run",
-      "proof_attempt_status": "not_run"
+      "proof_attempt_status": "not_run",
+      "checkout_directory": "lean-course25"
     },
     {
       "ordinal": 1,
@@ -148,7 +149,8 @@
       "environment_reconstructed": false,
       "project_build_status": "not_run",
       "lean_evidence_status": "not_run",
-      "proof_attempt_status": "not_run"
+      "proof_attempt_status": "not_run",
+      "checkout_directory": "prime-number-theorem"
     },
     {
       "ordinal": 2,
@@ -182,7 +184,8 @@
       "environment_reconstructed": false,
       "project_build_status": "not_run",
       "lean_evidence_status": "not_run",
-      "proof_attempt_status": "not_run"
+      "proof_attempt_status": "not_run",
+      "checkout_directory": "clap-lean"
     }
   ]
 }

@@ -162,6 +162,27 @@ jobs:
           ref: 74b3b63f8ba890d675f362924b21ac55db410383
           path: _pitb-sorrydb
           persist-credentials: false
+      - name: Checkout LeanCourse25 smoke project
+        uses: actions/checkout@v4
+        with:
+          repository: fpvandoorn/LeanCourse25
+          ref: cd0f32f5b07311e08a9e89733a1375f54eb790c0
+          path: _pitb-smoke/lean-course25
+          persist-credentials: false
+      - name: Checkout PrimeNumberTheoremAnd smoke project
+        uses: actions/checkout@v4
+        with:
+          repository: AlexKontorovich/PrimeNumberTheoremAnd
+          ref: ddcb6542f2b62883c8642d3db4ecc115afcce33e
+          path: _pitb-smoke/prime-number-theorem
+          persist-credentials: false
+      - name: Checkout clap-lean smoke project
+        uses: actions/checkout@v4
+        with:
+          repository: Clap-lang/clap-lean
+          ref: 326f55435f91295d95a6166b060cace7ef92e6e4
+          path: _pitb-smoke/clap-lean
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.96.0
@@ -287,6 +308,10 @@ jobs:
 
           path = Path("data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.v0.json")
           manifest = json.loads(path.read_text())
+          from jsonschema import Draft202012Validator, FormatChecker
+          candidate_schema = json.loads(Path("data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.schema.json").read_text())
+          Draft202012Validator.check_schema(candidate_schema)
+          Draft202012Validator(candidate_schema, format_checker=FormatChecker()).validate(manifest)
           assert manifest["schema_version"] == "pitb.sorrydb.smoke-candidates.v0"
           assert manifest["dataset"]["snapshot_id"] == "SorryDB_2601"
           assert manifest["dataset"]["source_repository_commit"] == "74b3b63f8ba890d675f362924b21ac55db410383"
@@ -316,3 +341,12 @@ jobs:
           assert "Fact (Nat.Prime p)" in instance["debug_context_signal"]
           print("PITB_SORRYDB_SMOKE_COHORT_PASS: three pinned candidates, three Lean toolchains, explicit LocalInstances challenge; all execution states remain not-run")
           PY
+      - name: Verify materialized smoke-project source pins and sorry spans
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$PITB_MANIFEST")"
+          cargo run --locked --bin verify_sorrydb_smoke_cohort -- --self-test
+          cargo run --locked --bin verify_sorrydb_smoke_cohort -- \
+            --manifest "$GITHUB_WORKSPACE/data/benchmarks/proof-insight-transfer-v0/sorrydb-track/smoke-cohort-candidates.v0.json" \
+            --checkouts-root "$GITHUB_WORKSPACE/_pitb-smoke"
