@@ -517,7 +517,7 @@ mod tests {
         let (task, oracle) = generate_knowledge_trajectory(config()).unwrap();
         let windows = knowledge_trajectory_windows(&task);
         let mut predictions = perfect_knowledge_trajectory_predictions(&oracle, &task);
-        let correction_index = usize::try_from(oracle.correction_observed_at / task.stream.interval_steps)
+        let correction_index = usize::try_from(oracle.correction_observed_at / task.checkpoint_interval_steps)
             .unwrap();
         let delayed = predictions.iter_mut().find(|prediction| {
             prediction.query_id == CURRENT_TRAJECTORY_QUERY_ID
@@ -536,7 +536,7 @@ mod tests {
         let (task, oracle) = generate_knowledge_trajectory(config()).unwrap();
         let windows = knowledge_trajectory_windows(&task);
         let mut predictions = perfect_knowledge_trajectory_predictions(&oracle, &task);
-        let retraction_index = usize::try_from(oracle.retraction_observed_at / task.stream.interval_steps)
+        let retraction_index = usize::try_from(oracle.retraction_observed_at / task.checkpoint_interval_steps)
             .unwrap();
         let delayed = predictions.iter_mut().find(|prediction| {
             prediction.query_id == CURRENT_TRAJECTORY_QUERY_ID
