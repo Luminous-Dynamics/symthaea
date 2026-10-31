@@ -22,6 +22,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const CLAIM_SCOPE: &str = "conditional_campaign_metrics_for_named_domain_and_declared_holdouts";
+const GROUP_BOOTSTRAP_REPLICATES: usize = 10_000;
+const MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL: usize = 10;
 
 #[derive(Debug, Clone)]
 struct Prediction {
@@ -307,6 +309,90 @@ fn macro_recall(groups: &BTreeMap<String, RecallCounts>) -> (Option<f64>, Option
     (Some(mean), Some(worst), values.len())
 }
 
+fn next_bootstrap_u64(state: &mut u64) -> u64 {
+    let mut value = *state;
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    *state = value;
+    value.wrapping_mul(0x2545_F491_4F6C_DD1D)
+}
+
+/// Deterministic equal-group percentile bootstrap. The seed deliberately
+/// depends only on campaign ID, grouping axis and algorithm version, so
+/// matched model arms with the same ordered group IDs use common resamples.
+fn group_bootstrap_interval(
+    groups: &BTreeMap<String, RecallCounts>,
+    campaign_id: &str,
+    axis: &str,
+) -> Value {
+    let values: Vec<f64> = groups.values().filter_map(recall).collect();
+    let group_count = values.len();
+    let point_estimate = if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / group_count as f64)
+    };
+    let seed_material = format!("{campaign_id}|{axis}|hardsec-group-bootstrap-v1");
+    let seed_digest = Sha256::digest(seed_material.as_bytes());
+    let seed_sha256 = seed_digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+
+    if group_count < MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL {
+        return json!({
+            "method": "deterministic_equal_group_percentile_bootstrap_v1",
+            "status": "unavailable_insufficient_independent_groups",
+            "point_estimate": point_estimate,
+            "independent_group_count": group_count,
+            "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
+            "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
+            "confidence_level": 0.95,
+            "lower_95": null,
+            "upper_95": null,
+            "seed_sha256": seed_sha256,
+            "seed_scope": "campaign_id + grouping_axis + algorithm_version",
+            "resampling_unit": "caller_declared_independent_group",
+            "assumption": "group identifiers encode independent exchangeable units",
+            "interpretation": "No interval is reported below the minimum group count; case/window counts do not substitute for independent groups."
+        });
+    }
+
+    let mut state = u64::from_le_bytes(seed_digest[..8].try_into().expect("SHA-256 has at least eight bytes"));
+    if state == 0 {
+        state = 0x9E37_79B9_7F4A_7C15;
+    }
+    let mut bootstrap_means = Vec::with_capacity(GROUP_BOOTSTRAP_REPLICATES);
+    for _ in 0..GROUP_BOOTSTRAP_REPLICATES {
+        let mut sum = 0.0f64;
+        for _ in 0..group_count {
+            let draw = next_bootstrap_u64(&mut state);
+            let index = ((draw as u128 * group_count as u128) >> 64) as usize;
+            sum += values[index];
+        }
+        bootstrap_means.push(sum / group_count as f64);
+    }
+    bootstrap_means.sort_by(f64::total_cmp);
+    let lower_index = (((GROUP_BOOTSTRAP_REPLICATES - 1) as f64) * 0.025).floor() as usize;
+    let upper_index = (((GROUP_BOOTSTRAP_REPLICATES - 1) as f64) * 0.975).ceil() as usize;
+
+    json!({
+        "method": "deterministic_equal_group_percentile_bootstrap_v1",
+        "status": "available_descriptive_interval",
+        "point_estimate": point_estimate,
+        "independent_group_count": group_count,
+        "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
+        "bootstrap_replicates": GROUP_BOOTSTRAP_REPLICATES,
+        "confidence_level": 0.95,
+        "lower_95": bootstrap_means[lower_index],
+        "upper_95": bootstrap_means[upper_index],
+        "quantile_rule": "lower_floor_upper_ceil_order_statistic",
+        "seed_sha256": seed_sha256,
+        "seed_scope": "campaign_id + grouping_axis + algorithm_version",
+        "resampling_unit": "caller_declared_independent_group",
+        "assumption": "group identifiers encode independent exchangeable units",
+        "interpretation": "Descriptive cluster-bootstrap interval conditional on caller-declared groups; not proof of independence or a family-wise population guarantee."
+    })
+}
+
 fn percentile(sorted: &[u64], q: f64) -> Option<u64> {
     if sorted.is_empty() {
         return None;
@@ -395,7 +481,7 @@ fn audit_values(
     let mut adaptation_family_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut program_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
     let mut execution_groups: BTreeMap<String, RecallCounts> = BTreeMap::new();
-    let mut benign_by_program: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
+    let mut benign_by_program: BTreeMap<String, RecallCounts> = BTreeMap::new();
 
     let mut total_costs = Vec::new();
     let mut measured_acquisition_sum = 0u64;
@@ -478,19 +564,16 @@ fn audit_values(
                 } else {
                     valid_benign_cases += 1;
                 }
-                let counts = benign_by_program.entry(meta.program_group_id.clone()).or_insert((0,0,0));
-                counts.0 += 1;
+                add_recall(benign_by_program.entry(meta.program_group_id.clone()).or_default(), &prediction.response);
                 match prediction.response.as_str() {
                     "alert" => {
                         benign_alerts += 1;
-                        counts.1 += 1;
                         if !invalid_sensor {
                             valid_benign_alerts += 1;
                         }
                     }
                     "clear" => {
                         benign_clears += 1;
-                        counts.2 += 1;
                         if !invalid_sensor {
                             valid_benign_clears += 1;
                         }
@@ -648,12 +731,13 @@ fn audit_values(
         "abstained": stats.abstained,
         "attack_effect_recall": recall(stats)
     })).collect();
-    let benign_groups: Vec<Value> = benign_by_program.iter().map(|(group, values)| json!({
+    let benign_groups: Vec<Value> = benign_by_program.iter().map(|(group, stats)| json!({
         "program_group_id": group,
-        "benign_cases": values.0,
-        "false_alerts": values.1,
-        "clear_verdicts": values.2,
-        "false_alert_rate": if values.0 == 0 { None } else { Some(values.1 as f64 / values.0 as f64) }
+        "benign_cases": stats.cases,
+        "false_alerts": stats.detected,
+        "clear_verdicts": stats.cleared,
+        "abstentions": stats.abstained,
+        "false_alert_rate": recall(stats)
     })).collect();
 
     Ok(json!({
@@ -720,6 +804,20 @@ fn audit_values(
             "worst_execution_recall": execution_worst,
             "execution_group_count": execution_group_count,
             "benign_false_alert_by_program": benign_groups
+        },
+        "statistical_support": {
+            "method": "deterministic_equal_group_percentile_bootstrap_v1",
+            "replicates": GROUP_BOOTSTRAP_REPLICATES,
+            "minimum_independent_groups": MIN_GROUPS_FOR_BOOTSTRAP_INTERVAL,
+            "common_random_numbers": "seed depends on campaign_id + grouping_axis + algorithm_version, not prediction bytes",
+            "assumption": "caller-declared group identifiers represent independent exchangeable units",
+            "warning": "Intervals are descriptive and are not simultaneous across axes; pre-register one primary axis or apply an explicit multiplicity procedure.",
+            "attack_family_macro_recall": group_bootstrap_interval(&attack_family_groups, &prediction_campaign, "attack_family"),
+            "adaptation_family_level_macro_recall": group_bootstrap_interval(&adaptation_groups, &prediction_campaign, "adaptation_family_level"),
+            "adaptation_family_macro_recall": group_bootstrap_interval(&adaptation_family_groups, &prediction_campaign, "adaptation_family"),
+            "program_macro_recall": group_bootstrap_interval(&program_groups, &prediction_campaign, "program"),
+            "execution_macro_recall": group_bootstrap_interval(&execution_groups, &prediction_campaign, "execution"),
+            "benign_program_macro_false_alert_rate": group_bootstrap_interval(&benign_by_program, &prediction_campaign, "benign_program")
         },
         "calibration": calibration,
         "sensor_integrity": {
@@ -1061,6 +1159,65 @@ mod tests {
         assert_eq!(receipt["primary_metrics"]["benign_invalid_sensor_cases"], 2);
         assert_eq!(receipt["primary_metrics"]["benign_false_alert_rate_on_valid_sensor_cases"], 0.5);
         assert_eq!(receipt["primary_metrics"]["benign_true_negative_rate_on_valid_sensor_cases"], 0.5);
+    }
+
+    #[test]
+    fn group_bootstrap_with_fewer_than_ten_groups_is_unavailable() {
+        let mut groups = BTreeMap::new();
+        for index in 0..9 {
+            groups.insert(format!("g{index}"), RecallCounts {
+                cases: 10,
+                detected: 8,
+                cleared: 2,
+                abstained: 0,
+            });
+        }
+        let interval = group_bootstrap_interval(&groups, "campaign-a", "program");
+        assert_eq!(interval["status"], "unavailable_insufficient_independent_groups");
+        assert_eq!(interval["independent_group_count"], 9);
+        assert_eq!(interval["lower_95"], Value::Null);
+        assert_eq!(interval["upper_95"], Value::Null);
+    }
+
+    #[test]
+    fn group_bootstrap_is_deterministic_and_equal_group_weighted() {
+        let mut groups = BTreeMap::new();
+        for index in 0..9 {
+            groups.insert(format!("g{index:02}"), RecallCounts {
+                cases: 100,
+                detected: 100,
+                cleared: 0,
+                abstained: 0,
+            });
+        }
+        groups.insert("g09".to_owned(), RecallCounts {
+            cases: 1,
+            detected: 0,
+            cleared: 1,
+            abstained: 0,
+        });
+        let first = group_bootstrap_interval(&groups, "same-campaign", "program");
+        let second = group_bootstrap_interval(&groups, "same-campaign", "program");
+        assert_eq!(first, second);
+        assert_eq!(first["status"], "available_descriptive_interval");
+        let point = first["point_estimate"].as_f64().unwrap();
+        assert!((point - 0.9).abs() < 1e-12);
+        let lower = first["lower_95"].as_f64().unwrap();
+        let upper = first["upper_95"].as_f64().unwrap();
+        assert!(lower <= point && point <= upper);
+        assert_eq!(first["bootstrap_replicates"], GROUP_BOOTSTRAP_REPLICATES);
+        assert_eq!(first["resampling_unit"], "caller_declared_independent_group");
+    }
+
+    #[test]
+    fn known_answer_suppresses_group_intervals_with_small_fixture_support() {
+        let (p,m,t,pb,mb,tb) = fixture_values();
+        let receipt = audit_values(&p,&m,&t,&pb,&mb,&tb).unwrap();
+        let support = &receipt["statistical_support"];
+        assert_eq!(support["attack_family_macro_recall"]["status"], "unavailable_insufficient_independent_groups");
+        assert_eq!(support["adaptation_family_level_macro_recall"]["independent_group_count"], 3);
+        assert_eq!(support["program_macro_recall"]["independent_group_count"], 3);
+        assert_eq!(support["benign_program_macro_false_alert_rate"]["independent_group_count"], 4);
     }
 
     #[test]
