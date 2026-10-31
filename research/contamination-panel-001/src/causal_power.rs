@@ -536,10 +536,33 @@ pub fn verify_causal_power_report(report: &CausalPowerPlanningReportV1) -> Resul
     if hash_domain(b"causal-power-planning-report.v1", &bytes) != report.report_sha256 {
         return Err("power report digest does not match contents".to_owned());
     }
-    if report.candidate_estimates.windows(2)
-        .any(|pair| pair[0].model_pair_count >= pair[1].model_pair_count)
+    if report.candidate_estimates.is_empty()
+        || report.candidate_estimates.windows(2)
+            .any(|pair| pair[0].model_pair_count >= pair[1].model_pair_count)
     {
-        return Err("power report candidate counts must be strictly increasing".to_owned());
+        return Err("power report candidate counts must be nonempty and strictly increasing".to_owned());
+    }
+    let expected_smallest = report.candidate_estimates.iter()
+        .find(|candidate| candidate.meets_preregistered_targets)
+        .map(|candidate| candidate.model_pair_count);
+    if expected_smallest != report.smallest_qualifying_model_pair_count {
+        return Err("smallest qualifying model-pair count does not match candidate results".to_owned());
+    }
+    for candidate in &report.candidate_estimates {
+        for rate in [
+            candidate.type_i_error_permille,
+            candidate.type_i_error_monte_carlo_se_permille,
+            candidate.estimated_power_permille,
+            candidate.power_monte_carlo_se_permille,
+            candidate.interval_coverage_permille,
+            candidate.interval_coverage_monte_carlo_se_permille,
+            candidate.estimated_primary_effect_sd_permille,
+            candidate.estimated_primary_effect_se_permille,
+        ].into_iter().flatten() {
+            if !rate.is_finite() || !(0.0..=1_000.0).contains(&rate) {
+                return Err("power report contains a non-finite or out-of-range rate".to_owned());
+            }
+        }
     }
     Ok(())
 }
@@ -656,6 +679,18 @@ mod tests {
         invalid.clusters_per_model_pair = 1_000;
         invalid.task_family_count = 10;
         assert!(plan_causal_power(&invalid).unwrap_err().contains("operation budget"));
+    }
+
+    #[test]
+    fn rehashed_report_with_wrong_selected_sample_size_is_rejected() {
+        let mut report = plan_causal_power(&config()).unwrap();
+        report.smallest_qualifying_model_pair_count = Some(999);
+        report.report_sha256.clear();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        report.report_sha256 = hash_domain(b"causal-power-planning-report.v1", &bytes);
+        assert!(verify_causal_power_report(&report)
+            .unwrap_err()
+            .contains("smallest qualifying"));
     }
 
     #[test]
