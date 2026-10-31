@@ -2041,9 +2041,15 @@ mod tests {
 
         let other_budget = sparse.forward_cause_likelihood_iit4(&[0, 1], &state, 1 << 17).unwrap();
         assert_ne!(report.receipt_sha256().unwrap(), other_budget.receipt_sha256().unwrap());
+        assert_eq!(
+            report.predicted_peak_factor_entries,
+            report.peak_factor_entries,
+            "preflight prediction must match the observed factor-table peak"
+        );
         assert!(
-            report.predicted_peak_factor_entries >= report.peak_factor_entries,
-            "preflight prediction must cover observed factor-table peak"
+            report.posterior_predicted_peak_factor_entries <= report.predicted_peak_factor_entries
+                && report.maximum_target_predicted_peak_factor_entries
+                    <= report.predicted_peak_factor_entries
         );
 
         let mut changed_prediction = report.clone();
