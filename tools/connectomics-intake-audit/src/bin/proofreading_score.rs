@@ -83,6 +83,10 @@ struct Args {
     #[arg(long, default_value_t = 500)]
     bootstrap_replicates: usize,
 
+    /// Conditional-IID calibration-null simulations; at least 100 required.
+    #[arg(long, default_value_t = 500)]
+    calibration_null_replicates: usize,
+
     /// Require complete domain metadata for calibration/shift diagnostics.
     #[arg(long, default_value_t = false)]
     require_domain_shift_audit: bool,
@@ -229,6 +233,22 @@ struct ConfidenceBinClusterBootstrap {
     mean_confidence_95: Option<Interval>,
 }
 
+#[derive(Debug, Serialize, PartialEq)]
+struct NullEceDistribution {
+    median: Option<f64>,
+    upper_95: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+struct CalibrationIidNullFloor {
+    assumption: &'static str,
+    requested_replicates: usize,
+    valid_replicates: usize,
+    fixed_probability_ece: NullEceDistribution,
+    adaptive_confidence_ece_15: NullEceDistribution,
+    equal_mass_reliability_ece_12: NullEceDistribution,
+}
+
 #[derive(Debug, Serialize)]
 struct OodClusterBootstrap {
     requested_replicates: usize,
@@ -248,6 +268,7 @@ struct DomainEvaluation {
     classification: ClassificationMetrics,
     calibration: CalibrationDiagnostics,
     calibration_cluster_bootstrap_95: CalibrationClusterBootstrap,
+    calibration_iid_null_floor: CalibrationIidNullFloor,
 }
 
 #[derive(Debug, Serialize)]
@@ -300,6 +321,7 @@ struct Report {
     domain_split_manifest_sha256: Option<String>,
     overall_calibration: Option<CalibrationDiagnostics>,
     overall_calibration_cluster_bootstrap_95: Option<CalibrationClusterBootstrap>,
+    overall_calibration_iid_null_floor: Option<CalibrationIidNullFloor>,
     per_domain: Option<BTreeMap<String, DomainEvaluation>>,
     ood_detector_id: Option<String>,
     ood_detector_profile_sha256: Option<String>,
@@ -757,6 +779,60 @@ fn scalar_percentile_interval(mut values: Vec<f64>, requested_replicates: usize)
         lower: percentile(&values, 0.025)?,
         upper: percentile(&values, 0.975)?,
     })
+}
+
+fn null_ece_distribution(mut values: Vec<f64>) -> NullEceDistribution {
+    values.sort_by(f64::total_cmp);
+    NullEceDistribution {
+        median: percentile(&values, 0.50),
+        upper_95: percentile(&values, 0.95),
+    }
+}
+
+fn calibration_iid_null_floor(
+    rows: &[&Prediction],
+    replicates: usize,
+    seed_material: &str,
+) -> CalibrationIidNullFloor {
+    let digest = sha256(seed_material.as_bytes());
+    let mut state = u64::from_str_radix(&digest[..16], 16).unwrap_or(1);
+    if state == 0 { state = 1; }
+    let mut fixed = Vec::with_capacity(replicates);
+    let mut adaptive = Vec::with_capacity(replicates);
+    let mut reliability = Vec::with_capacity(replicates);
+
+    for _ in 0..replicates {
+        let mut simulated = rows.iter().map(|row| (**row).clone()).collect::<Vec<_>>();
+        for row in &mut simulated {
+            let predicted_error = row.p_error >= 0.5;
+            let confidence = predicted_confidence(row);
+            let uniform = (next_u64(&mut state) >> 11) as f64 / ((1_u64 << 53) as f64);
+            let correct = uniform < confidence;
+            row.label_is_error = if predicted_error { correct } else { !correct };
+        }
+        let refs = simulated.iter().collect::<Vec<_>>();
+        let metrics = calibration_diagnostics(&refs);
+        if let (Some(f), Some(a), Some(r)) = (
+            metrics.expected_calibration_error,
+            metrics.adaptive_confidence_expected_calibration_error,
+            metrics.reliability_curve_expected_calibration_error,
+        ) {
+            if f.is_finite() && a.is_finite() && r.is_finite() {
+                fixed.push(f);
+                adaptive.push(a);
+                reliability.push(r);
+            }
+        }
+    }
+
+    CalibrationIidNullFloor {
+        assumption: "labels are conditionally independent Bernoulli draws with per-row correctness probability equal to predicted top-class confidence; this IID null is a finite-sample noise diagnostic, not a cluster-aware hypothesis test",
+        requested_replicates: replicates,
+        valid_replicates: fixed.len(),
+        fixed_probability_ece: null_ece_distribution(fixed),
+        adaptive_confidence_ece_15: null_ece_distribution(adaptive),
+        equal_mass_reliability_ece_12: null_ece_distribution(reliability),
+    }
 }
 
 fn calibration_cluster_bootstrap(
@@ -1564,6 +1640,7 @@ fn domain_shift_evaluation(
     required: bool,
     ood_threshold: Option<f64>,
     bootstrap_replicates: usize,
+    null_replicates: usize,
     seed_material: &str,
 ) -> Result<(
     &'static str,
@@ -1608,6 +1685,11 @@ fn domain_shift_evaluation(
                 &refs,
                 bootstrap_replicates,
                 &format!("{seed_material}:domain:{domain_id}:calibration"),
+            ),
+            calibration_iid_null_floor: calibration_iid_null_floor(
+                &refs,
+                null_replicates,
+                &format!("{seed_material}:domain:{domain_id}:iid-calibration-null"),
             ),
         });
     }
@@ -1721,6 +1803,9 @@ fn run() -> Result<i32, String> {
     if args.bootstrap_replicates < 100 {
         return Err("--bootstrap-replicates must be at least 100".into());
     }
+    if args.calibration_null_replicates < 100 {
+        return Err("--calibration-null-replicates must be at least 100".into());
+    }
     if let Some(threshold) = args.ood_score_threshold {
         if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
             return Err("--ood-score-threshold must be finite and in [0,1]".into());
@@ -1768,6 +1853,7 @@ fn run() -> Result<i32, String> {
         args.require_domain_shift_audit,
         args.ood_score_threshold,
         args.bootstrap_replicates,
+        args.calibration_null_replicates,
         &input_hash,
     )?;
     let refs: Vec<&Prediction> = records.iter().collect();
@@ -1777,6 +1863,15 @@ fn run() -> Result<i32, String> {
         args.bootstrap_replicates,
         &format!("{input_hash}:overall"),
     );
+    let overall_calibration_iid_null_floor = if overall_calibration.is_some() {
+        Some(calibration_iid_null_floor(
+            &refs,
+            args.calibration_null_replicates,
+            &format!("{input_hash}:overall:iid-calibration-null"),
+        ))
+    } else {
+        None
+    };
     let mut by_group: BTreeMap<String, Vec<&Prediction>> = BTreeMap::new();
     for row in &records {
         by_group.entry(row.group.clone()).or_default().push(row);
@@ -1840,6 +1935,7 @@ fn run() -> Result<i32, String> {
         domain_split_manifest_sha256: args.domain_split_manifest_sha256.clone(),
         overall_calibration,
         overall_calibration_cluster_bootstrap_95,
+        overall_calibration_iid_null_floor,
         per_domain,
         ood_detector_id: args.ood_detector_id.clone(),
         ood_detector_profile_sha256: args.ood_detector_profile_sha256.clone(),
@@ -1904,6 +2000,40 @@ mod tests {
         prediction.is_ood_domain = Some(is_ood);
         prediction.ood_score = Some(novelty);
         prediction
+    }
+
+    #[test]
+    fn conditional_iid_null_is_deterministic_and_nonzero_for_uncertain_predictions() {
+        let rows = vec![
+            row("null-1", false, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("null-2", true, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("null-3", false, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("null-4", true, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("null-5", false, 0.5, 0.5, 1.0, 1.0, "merge"),
+            row("null-6", true, 0.5, 0.5, 1.0, 1.0, "merge"),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let first = calibration_iid_null_floor(&refs, 500, "iid-null-seed");
+        let second = calibration_iid_null_floor(&refs, 500, "iid-null-seed");
+        assert_eq!(first.valid_replicates, 500);
+        assert!(first.fixed_probability_ece.median.unwrap() > 0.0);
+        assert_eq!(first.fixed_probability_ece, second.fixed_probability_ece);
+        assert_eq!(first.adaptive_confidence_ece_15, second.adaptive_confidence_ece_15);
+    }
+
+    #[test]
+    fn conditionally_perfect_confidence_has_zero_iid_calibration_noise_floor() {
+        let rows = vec![
+            row("null-perfect-1", true, 1.0, 1.0, 1.0, 1.0, "merge"),
+            row("null-perfect-2", true, 1.0, 1.0, 1.0, 1.0, "merge"),
+            row("null-perfect-3", false, 0.0, 0.0, 1.0, 1.0, "merge"),
+            row("null-perfect-4", false, 0.0, 0.0, 1.0, 1.0, "merge"),
+        ];
+        let refs = rows.iter().collect::<Vec<_>>();
+        let floor = calibration_iid_null_floor(&refs, 100, "perfect-iid-null");
+        assert_eq!(floor.fixed_probability_ece.median, Some(0.0));
+        assert_eq!(floor.adaptive_confidence_ece_15.upper_95, Some(0.0));
+        assert_eq!(floor.equal_mass_reliability_ece_12.upper_95, Some(0.0));
     }
 
     #[test]
