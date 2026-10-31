@@ -46,7 +46,7 @@ jobs:
                   for row in report["summary"]}
           assert len(rows) == len(report["summary"])
           for row in rows.values():
-              for field in ["mean_true_return", "mean_predicted_return",
+              for field in ["mean_true_return", "mean_reference_model_return", "mean_candidate_queries_per_episode",
                             "mean_optimizer_optimism_gap", "mean_selected_action_regret",
                             "selected_pocket_rate", "mean_selected_action_error",
                             "uniform_grid_prediction_mse"]:
