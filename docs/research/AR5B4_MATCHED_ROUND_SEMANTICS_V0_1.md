@@ -49,6 +49,8 @@ Pin or report model and version, prompts, context limits, tool access, agent cou
 
 ## Implemented contract
 
+The Rust contract accepts any positive seat count so it can support different system profiles. The matched benchmark protocol pins four seats per round; that experimental choice is deliberately separate from the generic validator.
+
 The v0.1 Rust module defines:
 
 - \`RoundPlan\`: immutable policy ID, seed, round index, parent-close digest, pre-round snapshot digest, cost-profile digest, required cost dimensions, claim caps, seat list and plan digest.
@@ -80,7 +82,7 @@ The ledger currently validates a caller-supplied receipt bundle. It is not a dis
 
 ## Authored tests
 
-Eleven unit tests are authored for:
+Twelve unit tests are authored for:
 
 - plan digest and seat validation;
 - duplicate action IDs;
@@ -91,7 +93,7 @@ Eleven unit tests are authored for:
 - stale snapshot / within-round feedback leakage;
 - result/action-kind mismatch;
 - failure cost accounting;
-- contiguous round and parent-close chain;
+- contiguous round and parent-close chain, including reconstruction of ledger totals and tamper rejection;
 - zero action charge rejection.
 
 These tests are authored but have **not** been compiled or executed in this authoring environment. Do not report them as passing.
