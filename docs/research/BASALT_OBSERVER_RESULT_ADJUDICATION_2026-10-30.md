@@ -21,7 +21,7 @@ The result adjudicator joins these exact artifacts and checks their byte digests
 - `benchmarks/basalt/schema/observer-receipts.v1.schema.json`: strict Draft 2020-12 observer-receipt schema.
 - `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json` plus its schema: machine-readable comparison arms, metric definitions, safety/selectivity/efficiency gates and sample-size protocol.
 - `xtask/src/main.rs`: `basalt-observer-result-audit` command.
-- Seventeen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch and incomplete receipts.
+- Nineteen Rust tests cover paired recall/selectivity, stale reuse, event loss, unrelated-resource attribution, unsupported channels, false invalidation, counterfactual output/read witnesses, worker-binary mismatch, scoped-pair completeness, cross-run/cross-catalog mismatch, incomplete receipts, and read-but-discard semantic access.
 - The adjudicator first runs the existing challenge-catalog structural auditor. Catalog validity and execution-result validity remain distinct checks.
 
 The result protocol deliberately rejects malformed, over-sized, duplicate, missing, unknown, cross-run, cross-profile, and cross-catalog records. Oracle mutation digests must be present (including explicit nulls when no mutation applies); applied mutations require distinct before/after SHA-256 values. The current 36-case catalog is the fixture definition, not evidence that any observer has executed it. The adjudicator also reports `unrelated_evidence_not_retained` separately from explicit `false_invalidations`, so unresolved or otherwise non-reused positive controls cannot disappear from the retention accounting.
@@ -182,7 +182,7 @@ Every preserve control must be paired with a capture control over the **same res
 
 ## Paradigm shift: benchmark the evidence-retention frontier
 
-The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and eight metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all four safety gates must pass before selectivity or cost can influence a promotion decision.
+The executable benchmark contract is `benchmarks/basalt/observer-evidence-retention-benchmark.v1.json`. It freezes seven matched comparison arms and ten metrics, including their numerators, denominators and targets. The protocol forbids compensating for a safety failure with a speed improvement; all six safety gates must pass before selectivity or cost can influence a promotion decision.
 
 A conventional cache benchmark tends to optimize cache hit rate and rebuild time. BASALT should instead optimize a constrained frontier:
 
