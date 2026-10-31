@@ -429,6 +429,11 @@ impl EventEnumerationQuery {
         {
             return Err("speaker attribution requires an explicit speaker ID or role".into());
         }
+        if !self.require_speaker_attribution
+            && (self.required_speaker_id.is_some() || self.required_speaker_role.is_some())
+        {
+            return Err("speaker-filtered event queries must require complete speaker attribution".into());
+        }
         Ok(())
     }
 }
@@ -892,6 +897,15 @@ mod tests {
             minimum_distinct_sessions: 1,
             minimum_independent_families: 1,
         }
+    }
+
+    #[test]
+    fn speaker_filter_cannot_be_run_with_attribution_gate_disabled() {
+        let mut request = query();
+        request.require_speaker_attribution = false;
+        assert!(request.validate().unwrap_err().contains(
+            "speaker-filtered event queries must require complete speaker attribution"
+        ));
     }
 
     #[test]
