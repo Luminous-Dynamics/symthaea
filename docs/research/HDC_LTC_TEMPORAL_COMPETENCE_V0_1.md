@@ -172,4 +172,6 @@ These are targets, not measured results:
 
 ## 11. Evidence and claim boundary
 
-The current artifact is a protocol and candidate matrix only. No Rust runner, dataset adapter, benchmark execution, model comparison, hardware measurement, or energy result is included. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
+The repository also contains an isolated, dependency-free Rust delayed-cue generator prototype under research/temporal-bench. It creates a deterministic event stream and a separate oracle record, with unit tests for reproducibility, temporal ordering, Hamming-similarity controls, uniqueness, and invalid configuration. The oracle is returned from the same process and is **not** a sealed evaluator boundary.
+
+The full multi-task generator, streaming runner, dataset adapters, separate evaluator process, benchmark execution, model comparison, hardware measurement, and energy result are not yet included. The Rust tests are authored but unrun in this environment. A passing benchmark would establish a result only for the declared tasks, splits, model versions, and hardware. It would not establish consciousness, general intelligence, universal superiority, or neuromorphic hardware efficiency if measured only on conventional CPU/GPU execution.
