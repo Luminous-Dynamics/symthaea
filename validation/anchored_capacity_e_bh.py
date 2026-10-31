@@ -59,6 +59,96 @@ def e_bh_baseline(
     }
 
 
+def anchored_e_bh_max_cardinality(
+    evalues: Sequence[int | float | str | Fraction],
+    alpha: int | float | str | Fraction,
+) -> dict:
+    """Return the largest-cardinality certified superset of ordinary e-BH.
+
+    For uniform anchored weights 1/m, let
+      h_i = alpha/m * (e_i - 1),
+      baseline = sum_i [-h_i]_+.
+    At fixed candidate size r and top-r ordered e-values, the closure load is
+      baseline + sum_{i<=r} [1/r - [h_i]_+]_+.
+    The positive terms are a suffix of the descending e-value order, so one
+    binary search plus a prefix sum evaluates each r in O(log m). Sorting
+    dominates at O(m log m), matching the paper's step-up complexity.
+    """
+    from bisect import bisect_right
+
+    e = tuple(as_fraction(x) for x in evalues)
+    a = as_fraction(alpha)
+    if not e:
+        raise ValueError("at least one e-value is required")
+    if any(x < 0 for x in e):
+        raise ValueError("e-values must be nonnegative")
+    if not 0 < a < 1:
+        raise ValueError("alpha must lie in (0,1)")
+    m = len(e)
+    ordinary = e_bh_baseline(e, a)
+    order = ordinary["ordering"]
+    h = tuple(a * (e[i] - 1) / m for i in order)
+    baseline_load = sum(
+        (max(-value, Fraction(0)) for value in h),
+        Fraction(0),
+    )
+    positive_h = tuple(max(value, Fraction(0)) for value in h)
+    negative_positive_h = tuple(-value for value in positive_h)
+    prefix = [Fraction(0)]
+    for value in positive_h:
+        prefix.append(prefix[-1] + value)
+
+    selected_k = 0
+    diagnostics = []
+    minimum_load = None
+    if ordinary["rejection_count"] == 0:
+        diagnostics.append({
+            "cardinality": 0,
+            "certified": True,
+            "closure_load": [0, 1],
+        })
+
+    for r in range(max(1, ordinary["rejection_count"]), m + 1):
+        threshold = Fraction(1, r)
+        # positive_h is nonincreasing; terms [threshold - positive_h_i]_+
+        # are positive exactly on the suffix where positive_h_i < threshold.
+        first_positive = bisect_right(negative_positive_h[:r], -threshold)
+        count = r - first_positive
+        selected_charge = count * threshold - (prefix[r] - prefix[first_positive])
+        load = baseline_load + selected_charge
+        certified = load <= a
+        diagnostics.append({
+            "cardinality": r,
+            "certified": certified,
+            "closure_load": fraction_pair(load),
+        })
+        if certified:
+            selected_k = r
+
+    mask = sum(1 << i for i in order[:selected_k])
+    if mask & ordinary["rejection_mask"] != ordinary["rejection_mask"]:
+        raise ArithmeticError("largest-cardinality candidate failed to retain e-BH baseline")
+    separator = _verify_separator(
+        e, tuple(Fraction(1, m) for _ in range(m)), (1 << m) - 1, a, mask
+    )
+    if not separator["certified"]:
+        raise ArithmeticError("step-up anchored baseline failed exact O(m) closure verification")
+    return {
+        "method": "anchored_e_bh_maximum_cardinality_step_up",
+        "baseline": ordinary,
+        "rejection_mask": mask,
+        "rejections": [i + 1 for i in range(m) if (mask >> i) & 1],
+        "rejection_count": mask.bit_count(),
+        "closure_slack": (
+            fraction_pair(separator["minimum_slack"])
+            if separator["minimum_slack"] is not None else None
+        ),
+        "worst_intersection_mask": separator["worst_intersection_mask"],
+        "complexity": "O(m log m) time, O(m) memory",
+        "cardinality_diagnostics": diagnostics,
+    }
+
+
 def anchored_local_evalue(
     evalues: Sequence[int | float | str | Fraction],
     subset_mask: int,
@@ -174,6 +264,7 @@ def select_anchored_capacity_e_bh(
             "can retain all baseline discoveries"
         )
 
+    maximum_cardinality = anchored_e_bh_max_cardinality(e, a)
     selected = select_capacity_aware_pareto(
         [[x] for x in e],
         [Fraction(1, m) for _ in range(m)],
@@ -195,6 +286,7 @@ def select_anchored_capacity_e_bh(
         ),
         "baseline_method": "e-BH",
         "baseline": baseline,
+        "anchored_max_cardinality": maximum_cardinality,
         "baseline_cost": fraction_pair(baseline_cost),
         "capacity": fraction_pair(cap),
         "local_evalue_collection": (
