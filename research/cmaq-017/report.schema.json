@@ -65,6 +65,8 @@
           "episode_count",
           "mean_return",
           "return_ci95_lower",
+          "lower_decile_mean_return",
+          "worst_episode_return",
           "return_ci95_upper",
           "paired_return_delta_vs_direct",
           "paired_delta_vs_direct_ci95_lower",
@@ -81,7 +83,9 @@
           "reference_model_false_safe_rate",
           "mean_candidate_sequence_queries",
           "mean_model_head_evaluations",
+          "mean_model_transition_evaluations",
           "mean_oracle_transition_evaluations",
+          "mean_evaluator_diagnostic_transition_evaluations",
           "mean_executed_steps"
         ],
         "properties": {
@@ -107,6 +111,8 @@
           "mean_return": { "type": "number" },
           "return_ci95_lower": { "type": "number" },
           "return_ci95_upper": { "type": "number" },
+          "lower_decile_mean_return": { "type": "number" },
+          "worst_episode_return": { "type": "number" },
           "paired_return_delta_vs_direct": { "type": "number" },
           "paired_delta_vs_direct_ci95_lower": { "type": "number" },
           "paired_delta_vs_direct_ci95_upper": { "type": "number" },
@@ -122,8 +128,10 @@
           "reference_model_false_safe_rate": { "type": "number", "minimum": 0, "maximum": 1 },
           "mean_candidate_sequence_queries": { "type": "number", "minimum": 0 },
           "mean_model_head_evaluations": { "type": "number", "minimum": 0 },
+          "mean_model_transition_evaluations": { "type": "number", "minimum": 0 },
           "mean_oracle_transition_evaluations": { "type": "number", "minimum": 0 },
-          "mean_executed_steps": { "type": "number", "minimum": 1, "maximum": 12 }
+          "mean_evaluator_diagnostic_transition_evaluations": { "type": "number", "minimum": 1, "maximum": 12 },
+          "mean_executed_steps: { "type": "number", "minimum": 1, "maximum": 12 }
         }
       }
     }
