@@ -50,10 +50,12 @@ cargo run --locked \
 - Conservative effect-confirmed alert precision is reported against all detector alerts; it is not a deployment-prevalence estimate.
 - Calibration (Brier, log loss, 10-bin ECE) is reported only when every test case has a numeric score, and its target is explicitly malicious-attempt versus benign—not successful attack effect.
 - Attack-family, adaptation-family and adaptation-family/level recall are reported separately (avoiding severity-level pseudoreplication), plus program-group and execution-group recall, with macro and worst-group outcomes.
+- Deterministic equal-group percentile bootstrap intervals (10,000 resamples) are emitted for attack-family, adaptation-family, program, execution and benign-program macro rates only when at least 10 declared independent groups exist. Resampling is at the group level, never at the window/case level. Seed derivation uses campaign ID, grouping axis and algorithm version—not prediction bytes—so matched model arms can use common resamples when group IDs match. These are descriptive intervals conditional on caller-declared independence/exchangeability, not proof of independence or family-wise population guarantees.
+- When fewer than 10 independent groups exist, point estimates and per-group support remain visible but the interval is explicitly unavailable. The nine-case known-answer fixture intentionally exercises this unavailable path.
 - The evaluator checks class/oracle consistency: benign cases must use attack/adaptation family none; malicious cases must name an attack family; named adaptation families require positive levels.
 - Benign false-alert rate is reported overall and on valid-sensor cases; valid-sensor true-negative rate excludes invalid telemetry.
 - Holdout checks require disjoint program, execution, attack-family and adaptation-family IDs across train/validation/test; the sentinel value none is excluded from attack/adaptation-family grouping for benign/no-adaptation cases.
-- Sixteen Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations.
+- Twenty-three Rust unit tests are authored, including direct attack-family and adaptation-family leakage mutations plus small-group interval suppression, reproducible equal-group bootstrap and known-answer support-count checks.
 - Sensor-invalid cases are counted separately. Any clear response on a missing, stale, misaligned, multiplexed or untrusted sensor is reported as an integrity violation.
 - Acquisition and inference nanoseconds, telemetry bytes and peak memory are summarized only where their required per-case measurements are complete. Energy is not inferred.
 
@@ -87,6 +89,8 @@ Expected evaluator-mechanics outputs:
 - end-to-end measured cost sum: 1,080 ns.
 
 These numbers are intentionally illustrative fixture behavior, not detection-performance results.
+
+The fixture has fewer than ten independent groups on every reported axis. The expected statistical-support section therefore emits no confidence intervals, even though there are nine test cases. This is intentional: raw case count is not independent-group support.
 
 Fourteen Rust unit tests cover known-answer outcomes, program/attack/adaptation-family holdout leakage, oracle/manifest class consistency, named-adaptation level semantics, attack-family macro reporting, duplicate/missing case IDs, failed/unknown effect semantics, invalid sensor clear verdicts, incomplete cost, calibration, adaptation-stratum reporting and evidence-domain separation.
 
