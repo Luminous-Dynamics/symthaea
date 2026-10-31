@@ -61,6 +61,7 @@ References:
 - Fu et al., Think-at-Hard: https://proceedings.mlr.press/v306/fu26t.html
 - Motwani et al., LongCoT: https://proceedings.mlr.press/v306/motwani26a.html
 - Pham et al., GRACE: https://aclanthology.org/2026.emnlp-main.1582/
+- Latent Recurrent Transformer: https://aclanthology.org/2026.findings-emnlp.2281/
 
 ## 1. The control object: an unresolved proof obligation
 
@@ -311,6 +312,7 @@ The latest latent-reasoning literature changes the fair baseline. A POD-Meta com
 - **Latent Recurrent Thoughts (Findings EMNLP 2026):** a small recurrent reasoner proposes/refines continuous latent thoughts while a large decoder remains frozen; the paper reports improvements over prior frozen-decoder methods and non-thinking CoT under its matched settings: https://aclanthology.org/2026.findings-emnlp.578/
 - **LOTUS (June 2026):** parallel supervision over latent thought blocks reports 2.5x–6.9x thought-phase latency reduction and closes the reported explicit-CoT gap at 3B in its evaluated tasks: https://www.microsoft.com/en-us/research/publication/bridging-the-gap-between-latent-and-explicit-reasoning-with-looped-transformers/
 - **Decoding Self-Knowledge from Latent Reasoning Models (Findings EMNLP 2026):** its probe results distinguish problem-level from rollout-level self-knowledge; it reports useful selective prediction/adaptive routing, but weak trajectory ranking among rollouts of the same problem. This is a warning against treating a model's own confidence as proof that a particular reasoning trajectory or token is correct: https://aclanthology.org/2026.findings-emnlp.1187/
+- **Latent Recurrent Transformer (Findings EMNLP 2026):** a separate paper from Latent Recurrent Thoughts. It reuses a prior token's high-level hidden state as cross-token recurrent memory while preserving the KV-cache interface and one forward per generated token; its reported experiments use about 2x ideal token compute in training and show 9% decoding-latency overhead over a standard Transformer. This is a relevant architecture comparator for temporal latent state, not a drop-in proof system: https://aclanthology.org/2026.findings-emnlp.2281/
 
 These are paper-reported results under each paper's own datasets, model sizes and protocols. They are not directly comparable to POAR and are not Symthaea measurements. Reproduce the official settings before ranking against them.
 
@@ -318,7 +320,8 @@ These are paper-reported results under each paper's own datasets, model sizes an
 
 Add two arms to the language-mediated comparison where code, model weights, license, and compute permit:
 - **D7: selective latent iteration** (Think-at-Hard-style token/step gating), with iteration decisions logged before outcomes;
-- **D8: latent self-knowledge adaptive routing**, reporting problem-level selective prediction separately from within-problem rollout selection.
+- **D8: latent self-knowledge adaptive routing**, reporting problem-level selective prediction separately from within-problem rollout selection;
+- **D9: Latent Recurrent Transformer-style cross-token recurrent memory**, matched by effective training/inference compute and a frozen decoder where available. Do not conflate this architecture with Latent Recurrent Thoughts; report latency overhead and KV-cache compatibility separately.
 
 Add metrics for optional-iteration skip rate, iteration-induced regression rate (a correct pre-iteration result made incorrect by another loop), and decision-quality change per joule / wall-clock second. At matched answer accuracy, coverage and proof-integrity gates, target at least 90% optional-iteration avoidance on the predeclared easy/cached slice; treat this as a stretch target, not an expectation across hard cases. The key ablation is whether proof-obligation deltas improve *which* operation/iteration is chosen beyond latent confidence alone.
 
