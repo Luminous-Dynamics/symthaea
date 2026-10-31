@@ -579,7 +579,7 @@ mod tests {
     #[test]
     fn fixture_exposes_query_sensitive_to_reconstruction_and_robust_control_query() {
         let input = fixture();
-        let bytes = serde_json::to_vec(&input).expect("fixture serialization should succeed");
+        let bytes = b"synthetic-input";
         let report = run(&input, &bytes).expect("finite scenario fixture should evaluate");
         assert_eq!(report.probability_claim, "NONE_FINITE_SCENARIO_SET_ONLY");
         let path = report
@@ -612,7 +612,7 @@ mod tests {
     fn scenario_result_order_is_canonical() {
         let mut input = fixture();
         input.scenarios.reverse();
-        let bytes = serde_json::to_vec(&input).unwrap();
+        let bytes = b"synthetic-input";
         let report = run(&input, &bytes).unwrap();
         let ids = report.queries[0]
             .scenario_results
