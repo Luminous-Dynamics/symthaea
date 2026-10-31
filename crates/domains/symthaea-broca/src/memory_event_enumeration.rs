@@ -908,6 +908,63 @@ mod tests {
         ));
     }
 
+    #[derive(Deserialize)]
+    struct ClosedWorldFixtureFile {
+        schema_version: String,
+        protocol_version: String,
+        case_count: usize,
+        cases: Vec<ClosedWorldFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct ClosedWorldFixtureCase {
+        case_id: String,
+        inventory_complete: bool,
+        extraction_complete: bool,
+        speaker_attribution_complete: bool,
+        matching_event_count: usize,
+        answer_is_permitted: bool,
+    }
+
+    #[test]
+    fn versioned_closed_world_fixture_matches_protocol_contract() {
+        let raw = include_str!(
+            "../../../../research/broca-bitemporal-evaluation-v1/closed-world-event-fixtures-v1.json"
+        );
+        let fixture: ClosedWorldFixtureFile = serde_json::from_str(raw).unwrap();
+        assert_eq!(fixture.schema_version, "broca-closed-world-event-fixtures-v1");
+        assert_eq!(fixture.protocol_version, EVENT_ENUMERATION_PROTOCOL_VERSION);
+        assert_eq!(fixture.case_count, 4);
+        assert_eq!(fixture.case_count, fixture.cases.len());
+
+        let complete = fixture.cases.iter()
+            .find(|case| case.case_id == "complete-inventory-complete-extraction-trusted-speakers")
+            .unwrap();
+        assert!(complete.inventory_complete);
+        assert!(complete.extraction_complete);
+        assert!(complete.speaker_attribution_complete);
+        assert_eq!(complete.matching_event_count, 1);
+        assert!(complete.answer_is_permitted);
+
+        let incomplete = fixture.cases.iter()
+            .find(|case| case.case_id == "truncated-inventory")
+            .unwrap();
+        assert!(!incomplete.inventory_complete);
+        assert!(!incomplete.answer_is_permitted);
+
+        let unknown_speaker = fixture.cases.iter()
+            .find(|case| case.case_id == "potentially-relevant-event-with-unknown-speaker")
+            .unwrap();
+        assert!(!unknown_speaker.speaker_attribution_complete);
+        assert!(!unknown_speaker.answer_is_permitted);
+
+        let unsupported = fixture.cases.iter()
+            .find(|case| case.case_id == "unsupported-source-explicit-disposition")
+            .unwrap();
+        assert!(!unsupported.extraction_complete);
+        assert!(!unsupported.answer_is_permitted);
+    }
+
     #[test]
     fn closed_world_count_uses_user_speaker_and_excludes_assistant_advice() {
         let (inventory, admissions) = inventory_and_admissions();
