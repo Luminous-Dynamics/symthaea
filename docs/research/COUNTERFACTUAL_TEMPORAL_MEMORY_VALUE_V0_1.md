@@ -36,7 +36,7 @@ The retain and evict arms must differ only in the declared intervention item set
 
 The evaluator deterministically randomizes whether retain or evict is executed first using an evaluator-held seed and records the first treatment. This uses SplitMix64 for reproducibility only; it is not a cryptographic random generator or secrecy boundary. The seed must not be exposed to candidate processes.
 
-Each run reports actual bytes, compute, refresh count, observations, read bytes, write bytes and optional calibrated energy. Declared resource caps are enforced against actual use. Energy-budgeted runs require an energy measurement; absence is not interpreted as zero energy.
+Each run reports actual bytes, retained byte-microseconds, compute, refresh count, observations, read bytes, write bytes and optional calibrated energy. Declared resource caps are enforced against actual use. Energy-budgeted runs require an energy measurement; absence is not interpreted as zero energy.
 
 ## 3. Interaction effects and exact small-subset oracle
 
