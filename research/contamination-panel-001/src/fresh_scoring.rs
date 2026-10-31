@@ -240,6 +240,14 @@ fn validate_bundle(
     ] {
         validate_digest(digest, label)?;
     }
+    crate::fresh_instance::parse_timestamp(
+        &manifest.checkpoint_frozen_at_utc,
+        "checkpoint_frozen_at_utc",
+    )?;
+    crate::fresh_instance::parse_timestamp(
+        &manifest.challenge_generated_at_utc,
+        "challenge_generated_at_utc",
+    )?;
     validate_digest(&manifest.checkpoint_freeze_receipt_sha256, "checkpoint_freeze_receipt_sha256")?;
     if public_packet_digest(public)? != public.public_packet_sha256 {
         return Err("public packet digest does not match contents".to_owned());
@@ -295,8 +303,12 @@ fn validate_bundle(
         return Err("public task and sealed oracle item IDs must be unique and identical".to_owned());
     }
     let mut answers = BTreeMap::new();
+    let mut task_text_digests = BTreeSet::new();
     for task in &public.tasks {
         validate_digest(&task.task_text_sha256, "task_text_sha256")?;
+        if !task_text_digests.insert(task.task_text_sha256.as_str()) {
+            return Err("public packet contains duplicate task text digests".to_owned());
+        }
         if hash_domain(b"fresh-task-text.v1", task.task_text.as_bytes())
             != task.task_text_sha256
         {
@@ -340,6 +352,36 @@ fn submission_digest(submission: &FreshAnswerSubmissionV1) -> Result<String, Str
 
 fn response_digest(response_text: &str) -> String {
     hash_domain(b"fresh-model-response.v1", response_text.as_bytes())
+}
+
+pub fn verify_fresh_score_report_integrity(report: &FreshScoreReportV1) -> Result<(), String> {
+    if report.schema != FRESH_SCORE_REPORT_SCHEMA || report.metric_id != FRESH_EXACT_METRIC_ID {
+        return Err("fresh score report schema or metric identifier is invalid".to_owned());
+    }
+    validate_digest(&report.report_sha256, "report_sha256")?;
+    let mut normalized = report.clone();
+    normalized.report_sha256.clear();
+    let bytes = serde_json::to_vec(&normalized)
+        .map_err(|error| format!("cannot serialize normalized score report: {error}"))?;
+    if hash_domain(b"fresh-instance-score-report.v1", &bytes) != report.report_sha256 {
+        return Err("fresh score report digest does not match contents".to_owned());
+    }
+    let total = report.correct_count
+        .checked_add(report.incorrect_count)
+        .and_then(|value| value.checked_add(report.invalid_format_count))
+        .and_then(|value| value.checked_add(report.abstained_count))
+        .ok_or_else(|| "fresh score report count partition overflowed".to_owned())?;
+    if total != report.item_count
+        || report.answered_count != report.item_count.saturating_sub(report.abstained_count)
+        || report.valid_format_response_count != report.correct_count + report.incorrect_count
+        || report.independently_verified
+    {
+        return Err("fresh score report count partition or trust boundary is invalid".to_owned());
+    }
+    if report.items.len() as u64 != report.item_count {
+        return Err("fresh score report item outcomes do not cover item_count".to_owned());
+    }
+    Ok(())
 }
 
 fn optional_rate(numerator: u64, denominator: u64) -> Option<f64> {
@@ -814,6 +856,16 @@ mod tests {
             serde_json::to_value(&submission.responses[0]).unwrap();
         response_json["expected_answer"] = serde_json::json!({"x": 1, "y": 2});
         assert!(serde_json::from_value::<FreshResponseRecordV1>(response_json).is_err());
+    }
+
+    #[test]
+    fn report_integrity_verifier_detects_field_mutations() {
+        let bundle = generate_fresh_challenge_bundle(&config(), &seed()).unwrap();
+        let mut report = score(&bundle, exact_responses(&bundle));
+        assert!(verify_fresh_score_report_integrity(&report).is_ok());
+        report.correct_count -= 1;
+        assert!(verify_fresh_score_report_integrity(&report)
+            .unwrap_err().contains("digest does not match"));
     }
 
     #[test]
