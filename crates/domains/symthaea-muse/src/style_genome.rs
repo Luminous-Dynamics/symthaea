@@ -437,7 +437,7 @@ impl GenomeArchive {
         copy.archive_sha256.clear();
         let bytes = serde_json::to_vec(&copy)
             .map_err(|error| GenomeIssue::new("archive_serialization_failed", error.to_string()))?;
-        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v1\\n", &bytes))
+        Ok(domain_sha256(b"symthaea:muse-style-genome-archive:v1\n", &bytes))
     }
 
     /// Detect tampering, duplicate IDs, changed candidate receipts, mixed
