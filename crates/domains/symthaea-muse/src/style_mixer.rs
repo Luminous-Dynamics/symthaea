@@ -481,8 +481,8 @@ pub fn compose_hybrid_style(
 
 fn process_cell_bank_shapes_match(owner: &CompositionSpec, donor: &CompositionSpec) -> bool {
     fn bank_shape_matches(
-        owner: &[Vec<symthaea_music_theory::SpecNote>],
-        donor: &[Vec<symthaea_music_theory::SpecNote>],
+        owner: &[Vec<symthaea_music_theory::spec::SpecNote>],
+        donor: &[Vec<symthaea_music_theory::spec::SpecNote>],
     ) -> bool {
         owner.len() == donor.len()
             && owner
