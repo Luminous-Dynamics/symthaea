@@ -432,6 +432,7 @@ mod tests {
                 }],
                 minimum_independent_families: 1,
                 minimum_distinct_sessions: 0,
+                minimum_user_authored_evidence: 0,
                 selection_overhead_tokens: 3,
             }],
         }
@@ -822,6 +823,7 @@ mod tests {
             source_span_end: 3,
             source_family_id: "family-old".into(),
             source_session_id: Some("session-old".into()),
+            source_speaker: None,
             scope_id: "scope-1".into(),
             payload_sha256: digest("old"),
             source_span_sha256: digest("old"),
