@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-025 — replay-verified FluidSynth support adapter
 
-**Status:** adapter and seven focused source tests authored; no compile, test, real FluidSynth render or dataset run claimed.
+**Status:** adapter and seven focused source tests authored; EVAL-035 adds separately replayable raw and temporally qualified support. No compile, test, real FluidSynth render or dataset run is claimed.
 
 ## Objective
 
@@ -12,7 +12,7 @@ Convert replay-verified EVAL-017 per-event acoustic-influence reports into the e
 2. Each render is bound to its exact Score, MIDI bytes, performed-event map artifact, WAV/decoded PCM, renderer executable/SoundFont hashes, process exit and ordered argv using `RendererExecutionReceipt`.
 3. `verify_renderer_audio_binding_for_score` reconstructs the performed-event map from MIDI bytes and returns an opaque `VerifiedRendererAudioBinding`.
 4. At least three independent no-op rerenders establish the per-window/channel repeatability floor. `verify_repeatability_calibration` replays this calibration and returns an opaque `VerifiedRepeatabilityCalibration`.
-5. `measure_counterfactual_influence` computes measured support against that calibration. `verify_counterfactual_influence` replays the report from the exact source Score, maps, schedules, receipts, audio buffers and calibration.
+5. `measure_counterfactual_influence` computes raw enter-threshold crossings and versioned hysteresis-qualified support against that calibration. `verify_counterfactual_influence` replays the per-window trace, temporal policy and output intervals from the exact source Score, maps, schedules, receipts, audio buffers and calibration.
 6. `verify_counterfactual_event_support` refuses to create planner evidence unless step 5 passes. It binds the evidence to the canonical source event ID and typed effects-group assignment.
 7. `assemble_counterfactual_support_adapter_report` requires exactly one event record for each source Score index, then produces an opaque aggregate verification token.
 8. `verify_counterfactual_support_adapter_report` independently replays all EVAL-017 reports before returning that token from a serialized report. Only the opaque verified aggregate exposes `planner_event_supports()` for EVAL-019.
@@ -27,12 +27,16 @@ The adapter rebuilds and replay-verifies the EVAL-029 `FluidSynthEffectsGroupAss
 
 ### Support interval and digest contract
 
-- `acoustic_support` is copied from `CounterfactualInfluenceReport.measured_influence_intervals`.
+- `support.acoustic_support` is copied from `CounterfactualInfluenceReport.qualified_support_intervals`; planner input never consumes raw isolated threshold crossings.
+- `raw_measured_support` separately retains the raw `measured_influence_intervals` for audit and diagnosis.
 - Starts remain inclusive and ends exclusive.
-- The interval horizon is `report.total_frames`: the rendered PCM output frame count. It can include release/reverb tails beyond input MIDI duration.
+- All intervals use `report.total_frames`: the rendered PCM output frame count. It can include release/reverb tails beyond input MIDI duration.
+- EVAL-017 v0.2 stores the full ordered per-window/per-channel trace, enter and release thresholds, raw detection, release detection, qualified membership, and bridged-gap flags.
+- The replay-bound `InfluenceSupportPolicy` has a release ratio, minimum active-window count, maximum bridged gap and explicit tail-extension frame bound. Tail extension is conservative post-processing, not an observed-effect claim; the applied frame count is reported and clamped to the exact output horizon.
+- Measured-empty scans remain empty even when a nonzero tail-extension policy is configured.
 - Every event receives a domain-separated SHA-256 support evidence digest, even when its measured interval list is empty.
 - Empty intervals plus digest mean the full output scan replayed and found no windows above the declared repeatability/absolute thresholds. It does not prove zero physical influence.
-- The per-event digest commits to the influence report receipt, source Score, event identity, baseline/counterfactual render receipts/audio, repeatability calibration, renderer profile, effects-group assignment, output format/horizon, measured intervals and route-domain metadata.
+- The per-event digest commits to the influence report receipt (including policy and trace), source Score, event identity, baseline/counterfactual render receipts/audio, repeatability calibration, renderer profile, effects-group assignment, output format/horizon, raw measured intervals, qualified intervals and route-domain metadata.
 - The aggregate receipt commits to the canonical ordered event records and common baseline/render context.
 - The serialized report is not itself a planner authorization. A caller must replay it to obtain `VerifiedCounterfactualSupportAdapterReport`.
 
@@ -58,7 +62,7 @@ The existing `validate_intervention` currently admits only `EventIntervention::R
 
 ## Next qualification steps
 
-1. Compile and run the focused Rust tests on a Rust-enabled runner.
+1. Compile and run the focused Rust tests on a Rust-enabled runner, including the EVAL-035 hysteresis/gap/tail controls.
 2. Execute the same baseline + three no-op calibration + one remove-one-event pair for every source event with real FluidSynth and a pinned SoundFont.
 3. Verify every event has a replayable report and every support digest matches the exact source Score/MIDI/map/renderer profile.
 4. Measure the 1/4/16/128 group matrix on matched pairs; report support intervals and cross-channel interaction reduction independently.
