@@ -792,7 +792,7 @@ fn run(input: &Input, input_bytes: &[u8], truth_bytes: Option<&[u8]>, tolerance_
             methods
         },
         status: if truth.is_some() { "SYNTHETIC_OR_HELD_OUT_EVALUATED_NOT_PROMOTED" } else { "PROPOSALS_ONLY_NOT_EVALUATED" },
-        information_flow: "Detector consumes only the exact profile input. Ground-truth boundary labels are parsed only after both candidate lists have been generated, are byte-bound to the exact input SHA-256, and are used only for evaluation.",
+        information_flow: "Detector consumes only the exact profile input. Ground-truth boundary labels are parsed only after all V1 and V2 candidate lists have been generated, are byte-bound to the exact input SHA-256, and are used only for evaluation.",
         scope_note: "Synthetic ordered 1D morphology profiles only. The optional physical-arclength mode compares deterministic piecewise-linear and nearest-source-observation resampling on a fixed nm grid, with half-window derived from physical length; both fixed score variants remain heuristic and not statistically calibrated. This does not inspect EM images, meshes, or skeleton geometry; does not identify a biological false merge; and does not justify automatic edits. A positive score is a human-review proposal only.",
     })
 }
@@ -1045,8 +1045,8 @@ mod tests {
     }
 
     #[test]
-    fn physical_mode_detects_same_physical_boundary_across_source_sampling_densities() {
-        let mut detected_positions = Vec::<Vec<f64>>::new();
+    fn physical_nearest_observation_mode_localizes_step_within_source_resolution_bound() {
+        let mut detected_positions = Vec::<(usize, Vec<f64>)>::new();
         for spacing_nm in [25_usize, 50, 100, 200] {
             let track = make_sampled_track("same-physical-step", spacing_nm, |x| {
                 if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
@@ -1054,22 +1054,51 @@ mod tests {
             let mut input = base_input(vec![track]);
             enable_physical_mode(&mut input, 25.0, 400.0);
             validate_input(&input).unwrap();
-            let (physical_input, report) = build_physical_resampled_input(&input, ResamplingInterpolation::PiecewiseLinear).unwrap();
+            let (physical_input, report) = build_physical_resampled_input(
+                &input,
+                ResamplingInterpolation::NearestObservation,
+            ).unwrap();
             let physical_input = physical_input.expect("physical mode should be enabled");
             let report = report.expect("resampling report should be present");
             assert_eq!(report.interval_nm, 25.0);
             assert_eq!(report.half_window_nm, 400.0);
             assert_eq!(report.effective_half_window_samples, 16);
+            assert_eq!(report.interpolation, "nearest_source_observation_on_uniform_arclength_grid_v1");
             assert_eq!(physical_input.tracks[0].samples.len(), 401);
             let candidates = detect(&physical_input, false);
             let positions = candidates.iter().map(|candidate| candidate.boundary_nm).collect::<Vec<_>>();
-            assert!(!positions.is_empty(), "spacing={spacing_nm} produced no physical candidate");
-            assert!(positions.iter().any(|position| (*position - 5_000.0).abs() <= 25.0),
-                "spacing={spacing_nm} positions={positions:?}");
-            detected_positions.push(positions);
+            assert_eq!(positions.len(), 1, "spacing={spacing_nm} positions={positions:?}");
+            let allowed_error_nm = spacing_nm as f64 / 2.0 + 25.0;
+            assert!((positions[0] - 5_000.0).abs() <= allowed_error_nm,
+                "spacing={spacing_nm} positions={positions:?} allowed_error={allowed_error_nm}");
+            detected_positions.push((spacing_nm, positions));
         }
-        assert!(detected_positions.windows(2).all(|pair| pair[0] == pair[1]),
-            "physical proposals changed across source sampling densities: {detected_positions:?}");
+        assert!(detected_positions.windows(2).all(|pair| {
+            let left_error = (pair[0].1[0] - 5_000.0).abs();
+            let right_error = (pair[1].1[0] - 5_000.0).abs();
+            (left_error <= pair[0].0 as f64 / 2.0 + 25.0)
+                && (right_error <= pair[1].0 as f64 / 2.0 + 25.0)
+        }));
+    }
+
+    #[test]
+    fn physical_linear_and_nearest_policies_are_both_reported_separately() {
+        let track = make_sampled_track("same-physical-step", 100, |x| {
+            if x < 5_000.0 { (80.0, 4.0, 0.95, 0.2) } else { (48.0, 5.0, 0.80, 0.7) }
+        });
+        let mut input = base_input(vec![track]);
+        enable_physical_mode(&mut input, 25.0, 400.0);
+        let input_bytes = b"physical-mode-input";
+        let report = run(&input, input_bytes, None, 500.0).unwrap();
+        assert_eq!(report.physical_resampling.len(), 2);
+        assert!(report.physical_resampling.iter().any(|entry|
+            entry.interpolation == "piecewise_linear_on_uniform_arclength_grid_v1"));
+        assert!(report.physical_resampling.iter().any(|entry|
+            entry.interpolation == "nearest_source_observation_on_uniform_arclength_grid_v1"));
+        assert!(report.method_reports.iter().any(|method|
+            method.method == "physical_arclength_piecewise_linear_radius_only"));
+        assert!(report.method_reports.iter().any(|method|
+            method.method == "physical_arclength_nearest_observation_radius_only"));
     }
 
     #[test]
