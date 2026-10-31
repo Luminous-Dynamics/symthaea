@@ -254,6 +254,14 @@ pub fn reconcile_mechanism_matched_campaign(
                 &format!("tapes[{tape_index}].events[{event_index}].resources"),
             )?;
         }
+        if resource_totals.charged_budget_microunits
+            != summary.total_charged_budget_microunits
+        {
+            return Err(MatchedCampaignError::new(
+                format!("tapes[{tape_index}].resources.charged_budget_microunits"),
+                "independently summed receipt charges do not reconcile to the event-tape summary",
+            ));
+        }
         resource_totals_by_policy.insert(policy_id.clone(), resource_totals);
 
         if let Some(expected_campaign) = &campaign_id {
@@ -643,6 +651,11 @@ mod tests {
         assert_eq!(summary.shared_candidate_identity_count, 1);
         assert_eq!(summary.candidate_identity_shared_by_all_policies, 1);
         assert!(summary.resource_budget_qualified);
+        assert!(summary.normalized_budget_spend_matched);
+        assert_eq!(
+            summary.resource_totals_by_policy["board"].host_cpu_millis,
+            Some(12)
+        );
         assert!(summary.all_execution_schedules_complete);
     }
 
@@ -659,10 +672,12 @@ mod tests {
         let right = policy_tape("thompson", "thompson-build-1", json!({"prior": 1.0}), 0.91, false);
         let summary = reconcile_mechanism_matched_campaign(&[left, right]).unwrap();
         assert!(!summary.resource_budget_qualified);
+        assert!(summary.normalized_budget_spend_matched);
         assert_eq!(
             summary.charged_budget_by_policy_microunits.get("board"),
             Some(&Some(100))
         );
+        assert_eq!(summary.resource_totals_by_policy["board"].wall_millis, None);
     }
 
     #[test]
@@ -687,4 +702,21 @@ mod tests {
         );
         assert!(reconcile_mechanism_matched_campaign(&[left, right]).is_err());
     }
+    #[test]
+    fn unequal_normalized_spend_is_reported_as_not_matched() {
+        let left = policy_tape("board", "board-build-1", json!({"alpha": 0.5}), 0.91, false);
+        let right = policy_tape_with_budget_model(
+            "thompson",
+            "thompson-build-1",
+            json!({"prior": 1.0}),
+            0.91,
+            false,
+            H2,
+            120,
+        );
+        let summary = reconcile_mechanism_matched_campaign(&[left, right]).unwrap();
+        assert!(!summary.normalized_budget_spend_matched);
+        assert!(summary.resource_budget_qualified);
+    }
+
 }
