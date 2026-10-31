@@ -1,0 +1,491 @@
+{
+  "schema_version": "symthaea.research.hdc_ltc_fast_slow_memory_matrix.v0.1",
+  "matrix_id": "HDC-LTC-FAST-SLOW-001",
+  "title": "Regime-conditioned fast/slow HDC-LTC and continuous-time baseline bake-off",
+  "status": "preregistered_not_executed",
+  "coordinating_issue": 9369,
+  "canonical_hdc_ltc_issue": 7749,
+  "trajectory_protocol": "docs/research/DYNAMICAL_HDC_LTC_TRAJECTORY_PROTOCOL_V0_1.md",
+  "detailed_protocol": "docs/research/HDC_LTC_FAST_SLOW_MEMORY_ABLATION_V0_1.md",
+  "execution_authorized": false,
+  "no_result_values": true,
+  "baseline_source": {
+    "path": "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs",
+    "required_mode": "active_incumbent_unchanged",
+    "current_source_revision": "40c3b0e75845a20b3ef2dbbe0ea3a0af0068f4b7",
+    "implementation_summary": [
+      "equilibrium = activation(bundle(bind(weight_hv,state), bind(input_mask,input), optional_fourier_basis))",
+      "tau uses state norm and input similarity to tau_modulator, clamped to [0.01,10.0]",
+      "gate uses state/input bundle similarity and gate bias followed by sigmoid and dt scaling",
+      "closed-form update interpolates state toward equilibrium"
+    ],
+    "stored_continuous_hv_vectors_per_neuron": 8,
+    "default_dimension": 16384,
+    "bytes_per_continuous_hv_f32_vector_at_default_dimension": 65536,
+    "source_derived_vector_payload_bytes_per_neuron_at_default_dimension": 524288,
+    "storage_note": "Source-derived payload estimate only; excludes Vec/allocator overhead, inputs, temporary binds/bundles/equilibrium, network buffers and measured runtime RSS."
+  },
+  "ablation_arms": [
+    {
+      "id": "A0",
+      "name": "active_incumbent",
+      "fast_path": "active_full_width",
+      "slow_path": "disabled",
+      "role": "exact_baseline"
+    },
+    {
+      "id": "A1",
+      "name": "allocated_context_unread",
+      "fast_path": "active_full_width",
+      "slow_path": "allocated_but_not_read",
+      "role": "allocation_and_overhead_control"
+    },
+    {
+      "id": "A2",
+      "name": "tau_only",
+      "fast_path": "active_full_width",
+      "slow_path": "modulates_tau_only",
+      "role": "isolates_time_constant_effect"
+    },
+    {
+      "id": "A3",
+      "name": "gate_only",
+      "fast_path": "active_full_width",
+      "slow_path": "modulates_gate_logit_only",
+      "role": "isolates_gating_effect"
+    },
+    {
+      "id": "A4",
+      "name": "tau_and_gate",
+      "fast_path": "active_full_width",
+      "slow_path": "modulates_tau_and_gate_logit",
+      "role": "combined_candidate"
+    },
+    {
+      "id": "A5",
+      "name": "reduced_fast_only",
+      "fast_path": "reduced_width",
+      "slow_path": "disabled",
+      "role": "compression_only_control"
+    },
+    {
+      "id": "A6",
+      "name": "reduced_fast_plus_slow",
+      "fast_path": "reduced_width",
+      "slow_path": "compact_context",
+      "role": "compressed_candidate"
+    },
+    {
+      "id": "A7",
+      "name": "slow_only",
+      "fast_path": "disabled",
+      "slow_path": "slow_context_only",
+      "role": "negative_control_not_promotable"
+    },
+    {
+      "id": "A8",
+      "name": "stale_context",
+      "fast_path": "active_or_reduced",
+      "slow_path": "frozen_or_deliberately_stale",
+      "role": "context_use_negative_control"
+    },
+    {
+      "id": "A9",
+      "name": "context_reset",
+      "fast_path": "active_or_reduced",
+      "slow_path": "explicitly_reset",
+      "role": "recovery_lifecycle_control"
+    }
+  ],
+  "dimensions": {
+    "semantic_widths": [
+      16384,
+      32768,
+      65536,
+      131072,
+      262144
+    ],
+    "initial_semantic_width": 16384,
+    "fast_dynamical_widths": [
+      1024,
+      4096,
+      16384,
+      32768
+    ],
+    "slow_context_dimensions": [
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "note": "Semantic width, fast dynamical width and slow context dimension are independent axes. 128K/256K semantic tiers remain exploratory under the existing trajectory gates."
+  },
+  "summary_methods": [
+    {
+      "id": "signed_countsketch",
+      "persistent_memory_order": "O(d)",
+      "summary_cost_order": "O(D)",
+      "parameters": "fixed deterministic hash/sign mapping"
+    },
+    {
+      "id": "fixed_block_pooling",
+      "persistent_memory_order": "O(d)",
+      "summary_cost_order": "O(D)",
+      "parameters": "fixed deterministic partition and normalization"
+    },
+    {
+      "id": "dense_projection_reference",
+      "persistent_memory_order": "O(D*d)",
+      "summary_cost_order": "O(D*d)",
+      "parameters": "costly upper-bound control; all weights and reads must be counted"
+    }
+  ],
+  "slow_update_equations": {
+    "candidate": "rho = exp(-delta_simulated_time / tau_slow); m_next = rho*m + (1-rho)*z",
+    "z": "declared compact sketch of the post-fast-transition state/input summary",
+    "ordering": "Context produced after fast transition t may only be consumed by fast transition t+1 or later.",
+    "warning": "Candidate update equation, not established optimal dynamics."
+  },
+  "cadence": {
+    "fixed_step_intervals": [
+      1,
+      2,
+      4,
+      8,
+      10,
+      16
+    ],
+    "irregular_time_period_multiples_of_training_median_dt": [
+      1,
+      2,
+      4,
+      8,
+      10,
+      16
+    ],
+    "update_time_source": "elapsed_simulated_time_from_input_timestamps",
+    "forbid_wall_clock_cadence": true,
+    "forbid_call_count_as_irregular_time_proxy": true
+  },
+  "adaptive_policy": {
+    "id": "innovation_threshold_with_max_staleness",
+    "novelty_threshold_development_percentiles": [
+      50,
+      75,
+      90
+    ],
+    "components": [
+      "threshold_only",
+      "max_age_only",
+      "periodic_only",
+      "threshold_plus_max_age"
+    ],
+    "maximum_staleness_required": true,
+    "threshold_frozen_before_confirmatory_test": true,
+    "metric": "task_utility_or_retention_per_slow_context_write_byte"
+  },
+  "task_families": [
+    {
+      "id": "s_mnist",
+      "family": "sequence_vision",
+      "dataset": "S-MNIST",
+      "regime": [
+        "fixed_dt",
+        "long_horizon"
+      ]
+    },
+    {
+      "id": "ps_mnist",
+      "family": "sequence_vision",
+      "dataset": "PS-MNIST",
+      "regime": [
+        "fixed_dt",
+        "long_horizon"
+      ]
+    },
+    {
+      "id": "shd",
+      "family": "event_audio",
+      "dataset": "SHD",
+      "regime": [
+        "irregular_dt",
+        "event_driven",
+        "bursty"
+      ]
+    },
+    {
+      "id": "ssc",
+      "family": "event_audio",
+      "dataset": "SSC",
+      "regime": [
+        "irregular_dt",
+        "event_driven",
+        "bursty"
+      ]
+    },
+    {
+      "id": "dvs_gesture",
+      "family": "event_vision",
+      "dataset": "DVS Gesture",
+      "regime": [
+        "event_driven",
+        "bursty"
+      ]
+    },
+    {
+      "id": "symthaea_temporal_associative_recall",
+      "family": "symthaea_native",
+      "owner_issue": 7749,
+      "requires_pinned_corpus": true
+    },
+    {
+      "id": "symthaea_streaming_sequence_classification",
+      "family": "symthaea_native",
+      "owner_issue": 7749,
+      "requires_pinned_corpus": true
+    },
+    {
+      "id": "symthaea_temporal_prediction_control",
+      "family": "symthaea_native",
+      "owner_issue": 7749,
+      "requires_pinned_corpus": true
+    },
+    {
+      "id": "symthaea_edge_state_update",
+      "family": "symthaea_native",
+      "owner_issue": 7749,
+      "requires_pinned_corpus": true
+    },
+    {
+      "id": "dfa_cfcn_physical_dynamics",
+      "family": "continuous_time_external",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_split_and_preprocessing": true
+    },
+    {
+      "id": "dfa_cfcn_human_activity",
+      "family": "continuous_time_external",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_split_and_preprocessing": true,
+      "public_code_audit": {
+        "source": "basic continuous time series modelling tasks/duv_person_activity.py",
+        "blob_sha": "ee684aef95386d680ea8306abf14c05a5eb1bec7",
+        "window_length": 50,
+        "window_stride": 25,
+        "random_split_after_windowing": true,
+        "split_fraction_train": 0.8,
+        "train_test_split_seed": 42,
+        "observed_validation_uses_test_loader": true,
+        "leakage_risk": "Overlapping windows from one original record may occur in both train and test.",
+        "confirmatory_rule": "Split by original record/subject before windowing; use separate dev and one-shot confirmatory test."
+      }
+    },
+    {
+      "id": "dfa_cfcn_physionet",
+      "family": "continuous_time_external",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_split_and_preprocessing": true
+    },
+    {
+      "id": "dfa_cfcn_xco2_remote_sensing",
+      "family": "continuous_time_external",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_split_and_preprocessing": true
+    },
+    {
+      "id": "dfa_cfcn_imdb_sentiment",
+      "family": "continuous_time_external",
+      "dataset": "IMDb sentiment",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_sequence_form_and_preprocessing": true,
+      "condition": "Include only if the original paper task's sequential formulation, input order, split and preprocessing can be reproduced."
+    },
+    {
+      "id": "dfa_cfcn_multi_energy_forecasting",
+      "family": "continuous_time_external",
+      "paper_baseline": "DFA-CfN/PRDFA-CfN",
+      "requires_original_split_and_preprocessing": true
+    }
+  ],
+  "external_baselines": [
+    {
+      "id": "active_symthaea_hdc_ltc",
+      "required": true
+    },
+    {
+      "id": "symthaea_fused_closed_form",
+      "required": true,
+      "separate_approximation_track": true
+    },
+    {
+      "id": "refined_rk4_same_equations",
+      "required": true,
+      "role": "numerical_reference_not_task_model"
+    },
+    {
+      "id": "cfc_cf_s",
+      "required_when_reproducible": true
+    },
+    {
+      "id": "cfc_no_gate",
+      "required_when_reproducible": true
+    },
+    {
+      "id": "cfc_vanilla",
+      "required_when_reproducible": true
+    },
+    {
+      "id": "cfc_mm_rnn",
+      "required_when_reproducible": true
+    },
+    {
+      "id": "nialim_dfa_cfn",
+      "required_when_reproducible": true,
+      "source": "https://github.com/nuist-xf/DFA-CfNs",
+      "paper_doi": "10.1109/TNNLS.2026.3669345",
+      "reference_revision": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+      "paper_match_status": "not independently verified"
+    },
+    {
+      "id": "nialim_prdfacfn",
+      "required_when_reproducible": true,
+      "source": "https://github.com/nuist-xf/DFA-CfNs",
+      "paper_doi": "10.1109/TNNLS.2026.3669345",
+      "reference_revision": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+      "paper_match_status": "not independently verified"
+    },
+    {
+      "id": "gru_lstm_grud",
+      "required_when_task_compatible": true
+    },
+    {
+      "id": "dual_memory_snn",
+      "required_on_event_tasks": true,
+      "semantics_must_remain_distinct": true
+    }
+  ],
+  "metrics": [
+    "task_quality",
+    "trajectory_error",
+    "tau_gate_sigma_distributions",
+    "long_horizon_retention",
+    "regime_shift_recovery",
+    "persistent_state_bytes",
+    "parameter_and_momentum_bytes",
+    "temporary_and_peak_memory_bytes",
+    "allocations",
+    "slow_state_reads_writes",
+    "bytes_moved_per_fast_update",
+    "bytes_moved_per_slow_update",
+    "bytes_per_correct_decision",
+    "p50_p95_p99_end_to_end_latency",
+    "throughput",
+    "deadline_miss_rate",
+    "cold_start_and_warm_residency",
+    "snapshot_reset_migration_cost",
+    "directly_metered_energy_per_correct_outcome"
+  ],
+  "measurement_protocol": {
+    "independent_data_seeds_minimum": 5,
+    "warmup_blocks_minimum": 10,
+    "independent_measurement_blocks_minimum": 30,
+    "timed_invocations_per_block_minimum": 1000,
+    "exceptions": "For small sequence datasets where 1,000 invocations per block are not meaningful, retain paired per-sequence observations and justify the measurement unit.",
+    "uncertainty": "95% interval with resampling unit stated; cluster by sequence/subject/device where appropriate.",
+    "full_path_boundary_required": true
+  },
+  "promotion_targets": {
+    "context_disabled_output_identity": "exact",
+    "classification_degradation_max_percentage_points": 1,
+    "regression_or_control_loss_max_relative_fraction": 0.02,
+    "compressed_fast_state_min_memory_or_traffic_reduction_fraction": 0.3,
+    "end_to_end_throughput_improvement_target": 2,
+    "whole_system_energy_reduction_target_fraction": 0.3,
+    "p95_p99_latency_regression_max_fraction": 0.05,
+    "all_values_are_targets_not_results": true
+  },
+  "holdout_policy": {
+    "hold_out_complete_workload_families_or_datasets": true,
+    "keep_repeated_sequences_in_single_partition": true,
+    "adaptive_thresholds_fit_on_training_or_development_only": true,
+    "confirmatory_test_one_shot": true
+  },
+  "literature": {
+    "dual_memory_pathways_snn": "https://www.nature.com/articles/s42256-026-01255-3",
+    "rederived_cfc_nialim": "https://ieeexplore.ieee.org/document/11424014/",
+    "neurobench": "https://www.nature.com/articles/s41467-025-56739-4",
+    "mlperf_tiny": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/"
+  },
+  "non_claims": [
+    "No Symthaea slow-context result has been measured.",
+    "No DFA-CfN/PRDFA-CfN result has been independently reproduced by this matrix.",
+    "No hardware energy or speedup is asserted.",
+    "This preregistration does not authorize production defaults or resolution promotion."
+  ],
+  "external_baseline_code_audit": {
+    "repository": "https://github.com/nuist-xf/DFA-CfNs",
+    "inspected_branch": "main",
+    "inspected_head": "f0e77101e6a22f1c87eae9b105b8cc4e1b3175b7",
+    "latest_code_commit_utc": "2025-08-17T14:20:06Z",
+    "paper_online_publication_utc": "2026-03-06",
+    "journal_issue": "IEEE Transactions on Neural Networks and Learning Systems, 37(9), September 2026",
+    "doi": "10.1109/TNNLS.2026.3669345",
+    "paper_to_public_snapshot_exact_match": "not independently verified",
+    "files": {
+      "torch_dfa": {
+        "path": "basic continuous time series modelling tasks/torch_cfc_DFA.py",
+        "blob_sha": "4cc687d49655ea6d4ef5542ed9a1b318fa302d6e"
+      },
+      "torch_prdfa": {
+        "path": "basic continuous time series modelling tasks/torch_cfc_PRDFA.py",
+        "blob_sha": "a03de948e047a555f0f30c7cc11032c61d559f22"
+      },
+      "tensorflow_dfa": {
+        "path": "basic continuous time series modelling tasks/tf_cfc_DFA.py",
+        "blob_sha": "702bd2a6f4dc112c173bdfbafaeb255852bd90c5"
+      },
+      "tensorflow_prdfa": {
+        "path": "basic continuous time series modelling tasks/tf_cfc_PRDFA.py",
+        "blob_sha": "6930fdb3fa719addd6057fc05e32c27cbf8c7899"
+      },
+      "person_activity_loader": {
+        "path": "basic continuous time series modelling tasks/duv_person_activity.py",
+        "blob_sha": "ee684aef95386d680ea8306abf14c05a5eb1bec7"
+      },
+      "person_activity_dfa_train": {
+        "path": "basic continuous time series modelling tasks/train_person_activity_DFA.py",
+        "blob_sha": "1dff77bb84966ef64130fb223c0325917995899c"
+      },
+      "person_activity_prdfa_train": {
+        "path": "basic continuous time series modelling tasks/train_person_activity_PRDFA.py",
+        "blob_sha": "86cfd6fb7e566b3b3289f9cda0d769c62980765a"
+      },
+      "physionet_train": {
+        "path": "basic continuous time series modelling tasks/train_physio.py",
+        "blob_sha": "6f9d12b213020f3a89cecac8c3f773f0cf8c1265"
+      },
+      "imdb_dfa_train": {
+        "path": "basic continuous time series modelling tasks/train_imdb_DFA.py",
+        "blob_sha": "edb50b789fc602f34b3f3964f4dbab426850aeab"
+      }
+    },
+    "observed_differences": [
+      "PyTorch uses positive time_a multiplier; TensorFlow uses negative time_a multiplier in t_sum. Backend results are not pooled without a parity explanation.",
+      "PRDFA performs Multi_period_predication pre-reconstruction before the recurrent loop; DFA disables that encoder.",
+      "PyTorch per-step memory list is cleared each forward call, consumed when return_sequences is true, but still populated for non-sequence output.",
+      "Human Activity windows are length 50 and stride 25, then window-level train_test_split randomly assigns windows: overlapping pieces of an original record may cross train/test.",
+      "Human Activity scripts use test_loader as per-epoch validation and again for final test.",
+      "Human Activity scripts call fix_seed once before five repeated eval calls, not a per-replicate independent seed reset."
+    ],
+    "human_activity_confirmatory_requirements": [
+      "Group original records/subjects before windowing; no record or overlapping window can cross partitions.",
+      "Separate train, development, confirmatory test; test is never used per epoch.",
+      "Reset and log all random seeds per replicate.",
+      "Keep source-like split only as a diagnostic, not the primary confirmatory result."
+    ],
+    "primary_reproduction_label": "reference_implementation_reproduction_until_final-paper-source-revision-is-verified",
+    "no_paper_score_claim": true
+  }
+}
