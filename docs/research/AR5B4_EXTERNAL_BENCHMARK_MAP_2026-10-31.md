@@ -156,3 +156,24 @@ Sources:
 - September 2026 robust multi-objective optimality under data uncertainty: https://link.springer.com/article/10.1007/s10479-026-07410-8
 
 This expands the immediate benchmark plan: go beyond deterministic front convergence to (1) expensive/limited evaluation budgets, (2) noisy or epistemically uncertain objective estimates, (3) constrained feasibility, (4) multimodal decision-space fronts, and (5) semantic alias/verifier failure injection. Report the applicable problem class, not one pooled score.
+
+## Latest AR-5B5 implementation tranche — 2026-10-31
+
+Three practical pieces now make this a runnable research programme rather than only a list of objectives:
+
+1. **Measured-resource adapter:** `event_tape_pareto.rs` consumes a strict EventTape and builds candidate-level quality, verification, uncertainty and resource objectives. Failed retries remain charged; proposal-generation overhead is reported separately and reconciled with whole-campaign totals. A deterministic verifier rebuilds the report from the tape and frozen mapping.
+2. **Verifier negative controls:** `semantic_alias_benchmark.rs` separates policy-visible surface forms from an evaluator-only truth key. It measures pairwise false merges/splits and downstream utility regret. Seeded corruption schedules freeze the seed, category rates and proposal-level corruptions into a separate digest, and that digest is carried into the result receipt.
+3. **Reference evolutionary baseline:** `pareto_nsga2.rs` implements deterministic NSGA-II for ZDT1 and three-objective DTLZ2, with seeded variation, binary tournament, nondominated sorting, crowding distance, exact evaluation budget, run replay verification and conversion to the same Pareto indicator path as Symthaea.
+
+### Updated competitive baseline scope
+
+PlatEMO 4.16 (released July 19, 2026) lists 360 algorithms and 630 problems, including new large-scale, expensive constrained and multimodal multi-objective coverage. This is much broader than our current ZDT1/DTLZ2 + NSGA-II starting point. Our next priorities should be cross-validation against a pinned PlatEMO 4.16 NSGA-II configuration, then MOEA/D and SMS-EMOA; add NSGA-III and RVEA for higher objective counts. Constrained DTLZ, WFG, expensive/noisy and multimodal tests should be added as separate problem classes, not pooled into one leaderboard.
+
+COCO's performance-assessment protocol supports reporting time/evaluations to reach multiple fixed indicator targets, instead of comparing only final hypervolume. It also preserves nondominated archives and versions reference values for future recalculation. We should copy this discipline: publish runlength-to-target curves and every archive point, then report HV, IGD+ and additive epsilon together.
+
+Sources:
+- PlatEMO 4.16 release notes and current algorithm/problem inventory: https://github.com/BIMK/PlatEMO/releases/tag/v4.16
+- COCO biobjective target/indicator performance assessment: https://numbbo.github.io/coco-doc/bbob-biobj/perf-assessment/
+- NSGA-II algorithm lifecycle and elitist parent/offspring selection: https://link.springer.com/article/10.1007/s42979-020-00265-1
+
+**Claim ceiling:** the new Rust NSGA-II implementation is not yet cross-checked against PlatEMO or original reference code; the synthetic alias fixture is not yet a large semantic benchmark; and all new Rust tests remain unexecuted. No algorithm is reported as outperforming SOTA.
