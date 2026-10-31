@@ -1,0 +1,781 @@
+//! HARDSEC-019 DKW-corrected Conditional Conformal Test Martingale (CCTM).
+//!
+//! Implements the published fixed-reference CCTM construction:
+//! - fixed empirical CDF per predeclared workload context;
+//! - DKW uniform confidence band for finite-reference CDF error;
+//! - corrected smoothed betting function;
+//! - predictable Online Newton Step update of eta;
+//! - context-level alpha/delta allocation with union bounds.
+//!
+//! The published theorem assumes the reference samples and the null test-score
+//! sequence are i.i.d. within each context, the score function is fixed, and
+//! context assignment does not depend on the anomaly score. The tool records
+//! these assumptions as unverified; identity digests and unique caller-declared
+//! group IDs do not prove them.
+//!
+//! Usage:
+//!   hardsec_context_cctm_monitor --plan plan.json \
+//!     --stream stream.json --receipt receipt.json
+
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::env;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+const PLAN_SCHEMA: &str = "hardsec-context-cctm-plan-v1";
+const STREAM_SCHEMA: &str = "hardsec-context-cctm-stream-v1";
+const RECEIPT_SCHEMA: &str = "hardsec-context-cctm-receipt-v1";
+const QUALIFIED_PMU: &str = "qualified_for_named_acquisition_conditions";
+const MAX_ETA: f64 = 0.5;
+
+#[derive(Debug, Clone)]
+struct ContextState {
+    reference_id: String,
+    reference_group_count: usize,
+    reference_digest: String,
+    scores: Vec<f64>,
+    alpha: f64,
+    delta: f64,
+    epsilon: f64,
+    scale: f64,
+    eta: f64,
+    ons_accumulator: f64,
+    log_wealth: f64,
+    first_alarm_sequence_index: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct Plan {
+    monitor_id: String,
+    evidence_domain: String,
+    stream_id: String,
+    evaluation_group_id: String,
+    scoring_artifact_sha256: String,
+    alpha_budget: f64,
+    delta_budget: f64,
+    smoothing_k: f64,
+    contexts: BTreeMap<String, ContextState>,
+}
+
+#[derive(Debug, Clone)]
+struct StreamRecord {
+    sequence_index: usize,
+    window_id: String,
+    context_id: String,
+    anomaly_score: f64,
+    sensor_state: String,
+    pmu_qualification_result: String,
+}
+
+#[derive(Debug, Clone)]
+struct Args {
+    plan: PathBuf,
+    stream: PathBuf,
+    receipt: PathBuf,
+}
+
+fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn nonempty(value: &str, context: &str) -> Result<(), String> {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
+        return Err(format!("{context} must be non-empty and contain no control characters"));
+    }
+    Ok(())
+}
+
+fn string_field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a str, String> {
+    let result = value.get(key).and_then(Value::as_str)
+        .ok_or_else(|| format!("{context}.{key} must be a string"))?;
+    nonempty(result, &format!("{context}.{key}"))?;
+    Ok(result)
+}
+
+fn f64_field(value: &Value, key: &str, context: &str) -> Result<f64, String> {
+    let result = value.get(key).and_then(Value::as_f64)
+        .ok_or_else(|| format!("{context}.{key} must be numeric"))?;
+    if !result.is_finite() {
+        return Err(format!("{context}.{key} must be finite"));
+    }
+    Ok(result)
+}
+
+fn usize_field(value: &Value, key: &str, context: &str) -> Result<usize, String> {
+    let raw = value.get(key).and_then(Value::as_u64)
+        .ok_or_else(|| format!("{context}.{key} must be a non-negative integer"))?;
+    usize::try_from(raw).map_err(|_| format!("{context}.{key} is outside the supported range"))
+}
+
+fn valid_sha(value: &str, context: &str) -> Result<(), String> {
+    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+        return Err(format!("{context} must be a lowercase SHA-256 digest"));
+    }
+    Ok(())
+}
+
+fn string_array(value: &Value, key: &str, context: &str) -> Result<Vec<String>, String> {
+    let values = value.get(key).and_then(Value::as_array)
+        .ok_or_else(|| format!("{context}.{key} must be an array"))?;
+    let mut seen = BTreeSet::new();
+    let mut output = Vec::with_capacity(values.len());
+    for (index, item) in values.iter().enumerate() {
+        let item = item.as_str().ok_or_else(|| format!("{context}.{key}[{index}] must be a string"))?;
+        nonempty(item, &format!("{context}.{key}[{index}]"))?;
+        if !seen.insert(item.to_owned()) {
+            return Err(format!("{context}.{key} contains duplicate entry {item}"));
+        }
+        output.push(item.to_owned());
+    }
+    Ok(output)
+}
+
+fn parse_plan(value: &Value, evaluation_group_id: &str) -> Result<Plan, String> {
+    if string_field(value, "schema_version", "plan")? != PLAN_SCHEMA {
+        return Err("unsupported CCTM plan schema_version".to_owned());
+    }
+    let monitor_id = string_field(value, "monitor_id", "plan")?.to_owned();
+    let evidence_domain = string_field(value, "evidence_domain", "plan")?.to_owned();
+    if !matches!(evidence_domain.as_str(), "synthetic_fixture" | "simulator" | "physical_hardware") {
+        return Err(format!("unsupported evidence_domain {evidence_domain}"));
+    }
+    let stream_id = string_field(value, "stream_id", "plan")?.to_owned();
+    if string_field(value, "evaluation_group_id", "plan")? != evaluation_group_id {
+        return Err("stream evaluation_group_id does not match the preregistered plan".to_owned());
+    }
+    let scoring_artifact_sha256 = string_field(value, "scoring_artifact_sha256", "plan")?.to_owned();
+    valid_sha(&scoring_artifact_sha256, "plan.scoring_artifact_sha256")?;
+    if string_field(value, "anomaly_score_direction", "plan")? != "higher_is_more_anomalous" {
+        return Err("anomaly_score_direction must be higher_is_more_anomalous".to_owned());
+    }
+    if string_field(value, "reference_update_policy", "plan")? != "immutable_no_test_time_updates" {
+        return Err("reference_update_policy must be immutable_no_test_time_updates".to_owned());
+    }
+    if string_field(value, "context_assignment_policy", "plan")? != "external_workload_metadata_not_score_derived" {
+        return Err("context_assignment_policy must be external_workload_metadata_not_score_derived".to_owned());
+    }
+    for key in [
+        "null_stream_assumption_status",
+        "reference_iid_assumption_status",
+        "context_assignment_assumption_status",
+    ] {
+        if string_field(value, key, "plan")? != "assumption_not_verified" {
+            return Err(format!("{key} must remain assumption_not_verified"));
+        }
+    }
+
+    let alpha_budget = f64_field(value, "alpha_budget", "plan")?;
+    let delta_budget = f64_field(value, "delta_budget", "plan")?;
+    if !(0.0..1.0).contains(&alpha_budget) || !(0.0..1.0).contains(&delta_budget)
+        || alpha_budget + delta_budget >= 1.0 {
+        return Err("alpha_budget and delta_budget must be in (0,1) and sum to less than one".to_owned());
+    }
+    let minimum_reference_scores = usize_field(value, "minimum_reference_scores", "plan")?;
+    if minimum_reference_scores < 2 {
+        return Err("minimum_reference_scores must be at least two".to_owned());
+    }
+    let smoothing_k = f64_field(value, "ons_smoothing_k", "plan")?;
+    if smoothing_k <= 0.0 {
+        return Err("ons_smoothing_k must be positive".to_owned());
+    }
+    if (f64_field(value, "ons_eta_bound", "plan")? - MAX_ETA).abs() > 1e-12 {
+        return Err("v1 implements the published ONS eta bound of 0.5".to_owned());
+    }
+
+    let context_values = value.get("contexts").and_then(Value::as_array)
+        .ok_or("plan.contexts must be an array")?;
+    if context_values.is_empty() {
+        return Err("plan.contexts must not be empty".to_owned());
+    }
+    let context_count = context_values.len() as f64;
+    let alpha_per_context = alpha_budget / context_count;
+    let delta_per_context = delta_budget / context_count;
+    let mut contexts = BTreeMap::new();
+    let mut all_reference_groups = BTreeSet::new();
+
+    for (index, item) in context_values.iter().enumerate() {
+        let context = format!("plan.contexts[{index}]");
+        let context_id = string_field(item, "context_id", &context)?.to_owned();
+        let reference_id = string_field(item, "reference_id", &context)?.to_owned();
+        let reference_group_ids = string_array(item, "reference_group_ids", &context)?;
+        let score_values = item.get("reference_scores").and_then(Value::as_array)
+            .ok_or_else(|| format!("{context}.reference_scores must be an array"))?;
+        if score_values.len() < minimum_reference_scores {
+            return Err(format!("{context} has {} reference scores; at least {minimum_reference_scores} are required", score_values.len()));
+        }
+        // The DKW construction assumes i.i.d. reference samples. v1 requires a
+        // distinct declared group ID for each row, but cannot authenticate
+        // that those IDs are genuinely independent executions/units.
+        if reference_group_ids.len() != score_values.len() {
+            return Err(format!("{context} must provide one distinct reference_group_id per reference score"));
+        }
+        for group_id in &reference_group_ids {
+            if group_id == evaluation_group_id {
+                return Err(format!("evaluation group {evaluation_group_id} overlaps a null-reference group"));
+            }
+            if !all_reference_groups.insert(group_id.clone()) {
+                return Err(format!("reference group {group_id} is reused across context references"));
+            }
+        }
+
+        let mut scores = Vec::with_capacity(score_values.len());
+        for (score_index, score_value) in score_values.iter().enumerate() {
+            let score = score_value.as_f64()
+                .ok_or_else(|| format!("{context}.reference_scores[{score_index}] must be numeric"))?;
+            if !score.is_finite() {
+                return Err(format!("{context}.reference_scores[{score_index}] must be finite"));
+            }
+            scores.push(score);
+        }
+        scores.sort_by(f64::total_cmp);
+        let epsilon = ( (2.0 / delta_per_context).ln() / (2.0 * scores.len() as f64) ).sqrt();
+        let scale = 1.0 / (0.5 + (1.0 + smoothing_k * smoothing_k).sqrt() * epsilon);
+        let encoded = serde_json::to_vec(&scores).map_err(|e| format!("cannot encode reference scores: {e}"))?;
+        let state = ContextState {
+            reference_id,
+            reference_group_count: reference_group_ids.len(),
+            reference_digest: sha256(&encoded),
+            scores,
+            alpha: alpha_per_context,
+            delta: delta_per_context,
+            epsilon,
+            scale,
+            eta: 0.0,
+            ons_accumulator: 1.0,
+            log_wealth: 0.0,
+            first_alarm_sequence_index: None,
+        };
+        if contexts.insert(context_id.clone(), state).is_some() {
+            return Err(format!("duplicate context_id {context_id}"));
+        }
+    }
+
+    Ok(Plan {
+        monitor_id,
+        evidence_domain,
+        stream_id,
+        evaluation_group_id: evaluation_group_id.to_owned(),
+        scoring_artifact_sha256,
+        alpha_budget,
+        delta_budget,
+        smoothing_k,
+        contexts,
+    })
+}
+
+fn parse_stream(value: &Value, plan: &Plan) -> Result<Vec<StreamRecord>, String> {
+    if string_field(value, "schema_version", "stream")? != STREAM_SCHEMA {
+        return Err("unsupported CCTM stream schema_version".to_owned());
+    }
+    if string_field(value, "evidence_domain", "stream")? != plan.evidence_domain {
+        return Err("stream evidence_domain must match plan evidence_domain".to_owned());
+    }
+    if string_field(value, "stream_id", "stream")? != plan.stream_id {
+        return Err("stream_id does not match the preregistered plan".to_owned());
+    }
+    if string_field(value, "evaluation_group_id", "stream")? != plan.evaluation_group_id {
+        return Err("evaluation_group_id does not match the preregistered plan".to_owned());
+    }
+    if string_field(value, "scoring_artifact_sha256", "stream")? != plan.scoring_artifact_sha256 {
+        return Err("stream scoring_artifact_sha256 does not match the plan".to_owned());
+    }
+
+    let records = value.get("records").and_then(Value::as_array)
+        .ok_or("stream.records must be an array")?;
+    if records.is_empty() {
+        return Err("stream.records must not be empty".to_owned());
+    }
+    let mut window_ids = BTreeSet::new();
+    let mut output = Vec::with_capacity(records.len());
+    for (index, item) in records.iter().enumerate() {
+        let context = format!("stream.records[{index}]");
+        let sequence_index = usize_field(item, "sequence_index", &context)?;
+        if sequence_index != index + 1 {
+            return Err(format!("{context}.sequence_index must be contiguous from one; expected {}, got {sequence_index}", index + 1));
+        }
+        let window_id = string_field(item, "window_id", &context)?.to_owned();
+        if !window_ids.insert(window_id.clone()) {
+            return Err(format!("duplicate window_id {window_id}"));
+        }
+        let context_id = string_field(item, "context_id", &context)?.to_owned();
+        let anomaly_score = f64_field(item, "anomaly_score", &context)?;
+        let sensor_state = string_field(item, "sensor_state", &context)?.to_owned();
+        if !matches!(sensor_state.as_str(), "valid" | "missing" | "stale" | "misaligned" | "multiplexed" | "untrusted") {
+            return Err(format!("{context}.sensor_state has unsupported state {sensor_state}"));
+        }
+        let pmu_qualification_result = string_field(item, "pmu_qualification_result", &context)?.to_owned();
+        output.push(StreamRecord {
+            sequence_index,
+            window_id,
+            context_id,
+            anomaly_score,
+            sensor_state,
+            pmu_qualification_result,
+        });
+    }
+    Ok(output)
+}
+
+// Fixed-reference empirical CDF: F_hat_0(x) = #{reference <= x} / n.
+// The reference is sorted once so each stream score uses O(log n) search.
+fn empirical_cdf(reference_scores: &[f64], score: f64) -> f64 {
+    let count = reference_scores.partition_point(|reference| *reference <= score);
+    count as f64 / reference_scores.len() as f64
+}
+
+// Published conditional CTM betting function, Algorithm 1 / equations (7)-(8).
+fn cctm_bet(
+    p_value: f64,
+    eta: f64,
+    epsilon: f64,
+    smoothing_k: f64,
+    scale: f64,
+) -> Result<(f64, f64, f64), String> {
+    if !(0.0..=1.0).contains(&p_value) {
+        return Err("CCTM empirical CDF value must be in [0,1]".to_owned());
+    }
+    let root = (eta * eta + smoothing_k * smoothing_k).sqrt();
+    let g = scale * (eta * (p_value - 0.5) - root * epsilon);
+    let beta = 1.0 + g;
+    if !beta.is_finite() || beta < 0.0 || beta > 2.0 {
+        return Err(format!("CCTM betting factor {beta} lies outside [0,2]"));
+    }
+    let g_prime = scale * (p_value - 0.5 - (eta / root) * epsilon);
+    if !g_prime.is_finite() {
+        return Err("CCTM ONS derivative is non-finite".to_owned());
+    }
+    Ok((beta, g, g_prime))
+}
+
+// Published Algorithm 2 ONS update. The current observation determines eta
+// for the next observation only; eta_t is predictable at the time of betting.
+fn ons_next_eta(eta: f64, accumulator: f64, g_prime: f64, beta: f64) -> Result<(f64, f64), String> {
+    if beta <= 0.0 {
+        return Err("CCTM ONS update cannot divide by a zero betting factor".to_owned());
+    }
+    let z = g_prime / beta;
+    let next_accumulator = accumulator + z * z;
+    if !next_accumulator.is_finite() || next_accumulator <= 0.0 {
+        return Err("CCTM ONS accumulator became invalid".to_owned());
+    }
+    let next_eta = (eta + 4.0 * z / next_accumulator).clamp(-MAX_ETA, MAX_ETA);
+    if !next_eta.is_finite() {
+        return Err("CCTM ONS eta became non-finite".to_owned());
+    }
+    Ok((next_eta, next_accumulator))
+}
+
+fn abstention_reason(record: &StreamRecord, plan: &Plan) -> Option<&'static str> {
+    if record.sensor_state != "valid" {
+        return Some("invalid_sensor_state");
+    }
+    if record.pmu_qualification_result != QUALIFIED_PMU {
+        return Some("pmu_acquisition_not_qualified");
+    }
+    if !plan.contexts.contains_key(&record.context_id) {
+        return Some("unseen_workload_context");
+    }
+    None
+}
+
+fn audit_values(plan_value: &Value, stream_value: &Value, plan_bytes: &[u8], stream_bytes: &[u8]) -> Result<Value, String> {
+    let evaluation_group_id = string_field(stream_value, "evaluation_group_id", "stream")?;
+    let mut plan = parse_plan(plan_value, evaluation_group_id)?;
+    let records = parse_stream(stream_value, &plan)?;
+    let mut first_alarm_sequence_index: Option<usize> = None;
+    let mut first_alarm_context_id: Option<String> = None;
+    let mut output_records = Vec::with_capacity(records.len());
+    let mut abstention_counts: BTreeMap<String, usize> = BTreeMap::new();
+
+    for record in &records {
+        if let Some(reason) = abstention_reason(record, &plan) {
+            *abstention_counts.entry(reason.to_owned()).or_default() += 1;
+            let context_log_wealth = plan.contexts.get(&record.context_id).map(|state| state.log_wealth);
+            output_records.push(json!({
+                "sequence_index":record.sequence_index,
+                "window_id":record.window_id,
+                "context_id":record.context_id,
+                "action":if first_alarm_sequence_index.is_some() {"alert_latched_observation_abstained"} else {"abstain"},
+                "abstention_reason":reason,
+                "ecdf_value":null,
+                "betting_factor":null,
+                "log_wealth_context":context_log_wealth,
+                "threshold_context":plan.contexts.get(&record.context_id).map(|s| -s.alpha.ln())
+            }));
+            continue;
+        }
+
+        let state = plan.contexts.get_mut(&record.context_id).ok_or("context state invariant failed")?;
+        let p_value = empirical_cdf(&state.scores, record.anomaly_score);
+        let eta_used = state.eta;
+        let (beta, g, g_prime) = cctm_bet(p_value, eta_used, state.epsilon, plan.smoothing_k, state.scale)?;
+        let (eta_next, next_accumulator) = ons_next_eta(eta_used, state.ons_accumulator, g_prime, beta)?;
+        state.log_wealth = if beta == 0.0 {
+            f64::NEG_INFINITY
+        } else {
+            state.log_wealth + beta.ln()
+        };
+        state.eta = eta_next;
+        state.ons_accumulator = next_accumulator;
+        let threshold = -state.alpha.ln();
+
+        let crossing_now = state.first_alarm_sequence_index.is_none() && state.log_wealth >= threshold;
+        if crossing_now {
+            state.first_alarm_sequence_index = Some(record.sequence_index);
+            if first_alarm_sequence_index.is_none() {
+                first_alarm_sequence_index = Some(record.sequence_index);
+                first_alarm_context_id = Some(record.context_id.clone());
+            }
+        }
+        let action = if crossing_now {
+            "alarm_crossing"
+        } else if first_alarm_sequence_index.is_some() {
+            "alert_latched"
+        } else {
+            "monitoring_no_alarm_yet"
+        };
+        output_records.push(json!({
+            "sequence_index":record.sequence_index,
+            "window_id":record.window_id,
+            "context_id":record.context_id,
+            "reference_id":state.reference_id,
+            "ecdf_value":p_value,
+            "epsilon_dkw":state.epsilon,
+            "ons_eta_used":eta_used,
+            "ons_eta_next":eta_next,
+            "ons_accumulator":next_accumulator,
+            "cctm_g":g,
+            "betting_factor":beta,
+            "log_wealth_context":state.log_wealth,
+            "threshold_context":threshold,
+            "action":action,
+            "abstention_reason":null
+        }));
+    }
+
+    let context_reports: Vec<Value> = plan.contexts.iter().map(|(context_id, state)| json!({
+        "context_id":context_id,
+        "reference_id":state.reference_id,
+        "reference_digest":state.reference_digest,
+        "reference_score_count":state.scores.len(),
+        "declared_reference_independent_group_count":state.reference_group_count,
+        "alpha_allocation":state.alpha,
+        "delta_allocation":state.delta,
+        "dkw_epsilon":state.epsilon,
+        "betting_scale_C":state.scale,
+        "final_log_wealth":state.log_wealth,
+        "ons_eta_final":state.eta,
+        "ons_accumulator_final":state.ons_accumulator,
+        "first_alarm_sequence_index":state.first_alarm_sequence_index,
+        "threshold_log_wealth":-state.alpha.ln()
+    })).collect();
+
+    let result = if first_alarm_sequence_index.is_some() {
+        "alarm_threshold_crossed"
+    } else {
+        "no_alarm_threshold_crossed"
+    };
+    let valid_count = records.len() - abstention_counts.values().sum::<usize>();
+    let context_count = plan.contexts.len();
+
+    Ok(json!({
+        "schema_version":RECEIPT_SCHEMA,
+        "result":result,
+        "claim_scope":"published_dkw_corrected_cctm_mechanics_with_unverified_iid_assumptions",
+        "monitor_id":plan.monitor_id,
+        "stream_id":plan.stream_id,
+        "evidence_domain":plan.evidence_domain,
+        "evaluation_group_id":plan.evaluation_group_id,
+        "scoring_artifact_sha256":plan.scoring_artifact_sha256,
+        "inputs":{"plan_sha256":sha256(plan_bytes),"stream_sha256":sha256(stream_bytes)},
+        "reference_policy":{
+            "update_policy":"immutable_no_test_time_updates",
+            "test_time_reference_updates":0,
+            "evaluation_group_separated_from_reference_groups":true,
+            "contexts":context_reports
+        },
+        "sequential_monitor":{
+            "alpha_budget_total":plan.alpha_budget,
+            "delta_budget_total":plan.delta_budget,
+            "context_count":context_count,
+            "overall_first_alarm_sequence_index":first_alarm_sequence_index,
+            "overall_first_alarm_context_id":first_alarm_context_id,
+            "valid_observation_count":valid_count,
+            "abstention_count":abstention_counts.values().sum::<usize>(),
+            "abstention_counts_by_reason":abstention_counts,
+            "alarm_is_latched":first_alarm_sequence_index.is_some(),
+            "post_alarm_reset_count":0,
+            "window_decisions":output_records
+        },
+        "statistical_guarantees":{
+            "method":"conditional_conformal_test_martingale_with_dkw_ecdf_correction",
+            "reference_cdf_confidence":1.0-plan.delta_budget,
+            "conditional_type_i_error_budget_if_all_context_reference_bands_hold":plan.alpha_budget,
+            "unconditional_type_i_upper_bound_if_all_paper_assumptions_hold":(plan.alpha_budget+plan.delta_budget).min(1.0),
+            "null_stream_iid_assumption_status":"assumption_not_verified",
+            "reference_sample_iid_assumption_status":"assumption_not_verified",
+            "context_assignment_exogeneity_status":"assumption_not_verified",
+            "scoring_function_fixed_status":"artifact_digest_bound_not_authenticated",
+            "theorem_guarantee_status":"not_established_from_input_receipts",
+            "effective_sample_size_estimate":null,
+            "independence_status":"not_established"
+        },
+        "theoretical_contract":{
+            "null_hypothesis":"within each declared context, reference and test scores are i.i.d. from the same unknown context-specific distribution",
+            "reference_confidence_bound":"DKW epsilon = sqrt(ln(2/delta_context)/(2*n_context))",
+            "betting_function":"1 + C*(eta*(Fhat_0(x)-0.5) - sqrt(eta^2+k^2)*epsilon)",
+            "ons_update":"z=g_prime/b; a_next=a+z^2; eta_next=clip(eta+4*z/a_next,-0.5,0.5)",
+            "context_allocation":"Bonferroni alpha_context=alpha_total/K and delta_context=delta_total/K",
+            "scope":"union-bound control across the predeclared finite context set, conditional on all DKW reference bands and the within-context i.i.d./external-context assumptions"
+        },
+        "limitations":[
+            "The published CCTM theorem assumes i.i.d. null test scores and i.i.d. calibration scores within each context; it does not provide a guarantee for arbitrary autocorrelated or adversarially dependent PMU windows.",
+            "Unique reference group IDs and input digests are caller-declared; the receipt cannot authenticate group identity, independence or the actual scoring implementation.",
+            "Context assignment must be external to, and not selected from, the same anomaly score being tested; this assumption is not verified.",
+            "The monitor is a Rust implementation of the published paper equations, not yet an independent reproduction of the authors' experiment suite or a comparison against their Python package.",
+            "A boundary crossing does not establish a hardware attack or causal attack effect; it indicates score-distribution change under the supplied reference/model."
+        ]
+    }))
+}
+
+fn read_input(path: &Path, label: &str) -> Result<(Vec<u8>, Value), String> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|e| format!("cannot stat {label} {}: {e}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("{label} must be a regular non-symlink file"));
+    }
+    let bytes = fs::read(path).map_err(|e| format!("cannot read {label}: {e}"))?;
+    let value = serde_json::from_slice(&bytes).map_err(|e| format!("invalid {label} JSON: {e}"))?;
+    Ok((bytes, value))
+}
+
+fn parse_args() -> Result<Args, String> {
+    let mut plan = None;
+    let mut stream = None;
+    let mut receipt = None;
+    let mut args = env::args().skip(1);
+    while let Some(flag) = args.next() {
+        let target = match flag.as_str() {
+            "--plan" => &mut plan,
+            "--stream" => &mut stream,
+            "--receipt" => &mut receipt,
+            _ => return Err(format!("unknown argument {flag}")),
+        };
+        let path = args.next().ok_or_else(|| format!("{flag} requires a path"))?;
+        if target.replace(PathBuf::from(path)).is_some() {
+            return Err(format!("duplicate argument {flag}"));
+        }
+    }
+    Ok(Args {
+        plan:plan.ok_or("missing required argument --plan")?,
+        stream:stream.ok_or("missing required argument --stream")?,
+        receipt:receipt.ok_or("missing required argument --receipt")?,
+    })
+}
+
+fn validate_receipt_location(receipt: &Path, inputs: &[&Path]) -> Result<(), String> {
+    if receipt.exists() {
+        return Err(format!("refusing to overwrite receipt {}", receipt.display()));
+    }
+    let parent = receipt.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let canonical_parent = fs::canonicalize(parent).map_err(|e| format!("receipt parent must exist: {e}"))?;
+    for input in inputs {
+        let canonical_input = fs::canonicalize(input)
+            .map_err(|e| format!("cannot canonicalize input {}: {e}", input.display()))?;
+        let input_parent = canonical_input.parent().ok_or("input has no parent directory")?;
+        if canonical_parent.starts_with(input_parent) {
+            return Err("receipt must be outside every input directory".to_owned());
+        }
+    }
+    Ok(())
+}
+
+fn run() -> Result<(), String> {
+    let args = parse_args()?;
+    let (plan_bytes, plan) = read_input(&args.plan, "plan")?;
+    let (stream_bytes, stream) = read_input(&args.stream, "stream")?;
+    validate_receipt_location(&args.receipt, &[args.plan.as_path(), args.stream.as_path()])?;
+    let receipt = audit_values(&plan, &stream, &plan_bytes, &stream_bytes)?;
+    let encoded = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("cannot encode receipt: {e}"))?;
+    let mut file = OpenOptions::new().write(true).create_new(true).open(&args.receipt)
+        .map_err(|e| format!("cannot create receipt without overwrite: {e}"))?;
+    file.write_all(&encoded).map_err(|e| format!("cannot write receipt: {e}"))?;
+    file.write_all(b"\n").map_err(|e| format!("cannot finish receipt: {e}"))?;
+    Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("HARDSEC-019 CCTM monitor failed: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> (Value, Value, Vec<u8>, Vec<u8>) {
+        let plan_bytes = include_bytes!("../tests/fixtures/hardsec/context-cctm-v1/plan.json").to_vec();
+        let stream_bytes = include_bytes!("../tests/fixtures/hardsec/context-cctm-v1/stream.json").to_vec();
+        let plan = serde_json::from_slice(&plan_bytes).unwrap();
+        let stream = serde_json::from_slice(&stream_bytes).unwrap();
+        (plan, stream, plan_bytes, stream_bytes)
+    }
+
+    fn encode(value: &Value) -> Vec<u8> {
+        let mut bytes = serde_json::to_vec_pretty(value).unwrap();
+        bytes.push(b'\n');
+        bytes
+    }
+
+    fn audit(plan: &Value, stream: &Value) -> Result<Value, String> {
+        let plan_bytes = encode(plan);
+        let stream_bytes = encode(stream);
+        audit_values(plan, stream, &plan_bytes, &stream_bytes)
+    }
+
+    #[test]
+    fn known_answer_uses_dkw_correction_ons_and_context_alpha_allocation() {
+        let (p, s, pb, sb) = fixture();
+        let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
+        assert_eq!(receipt["result"], "alarm_threshold_crossed");
+        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_sequence_index"], 15);
+        assert_eq!(receipt["sequential_monitor"]["overall_first_alarm_context_id"], "compute");
+        assert_eq!(receipt["sequential_monitor"]["valid_observation_count"], 15);
+        assert_eq!(receipt["sequential_monitor"]["abstention_count"], 3);
+        assert_eq!(receipt["sequential_monitor"]["post_alarm_reset_count"], 0);
+        assert_eq!(receipt["statistical_guarantees"]["null_stream_iid_assumption_status"], "assumption_not_verified");
+        assert_eq!(receipt["statistical_guarantees"]["reference_sample_iid_assumption_status"], "assumption_not_verified");
+        assert_eq!(receipt["statistical_guarantees"]["theorem_guarantee_status"], "not_established_from_input_receipts");
+        assert_eq!(receipt["statistical_guarantees"]["effective_sample_size_estimate"], Value::Null);
+    }
+
+    #[test]
+    fn dkw_epsilon_matches_preregistered_delta_and_reference_size() {
+        let (p, s, pb, sb) = fixture();
+        let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
+        let epsilon = receipt["reference_policy"]["contexts"][0]["dkw_epsilon"].as_f64().unwrap();
+        let expected = ((2.0_f64 / 0.005).ln() / (2.0 * 600.0)).sqrt();
+        assert!((epsilon - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn alpha_and_delta_are_bonferroni_allocated_over_contexts() {
+        let (p, s, pb, sb) = fixture();
+        let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
+        assert_eq!(receipt["reference_policy"]["contexts"][0]["alpha_allocation"], 0.025);
+        assert_eq!(receipt["reference_policy"]["contexts"][1]["alpha_allocation"], 0.025);
+        assert_eq!(receipt["reference_policy"]["contexts"][0]["delta_allocation"], 0.005);
+        assert_eq!(receipt["reference_policy"]["contexts"][1]["delta_allocation"], 0.005);
+    }
+
+    #[test]
+    fn dkw_corrected_betting_factor_stays_in_unit_interval() {
+        let (p, s, pb, sb) = fixture();
+        let receipt = audit_values(&p, &s, &pb, &sb).unwrap();
+        for row in receipt["sequential_monitor"]["window_decisions"].as_array().unwrap() {
+            if let Some(beta) = row["betting_factor"].as_f64() {
+                assert!((0.0..=2.0).contains(&beta));
+            }
+            if let Some(eta) = row["ons_eta_next"].as_f64() {
+                assert!(eta.abs() <= 0.5);
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_reference_group_count_different_from_reference_sample_count() {
+        let (mut p, s, _, _) = fixture();
+        p["contexts"][0]["reference_group_ids"].as_array_mut().unwrap().pop();
+        assert!(audit(&p, &s).unwrap_err().contains("one distinct reference_group_id per reference score"));
+    }
+
+    #[test]
+    fn rejects_reference_evaluation_group_overlap() {
+        let (mut p, s, _, _) = fixture();
+        p["contexts"][0]["reference_group_ids"][0] = json!("heldout-execution-cctm-01");
+        assert!(audit(&p, &s).unwrap_err().contains("overlaps a null-reference group"));
+    }
+
+    #[test]
+    fn rejects_reference_group_reuse_across_contexts() {
+        let (mut p, s, _, _) = fixture();
+        p["contexts"][1]["reference_group_ids"][0] = p["contexts"][0]["reference_group_ids"][0].clone();
+        assert!(audit(&p, &s).unwrap_err().contains("reused across context references"));
+    }
+
+    #[test]
+    fn invalid_and_unseen_context_records_abstain_without_wealth_update() {
+        let (p, mut s, _, _) = fixture();
+        s["records"] = json!([
+            {"sequence_index":1,"window_id":"stale","context_id":"compute","anomaly_score":100.0,"sensor_state":"stale","pmu_qualification_result":QUALIFIED_PMU},
+            {"sequence_index":2,"window_id":"unseen","context_id":"other","anomaly_score":100.0,"sensor_state":"valid","pmu_qualification_result":QUALIFIED_PMU}
+        ]);
+        let r = audit(&p, &s).unwrap();
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
+        assert_eq!(r["reference_policy"]["contexts"][0]["final_log_wealth"], 0.0);
+    }
+
+    #[test]
+    fn unqualified_pmu_observation_abstains() {
+        let (p, mut s, _, _) = fixture();
+        s["records"] = json!([{
+            "sequence_index":1,"window_id":"no-metro","context_id":"compute","anomaly_score":100.0,
+            "sensor_state":"valid","pmu_qualification_result":"measurement_quality_gate_failed"
+        }]);
+        let r = audit(&p, &s).unwrap();
+        assert_eq!(r["sequential_monitor"]["valid_observation_count"], 0);
+        assert_eq!(r["sequential_monitor"]["abstention_counts_by_reason"]["pmu_acquisition_not_qualified"], 1);
+    }
+
+    #[test]
+    fn rejects_duplicate_window_ids() {
+        let (p, mut s, _, _) = fixture();
+        s["records"][1]["window_id"] = s["records"][0]["window_id"].clone();
+        assert!(audit(&p, &s).unwrap_err().contains("duplicate window_id"));
+    }
+
+    #[test]
+    fn rejects_non_contiguous_sequence_indices() {
+        let (p, mut s, _, _) = fixture();
+        s["records"][1]["sequence_index"] = json!(9);
+        assert!(audit(&p, &s).unwrap_err().contains("must be contiguous from one"));
+    }
+
+    #[test]
+    fn score_artifact_digest_mismatch_is_rejected() {
+        let (p, mut s, _, _) = fixture();
+        s["scoring_artifact_sha256"] = json!("d".repeat(64));
+        assert!(audit(&p, &s).unwrap_err().contains("scoring_artifact_sha256 does not match"));
+    }
+
+    #[test]
+    fn rejects_too_few_reference_scores() {
+        let (mut p, s, _, _) = fixture();
+        p["contexts"][0]["reference_scores"] = json!([0.1,0.2,0.3]);
+        p["contexts"][0]["reference_group_ids"] = json!(["a","b","c"]);
+        assert!(audit(&p, &s).unwrap_err().contains("reference scores; at least"));
+    }
+
+    #[test]
+    fn rejects_claims_that_assumptions_are_verified_by_metadata() {
+        let (mut p, s, _, _) = fixture();
+        p["null_stream_assumption_status"] = json!("verified");
+        assert!(audit(&p, &s).unwrap_err().contains("must remain assumption_not_verified"));
+    }
+
+    #[test]
+    fn rejects_context_selection_based_on_monitor_score() {
+        let (mut p, s, _, _) = fixture();
+        p["context_assignment_policy"] = json!("derived_from_anomaly_score");
+        assert!(audit(&p, &s).unwrap_err().contains("external_workload_metadata_not_score_derived"));
+    }
+}
